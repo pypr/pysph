@@ -1,4 +1,5 @@
 from collections import defaultdict, OrderedDict
+from mako.template import Template
 from textwrap import dedent
 
 ###############################################################################
@@ -174,38 +175,16 @@ def get_code(obj, key):
     return [doc, code.get(key)] if key in code else []
     
 ###############################################################################
-def define_particle_array_wrapper(particle_arrays):
-    """Get the union of all particle arrays."""
+def get_array_names(particle_arrays):
+    """Get the union of the names of all particle array properties.
+    """
     props = set()
     for array in particle_arrays:
         for name in array.properties.keys():
             props.add(name)
     props.difference_update(set(('tag', 'group', 'local', 'pid')))
-    array_code = ', '.join(props)
-    
-    src = dedent('''\
-    from pysph.base.particle_array cimport ParticleArray
-    from pysph.base.particle_array import ParticleArray
-    
-    cdef class ParticleArrayWrapper:
-        cdef public ParticleArray array
-        cdef public LongArray tag, group
-        cdef public IntArray local, pid
-        cdef public DoubleArray {array_code}
-        
-        def __init__(self, pa):
-            self.array = pa
-            props = set(pa.properties.keys())
-            props = props.union(['tag', 'group', 'local', 'pid'])
-            for prop in props:
-                setattr(self, prop, pa.get_carray(prop))
-            
-        cpdef long size(self):
-            return self.array.get_number_of_particles()
-            
-            
-    '''.format(array_code=array_code))
-    return dict(code=src)
+    array_names = ', '.join(sorted(props))
+    return array_names    
 
 ###############################################################################
 # `SPHEval` class.
@@ -239,10 +218,6 @@ class SPHEval(object):
                 
     def _get_helpers(self):
         helpers = []
-        helpers.extend(['from pysph.base.carray cimport DoubleArray, LongArray, IntArray, UIntArray',
-                        'from pysph.base.carray import DoubleArray, LongArray, IntArray, UIntArray',
-                        ''
-                        ])
         helpers.extend(get_code(self.kernel, 'helper'))
         
         for group in self.equation_groups:
@@ -251,7 +226,6 @@ class SPHEval(object):
                 
         helpers.extend(get_code(self.locator, 'helper'))
         
-        helpers.append(define_particle_array_wrapper(self.particle_arrays).get('code'))
         return '\n'.join(helpers)
         
     def _check_and_get_variables(self):
@@ -300,7 +274,8 @@ class SPHEval(object):
                     raise VariableNameClashError(msg)
         return vars, temps
         
-    def _get_variable_declarations(self, vars, tmps):
+    def _get_variable_declarations(self):
+        vars, tmps = self._check_and_get_variables()
         decl = {}
         for var in vars:
             decl[var.declare] = None
@@ -364,87 +339,17 @@ class SPHEval(object):
                  for n in names]
         return '\n'.join(lines)
         
-        
-    def _get_body(self):
-        vars, tmps = self._check_and_get_variables()
-        
-        src = SourceCode()
-        level = 0
-        
+    def get_code(self):
+        helpers = self._get_helpers()
+        array_names =  get_array_names(self.particle_arrays)
         parrays = [pa.name for pa in self.particle_arrays]
-        pa_names = ', '.join(parrays)    
-        code = dedent('''\
-        cdef class SPHCalc:
-
-            cdef public ParticleArrayWrapper {pa_names}
-    
-            def __init__(self, *particle_arrays):
-                for pa in particle_arrays:
-                    name = pa.name
-                    setattr(self, name, ParticleArrayWrapper(pa))
-            
-            cpdef void compute(self):
-                cdef public long s_idx, d_idx, NP_SRC, NP_DEST
-                cdef public LongArray nbrs
-            
-        '''.format(pa_names=pa_names))
-        src.add(code)
-        src.indent()
-        src.indent()
-        
-        src.add(self._get_array_declarations())
-        src.add(self._get_variable_declarations(vars, tmps))
-        
-        for g_idx, group in enumerate(self.groups):
-            src.add('# Group %d.\n'%g_idx)
-            for dest, sources in group.iteritems():
-                code = dedent('''\
-                        # Destination %s.
-                        '''%dest)
-                src.add(code)
-                src.add(self._get_dest_array_setup(dest, sources))
-                for source, equations in sources.iteritems():
-                    code = dedent('''\
-                            # Source %s.
-                            '''%source)
-                    src.add(code)
-                    src.add(self._get_src_array_setup(source, equations))
-                    
-                    src.add(self.locator.cython_code().get('setup'))
-                    code = dedent('''\
-                            for d_idx in range(NP_DEST):
-                            ''')
-                    src.add(code)
-                    src.indent()
-                    
-                    # Initialize the variables.
-                    init = self._get_initialization(equations)
-                    src.add(init)
-                    
-                    code = dedent('''\
-                            locator.get_neighbors(d_idx, nbrs)
-                            for nbr_idx in range(len(nbrs)):
-                                s_idx = nbrs[nbr_idx]
-                            ''')
-                    src.add(code)
-                    src.indent()
-                    for equation in equations:
-                        src.add('# Equation %s'%equation.__class__.__name__)
-                        src.add(self._get_equation_loop(equation))
-                    src.dedent()
-                    for equation in equations:
-                        code = equation.cython_code()
-                        src.add(code.get('post'))
-                    src.dedent()
-                    src.add('# Source %s done.\n'%source)
-                src.add('# Destination %s done.\n'%dest)
-            src.add('# Group %d done.'%g_idx)
-                    
-        return src.get()
+        pa_names = ', '.join(parrays)
+        template = Template(filename='sph_eval.mako')
+        return template.render(helpers=helpers, array_names=array_names, 
+                               pa_names=pa_names, object=self)
         
     def generate(self, fp):
-        code = self._get_helpers()
-        code += self._get_body()
+        code = self.get_code()
         fp.write(code)
         
     def compute(self):
