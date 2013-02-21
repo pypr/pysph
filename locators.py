@@ -5,12 +5,6 @@ from textwrap import dedent
 # `Locator` class.
 ###############################################################################
 class Locator(object):
-    def initialize(self):
-        raise NotImplementedError()
-        
-    def get_neighbors(self, d_idx, nbr_array):
-        raise NotImplementedError()
-        
     def cython_code(self):
         raise NotImplementedError
         
@@ -19,9 +13,6 @@ class Locator(object):
 # `AllPairLocator` class.
 ###############################################################################
 class AllPairLocator(Locator):
-    def initialize(self):
-        self.len = len(self.s_x)
-        
     def cython_code(self):
         code = dedent('''\
         cdef class AllPairLocator:
