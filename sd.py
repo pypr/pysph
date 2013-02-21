@@ -1,6 +1,10 @@
 from numpy import linspace
-from cgsph import CubicSpline, SummationDensity, AllPairLocator, SPHEval
 from pysph.base.particle_array import get_particle_array
+
+from equations import SummationDensity
+from kernels import CubicSpline
+from locators import AllPairLocator
+from sph_eval import SPHEval
 
 def make_particles():
     x = linspace(0, 5.0, 11)
