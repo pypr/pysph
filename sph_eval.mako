@@ -5,8 +5,9 @@ ${' '*4*level}${l}
 % endfor
 </%def>
 
-from pysph.base.carray cimport DoubleArray, LongArray, IntArray, UIntArray
-from pysph.base.carray import DoubleArray, LongArray, IntArray, UIntArray
+cimport numpy
+from pysph.base.carray cimport DoubleArray, LongArray, IntArray
+from pysph.base.carray import DoubleArray, LongArray, IntArray
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.particle_array import ParticleArray
 
@@ -15,7 +16,7 @@ ${helpers}
 # #############################################################################
 cdef class ParticleArrayWrapper:
     cdef public ParticleArray array
-    cdef public LongArray tag, group
+    cdef public LongArray tag, group, idx
     cdef public IntArray local, pid
     cdef public DoubleArray ${array_names}
     
@@ -29,6 +30,8 @@ cdef class ParticleArrayWrapper:
     cpdef long size(self):
         return self.array.get_number_of_particles()
         
+        
+${locator}
 
 # #############################################################################
 cdef class SPHCalc:
@@ -39,9 +42,9 @@ cdef class SPHCalc:
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa))
     
-    cpdef void compute(self):
-        cdef public long s_idx, d_idx, NP_SRC, NP_DEST
-        cdef public LongArray nbrs
+    cpdef compute(self):
+        cdef long s_idx, d_idx, NP_SRC, NP_DEST
+        cdef LongArray nbrs = LongArray()
         # Arrays.\
         ${indent(object._get_array_declarations(), 2)}
         # Variables.\
@@ -55,7 +58,7 @@ cdef class SPHCalc:
         # Source ${source}.\
         ${indent(object._get_src_array_setup(source, equations), 2)}
         # Locator.\
-        ${indent(object.locator.cython_code().get('setup'), 2)}
+        ${indent(object._get_locator_code(source, dest), 2)}
         for d_idx in range(NP_DEST):
             # Initialize temp vars.\
             ${indent(object._get_initialization(equations), 3)}
@@ -63,7 +66,7 @@ cdef class SPHCalc:
             for nbr_idx in range(nbrs.length):
                 s_idx = nbrs[nbr_idx]
                 % for equation in equations:
-                # Equation ${equation.__class__.__name__} \
+                # Equation ${equation.__class__.__name__}. \
                 ${indent(object._get_equation_loop(equation), 4)}
                 % endfor
             # Set destination values.\

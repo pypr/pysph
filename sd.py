@@ -1,9 +1,11 @@
-from cgsph import *
+from numpy import linspace
+from cgsph import CubicSpline, SummationDensity, AllPairLocator, SPHEval
 from pysph.base.particle_array import get_particle_array
 
 def make_particles():
-    f = get_particle_array(name = 'fluid')
-    s = get_particle_array(name = 'solid')
+    x = linspace(0, 5.0, 11)
+    f = get_particle_array(x=x, name = 'fluid')
+    s = get_particle_array(x=x, name = 'solid')
     return [f, s]
 
 particles = make_particles()
@@ -15,14 +17,8 @@ equations = [SummationDensity(dest='fluid', sources=['fluid', 'solid']),
 
 locator = AllPairLocator()
 evaluator = SPHEval(particles, equations, locator, kernel)
-
-with open('test.pyx', 'w') as f:
-    evaluator.generate(f)
-
-
-'''
+evaluator.setup_calc('test.pyx')
 evaluator.compute()
-
-pa = particles.get_particle_array('fluid')
-print pa.x, pa.rho
-'''
+    
+print particles[0].rho
+print particles[1].rho

@@ -1,6 +1,7 @@
 from collections import defaultdict, OrderedDict
 from mako.template import Template
 from textwrap import dedent
+from os.path import basename, dirname, splitext
 
 ###############################################################################
 # `CubicSpline` class.
@@ -8,7 +9,7 @@ from textwrap import dedent
 class CubicSpline(object):
     def cython_code(self):
         code = dedent('''\
-        double cdef CubicSplineKernel(double x, double y, double h):
+        cdef double CubicSplineKernel(double x, double y, double h):
             return 1.0
         ''')
         return dict(helper=code)
@@ -99,59 +100,28 @@ class AllPairLocator(Locator):
         self.len = len(self.s_x)
         
     def cython_code(self):
-        helper = dedent('''\
+        code = dedent('''\
         cdef class AllPairLocator:
+            cdef ParticleArrayWrapper src, dest
             cdef long N
             cdef LongArray nbrs
-            def __init__(self, s_x, s_h, d_x, d_h):
-                self.N = len(s_x)
+            def __init__(self, ParticleArrayWrapper src, 
+                         ParticleArrayWrapper dest):
+                self.src = src
+                self.dest = dest
+                self.N = src.size()
                 self.nbrs = LongArray(self.N)
                 cdef long i
                 for i in range(self.N):
                     self.nbrs[i] = i
                 
-            def get_neighbors(long d_idx, LongArray nbr_array):
+            def get_neighbors(self, long d_idx, LongArray nbr_array):
                 nbr_array.resize(self.N)
-                nbr_array.copy_values(self.nbrs)
+                nbr_array.set_data(self.nbrs.get_npy_array())
         '''
         )
-        setup = dedent('''\
-        locator = AllPairLocator(s_x, s_h, d_x, d_h)
-        ''')
-        return dict(helper=helper, setup=setup)
+        return dict(helper='', code=code)
         
-###############################################################################
-# `SourceCode` class.
-###############################################################################
-class SourceCode(object):
-    def __init__(self):
-        self.code = []
-        self.level = 0
-    
-    def indent(self):
-        self.level += 1
-        
-    def dedent(self):
-        self.level -= 1
-        
-    def add(self, code):
-        """Add the given code string to the source suitably indented based
-        on the current indentation level.
-        """
-        self.code.append((code, self.level))
-        
-    def get(self):
-        """Return a string of the code, properly indented."""
-        src = [self._indented_code(c, l) for c, l in self.code]
-        return '\n'.join(src)
-        
-    def _indented_code(self, code, level):
-        indent = level*4*' '
-        src = []
-        for line in code.splitlines():
-            src.append(indent + line)
-        return '\n'.join(src)
-    
 ###############################################################################
 # `VariableNameClashError` class.
 ###############################################################################
@@ -172,7 +142,8 @@ def check_equations(equations):
 def get_code(obj, key):
     code = obj.cython_code()
     doc = '# From %s'%obj.__class__.__name__
-    return [doc, code.get(key)] if key in code else []
+    src = code.get(key, '')
+    return [doc, src] if len(src) > 0 else []
     
 ###############################################################################
 def get_array_names(particle_arrays):
@@ -182,7 +153,7 @@ def get_array_names(particle_arrays):
     for array in particle_arrays:
         for name in array.properties.keys():
             props.add(name)
-    props.difference_update(set(('tag', 'group', 'local', 'pid')))
+    props.difference_update(set(('tag', 'group', 'local', 'pid', 'idx')))
     array_names = ', '.join(sorted(props))
     return array_names    
 
@@ -196,7 +167,7 @@ class SPHEval(object):
         self.locator = locator
         self.kernel = kernel
         self.groups = [self._make_group(g) for g in self.equation_groups]
-        #self.generate()
+        self.sph_compute = None
         
     def _make_group(self, group):
         equations = group.equations
@@ -321,8 +292,7 @@ class SPHEval(object):
         for eq in sources.values():
             eqs.extend(eq)
         eqs = set(eqs)
-        names = ['d_x', 'd_y', 'd_z', 'd_h'] # Needed for locator.
-        names += [arr for e in eqs for arr in e.cython_code().get('arrays') 
+        names = [arr for e in eqs for arr in e.cython_code().get('arrays') 
                     if arr.startswith('d_')]
         names = set(names)
         lines = ['NP_DEST = self.%s.size()'%dest_name]
@@ -331,27 +301,54 @@ class SPHEval(object):
         return '\n'.join(lines)
         
     def _get_src_array_setup(self, src_name, eqs):
-        names = ['s_x', 's_y', 's_z', 's_h'] # Needed for locator.
-        names += [arr for e in eqs for arr in e.cython_code().get('arrays') 
+        names = [arr for e in eqs for arr in e.cython_code().get('arrays') 
                     if arr.startswith('s_')]
         names = set(names)
-        lines = ['%s = self.%s.%s.get_data_ptr()'%(n, src_name, n[2:]) 
+        lines = ['NP_SRC = self.%s.size()'%src_name]
+        lines += ['%s = self.%s.%s.get_data_ptr()'%(n, src_name, n[2:]) 
                  for n in names]
         return '\n'.join(lines)
         
+    def _get_locator_code(self, src_name, dest_name):
+        locator_name = self.locator.__class__.__name__
+        return 'locator = %s(self.%s, self.%s)'%(locator_name, src_name, dest_name)
+                
     def get_code(self):
         helpers = self._get_helpers()
         array_names =  get_array_names(self.particle_arrays)
         parrays = [pa.name for pa in self.particle_arrays]
         pa_names = ', '.join(parrays)
+        locator = '\n'.join(get_code(self.locator, 'code'))
         template = Template(filename='sph_eval.mako')
         return template.render(helpers=helpers, array_names=array_names, 
-                               pa_names=pa_names, object=self)
+                               pa_names=pa_names, locator=locator, object=self)
         
     def generate(self, fp):
         code = self.get_code()
         fp.write(code)
         
+    def build(self, fname):
+        from pyximport import pyxbuild
+        from distutils.extension import Extension
+        import pysph
+        import numpy
+        inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include(), '.']
+        ext = Extension(name=splitext(fname)[0], sources=[fname], 
+                        include_dirs=inc_dirs)
+        return pyxbuild.pyx_to_dll(fname, ext)
+        
+    def load_mod(self, name, mod_path):
+        import imp
+        file, path, desc = imp.find_module(name, [dirname(mod_path)])
+        mod = imp.load_module(name, file, path, desc)
+        calc = mod.SPHCalc(*self.particle_arrays)
+        self.sph_compute = calc.compute
+        
+    def setup_calc(self, fname):
+        self.generate(open(fname, 'w'))
+        name = splitext(basename(fname))[0]
+        m_path = self.build(fname)
+        self.load_mod(name, m_path)
+        
     def compute(self):
-        pass
-
+        self.sph_compute()
