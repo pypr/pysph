@@ -1,8 +1,6 @@
 To do List
 ============
 
-  - Support for equations.
-  
   - Proper test framework:
     - For kernels,
     - equations,

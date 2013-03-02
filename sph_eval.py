@@ -69,10 +69,14 @@ class SPHEval(object):
         dests = OrderedDict()
         for dest in dest_list:
             sources = defaultdict(list)
+            eqs_with_no_source = [] # For equations that have no source.
             for equation in equations:
-                for src in equation.sources:
-                    sources[src].append(equation)
-            dests[dest] = sources
+                if equation.no_source:
+                    eqs_with_no_source.append(equation)
+                else:
+                    for src in equation.sources:
+                        sources[src].append(equation)
+            dests[dest] = (eqs_with_no_source, sources)
             
         return dests
                 
@@ -192,8 +196,8 @@ class SPHEval(object):
         code = code.replace('KERNEL', kernel).replace('GRADIENT', gradient)
         return code
         
-    def _get_dest_array_setup(self, dest_name, sources):
-        eqs = []
+    def _get_dest_array_setup(self, dest_name, eqs_with_no_source, sources):
+        eqs = [eq for eq in eqs_with_no_source]
         for eq in sources.values():
             eqs.extend(eq)
         eqs = set(eqs)

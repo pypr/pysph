@@ -6,7 +6,10 @@ from textwrap import dedent
 class Equation(object):
     def __init__(self, dest, sources):
         self.dest = dest
-        self.sources = sources
+        self.sources = sources if sources is not None and len(sources) > 0 \
+                                                                else None
+        # Does the equation require neighbors or not.
+        self.no_source = self.sources is None
         
 ###############################################################################
 # `Group` class.
