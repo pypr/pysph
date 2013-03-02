@@ -51,15 +51,20 @@ class SummationDensity(Equation):
     def cython_code(self):
         variables = [Variable(type='double', name='rho_sum', default=0.0)]
         temp = [Temporary(type='double', name='hab', default=0.0)]
-        arrays = ['s_h', 's_m', 's_x', 'd_h', 'd_x', 'd_rho']
+        arrays = ['s_h', 's_m', 's_x', 's_y', 's_z',
+                  'd_h', 'd_x', 'd_y', 'd_z', 'd_rho']
         
         loop = dedent('''\
         hab = 0.5*(s_h[s_idx] + d_h[d_idx])
-        rho_sum += s_m[s_idx]*KERNEL(d_x[d_idx], s_x[s_idx], hab)
+        rho_sum += s_m[s_idx]*KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx],
+                                     s_x[s_idx], s_y[s_idx], s_z[s_idx], hab)
         ''')
         post = dedent('''\
         d_rho[d_idx] = rho_sum
         ''')
         return dict(variables=variables, temporaries=temp, loop=loop, post=post,
                     arrays=arrays)
+
+                 
+                 
  
