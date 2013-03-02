@@ -3,6 +3,7 @@ from mako.template import Template
 from os.path import basename, dirname, splitext
 
 from equations import Group
+from ext_module import ExtModule
 
 ###############################################################################
 # `VariableNameClashError` class.
@@ -49,7 +50,14 @@ class SPHEval(object):
         self.locator = locator
         self.kernel = kernel
         self.groups = [self._make_group(g) for g in self.equation_groups]
-        self.sph_compute = None
+        self._setup()
+        
+    def _setup(self):
+        code = self.get_code()
+        self.ext_mod = ExtModule(code)
+        mod = self.ext_mod.load()
+        self.calc = mod.SPHCalc(*self.particle_arrays)
+        self.sph_compute = self.calc.compute
         
     def _make_group(self, group):
         equations = group.equations
@@ -204,33 +212,6 @@ class SPHEval(object):
         template = Template(filename='sph_eval.mako')
         return template.render(helpers=helpers, array_names=array_names, 
                                pa_names=pa_names, locator=locator, object=self)
-        
-    def generate(self, fp):
-        code = self.get_code()
-        fp.write(code)
-        
-    def build(self, fname):
-        from pyximport import pyxbuild
-        from distutils.extension import Extension
-        import pysph
-        import numpy
-        inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include(), '.']
-        ext = Extension(name=splitext(fname)[0], sources=[fname], 
-                        include_dirs=inc_dirs)
-        return pyxbuild.pyx_to_dll(fname, ext)
-        
-    def load_mod(self, name, mod_path):
-        import imp
-        file, path, desc = imp.find_module(name, [dirname(mod_path)])
-        mod = imp.load_module(name, file, path, desc)
-        calc = mod.SPHCalc(*self.particle_arrays)
-        self.sph_compute = calc.compute
-        
-    def setup_calc(self, fname):
-        self.generate(open(fname, 'w'))
-        name = splitext(basename(fname))[0]
-        m_path = self.build(fname)
-        self.load_mod(name, m_path)
         
     def compute(self):
         self.sph_compute()
