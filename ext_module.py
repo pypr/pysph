@@ -18,7 +18,7 @@ def get_md5(data):
 class ExtModule(object):
     """Encapsulates the generated code, extension module etc.
     """
-    def __init__(self, src, extension='pyx', root=None):
+    def __init__(self, src, extension='pyx', root=None, verbose=False):
         """Initialize ExtModule.
         
         Parameters
@@ -31,6 +31,8 @@ class ExtModule(object):
         
         root : str: root of directory to store code and modules in.
             If not set it defaults to "~/.pysph/source".
+            
+        verbose : Bool : Print messages for convenience.
         """
         self._setup_root(root)
         self.code = src
@@ -38,6 +40,7 @@ class ExtModule(object):
         self.name = base = 'm_{0}'.format(self.hash)
         self.src_path = join(self.root, base + '.' + extension)
         self.ext_path = join(self.root, base + '.' + 'so')
+        self.verbose = verbose
 
         # Create the source.
         path = self.src_path
@@ -62,12 +65,15 @@ class ExtModule(object):
         previously compiled module is returned.
         """
         if not exists(self.ext_path) or force:
+            self._message("Compiling code at:", self.src_path)
             inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include()]
             extension = Extension(name=self.name, sources=[self.src_path], 
                                   include_dirs=inc_dirs)
             mod = pyxbuild.pyx_to_dll(self.src_path, extension, 
                                       pyxbuild_dir=self.build_dir)
             shutil.copy(mod, self.ext_path)
+        else:
+            self._message("Precompiled code from:", self.src_path)
         
     def load(self):
         """Build and load the built extension module. 
@@ -77,3 +83,8 @@ class ExtModule(object):
         self.build()
         file, path, desc = imp.find_module(self.name, [dirname(self.ext_path)])
         return imp.load_module(self.name, file, path, desc)
+
+    def _message(self, *args):
+        if self.verbose:
+            print ' '.join(args)
+            

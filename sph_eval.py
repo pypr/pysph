@@ -53,7 +53,7 @@ class SPHEval(object):
         
     def _setup(self):
         code = self.get_code()
-        self.ext_mod = ExtModule(code)
+        self.ext_mod = ExtModule(code, verbose=True)
         mod = self.ext_mod.load()
         self.calc = mod.SPHCalc(*self.particle_arrays)
         self.sph_compute = self.calc.compute
