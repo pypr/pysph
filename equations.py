@@ -66,5 +66,41 @@ class SummationDensity(Equation):
                     arrays=arrays)
 
                  
-                 
- 
+class TaitEOS(Equation):
+    def __init__(self, dest, sources=[], rho0=1000.0, c0=1.0, gamma=7.0):
+        Equation.__init__(self, dest, sources)
+        self.rho0 = rho0
+        self.c0 = c0
+        self.gamma = gamma
+
+        self.B = rho0*c0*c0/gamma
+        
+    def cython_code(self):
+        temp = [ Temporary(type='double', name='ratio', default=0.0),
+                 Temporary(type='double', name='gamma1', default=0.0),
+                 Temporary(type='double', name='gamma_power1', default=0.0) ]
+
+        constants = [ Variable(type='double', name='gamma', default=7.0),
+                      Variable(type='double', name='c0', default=1.0),
+                      Variable(type='double', name='rho0', default=1.0),
+                      Variable(type='double', name='B', default=1.0) ]
+        
+        
+        arrays = ['d_rho', 'd_p', 'd_cs']
+
+        loop = dedent("""\
+        ratio = d_rho[d_idx]/rho0
+        gamma1 = 0.5 * (GAMMA - 1.0)
+        gamma_power1 = pow( ratio, GAMMA )
+
+        d_p[d_idx] = B * (gamma_power1 -1)
+        d_cs[d_idx] = c0 * pow( ratio, gamma_power1 )
+        """).replace('B', str(self.B)).replace('c0', str(self.c0))\
+                      .replace('rho0', str(self.rho0)).replace('GAMMA', str(self.gamma))
+
+        helpers = dedent("""\
+        from libc.math cimport pow
+        """)
+
+        return dict(temporaries=temp, loop=loop, arrays=arrays, constants=constants,
+                    helper=helpers)

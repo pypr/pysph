@@ -91,9 +91,15 @@ class SPHEval(object):
     def _check_and_get_variables(self):
         vars = []
         temps = []
+        consts = []
         var_names = defaultdict(list)
+
         tmp_names = defaultdict(list)
         tmp_declare = defaultdict(list)
+
+        const_names = defaultdict(list)
+        const_declare = defaultdict(list)
+        
         equations = []
         for g in self.equation_groups:
             equations.extend(g.equations)
@@ -113,6 +119,13 @@ class SPHEval(object):
             for name, declare in names:
                 tmp_names[name].append(eq_name)
                 tmp_declare[name].append(declare)
+
+            c = code.get('constants', [])
+            consts.extend(c)
+            names = [(x.name, x.declare) for x in c]
+            for name, declare in names:
+                const_names[ name ].append( eq_name )
+                const_declare[ name ].append( declare )
 
         for name, eqs in var_names.iteritems():
             if len(eqs) > 1:
@@ -160,12 +173,15 @@ class SPHEval(object):
         init = {}
         for equation in equations:
             code = equation.cython_code()
-            vars = code.get('variables')
-            tmps = code.get('temporaries')
+            vars = code.get('variables', [])
+            tmps = code.get('temporaries', [])
+            consts = code.get('constants', [])
             for var in vars:
                 init[var.initialize] = None
             for var in tmps:
                 init[var.initialize] = None
+            for var in consts:
+                init[var.initialize] = None            
             
         return '\n'.join(init.keys())
         

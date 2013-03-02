@@ -1,7 +1,7 @@
 from numpy import linspace, ones_like
 from pysph.base.particle_array import get_particle_array
 
-from equations import SummationDensity
+from equations import SummationDensity, TaitEOS
 from kernels import CubicSpline
 from locators import AllPairLocator
 from sph_eval import SPHEval
@@ -19,6 +19,7 @@ particles = make_particles()
 kernel = CubicSpline(dim=1)
 
 equations = [SummationDensity(dest='fluid', sources=['fluid', 'solid']),
+             TaitEOS(dest='fluid', sources=['fluid',]),
             ]            
 
 locator = AllPairLocator()
