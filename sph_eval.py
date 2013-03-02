@@ -1,6 +1,5 @@
 from collections import defaultdict, OrderedDict
 from mako.template import Template
-from os.path import basename, dirname, splitext
 
 from equations import Group
 from ext_module import ExtModule
