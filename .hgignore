@@ -1,2 +1,7 @@
 syntax: glob
 *.pyc
+*.o
+*.c
+*~
+*.so
+test.pyx

@@ -23,7 +23,7 @@ class CubicSpline(object):
                 fac = M_1_PI * h1 * h1 * h1
 
             elif DIM == 2:
-                fac = 10./7*M_1_PI * h1 * h1
+                fac = 10*M_1_PI/7.0 * h1 * h1
 
             else:
                 fac = 2./3 * h1
@@ -41,8 +41,8 @@ class CubicSpline(object):
 
 
         cdef CubicSplineGradient(double xi, double yi, double zi,
-                                  double xj, double yj, double zj, double h,
-                                  double* grad):
+                                 double xj, double yj, double zj, double h,
+                                 double* grad):
             cdef double xij = xi - xj
             cdef double yij = yi - yj
             cdef double zij = zi - zj
@@ -56,7 +56,7 @@ class CubicSpline(object):
                 fac = M_1_PI * h1 * h1 * h1
 
             elif DIM == 2:
-                fac = 10./7*M_1_PI * h1 * h1
+                fac = 10*M_1_PI/7.0 * h1 * h1
 
             else:
                 fac = 2./3 * h1
