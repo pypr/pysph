@@ -13,9 +13,9 @@ allowing most of the user code to be written in pure Python.  See here:
 for more information.
 """
 
+import numpy
 from setuptools import find_packages, setup
 
-from distutils.core import setup
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
@@ -32,13 +32,22 @@ from Cython.Distutils import build_ext
 #include_dirs = zoltan_include_dirs + mpi_include_dirs + sph2d_include_dirs
 #library_dirs = zoltan_library_dirs + mpi_library_dirs
 
+include_dirs = [numpy.get_include()]
+
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
 
-    Extension( name="integrator",
-               sources=["integrator.pyx"])
+    Extension( name="pysph.base.carray",
+               sources=["pysph/base/carray.pyx"]),
+    Extension( name="pysph.base.particle_array",
+               sources=["pysph/base/particle_array.pyx"]),
+    Extension( name="pysph.sph.integrator",
+               sources=["pysph/sph/integrator.pyx"])
     ]
+    
+for ext in ext_modules:
+    ext.include_dirs = include_dirs
 
 setup(name='PySPH',
       version = '1.0alpha',
@@ -50,8 +59,8 @@ setup(name='PySPH',
       license = "BSD",
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
-      packages = find_packages('pysph'),
-      
+      packages = find_packages(),
+
       ext_modules = ext_modules,
       
       include_package_data = True,

@@ -5,3 +5,6 @@ syntax: glob
 *~
 *.so
 test.pyx
+PySPH.egg-info/
+build/
+dist/

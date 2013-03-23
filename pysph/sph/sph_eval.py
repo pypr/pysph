@@ -1,5 +1,6 @@
 from collections import defaultdict, OrderedDict
 from mako.template import Template
+from os.path import dirname, join
 
 from pysph.sph.equations import Group
 from pysph.base.ext_module import ExtModule
@@ -228,7 +229,8 @@ class SPHEval(object):
         parrays = [pa.name for pa in self.particle_arrays]
         pa_names = ', '.join(parrays)
         locator = '\n'.join(get_code(self.locator, 'code'))
-        template = Template(filename='sph_eval.mako')
+        path = join(dirname(__file__), 'sph_eval.mako')
+        template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names, 
                                pa_names=pa_names, locator=locator, object=self)
         
