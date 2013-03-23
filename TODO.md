@@ -2,15 +2,10 @@ To do List
 ============
 
   - Proper test framework:
-    - For kernels,
     - equations,
     - sph_eval.
 
   - Add logging support.
-  
-  - Add integrator.
-  
-  - Solve dam break.
   
   - Clean.
   
