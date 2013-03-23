@@ -1,8 +1,8 @@
 from collections import defaultdict, OrderedDict
 from mako.template import Template
 
-from equations import Group
-from ext_module import ExtModule
+from pysph.sph.equations import Group
+from pysph.base.ext_module import ExtModule
 
 ###############################################################################
 # `VariableNameClashError` class.

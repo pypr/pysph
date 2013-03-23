@@ -1,16 +1,16 @@
 """Elliptical drop example"""
 
-from numpy import linspace, ones_like, mgrid, sqrt, arange, array
+from numpy import ones_like, mgrid, sqrt, arange, array
 from pysph.base.particle_array import get_particle_array
 from pysph.base.carray import LongArray
 
-from equations import SummationDensity, TaitEOS, ContinuityEquation,\
-     MomentumEquation, XSPHCorrection
-from kernels import CubicSpline
-from locators import AllPairLocator
-from sph_eval import SPHEval
+from pysph.base.kernels import CubicSpline
+from pysph.base.locators import AllPairLocator
+from pysph.sph.equations import (TaitEOS, ContinuityEquation, MomentumEquation,
+    XSPHCorrection)
+from pysph.sph.integrator import WCSPHRK2Integrator
+from pysph.sph.sph_eval import SPHEval
 
-from integrator import WCSPHRK2Integrator
 
 hdx = 1.3
 def get_circular_patch(name="", type=0, dx=0.025/hdx,

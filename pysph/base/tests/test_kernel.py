@@ -1,14 +1,11 @@
 import numpy
 from mako.template import Template
-from os.path import dirname, abspath
 from scipy.integrate import quad
-import sys
 from textwrap import dedent
 from unittest import TestCase, main
-sys.path.append(dirname(dirname(abspath(__file__))))
 
-from kernels import CubicSpline
-from ext_module import ExtModule
+from pysph.base.kernels import CubicSpline
+from pysph.base.ext_module import ExtModule
 
 def generate_kernel_code(kernel_factory):
     """Given a factory function to create a kernel, this generates

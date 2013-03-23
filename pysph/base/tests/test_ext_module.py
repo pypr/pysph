@@ -1,13 +1,11 @@
 import os
-from os.path import dirname, abspath, join, exists
+from os.path import join, exists
 import shutil
-import sys
 import tempfile
 from textwrap import dedent
 from unittest import TestCase, main
-sys.path.append(dirname(dirname(abspath(__file__))))
 
-from ext_module import get_md5, ExtModule
+from pysph.base.ext_module import get_md5, ExtModule
 
 class TestMiscExtMod(TestCase):
     def test_md5(self):

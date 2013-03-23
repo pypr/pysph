@@ -1,10 +1,9 @@
 from numpy import linspace, ones_like
 from pysph.base.particle_array import get_particle_array
-
-from equations import SummationDensity, TaitEOS
-from kernels import CubicSpline
-from locators import AllPairLocator
-from sph_eval import SPHEval
+from pysph.base.kernels import CubicSpline
+from pysph.base.locators import AllPairLocator
+from pysph.sph.equations import SummationDensity, TaitEOS
+from pysph.sph.sph_eval import SPHEval
 
 def make_particles():
     x = linspace(0, 1.0, 11); dx = x[1] - x[0]
