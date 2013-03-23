@@ -16,7 +16,7 @@ for more information.
 import numpy
 from setuptools import find_packages, setup
 
-from distutils.extension import Extension
+from numpy.distutils.extension import Extension
 from Cython.Distutils import build_ext
 
 #import commands
