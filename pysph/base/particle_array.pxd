@@ -17,32 +17,22 @@ from carray cimport LongArray, BaseArray, UIntArray
 # etc. Cython modules can directly use the enum name.
 
 cdef enum ParticleTag:
-    LocalReal = 0
-    Dummy
-    LocalDummy
-    RemoteReal
-    RemoteDummy
-    GhostParticle
+    Local = 0
+    Remote
+    Ghost
 
-cpdef bint is_local_real(long tag)
-cpdef bint is_local_dummy(long tag)
-cpdef bint is_remote_real(long tag)
-cpdef bint is_remote_dummy(long tag)
+cpdef bint is_local(int tag)
+cpdef bint is_remote(int tag)
+cpdef bint is_ghost(int tag)
 
-cpdef long get_local_real_tag()
-cpdef long get_dummy_tag()
-cpdef long get_local_dummy_tag()
-cpdef long get_remote_real_tag()
-cpdef long get_remote_dummy_tag()
-
+cpdef int get_local_tag()
+cpdef int get_remote_tag()
+cpdef int get_ghost_tag()
 
 cdef class ParticleArray:
     """
     Maintains various properties for particles.
     """
-    #the type of particles
-    cdef public int particle_type
-
     # dictionary to hold the properties held per particle
     cdef public dict properties
     cdef public list property_arrays
@@ -105,7 +95,7 @@ cdef class ParticleArray:
     cpdef double get_time(self)
 
     cpdef set_name(self, str name)
-    cpdef set_particle_type(self, int particle_type)
+
     cpdef set_dirty(self, bint val)
     cpdef set_indices_invalid(self, bint val)
 

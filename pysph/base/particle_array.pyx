@@ -64,74 +64,23 @@ _UINT_MAX = UINT_MAX
 # The is_* functions defined below are to be used in Python for tests
 # etc. Cython modules can directly use the enum name.
 
-class ParticleType:
-    """
-    An empty class to provide an enum for the different particle types
-    used in PySPH.
+cpdef bint is_local(int tag):
+    return tag == Local
 
-    The types defined are:
+cpdef bint is_remote(int tag):
+    return tag == Remote
 
-    Fluid -- The default particle type used to represent fluids.
+cpdef bint is_ghost(int tag):
+    return tag == Ghost
 
-    Solid -- Use this to represent solids
+cpdef int get_local_tag():
+    return Local
 
-    DummyFluid --
+cpdef int get_remote_tag():
+    return Remote
 
-    Probe --
-
-    Boundary -- Boundary particles that contribute to forces but
-    inherit properties from other particles. Use this to avoid
-    particle deficiency near boundaries.
-
-    """
-    Fluid = 0
-    Solid = 1
-    DummyFluid = 2
-    Probe = 3
-    Boundary = 4
-    Ghost = 5
-    
-    def __init__(self):
-        """
-        Constructor.
-
-        We do not allow this class to be instantiated. Only the class attributes
-        are directly accessed. Instantiation will raise an error.
-        """
-        raise SystemError, 'Do not instantiate the ParticleType class'
-
-cpdef bint is_local_real(long tag):
-    return tag == LocalReal
-
-cpdef bint is_local_dummy(long tag):
-    return tag == LocalDummy
-
-cpdef bint is_remote_real(long tag):
-    return tag == RemoteReal
-
-cpdef bint is_remote_dummy(long tag):
-    return tag == RemoteDummy
-
-cpdef bint is_ghost_particle(long tag):
-    return tag == GhostParticle
-
-cpdef long get_local_real_tag():
-    return LocalReal
-
-cpdef long get_local_dummy_tag():
-    return LocalDummy
-
-cpdef long get_remote_real_tag():
-    return RemoteReal
-
-cpdef long get_remote_dummy_tag():
-    return RemoteDummy
-
-cpdef long get_dummy_tag():
-    return Dummy
-
-cpdef long get_ghost_particle_tag():
-    return GhostParticle
+cpdef int get_ghost_tag():
+    return Ghost
 
 cdef class ParticleArray:
     """
@@ -158,8 +107,7 @@ cdef class ParticleArray:
     ######################################################################
     # `object` interface
     ######################################################################
-    def __cinit__(self, str name='', default_particle_tag=LocalReal,
-                  particle_type = ParticleType.Fluid,
+    def __cinit__(self, str name='', default_particle_tag=Local,
                   cl_precision = 'double', constants={},
                   *args, **props):
         """ Constructor
@@ -170,9 +118,6 @@ cdef class ParticleArray:
         name : str 
             name of this particle array.
 
-        particle_type : ParticleType
-            The particle type to use (Fluid, Solid etc.)
-
         cl_precision : {'single', 'double'}
             Set the precision to use for OpenCL.
 
@@ -180,7 +125,7 @@ cdef class ParticleArray:
             dictionary of properties for every particle in this array
 
         """
-        self.properties = {'tag':LongArray(0), 'group':LongArray(0),
+        self.properties = {'tag':IntArray(0), 'group':LongArray(0),
                            'local':IntArray(0), 'pid':IntArray(0)}
         self.default_values = {'tag':default_particle_tag, 'group':0, 'local':1,
                                'pid':0}
@@ -197,8 +142,6 @@ cdef class ParticleArray:
         self.is_dirty = True
         self.indices_invalid = True
         
-        self.particle_type = particle_type
-
         self.cl_precision = cl_precision
 
         self.queue = object()
@@ -248,7 +191,6 @@ cdef class ParticleArray:
         d = {}
         # we want only the names of temporary arrays.
         d['name'] = self.name
-        d['particle_type'] = self.particle_type
         d['temporary_arrays'] = self.temporary_arrays.keys()
         d['constants'] = self.constants
         props = {}
@@ -277,12 +219,11 @@ cdef class ParticleArray:
         self.num_real_particles = 0
 
         self.name = d['name']
-        self.particle_type = d['particle_type']
         props = d['properties']
         self.constants = d['constants']
         for prop in props:
             self.add_property(props[prop])
-        self.num_real_particles = numpy.sum(props['tag']['data']==LocalReal)
+        self.num_real_particles = numpy.sum(props['tag']['data']==Local)
         
     ######################################################################
     # `Public` interface
@@ -321,9 +262,6 @@ cdef class ParticleArray:
 
     cpdef set_name(self, str name):
         self.name = name
-
-    cpdef set_particle_type(self, int particle_type):
-        self.particle_type = particle_type
 
     def initialize(self, **props):
         """ Initialize the particle array with the given props
@@ -914,7 +852,7 @@ cdef class ParticleArray:
                     arr.get_npy_array()[:] = self.default_values[prop]
                 if prop_name == 'tag':
                     arr = numpy.asarray(data)
-                    self.num_real_particles = numpy.sum(arr==LocalReal)
+                    self.num_real_particles = numpy.sum(arr==Local)
                 else:
                     self.num_real_particles = len(data)
 
@@ -1035,9 +973,9 @@ cdef class ParticleArray:
         return a
 
     cpdef int align_particles(self) except -1:
-        """ Moves all 'LocalReal' particles to the beginning of the array
+        """ Moves all 'Local' particles to the beginning of the array
 
-        This makes retrieving numpy slices of properties of 'LocalReal'
+        This makes retrieving numpy slices of properties of 'Local'
         particles possible. This facility will be required frequently.
 
         **Algorithm**::
@@ -1047,7 +985,7 @@ cdef class ParticleArray:
             next_insert = 0
             for i from 0 to n
                 p <- ith particle
-                if p is LocalReal
+                if p is Local
                     if i != next_insert
                         tmp = index_arr[next_insert]
                         index_arr[next_insert] = i
@@ -1087,7 +1025,7 @@ cdef class ParticleArray:
         index_array = LongArray(num_particles)
         
         for i in range(num_particles):
-            if tag_arr.data[i] == LocalReal:
+            if tag_arr.data[i] == Local:
                 num_real_particles += 1
                 if i != next_insert:
                     tmp = index_array.data[next_insert]
@@ -1178,7 +1116,6 @@ cdef class ParticleArray:
         
         result_array.align_particles()
         result_array.name = self.name
-        result_array.particle_type = self.particle_type
         return result_array
 
     cpdef set_flag(self, str flag_name, int flag_value, LongArray indices):
@@ -1458,7 +1395,6 @@ def get_particle_array(cl_precision="double", **props):
 
     prop_dict = {}
     name = ""
-    particle_type = ParticleType.Fluid
 
     default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
                      'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,'e':0.0,
@@ -1498,19 +1434,12 @@ def get_particle_array(cl_precision="double", **props):
         prop_dict['idx'] = {'name':'idx', 'data':numpy.arange(np),
                             'type':'long'}
             
-    #handle the name and particle_type information separately
+    #handle the name separately
 
     if props.has_key('name'):
         name = props['name']
 
-    if props.has_key("type"):
-        particle_type = props["type"]
-        assert particle_type in [ParticleType.Fluid, ParticleType.Solid,
-                                 ParticleType.Probe,
-                                 ParticleType.Boundary,
-                                 ParticleType.DummyFluid],'Type not understood!'
-
-    pa = ParticleArray(name=name, particle_type=particle_type,
+    pa = ParticleArray(name=name, 
                        cl_precision=cl_precision, **prop_dict)
 
     # add the constants
@@ -1518,6 +1447,3 @@ def get_particle_array(cl_precision="double", **props):
         pa.constants[prop] = constants[prop]
 
     return pa
-
-
-        
