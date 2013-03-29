@@ -194,7 +194,7 @@ class MomentumEquation(Equation):
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
-        pij = 0.0
+        piij = 0.0
         if vijdotxij < 0:
             rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
