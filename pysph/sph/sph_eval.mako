@@ -16,14 +16,13 @@ ${helpers}
 # #############################################################################
 cdef class ParticleArrayWrapper:
     cdef public ParticleArray array
-    cdef public LongArray tag, group, idx
-    cdef public IntArray local, pid
+    cdef public IntArray tag, pid
     cdef public DoubleArray ${array_names}
     
     def __init__(self, pa):
         self.array = pa
         props = set(pa.properties.keys())
-        props = props.union(['tag', 'group', 'local', 'pid'])
+        props = props.union(['tag', 'pid'])
         for prop in props:
             setattr(self, prop, pa.get_carray(prop))
         
