@@ -143,5 +143,3 @@ cdef class ParticleArray:
 
     # resize all arrays to a new size
     cpdef resize(self, long size)
-
-cpdef LongArray arange_long(long start, long stop=*)

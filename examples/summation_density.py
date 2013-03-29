@@ -1,5 +1,5 @@
 from numpy import linspace, ones_like
-from pysph.base.particle_array import get_particle_array
+from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.base.locators import AllPairLocator
 from pysph.sph.equations import SummationDensity, TaitEOS

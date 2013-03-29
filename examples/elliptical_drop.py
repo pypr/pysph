@@ -1,7 +1,7 @@
 """Elliptical drop example"""
 
 from numpy import ones_like, mgrid, sqrt, arange, array
-from pysph.base.particle_array import get_particle_array
+from pysph.base.utils import get_particle_array
 from pysph.base.carray import LongArray
 
 from pysph.base.kernels import CubicSpline
@@ -46,8 +46,6 @@ def get_circular_patch(name="", type=0, dx=0.025/hdx,
 
     pa.remove_particles(la)
 
-    pa.set(idx=arange(len(pa.x)))
- 
     print 'Number of particles: ', len(pa.x)
 
     # add the acceleration variables
