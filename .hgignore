@@ -4,6 +4,7 @@ syntax: glob
 *.c
 *~
 *.so
+*.orig
 test.pyx
 PySPH.egg-info/
 build/
