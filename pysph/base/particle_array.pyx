@@ -91,7 +91,6 @@ cdef class ParticleArray:
      - properties - for every property, gives the index into the list where the
        property array is found.
      - property_arrays - list of arrays, one for each property.
-     - temporary_arrays - dict of temporary arrays. temporary arrays are just
        for internal calculations.
      - is_dirty - indicates if the particle positions have changed.
      - standard_name_map - a map from a few standard property names to the
@@ -125,12 +124,8 @@ cdef class ParticleArray:
             dictionary of properties for every particle in this array
 
         """
-        self.properties = {'tag':IntArray(0), 'group':LongArray(0),
-                           'local':IntArray(0), 'pid':IntArray(0)}
-        self.default_values = {'tag':default_particle_tag, 'group':0, 'local':1,
-                               'pid':0}
-        
-        self.temporary_arrays = {}
+        self.properties = {'tag':IntArray(0),'pid':IntArray(0)}
+        self.default_values = {'tag':default_particle_tag, 'pid':0}
         
         self.constants = {}
         self.constants.update(constants)
@@ -166,7 +161,7 @@ cdef class ParticleArray:
         care on using this numpy array.
 
         """
-        keys = self.properties.keys() + self.temporary_arrays.keys()
+        keys = self.properties.keys()
         if name in keys:
             return self._get_real_particle_prop(name)
         elif name in self.constants:
@@ -178,7 +173,7 @@ cdef class ParticleArray:
 
     def __setattr__(self, name, value):
         """ Convenience, to set particle property arrays as an attribute """
-        keys = self.properties.keys() + self.temporary_arrays.keys()
+        keys = self.properties.keys()
         if name in keys:
             self.set(**{name:value})
         elif name in self.constants:
@@ -189,9 +184,7 @@ cdef class ParticleArray:
     def __reduce__(self):
         """ Implemented to facilitate pickling of extension types """
         d = {}
-        # we want only the names of temporary arrays.
         d['name'] = self.name
-        d['temporary_arrays'] = self.temporary_arrays.keys()
         d['constants'] = self.constants
         props = {}
         default_values = {}
@@ -213,7 +206,6 @@ cdef class ParticleArray:
         self.properties = {}
         self.property_arrays = []
         self.default_values = {}
-        self.temporary_arrays = {}
         self.is_dirty = True
         self.indices_invalid = True
         self.num_real_particles = 0
@@ -242,15 +234,11 @@ cdef class ParticleArray:
 
     def clear(self):
         """ Clear all data held by this array """
-        self.properties = {'tag':LongArray(0),
-                           'group':LongArray(0), 'local':IntArray(0),
-                           'pid':IntArray(0)}
+        self.properties = {'tag':IntArray(0), 'pid':IntArray(0)}
         tag_def_values = self.default_values['tag']
         self.default_values.clear()
-        self.default_values = {'tag':tag_def_values, 'group':0, 'local':1,
-                               'pid':0}
+        self.default_values = {'tag':tag_def_values,'pid':0}
         
-        self.temporary_arrays.clear()
         self.is_dirty = True
         self.indices_invalid = True
 
@@ -286,7 +274,7 @@ cdef class ParticleArray:
         cdef int nprop, nparticles
         cdef bint tag_present = False
         cdef numpy.ndarray a, arr, npyarr
-        cdef LongArray tagarr
+        cdef IntArray tagarr
         cdef str prop
 
         self.clear()
@@ -296,37 +284,12 @@ cdef class ParticleArray:
         if nprop == 0:
             return 
 
-        # check if the 'tag' array has been given as part of the properties.
-        # if props.has_key('tag'):
-        #     tag_prop = props['tag']
-        #     data = tag_prop.get('data')
-        #     a = numpy.asarray(tag_prop['data'], dtype=numpy.long)
-        #     self.properties['tag'].resize(a.size)
-        #     self.properties['tag'].set_data(a)
-        #     props.pop('tag')
-        
-        # add the property names to the properties dict and the arrays to the
-        # property array.
+        # add the properties
         for prop in props.keys():
-            # if self.properties.has_key(prop):
-            #     raise ValueError, 'property %s already exists'%(prop)
-
-            # add any scalar value to the constants dict
             prop_info = props[prop]
             prop_info['name'] = prop
             self.add_property(prop_info)
             
-        # if tag was not present in the input set of properties, add tag with
-        # default value.
-        # if (tag_present == False and
-        #     self.get_number_of_particles() > 0):
-        #     nparticles = self.get_number_of_particles()
-        #     tagarr = self.properties['tag']
-        #     tagarr.resize(nparticles)
-        #     # set them to the default value
-        #     npyarr = tagarr.get_npy_array()
-        #     npyarr[:] = self.default_values['tag']
-
         self.align_particles()
 
     cpdef int get_number_of_particles(self):
@@ -337,30 +300,12 @@ cdef class ParticleArray:
         else:
             return 0
 
-    def add_temporary_array(self, arr_name):
-        """ Add temporary double with name arr_name
-
-        **Parameters**
-
-         - arr_name - name of the temporary array needed. It should be different
-           from any property name.
-           
-        """
-        if self.properties.has_key(arr_name):
-            raise ValueError, 'property (%s) exists'%(arr_name)
-        
-        np = self.get_number_of_particles()
-        
-        if not self.temporary_arrays.has_key(arr_name):
-            carr = DoubleArray(np)
-            self.temporary_arrays[arr_name] = carr            
-        
     cpdef remove_particles(self, BaseArray index_list):
         """ Remove particles whose indices are given in index_list.
 
         We repeatedly interchange the values of the last element and values from
         the index_list and reduce the size of the array by one. This is done for
-        every property and temporary arrays that is being maintained.
+        every property that is being maintained.
     
         **Parameters**
         
@@ -376,15 +321,11 @@ cdef class ParticleArray:
          for every every array in property_array
              array.remove(sorted_indices)
 
-         for every array in temporary_arrays:
-             array.remove(sorted_indices)
-
         """
         cdef str msg
         cdef numpy.ndarray sorted_indices
         cdef BaseArray prop_array
         cdef int num_arrays, i
-        cdef list temp_arrays
         cdef list property_arrays
 
         if index_list.length > self.get_number_of_particles():
@@ -401,18 +342,12 @@ cdef class ParticleArray:
             prop_array = property_arrays[i]
             prop_array.remove(sorted_indices, 1)
 
-        temp_arrays = self.temporary_arrays.values()
-        num_arrays = len(temp_arrays)
-        for i in range(num_arrays):
-            prop_array = temp_arrays[i]
-            prop_array.remove(sorted_indices, 1)
-            
         if index_list.length > 0:
             self.align_particles()
             self.is_dirty = True
             self.indices_invalid = True
     
-    cpdef remove_tagged_particles(self, long tag):
+    cpdef remove_tagged_particles(self, int tag):
         """ Remove particles that have the given tag.
 
         **Parameters**
@@ -421,33 +356,13 @@ cdef class ParticleArray:
 
         """
         cdef LongArray indices = LongArray()
-        cdef LongArray tag_array = self.properties['tag']
-        cdef long *tagarrptr = tag_array.get_data_ptr()
+        cdef IntArray tag_array = self.properties['tag']
+        cdef int *tagarrptr = tag_array.get_data_ptr()
         cdef int i
         
         # find the indices of the particles to be removed.
         for i in range(tag_array.length):
             if tagarrptr[i] == tag:
-                indices.append(i)
-
-        # remove the particles.
-        self.remove_particles(indices)
-
-    cpdef remove_flagged_particles(self, str flag_name, int
-                                   flag_value):
-        """
-        Remove all particles that have the value of property flag_name set to
-        flag_value.
-
-        """
-        cdef LongArray indices = LongArray()
-        cdef IntArray flag_array = self.properties[flag_name]
-        cdef int *flagarrptr = flag_array.get_data_ptr()
-        cdef int i
-
-        # find the indices of the particles to be removed.
-        for i in range(flag_array.length):
-            if flagarrptr[i] == flag_value:
                 indices.append(i)
 
         # remove the particles.
@@ -467,7 +382,6 @@ cdef class ParticleArray:
          - all properties should have same length arrays.
          - all properties should already be present in this particles array.
            if new properties are seen, an exception will be raised.
-         - temporary arrays are not to be specified here, only particle
            properties.
 
         **Issues**
@@ -504,10 +418,6 @@ cdef class ParticleArray:
                 nparr = arr.get_npy_array()
                 nparr[old_num_particles:] = self.default_values[prop]
         
-        # now extend the temporary arrays.
-        for arr in self.temporary_arrays.values():
-            arr.resize(new_num_particles)
-
         if num_extra_particles > 0:
             # make sure particles are aligned properly.
             self.align_particles()
@@ -585,9 +495,6 @@ cdef class ParticleArray:
             nparr = arr.get_npy_array()
             nparr[old_size:] = self.default_values[key]
 
-        for arr in self.temporary_arrays.values():
-            arr.resize(new_size)
-
     def get_property_index(self, prop_name):
         """ Get the index of the property in the property array """
         return self.properties.get(prop_name)
@@ -603,11 +510,7 @@ cdef class ParticleArray:
         if prop_array is not None:
             return prop_array.get_npy_array()[:self.num_real_particles]
         else:
-            prop_array = self.temporary_arrays.get(prop_name)
-            if prop_array is not None:
-                return prop_array.get_npy_array()[:self.num_real_particles]
-            else:
-                return None
+            return None
 
     def get_property_arrays(self, all=False):
 
@@ -662,10 +565,7 @@ cdef class ParticleArray:
                     arg_array = self.properties[arg]
                     result.append(
                         arg_array.get_npy_array()[:self.num_real_particles])
-                elif self.temporary_arrays.has_key(arg):
-                    result.append(
-                        self.temporary_arrays[arg].get_npy_array()[
-                            :self.num_real_particles])
+
                 else:
                     result.append(self.constants[arg])
         else:
@@ -676,8 +576,6 @@ cdef class ParticleArray:
                 if arg in self.properties:
                     arg_array = self.properties[arg]
                     result.append(arg_array.get_npy_array())
-                elif self.temporary_arrays.has_key(arg):
-                    result.append(self.temporary_arrays[arg].get_npy_array())
                 else:
                     result.append(self.constants[arg])
 
@@ -722,8 +620,6 @@ cdef class ParticleArray:
             if self.properties.has_key(prop):
                 prop_array = self.properties[prop]
                 prop_array.set_data(proparr)
-            elif self.temporary_arrays.has_key(prop):
-                self.temporary_arrays[prop].set_data(proparr)
             # if the tag property is being set, the alignment will have to be
             # changed.                 
             if prop == 'tag':
@@ -732,11 +628,9 @@ cdef class ParticleArray:
                 self.set_dirty(True)
     
     cpdef BaseArray get_carray(self, str prop):
-        """ Return the c-array for the property or temporary array """
+        """ Return the c-array for the property """
         if PyDict_Contains(self.properties, prop) == 1:
             return <BaseArray>PyDict_GetItem(self.properties, prop)
-        elif PyDict_Contains(self.temporary_arrays, prop) == 1:
-            return <BaseArray>PyDict_GetItem(self.temporary_arrays, prop)
         else:
             return None
         
@@ -940,8 +834,7 @@ cdef class ParticleArray:
             
     cdef _check_property(self, str prop):
         """ Check if a property is present or not """
-        if (PyDict_Contains(self.temporary_arrays, prop) == 1 or
-            PyDict_Contains(self.properties, prop) or
+        if (PyDict_Contains(self.properties, prop) or
             PyDict_Contains(self.constants, prop)):
             return
         else:
@@ -1009,8 +902,9 @@ cdef class ParticleArray:
         cdef size_t i, num_particles
         cdef size_t next_insert
         cdef size_t num_arrays
-        cdef long tmp
-        cdef LongArray index_array, tag_arr
+        cdef int tmp
+        cdef IntArray tag_arr
+        cdef LongArray index_array
         cdef BaseArray arr
         cdef list arrays
         cdef long num_real_particles = 0
@@ -1045,13 +939,6 @@ cdef class ParticleArray:
         arrays = self.properties.values()
         num_arrays = len(arrays)
         
-        for i in range(num_arrays):
-            arr = arrays[i]
-            arr._align_array(index_array)
-
-        # now the temporary arrays
-        arrays = self.temporary_arrays.values()
-        num_arrays = len(arrays)
         for i in range(num_arrays):
             arr = arrays[i]
             arr._align_array(index_array)
@@ -1117,14 +1004,6 @@ cdef class ParticleArray:
         result_array.align_particles()
         result_array.name = self.name
         return result_array
-
-    cpdef set_flag(self, str flag_name, int flag_value, LongArray indices):
-        """ Set property flag_name to flag_value for particles in indices """
-        cdef IntArray flag_arr = self.get_carray(flag_name)
-        cdef int i
-
-        for i in range(indices.length):
-            flag_arr.data[indices.data[i]] = flag_value
 
     cpdef set_tag(self, long tag_value, LongArray indices):
         """ Set value of tag to tag_value for the particles in indices """

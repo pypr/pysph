@@ -34,7 +34,6 @@ class ParticleArrayTest(unittest.TestCase):
         p = particle_array.ParticleArray(name='test_particle_array') 
 
         self.assertEqual(p.name, 'test_particle_array')
-        self.assertEqual(p.temporary_arrays == {}, True)
         self.assertEqual(p.is_dirty, True)
         self.assertEqual(p.properties.has_key('tag'), True)
         self.assertEqual(p.properties['tag'].length, 0)
@@ -83,7 +82,7 @@ class ParticleArrayTest(unittest.TestCase):
         tags = [0, 1, 0, 1]
         p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
                                          z={'data':z},
-                                         tag={'data':tags,'type':'long'})
+                                         tag={'data':tags,'type':'int'})
         self.assertEqual(check_array(p.get('tag', only_real_particles=False),
                                      [0,0,1,1]), True)
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
@@ -178,35 +177,6 @@ class ParticleArrayTest(unittest.TestCase):
         # try setting array with longer array.
         self.assertRaises(ValueError, p.set, **{'x':[1., 2, 3, 5, 6]})
 
-    def test_add_temporary_array(self):
-        """
-        Tests the add_temporary_array function.
-        """
-        x = [1, 2, 3, 4.]
-        y = [0., 1., 2., 3.]
-        z = [0., 0., 0., 0.]
-        m = [1., 1., 1., 1.]
-        h = [.1, .1, .1, .1]
-
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y}, z={'data':z}, m={'data':m}, h={'data':h})
-
-        # make sure the temporary_arrays dict is empty.
-        self.assertEqual(p.temporary_arrays, {})
-        
-        # now add some temporary arrays.
-        p.add_temporary_array('temp1')
-        p.add_temporary_array('temp2')
-        # get the arrays and make sure they are of correct size.
-        self.assertEqual(p.get('temp1').size == 4, True)
-        self.assertEqual(p.get('temp2').size == 4, True)
-        
-        # try to add temporary array with name as some property.
-        self.assertRaises(ValueError, p.add_temporary_array, 'x')
-
-        # try setting a temporary array.
-        p.set(**{'temp1':[2, 4, 3, 1]})
-        self.assertEqual(check_array(p.get('temp1'), [2, 4, 3, 1]), True)
-                
     def test_clear(self):
         """
         Tests the clear function.
@@ -223,17 +193,14 @@ class ParticleArrayTest(unittest.TestCase):
 
         p.clear()
 
-        self.assertEqual(len(p.properties), 4)
+        self.assertEqual(len(p.properties), 2)
         self.assertEqual(p.properties.has_key('tag'), True)
         self.assertEqual(p.properties['tag'].length, 0)
-        self.assertEqual(p.properties.has_key('group'), True)
-        self.assertEqual(p.properties['group'].length, 0)
-        self.assertEqual(p.properties.has_key('local'), True)
-        self.assertEqual(p.properties['local'].length, 0)
+
         self.assertEqual(p.properties.has_key('pid'), True)
         self.assertEqual(p.properties['pid'].length, 0)
+
         self.assertEqual(p.is_dirty, True)
-        self.assertEqual(p.temporary_arrays, {})
 
     def test_getattr(self):
         """
@@ -291,8 +258,6 @@ class ParticleArrayTest(unittest.TestCase):
         p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
                                          z={'data':z}, m={'data':m},
                                          h={'data':h})
-        p.add_temporary_array('tmp1')
-
         remove_arr = LongArray(0)
         remove_arr.append(0)
         remove_arr.append(1)
@@ -305,7 +270,6 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.z, [0., 0.]), True)
         self.assertEqual(check_array(p.m, [1., 1.]), True)
         self.assertEqual(check_array(p.h, [.1, .1]), True)
-        self.assertEqual(len(p.tmp1), 2)
 
         # now try invalid operatios to make sure errors are raised.
         remove_arr.resize(10)
@@ -324,7 +288,6 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.z, [0., 0.]), True)
         self.assertEqual(check_array(p.m, [1., 1.]), True)
         self.assertEqual(check_array(p.h, [.1, .1]), True)
-        self.assertEqual(len(p.tmp1), 2)
         
     def test_add_particles(self):
         """
@@ -339,7 +302,6 @@ class ParticleArrayTest(unittest.TestCase):
         p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
                                          z={'data':z}, m={'data':m},
                                          h={'data':h})
-        p.add_temporary_array('tmp1')
         p.set_dirty(False)
         
         new_particles = {}
@@ -358,7 +320,6 @@ class ParticleArrayTest(unittest.TestCase):
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
         self.assertEqual(len(p.m), 7)
-        self.assertEqual(len(p.tmp1), 7)
 
         p.set_dirty(False)
 
@@ -373,7 +334,6 @@ class ParticleArrayTest(unittest.TestCase):
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
         self.assertEqual(len(p.m), 7)
-        self.assertEqual(len(p.tmp1), 7)
 
         # adding particles with tags
         p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
@@ -401,8 +361,6 @@ class ParticleArrayTest(unittest.TestCase):
                                          z={'data':z}, m={'data':m},
                                          h={'data':h}, tag={'data':tag})
 
-        p.add_temporary_array('tmp1')
-
         print p.x, p.tag
 
         p.remove_tagged_particles(0)
@@ -419,14 +377,12 @@ class ParticleArrayTest(unittest.TestCase):
                                      , [.1, .1, .1]), True)
         self.assertEqual(check_array(p.get('m', only_real_particles=False)
                                      , [1., 1., 1.]), True)
-        self.assertEqual(len(p.get('tmp1', only_real_particles=False)), 3)
         
         self.assertEqual(check_array(p.x, []), True)
         self.assertEqual(check_array(p.y, []), True)
         self.assertEqual(check_array(p.z, []), True)
         self.assertEqual(check_array(p.h, []), True)
         self.assertEqual(check_array(p.m, []), True)
-        self.assertEqual(check_array(p.tmp1, []), True)
 
     def test_add_property(self):
         """

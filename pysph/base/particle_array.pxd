@@ -1,5 +1,5 @@
 cimport numpy as np
-from carray cimport LongArray, BaseArray, UIntArray
+from carray cimport BaseArray, UIntArray, IntArray, LongArray
 
 # ParticleTag
 # Declares various tags for particles, and functions to check them.
@@ -42,9 +42,6 @@ cdef class ParticleArray:
 
     # default value associated with each property
     cdef public dict default_values
-
-    # dictionary to hold temporary arrays - we can do away with this.
-    cdef public dict temporary_arrays
 
     # name associated with this particle array
     cdef public str name
@@ -103,7 +100,7 @@ cdef class ParticleArray:
 
     cpdef int get_number_of_particles(self)
     cpdef remove_particles(self, BaseArray index_list)
-    cpdef remove_tagged_particles(self, long tag)
+    cpdef remove_tagged_particles(self, int tag)
     
     # function to add any property
     cpdef add_property(self, dict prop_info)
@@ -113,20 +110,6 @@ cdef class ParticleArray:
     cpdef extend(self, int num_particles)
 
     cpdef has_array(self, str arr_name)
-
-    #function to remove particles with particular value of a flag property.
-    cpdef remove_flagged_particles(self, str flag_name, int flag_value)
-
-    # function to get indices of particles that have a particle integer property
-    # set to the specified value.
-    #cpdef int get_flagged_particles(self, str flag_name, int flag_value,
-    # LongArray flag_value)
-    
-    # get requested properties of selected particles
-    # cpdef get_props(self, LongArray indices, *args)
-
-    # set the properties of selected particles int the parray.
-    #cpdef int set_particle_props(self, LongArray indices, **props)
 
     # aligns all the real particles in contiguous positions starting from 0
     cpdef int align_particles(self) except -1
@@ -139,9 +122,7 @@ cdef class ParticleArray:
     cpdef ParticleArray extract_particles(self, LongArray index_array, list
                                           props=*)
 
-    # sets the value of the property flag_name to flag_value for the particles
-    # in indices.
-    cpdef set_flag(self, str flag_name, int flag_value, LongArray indices)
+    # set the tag value for the particles
     cpdef set_tag(self, long tag_value, LongArray indices)
 
     cpdef copy_properties(self, ParticleArray source, long start_index=*, long
