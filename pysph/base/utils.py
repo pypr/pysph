@@ -52,17 +52,15 @@ def get_particle_array(cl_precision="double", **props):
 
     default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
                      'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,'e':0.0,
-                     'rho':1.0, 'cs':0.0, '_tmpx':0.0,
-                     '_tmpy':0.0, '_tmpz':0.0}
+                     'rho':1.0, 'cs':0.0}
     
     #Add the properties requested
-    
     np = 0
 
     constants = {}
 
     for prop in props.keys():
-        if prop in ['name','type']:
+        if prop == 'name':
             pass
         else:
             if not isinstance(props[prop], numpy.ndarray):
