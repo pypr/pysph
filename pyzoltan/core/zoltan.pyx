@@ -342,9 +342,12 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
             importProcs.data[i] = _importProcs[i]
 
     cpdef Zoltan_Invert_Lists(self):
-        """Invert the exchange lists after computing which remote
-        particles we need to export. This is should be called after
-        'compute_remote_particles'
+        """Invert export lists to get import lists
+
+        At times, we know which particles to export without any
+        information aobut import requirements. Two situations in which
+        this arises is in computing neighbors for geometric
+        partitioners and load balancing using cell lists.
 
         """
         cdef Zoltan_Struct* zz = self._zstruct.zz
@@ -402,7 +405,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
             &_importParts
             )
 
-        _check_error(ierr)            
+        _check_error(ierr)
 
     def Zoltan_register_query_functions(self):
         cdef Zoltan_Struct* zz = self._zstruct.zz
@@ -432,18 +435,21 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         _check_error(err)
 
-    def update_gid(self):
+    def update_particle_gid(self):
+        cdef UIntArray gid = self.gid
+        self._update_gid( gid )
+
+    def _update_gid(self, UIntArray gid):
         """Update the unique global indices.
 
         We call a utility function to get the new number of particles
         across the processors and then linearly assign indices to the
-        particles.
+        objects.
 
         """
         cdef int num_global_objects, num_local_objects, _sum, i
 
         cdef np.ndarray[ndim=1, dtype=np.int32_t] num_objects_data
-        cdef UIntArray gid = self.gid
 
         cdef mpi.Comm comm = self.comm
         cdef int rank = self.rank

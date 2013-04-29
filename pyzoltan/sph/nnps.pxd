@@ -139,3 +139,14 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     # list is of the same type of the local and global ids (uint)
     cpdef brute_force_neighbors(self, size_t i,
                                 UIntArray nbrs)
+
+cdef class NNPSCellGeometric(NNPSParticleGeometric):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+
+    # global indices for the cells
+    cdef UIntArray cell_gid
+
+    # cell coordinate values
+    cdef DoubleArray cx, cy

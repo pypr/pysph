@@ -386,9 +386,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.compute_cell_size()
         self.local_bin()
 
-        # setup the initial global ids
+        # setup the initial global particle ids
         if self.in_parallel:
-            self.update_gid()
+            self.update_particle_gid()
 
     def update(self, initial=False):
         """Perform one step of a parallel update.
@@ -744,12 +744,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         """
         # data arrays
         cdef ParticleArray pa = self.pa
-        cdef DoubleArray x = self.x
-        cdef DoubleArray y = self.y
-        cdef DoubleArray h = self.h
-        cdef UIntArray gid = self.gid
         
-        # Zoltan generated lists
+        # Import/Export lists
         cdef UIntArray exportGlobalids = self.exportGlobalids
         cdef UIntArray exportLocalids = self.exportLocalids
         cdef IntArray exportProcs = self.exportProcs
@@ -761,8 +757,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         # collect the data to send
         cdef dict recv = {}
-        cdef dict send = nnps_utils.get_send_data(self.comm, pa, self.lb_props, exportLocalids,
-                                                  exportProcs)
+        cdef dict send = nnps_utils.get_send_data(
+            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
 
         # current number of particles
         cdef int current_size = self.num_particles
@@ -1069,7 +1065,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         # update gid if in parallel
         if self.in_parallel:
-            self.update_gid()
+            self.update_particle_gid()
 
     def _remove_ghost_particles(self):
         """Remove ghost particles.
@@ -1088,7 +1084,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         # call update gid. This will compute the new number of
         # particles as well setting the new unique global indices.
-        self.update_gid()
+        self.update_particle_gid()
 
     ######################################################################
     # Neighbor location routines
@@ -1194,6 +1190,199 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         return nbrs
 
+cdef class NNPSCellGeometric(NNPSParticleGeometric):
+    """ Zoltan enabled NNPS which uses the cell structure for load
+    balancing.
+
+    """
+    def __init__(self, int dim, ParticleArray pa, object comm,
+                 double radius_scale=2.0,
+                 int ghost_layers=2, domain=None,
+                 lb_props=None):
+        """Constructor for NNPS
+
+        Parameters:
+        -----------
+
+        dim : int
+            Dimension (Not sure if this is really needed)
+
+        pa : ParticleArray
+            Particle data
+
+        comm : mpi4py.MPI.COMM, default (None)
+            MPI communicator for parallel invocations
+
+        radius_scale : double, default (2)
+            Optional kernel radius scale. Defaults to 2
+
+        ghost_layers : int, default (2)
+            Optional factor for computing bounding boxes for cells.
+
+        domain : DomainLimits, default (None)
+            Optional limits for the domain            
+
+        """
+        super(NNPSCellGeometric, self).__init__(
+            dim, pa, comm, radius_scale, ghost_layers, domain)
+
+        # set up the cell_gid array
+        self.cell_gid = UIntArray()
+
+        # cell coordinate values
+        self.cx = DoubleArray()
+        self.cy = DoubleArray()
+    
+    def update_cell_gid(self):
+        """Update the local and global indices for the cell map.
+
+        The objects to be partitioned in this class are the cells and
+        we need to number them uniquely across processors. The
+        numbering is done sequentially starting from the processor
+        with rank 0 to the processor with rank size-1
+
+        """
+        self.num_local_objects = len(self.cells)
+        super(NNPSCellGeometric, self)._update_gid( self.cell_gid )
+
+    def update(self, initial=False):
+        """Update the partition."""
+
+        # remove ghost particles from a previous step
+        self.remove_remote_particles()
+
+        # bin locally
+        self.local_bin()
+
+        # update the global indices for the cells
+        self.update_cell_gid()
+
+        if self.in_parallel:
+
+            # call a load balancing function and exchange data
+            self.Zoltan_LB_Balance()
+            self.create_particle_lists()
+            self.lb_exchange_data()
+
+            # compute remote particles and exchange data
+            self.compute_remote_particles()
+            self.Zoltan_Invert_Lists()
+            self.remote_exchange_data()
+
+            # align particles. I hate this but it must be done!
+            self.pa.align_particles()
+
+    def create_particle_lists(self):
+        """Create export/import lists based on particles
+
+        For the cell based partitioner, Zoltan generated import and
+        export lists apply to the cells. From this data, we can
+        generate local export indices for the particles which must
+        then be inverted to get the requisite import lists.
+
+        We first construct the particle export lists in local arrays
+        using the information from Zoltan_LB_Balance and subsequently
+        call Zoltan_Invert_Lists to get the import lists. These arrays
+        are then copied to the class arrays.
+
+        """
+        # these are the Zoltan generated lists that correspond to cells
+        cdef UIntArray exportLocalids = self.exportLocalids
+        cdef UIntArray exportGlobalids = self.exportGlobalids
+        cdef IntArray exportProcs = self.exportProcs
+        cdef int numExport = self.numExport
+
+        cdef UIntArray importLocalids = self.importLocalids
+        cdef UIntArray importGlobalids = self.importGlobalids
+        cdef IntArray importProcs = self.importProcs
+
+        # the local cell map and cellids
+        cdef dict cell_map = self.cells
+        cdef list cellids = cell_map.keys()
+        cdef list cells = cell_map.values()
+        cdef IntPoint cellid
+        cdef Cell cell
+
+        # temp buffers to create the particle lists. these will be
+        # copied over to the main lists
+        cdef UIntArray _exportLocalids = UIntArray()
+        cdef UIntArray _exportGlobalids = UIntArray()
+        cdef IntArray _exportProcs = IntArray()
+        cdef int _numExport = 0
+
+        cdef int indexi, i, j, export_proc, nindices
+        cdef UIntArray lindices, gindices
+        cdef int ierr
+
+        # iterate over the Zoltan generated export lists
+        for indexi in range(numExport):
+            i = exportLocalids[indexi]             # local index for the cell to export
+            cell = cells[ i ]                      # local cell to export
+            export_proc = exportProcs.data[indexi] # processor to export cell to
+            lindices = cell.lindices               # local particle  indices in cell
+            gindices = cell.gindices               # global particle indices in cell
+            nindices = lindices.length
+
+            for j in range( nindices ):
+                _exportLocalids.append( lindices.data[j] )
+                _exportGlobalids.append( gindices.data[j] )
+                _exportProcs.append( export_proc )
+
+                _numExport = _numExport + 1
+
+            # remove the cell from the local cell map
+            cellid = cellids[ i ]
+            cell_map.pop( cellid )
+
+        # resize the export lists and copy
+        self.numExport =  _numExport
+        exportLocalids.resize( _numExport )
+        exportGlobalids.resize( _numExport )
+        exportProcs.resize( _numExport )
+
+        for i in range( _numExport ):
+            exportLocalids.data[i] = _exportLocalids.data[i]
+            exportGlobalids.data[i] = _exportGlobalids.data[i]
+            exportProcs.data[i] = _exportProcs.data[i]            
+                
+        # Given the export particle indices, we invert the lists to
+        # get the import lists from remote processors...
+        self.Zoltan_Invert_Lists()
+
     #######################################################################
-    # Object interface
+    # Private interface
     #######################################################################
+    def _set_data(self):
+        """Set the user defined particle data structure for Zoltan."""
+
+        cdef dict cell_map = self.cells
+        cdef list cells = cell_map.values()
+        cdef int num_local_objects = self.num_local_objects
+        cdef int num_global_objects = self.num_global_objects
+
+        cdef UIntArray gid = self.cell_gid
+        cdef DoubleArray x = self.cx
+        cdef DoubleArray y = self.cy
+
+        cdef int i
+        cdef Cell cell
+        cdef cPoint centroid
+
+        # resize the coordinate arrays
+        x.resize( num_local_objects )
+        y.resize( num_local_objects )
+
+        # populate the arrays
+        for i in range( num_local_objects ):
+            cell = cells[ i ]
+            centroid = cell.centroid
+
+            x.data[i] = centroid.x
+            y.data[i] = centroid.y        
+        
+        self._cdata.numGlobalPoints = <ZOLTAN_ID_TYPE>num_global_objects
+        self._cdata.numMyPoints = <ZOLTAN_ID_TYPE>num_local_objects
+        
+        self._cdata.myGlobalIDs = gid.data
+        self._cdata.x = x.data
+        self._cdata.y = y.data
