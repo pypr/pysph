@@ -1,0 +1,25 @@
+syntax: glob
+*.c
+*.cpp
+*.pyc
+*.so
+*.o
+*~
+*.rej
+*.orig
+*.swp
+*.log
+*.npz
+*.pyd
+*.pdf
+*.txt
+docs/build/
+source/build/
+PyZoltan.egg-info/
+dist/
+build/
+
+syntax: regexp
+^source/.*\.html$
+^examples/.*_output
+
