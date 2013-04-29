@@ -370,10 +370,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         else:
             self.lb_props = lb_props
 
-        if self.in_parallel:
-            # setup the initial global ids
-            self.update_gid()
-
         self.ghost_layers = ghost_layers
 
         self.domain = domain
@@ -386,12 +382,13 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         # initialize the cells dict
         self.cells = {}
 
-        # initialize Zoltan arrays
-        self._setup_zoltan_arrays()
-
-        # compute the cell
+        # compute the cell size
         self.compute_cell_size()
         self.local_bin()
+
+        # setup the initial global ids
+        if self.in_parallel:
+            self.update_gid()
 
     def update(self, initial=False):
         """Perform one step of a parallel update.
@@ -550,7 +547,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         # set the number of remote particles
         self.num_remote = x.length - self.num_particles
 
-        # re-bin the remote particles
+        # bin the remote particles
         self.remote_bin()
 
     cpdef compute_remote_particles(self):
