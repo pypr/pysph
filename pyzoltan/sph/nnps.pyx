@@ -304,9 +304,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     on the spatial index (IntPoint) of the cell.
 
     """
-    def __init__(self, int dim, ParticleArray pa,
+    def __init__(self, int dim, ParticleArray pa, object comm,
                  double radius_scale=2.0,
-                 int ghost_layers=2, object comm=None, domain=None,
+                 int ghost_layers=2, domain=None,
                  lb_props=None):
         """Constructor for NNPS
 
@@ -317,16 +317,16 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             Dimension (Not sure if this is really needed)
 
         pa : ParticleArray
-            Particle data 
+            Particle data
+
+        comm : mpi4py.MPI.COMM, default (None)
+            MPI communicator for parallel invocations
 
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
 
         ghost_layers : int, default (2)
             Optional factor for computing bounding boxes for cells.
-
-        comm : mpi4py.MPI.COMM, default (None)
-            Optional communicator for parallel invocations
 
         domain : DomainLimits, default (None)
             Optional limits for the domain            
@@ -651,7 +651,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         cdef double maxh = h.maximum
 
         # compute the global max h if in parallel
-        if comm is not None:
+        if self.in_parallel:
             recvbuf[:] = 0.0
             sendbuf[0] = maxh
 
