@@ -81,6 +81,17 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     # Zoltan interface definitions
     cdef public list lb_props                # list of load balancing props
 
+    # Zoltan Import/Export lists for particles
+    cdef public UIntArray exportParticleGlobalids
+    cdef public UIntArray exportParticleLocalids
+    cdef public IntArray exportParticleProcs
+    cdef public int numParticleExport
+
+    cdef public UIntArray importParticleGlobalids
+    cdef public UIntArray importParticleLocalids
+    cdef public IntArray importParticleProcs
+    cdef public int numParticleImport    
+
     ############################################################################
     # Member functions
     ############################################################################
@@ -150,3 +161,14 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
 
     # cell coordinate values
     cdef DoubleArray cx, cy
+
+    # Zoltan Import/Export lists for cells
+    cdef public UIntArray exportCellGlobalids
+    cdef public UIntArray exportCellLocalids
+    cdef public IntArray exportCellProcs
+    cdef public int numCellExport
+
+    cdef public UIntArray importCellGlobalids
+    cdef public UIntArray importCellLocalids
+    cdef public IntArray importCellProcs
+    cdef public int numCellImport

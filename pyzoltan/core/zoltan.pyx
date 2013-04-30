@@ -295,7 +295,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         self.importProcs.reset()
 
         self.numExport = 0
-        self.numImport = 0        
+        self.numImport = 0
 
     cdef _set_Zoltan_lists(self,
                            int numExport,
