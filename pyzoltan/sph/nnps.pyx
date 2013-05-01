@@ -141,6 +141,21 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
     return arange
 
+################################################################
+# ParticleArrayWrapper
+################################################################
+cdef class ParticleArrayWrapper:
+    def __init__(self, ParticleArray pa):
+        self.pa = pa
+        self.name = pa.name
+
+        self.x = pa.get_carray('x')
+        self.y = pa.get_carray('y')
+        self.z = pa.get_carray('z')
+        self.h = pa.get_carray('h')
+        self.gid = pa.get_carray('gid')
+        self.tag = pa.get_carray('tag')
+
 #################################################################
 # NNPS extension classes
 #################################################################
@@ -333,13 +348,12 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         """
         self.pa = pa
+        self.pa_wrapper = pa_wrapper = ParticleArrayWrapper(pa)
         super(NNPSParticleGeometric, self).__init__(dim, comm,
-                                                    pa.get_carray('x'),
-                                                    pa.get_carray('y'),
-                                                    pa.get_carray('z'),
-                                                    pa.get_carray('gid'))
-        self.h = pa.get_carray('h')
-        self.tag = pa.get_carray('tag')
+                                                    pa_wrapper.x,
+                                                    pa_wrapper.y,
+                                                    pa_wrapper.z,
+                                                    pa_wrapper.gid)
 
         self.num_particles = pa.get_number_of_particles()
         self.num_remote = 0
@@ -662,7 +676,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.importParticleProcs.copy_subset( self.importProcs )
 
     cpdef compute_cell_size(self):
-        cdef DoubleArray h = self.h
+        cdef DoubleArray h = self.pa_wrapper.h
         cdef double cell_size
         cdef object comm = self.comm
         cdef np.ndarray[ndim=1,dtype=np.float64_t] recvbuf = self.hmax_recvbuf
@@ -913,7 +927,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     def set_tag(self, int start, int end, int value):
         """Reset the annoying tag value after particles are resized."""
         cdef int i
-        cdef IntArray tag = self.tag
+        cdef IntArray tag = self.pa_wrapper.tag
 
         for i in range(start, end):
             tag[i] = value
@@ -1156,9 +1170,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         cdef dict cells = self.cells
 
         # data arrays
-        cdef DoubleArray x = self.x
-        cdef DoubleArray y = self.y
-        cdef DoubleArray h = self.h
+        cdef DoubleArray x = self.pa_wrapper.x
+        cdef DoubleArray y = self.pa_wrapper.y
+        cdef DoubleArray h = self.pa_wrapper.h
         
         cdef double cell_size = self.cell_size
         cdef double radius_scale = self.radius_scale
@@ -1208,9 +1222,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         nbrs._length = nnbrs
 
     cpdef brute_force_neighbors(self, size_t i, UIntArray nbrs):
-        cdef DoubleArray x = self.x
-        cdef DoubleArray y = self.y
-        cdef DoubleArray h = self.h
+        cdef DoubleArray x = self.pa_wrapper.x
+        cdef DoubleArray y = self.pa_wrapper.y
+        cdef DoubleArray h = self.pa_wrapper.h
 
         cdef double radius_scale = self.radius_scale
         cdef double cell_size = self.cell_size

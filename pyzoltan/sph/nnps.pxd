@@ -13,6 +13,16 @@ cdef inline int real_to_int(double val, double step)
 cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
 cpdef UIntArray arange_uint(int start, int stop=*)
 
+# Simple ParticleArray wrapper class to hold particle data. For NNPS,
+# we hold only essential data like x, y, z, h and gid
+cdef class ParticleArrayWrapper:
+    cdef ParticleArray pa
+    cdef public str name
+    cdef public DoubleArray x, y, z, h
+    cdef public UIntArray gid
+    cdef public IntArray tag
+
+# Domain limits
 cdef class DomainLimits:
     cdef public double xmin, xmax
     cdef public double ymin, ymax
@@ -25,6 +35,7 @@ cdef class DomainLimits:
     cdef public int dim
     cdef public bint is_periodic
 
+# basic cell data structure
 cdef class Cell:
     ############################################################################
     # Data Attributes
@@ -57,9 +68,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public ParticleArray pa         # particle array data
-    cdef DoubleArray h                   # Data arrays required for binning
-    cdef IntArray tag                    # tag array
+    cdef public ParticleArray pa         # Particle data
+    cdef public ParticleArrayWrapper pa_wrapper
 
     cdef bint in_parallel                # Flag to determine if in parallel
 
