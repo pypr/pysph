@@ -14,7 +14,7 @@ from pyzoltan.sph.nnps_utils import get_particle_array
 
 """Utility to compute summation density"""
 def sd_evaluate(nps, mass):
-    pa = nps.pa
+    pa = nps.particles[0]
     x, y, h, rho= pa.get('x', 'y','h', 'rho')
 
     neighbors = UIntArray()
@@ -25,7 +25,7 @@ def sd_evaluate(nps, mass):
         xi = Point( x[i], y[i], 0.0 )
         hi = h[i]
 
-        nps.get_nearest_particles(i, neighbors)
+        nps.get_nearest_particles(0, i, neighbors)
         nnbrs = neighbors._length
 
         rho_sum = 0.0
@@ -67,7 +67,7 @@ global_gid = numpy.array( range(numGlobalPoints), dtype=numpy.uint32 )
 global_h = numpy.ones_like(global_x) * 1.2*dx
 
 PA = get_particle_array(x=global_x, y=global_y, h=global_h, gid=global_gid)
-NPS = NNPSCellGeometric(dim=2, pa=PA, comm=comm)
+NPS = NNPSCellGeometric(dim=2, particles=[PA,], comm=comm)
 
 if rank == 0:
     # compute the initial RHO
@@ -84,10 +84,10 @@ pa = get_particle_array(x=global_x[rank*numMyPoints:(rank+1)*numMyPoints],
                         gid=global_gid[rank*numMyPoints:(rank+1)*numMyPoints])
 
 # create the local nnps object
-nps = NNPSCellGeometric(dim=2, comm=comm, pa=pa)
+nps = NNPSCellGeometric(dim=2, comm=comm, particles=[pa,])
 
 # set the Zoltan parameters (Optional)
-nps.set_lb_method("HSFC")
+nps.set_lb_method("RIB")
 nps.Zoltan_Set_Param("RETURN_LISTS", "ALL")
 nps.Zoltan_Set_Param("DEBUG_LEVEL", "0")
 nps.Zoltan_Set_Param("KEEP_CUTS", "1")
@@ -96,7 +96,7 @@ nps.Zoltan_Set_Param("KEEP_CUTS", "1")
 nps.update()
 
 # new number of points per processor
-numMyPoints = nps.num_particles
+numMyPoints = nps.num_local[0]
 
 # Compute summation density individually on each processor
 sd_evaluate(nps, mass)

@@ -5,6 +5,9 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
+# MPI4PY
+import mpi4py.MPI as mpi
+
 # PyZoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core import zoltan_utils
@@ -1281,10 +1284,10 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.numParticleExport = 0
         self.numParticleImport = 0
 
-cdef class NNPSCellGeometric(NNPSParticleGeometric):
+cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     """ Zoltan enabled NNPS which uses the cells for load balancing."""
 
-    def __init__(self, int dim, ParticleArray pa, object comm,
+    def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
                  lb_props=None):
@@ -1312,8 +1315,16 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
             Optional limits for the domain            
 
         """
-        super(NNPSCellGeometric, self).__init__(
-            dim, pa, comm, radius_scale, ghost_layers, domain)
+        self.narrays = len(particles)
+        self.particles = particles
+        self.pa_wrappers = [ParticleArrayWrapper(pa) for pa in particles]
+        self.nnps = [NNPSParticleGeometric(
+            dim, pa, comm, radius_scale, ghost_layers, domain) for pa in particles]
+
+        # number of local/global/remote particles
+        self.num_local = [0] * self.narrays
+        self.num_global = [0] * self.narrays
+        self.num_remote = [0] * self.narrays
 
         # set up the cell_gid array
         self.cell_gid = UIntArray()
@@ -1321,8 +1332,55 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         # cell coordinate values
         self.cx = DoubleArray()
         self.cy = DoubleArray()
-    
-    def update_cell_gid(self):
+        self.cy = DoubleArray()
+
+        # base class initialization
+        super(NNPSCellGeometric, self).__init__(dim, comm, self.cx, self.cy, self.cz,
+                                                self.cell_gid)
+
+        # minimum and maximum arrays for MPI reduce operations
+        self.minx = np.zeros( shape=1, dtype=np.float64 )
+        self.miny = np.zeros( shape=1, dtype=np.float64 )
+        self.minz = np.zeros( shape=1, dtype=np.float64 )
+
+        self.maxx = np.zeros( shape=1, dtype=np.float64 )
+        self.maxy = np.zeros( shape=1, dtype=np.float64 )
+        self.maxz = np.zeros( shape=1, dtype=np.float64 )
+        self.maxh = np.zeros( shape=1, dtype=np.float64 )        
+
+        # now we have all comm, rank and size setup
+        self.in_parallel = True
+        if self.size == 1: self.in_parallel = False
+
+        # cells dict and cell size
+        self.cells = {}
+        self.radius_scale = radius_scale
+        self.ghost_layers = ghost_layers
+
+        # do a local bin
+        self.local_bin()
+
+    cpdef compute_cell_size(self):
+        """Compute the cell size for the binning.
+
+        The cell size is chosen as the kernel radius scale times the
+        maximum smoothing length in the local processor. For parallel
+        runs, we would need to communicate the maximum 'h' on all
+        processors to decide on the appropriate binning size.
+
+        """
+        self._compute_bounds()
+        cdef double hmax = self.Mh
+
+        cell_size = self.radius_scale * hmax
+        if cell_size < 1e-6:
+            msg = """Cell size too small %g. Perhaps h = 0?
+            Setting cell size to 1"""%(cell_size)
+            print msg
+            cell_size = 1.0
+        self.cell_size = cell_size        
+
+    def update_gids(self):
         """Update the local and global indices for the cell map.
 
         The objects to be partitioned in this class are the cells and
@@ -1331,8 +1389,13 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         with rank 0 to the processor with rank size-1
 
         """
+        # update the cell gids
         self.num_local_objects = len(self.cells)
-        super(NNPSCellGeometric, self)._update_gid( self.cell_gid )
+        self._update_gid( self.cell_gid )
+
+        # update the particle gids
+        for nps in self.nnps:
+            nps.update_particle_gid()
 
     def update(self, initial=False):
         """Update the partition."""
@@ -1344,23 +1407,151 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         self.local_bin()
 
         # update the global indices for the cells
-        self.update_cell_gid()
+        self.update_gids()
 
         if self.in_parallel:
 
-            # call a load balancing function and exchange data
+            # call a load balancing function
             self.load_balance()
-            self.create_particle_lists()
-            self.lb_exchange_data()
+
+            # move the individual particle data
+            for i in range(self.narrays):
+
+                # create the particle lists from the cell lists
+                self.create_particle_lists(i)
+
+                # move the particle data
+                nnps = self.nnps[i]
+                nnps.lb_exchange_data()
+
+            # create the new local cell map
+            self.update_local_data()
 
             # compute remote particles and exchange data
-            self.compute_remote_particles()
-            self.remote_exchange_data()
+            for i in range(self.narrays):
+                nnps = self.nnps[i]
+                self.compute_remote_particles(i)
+
+                # move the remote particle data
+                nnps.remote_exchange_data()
+
+            # index the remote particle data
+            self.update_remote_data()
 
             # align particles. I hate this but it must be done!
-            self.pa.align_particles()
+            for i in range(self.narrays):
+                pa = self.particles[i]
+                pa.align_particles()
 
-    def create_particle_lists(self):
+    def remove_remote_particles(self):
+        cdef int narrays = self.narrays
+        cdef NNPSParticleGeometric nps
+
+        for i in range(narrays):
+            nps = self.nnps[i]
+            nps.remove_remote_particles()
+
+    def local_bin(self):
+        """Bin the particles by deleting any previous cells and
+        re-computing the indexing structure. This corresponds to a
+        local binning process that is called when each processor has
+        a given list of particles to deal with.
+
+        """
+        cdef dict cells = self.cells
+        cdef int num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        # clear the indices for the cells. 
+        self.cells.clear()
+
+        # compute the cell size
+        self.compute_cell_size()
+
+        # # deal with ghosts
+        # if self.is_periodic:
+        #     # remove-ghost-particles
+        #     self._remove_ghost_particles()
+
+        #     # adjust local particles
+        #     self._adjust_particles()
+
+        #     # create new ghosts
+        #     self._create_ghosts()
+
+        # bin each particle array separately
+        for pa in self.particles:
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa.index, indices )
+
+    cdef _bin(self, int index, UIntArray indices):
+        """Bin a given particle array with indices.
+
+        Parameters:
+        -----------
+
+        index : int
+            Index of the particle array corresponding to the particles list
+        
+        indices : UIntArray
+            Subset of particles to bin
+
+        """
+        cdef pa_wrapper = self.pa_wrappers[ index ]
+        cdef DoubleArray x = pa_wrapper.x
+        cdef DoubleArray y = pa_wrapper.y
+        cdef DoubleArray z = pa_wrapper.z
+        cdef UIntArray gid = pa_wrapper.gid
+
+        cdef dict cells = self.cells
+        cdef double cell_size = self.cell_size
+
+        cdef UIntArray lindices, gindices
+        cdef size_t num_particles, indexi, i
+
+        cdef Cell cell
+        cdef cIntPoint _cid
+        cdef IntPoint cid = IntPoint()
+        cdef cPoint pnt
+
+        cdef int narrays = self.narrays
+        cdef int layers = self.ghost_layers
+
+        cdef int dim = self.dim
+
+        # now bin the particles
+        num_particles = indices.length
+        for indexi in range(num_particles):
+            i = indices.data[indexi]
+
+            pnt = cPoint_new( x.data[i], y.data[i], 0.0 )
+            _cid = find_cell_id( pnt, cell_size )
+
+            cid = IntPoint_from_cIntPoint(_cid)
+
+            if not cells.has_key( cid ):
+                cell = Cell(cid=cid, cell_size=cell_size,
+                            narrays=self.narrays, layers=layers)
+
+                lindices = UIntArray()
+                gindices = UIntArray()
+
+                cell.set_indices( index, lindices, gindices )
+                cells[ cid ] = cell
+
+            # add this particle to the list of indicies
+            cell = cells[ cid ]
+            lindices = cell.lindices[index]
+            gindices = cell.gindices[index]
+
+            lindices.append( <ZOLTAN_ID_TYPE> i )
+            gindices.append( gid.data[i] )
+
+    def create_particle_lists(self, int pa_index):
         """Create export/import lists based on particles
 
         For the cell based partitioner, Zoltan generated import and
@@ -1398,13 +1589,15 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         cdef UIntArray lindices, gindices
         cdef int ierr
 
+        cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
+
         # iterate over the Zoltan generated export lists
         for indexi in range(numCellExport):
             i = exportCellLocalids[indexi]             # local index for the cell to export
             cell = cells[ i ]                      # local cell to export
             export_proc = exportCellProcs.data[indexi] # processor to export cell to
-            lindices = cell.lindices[0]               # local particle  indices in cell
-            gindices = cell.gindices[0]               # global particle indices in cell
+            lindices = cell.lindices[pa_index]               # local particle  indices in cell
+            gindices = cell.gindices[pa_index]               # global particle indices in cell
             nindices = lindices.length
 
             for j in range( nindices ):
@@ -1433,25 +1626,139 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         self.Zoltan_Invert_Lists()
 
         # now copy over to the particle lists
-        self.numParticleExport = self.numExport
-        self.exportParticleGlobalids.resize( self.numExport )
-        self.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        nnps.numParticleExport = self.numExport
+        nnps.exportParticleGlobalids.resize( self.numExport )
+        nnps.exportParticleGlobalids.copy_subset( self.exportGlobalids )
 
-        self.exportParticleLocalids.resize( self.numExport )
-        self.exportParticleLocalids.copy_subset( self.exportLocalids )
+        nnps.exportParticleLocalids.resize( self.numExport )
+        nnps.exportParticleLocalids.copy_subset( self.exportLocalids )
 
-        self.exportParticleProcs.resize( self.numExport )
-        self.exportParticleProcs.copy_subset( self.exportProcs )
+        nnps.exportParticleProcs.resize( self.numExport )
+        nnps.exportParticleProcs.copy_subset( self.exportProcs )
 
-        self.numParticleImport = self.numImport
-        self.importParticleGlobalids.resize( self.numImport )
-        self.importParticleGlobalids.copy_subset( self.importGlobalids )
+        nnps.numParticleImport = self.numImport
+        nnps.importParticleGlobalids.resize( self.numImport )
+        nnps.importParticleGlobalids.copy_subset( self.importGlobalids )
 
-        self.importParticleLocalids.resize( self.numImport )
-        self.importParticleLocalids.copy_subset( self.importLocalids )
+        nnps.importParticleLocalids.resize( self.numImport )
+        nnps.importParticleLocalids.copy_subset( self.importLocalids )
 
-        self.importParticleProcs.resize( self.numImport )
-        self.importParticleProcs.copy_subset( self.importProcs )
+        nnps.importParticleProcs.resize( self.numImport )
+        nnps.importParticleProcs.copy_subset( self.importProcs )
+
+    def compute_remote_particles(self, int pa_index):
+        """Compute remote particles we need to export.
+
+        Particles to be exported are determined by flagging individual
+        cells and where they need to be shared to meet neighbor
+        requirements.
+        
+        """
+        cdef Zoltan_Struct* zz = self._zstruct.zz
+        cdef UIntArray exportGlobalids, exportLocalids
+        cdef IntArray exportProcs
+
+        cdef Cell cell
+        cdef cPoint boxmin, boxmax
+
+        cdef object comm = self.comm
+        cdef int rank = self.rank
+        cdef int size = self.size
+        
+        cdef dict cells = self.cells
+        cdef IntPoint cid
+        cdef UIntArray lindices, gindices
+
+        cdef np.ndarray nbrprocs
+        cdef np.ndarray[ndim=1, dtype=np.int32_t] procs, parts
+        
+        cdef int nbrproc, num_particles
+        cdef ZOLTAN_ID_TYPE i
+
+        cdef int *_procs, *_parts
+        cdef int numprocs = 0
+        cdef int numparts = 0
+
+        cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
+
+        # reset the Zoltan lists
+        self.reset_Zoltan_lists()
+        exportGlobalids = self.exportGlobalids
+        exportLocalids = self.exportLocalids
+        exportProcs = self.exportProcs
+
+        # initialize the procs and parts
+        procs = self.procs
+        parts = self.parts
+        
+        for cid in cells:
+            cell = cells[ cid ]
+
+            # reset the procs and parts to -1
+            procs[:] = -1; parts[:] = -1
+
+            _procs = <int*>procs.data
+            _parts = <int*>parts.data
+
+            # get the bounding box for this cell
+            boxmin = cell.boxmin; boxmax = cell.boxmax
+
+            czoltan.Zoltan_LB_Box_PP_Assign(
+                zz,
+                boxmin.x, boxmin.y, boxmin.z,
+                boxmax.x, boxmax.y, boxmax.z,
+                _procs, &numprocs,
+                _parts, &numparts
+                )                
+
+            # array of neighboring processors
+            nbrprocs = procs[np.where( (procs != -1) * (procs != rank) )[0]]
+
+            if nbrprocs.size > 0:
+                cell.is_boundary = True
+
+                lindices = cell.lindices[pa_index]
+                gindices = cell.gindices[pa_index]
+                cell.nbrprocs.resize( nbrprocs.size )
+                cell.nbrprocs.set_data( nbrprocs )
+                
+                num_particles = lindices.length
+                for nbrproc in nbrprocs:
+                    for indexi in range( num_particles ):
+                        i = lindices.data[indexi]
+
+                        exportGlobalids.append( gindices.data[indexi] )
+                        exportLocalids.append( i )
+                        exportProcs.append( nbrproc )
+
+        # set the numImport and numExport
+        self.numImport = 0
+        self.numExport = exportProcs.length
+
+        # Invert the lists...
+        self.Zoltan_Invert_Lists()
+
+        # copy the lists to the particle lists
+        nnps.numParticleExport = self.numExport
+        nnps.numParticleImport = self.numImport
+
+        nnps.exportParticleGlobalids.resize( self.numExport )
+        nnps.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+
+        nnps.exportParticleLocalids.resize( self.numExport )
+        nnps.exportParticleLocalids.copy_subset( self.exportLocalids )
+        
+        nnps.exportParticleProcs.resize( self.numExport )
+        nnps.exportParticleProcs.copy_subset( self.exportProcs )
+
+        nnps.importParticleGlobalids.resize( self.numImport )
+        nnps.importParticleGlobalids.copy_subset( self.importGlobalids )
+
+        nnps.importParticleLocalids.resize( self.numImport )
+        nnps.importParticleLocalids.copy_subset( self.importLocalids )
+
+        nnps.importParticleProcs.resize( self.numImport )
+        nnps.importParticleProcs.copy_subset( self.importProcs )        
 
     def load_balance(self):
         self.Zoltan_LB_Balance()
@@ -1477,6 +1784,48 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
 
         self.importCellProcs.resize( self.numImport )
         self.importCellProcs.copy_subset( self.importProcs )
+
+    def update_local_data(self):
+        """Update the cell map after load balance"""
+        cdef NNPSParticleGeometric nnps
+        cdef int num_particles, i
+        cdef UIntArray indices
+
+        # clear the local cells dict
+        self.cells.clear()
+
+        for i in range(self.narrays):
+            nnps = self.nnps[i]
+            num_particles = nnps.num_particles
+
+            # set the number of local and global particles
+            self.num_local[i] = nnps.num_local_objects
+            self.num_global[i] = nnps.num_global_objects
+
+            # bin the particles
+            indices = arange_uint( num_particles )
+            self._bin(i, indices)
+
+    def update_remote_data(self):
+        """Update the cell structure after sharing remote particles"""
+        cdef int narrays = self.narrays
+        cdef int num_particles, num_remote, i
+        cdef NNPSParticleGeometric nnps
+        cdef UIntArray indices
+
+        for i in range(narrays):
+            nnps = self.nnps[i]
+
+            # get the number of local and remote particles
+            num_particles = nnps.num_particles
+            num_remote = nnps.num_remote
+
+            # update the number of local/remote particles
+            self.num_local[i] = num_particles
+            self.num_remote[i] = num_remote
+
+            indices = arange_uint( num_particles, num_particles + num_remote )
+            self._bin( i, indices )        
 
     #######################################################################
     # Private interface
@@ -1530,3 +1879,131 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
 
         self.numCellImport = 0
         self.numCellExport = 0
+
+    cdef _compute_bounds(self):
+        """Compute the domain bounds for indexing."""
+
+        cdef double mx, my, mz
+        cdef double Mx, My, Mz, Mh
+
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef ParticleArrayWrapper pa
+        cdef DoubleArray x, y, z, h
+        
+        mx = np.inf; my = np.inf; mz = np.inf
+        Mx = -np.inf; My = -np.inf; Mz = -np.inf; Mh = -np.inf
+
+        # find the local min and max for all arrays on this proc
+        for pa in pa_wrappers:
+            x = pa.x; y = pa.y; z = pa.z; h = pa.h
+            x.update_min_max(); y.update_min_max()
+            z.update_min_max(); h.update_min_max()
+
+            if x.minimum < mx: mx = x.minimum
+            if x.maximum > Mx: Mx = x.maximum
+            
+            if y.minimum < my: my = y.minimum
+            if y.maximum > My: My = y.maximum
+            
+            if z.minimum < mz: mz = z.minimum
+            if z.maximum > Mz: Mz = z.maximum
+            
+            if h.maximum > Mh: Mh = h.maximum
+
+        self.minx[0] = mx; self.miny[0] = my; self.minz[0] = mz
+        self.maxx[0] = Mx; self.maxy[0] = My; self.maxz[0] = Mz
+        self.maxh[0] = Mh            
+
+        # now compute global min and max if in parallel
+        comm = self.comm
+        if self.in_parallel:
+
+            # global reduction for minimum values
+            comm.Allreduce(sendbuf=self.minx, recvbuf=self.minx, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.miny, recvbuf=self.miny, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.minz, recvbuf=self.minz, op=mpi.MIN)
+
+            # global reduction for maximum values
+            comm.Allreduce(sendbuf=self.maxx, recvbuf=self.maxx, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxy, recvbuf=self.maxy, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxz, recvbuf=self.maxz, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxh, recvbuf=self.maxh, op=mpi.MAX)
+            
+        self.mx = self.minx[0]; self.my = self.miny[0]; self.mz = self.minz[0]
+        self.Mx = self.maxx[0]; self.My = self.maxy[0]; self.Mz = self.maxz[0]
+        self.Mh = self.maxh[0]
+
+    ######################################################################
+    # Neighbor location routines
+    ######################################################################
+    def get_nearest_particles(self, int pa_index, size_t i, UIntArray nbrs):
+        """Utility function to get near-neighbors for a particle.
+
+        Parameters:
+        -----------
+
+        pa_index : int
+            Data from which neighbors are sought
+
+        i : int (input)
+            Particle for which neighbors are sought.
+
+        nbrs : UIntArray (output)
+            Neighbors for the requested particle are stored here.
+
+        """
+        cdef Cell cell
+        cdef dict cells = self.cells
+        cdef ParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+
+        # data arrays
+        cdef DoubleArray x = pa_wrapper.x
+        cdef DoubleArray y = pa_wrapper.y
+        cdef DoubleArray h = pa_wrapper.h
+        
+        cdef double cell_size = self.cell_size
+        cdef double radius_scale = self.radius_scale
+        cdef UIntArray lindices
+        cdef size_t indexj
+        cdef ZOLTAN_ID_TYPE j
+
+        cdef cPoint xi = cPoint_new(x.data[i], y.data[i], 0.0)
+        cdef cIntPoint _cid = find_cell_id( xi, cell_size )
+        cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
+        cdef IntPoint cellid = IntPoint(0, 0, 0)
+
+        cdef cPoint xj
+        cdef double xij
+
+        cdef double hi, hj
+        hi = radius_scale * h.data[i]
+
+        cdef int nnbrs = 0
+
+        cdef int ix, iy
+        for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
+            for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
+                cellid.data.x = ix; cellid.data.y = iy
+
+                if cells.has_key( cellid ):
+                    cell = cells[ cellid ]
+                    lindices = cell.lindices[0]
+                    for indexj in range( lindices.length ):
+                        j = lindices.data[indexj]
+
+                        xj = cPoint_new( x.data[j], y.data[j], 0.0 )
+                        xij = cPoint_distance( xi, xj )
+
+                        hj = radius_scale * h.data[j]
+
+                        if ( (xij < hi) or (xij < hj) ):
+                            if nnbrs == nbrs.length:
+                                nbrs.resize( nbrs.length + 50 )
+                                print """Warning: Extending the neighbor list to %d"""%(nbrs.length)
+
+                            nbrs.data[ nnbrs ] = j
+                            nnbrs = nnbrs + 1
+                            #nbrs.append( j )
+
+        # update the _length for nbrs to indicate the number of neighbors
+        nbrs._length = nnbrs

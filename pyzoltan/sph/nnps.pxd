@@ -162,16 +162,45 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef brute_force_neighbors(self, size_t i,
                                 UIntArray nbrs)
 
-cdef class NNPSCellGeometric(NNPSParticleGeometric):
+cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public dict cells               # index structure
+    cdef public int ghost_layers         # BOunding box size
+    cdef public double cell_size         # cell size used for binning
+    
+    # list of particle arrays, wrappers and nnps instances
+    cdef public list particles
+    cdef public list pa_wrappers
+    cdef public list nnps
+
+    # number of local and remote particles
+    cdef public list num_local
+    cdef public list num_remote
+    cdef public list num_global
+
+    cdef public double radius_scale      # Radius scale for kernel
+
+    # number of arrays
+    cdef int narrays
+
+    # boolean for parallel
+    cdef bint in_parallel
+
+    # Min and max across all processors
+    cdef np.ndarray minx, miny, minz     # min and max arrays used 
+    cdef np.ndarray maxx, maxy, maxz     # for MPI Allreduce 
+    cdef np.ndarray maxh                 # operations
+
+    cdef public double mx, my, mz        # global min and max values
+    cdef public double Mx, My, Mz, Mh
 
     # global indices for the cells
     cdef UIntArray cell_gid
 
     # cell coordinate values
-    cdef DoubleArray cx, cy
+    cdef DoubleArray cx, cy, cz
 
     # Zoltan Import/Export lists for cells
     cdef public UIntArray exportCellGlobalids
@@ -183,3 +212,19 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
     cdef public UIntArray importCellLocalids
     cdef public IntArray importCellProcs
     cdef public int numCellImport
+
+    ############################################################################
+    # Member functions
+    ############################################################################
+    # Index particles given by a list of indices. The indices are
+    # assumed to be of type unsigned int and local to the NNPS object
+    cdef _bin(self, int index, UIntArray indices)
+    
+    # Compute the cell size across processors. The cell size is taken
+    # as max(h)*radius_scale
+    cpdef compute_cell_size(self)
+
+    # compute global bounds for the particle distribution. The bounds
+    # are the min and max coordinate values across all processors and
+    # the maximum smoothing length needed for parallel binning.
+    cdef _compute_bounds(self)
