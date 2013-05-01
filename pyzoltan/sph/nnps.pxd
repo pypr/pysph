@@ -42,9 +42,10 @@ cdef class Cell:
     ############################################################################
     cdef cIntPoint _cid                 # Spatial index for the cell
     cdef public bint is_boundary        # Flag to indicate boundary cells
-    cdef long nparticles                # Number of particles in the cell         
-    cdef public UIntArray lindices      # Local indices for particles
-    cdef public UIntArray gindices      # Global indices for binned particles
+    cdef int narrays                    # number of arrays
+    cdef public list lindices           # Local indices for particles
+    cdef public list gindices           # Global indices for binned particles
+    cdef list nparticles                # Number of particles in the cell
     cdef double cell_size               # bin size
     cdef public cPoint centroid         # Centroid computed from indices
     cdef cPoint boxmin                  # Bounding box min for the cell
@@ -56,7 +57,7 @@ cdef class Cell:
     # Member functions
     ############################################################################
     # set the indices for the cell
-    cpdef set_indices(self, UIntArray lindices, UIntArray gindices)
+    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices)
 
     # compute the bounding box for a cell. Layers is used to determine
     # the factor times the cell size the bounding box is offset from

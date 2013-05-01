@@ -204,7 +204,8 @@ cdef class Cell:
     (local and global) that are within this cell. 
 
     """
-    def __init__(self, IntPoint cid, double cell_size, int layers=2):
+    def __init__(self, IntPoint cid, double cell_size, int narrays=1,
+                 int layers=2):
         """Constructor
 
         Parameters:
@@ -216,6 +217,9 @@ cdef class Cell:
         cell_size : double
             Spatial extent of the cell in each dimension
 
+        narrays : int default (1)
+            Number of arrays
+
         layers : int default (2)
             Factor to compute the bounding box        
 
@@ -223,9 +227,12 @@ cdef class Cell:
         self._cid = cIntPoint_new(cid.x, cid.y, cid.z)
         self.cell_size = cell_size
 
-        self.lindices = lindices = UIntArray()
-        self.gindices = gindices = UIntArray()
-        self.nparticles = lindices.length
+        self.narrays = narrays
+
+        self.lindices = [UIntArray() for i in range(narrays)]
+        self.gindices = [UIntArray() for i in range(narrays)]
+
+        self.nparticles = [0 for i in range(narrays)]
         self.is_boundary = False
 
         # compute the centroid for the cell
@@ -238,11 +245,11 @@ cdef class Cell:
         # list of neighboring processors
         self.nbrprocs = IntArray(0)
 
-    cpdef set_indices(self, UIntArray lindices, UIntArray gindices):
+    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices):
         """Set the global and local indices for the cell"""
-        self.lindices = lindices
-        self.gindices = gindices
-        self.nparticles = lindices.length
+        self.lindices[index] = lindices
+        self.gindices[index] = gindices
+        self.nparticles[index] = lindices.length
 
     def get_centroid(self, Point pnt):
         """Utility function to get the centroid of the cell.
@@ -523,17 +530,19 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             cid = IntPoint_from_cIntPoint(_cid)
 
             if not cells.has_key( cid ):
-                cell = Cell(cid, cell_size, layers)
+                # create a cell with narrays = 1
+                cell = Cell(cid=cid, cell_size=cell_size,
+                            narrays=1, layers=layers)
                 lindices = UIntArray()
                 gindices = UIntArray()
 
-                cell.set_indices( lindices, gindices )
+                cell.set_indices( 0, lindices, gindices )
                 cells[ cid ] = cell
 
             # add this particle to the list of indicies
             cell = cells[ cid ]
-            lindices = cell.lindices
-            gindices = cell.gindices
+            lindices = cell.lindices[0]
+            gindices = cell.gindices[0]
 
             lindices.append( <ZOLTAN_ID_TYPE> i )
             gindices.append( gid.data[i] )        
@@ -633,7 +642,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             if nbrprocs.size > 0:
                 cell.is_boundary = True
 
-                lindices = cell.lindices
+                lindices = cell.lindices[0]
                 cell.nbrprocs.resize( nbrprocs.size )
                 cell.nbrprocs.set_data( nbrprocs )
                 
@@ -1200,7 +1209,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
                 if cells.has_key( cellid ):
                     cell = cells[ cellid ]
-                    lindices = cell.lindices
+                    lindices = cell.lindices[0]
                     for indexj in range( lindices.length ):
                         j = lindices.data[indexj]
 
@@ -1391,8 +1400,8 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
             i = exportCellLocalids[indexi]             # local index for the cell to export
             cell = cells[ i ]                      # local cell to export
             export_proc = exportCellProcs.data[indexi] # processor to export cell to
-            lindices = cell.lindices               # local particle  indices in cell
-            gindices = cell.gindices               # global particle indices in cell
+            lindices = cell.lindices[0]               # local particle  indices in cell
+            gindices = cell.gindices[0]               # global particle indices in cell
             nindices = lindices.length
 
             for j in range( nindices ):

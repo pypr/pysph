@@ -46,7 +46,7 @@ for i in range(numPoints):
 
 def test_get_centroid():
     """Tests the get_centroid function."""
-    cell = Cell(IntPoint(0, 0, 0), cell_size=0.1)
+    cell = Cell(IntPoint(0, 0, 0), cell_size=0.1, narrays=1)
     centroid = Point()
     cell.get_centroid(centroid)
 
