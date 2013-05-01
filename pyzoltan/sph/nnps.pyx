@@ -426,7 +426,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             # set the local/global number of particles
 
             # call a load balancing function and exchange data
-            self.Zoltan_LB_Balance()
+            self.load_balance()
             self.lb_exchange_data()
 
             # compute remote particles and exchange data
@@ -709,9 +709,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     def set_num_global_particles(self, size_t num_particles):
         self.num_global = num_particles
 
-    def Zoltan_LB_Balance(self):
+    def load_balance(self):
         """Do the load balancing and copy the arrays."""
-        super(NNPSParticleGeometric, self).Zoltan_LB_Balance()
+        self.Zoltan_LB_Balance()
 
         # resize and copy to particle export lists
         self.numParticleExport = self.numExport
@@ -1270,10 +1270,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.numParticleImport = 0
 
 cdef class NNPSCellGeometric(NNPSParticleGeometric):
-    """ Zoltan enabled NNPS which uses the cell structure for load
-    balancing.
+    """ Zoltan enabled NNPS which uses the cells for load balancing."""
 
-    """
     def __init__(self, int dim, ParticleArray pa, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
@@ -1339,7 +1337,7 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         if self.in_parallel:
 
             # call a load balancing function and exchange data
-            self.Zoltan_LB_Balance()
+            self.load_balance()
             self.create_particle_lists()
             self.lb_exchange_data()
 
@@ -1443,8 +1441,8 @@ cdef class NNPSCellGeometric(NNPSParticleGeometric):
         self.importParticleProcs.resize( self.numImport )
         self.importParticleProcs.copy_subset( self.importProcs )
 
-    def Zoltan_LB_Balance(self):
-        ZoltanGeometricPartitioner.Zoltan_LB_Balance(self)
+    def load_balance(self):
+        self.Zoltan_LB_Balance()
 
         # copy the Zoltan export lists to the cell lists
         self.numCellExport = self.numExport
