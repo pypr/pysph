@@ -435,10 +435,6 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         _check_error(err)
 
-    def update_particle_gid(self):
-        cdef UIntArray gid = self.gid
-        self._update_gid( gid )
-
     def _update_gid(self, UIntArray gid):
         """Update the unique global indices.
 

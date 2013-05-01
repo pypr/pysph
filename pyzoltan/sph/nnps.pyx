@@ -411,6 +411,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         if self.in_parallel:
             self.update_particle_gid()
 
+    def update_particle_gid(self):
+        self._update_gid( self.pa_wrapper.gid )
+
     def update(self, initial=False):
         """Perform one step of a parallel update.
 
