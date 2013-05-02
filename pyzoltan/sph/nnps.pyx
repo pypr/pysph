@@ -417,6 +417,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     def update_particle_gid(self):
         self._update_gid( self.pa_wrapper.gid )
 
+        self.num_particles = self.num_local_objects
+        self.num_global = self.num_global_objects
+
     def update(self, initial=False):
         """Perform one step of a parallel update.
 
@@ -556,7 +559,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef update_data(self):
         """Re-bin after a load balancing step"""
         # set the number of particles
-        self.num_particles = self.x.length
         self.set_num_local_objects( self.num_particles )
 
         # re-bin given the new arrays
@@ -570,11 +572,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         function.
         
         """
-        cdef DoubleArray x = self.x
-
-        # set the number of remote particles
-        self.num_remote = x.length - self.num_particles
-
         # bin the remote particles
         self.remote_bin()
 
@@ -807,6 +804,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self._exchange_data(count, send, recv)
 
         # update the data
+        self.num_particles = newsize
         self.update_data()
 
     def remote_exchange_data(self):
@@ -860,6 +858,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self._exchange_data(count, send, recv)
 
         # update NNPS with the remote particle data
+        self.num_remote = newsize - current_size
         self.update_remote_particle_data()
 
     cdef _exchange_data(self, int count, dict send, dict recv):
@@ -928,7 +927,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
                 count = count + recv[i]
 
         ############### SEND AND RECEIVE STOP ########################                
-
     def remove_remote_particles(self):
         cdef int num_particles = self.num_particles
 
@@ -1303,7 +1301,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None):
+                 lb_props=None, str lb_method='RCB'):
         """Constructor.
 
         Parameters:
@@ -1330,6 +1328,9 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         lb_props : list
             optional list of properties required for load balancing
 
+        lb_method : string
+            optional initial load balancing method
+
         """
         # number of arrays and a reference to the particle list
         self.narrays = len(particles)
@@ -1343,7 +1344,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             dim, pa, comm, radius_scale, ghost_layers, domain) for pa in particles]
 
         # number of local/global/remote particles
-        self.num_local = [0] * self.narrays
+        self.num_local = [pa.get_number_of_particles() for pa in particles]
         self.num_global = [0] * self.narrays
         self.num_remote = [0] * self.narrays
 
@@ -1388,8 +1389,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.radius_scale = radius_scale
         self.ghost_layers = ghost_layers
 
-        # given all the data attributes, locally bin all the
-        # particles.
+        # remove remote particles and create the local cell map
+        self.remove_remote_particles()
         self.local_bin()
 
     cpdef compute_cell_size(self):
@@ -1427,8 +1428,12 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self._update_gid( self.cell_gid )
 
         # update the particle gids
-        for nnps in self.nnps:
+        for i in range(self.narrays):
+            nnps = self.nnps[i]
             nnps.update_particle_gid()
+
+            self.num_local[i] = nnps.num_local_objects
+            self.num_global[i] = nnps.num_global_objects
 
     def update(self, initial=False):
         """Update the partition.
@@ -1563,12 +1568,12 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         #     self._create_ghosts()
 
         # bin each particle array separately
-        for pa in self.particles:
-            num_particles = pa.get_number_of_particles()
+        for i in range(self.narrays):
+            num_particles = self.num_local[i]
             indices = arange_uint(num_particles)
 
             # bin the particles
-            self._bin( pa.index, indices )
+            self._bin( i, indices )
 
     cdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.

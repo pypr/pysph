@@ -34,6 +34,7 @@ cdef extern from "limits.h":
     cdef int INT_MAX
     cdef int INT_MIN
 
+# Zoltan error function
 cdef _check_error(int ierr):
     if ierr == ZOLTAN_WARN:
         warn("ZOTLAN WARNING")
@@ -43,6 +44,7 @@ cdef _check_error(int ierr):
 
     if ierr == ZOLTAN_MEMERR:
         raise MemoryError("Zoltan MEMERR error!")
+
 ###############################################################
 # ZOLTAN QUERY FUNCTIONS
 ###############################################################
