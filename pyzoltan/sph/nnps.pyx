@@ -2025,14 +2025,18 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     ######################################################################
     # Neighbor location routines
     ######################################################################
-    def get_nearest_particles(self, int pa_index, size_t i, UIntArray nbrs):
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t i, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
         -----------
 
-        pa_index : int
-            Data from which neighbors are sought
+        src_index : int
+            Index of the source particle array in the particles list
+
+        dst_index : int
+            Index of the destination particle array in the particles list
 
         i : int (input)
             Particle for which neighbors are sought.
@@ -2041,22 +2045,29 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             Neighbors for the requested particle are stored here.
 
         """
-        cdef Cell cell
         cdef dict cells = self.cells
-        cdef ParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        cdef Cell cell
 
-        # data arrays
-        cdef DoubleArray x = pa_wrapper.x
-        cdef DoubleArray y = pa_wrapper.y
-        cdef DoubleArray h = pa_wrapper.h
-        
-        cdef double cell_size = self.cell_size
+        cdef ParticleArrayWrapper src = self.pa_wrappers[ src_index ]
+        cdef ParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
+
+        # Source data arrays
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_h = src.h
+
+        # Destination particle arrays
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_h = dst.h
+
         cdef double radius_scale = self.radius_scale
+        cdef double cell_size = self.cell_size
         cdef UIntArray lindices
         cdef size_t indexj
         cdef ZOLTAN_ID_TYPE j
 
-        cdef cPoint xi = cPoint_new(x.data[i], y.data[i], 0.0)
+        cdef cPoint xi = cPoint_new(d_x.data[i], d_y.data[i], 0.0)
         cdef cIntPoint _cid = find_cell_id( xi, cell_size )
         cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
         cdef IntPoint cellid = IntPoint(0, 0, 0)
@@ -2065,7 +2076,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef double xij
 
         cdef double hi, hj
-        hi = radius_scale * h.data[i]
+        hi = radius_scale * d_h.data[i]
 
         cdef int nnbrs = 0
 
@@ -2076,14 +2087,14 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
                 if cells.has_key( cellid ):
                     cell = cells[ cellid ]
-                    lindices = cell.lindices[0]
+                    lindices = cell.lindices[src_index]
                     for indexj in range( lindices.length ):
                         j = lindices.data[indexj]
 
-                        xj = cPoint_new( x.data[j], y.data[j], 0.0 )
+                        xj = cPoint_new( s_x.data[j], s_y.data[j], 0.0 )
                         xij = cPoint_distance( xi, xj )
 
-                        hj = radius_scale * h.data[j]
+                        hj = radius_scale * s_h.data[j]
 
                         if ( (xij < hi) or (xij < hj) ):
                             if nnbrs == nbrs.length:
@@ -2092,7 +2103,6 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
                             nbrs.data[ nnbrs ] = j
                             nnbrs = nnbrs + 1
-                            #nbrs.append( j )
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs

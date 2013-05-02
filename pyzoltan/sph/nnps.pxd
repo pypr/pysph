@@ -228,3 +228,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     # are the min and max coordinate values across all processors and
     # the maximum smoothing length needed for parallel binning.
     cdef _compute_bounds(self)
+
+    # nearest neighbor search routines taking into account multiple
+    # particle arrays
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t i, UIntArray nbrs)

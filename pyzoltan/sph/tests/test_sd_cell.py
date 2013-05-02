@@ -25,7 +25,8 @@ def sd_evaluate(nps, mass):
         xi = Point( x[i], y[i], 0.0 )
         hi = h[i]
 
-        nps.get_nearest_particles(0, i, neighbors)
+        nps.get_nearest_particles(src_index=0, dst_index=0, i=i,
+                                  nbrs=neighbors)
         nnbrs = neighbors._length
 
         rho_sum = 0.0
