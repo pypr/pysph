@@ -1285,24 +1285,37 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.numParticleImport = 0
 
 cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
-    """ Zoltan enabled NNPS which uses the cells for load balancing."""
+    """ Zoltan enabled NNPS which uses the cells for load balancing.
 
+    To partition a list of arrays, we do an NNPS like box sort on all
+    arrays to create a global spatial indexing structure. The cells
+    are then used as 'objects' to be partitioned by Zoltan. The cells
+    dictionary (cell-map) need not be unique across processors. We are
+    responsible for assignning unique global ids for the cells.
+
+    The Zoltan generated (cell) import/export lists are then used to
+    construct particle import/export lists which are used to perform
+    the data movement of the particles. A NNPSParticleGeometric object
+    (lb_exchange_data and remote_exchange_data) is used for each
+    particle array in turn to effect this movement.
+
+    """
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
                  lb_props=None):
-        """Constructor for NNPS
+        """Constructor.
 
         Parameters:
         -----------
 
         dim : int
-            Dimension (Not sure if this is really needed)
+            Dimension
 
-        pa : ParticleArray
-            Particle data
+        particles : list
+            list of particle arrays to be managed.
 
-        comm : mpi4py.MPI.COMM, default (None)
+        comm : mpi4py.MPI.COMM, default 
             MPI communicator for parallel invocations
 
         radius_scale : double, default (2)
@@ -1312,12 +1325,20 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             Optional factor for computing bounding boxes for cells.
 
         domain : DomainLimits, default (None)
-            Optional limits for the domain            
+            Optional limits for the domain
+
+        lb_props : list
+            optional list of properties required for load balancing
 
         """
+        # number of arrays and a reference to the particle list
         self.narrays = len(particles)
         self.particles = particles
+
+        # particle array wrappers
         self.pa_wrappers = [ParticleArrayWrapper(pa) for pa in particles]
+
+        # individual NNPSParticleGeometric objects for the arrays
         self.nnps = [NNPSParticleGeometric(
             dim, pa, comm, radius_scale, ghost_layers, domain) for pa in particles]
 
@@ -1326,38 +1347,49 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.num_global = [0] * self.narrays
         self.num_remote = [0] * self.narrays
 
-        # set up the cell_gid array
+        # global indices used by Zoltan
         self.cell_gid = UIntArray()
 
-        # cell coordinate values
+        # cell coordinate values used by Zoltan
         self.cx = DoubleArray()
         self.cy = DoubleArray()
         self.cy = DoubleArray()
 
-        # base class initialization
+        # Initialize the base ZoltanGeometricPartitioner class. Here
+        # we pass a reference to the coordinate and global indices arrays.
         super(NNPSCellGeometric, self).__init__(dim, comm, self.cx, self.cy, self.cz,
                                                 self.cell_gid)
 
-        # minimum and maximum arrays for MPI reduce operations
+        # minimum and maximum arrays for MPI reduce operations. These
+        # are used to find global bounds across processors.
         self.minx = np.zeros( shape=1, dtype=np.float64 )
         self.miny = np.zeros( shape=1, dtype=np.float64 )
         self.minz = np.zeros( shape=1, dtype=np.float64 )
 
+        # global minimum values for x, y and z
+        self.mx = 0.0; self.my = 0.0; self.mz = 0.0
+
         self.maxx = np.zeros( shape=1, dtype=np.float64 )
         self.maxy = np.zeros( shape=1, dtype=np.float64 )
         self.maxz = np.zeros( shape=1, dtype=np.float64 )
-        self.maxh = np.zeros( shape=1, dtype=np.float64 )        
+        self.maxh = np.zeros( shape=1, dtype=np.float64 )
 
-        # now we have all comm, rank and size setup
+        # global max values for x ,y, z & h
+        self.Mx = 0.0; self.My = 0.0; self.Mz = 0.0; self.Mh = 0.0
+
+        # from the init for ZoltanGeometricPartitioner, we have the
+        # comm, rank and size setup
         self.in_parallel = True
         if self.size == 1: self.in_parallel = False
 
-        # cells dict and cell size
+        # The cells dictionary, radius scale for binning and ghost
+        # layers for remote neighbors.
         self.cells = {}
         self.radius_scale = radius_scale
         self.ghost_layers = ghost_layers
 
-        # do a local bin
+        # given all the data attributes, locally bin all the
+        # particles.
         self.local_bin()
 
     cpdef compute_cell_size(self):
@@ -1369,6 +1401,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         processors to decide on the appropriate binning size.
 
         """
+        # compute global bounds for the solution
         self._compute_bounds()
         cdef double hmax = self.Mh
 
@@ -1381,7 +1414,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.cell_size = cell_size        
 
     def update_gids(self):
-        """Update the local and global indices for the cell map.
+        """Update global indices for the cells dictionary.
 
         The objects to be partitioned in this class are the cells and
         we need to number them uniquely across processors. The
@@ -1394,27 +1427,70 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self._update_gid( self.cell_gid )
 
         # update the particle gids
-        for nps in self.nnps:
-            nps.update_particle_gid()
+        for nnps in self.nnps:
+            nnps.update_particle_gid()
 
     def update(self, initial=False):
-        """Update the partition."""
+        """Update the partition.
 
-        # remove ghost particles from a previous step
+        This is the main entry point for NNPSCellGeometric. Given
+        particles distributed across processors, we bin them, assign
+        uniqe global indices and perform the following steps:
+
+        (a) Call Zoltan's load balance function to get import and
+            export lists for the cell indices.
+
+        for each particle array:
+
+            (b) Create particle import/export lists using the cell lists
+                returned by Zoltan.
+
+            (c) Call NNPSParticleGeometric's lb_exchange data with these particle
+                import/export lists to effect the data movement for particles.
+
+        (d) Update the local cell map after the data has been exchanged.
+
+        now that we have the updated map, for each particle array:
+
+            (e) Compute remote particle import/export lists from the cell map
+
+            (f) Call NNPSParticleGeometric's remote_exchange_data with these lists
+                to effect the data movement.
+
+        now that the data movement is done,
+
+        (g) Update the local cell map to accomodate remote particles.
+
+        Notes:
+        ------
+
+        Although not intended to be a 'parallel' NNPS, NNPSCellGeometric can be
+        used for this purpose. I don't think this is advisable in variable
+        smoothing length simulations where we should be using a very coarse
+        grained partitioning to ensure safe local computations.
+
+        For two step integrators commonly employed in SPH and with a
+        sufficient number of ghost layers for remote particles, we
+        should call 'update' only at the end of a time step. The idea
+        of multiple ghost layers is to ensure that local particles
+        have a sufficiently large halo region around them.
+        
+        """
+        # remove remote particles from a previous step
         self.remove_remote_particles()
 
-        # bin locally
+        # create the initial local cell map
         self.local_bin()
 
-        # update the global indices for the cells
+        # update the global indices for the cells and particle ids
         self.update_gids()
 
         if self.in_parallel:
 
-            # call a load balancing function
+            # use Zoltan to get the cell import/export lists
             self.load_balance()
 
-            # move the individual particle data
+            # move the particle data one by one
             for i in range(self.narrays):
 
                 # create the particle lists from the cell lists
@@ -1424,7 +1500,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                 nnps = self.nnps[i]
                 nnps.lb_exchange_data()
 
-            # create the new local cell map
+            # update the local cell map after data movement
             self.update_local_data()
 
             # compute remote particles and exchange data
@@ -1435,7 +1511,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                 # move the remote particle data
                 nnps.remote_exchange_data()
 
-            # index the remote particle data
+            # update the local cell map to accomodate remote particles
             self.update_remote_data()
 
             # align particles. I hate this but it must be done!
@@ -1444,15 +1520,21 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                 pa.align_particles()
 
     def remove_remote_particles(self):
+        """Remove remote particles"""
         cdef int narrays = self.narrays
-        cdef NNPSParticleGeometric nps
+        cdef NNPSParticleGeometric nnps
 
         for i in range(narrays):
-            nps = self.nnps[i]
-            nps.remove_remote_particles()
+            nnps = self.nnps[i]
+            nnps.remove_remote_particles()
+
+            self.num_local[i] = nnps.num_particles
+            self.num_remote[i] = nnps.num_remote
 
     def local_bin(self):
-        """Bin the particles by deleting any previous cells and
+        """Create the local cell map.
+
+        Bin the particles by deleting any previous cells and
         re-computing the indexing structure. This corresponds to a
         local binning process that is called when each processor has
         a given list of particles to deal with.
@@ -1488,20 +1570,20 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             # bin the particles
             self._bin( pa.index, indices )
 
-    cdef _bin(self, int index, UIntArray indices):
+    cdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
         Parameters:
         -----------
 
-        index : int
+        pa_index : int
             Index of the particle array corresponding to the particles list
         
         indices : UIntArray
             Subset of particles to bin
 
         """
-        cdef pa_wrapper = self.pa_wrappers[ index ]
+        cdef pa_wrapper = self.pa_wrappers[ pa_index ]
         cdef DoubleArray x = pa_wrapper.x
         cdef DoubleArray y = pa_wrapper.y
         cdef DoubleArray z = pa_wrapper.z
@@ -1540,13 +1622,13 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                 lindices = UIntArray()
                 gindices = UIntArray()
 
-                cell.set_indices( index, lindices, gindices )
+                cell.set_indices( pa_index, lindices, gindices )
                 cells[ cid ] = cell
 
             # add this particle to the list of indicies
             cell = cells[ cid ]
-            lindices = cell.lindices[index]
-            gindices = cell.gindices[index]
+            lindices = cell.lindices[pa_index]
+            gindices = cell.gindices[pa_index]
 
             lindices.append( <ZOLTAN_ID_TYPE> i )
             gindices.append( gid.data[i] )
@@ -1562,7 +1644,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         We first construct the particle export lists in local arrays
         using the information from Zoltan_LB_Balance and subsequently
         call Zoltan_Invert_Lists to get the import lists. These arrays
-        are then copied to the class arrays.
+        are then copied to the NNPSParticleGeometric import/export
+        lists.
 
         """
         # these are the Zoltan generated lists that correspond to cells
@@ -1647,7 +1730,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         nnps.importParticleProcs.copy_subset( self.importProcs )
 
     def compute_remote_particles(self, int pa_index):
-        """Compute remote particles we need to export.
+        """Compute remote particles.
 
         Particles to be exported are determined by flagging individual
         cells and where they need to be shared to meet neighbor
@@ -1761,6 +1844,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         nnps.importParticleProcs.copy_subset( self.importProcs )        
 
     def load_balance(self):
+        """Use Zoltan to generate import/export lists for the cells."""
         self.Zoltan_LB_Balance()
 
         # copy the Zoltan export lists to the cell lists
@@ -1999,7 +2083,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                         if ( (xij < hi) or (xij < hj) ):
                             if nnbrs == nbrs.length:
                                 nbrs.resize( nbrs.length + 50 )
-                                print """Warning: Extending the neighbor list to %d"""%(nbrs.length)
+                                print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
 
                             nbrs.data[ nnbrs ] = j
                             nnbrs = nnbrs + 1
