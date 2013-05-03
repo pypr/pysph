@@ -65,32 +65,24 @@ cdef class Cell:
     cdef _compute_bounding_box(self, double cell_size,
                                int layers)
 
-cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
+cdef class ParticleArrayExchange:
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public ParticleArray pa         # Particle data
-    cdef public ParticleArrayWrapper pa_wrapper
-
-    cdef bint in_parallel                # Flag to determine if in parallel
+    cdef public ParticleArray pa                   # Particle data
+    cdef public ParticleArrayWrapper pa_wrapper    # wrapper for data access
 
     cdef public size_t num_particles     # Total number of particles 
     cdef public size_t num_remote        # Number of remote particles
     cdef public size_t num_ghost         # Number of ghost particles
     cdef public size_t num_global        # Global number of particles
-    cdef public DomainLimits domain      # Domain limits for the geometry
 
-    cdef public int ghost_layers         # BOunding box size
-    cdef public dict cells
-    cdef public bint is_periodic         # Flag to indicate periodicity
-    cdef public double cell_size         # Cell size for binning
-    cdef public double radius_scale      # Radius scale for kernel
-
-    cdef np.ndarray hmax_recvbuf         # Array of maximum local h's
-    cdef np.ndarray hmax_sendbuf         # send buffer of max h's
+    # mpi.Comm object and associated rank and size
+    cdef public object comm
+    cdef public int rank, size    
 
     # Zoltan interface definitions
-    cdef public list lb_props                # list of load balancing props
+    cdef public list lb_props                      # list of load balancing props
 
     # Zoltan Import/Export lists for particles
     cdef public UIntArray exportParticleGlobalids
@@ -101,7 +93,43 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cdef public UIntArray importParticleGlobalids
     cdef public UIntArray importParticleLocalids
     cdef public IntArray importParticleProcs
-    cdef public int numParticleImport    
+    cdef public int numParticleImport
+
+    cdef public DoubleArray doublebuf        # temp buffer to import data
+    cdef public UIntArray uintbuf            # temp buffer to import id info
+    cdef public IntArray intbuf              # temp buffer for integer arrays
+    cdef public LongArray longbuf            # temp buffer for long arrays
+
+    ############################################################################
+    # Member functions
+    ############################################################################
+    # exchange data given send and receive lists
+    cdef _exchange_data(self, int count, dict send, dict recv)
+
+cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef public ParticleArray pa                   # Particle data
+    cdef ParticleArrayExchange pa_exchange         # object to effect the data movement
+    cdef public ParticleArrayWrapper pa_wrapper    # wrapper for data access
+
+    cdef bint in_parallel                # Flag to determine if in parallel
+    cdef public DomainLimits domain      # Domain limits for the geometry
+
+    cdef public int ghost_layers         # BOunding box size
+    cdef public dict cells
+    cdef public bint is_periodic         # Flag to indicate periodicity
+    cdef public double cell_size         # Cell size for binning
+    cdef public double radius_scale      # Radius scale for kernel
+
+    cdef public size_t num_particles     # Total number of particles 
+    cdef public size_t num_remote        # Number of remote particles
+    cdef public size_t num_ghost         # Number of ghost particles
+    cdef public size_t num_global        # Global number of particles    
+
+    cdef np.ndarray hmax_recvbuf         # Array of maximum local h's
+    cdef np.ndarray hmax_sendbuf         # send buffer of max h's
 
     ############################################################################
     # Member functions
@@ -109,12 +137,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
     cdef _bin(self, UIntArray indices)
-
-    # Index additional ghost (remote) particle data after we have
-    # communicated this information. The indices for this call is
-    # taken to be the difference in lengths between the current size
-    # of the arrays and the old (num_particles) size
-    cpdef remote_bin(self)
 
     # Main binning routine for NNPS for local particles. This clears
     # the current cell data, re-computes the cell size and bins all
@@ -126,7 +148,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef compute_cell_size(self)
 
     # Re-compute the bin structure after a load balancing step.
-    cpdef update_data(self)
+    cpdef update_local_particle_data(self)
 
     # Add remote particles to the local bins after they have
     # been exchanged. 
@@ -135,9 +157,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     # Compute the particles that need to be exported to remote
     # processors to satisfy their neighbor requirements for binning.
     cpdef compute_remote_particles(self)
-
-    # exchange data given send and receive lists
-    cdef _exchange_data(self, int count, dict send, dict recv)
 
     #######################################################
     # Functions for periodicity

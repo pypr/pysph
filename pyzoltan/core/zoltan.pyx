@@ -173,11 +173,6 @@ cdef class PyZoltan:
         self.procs = np.ones(shape=self.size, dtype=np.int32)
         self.parts = np.ones(shape=self.size, dtype=np.int32)
 
-        self.doublebuf = DoubleArray()
-        self.idbuf = UIntArray()
-        self.intbuf = IntArray()
-        self.longbuf = LongArray()
-
     def _print_config(self):
         if self.rank == 0:
             if UNSIGNED_INT_GLOBAL_IDS:

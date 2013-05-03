@@ -55,11 +55,6 @@ cdef class PyZoltan:
     cdef public np.ndarray procs             # processors of range size
     cdef public np.ndarray parts             # partitions of range size
 
-    cdef public DoubleArray doublebuf        # temp buffer to import data
-    cdef public UIntArray idbuf              # temp buffer to import id info
-    cdef public IntArray intbuf              # temp buffer for integer arrays
-    cdef public LongArray longbuf            # temp buffer for long arrays
-
     # General Zoltan parameters (refer the user guide)
     cdef public str ZOLTAN_DEBUG_LEVEL
     cdef public str ZOLTAN_OBJ_WEIGHT_DIM

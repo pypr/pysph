@@ -146,7 +146,7 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
 ################################################################
 # ParticleArrayWrapper
-################################################################
+################################################################w
 cdef class ParticleArrayWrapper:
     def __init__(self, ParticleArray pa):
         self.pa = pa
@@ -159,6 +159,243 @@ cdef class ParticleArrayWrapper:
         self.gid = pa.get_carray('gid')
         self.tag = pa.get_carray('tag')
 
+################################################################
+# ParticleArrayExchange
+################################################################w
+cdef class ParticleArrayExchange:
+    def __init__(self, ParticleArray pa, lb_props=None):
+        self.pa = pa
+        self.pa_wrapper = ParticleArrayWrapper( pa )
+
+        # num particles
+        self.num_particles = pa.get_number_of_particles()
+        self.num_remote = 0
+        self.num_global = 0
+        self.num_ghost = 0
+
+        # Particle Import/Export lists
+        self.exportParticleGlobalids = UIntArray()
+        self.exportParticleLocalids = UIntArray()
+        self.exportParticleProcs = IntArray()
+        self.numParticleExport = 0
+
+        self.importParticleGlobalids = UIntArray()
+        self.importParticleLocalids = UIntArray()
+        self.importParticleProcs = IntArray()
+        self.numParticleImport = 0
+
+        # load balancing props
+        if lb_props is None:
+            self.lb_props = ['x','y','h','gid']
+        else:
+            self.lb_props = lb_props
+
+        # temporary buffers
+        self.uintbuf = UIntArray()
+        self.intbuf = IntArray()
+        self.doublebuf = DoubleArray()
+        self.longbuf = LongArray()
+
+    def lb_exchange_data(self):
+        """Share particle info after Zoltan_LB_Balance
+
+        After an initial call to 'Zoltan_LB_Balance', the new size of
+        the arrays should be (num_particles - numExport + numImport)
+        to reflect particles that should be imported and exported.
+
+        This function should be called after the load balancing lists
+        a defined. The particles to be exported are removed and the
+        arrays re-sized. MPI is then used to send and receive the data
+
+        """
+        # data array
+        cdef ParticleArray pa = self.pa
+        
+        # Zoltan generated lists
+        cdef UIntArray exportGlobalids = self.exportParticleGlobalids
+        cdef UIntArray exportLocalids = self.exportParticleLocalids
+        cdef IntArray exportProcs = self.exportParticleProcs
+        cdef int numExport = self.numParticleExport
+
+        cdef UIntArray importGlobalids = self.importParticleGlobalids
+        cdef UIntArray importLocalids = self.importParticleLocalids
+        cdef IntArray importProcs = self.importParticleProcs
+        cdef int numImport = self.numParticleImport
+
+        # dicts to send/recv data 
+        cdef dict recv = {}
+
+        # collect the data to send
+        cdef dict send = nnps_utils.get_send_data(self.comm, pa, self.lb_props, exportLocalids,
+                                                  exportProcs)
+
+        # current number of particles
+        cdef int current_size = self.num_particles
+        cdef int count, new_size
+
+        # MPI communicator
+        cdef object comm = self.comm
+
+        # count the number of objects to receive from remote procesors
+        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
+
+        # Remove particles to be exported
+        pa.remove_particles( exportLocalids )
+
+        # resize the arrays
+        newsize = current_size - numExport + numImport
+        count = current_size - numExport
+
+        pa.resize( newsize )
+        self.set_tag(count, newsize, 0)
+        
+        # exchange the data
+        self._exchange_data(count, send, recv)
+
+        # update the number of particles
+        self.num_particles = newsize
+
+    def remote_exchange_data(self):
+        """Share particle info after computing remote particles.
+
+        After a load balancing and the corresponding exhange of
+        particles, additional particles are needed as remote
+        (remote). Calls to 'compute_remote_particles' and
+        'Zoltan_Invert_Lists' builds the lists required.
+
+        The arrays must now be re-sized to (num_particles + numImport)
+        to reflect the new particles that come in as remote particles.
+
+        """
+        # data arrays
+        cdef ParticleArray pa = self.pa
+        
+        # Import/Export lists
+        cdef UIntArray exportGlobalids = self.exportParticleGlobalids
+        cdef UIntArray exportLocalids = self.exportParticleLocalids
+        cdef IntArray exportProcs = self.exportParticleProcs
+
+        cdef UIntArray importGlobalids = self.importParticleGlobalids
+        cdef UIntArray importLocalids = self.importParticleLocalids
+        cdef IntArray importProcs = self.importParticleProcs
+        cdef int numImport = self.numParticleImport
+
+        # collect the data to send
+        cdef dict recv = {}
+        cdef dict send = nnps_utils.get_send_data(
+            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
+
+        # current number of particles
+        cdef int current_size = self.num_particles
+        cdef int count, new_size
+
+        # MPI communicator
+        cdef object comm = self.comm
+
+        # count the number of objects to receive from remote procesors
+        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
+
+        # resize the arrays
+        newsize = current_size + numImport
+        count = current_size
+
+        pa.resize( newsize )
+        self.set_tag(count, newsize, 0)
+
+        # share the data
+        self._exchange_data(count, send, recv)
+
+        # store the number of remote particles
+        self.num_remote = newsize - current_size
+
+    cdef _exchange_data(self, int count, dict send, dict recv):
+        """New send and receive."""
+        # data arrays
+        cdef ParticleArray pa = self.pa
+
+        # MPI communicator
+        cdef object comm = self.comm
+
+        # temp buffers to store info
+        cdef DoubleArray doublebuf = self.doublebuf
+        cdef UIntArray uintbuf = self.uintbuf
+        cdef LongArray longbuf = self.longbuf
+        cdef IntArray intbuf = self.intbuf
+
+        cdef int rank = self.rank
+        cdef int size = self.size
+        cdef int i, j
+
+        ctype_map = {'unsigned int':uintbuf,
+                     'double':doublebuf,
+                     'long':longbuf,
+                     'int':intbuf}
+
+        props = {}
+        for prop in self.lb_props:
+            prop_array = pa.get_carray(prop)
+            props[ prop ] = ctype_map[ prop_array.get_c_type() ]
+            
+        ############### SEND AND RECEIVE START ########################
+        # Receive from processors with a lower rank
+        for i in recv.keys():
+            if i < rank:
+                for prop, recvbuf in props.iteritems():
+                    recvbuf.resize( recv[i] )
+
+                    nnps_utils.Recv(comm=comm,
+                                    localbuf=pa.get_carray(prop),
+                                    localbufsize=count,
+                                    recvbuf=recvbuf,
+                                    source=i)
+                
+                # update the local buffer size
+                count = count + recv[i]
+
+        # Send the data across
+        for pid in send.keys():
+            for prop in props:
+                sendbuf = send[pid][prop]
+                comm.Send( sendbuf, dest=pid )
+                    
+        # recv from procs with higher rank i value as set in first loop
+        for i in recv.keys():
+            if i > rank:
+                for prop, recvbuf in props.iteritems():
+                    recvbuf.resize( recv[i] )
+
+                    nnps_utils.Recv(comm=comm,
+                                    localbuf=pa.get_carray(prop),
+                                    localbufsize=count,
+                                    recvbuf=recvbuf,
+                                    source=i)
+
+                # update to the new length
+                count = count + recv[i]
+
+        ############### SEND AND RECEIVE STOP ########################
+
+    def remove_remote_particles(self):
+        cdef int num_particles = self.num_particles
+
+        # resize the particle array
+        self.pa.resize( num_particles )
+        self.pa.align_particles()
+        
+        # reset the number of remote particles
+        self.num_remote = 0
+
+    def align_particles(self):
+        self.pa.align_particles()
+
+    def set_tag(self, int start, int end, int value):
+        """Reset the annoying tag value after particles are resized."""
+        cdef int i
+        cdef IntArray tag = self.pa_wrapper.tag
+
+        for i in range(start, end):
+            tag[i] = value
+            
 #################################################################
 # NNPS extension classes
 #################################################################
@@ -357,18 +594,28 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             Optional limits for the domain            
 
         """
+        # create the particle exchange object
         self.pa = pa
-        self.pa_wrapper = pa_wrapper = ParticleArrayWrapper(pa)
+        self.pa_exchange = pa_exchange = ParticleArrayExchange(pa, lb_props)
+        self.pa_wrapper = pa_wrapper = self.pa_exchange.pa_wrapper
+
+        # base class initialization
         super(NNPSParticleGeometric, self).__init__(dim, comm,
                                                     pa_wrapper.x,
                                                     pa_wrapper.y,
                                                     pa_wrapper.z,
                                                     pa_wrapper.gid)
 
-        self.num_particles = pa.get_number_of_particles()
-        self.num_remote = 0
-        self.num_global = 0
-        self.num_ghost = 0
+        # set the comm, rank and size for the pa_exchange object
+        pa_exchange.comm = self.comm
+        pa_exchange.rank = self.rank
+        pa_exchange.size = self.size        
+
+        # set the num particles from the pa_exchange object
+        self.num_particles = pa_exchange.num_particles
+        self.num_remote = pa_exchange.num_remote
+        self.num_global = pa_exchange.num_global
+        self.num_ghost = pa_exchange.num_ghost
 
         self.radius_scale = radius_scale
         self.dim = dim
@@ -387,12 +634,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             self.procs = np.ones(size, dtype=np.int32)
             self.parts = np.ones(size, dtype=np.int32)
             self.hmax_recvbuf = np.zeros(size, dtype=np.float64)
-
-        # load balancing props
-        if lb_props is None:
-            self.lb_props = ['x','y','h','gid']
-        else:
-            self.lb_props = lb_props
 
         self.ghost_layers = ghost_layers
 
@@ -420,6 +661,9 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.num_particles = self.num_local_objects
         self.num_global = self.num_global_objects
 
+        # update number of global objects for pa_exchange
+        self.pa_exchange.num_global = self.num_global
+
     def update(self, initial=False):
         """Perform one step of a parallel update.
 
@@ -432,25 +676,25 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
           (3) Compute remote particles given the new partition.
 
         """
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
+
         # remove ghost particles from a previous step
-        self.remove_remote_particles()
+        pa_exchange.remove_remote_particles()
 
         # bin locally
         self.local_bin()
 
         if self.in_parallel:
-            # set the local/global number of particles
+            self.load_balance()                  # get import/export lists
+            pa_exchange.lb_exchange_data()       # exchange particle data
+            self.update_local_particle_data()    # update local cell map
 
-            # call a load balancing function and exchange data
-            self.load_balance()
-            self.lb_exchange_data()
-
-            # compute remote particles and exchange data
-            self.compute_remote_particles()
-            self.remote_exchange_data()
+            self.compute_remote_particles()      # get remote import/export lists
+            pa_exchange.remote_exchange_data()   # exchange remote particle data
+            self.update_remote_particle_data()   # update local cell map
 
             # align particles. I hate this but it must be done!
-            self.pa.align_particles()
+            pa_exchange.align_particles()
 
     cpdef local_bin(self):
         """Bin the particles by deleting any previous cells and
@@ -486,83 +730,18 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         # bin the particles
         self._bin(indices)
 
-    cpdef remote_bin(self):
-        """Bin the remote particles.
-
-        This function assumes that a previously created cell structure
-        exists for local particles, prefrebaly after a load balancing
-        step and a subsequent call to 'update_data'
-
-        """
-        cdef int num_particles = self.num_particles
-        cdef int num_remote = self.num_remote
-        cdef UIntArray indices = arange_uint(num_particles, num_remote+num_particles)
-
-        # bin the remote particles
-        self._bin(indices)
-
-    cdef _bin(self, UIntArray indices):
-        """Bin particles given by indices.
-
-        Parameters:
-        -----------
-        indices : UIntArray
-            Subset of particles to bin
-
-        """
-        cdef DoubleArray x = self.x
-        cdef DoubleArray y = self.y
-        cdef UIntArray gid = self.gid
-
-        cdef dict cells = self.cells
-        cdef double cell_size = self.cell_size
-        cdef int layers = self.ghost_layers
-
-        cdef UIntArray lindices, gindices
-        cdef size_t num_particles, indexi, i
-
-        cdef cIntPoint _cid
-        cdef IntPoint cid = IntPoint()
-
-        cdef Cell cell
-
-        # now bin the particles
-        num_particles = indices.length
-        for indexi in range(num_particles):
-            i = indices.data[indexi]
-
-            globalid = gid.data[i]
-
-            pnt = cPoint_new( x.data[i], y.data[i], 0.0 )
-            _cid = find_cell_id( pnt, cell_size )
-
-            cid = IntPoint_from_cIntPoint(_cid)
-
-            if not cells.has_key( cid ):
-                # create a cell with narrays = 1
-                cell = Cell(cid=cid, cell_size=cell_size,
-                            narrays=1, layers=layers)
-                lindices = UIntArray()
-                gindices = UIntArray()
-
-                cell.set_indices( 0, lindices, gindices )
-                cells[ cid ] = cell
-
-            # add this particle to the list of indicies
-            cell = cells[ cid ]
-            lindices = cell.lindices[0]
-            gindices = cell.gindices[0]
-
-            lindices.append( <ZOLTAN_ID_TYPE> i )
-            gindices.append( gid.data[i] )        
-
-    cpdef update_data(self):
+    cpdef update_local_particle_data(self):
         """Re-bin after a load balancing step"""
-        # set the number of particles
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
+        self.num_particles = pa_exchange.num_particles
+
+        # set the number of particles for the Zoltan wrapper
         self.set_num_local_objects( self.num_particles )
 
         # re-bin given the new arrays
-        self.local_bin()
+        cdef UIntArray indices = arange_uint(self.num_particles)
+        self.cells.clear()
+        self._bin(indices)
 
     cpdef update_remote_particle_data(self):
         """Bin remote particles.
@@ -572,8 +751,14 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         function.
         
         """
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
+        cdef int num_particles = pa_exchange.num_particles
+        cdef int num_remote = pa_exchange.num_remote
+
+        cdef UIntArray indices = arange_uint(num_particles, num_remote+num_particles)
+
         # bin the remote particles
-        self.remote_bin()
+        self._bin(indices)
 
     cpdef compute_remote_particles(self):
         """Compute remote particles we need to export.
@@ -585,6 +770,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         """
         cdef Zoltan_Struct* zz = self._zstruct.zz
         cdef UIntArray gid = self.gid
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
+        
         cdef UIntArray exportGlobalids, exportLocalids
         cdef IntArray exportProcs
 
@@ -666,26 +853,26 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         self.Zoltan_Invert_Lists()
 
         # copy the lists to the particle lists
-        self.numParticleExport = self.numExport
-        self.numParticleImport = self.numImport
+        pa_exchange.numParticleExport = self.numExport
+        pa_exchange.numParticleImport = self.numImport
 
-        self.exportParticleGlobalids.resize( self.numExport )
-        self.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.exportParticleGlobalids.resize( self.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
 
-        self.exportParticleLocalids.resize( self.numExport )
-        self.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( self.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
         
-        self.exportParticleProcs.resize( self.numExport )
-        self.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( self.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
 
-        self.importParticleGlobalids.resize( self.numImport )
-        self.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.importParticleGlobalids.resize( self.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
 
-        self.importParticleLocalids.resize( self.numImport )
-        self.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( self.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
 
-        self.importParticleProcs.resize( self.numImport )
-        self.importParticleProcs.copy_subset( self.importProcs )
+        pa_exchange.importParticleProcs.resize( self.numImport )
+        pa_exchange.importParticleProcs.copy_subset( self.importProcs )
 
     cpdef compute_cell_size(self):
         cdef DoubleArray h = self.pa_wrapper.h
@@ -716,234 +903,33 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             cell_size = 1.0
 
         self.cell_size = cell_size
-        #print self.cell_size, h.maximum
-
-    def set_num_global_particles(self, size_t num_particles):
-        self.num_global = num_particles
 
     def load_balance(self):
         """Do the load balancing and copy the arrays."""
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
         self.Zoltan_LB_Balance()
 
         # resize and copy to particle export lists
-        self.numParticleExport = self.numExport
-        self.exportParticleGlobalids.resize( self.numExport )
-        self.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.numParticleExport = self.numExport
+        pa_exchange.exportParticleGlobalids.resize( self.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
 
-        self.exportParticleLocalids.resize( self.numExport )
-        self.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( self.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
 
-        self.exportParticleProcs.resize( self.numExport )
-        self.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( self.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
 
         # resize and copy to particle import lists
-        self.numParticleImport = self.numImport
-        self.importParticleGlobalids.resize( self.numImport )
-        self.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.numParticleImport = self.numImport
+        pa_exchange.importParticleGlobalids.resize( self.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
 
-        self.importParticleLocalids.resize( self.numImport )
-        self.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( self.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
 
-        self.importParticleProcs.resize( self.numImport )
-        self.importParticleProcs.copy_subset( self.importProcs )
-        
-    def lb_exchange_data(self):
-        """Share particle info after Zoltan_LB_Balance
-
-        After an initial call to 'Zoltan_LB_Balance', the new size of
-        the arrays should be (num_particles - numExport + numImport)
-        to reflect particles that should be imported and exported.
-
-        This function should be called after the load balancing lists
-        a defined. The particles to be exported are removed and the
-        arrays re-sized. MPI is then used to send and receive the data
-
-        """
-        # data arrays
-        cdef ParticleArray pa = self.pa
-        
-        # Zoltan generated lists
-        cdef UIntArray exportGlobalids = self.exportParticleGlobalids
-        cdef UIntArray exportLocalids = self.exportParticleLocalids
-        cdef IntArray exportProcs = self.exportParticleProcs
-        cdef int numExport = self.numParticleExport
-
-        cdef UIntArray importGlobalids = self.importParticleGlobalids
-        cdef UIntArray importLocalids = self.importParticleLocalids
-        cdef IntArray importProcs = self.importParticleProcs
-        cdef int numImport = self.numParticleImport
-
-        # dicts to send/recv data 
-        cdef dict recv = {}
-
-        # collect the data to send
-        cdef dict send = nnps_utils.get_send_data(self.comm, pa, self.lb_props, exportLocalids,
-                                                  exportProcs)
-
-        # current number of particles
-        cdef int current_size = self.num_particles
-        cdef int count, new_size
-
-        # MPI communicator
-        cdef object comm = self.comm
-
-        # count the number of objects to receive from remote procesors
-        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
-
-        # Remove particles to be exported
-        pa.remove_particles( exportLocalids )
-
-        # resize the arrays
-        newsize = current_size - numExport + numImport
-        count = current_size - numExport
-
-        pa.resize( newsize )
-        self.set_tag(count, newsize, 0)
-        
-        # exchange the data
-        self._exchange_data(count, send, recv)
-
-        # update the data
-        self.num_particles = newsize
-        self.update_data()
-
-    def remote_exchange_data(self):
-        """Share particle info after computing remote particles.
-
-        After a load balancing and the corresponding exhange of
-        particles, additional particles are needed as remote
-        (remote). Calls to 'compute_remote_particles' and
-        'Zoltan_Invert_Lists' builds the lists required.
-
-        The arrays must now be re-sized to (num_particles + numImport)
-        to reflect the new particles that come in as remote particles.
-
-        """
-        # data arrays
-        cdef ParticleArray pa = self.pa
-        
-        # Import/Export lists
-        cdef UIntArray exportGlobalids = self.exportParticleGlobalids
-        cdef UIntArray exportLocalids = self.exportParticleLocalids
-        cdef IntArray exportProcs = self.exportParticleProcs
-
-        cdef UIntArray importGlobalids = self.importParticleGlobalids
-        cdef UIntArray importLocalids = self.importParticleLocalids
-        cdef IntArray importProcs = self.importParticleProcs
-        cdef int numImport = self.numParticleImport
-
-        # collect the data to send
-        cdef dict recv = {}
-        cdef dict send = nnps_utils.get_send_data(
-            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
-
-        # current number of particles
-        cdef int current_size = self.num_particles
-        cdef int count, new_size
-
-        # MPI communicator
-        cdef object comm = self.comm
-
-        # count the number of objects to receive from remote procesors
-        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
-
-        # resize the arrays
-        newsize = current_size + numImport
-        count = current_size
-
-        pa.resize( newsize )
-        self.set_tag(count, newsize, 0)
-
-        # share the data
-        self._exchange_data(count, send, recv)
-
-        # update NNPS with the remote particle data
-        self.num_remote = newsize - current_size
-        self.update_remote_particle_data()
-
-    cdef _exchange_data(self, int count, dict send, dict recv):
-        """New send and receive."""
-        # data arrays
-        cdef ParticleArray pa = self.pa
-
-        # MPI communicator
-        cdef object comm = self.comm
-
-        # temp buffers to store info
-        cdef DoubleArray doublebuf = self.doublebuf
-        cdef UIntArray uintbuf = self.idbuf
-        cdef LongArray longbuf = self.longbuf
-        cdef IntArray intbuf = self.intbuf
-
-        cdef int rank = self.rank
-        cdef int size = self.size
-        cdef int i, j
-
-        ctype_map = {'unsigned int':uintbuf,
-                     'double':doublebuf,
-                     'long':longbuf,
-                     'int':intbuf}
-
-        props = {}
-        for prop in self.lb_props:
-            prop_array = pa.get_carray(prop)
-            props[ prop ] = ctype_map[ prop_array.get_c_type() ]
-            
-        ############### SEND AND RECEIVE START ########################
-        # Receive from processors with a lower rank
-        for i in recv.keys():
-            if i < rank:
-                for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( recv[i] )
-
-                    nnps_utils.Recv(comm=comm,
-                                    localbuf=pa.get_carray(prop),
-                                    localbufsize=count,
-                                    recvbuf=recvbuf,
-                                    source=i)
-                
-                # update the local buffer size
-                count = count + recv[i]
-
-        # Send the data across
-        for pid in send.keys():
-            for prop in props:
-                sendbuf = send[pid][prop]
-                comm.Send( sendbuf, dest=pid )
-                    
-        # recv from procs with higher rank i value as set in first loop
-        for i in recv.keys():
-            if i > rank:
-                for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( recv[i] )
-
-                    nnps_utils.Recv(comm=comm,
-                                    localbuf=pa.get_carray(prop),
-                                    localbufsize=count,
-                                    recvbuf=recvbuf,
-                                    source=i)
-
-                # update to the new length
-                count = count + recv[i]
-
-        ############### SEND AND RECEIVE STOP ########################                
-    def remove_remote_particles(self):
-        cdef int num_particles = self.num_particles
-
-        # resize the particle array
-        self.pa.resize( num_particles )
-        self.pa.align_particles()
-        
-        # reset the number of remote particles
-        self.num_remote = 0
-
-    def set_tag(self, int start, int end, int value):
-        """Reset the annoying tag value after particles are resized."""
-        cdef int i
-        cdef IntArray tag = self.pa_wrapper.tag
-
-        for i in range(start, end):
-            tag[i] = value
+        pa_exchange.importParticleProcs.resize( self.numImport )
+        pa_exchange.importParticleProcs.copy_subset( self.importProcs )
 
     #######################################################
     # Functions for periodicity
@@ -1166,6 +1152,62 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     ######################################################################
     # Neighbor location routines
     ######################################################################
+    cdef _bin(self, UIntArray indices):
+        """Bin particles given by indices.
+
+        Parameters:
+        -----------
+        indices : UIntArray
+            Subset of particles to bin
+
+        """
+        cdef ParticleArrayWrapper pa_wrapper = self.pa_wrapper
+        cdef DoubleArray x = pa_wrapper.x
+        cdef DoubleArray y = pa_wrapper.y
+        cdef UIntArray gid = pa_wrapper.gid
+
+        cdef dict cells = self.cells
+        cdef double cell_size = self.cell_size
+        cdef int layers = self.ghost_layers
+
+        cdef UIntArray lindices, gindices
+        cdef size_t num_particles, indexi, i
+
+        cdef cIntPoint _cid
+        cdef IntPoint cid = IntPoint()
+
+        cdef Cell cell
+
+        # now bin the particles
+        num_particles = indices.length
+        for indexi in range(num_particles):
+            i = indices.data[indexi]
+
+            globalid = gid.data[i]
+
+            pnt = cPoint_new( x.data[i], y.data[i], 0.0 )
+            _cid = find_cell_id( pnt, cell_size )
+
+            cid = IntPoint_from_cIntPoint(_cid)
+
+            if not cells.has_key( cid ):
+                # create a cell with narrays = 1
+                cell = Cell(cid=cid, cell_size=cell_size,
+                            narrays=1, layers=layers)
+                lindices = UIntArray()
+                gindices = UIntArray()
+
+                cell.set_indices( 0, lindices, gindices )
+                cells[ cid ] = cell
+
+            # add this particle to the list of indicies
+            cell = cells[ cid ]
+            lindices = cell.lindices[0]
+            gindices = cell.gindices[0]
+
+            lindices.append( <ZOLTAN_ID_TYPE> i )
+            gindices.append( gid.data[i] )
+    
     cpdef get_nearest_particles(self, size_t i, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
 
@@ -1266,21 +1308,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
         return nbrs
-
-    def _setup_zoltan_arrays(self):
-        super( NNPSParticleGeometric, self )._setup_zoltan_arrays()
-
-        # Import/Export lists for particles
-        self.exportParticleGlobalids = UIntArray()
-        self.exportParticleLocalids = UIntArray()
-        self.exportParticleProcs = IntArray()
-
-        self.importParticleGlobalids = UIntArray()
-        self.importParticleLocalids = UIntArray()
-        self.importParticleProcs = IntArray()
-
-        self.numParticleExport = 0
-        self.numParticleImport = 0
 
 cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     """ Zoltan enabled NNPS which uses the cells for load balancing.
