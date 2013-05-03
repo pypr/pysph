@@ -163,12 +163,16 @@ cdef class ParticleArrayWrapper:
 # ParticleArrayExchange
 ################################################################w
 cdef class ParticleArrayExchange:
-    def __init__(self, ParticleArray pa, lb_props=None):
+    def __init__(self, ParticleArray pa, object comm, lb_props=None):
         self.pa = pa
         self.pa_wrapper = ParticleArrayWrapper( pa )
 
+        self.comm = comm
+        self.rank = comm.Get_rank()
+        self.size = comm.Get_size()
+
         # num particles
-        self.num_particles = pa.get_number_of_particles()
+        self.num_local = pa.get_number_of_particles()
         self.num_remote = 0
         self.num_global = 0
         self.num_ghost = 0
@@ -230,7 +234,7 @@ cdef class ParticleArrayExchange:
                                                   exportProcs)
 
         # current number of particles
-        cdef int current_size = self.num_particles
+        cdef int current_size = self.num_local
         cdef int count, new_size
 
         # MPI communicator
@@ -253,7 +257,7 @@ cdef class ParticleArrayExchange:
         self._exchange_data(count, send, recv)
 
         # update the number of particles
-        self.num_particles = newsize
+        self.num_local = newsize
 
     def remote_exchange_data(self):
         """Share particle info after computing remote particles.
@@ -286,7 +290,7 @@ cdef class ParticleArrayExchange:
             self.comm, pa, self.lb_props, exportLocalids,exportProcs)
 
         # current number of particles
-        cdef int current_size = self.num_particles
+        cdef int current_size = self.num_local
         cdef int count, new_size
 
         # MPI communicator
@@ -376,10 +380,10 @@ cdef class ParticleArrayExchange:
         ############### SEND AND RECEIVE STOP ########################
 
     def remove_remote_particles(self):
-        cdef int num_particles = self.num_particles
+        cdef int num_local = self.num_local
 
         # resize the particle array
-        self.pa.resize( num_particles )
+        self.pa.resize( num_local )
         self.pa.align_particles()
         
         # reset the number of remote particles
@@ -395,7 +399,40 @@ cdef class ParticleArrayExchange:
 
         for i in range(start, end):
             tag[i] = value
-            
+
+    def update_particle_gids(self):
+        """Update the global indices.
+
+        We call a utility function to get the new number of particles
+        across the processors and then linearly assign indices to the
+        objects.
+
+        """
+        cdef int num_global_objects, num_local_objects, _sum, i
+        cdef np.ndarray[ndim=1, dtype=np.int32_t] num_objects_data
+
+        # the global indices array
+        cdef UIntArray gid = self.pa_wrapper.gid
+
+        cdef object comm = self.comm
+        cdef int rank = self.rank
+        cdef int size = self.size
+
+        num_objects_data = zoltan_utils.get_num_objects_per_proc(
+            comm, self.num_local)
+        
+        num_local_objects = num_objects_data[ rank ]
+        num_global_objects = np.sum( num_objects_data )
+
+        _sum = np.sum( num_objects_data[:rank] )
+
+        gid.resize( num_local_objects )
+        for i in range( num_local_objects ):
+            gid.data[i] = <ZOLTAN_ID_TYPE> ( _sum + i )
+
+        # set the number of local and global objects
+        self.num_global = num_global_objects
+
 #################################################################
 # NNPS extension classes
 #################################################################
@@ -596,7 +633,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         """
         # create the particle exchange object
         self.pa = pa
-        self.pa_exchange = pa_exchange = ParticleArrayExchange(pa, lb_props)
+        self.pa_exchange = pa_exchange = ParticleArrayExchange(pa, comm, lb_props)
         self.pa_wrapper = pa_wrapper = self.pa_exchange.pa_wrapper
 
         # base class initialization
@@ -606,13 +643,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
                                                     pa_wrapper.z,
                                                     pa_wrapper.gid)
 
-        # set the comm, rank and size for the pa_exchange object
-        pa_exchange.comm = self.comm
-        pa_exchange.rank = self.rank
-        pa_exchange.size = self.size        
-
         # set the num particles from the pa_exchange object
-        self.num_particles = pa_exchange.num_particles
+        self.num_particles = pa_exchange.num_local
         self.num_remote = pa_exchange.num_remote
         self.num_global = pa_exchange.num_global
         self.num_ghost = pa_exchange.num_ghost
@@ -656,13 +688,14 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
             self.update_particle_gid()
 
     def update_particle_gid(self):
-        self._update_gid( self.pa_wrapper.gid )
+        self.pa_exchange.update_particle_gids()
 
-        self.num_particles = self.num_local_objects
-        self.num_global = self.num_global_objects
+        self.num_particles = self.pa_exchange.num_local
+        self.num_global = self.pa_exchange.num_global
 
-        # update number of global objects for pa_exchange
-        self.pa_exchange.num_global = self.num_global
+        # update number of global objects for ZoltanGeometricPartitioner
+        self.set_num_local_objects( self.num_particles )
+        self.set_num_global_objects( self.num_global )
 
     def update(self, initial=False):
         """Perform one step of a parallel update.
@@ -676,8 +709,6 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
           (3) Compute remote particles given the new partition.
 
         """
-        cdef ParticleArrayExchange pa_exchange = self.pa_exchange
-
         # remove ghost particles from a previous step
         self.remove_remote_particles()
 
@@ -733,7 +764,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef update_local_particle_data(self):
         """Re-bin after a load balancing step"""
         cdef ParticleArrayExchange pa_exchange = self.pa_exchange
-        self.num_particles = pa_exchange.num_particles
+        self.num_particles = pa_exchange.num_local
 
         # set the number of particles for the Zoltan wrapper
         self.set_num_local_objects( self.num_particles )
@@ -752,7 +783,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         
         """
         cdef ParticleArrayExchange pa_exchange = self.pa_exchange
-        cdef int num_particles = pa_exchange.num_particles
+        cdef int num_particles = pa_exchange.num_local
         cdef int num_remote = pa_exchange.num_remote
 
         cdef UIntArray indices = arange_uint(num_particles, num_remote+num_particles)
@@ -932,14 +963,18 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         pa_exchange.importParticleProcs.copy_subset( self.importProcs )
 
     def remove_remote_particles(self):
-        self.pa_exchange.remove_remote_particles()
+        pa_exchange = self.pa_exchange
+        pa_exchange.remove_remote_particles()
+
+        self.num_particles = pa_exchange.num_local
+        self.num_remote = pa_exchange.num_remote
 
     def align_particles(self):
         self.pa_exchange.align_particles()
 
     def lb_exchange_data(self):
         self.pa_exchange.lb_exchange_data()
-        self.num_particles = self.pa_exchange.num_particles
+        self.num_particles = self.pa_exchange.num_local
 
     def remote_exchange_data(self):
         self.pa_exchange.remote_exchange_data()
@@ -1334,7 +1369,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
     The Zoltan generated (cell) import/export lists are then used to
     construct particle import/export lists which are used to perform
-    the data movement of the particles. A NNPSParticleGeometric object
+    the data movement of the particles. A ParticleArrayExchange object
     (lb_exchange_data and remote_exchange_data) is used for each
     particle array in turn to effect this movement.
 
@@ -1380,9 +1415,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         # particle array wrappers
         self.pa_wrappers = [ParticleArrayWrapper(pa) for pa in particles]
 
-        # individual NNPSParticleGeometric objects for the arrays
-        self.nnps = [NNPSParticleGeometric(
-            dim, pa, comm, radius_scale, ghost_layers, domain) for pa in particles]
+        # particle array exchange instances
+        self.pa_exchanges = [ParticleArrayExchange(pa, comm, lb_props) for pa in particles]
 
         # number of local/global/remote particles
         self.num_local = [pa.get_number_of_particles() for pa in particles]
@@ -1471,11 +1505,11 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     def update_particle_gids(self):
         """Update individual particle global indices"""        
         for i in range(self.narrays):
-            nnps = self.nnps[i]
-            nnps.update_particle_gid()
+            pa_exchange = self.pa_exchanges[i]
+            pa_exchange.update_particle_gids()
 
-            self.num_local[i] = nnps.num_local_objects
-            self.num_global[i] = nnps.num_global_objects
+            self.num_local[i] = pa_exchange.num_local
+            self.num_global[i] = pa_exchange.num_global
 
     def update(self, initial=False):
         """Update the partition.
@@ -1543,19 +1577,19 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                 self.create_particle_lists(i)
 
                 # move the particle data
-                nnps = self.nnps[i]
-                nnps.lb_exchange_data()
+                pa_exchange = self.pa_exchanges[i]
+                pa_exchange.lb_exchange_data()
 
             # update the local cell map after data movement
             self.update_local_data()
 
             # compute remote particles and exchange data
             for i in range(self.narrays):
-                nnps = self.nnps[i]
                 self.compute_remote_particles(i)
 
                 # move the remote particle data
-                nnps.remote_exchange_data()
+                pa_exchange = self.pa_exchanges[i]
+                pa_exchange.remote_exchange_data()
 
             # update the local cell map to accomodate remote particles
             self.update_remote_data()
@@ -1568,14 +1602,14 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     def remove_remote_particles(self):
         """Remove remote particles"""
         cdef int narrays = self.narrays
-        cdef NNPSParticleGeometric nnps
+        cdef ParticleArrayExchange pa_exchange
 
         for i in range(narrays):
-            nnps = self.nnps[i]
-            nnps.remove_remote_particles()
+            pa_exchange = self.pa_exchanges[i]
+            pa_exchange.remove_remote_particles()
 
-            self.num_local[i] = nnps.num_particles
-            self.num_remote[i] = nnps.num_remote
+            self.num_local[i] = pa_exchange.num_local
+            self.num_remote[i] = pa_exchange.num_remote
 
     def local_bin(self):
         """Create the local cell map.
@@ -1718,8 +1752,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef UIntArray lindices, gindices
         cdef int ierr
 
-        cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
-        cdef ParticleArrayExchange pa_exchange = nnps.pa_exchange
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
 
         # iterate over the Zoltan generated export lists
         for indexi in range(numCellExport):
@@ -1809,8 +1842,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef int numprocs = 0
         cdef int numparts = 0
 
-        cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
-        cdef ParticleArrayExchange pa_exchange = nnps.pa_exchange
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
 
         # reset the Zoltan lists
         self.reset_Zoltan_lists()
@@ -1919,7 +1951,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
     def update_local_data(self):
         """Update the cell map after load balance"""
-        cdef NNPSParticleGeometric nnps
+        cdef ParticleArrayExchange pa_exchange
         cdef int num_particles, i
         cdef UIntArray indices
 
@@ -1927,12 +1959,12 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.cells.clear()
 
         for i in range(self.narrays):
-            nnps = self.nnps[i]
-            num_particles = nnps.num_particles
+            pa_exchange = self.pa_exchanges[i]
+            num_particles = pa_exchange.num_local
 
             # set the number of local and global particles
-            self.num_local[i] = nnps.num_local_objects
-            self.num_global[i] = nnps.num_global_objects
+            self.num_local[i] = pa_exchange.num_local
+            self.num_global[i] = pa_exchange.num_global
 
             # bin the particles
             indices = arange_uint( num_particles )
@@ -1941,22 +1973,22 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     def update_remote_data(self):
         """Update the cell structure after sharing remote particles"""
         cdef int narrays = self.narrays
-        cdef int num_particles, num_remote, i
-        cdef NNPSParticleGeometric nnps
+        cdef int num_local, num_remote, i
+        cdef ParticleArrayExchange pa_exchange
         cdef UIntArray indices
 
         for i in range(narrays):
-            nnps = self.nnps[i]
+            pa_exchange = self.pa_exchanges[i]
 
             # get the number of local and remote particles
-            num_particles = nnps.num_particles
-            num_remote = nnps.num_remote
+            num_local = pa_exchange.num_local
+            num_remote = pa_exchange.num_remote
 
             # update the number of local/remote particles
-            self.num_local[i] = num_particles
+            self.num_local[i] = num_local
             self.num_remote[i] = num_remote
 
-            indices = arange_uint( num_particles, num_particles + num_remote )
+            indices = arange_uint( num_local, num_local + num_remote )
             self._bin( i, indices )        
 
     #######################################################################

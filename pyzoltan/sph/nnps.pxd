@@ -72,10 +72,10 @@ cdef class ParticleArrayExchange:
     cdef public ParticleArray pa                   # Particle data
     cdef public ParticleArrayWrapper pa_wrapper    # wrapper for data access
 
-    cdef public size_t num_particles     # Total number of particles 
+    cdef public size_t num_local         # Total number of particles
+    cdef public size_t num_global        # Global number of particles
     cdef public size_t num_remote        # Number of remote particles
     cdef public size_t num_ghost         # Number of ghost particles
-    cdef public size_t num_global        # Global number of particles
 
     # mpi.Comm object and associated rank and size
     cdef public object comm
@@ -189,10 +189,10 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     cdef public int ghost_layers         # BOunding box size
     cdef public double cell_size         # cell size used for binning
     
-    # list of particle arrays, wrappers and nnps instances
+    # list of particle arrays, wrappers, exchange and nnps instances
     cdef public list particles
     cdef public list pa_wrappers
-    cdef public list nnps
+    cdef public list pa_exchanges
 
     # number of local and remote particles
     cdef public list num_local
