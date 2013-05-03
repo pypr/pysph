@@ -679,22 +679,22 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
         cdef ParticleArrayExchange pa_exchange = self.pa_exchange
 
         # remove ghost particles from a previous step
-        pa_exchange.remove_remote_particles()
+        self.remove_remote_particles()
 
         # bin locally
         self.local_bin()
 
         if self.in_parallel:
             self.load_balance()                  # get import/export lists
-            pa_exchange.lb_exchange_data()       # exchange particle data
+            self.lb_exchange_data()              # exchange particle data
             self.update_local_particle_data()    # update local cell map
 
             self.compute_remote_particles()      # get remote import/export lists
-            pa_exchange.remote_exchange_data()   # exchange remote particle data
+            self.remote_exchange_data()          # exchange remote particle data
             self.update_remote_particle_data()   # update local cell map
 
             # align particles. I hate this but it must be done!
-            pa_exchange.align_particles()
+            self.align_particles()
 
     cpdef local_bin(self):
         """Bin the particles by deleting any previous cells and
@@ -930,6 +930,20 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         pa_exchange.importParticleProcs.resize( self.numImport )
         pa_exchange.importParticleProcs.copy_subset( self.importProcs )
+
+    def remove_remote_particles(self):
+        self.pa_exchange.remove_remote_particles()
+
+    def align_particles(self):
+        self.pa_exchange.align_particles()
+
+    def lb_exchange_data(self):
+        self.pa_exchange.lb_exchange_data()
+        self.num_particles = self.pa_exchange.num_particles
+
+    def remote_exchange_data(self):
+        self.pa_exchange.remote_exchange_data()
+        self.num_remote = self.pa_exchange.num_remote
 
     #######################################################
     # Functions for periodicity
@@ -1267,7 +1281,7 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
                         if ( (xij < hi) or (xij < hj) ):
                             if nnbrs == nbrs.length:
                                 nbrs.resize( nbrs.length + 50 )
-                                print """Warning: Extending the neighbor list to %d"""%(nbrs.length)
+                                print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
 
                             nbrs.data[ nnbrs ] = j
                             nnbrs = nnbrs + 1
@@ -1441,7 +1455,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             cell_size = 1.0
         self.cell_size = cell_size        
 
-    def update_gids(self):
+    def update_cell_gids(self):
         """Update global indices for the cells dictionary.
 
         The objects to be partitioned in this class are the cells and
@@ -1454,7 +1468,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.num_local_objects = len(self.cells)
         self._update_gid( self.cell_gid )
 
-        # update the particle gids
+    def update_particle_gids(self):
+        """Update individual particle global indices"""        
         for i in range(self.narrays):
             nnps = self.nnps[i]
             nnps.update_particle_gid()
@@ -1511,11 +1526,10 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         # remove remote particles from a previous step
         self.remove_remote_particles()
 
-        # create the initial local cell map
+        # update particle gids, bin particles and update cell gids
+        self.update_particle_gids()
         self.local_bin()
-
-        # update the global indices for the cells and particle ids
-        self.update_gids()
+        self.update_cell_gids()
 
         if self.in_parallel:
 
@@ -1705,6 +1719,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef int ierr
 
         cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
+        cdef ParticleArrayExchange pa_exchange = nnps.pa_exchange
 
         # iterate over the Zoltan generated export lists
         for indexi in range(numCellExport):
@@ -1741,25 +1756,25 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.Zoltan_Invert_Lists()
 
         # now copy over to the particle lists
-        nnps.numParticleExport = self.numExport
-        nnps.exportParticleGlobalids.resize( self.numExport )
-        nnps.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.numParticleExport = self.numExport
+        pa_exchange.exportParticleGlobalids.resize( self.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
 
-        nnps.exportParticleLocalids.resize( self.numExport )
-        nnps.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( self.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
 
-        nnps.exportParticleProcs.resize( self.numExport )
-        nnps.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( self.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
 
-        nnps.numParticleImport = self.numImport
-        nnps.importParticleGlobalids.resize( self.numImport )
-        nnps.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.numParticleImport = self.numImport
+        pa_exchange.importParticleGlobalids.resize( self.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
 
-        nnps.importParticleLocalids.resize( self.numImport )
-        nnps.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( self.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
 
-        nnps.importParticleProcs.resize( self.numImport )
-        nnps.importParticleProcs.copy_subset( self.importProcs )
+        pa_exchange.importParticleProcs.resize( self.numImport )
+        pa_exchange.importParticleProcs.copy_subset( self.importProcs )
 
     def compute_remote_particles(self, int pa_index):
         """Compute remote particles.
@@ -1795,6 +1810,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef int numparts = 0
 
         cdef NNPSParticleGeometric nnps = self.nnps[pa_index]
+        cdef ParticleArrayExchange pa_exchange = nnps.pa_exchange
 
         # reset the Zoltan lists
         self.reset_Zoltan_lists()
@@ -1854,26 +1870,26 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.Zoltan_Invert_Lists()
 
         # copy the lists to the particle lists
-        nnps.numParticleExport = self.numExport
-        nnps.numParticleImport = self.numImport
+        pa_exchange.numParticleExport = self.numExport
+        pa_exchange.numParticleImport = self.numImport
 
-        nnps.exportParticleGlobalids.resize( self.numExport )
-        nnps.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.exportParticleGlobalids.resize( self.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
 
-        nnps.exportParticleLocalids.resize( self.numExport )
-        nnps.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( self.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
         
-        nnps.exportParticleProcs.resize( self.numExport )
-        nnps.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( self.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
 
-        nnps.importParticleGlobalids.resize( self.numImport )
-        nnps.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.importParticleGlobalids.resize( self.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
 
-        nnps.importParticleLocalids.resize( self.numImport )
-        nnps.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( self.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
 
-        nnps.importParticleProcs.resize( self.numImport )
-        nnps.importParticleProcs.copy_subset( self.importProcs )        
+        pa_exchange.importParticleProcs.resize( self.numImport )
+        pa_exchange.importParticleProcs.copy_subset( self.importProcs )        
 
     def load_balance(self):
         """Use Zoltan to generate import/export lists for the cells."""
