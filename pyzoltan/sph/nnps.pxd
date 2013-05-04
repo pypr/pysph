@@ -7,7 +7,7 @@ from pyzoltan.sph.particle_array cimport ParticleArray
 from pyzoltan.core.point cimport *
 from pyzoltan.czoltan.zoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 from pyzoltan.czoltan cimport czoltan
-from pyzoltan.core.zoltan cimport ZoltanGeometricPartitioner
+from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
 
 cdef inline int real_to_int(double val, double step)
 cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
@@ -181,10 +181,18 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef brute_force_neighbors(self, size_t i,
                                 UIntArray nbrs)
 
-cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
+# Zoltan based parallel cell manager for SPH simulations
+cdef class ZoltanParallelManager:
     ############################################################################
     # Data Attributes
     ############################################################################
+    # mpi comm, rank and size
+    cdef public object comm
+    cdef public int rank
+    cdef public int size
+    
+    cdef public PyZoltan pz              # the PyZoltan wrapper for lb etc
+
     cdef public dict cells               # index structure
     cdef public int ghost_layers         # BOunding box size
     cdef public double cell_size         # cell size used for binning
@@ -230,7 +238,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     cdef public UIntArray importCellGlobalids
     cdef public UIntArray importCellLocalids
     cdef public IntArray importCellProcs
-    cdef public int numCellImport
+    cdef public int numCellImport    
 
     ############################################################################
     # Member functions
@@ -252,3 +260,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     # particle arrays
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t i, UIntArray nbrs)
+
+# Class of geometric load balancers
+cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
+    pass

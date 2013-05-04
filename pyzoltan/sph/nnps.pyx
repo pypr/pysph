@@ -10,6 +10,7 @@ import mpi4py.MPI as mpi
 
 # PyZoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
+from pyzoltan.core.zoltan cimport ZoltanGeometricPartitioner
 from pyzoltan.core import zoltan_utils
 
 # local imports
@@ -1358,8 +1359,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         return nbrs
 
-cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
-    """ Zoltan enabled NNPS which uses the cells for load balancing.
+cdef class ZoltanParallelManager:
+    """Base class for Zoltan enabled parallel cell managers.
 
     To partition a list of arrays, we do an NNPS like box sort on all
     arrays to create a global spatial indexing structure. The cells
@@ -1431,10 +1432,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.cy = DoubleArray()
         self.cy = DoubleArray()
 
-        # Initialize the base ZoltanGeometricPartitioner class. Here
-        # we pass a reference to the coordinate and global indices arrays.
-        super(NNPSCellGeometric, self).__init__(dim, comm, self.cx, self.cy, self.cz,
-                                                self.cell_gid)
+        # Initialize the base PyZoltan class. 
+        self.pz = PyZoltan(comm)
 
         # minimum and maximum arrays for MPI reduce operations. These
         # are used to find global bounds across processors.
@@ -1456,6 +1455,12 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         # from the init for ZoltanGeometricPartitioner, we have the
         # comm, rank and size setup
         self.in_parallel = True
+
+        # MPI comm rank and size
+        self.rank = self.pz.rank
+        self.size = self.pz.size
+        self.comm = self.pz.comm
+        
         if self.size == 1: self.in_parallel = False
 
         # The cells dictionary, radius scale for binning and ghost
@@ -1463,6 +1468,9 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         self.cells = {}
         self.radius_scale = radius_scale
         self.ghost_layers = ghost_layers
+
+        # setup cell import/export lists
+        self._setup_zoltan_arrays()
 
         # remove remote particles and create the local cell map
         self.remove_remote_particles()
@@ -1499,8 +1507,10 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
         """
         # update the cell gids
-        self.num_local_objects = len(self.cells)
-        self._update_gid( self.cell_gid )
+        cdef PyZoltan pz = self.pz
+
+        pz.num_local_objects = len(self.cells)
+        pz._update_gid( self.cell_gid )
 
     def update_particle_gids(self):
         """Update individual particle global indices"""        
@@ -1514,9 +1524,10 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     def update(self, initial=False):
         """Update the partition.
 
-        This is the main entry point for NNPSCellGeometric. Given
+        This is the main entry point for the parallel manager. Given
         particles distributed across processors, we bin them, assign
-        uniqe global indices and perform the following steps:
+        uniqe global indices for the cells and particles and
+        subsequently perform the following steps:
 
         (a) Call Zoltan's load balance function to get import and
             export lists for the cell indices.
@@ -1526,7 +1537,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             (b) Create particle import/export lists using the cell lists
                 returned by Zoltan.
 
-            (c) Call NNPSParticleGeometric's lb_exchange data with these particle
+            (c) Call ParticleArrayExchange's lb_exchange data with these particle
                 import/export lists to effect the data movement for particles.
 
         (d) Update the local cell map after the data has been exchanged.
@@ -1535,7 +1546,7 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
             (e) Compute remote particle import/export lists from the cell map
 
-            (f) Call NNPSParticleGeometric's remote_exchange_data with these lists
+            (f) Call ParticleArrayExchange's remote_exchange_data with these lists
                 to effect the data movement.
 
         now that the data movement is done,
@@ -1683,8 +1694,6 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef int narrays = self.narrays
         cdef int layers = self.ghost_layers
 
-        cdef int dim = self.dim
-
         # now bin the particles
         num_particles = indices.length
         for indexi in range(num_particles):
@@ -1724,10 +1733,13 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         We first construct the particle export lists in local arrays
         using the information from Zoltan_LB_Balance and subsequently
         call Zoltan_Invert_Lists to get the import lists. These arrays
-        are then copied to the NNPSParticleGeometric import/export
+        are then copied to the ParticleArrayExchange import/export
         lists.
 
         """
+        # PyZoltan reference
+        cdef PyZoltan pz = self.pz
+        
         # these are the Zoltan generated lists that correspond to cells
         cdef UIntArray exportCellLocalids = self.exportCellLocalids
         cdef UIntArray exportCellGlobalids = self.exportCellGlobalids
@@ -1775,39 +1787,39 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             cell_map.pop( cellid )
 
         # resize the export lists and copy
-        self.numExport =  _numExport
-        self.exportLocalids.resize( _numExport )
-        self.exportGlobalids.resize( _numExport )
-        self.exportProcs.resize( _numExport )
+        pz.numExport =  _numExport
+        pz.exportLocalids.resize( _numExport )
+        pz.exportGlobalids.resize( _numExport )
+        pz.exportProcs.resize( _numExport )
 
-        self.exportLocalids.copy_subset( _exportLocalids )
-        self.exportGlobalids.copy_subset( _exportGlobalids )
-        self.exportProcs.copy_subset( _exportProcs )
+        pz.exportLocalids.copy_subset( _exportLocalids )
+        pz.exportGlobalids.copy_subset( _exportGlobalids )
+        pz.exportProcs.copy_subset( _exportProcs )
 
         # Given the export particle indices, we invert the lists to
         # get the import lists from remote processors...
-        self.Zoltan_Invert_Lists()
+        pz.Zoltan_Invert_Lists()
 
         # now copy over to the particle lists
-        pa_exchange.numParticleExport = self.numExport
-        pa_exchange.exportParticleGlobalids.resize( self.numExport )
-        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.numParticleExport = pz.numExport
+        pa_exchange.exportParticleGlobalids.resize( pz.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( pz.exportGlobalids )
 
-        pa_exchange.exportParticleLocalids.resize( self.numExport )
-        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( pz.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( pz.exportLocalids )
 
-        pa_exchange.exportParticleProcs.resize( self.numExport )
-        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( pz.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( pz.exportProcs )
 
-        pa_exchange.numParticleImport = self.numImport
-        pa_exchange.importParticleGlobalids.resize( self.numImport )
-        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.numParticleImport = pz.numImport
+        pa_exchange.importParticleGlobalids.resize( pz.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( pz.importGlobalids )
 
-        pa_exchange.importParticleLocalids.resize( self.numImport )
-        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( pz.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( pz.importLocalids )
 
-        pa_exchange.importParticleProcs.resize( self.numImport )
-        pa_exchange.importParticleProcs.copy_subset( self.importProcs )
+        pa_exchange.importParticleProcs.resize( pz.numImport )
+        pa_exchange.importParticleProcs.copy_subset( pz.importProcs )
 
     def compute_remote_particles(self, int pa_index):
         """Compute remote particles.
@@ -1817,7 +1829,8 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         requirements.
         
         """
-        cdef Zoltan_Struct* zz = self._zstruct.zz
+        cdef PyZoltan pz = self.pz
+        cdef Zoltan_Struct* zz = pz._zstruct.zz
         cdef UIntArray exportGlobalids, exportLocalids
         cdef IntArray exportProcs
 
@@ -1845,14 +1858,14 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
         cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
 
         # reset the Zoltan lists
-        self.reset_Zoltan_lists()
-        exportGlobalids = self.exportGlobalids
-        exportLocalids = self.exportLocalids
-        exportProcs = self.exportProcs
+        pz.reset_Zoltan_lists()
+        exportGlobalids = pz.exportGlobalids
+        exportLocalids = pz.exportLocalids
+        exportProcs = pz.exportProcs
 
         # initialize the procs and parts
-        procs = self.procs
-        parts = self.parts
+        procs = pz.procs
+        parts = pz.parts
         
         for cid in cells:
             cell = cells[ cid ]
@@ -1895,62 +1908,84 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
                         exportProcs.append( nbrproc )
 
         # set the numImport and numExport
-        self.numImport = 0
-        self.numExport = exportProcs.length
+        pz.numImport = 0
+        pz.numExport = exportProcs.length
 
         # Invert the lists...
-        self.Zoltan_Invert_Lists()
+        pz.Zoltan_Invert_Lists()
 
         # copy the lists to the particle lists
-        pa_exchange.numParticleExport = self.numExport
-        pa_exchange.numParticleImport = self.numImport
+        pa_exchange.numParticleExport = pz.numExport
+        pa_exchange.numParticleImport = pz.numImport
 
-        pa_exchange.exportParticleGlobalids.resize( self.numExport )
-        pa_exchange.exportParticleGlobalids.copy_subset( self.exportGlobalids )
+        pa_exchange.exportParticleGlobalids.resize( pz.numExport )
+        pa_exchange.exportParticleGlobalids.copy_subset( pz.exportGlobalids )
 
-        pa_exchange.exportParticleLocalids.resize( self.numExport )
-        pa_exchange.exportParticleLocalids.copy_subset( self.exportLocalids )
+        pa_exchange.exportParticleLocalids.resize( pz.numExport )
+        pa_exchange.exportParticleLocalids.copy_subset( pz.exportLocalids )
         
-        pa_exchange.exportParticleProcs.resize( self.numExport )
-        pa_exchange.exportParticleProcs.copy_subset( self.exportProcs )
+        pa_exchange.exportParticleProcs.resize( pz.numExport )
+        pa_exchange.exportParticleProcs.copy_subset( pz.exportProcs )
 
-        pa_exchange.importParticleGlobalids.resize( self.numImport )
-        pa_exchange.importParticleGlobalids.copy_subset( self.importGlobalids )
+        pa_exchange.importParticleGlobalids.resize( pz.numImport )
+        pa_exchange.importParticleGlobalids.copy_subset( pz.importGlobalids )
 
-        pa_exchange.importParticleLocalids.resize( self.numImport )
-        pa_exchange.importParticleLocalids.copy_subset( self.importLocalids )
+        pa_exchange.importParticleLocalids.resize( pz.numImport )
+        pa_exchange.importParticleLocalids.copy_subset( pz.importLocalids )
 
-        pa_exchange.importParticleProcs.resize( self.numImport )
-        pa_exchange.importParticleProcs.copy_subset( self.importProcs )        
+        pa_exchange.importParticleProcs.resize( pz.numImport )
+        pa_exchange.importParticleProcs.copy_subset( pz.importProcs )        
 
     def load_balance(self):
-        """Use Zoltan to generate import/export lists for the cells."""
-        self.Zoltan_LB_Balance()
+        """Use Zoltan to generate import/export lists for the cells.
+
+        For the Zoltan interface, we require to populate a user
+        defined struct with appropriate data for Zoltan to deal
+        with. For the geometric based partitioners for example, we
+        require the unique cell global indices and arrays for the cell
+        centroid coordinates. Computation of this data must be done
+        prior to calling 'pz.Zoltan_LB_Balance' through a call to
+        'set_data'
+
+        """
+        cdef PyZoltan pz = self.pz
+
+        # set the data which will be used by the Zoltan wrapper
+        self.set_data()
+
+        # call Zoltan to get the cell import/export lists
+        pz.Zoltan_LB_Balance()
 
         # copy the Zoltan export lists to the cell lists
-        self.numCellExport = self.numExport
-        self.exportCellGlobalids.resize( self.numExport )
-        self.exportCellGlobalids.copy_subset( self.exportGlobalids )
+        self.numCellExport = pz.numExport
+        self.exportCellGlobalids.resize( pz.numExport )
+        self.exportCellGlobalids.copy_subset( pz.exportGlobalids )
 
-        self.exportCellLocalids.resize( self.numExport )
-        self.exportCellLocalids.copy_subset( self.exportLocalids )
+        self.exportCellLocalids.resize( pz.numExport )
+        self.exportCellLocalids.copy_subset( pz.exportLocalids )
 
-        self.exportCellProcs.resize( self.numExport )
-        self.exportCellProcs.copy_subset( self.exportProcs )
+        self.exportCellProcs.resize( pz.numExport )
+        self.exportCellProcs.copy_subset( pz.exportProcs )
 
         # copy the Zoltan import lists to the cell lists
-        self.numCellImport = self.numImport
-        self.importCellGlobalids.resize( self.numImport )
-        self.importCellGlobalids.copy_subset( self.importGlobalids )
+        self.numCellImport = pz.numImport
+        self.importCellGlobalids.resize( pz.numImport )
+        self.importCellGlobalids.copy_subset( pz.importGlobalids )
 
-        self.importCellLocalids.resize( self.numImport )
-        self.importCellLocalids.copy_subset( self.importLocalids )
+        self.importCellLocalids.resize( pz.numImport )
+        self.importCellLocalids.copy_subset( pz.importLocalids )
 
-        self.importCellProcs.resize( self.numImport )
-        self.importCellProcs.copy_subset( self.importProcs )
+        self.importCellProcs.resize( pz.numImport )
+        self.importCellProcs.copy_subset( pz.importProcs )
 
     def update_local_data(self):
-        """Update the cell map after load balance"""
+        """Update the cell map after load balance.
+        
+        After the load balancing step, each processor has a new set of
+        local particles which need to be indexed. This new cell
+        structure is then used to compute remote particles.
+
+        """
         cdef ParticleArrayExchange pa_exchange
         cdef int num_particles, i
         cdef UIntArray indices
@@ -1971,7 +2006,12 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
             self._bin(i, indices)
 
     def update_remote_data(self):
-        """Update the cell structure after sharing remote particles"""
+        """Update the cell structure after sharing remote particles.
+
+        After exchanging remote particles, we need to index the new
+        remote particles for a possible neighbor query.
+
+        """
         cdef int narrays = self.narrays
         cdef int num_local, num_remote, i
         cdef ParticleArrayExchange pa_exchange
@@ -1994,44 +2034,11 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
     #######################################################################
     # Private interface
     #######################################################################
-    def _set_data(self):
-        """Set the user defined particle data structure for Zoltan."""
-
-        cdef dict cell_map = self.cells
-        cdef list cells = cell_map.values()
-        cdef int num_local_objects = self.num_local_objects
-        cdef int num_global_objects = self.num_global_objects
-
-        cdef UIntArray gid = self.cell_gid
-        cdef DoubleArray x = self.cx
-        cdef DoubleArray y = self.cy
-
-        cdef int i
-        cdef Cell cell
-        cdef cPoint centroid
-
-        # resize the coordinate arrays
-        x.resize( num_local_objects )
-        y.resize( num_local_objects )
-
-        # populate the arrays
-        for i in range( num_local_objects ):
-            cell = cells[ i ]
-            centroid = cell.centroid
-
-            x.data[i] = centroid.x
-            y.data[i] = centroid.y        
-        
-        self._cdata.numGlobalPoints = <ZOLTAN_ID_TYPE>num_global_objects
-        self._cdata.numMyPoints = <ZOLTAN_ID_TYPE>num_local_objects
-        
-        self._cdata.myGlobalIDs = gid.data
-        self._cdata.x = x.data
-        self._cdata.y = y.data
+    def set_data(self):
+        """Compute the user defined data for use with Zoltan"""
+        raise NotImplementedError("ZoltanParallelManager::_set_data should not be called!")
 
     def _setup_zoltan_arrays(self):
-        super( NNPSCellGeometric, self )._setup_zoltan_arrays()
-
         # Import/Export lists for cells
         self.exportCellGlobalids = UIntArray()
         self.exportCellLocalids = UIntArray()
@@ -2181,3 +2188,61 @@ cdef class NNPSCellGeometric(ZoltanGeometricPartitioner):
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs
+
+cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
+    """Zoltan enabled parallel manager for use with geometric load balancing.
+
+    Use this class for the Zoltan RCB, RIB and HSFC load balancing
+    algorithms.
+
+    """
+    def __init__(self, int dim, list particles, object comm,
+                 double radius_scale=2.0,
+                 int ghost_layers=2, domain=None,
+                 lb_props=None, str lb_method='RCB'):
+
+        # initialize the base class
+        super(ZoltanParallelManagerGeometric, self).__init__(
+            dim, particles, comm, radius_scale, ghost_layers, domain,
+            lb_props, lb_method)
+
+        # concrete implementation of a PyZoltan class
+        self.pz = ZoltanGeometricPartitioner(
+            dim, self.comm, self.cx, self.cy, self.cz, self.cell_gid)
+                                                
+    def set_data(self):
+        """Set the user defined particle data structure for Zoltan.
+
+        For the geometric based partitioners, Zoltan requires as input
+        the number of local/global objects, unique global indices for
+        the local objects and coordinate values for the local
+        objects.
+
+        """
+
+        cdef ZoltanGeometricPartitioner pz = self.pz
+        
+        cdef dict cell_map = self.cells
+        cdef list cells = cell_map.values()
+
+        cdef int num_local_objects = pz.num_local_objects
+        cdef int num_global_objects = pz.num_global_objects
+
+        cdef DoubleArray x = self.cx
+        cdef DoubleArray y = self.cy
+
+        cdef int i
+        cdef Cell cell
+        cdef cPoint centroid
+
+        # resize the coordinate arrays
+        x.resize( num_local_objects )
+        y.resize( num_local_objects )
+
+        # populate the arrays
+        for i in range( num_local_objects ):
+            cell = cells[ i ]
+            centroid = cell.centroid
+
+            x.data[i] = centroid.x
+            y.data[i] = centroid.y

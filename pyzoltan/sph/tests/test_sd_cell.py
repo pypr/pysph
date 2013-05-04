@@ -9,7 +9,7 @@ from numpy import savez, load
 from pyzoltan.core.point import Point
 from pyzoltan.core.carray import UIntArray
 from pyzoltan.sph.kernels import CubicSpline
-from pyzoltan.sph.nnps import NNPSCellGeometric
+from pyzoltan.sph.nnps import ZoltanParallelManagerGeometric
 from pyzoltan.sph.nnps_utils import get_particle_array
 
 """Utility to compute summation density"""
@@ -68,7 +68,7 @@ global_gid = numpy.array( range(numGlobalPoints), dtype=numpy.uint32 )
 global_h = numpy.ones_like(global_x) * 1.2*dx
 
 PA = get_particle_array(x=global_x, y=global_y, h=global_h, gid=global_gid)
-NPS = NNPSCellGeometric(dim=2, particles=[PA,], comm=comm)
+NPS = ZoltanParallelManagerGeometric(dim=2, particles=[PA,], comm=comm)
 
 if rank == 0:
     # compute the initial RHO
@@ -85,13 +85,14 @@ pa = get_particle_array(x=global_x[rank*numMyPoints:(rank+1)*numMyPoints],
                         gid=global_gid[rank*numMyPoints:(rank+1)*numMyPoints])
 
 # create the local nnps object
-nps = NNPSCellGeometric(dim=2, comm=comm, particles=[pa,])
+nps = ZoltanParallelManagerGeometric(dim=2, comm=comm, particles=[pa,])
 
 # set the Zoltan parameters (Optional)
-nps.set_lb_method("RIB")
-nps.Zoltan_Set_Param("RETURN_LISTS", "ALL")
-nps.Zoltan_Set_Param("DEBUG_LEVEL", "0")
-nps.Zoltan_Set_Param("KEEP_CUTS", "1")
+pz = nps.pz
+pz.set_lb_method("RIB")
+pz.Zoltan_Set_Param("RETURN_LISTS", "ALL")
+pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
+pz.Zoltan_Set_Param("KEEP_CUTS", "1")
 
 # CALL NNPS update
 nps.update()
