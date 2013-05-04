@@ -46,7 +46,7 @@ cdef _check_error(int ierr):
         raise MemoryError("Zoltan MEMERR error!")
 
 ###############################################################
-# ZOLTAN QUERY FUNCTIONS
+# ZOLTAN QUERY FUNCTIONS FOR GEOMETRIC PARTITIONING
 ###############################################################
 cdef int get_number_of_objects(void* data, int* ierr):
     """Return the number of local objects on a processor.
@@ -115,7 +115,19 @@ cdef class PyZoltan:
         # set default values
         self._set_default()
 
+    #######################################################################
+    # Public interface
+    #######################################################################
+    def set_num_local_objects(self, int num_local_objects):
+        """Set the number of local objects"""
+        self.num_local_objects = num_local_objects
+
+    def set_num_global_objects(self, int num_global_objects):
+        """Set the number of global objects"""
+        self.num_global_objects = num_global_objects        
+
     def Zoltan_Initialize(self, int argc=0, args=''):
+        """Initialize Zoltan"""
         cdef float version
         cdef char **c_argv
         
@@ -136,12 +148,14 @@ cdef class PyZoltan:
         return version        
 
     def Zoltan_Create(self, mpi.Comm comm):
+        """Create the Zoltan struct"""
         cdef mpic.MPI_Comm _comm = comm.ob_mpi
 
         cdef czoltan.Zoltan_Struct* zz = czoltan.Zoltan_Create( _comm )
         self._zstruct.zz = zz
 
     def Zoltan_Set_Param(self, str _name, str _value):
+        """Set a general Zoltan Parameter"""
         cdef bytes tmp_name = _name.encode()
         cdef bytes tmp_value = _value.encode()
 
@@ -152,6 +166,7 @@ cdef class PyZoltan:
         czoltan.Zoltan_Set_Param( zz, name, value )
 
     def set_lb_method(self, str value):
+        """Set the Zoltan load balancing method"""
         cdef str name = "LB_METHOD"
         self.lb_method = value
         
@@ -159,64 +174,9 @@ cdef class PyZoltan:
         self.ZOLTAN_LB_METHOD = value
 
     def Zoltan_Destroy(self):
+        """Destroy the Zoltan struct"""
         czoltan.Zoltan_Destroy( &self._zstruct.zz )
 
-    def _setup_zoltan_arrays(self):
-        self.exportGlobalids = UIntArray()
-        self.exportLocalids = UIntArray()
-        self.exportProcs = IntArray()
-
-        self.importGlobalids = UIntArray()
-        self.importLocalids = UIntArray()
-        self.importProcs = IntArray()
-
-        self.procs = np.ones(shape=self.size, dtype=np.int32)
-        self.parts = np.ones(shape=self.size, dtype=np.int32)
-
-    def _print_config(self):
-        if self.rank == 0:
-            if UNSIGNED_INT_GLOBAL_IDS:
-                id_type_str = "ZOLTAN_ID_TYPE = unsigned int"
-                print """Zoltan Configuration from Zoltan_config.h:
-                version = %g
-                %s 
-                """%(self.version, id_type_str)
-
-    def _set_default(self):
-        self.ZOLTAN_DEBUG_LEVEL = "1"
-        self.Zoltan_Set_Param("DEBUG_LEVEL", "1")
-        
-        self.ZOLTAN_OBJ_WEIGHT_DIM = "0"
-        self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", "0")
-        
-        self.ZOLTAN_EDGE_WEIGHT_DIM = "0"
-        self.Zoltan_Set_Param("EDGE_WEIGHT_DIM", "0")
-        
-        self.ZOLTAN_RETURN_LISTS = "ALL"
-        self.Zoltan_Set_Param("RETURN_LISTS", "ALL")
-
-    def __dealloc__(self):
-        self.Zoltan_Destroy()
-
-cdef class ZoltanGeometricPartitioner(PyZoltan):
-    def __init__(self, int dim, object comm, DoubleArray x, DoubleArray y,
-                 DoubleArray z, UIntArray gid):
-        super(ZoltanGeometricPartitioner, self).__init__(comm)
-        self.dim = dim
-
-        self.x = x
-        self.y = y
-        self.z = z
-        self.gid = gid
-
-        self.num_local_objects = x.length
-
-        # register the query functions with Zoltan
-        self.Zoltan_register_query_functions()
-        
-    ######################################################################
-    # Public interface
-    ######################################################################
     def Zoltan_LB_Balance(self):
         """Call the Zoltan load balancing function.
         
@@ -404,34 +364,6 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         _check_error(ierr)
 
-    def Zoltan_register_query_functions(self):
-        cdef Zoltan_Struct* zz = self._zstruct.zz
-        cdef int err
-
-        # number of objects function
-        err = czoltan.Zoltan_Set_Num_Obj_Fn(
-            zz, &get_number_of_objects, <void*>&self._cdata)
-
-        _check_error(err)
-
-        # object list function
-        err = czoltan.Zoltan_Set_Obj_List_Fn(
-            zz, &get_obj_list, <void*>&self._cdata)
-
-        _check_error(err)
-
-        # geom num geom function
-        err = czoltan.Zoltan_Set_Num_Geom_Fn(
-            zz, &get_num_geom, <void*>&self._cdata)
-
-        _check_error(err)
-
-        # geom multi function
-        err = czoltan.Zoltan_Set_Geom_Multi_Fn(
-            zz, &get_geometry_list, <void*>&self._cdata)
-
-        _check_error(err)
-
     def _update_gid(self, UIntArray gid):
         """Update the unique global indices.
 
@@ -461,17 +393,111 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
             gid.data[i] = <ZOLTAN_ID_TYPE> ( _sum + i )
 
         self.num_global_objects = num_global_objects
-        self.num_local_objects = num_local_objects
+        self.num_local_objects = num_local_objects        
 
-    def set_num_local_objects(self, int num_local_objects):
-        self.num_local_objects = num_local_objects
+    def _setup_zoltan_arrays(self):
+        self.exportGlobalids = UIntArray()
+        self.exportLocalids = UIntArray()
+        self.exportProcs = IntArray()
 
-    def set_num_global_objects(self, int num_global_objects):
-        self.num_global_objects = num_global_objects
+        self.importGlobalids = UIntArray()
+        self.importLocalids = UIntArray()
+        self.importProcs = IntArray()
+
+        self.procs = np.ones(shape=self.size, dtype=np.int32)
+        self.parts = np.ones(shape=self.size, dtype=np.int32)
+
+    def _set_default(self):
+        self.ZOLTAN_DEBUG_LEVEL = "1"
+        self.Zoltan_Set_Param("DEBUG_LEVEL", "1")
+        
+        self.ZOLTAN_OBJ_WEIGHT_DIM = "0"
+        self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", "0")
+        
+        self.ZOLTAN_EDGE_WEIGHT_DIM = "0"
+        self.Zoltan_Set_Param("EDGE_WEIGHT_DIM", "0")
+        
+        self.ZOLTAN_RETURN_LISTS = "ALL"
+        self.Zoltan_Set_Param("RETURN_LISTS", "ALL")
+
+    def _set_data(self):
+        raise NotImplementedError("PyZoltan::_set_data should not be called!")
+
+    def __dealloc__(self):
+        self.Zoltan_Destroy()
+
+cdef class ZoltanGeometricPartitioner(PyZoltan):
+    """Concrete implementation of PyZoltan using the geometric algorithms.
+
+    Use the ZoltanGeometricPartitioner to load balance/partition a set
+    of objects defined by their coordinates (x, y & z) and an array of
+    unique global indices.
+
+    """
+    def __init__(self, int dim, object comm, DoubleArray x, DoubleArray y,
+                 DoubleArray z, UIntArray gid):
+        """Constructor
+
+        Parameters:
+        -----------
+
+        dim : int
+            Problem dimensionality
+
+        comm : mpi4py.MPI.Comm
+            MPI communicator (typically COMM_WORLD)
+
+        x, y, z : DoubleArray
+            Coordinate arrays for the objects to be partitioned
+
+        gid : UIntArray
+            Global indices for the objects to be partitioned
+        """
+        super(ZoltanGeometricPartitioner, self).__init__(comm)
+        self.dim = dim
+
+        self.x = x
+        self.y = y
+        self.z = z
+        self.gid = gid
+
+        self.num_local_objects = x.length
+
+        # register the query functions with Zoltan
+        self._Zoltan_register_query_functions()
 
     #######################################################################
     # Private interface
     #######################################################################
+    def _Zoltan_register_query_functions(self):
+        """Query functions for the Geometric based partitioners."""
+        cdef Zoltan_Struct* zz = self._zstruct.zz
+        cdef int err
+
+        # number of objects function
+        err = czoltan.Zoltan_Set_Num_Obj_Fn(
+            zz, &get_number_of_objects, <void*>&self._cdata)
+
+        _check_error(err)
+
+        # object list function
+        err = czoltan.Zoltan_Set_Obj_List_Fn(
+            zz, &get_obj_list, <void*>&self._cdata)
+
+        _check_error(err)
+
+        # geom num geom function
+        err = czoltan.Zoltan_Set_Num_Geom_Fn(
+            zz, &get_num_geom, <void*>&self._cdata)
+
+        _check_error(err)
+
+        # geom multi function
+        err = czoltan.Zoltan_Set_Geom_Multi_Fn(
+            zz, &get_geometry_list, <void*>&self._cdata)
+
+        _check_error(err)
+
     def _set_data(self):
         """Set the user defined particle data structure for Zoltan.
 
@@ -489,6 +515,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         self._cdata.y = self.y.data
 
     def _set_default(self):
+        """Resonable defaults?"""
         PyZoltan._set_default(self)
 
         self.ZOLTAN_KEEP_CUTS = "1"

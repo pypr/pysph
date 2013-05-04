@@ -61,6 +61,26 @@ cdef class PyZoltan:
     cdef public str ZOLTAN_EDGE_WEIGHT_DIM
     cdef public str ZOLTAN_RETURN_LISTS
 
+    ###############################################################
+    # Member functions
+    ###############################################################
+    # after a load balance, copy the Zoltan allocated lists to local
+    # numpy arrays. The Zoltan lists are freed after a call to LB_Balance
+    cdef _set_Zoltan_lists(
+        self,                                           
+        int numExport,                          # number of objects to export
+        ZOLTAN_ID_PTR _exportGlobal,            # global indices of export objects
+        ZOLTAN_ID_PTR _exportLocal,             # local indices of export objects
+        int* _exportProcs,                      # target processors to export
+        int numImport,                          # number of objects to import
+        ZOLTAN_ID_PTR _importGlobal,            # global indices of import objects
+        ZOLTAN_ID_PTR _importLocal,             # local indices of import objects
+        int* _importProcs                       # target processors to import
+        )
+
+    # Invert the lists after computing remote particles
+    cpdef Zoltan_Invert_Lists(self)    
+
 # User defined data for the RCB, RIB and HSFC methods
 cdef struct CoordinateData:
     int numGlobalPoints
@@ -86,24 +106,4 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
     # ZOLTAN parameters for Geometric partitioners
     cdef public str ZOLTAN_KEEP_CUTS
     cdef public str ZOLTAN_LB_METHOD
-
-    ###############################################################
-    # Member functions
-    ###############################################################
-    # after a load balance, copy the Zoltan allocated lists to local
-    # numpy arrays. The Zoltan lists are freed after a call to LB_Balance
-    cdef _set_Zoltan_lists(
-        self,                                           
-        int numExport,                          # number of objects to export
-        ZOLTAN_ID_PTR _exportGlobal,            # global indices of export objects
-        ZOLTAN_ID_PTR _exportLocal,             # local indices of export objects
-        int* _exportProcs,                      # target processors to export
-        int numImport,                          # number of objects to import
-        ZOLTAN_ID_PTR _importGlobal,            # global indices of import objects
-        ZOLTAN_ID_PTR _importLocal,             # local indices of import objects
-        int* _importProcs                       # target processors to import
-        )
-
-    # Invert the lists after computing remote particles
-    cpdef Zoltan_Invert_Lists(self)
     
