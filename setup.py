@@ -87,14 +87,14 @@ if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
     d['main'](None)
 
 setup(name='PyZoltan',
-      version = '1.0alpha',
+      version = '1.0',
       author = 'PySPH Developers',
       author_email = 'pysph-dev@googlegroups.com',
-      description = "A general purpose Smoothed Particle Hydrodynamics framework",
+      description = "Wrapper for the Zotlan data management library",
       long_description = __doc__,
-      url = 'http://pysph.googlecode.com',
+      url = 'http://ww.bitbucket.org/kunalp/pyzoltan',
       license = "BSD",
-      keywords = "SPH simulation computational fluid dynamics",
+      keywords = "Dynamic load balancing SPH AMR",
       test_suite = "nose.collector",
       packages = find_packages(),
 
@@ -110,7 +110,7 @@ setup(name='PyZoltan',
       #    [console_scripts]
       #    pysph_viewer = pysph.tools.mayavi_viewer:main
       #    """,
-      platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
+      platforms=['Linux', 'Mac OS-X', 'Unix'],
       classifiers = [c.strip() for c in """\
         Development Status :: 3 - Alpha
         Environment :: Console
@@ -119,7 +119,6 @@ setup(name='PyZoltan',
         License :: OSI Approved :: BSD License
         Natural Language :: English
         Operating System :: MacOS :: MacOS X
-        Operating System :: Microsoft :: Windows
         Operating System :: POSIX
         Operating System :: Unix
         Programming Language :: Python
