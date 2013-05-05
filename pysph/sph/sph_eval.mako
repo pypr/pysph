@@ -5,6 +5,7 @@ ${' '*4*level}${l}
 % endfor
 </%def>
 
+from libc.math cimport pow, sqrt
 cimport numpy
 from pysph.base.carray cimport DoubleArray, LongArray, IntArray
 from pysph.base.carray import DoubleArray, LongArray, IntArray
@@ -43,23 +44,23 @@ cdef class SPHCalc:
             setattr(self, name, ParticleArrayWrapper(pa))
     
     cpdef compute(self):
-        cdef long s_idx, d_idx, NP_SRC, NP_DEST
+        cdef long s_idx, d_idx, nbr_idx, NP_SRC, NP_DEST
         cdef LongArray nbrs = LongArray()
         #######################################################################
         ##  Declare all the arrays.
         #######################################################################
         # Arrays.\
-        ${indent(object._get_array_declarations(), 2)}
+        ${indent(object.get_array_declarations(), 2)}
         #######################################################################
         ## Declare any variables.
         #######################################################################
         # Variables.\
-        ${indent(object._get_variable_declarations(), 2)}
+        ${indent(object.get_variable_declarations(), 2)}
         #######################################################################
         ## Iterate over groups:
         ## Groups are organized as {destination: (eqs_with_no_source, sources)}
-        ## eqs_with_no_source: [equations] all SPH Equations with no source.
-        ## sources are {source: [equations...]} 
+        ## eqs_with_no_source: Group([equations]) all SPH Equations with no source.
+        ## sources are {source: Group([equations...])} 
         #######################################################################
         % for g_idx, group in enumerate(object.groups):
         # Group ${g_idx}.
@@ -71,38 +72,35 @@ cdef class SPHCalc:
         #######################################################################
         ## Setup destination array pointers.
         #######################################################################
-        ${indent(object._get_dest_array_setup(dest, eqs_with_no_source, sources), 2)}
+        ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources), 2)}
         #######################################################################
         ## Handle all the equations that do not have a source.
         #######################################################################
-        % if len(eqs_with_no_source) > 0:
+        % if len(eqs_with_no_source.equations) > 0:
         # SPH Equations with no sources.
         for d_idx in range(NP_DEST):
-            % for equation in eqs_with_no_source:
-            # Equation ${equation.__class__.__name__}. \
-            ${indent(object._get_equation_loop(equation), 3)}
-            % endfor
+            ${indent(eqs_with_no_source.get_loop_code(object.kernel), 3)}
         % endif
         #######################################################################
         ## Iterate over sources.
         #######################################################################
-        % for source, equations in sources.iteritems():
+        % for source, eq_group in sources.iteritems():
         # Source ${source}.\
         #######################################################################
         ## Setup source array pointers.
         #######################################################################
-        ${indent(object._get_src_array_setup(source, equations), 2)}
+        ${indent(object.get_src_array_setup(source, eq_group), 2)}
         # Locator.\
         #######################################################################
         ## Create the locator
         #######################################################################
-        ${indent(object._get_locator_code(source, dest), 2)}
+        ${indent(object.get_locator_code(source, dest), 2)}
         #######################################################################
         ## Iterate over destination particles.
         #######################################################################
         for d_idx in range(NP_DEST):
             # Initialize temp vars.\
-            ${indent(object._get_initialization(equations), 3)}
+            ${indent(object.get_initialization(eq_group), 3)}
             ###################################################################
             ## Find and iterate over neighbors.
             ###################################################################
@@ -112,17 +110,12 @@ cdef class SPHCalc:
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
                 ###############################################################
-                % for equation in equations:
-                # Equation ${equation.__class__.__name__}. \
-                ${indent(object._get_equation_loop(equation), 4)}
-                % endfor
+                ${indent(eq_group.get_loop_code(object.kernel), 4)}
             ###################################################################
             ## Do any post neighbor loop assignments.
             ###################################################################
-            # Set destination values.\
-            % for equation in equations:
-            ${indent(equation.cython_code().get('post', ''), 3)}
-            % endfor
+            # Post-loop code.\
+            ${indent(eq_group.get_post_loop_code(object.kernel), 3)}
         # Source ${source} done.
         % endfor
         # Destination ${dest} done.
