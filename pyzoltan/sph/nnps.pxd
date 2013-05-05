@@ -181,8 +181,8 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
     cpdef brute_force_neighbors(self, size_t i,
                                 UIntArray nbrs)
 
-# Zoltan based parallel cell manager for SPH simulations
-cdef class ZoltanParallelManager:
+# base class for all parallel managers
+cdef class ParallelManager:
     ############################################################################
     # Data Attributes
     ############################################################################
@@ -190,13 +190,11 @@ cdef class ZoltanParallelManager:
     cdef public object comm
     cdef public int rank
     cdef public int size
-    
-    cdef public PyZoltan pz              # the PyZoltan wrapper for lb etc
 
     cdef public dict cells               # index structure
     cdef public int ghost_layers         # BOunding box size
     cdef public double cell_size         # cell size used for binning
-    
+
     # list of particle arrays, wrappers, exchange and nnps instances
     cdef public list particles
     cdef public list pa_wrappers
@@ -229,7 +227,7 @@ cdef class ZoltanParallelManager:
     # cell coordinate values
     cdef DoubleArray cx, cy, cz
 
-    # Zoltan Import/Export lists for cells
+    # Import/Export lists for cells
     cdef public UIntArray exportCellGlobalids
     cdef public UIntArray exportCellLocalids
     cdef public IntArray exportCellProcs
@@ -259,7 +257,14 @@ cdef class ZoltanParallelManager:
     # nearest neighbor search routines taking into account multiple
     # particle arrays
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t i, UIntArray nbrs)
+                                size_t i, UIntArray nbrs)    
+
+# Zoltan based parallel cell manager for SPH simulations
+cdef class ZoltanParallelManager(ParallelManager):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef public PyZoltan pz              # the PyZoltan wrapper for lb etc
 
 # Class of geometric load balancers
 cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):

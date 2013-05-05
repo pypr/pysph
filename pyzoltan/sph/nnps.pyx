@@ -1359,26 +1359,12 @@ cdef class NNPSParticleGeometric(ZoltanGeometricPartitioner):
 
         return nbrs
 
-cdef class ZoltanParallelManager:
-    """Base class for Zoltan enabled parallel cell managers.
-
-    To partition a list of arrays, we do an NNPS like box sort on all
-    arrays to create a global spatial indexing structure. The cells
-    are then used as 'objects' to be partitioned by Zoltan. The cells
-    dictionary (cell-map) need not be unique across processors. We are
-    responsible for assignning unique global ids for the cells.
-
-    The Zoltan generated (cell) import/export lists are then used to
-    construct particle import/export lists which are used to perform
-    the data movement of the particles. A ParticleArrayExchange object
-    (lb_exchange_data and remote_exchange_data) is used for each
-    particle array in turn to effect this movement.
-
-    """
+cdef class ParallelManager:
+    """Base class for all parallel managers."""
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None, str lb_method='RCB'):
+                 lb_props=None):
         """Constructor.
 
         Parameters:
@@ -1405,9 +1391,6 @@ cdef class ZoltanParallelManager:
         lb_props : list
             optional list of properties required for load balancing
 
-        lb_method : string
-            optional initial load balancing method
-
         """
         # number of arrays and a reference to the particle list
         self.narrays = len(particles)
@@ -1424,16 +1407,13 @@ cdef class ZoltanParallelManager:
         self.num_global = [0] * self.narrays
         self.num_remote = [0] * self.narrays
 
-        # global indices used by Zoltan
+        # global indices used for load balancing
         self.cell_gid = UIntArray()
 
-        # cell coordinate values used by Zoltan
+        # cell coordinate values used for load balancing
         self.cx = DoubleArray()
         self.cy = DoubleArray()
         self.cy = DoubleArray()
-
-        # Initialize the base PyZoltan class. 
-        self.pz = PyZoltan(comm)
 
         # minimum and maximum arrays for MPI reduce operations. These
         # are used to find global bounds across processors.
@@ -1457,9 +1437,9 @@ cdef class ZoltanParallelManager:
         self.in_parallel = True
 
         # MPI comm rank and size
-        self.rank = self.pz.rank
-        self.size = self.pz.size
-        self.comm = self.pz.comm
+        self.comm = comm
+        self.rank = comm.Get_rank()
+        self.size = comm.Get_size()
         
         if self.size == 1: self.in_parallel = False
 
@@ -1470,7 +1450,7 @@ cdef class ZoltanParallelManager:
         self.ghost_layers = ghost_layers
 
         # setup cell import/export lists
-        self._setup_zoltan_arrays()
+        self._setup_arrays()
 
         # remove remote particles and create the local cell map
         self.remove_remote_particles()
@@ -1529,13 +1509,13 @@ cdef class ZoltanParallelManager:
         uniqe global indices for the cells and particles and
         subsequently perform the following steps:
 
-        (a) Call Zoltan's load balance function to get import and
-            export lists for the cell indices.
+        (a) Call a load balancing function to get import and export
+            lists for the cell indices.
 
         for each particle array:
 
-            (b) Create particle import/export lists using the cell lists
-                returned by Zoltan.
+            (b) Create particle import/export lists using the cell
+                import/export lists
 
             (c) Call ParticleArrayExchange's lb_exchange data with these particle
                 import/export lists to effect the data movement for particles.
@@ -1556,10 +1536,11 @@ cdef class ZoltanParallelManager:
         Notes:
         ------
 
-        Although not intended to be a 'parallel' NNPS, NNPSCellGeometric can be
-        used for this purpose. I don't think this is advisable in variable
-        smoothing length simulations where we should be using a very coarse
-        grained partitioning to ensure safe local computations.
+        Although not intended to be a 'parallel' NNPS, the
+        ParallelManager can be used for this purpose. I don't think
+        this is advisable in variable smoothing length simulations
+        where we should be using a very coarse grained partitioning to
+        ensure safe local computations.
 
         For two step integrators commonly employed in SPH and with a
         sufficient number of ghost layers for remote particles, we
@@ -1722,8 +1703,284 @@ cdef class ZoltanParallelManager:
             lindices.append( <ZOLTAN_ID_TYPE> i )
             gindices.append( gid.data[i] )
 
+    def update_local_data(self):
+        """Update the cell map after load balance.
+        
+        After the load balancing step, each processor has a new set of
+        local particles which need to be indexed. This new cell
+        structure is then used to compute remote particles.
+
+        """
+        cdef ParticleArrayExchange pa_exchange
+        cdef int num_particles, i
+        cdef UIntArray indices
+
+        # clear the local cells dict
+        self.cells.clear()
+
+        for i in range(self.narrays):
+            pa_exchange = self.pa_exchanges[i]
+            num_particles = pa_exchange.num_local
+
+            # set the number of local and global particles
+            self.num_local[i] = pa_exchange.num_local
+            self.num_global[i] = pa_exchange.num_global
+
+            # bin the particles
+            indices = arange_uint( num_particles )
+            self._bin(i, indices)
+
+    def update_remote_data(self):
+        """Update the cell structure after sharing remote particles.
+
+        After exchanging remote particles, we need to index the new
+        remote particles for a possible neighbor query.
+
+        """
+        cdef int narrays = self.narrays
+        cdef int num_local, num_remote, i
+        cdef ParticleArrayExchange pa_exchange
+        cdef UIntArray indices
+
+        for i in range(narrays):
+            pa_exchange = self.pa_exchanges[i]
+
+            # get the number of local and remote particles
+            num_local = pa_exchange.num_local
+            num_remote = pa_exchange.num_remote
+
+            # update the number of local/remote particles
+            self.num_local[i] = num_local
+            self.num_remote[i] = num_remote
+
+            indices = arange_uint( num_local, num_local + num_remote )
+            self._bin( i, indices )
+
+    def load_balance(self):
+        raise NotImplementedError("ParallelManager::load_balance")
+
+    def create_particle_lists(self, pa_index):
+        raise NotImplementedError("ParallelManager::create_particle_lists")
+
+    def compute_remote_particles(self, pa_index):
+        raise NotImplementedError("ParallelManager::compute_remote_particles")
+
+    #######################################################################
+    # Private interface
+    #######################################################################
+    def set_data(self):
+        """Compute the user defined data for use with Zoltan"""
+        raise NotImplementedError("ZoltanParallelManager::_set_data should not be called!")
+    
+    def _setup_arrays(self):
+        # Import/Export lists for cells
+        self.exportCellGlobalids = UIntArray()
+        self.exportCellLocalids = UIntArray()
+        self.exportCellProcs = IntArray()
+
+        self.importCellGlobalids = UIntArray()
+        self.importCellLocalids = UIntArray()
+        self.importCellProcs = IntArray()
+
+        self.numCellImport = 0
+        self.numCellExport = 0
+
+    cdef _compute_bounds(self):
+        """Compute the domain bounds for indexing."""
+
+        cdef double mx, my, mz
+        cdef double Mx, My, Mz, Mh
+
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef ParticleArrayWrapper pa
+        cdef DoubleArray x, y, z, h
+        
+        mx = np.inf; my = np.inf; mz = np.inf
+        Mx = -np.inf; My = -np.inf; Mz = -np.inf; Mh = -np.inf
+
+        # find the local min and max for all arrays on this proc
+        for pa in pa_wrappers:
+            x = pa.x; y = pa.y; z = pa.z; h = pa.h
+            x.update_min_max(); y.update_min_max()
+            z.update_min_max(); h.update_min_max()
+
+            if x.minimum < mx: mx = x.minimum
+            if x.maximum > Mx: Mx = x.maximum
+            
+            if y.minimum < my: my = y.minimum
+            if y.maximum > My: My = y.maximum
+            
+            if z.minimum < mz: mz = z.minimum
+            if z.maximum > Mz: Mz = z.maximum
+            
+            if h.maximum > Mh: Mh = h.maximum
+
+        self.minx[0] = mx; self.miny[0] = my; self.minz[0] = mz
+        self.maxx[0] = Mx; self.maxy[0] = My; self.maxz[0] = Mz
+        self.maxh[0] = Mh            
+
+        # now compute global min and max if in parallel
+        comm = self.comm
+        if self.in_parallel:
+
+            # global reduction for minimum values
+            comm.Allreduce(sendbuf=self.minx, recvbuf=self.minx, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.miny, recvbuf=self.miny, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.minz, recvbuf=self.minz, op=mpi.MIN)
+
+            # global reduction for maximum values
+            comm.Allreduce(sendbuf=self.maxx, recvbuf=self.maxx, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxy, recvbuf=self.maxy, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxz, recvbuf=self.maxz, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxh, recvbuf=self.maxh, op=mpi.MAX)
+            
+        self.mx = self.minx[0]; self.my = self.miny[0]; self.mz = self.minz[0]
+        self.Mx = self.maxx[0]; self.My = self.maxy[0]; self.Mz = self.maxz[0]
+        self.Mh = self.maxh[0]
+
+    ######################################################################
+    # Neighbor location routines
+    ######################################################################
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t i, UIntArray nbrs):
+        """Utility function to get near-neighbors for a particle.
+
+        Parameters:
+        -----------
+
+        src_index : int
+            Index of the source particle array in the particles list
+
+        dst_index : int
+            Index of the destination particle array in the particles list
+
+        i : int (input)
+            Particle for which neighbors are sought.
+
+        nbrs : UIntArray (output)
+            Neighbors for the requested particle are stored here.
+
+        """
+        cdef dict cells = self.cells
+        cdef Cell cell
+
+        cdef ParticleArrayWrapper src = self.pa_wrappers[ src_index ]
+        cdef ParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
+
+        # Source data arrays
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_h = src.h
+
+        # Destination particle arrays
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_h = dst.h
+
+        cdef double radius_scale = self.radius_scale
+        cdef double cell_size = self.cell_size
+        cdef UIntArray lindices
+        cdef size_t indexj
+        cdef ZOLTAN_ID_TYPE j
+
+        cdef cPoint xi = cPoint_new(d_x.data[i], d_y.data[i], 0.0)
+        cdef cIntPoint _cid = find_cell_id( xi, cell_size )
+        cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
+        cdef IntPoint cellid = IntPoint(0, 0, 0)
+
+        cdef cPoint xj
+        cdef double xij
+
+        cdef double hi, hj
+        hi = radius_scale * d_h.data[i]
+
+        cdef int nnbrs = 0
+
+        cdef int ix, iy
+        for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
+            for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
+                cellid.data.x = ix; cellid.data.y = iy
+
+                if cells.has_key( cellid ):
+                    cell = cells[ cellid ]
+                    lindices = cell.lindices[src_index]
+                    for indexj in range( lindices.length ):
+                        j = lindices.data[indexj]
+
+                        xj = cPoint_new( s_x.data[j], s_y.data[j], 0.0 )
+                        xij = cPoint_distance( xi, xj )
+
+                        hj = radius_scale * s_h.data[j]
+
+                        if ( (xij < hi) or (xij < hj) ):
+                            if nnbrs == nbrs.length:
+                                nbrs.resize( nbrs.length + 50 )
+                                print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
+
+                            nbrs.data[ nnbrs ] = j
+                            nnbrs = nnbrs + 1
+
+        # update the _length for nbrs to indicate the number of neighbors
+        nbrs._length = nnbrs            
+
+cdef class ZoltanParallelManager:
+    """Base class for Zoltan enabled parallel cell managers.
+
+    To partition a list of arrays, we do an NNPS like box sort on all
+    arrays to create a global spatial indexing structure. The cells
+    are then used as 'objects' to be partitioned by Zoltan. The cells
+    dictionary (cell-map) need not be unique across processors. We are
+    responsible for assignning unique global ids for the cells.
+
+    The Zoltan generated (cell) import/export lists are then used to
+    construct particle import/export lists which are used to perform
+    the data movement of the particles. A ParticleArrayExchange object
+    (lb_exchange_data and remote_exchange_data) is used for each
+    particle array in turn to effect this movement.
+
+    """
+    def __init__(self, int dim, list particles, object comm,
+                 double radius_scale=2.0,
+                 int ghost_layers=2, domain=None,
+                 lb_props=None, str lb_method='RCB'):
+        """Constructor.
+
+        Parameters:
+        -----------
+
+        dim : int
+            Dimension
+
+        particles : list
+            list of particle arrays to be managed.
+
+        comm : mpi4py.MPI.COMM, default 
+            MPI communicator for parallel invocations
+
+        radius_scale : double, default (2)
+            Optional kernel radius scale. Defaults to 2
+
+        ghost_layers : int, default (2)
+            Optional factor for computing bounding boxes for cells.
+
+        domain : DomainLimits, default (None)
+            Optional limits for the domain
+
+        lb_props : list
+            optional list of properties required for load balancing
+
+        lb_method : string
+            optional initial load balancing method
+
+        """
+        super(ZoltanParallelManager, self).__init__(
+            dim, particles, comm, radius_scale, ghost_layers, lb_props)
+
+        # Initialize the base PyZoltan class. 
+        self.pz = PyZoltan(comm)
+
     def create_particle_lists(self, int pa_index):
-        """Create export/import lists based on particles
+        """Create particle export/import lists
 
         For the cell based partitioner, Zoltan generated import and
         export lists apply to the cells. From this data, we can
@@ -1977,217 +2234,6 @@ cdef class ZoltanParallelManager:
 
         self.importCellProcs.resize( pz.numImport )
         self.importCellProcs.copy_subset( pz.importProcs )
-
-    def update_local_data(self):
-        """Update the cell map after load balance.
-        
-        After the load balancing step, each processor has a new set of
-        local particles which need to be indexed. This new cell
-        structure is then used to compute remote particles.
-
-        """
-        cdef ParticleArrayExchange pa_exchange
-        cdef int num_particles, i
-        cdef UIntArray indices
-
-        # clear the local cells dict
-        self.cells.clear()
-
-        for i in range(self.narrays):
-            pa_exchange = self.pa_exchanges[i]
-            num_particles = pa_exchange.num_local
-
-            # set the number of local and global particles
-            self.num_local[i] = pa_exchange.num_local
-            self.num_global[i] = pa_exchange.num_global
-
-            # bin the particles
-            indices = arange_uint( num_particles )
-            self._bin(i, indices)
-
-    def update_remote_data(self):
-        """Update the cell structure after sharing remote particles.
-
-        After exchanging remote particles, we need to index the new
-        remote particles for a possible neighbor query.
-
-        """
-        cdef int narrays = self.narrays
-        cdef int num_local, num_remote, i
-        cdef ParticleArrayExchange pa_exchange
-        cdef UIntArray indices
-
-        for i in range(narrays):
-            pa_exchange = self.pa_exchanges[i]
-
-            # get the number of local and remote particles
-            num_local = pa_exchange.num_local
-            num_remote = pa_exchange.num_remote
-
-            # update the number of local/remote particles
-            self.num_local[i] = num_local
-            self.num_remote[i] = num_remote
-
-            indices = arange_uint( num_local, num_local + num_remote )
-            self._bin( i, indices )        
-
-    #######################################################################
-    # Private interface
-    #######################################################################
-    def set_data(self):
-        """Compute the user defined data for use with Zoltan"""
-        raise NotImplementedError("ZoltanParallelManager::_set_data should not be called!")
-
-    def _setup_zoltan_arrays(self):
-        # Import/Export lists for cells
-        self.exportCellGlobalids = UIntArray()
-        self.exportCellLocalids = UIntArray()
-        self.exportCellProcs = IntArray()
-
-        self.importCellGlobalids = UIntArray()
-        self.importCellLocalids = UIntArray()
-        self.importCellProcs = IntArray()
-
-        self.numCellImport = 0
-        self.numCellExport = 0
-
-    cdef _compute_bounds(self):
-        """Compute the domain bounds for indexing."""
-
-        cdef double mx, my, mz
-        cdef double Mx, My, Mz, Mh
-
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef ParticleArrayWrapper pa
-        cdef DoubleArray x, y, z, h
-        
-        mx = np.inf; my = np.inf; mz = np.inf
-        Mx = -np.inf; My = -np.inf; Mz = -np.inf; Mh = -np.inf
-
-        # find the local min and max for all arrays on this proc
-        for pa in pa_wrappers:
-            x = pa.x; y = pa.y; z = pa.z; h = pa.h
-            x.update_min_max(); y.update_min_max()
-            z.update_min_max(); h.update_min_max()
-
-            if x.minimum < mx: mx = x.minimum
-            if x.maximum > Mx: Mx = x.maximum
-            
-            if y.minimum < my: my = y.minimum
-            if y.maximum > My: My = y.maximum
-            
-            if z.minimum < mz: mz = z.minimum
-            if z.maximum > Mz: Mz = z.maximum
-            
-            if h.maximum > Mh: Mh = h.maximum
-
-        self.minx[0] = mx; self.miny[0] = my; self.minz[0] = mz
-        self.maxx[0] = Mx; self.maxy[0] = My; self.maxz[0] = Mz
-        self.maxh[0] = Mh            
-
-        # now compute global min and max if in parallel
-        comm = self.comm
-        if self.in_parallel:
-
-            # global reduction for minimum values
-            comm.Allreduce(sendbuf=self.minx, recvbuf=self.minx, op=mpi.MIN)
-            comm.Allreduce(sendbuf=self.miny, recvbuf=self.miny, op=mpi.MIN)
-            comm.Allreduce(sendbuf=self.minz, recvbuf=self.minz, op=mpi.MIN)
-
-            # global reduction for maximum values
-            comm.Allreduce(sendbuf=self.maxx, recvbuf=self.maxx, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxy, recvbuf=self.maxy, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxz, recvbuf=self.maxz, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxh, recvbuf=self.maxh, op=mpi.MAX)
-            
-        self.mx = self.minx[0]; self.my = self.miny[0]; self.mz = self.minz[0]
-        self.Mx = self.maxx[0]; self.My = self.maxy[0]; self.Mz = self.maxz[0]
-        self.Mh = self.maxh[0]
-
-    ######################################################################
-    # Neighbor location routines
-    ######################################################################
-    cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t i, UIntArray nbrs):
-        """Utility function to get near-neighbors for a particle.
-
-        Parameters:
-        -----------
-
-        src_index : int
-            Index of the source particle array in the particles list
-
-        dst_index : int
-            Index of the destination particle array in the particles list
-
-        i : int (input)
-            Particle for which neighbors are sought.
-
-        nbrs : UIntArray (output)
-            Neighbors for the requested particle are stored here.
-
-        """
-        cdef dict cells = self.cells
-        cdef Cell cell
-
-        cdef ParticleArrayWrapper src = self.pa_wrappers[ src_index ]
-        cdef ParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
-
-        # Source data arrays
-        cdef DoubleArray s_x = src.x
-        cdef DoubleArray s_y = src.y
-        cdef DoubleArray s_h = src.h
-
-        # Destination particle arrays
-        cdef DoubleArray d_x = dst.x
-        cdef DoubleArray d_y = dst.y
-        cdef DoubleArray d_h = dst.h
-
-        cdef double radius_scale = self.radius_scale
-        cdef double cell_size = self.cell_size
-        cdef UIntArray lindices
-        cdef size_t indexj
-        cdef ZOLTAN_ID_TYPE j
-
-        cdef cPoint xi = cPoint_new(d_x.data[i], d_y.data[i], 0.0)
-        cdef cIntPoint _cid = find_cell_id( xi, cell_size )
-        cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
-        cdef IntPoint cellid = IntPoint(0, 0, 0)
-
-        cdef cPoint xj
-        cdef double xij
-
-        cdef double hi, hj
-        hi = radius_scale * d_h.data[i]
-
-        cdef int nnbrs = 0
-
-        cdef int ix, iy
-        for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
-            for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
-                cellid.data.x = ix; cellid.data.y = iy
-
-                if cells.has_key( cellid ):
-                    cell = cells[ cellid ]
-                    lindices = cell.lindices[src_index]
-                    for indexj in range( lindices.length ):
-                        j = lindices.data[indexj]
-
-                        xj = cPoint_new( s_x.data[j], s_y.data[j], 0.0 )
-                        xij = cPoint_distance( xi, xj )
-
-                        hj = radius_scale * s_h.data[j]
-
-                        if ( (xij < hi) or (xij < hj) ):
-                            if nnbrs == nbrs.length:
-                                nbrs.resize( nbrs.length + 50 )
-                                print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
-
-                            nbrs.data[ nnbrs ] = j
-                            nnbrs = nnbrs + 1
-
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
 
 cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
     """Zoltan enabled parallel manager for use with geometric load balancing.
