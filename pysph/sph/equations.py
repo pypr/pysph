@@ -533,24 +533,24 @@ class MomentumEquation(Equation):
         tmp = tmp + piij
         tmp = -s_m[s_idx] * tmp
 
-        usum += tmp*XIJ[0]
-        vsum += tmp*XIJ[1]
-        wsum += tmp*XIJ[2]
+        d_au[d_idx] = d_au[d_idx] + tmp*DWIJ[0]
+        d_av[d_idx] = d_av[d_idx] + tmp*DWIJ[1]
+        d_aw[d_idx] = d_aw[d_idx] + tmp*DWIJ[2]
+
         """)
 
         self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
                               eta=self.eta, muij=0.0, piij=0.0, cij=0.0, 
                               arhoij=0.0, tmp=0.0, vijdotxij=0.0, usum=0.0,
                               vsum=0.0, wsum=0.0)
-        self.initialize_vars = set(('usum', 'vsum', 'wsum'))
+
         code = dedent("""
-        d_au[d_idx] = usum + gx
-        d_av[d_idx] = vsum + gy
-        d_aw[d_idx] = wsum + gz
+        d_au[d_idx] = d_au[d_idx] + gx
+        d_av[d_idx] = d_av[d_idx] + gy
+        d_aw[d_idx] = d_aw[d_idx] + gz
         """)
         self.post_loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, 
                                    gz=self.gz)
-
 
 class XSPHCorrection(Equation):
     def __init__(self, dest, sources, eps=0.5):
