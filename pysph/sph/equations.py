@@ -1,193 +1,519 @@
+# System library imports.
+import ast
+from collections import OrderedDict
+from copy import deepcopy
+import itertools
+import numpy
 from textwrap import dedent
 
-###############################################################################
+# Local imports.
+from ast_utils import get_symbols
+
+
+##############################################################################
+# `Context` class.
+##############################################################################        
+class Context(dict):
+    """Based on the Bunch receipe by Alex Martelli from Active State's recipes.
+    
+    A convenience class used to specify a context in which a code block will 
+    execute.
+    
+    Example
+    -------
+    
+    Basic usage::
+        >>> c = Context(a=1, b=2)
+        >>> c.a
+        1
+        >>> c.x = 'a'
+        >>> c.x
+        'a'
+        >>> c.keys()
+        ['a', 'x', 'b']
+    """
+    __getattr__ = dict.__getitem__
+    def __setattr__(self, key, value):
+        self[key] = value
+
+
+##############################################################################
+# `BasicCodeBlock` class.
+##############################################################################        
+class BasicCodeBlock(object):
+    """Encapsulates a string of code and the context in which it executes.
+    
+    It also performs some simple analysis of the code that proves handy.
+    """
+    
+    ##########################################################################
+    # `object` interface.
+    ##########################################################################
+    def __init__(self, code, **kwargs):
+        """Constructor. 
+        
+        Parameters
+        ----------
+        
+        code : str: source code.
+        kwargs : values which define the context of the code.
+        """
+        self.setup(code, **kwargs)
+
+    def __call__(self, **kwargs):
+        """A simplistic test for the code that runs the code in the setup
+        context with any additional arguments passed set in the context.
+
+        Note that this will make a deepcopy of the context to prevent any 
+        changes to the original context.
+        
+        It returns a dictionary.
+        
+        """
+        context = deepcopy(dict(self.context))
+        if kwargs:
+            context.update(kwargs)
+        bytecode = compile(self.code, '<string>', 'exec')
+        glb = globals()
+        exec(bytecode, glb, context)
+        return Context(**context)
+
+    ##########################################################################
+    # Private interface.
+    ##########################################################################
+    def _setup_context(self):
+        context = self.context
+        symbols = self.symbols
+        for index in ('s_idx', 'd_idx'):
+            if index in symbols and index not in context:
+                context[index] = 0
+                
+        for a_name in itertools.chain(self.src_arrays, self.dest_arrays):
+            if a_name not in context:
+                context[a_name] = numpy.zeros(2, dtype=float)
+
+    def _setup_code(self, code):
+        """Perform analysis of the code and store the information in various
+        attributes.
+        """
+        code = dedent(code)
+        self.code = code
+        self.ast_tree = ast.parse(code)
+        self.symbols = get_symbols(self.ast_tree)
+        
+        symbols = self.symbols
+        self.src_arrays = set(x for x in symbols 
+                                if x.startswith('s_') and x != 's_idx')
+        self.dest_arrays = set(x for x in symbols 
+                                if x.startswith('d_') and x != 'd_idx')
+        self._setup_context()
+
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def setup(self, code, **kwargs):
+        """Setup the code and context with the given arguments.
+        
+        Parameters
+        ----------
+        
+        code : str: source code.
+        
+        kwargs : values which define the context of the code.
+        """
+        self.context = Context(**kwargs)
+
+        if code is not None:
+            self._setup_code(code)
+
+
+##############################################################################
+# Convenient precomputed symbols and their code.
+##############################################################################
+def precomputed_symbols():
+    """Return a collection of predefined symbols that can be used in equations.    
+    """
+    c = Context()
+    c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(s_h[s_idx] + d_h[d_idx])", HIJ=0.0)
+    c.XIJ = BasicCodeBlock(code=dedent("""
+                XIJ[0] = d_x[d_idx] - s_x[s_idx]
+                XIJ[1] = d_y[d_idx] - s_y[s_idx]
+                XIJ[2] = d_z[d_idx] - s_z[s_idx]
+                """), 
+                XIJ=[0.0, 0.0, 0.0])
+    c.VIJ = BasicCodeBlock(code=dedent("""
+                VIJ[0] = d_u[d_idx] - s_u[s_idx]
+                VIJ[1] = d_v[d_idx] - s_v[s_idx]
+                VIJ[2] = d_w[d_idx] - s_w[s_idx]
+                """),
+                VIJ=[0.0, 0.0, 0.0])
+    c.RIJ = BasicCodeBlock(code=dedent("""
+                RIJ = sqrt(XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2])
+                """),
+                RIJ=0.0)
+    c.WIJ = BasicCodeBlock(
+                code="WIJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ)",
+                WIJ=0.0)
+    c.WI = BasicCodeBlock(
+                code="WI = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx])",
+                WI=0.0)
+    c.WJ = BasicCodeBlock(
+                code="WJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx])",
+                WJ=0.0)
+    c.DWIJ = BasicCodeBlock(
+                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ, DWIJ)",
+                DWIJ=[0.0, 0.0, 0.0])
+    c.DWI = BasicCodeBlock(
+                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx], DWI)",
+                DWI=[0.0, 0.0, 0.0])
+    c.DWJ = BasicCodeBlock(
+                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
+                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx], DWJ)",
+                DWJ=[0.0, 0.0, 0.0])
+    return c
+
+
+##############################################################################
+# `CodeBlock` class.
+##############################################################################        
+class CodeBlock(BasicCodeBlock):
+    
+    pre_comp = precomputed_symbols()
+        
+    ##########################################################################
+    # Private interface.
+    ##########################################################################
+    def _setup_code(self, code):
+        super(CodeBlock, self)._setup_code(code)
+        
+        # Calculate the precomputed symbols for this equation.
+        pre = self.pre_comp
+        precomputed = dict((s, pre[s]) for s in self.symbols if s in pre)
+
+        # Now find the precomputed symbols in the pre-computed symbols.
+        precomputed_symbols = set()
+        for cb in precomputed.values():
+            precomputed_symbols.update((s for s in cb.symbols if s in pre))
+
+        for s in precomputed_symbols:
+            if s not in precomputed:
+                precomputed[s] = pre[s]
+
+        self.precomputed = sort_precomputed(precomputed)
+
+        # Update the context.
+        context = self.context
+        for p, cb in self.precomputed.iteritems():
+            context[p] = cb.context[p]
+
+
+def sort_precomputed(precomputed):
+    """Sorts the precomputed equations in the given dictionary and
+    returns an ordered dict 
+    """
+    first = set()
+    other = set()
+    pre_comp = CodeBlock.pre_comp
+    for pre, cb in precomputed.iteritems():
+        precomp_symbols = [x for x in cb.symbols if x in pre_comp and x != pre]
+        if len(precomp_symbols) > 0:
+            other.add(pre)
+        else:
+            first.add(pre)
+    result = OrderedDict()
+    for s in sorted(first):
+        result[s] = pre_comp[s]
+    for s in sorted(other):
+        result[s] = pre_comp[s]
+
+    return result
+
+
+
+##############################################################################
 # `Equation` class.
-###############################################################################
+##############################################################################        
 class Equation(object):
-    def __init__(self, dest, sources):
+    
+    ##########################################################################
+    # `object` interface.
+    ##########################################################################
+    def __init__(self, dest, sources=None, name=None):
         self.dest = dest
         self.sources = sources if sources is not None and len(sources) > 0 \
                                                                 else None
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
-
-        # we assume that positions, mass, density and h are always required
-        self.arrays = ['d_x', 'd_y', 'd_z', 'd_m', 'd_rho', 'd_h',
-                       's_x', 's_y', 's_z', 's_m', 's_rho', 's_h',]
+        self.name = self.__class__.__name__ if name is None else name
         
+        # The initialization of any variables.  Should be a set of variables.
+        self.initialize_vars = None
+        # The loop code is run for each particle pair.
+        self.loop = None
+        # The post_loop code is run for each destination particle.
+        self.post_loop = None
+        self.setup()
+        
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def setup(self):
+        """setup the code and context.        
+        """
+        pass
+
+class VariableClashError(Exception):
+    pass
+
+
 ###############################################################################
 # `Group` class.
 ###############################################################################
 class Group(object):
+    """A group of equations.
+    
+    This class provides some support for the code generation for the
+    collection of equations. 
+    """
     def __init__(self, equations):
         self.equations = equations
+        self.src_arrays = self.dest_arrays = None
+        self.update()
         
-###############################################################################
-# `Variable` class.
-###############################################################################
-class Variable(object):
-    """Should be unique to each equation.
-    """
-    def __init__(self, type, name, default=None):
-        self.type = type
-        self.name = name
-        self.default = default
-        if default is not None:
-            declare = 'cdef {0} {1} = {2}'.format(self.type, self.name, 
-                                                self.default)
-            initialize = '{0} = {1}'.format(self.name, self.default)
+    ##########################################################################
+    # Non-public interface.
+    ##########################################################################
+    def _get_variable_decl(self, context, mode='declare'):
+        decl = []
+        names = context.keys()
+        names.sort()
+        for var in names:
+            value = context[var]
+            if type(value) == int:
+                declare = 'cdef long ' if mode == 'declare' else ''
+                decl.append('{declare}{var} = {value}'.format(declare=declare,
+                                                              var=var, 
+                                                              value=value))                    
+            elif type(value) == float:
+                declare = 'cdef double ' if mode == 'declare' else ''
+                decl.append('{declare}{var} = {value}'.format(declare=declare,
+                                                              var=var, 
+                                                              value=value))
+            elif isinstance(value, (list, tuple)):
+                if mode == 'declare':
+                    decl.append('cdef double[{size}] {var}'\
+                            .format(size=len(value), var=var))
+                else:
+                    pass
+        return '\n'.join(decl)
+        
+    def _get_code(self, kind='loop'):
+        assert kind in ('loop', 'post_loop')
+        # We assume here that precomputed quantities are only relevant
+        # for loops and not post_loops.
+        pre = []
+        if kind == 'loop':
+            for p, cb in self.precomputed.iteritems():
+                pre.append(cb.code.strip())
+            if len(pre) > 0:
+                pre.append('')
+        code = []
+        for eq in self.equations:
+            cb = getattr(eq, kind)
+            if cb:
+                code.append('# %s.'%eq.name)
+                code.append(cb.code.strip())
+        if len(code) > 0:
+            code.append('')
+        return '\n'.join(pre + code)
+        
+    def _set_kernel(self, code, kernel):
+        if kernel is not None:
+            k_name = kernel.__class__.__name__
+            k_func = k_name + 'Kernel'
+            g_func = k_name + 'Gradient'
+            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
         else:
-            declare = 'cdef {0} {1}'.format(self.type, self.name)
-            initialize = ''
-        self.declare = declare
-        self.initialize = initialize
-        
-###############################################################################
-# `Temporary` class.
-###############################################################################
-class Temporary(Variable):
-    """Use for temporary variables.  Can be common between equations.
-    """
-    pass
-    
+            return code
 
-###############################################################################
-# `SummationDensity` class.
-###############################################################################
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def update(self):
+        precomp = {}
+        initialize_vars = set()
+        for equation in self.equations:
+            if equation.initialize_vars:
+                initialize_vars.update(equation.initialize_vars)   
+            if equation.loop:
+                precomp.update(equation.loop.precomputed)
+            if equation.post_loop:
+                precomp.update(equation.post_loop.precomputed)                
+
+        self.precomputed = sort_precomputed(precomp)
+        self.initialize_vars = initialize_vars
+
+    def get_array_names(self, recompute=False):
+        """Returns two sets of array names, the first being source_arrays
+        and the second being destination array names.
+        """
+        if not recompute and self.src_arrays is not None:
+            return set(self.src_arrays), set(self.dest_arrays)
+        src_arrays = set()
+        dest_arrays = set()
+        for equation in self.equations:
+            if equation.loop is not None:
+                src_arrays.update(equation.loop.src_arrays)
+                dest_arrays.update(equation.loop.dest_arrays)
+            if equation.post_loop is not None:
+                src_arrays.update(equation.post_loop.src_arrays)
+                dest_arrays.update(equation.post_loop.dest_arrays)
+        for cb in self.precomputed.values():
+            src_arrays.update(cb.src_arrays)
+            dest_arrays.update(cb.dest_arrays)
+
+        self.src_arrays = src_arrays
+        self.dest_arrays = dest_arrays
+        return set(src_arrays), set(dest_arrays)
+        
+    def get_variable_names(self):
+        # First get all the contexts and find the names.
+        all_vars = set()
+        for equation in self.equations:
+            if equation.loop is not None:
+                all_vars.update(equation.loop.symbols)
+            if equation.post_loop is not None:
+                all_vars.update(equation.post_loop.symbols)
+        for cb in self.precomputed.values():
+            all_vars.update(cb.symbols)
+            
+        # Filter out all arrays.
+        filtered_vars = [x for x in all_vars \
+                         if not x.startswith(('s_', 'd_'))]
+        # Filter other things.
+        ignore = ['KERNEL', 'GRADIENT', 's_idx', 'd_idx']
+        # Math functions.
+        import math
+        ignore += [x for x in dir(math) if not x.startswith('_') 
+                                            and callable(getattr(math, x))]
+        ignore.remove('gamma')
+        ignore.remove('lgamma')
+        filtered_vars = [x for x in filtered_vars if x not in ignore]
+                            
+        return filtered_vars
+
+    def check_variables(self, variables):
+        """Given the sequence of variables, check for any conflicts
+        in the equations and returns the full context if there are no clashes.
+        """
+        context = Context()
+        seen = Context()
+        for equation in self.equations:
+            for var in variables:
+                for eq_kind in (equation.loop, equation.post_loop):
+                    if eq_kind is None or var not in eq_kind.context:
+                        continue
+                    eq_val = eq_kind.context[var]
+                    if var in context:
+                        ctx_val = context[var]
+                        if type(eq_val) != type(ctx_val):
+                            msg = 'Variable %s in %s has different type from '\
+                                'equation %s'%(var, equation.name, seen[var])
+                            raise VariableClashError(msg)
+                        elif eq_val != ctx_val:
+                            msg = 'Variable %s in %s has different value from '\
+                                'equation %s'%(var, equation.name, seen[var])
+                            raise VariableClashError(msg)
+                    else:
+                        context[var] = eq_val
+                        seen[var] = equation.name
+        return context
+
+    def get_array_declarations(self, names):
+        decl = []
+        for arr in sorted(names):
+            decl.append('cdef double* %s'%arr)
+        return '\n'.join(decl)
+        
+    def get_variable_declarations(self, context):
+        return self._get_variable_decl(context, mode='declare')
+        
+    def get_variable_initializations(self, context):
+        # Only initialize variables that are to be initialized
+        ctx = Context((x, context[x]) for x in context 
+                                        if x in self.initialize_vars)
+        return self._get_variable_decl(ctx, mode='initialize')
+
+    def get_loop_code(self, kernel=None):
+        code = self._get_code()
+        return self._set_kernel(code, kernel)
+            
+    def get_post_loop_code(self, kernel=None):
+        code = self._get_code(kind='post_loop')
+        return self._set_kernel(code, kernel)
+
+##############################################################################
+# `ContinuityEquation` class.
+##############################################################################        
+class ContinuityEquation(Equation):
+    def setup(self):
+        code = dedent("""
+        vijdotdwij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
+
+        d_arho[d_idx] += s_m[s_idx]*vijdotdwij
+        """)
+
+        self.loop = CodeBlock(code=code, vijdotdwij=0.0)
+
 class SummationDensity(Equation):
-    def cython_code(self):
-        variables = [Variable(type='double', name='rho_sum', default=0.0)]
-        temp = [Temporary(type='double', name='hab', default=0.0)]
-        arrays = ['s_h', 's_m', 's_x', 's_y', 's_z',
-                  'd_h', 'd_x', 'd_y', 'd_z', 'd_rho']
-        
-        loop = dedent('''\
-        hab = 0.5*(s_h[s_idx] + d_h[d_idx])
-        rho_sum += s_m[s_idx]*KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx],
-                                     s_x[s_idx], s_y[s_idx], s_z[s_idx], hab)
+    def setup(self):
+        code = dedent('''
+        d_rho[d_idx] += s_m[s_idx]*WIJ
         ''')
-        post = dedent('''\
-        d_rho[d_idx] = rho_sum
-        ''')
-        return dict(variables=variables, temporaries=temp, loop=loop, post=post,
-                    arrays=arrays)
+        self.loop = CodeBlock(code=code)
 
-                 
 class TaitEOS(Equation):
-    def __init__(self, dest, sources=[], rho0=1000.0, c0=1.0, gamma=7.0):
-        Equation.__init__(self, dest, sources)
+    def __init__(self, dest, sources,
+                 rho0=1000.0, c0=1.0, gamma=7.0):
         self.rho0 = rho0
         self.c0 = c0
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
-
         self.B = rho0*c0*c0/gamma
+        super(TaitEOS, self).__init__(dest, sources)
         
-    def cython_code(self):
-        temp = [ Temporary(type='double', name='ratio', default=0.0),
-                 Temporary(type='double', name='tmp', default=0.0),
-                 Temporary(type='double', name='hij', default=0.0)]
-
-        arrays = ['d_rho', 'd_p', 'd_cs']
-
-        loop = dedent("""\
+    def setup(self):
+        code = dedent("""
         ratio = d_rho[d_idx]/rho0
-        tmp = pow(ratio, GAMMA)
+        tmp = pow(ratio, gamma)
 
         d_p[d_idx] = B * (tmp -1)
-        d_cs[d_idx] = c0 * pow( ratio, GAMMA1 )
-        """).replace('B', str(self.B)).replace('c0', str(self.c0))\
-                      .replace('rho0', str(self.rho0)).replace('GAMMA1', str(self.gamma1))\
-                      .replace('GAMMA', str(self.gamma))
-
-        helpers = dedent("""\
-        from libc.math cimport pow
+        d_cs[d_idx] = c0 * pow( ratio, gamma1 )
         """)
-
-        return dict(temporaries=temp, loop=loop, arrays=arrays,
-                    helper=helpers)
-
-class ContinuityEquation(Equation):
-    def cython_code(self):
-        variables = [Variable(type='double', name='rho_sum', default=0.0)]
-        temp = [ Temporary(type='double[3]', name='grad', default=None),
-                 Temporary(type='double[3]', name='xij', default=None),
-                 Temporary(type='double', name='vijdotdwij', default=0.0)]
-
-        arrays = self.arrays + ['d_u', 'd_v', 'd_w', 's_u', 's_v', 's_w',
-                                'd_arho']
-
-        loop = dedent("""\
-
-        hij = 0.5*(s_h[s_idx] + d_h[d_idx])
-        GRADIENT( d_x[d_idx], d_y[d_idx], d_z[d_idx], s_x[s_idx], s_y[s_idx], s_z[s_idx], hij, grad)
-
-        # relative position vector
-        xij[0] = d_x[d_idx] - s_x[s_idx]
-        xij[1] = d_y[d_idx] - s_y[s_idx]
-        xij[2] = d_z[d_idx] - s_z[s_idx]
-
-        vijdotdwij = grad[0]*xij[0] + grad[1]*xij[1] + grad[2]*xij[2]
-
-        #print d_idx, vijdotdwij, grad[0], grad[1], grad[2], rho_sum
-        rho_sum += s_m[s_idx]*vijdotdwij
-        """)
-
-        post = dedent('''\
-        # Density rate
-        d_arho[d_idx] = rho_sum
-        ''')
-        
-        return dict(temporaries=temp, loop=loop, arrays=arrays,
-                    post=post, variables=variables)
+        self.loop = CodeBlock(code=code,
+                              rho0=self.rho0, c0=self.c0, B=self.B,
+                              gamma=self.gamma, gamma1=self.gamma1,
+                              ratio=0.0, tmp=0.0)
 
 class MomentumEquation(Equation):
-    def __init__(self, dest, sources, alpha=1.0, beta=1.0, eta=0.1,
-                 gx=0.0, gy=0.0, gz=0.0):
-        Equation.__init__(self, dest, sources)
+    def __init__(self, dest, sources,
+                 alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
-
         self.gx = gx
         self.gy = gy
         self.gz = gz
-        
-    def cython_code(self):
-        variables = [Variable(type='double', name='usum', default=0.0),
-                     Variable(type='double', name='vsum', default=0.0),
-                     Variable(type='double', name='wsum', default=0.0)]
-        
-        temp = [ Temporary(type='double', name='muij', default=0.0),
-                 Temporary(type='double', name='piij', default=0.0),
-                 Temporary(type='double', name='cij', default=0.0),
-                 Temporary(type='double', name='xij2', default=0.0),
-                 Temporary(type='double', name='rhoij', default=0.0),
-                 Temporary(type='double', name='rhoi21', default=0.0),
-                 Temporary(type='double', name='tmp', default=0.0),
-                 Temporary(type='double[3]', name='xij', default=None),
-                 Temporary(type='double[3]', name='vij', default=None),
-                 Temporary(type='double', name='vijdotxij', default=0.0),]
+        super(MomentumEquation, self).__init__(dest, sources)
 
-        arrays = self.arrays + ['d_u', 'd_v', 'd_w', 's_u', 's_v', 's_w',
-                                'd_p', 's_p', 'd_cs', 's_cs',
-                                'd_au', 'd_av', 'd_aw']
-
-        loop = dedent("""\
-
-        hij = 0.5*(s_h[s_idx] + d_h[d_idx])
-
-        # relative position vector
-        xij[0] = d_x[d_idx] - s_x[s_idx]
-        xij[1] = d_y[d_idx] - s_y[s_idx]
-        xij[2] = d_z[d_idx] - s_z[s_idx]
-
-        # relative velocity vector
-        vij[0] = d_u[d_idx] - s_u[s_idx]
-        vij[1] = d_v[d_idx] - s_v[s_idx]
-        vij[2] = d_w[d_idx] - s_w[s_idx]
-
-        vijdotxij = vij[0]*xij[0] + vij[1]*xij[1] + vij[2]*xij[2]
+    def setup(self):
+        code = dedent("""
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
@@ -199,85 +525,54 @@ class MomentumEquation(Equation):
             rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            xij2 = (xij[0]*xij[0] + xij[1]*xij[1] + xij[2]*xij[2])
+            muij = (HIJ * vijdotxij)/(RIJ*RIJ + eta*eta*HIJ*HIJ)
 
-            muij = hij * vijdotxij
-            muij = muij/(xij2 + ETA*ETA*hij*hij)
-
-            piij = -ALPHA*cij*muij + BETA*muij*muij
+            piij = -alpha*cij*muij + beta*muij*muij
             piij = piij/rhoij
 
         tmp = tmp + piij
         tmp = -s_m[s_idx] * tmp
 
-        GRADIENT( d_x[d_idx], d_y[d_idx], d_z[d_idx], s_x[s_idx], s_y[s_idx], s_z[s_idx], hij, grad)
+        usum += tmp*XIJ[0]
+        vsum += tmp*XIJ[1]
+        wsum += tmp*XIJ[2]
+        """)
 
-        usum = usum + tmp*xij[0]
-        vsum = vsum + tmp*xij[1]
-        wsum = wsum + tmp*xij[2]
+        self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
+                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0, 
+                              arhoij=0.0, tmp=0.0, vijdotxij=0.0, usum=0.0,
+                              vsum=0.0, wsum=0.0)
+        self.initialize_vars = set(('usum', 'vsum', 'wsum'))
+        code = dedent("""
+        d_au[d_idx] = usum + gx
+        d_av[d_idx] = vsum + gy
+        d_aw[d_idx] = wsum + gz
+        """)
+        self.post_loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, 
+                                   gz=self.gz)
 
-        """).replace('ALPHA', str(self.alpha)).replace('BETA', str(self.beta))\
-        .replace('ETA', str(self.eta))
-
-        post = dedent('''\
-        # Gradient of Pressure and viscosity
-        d_au[d_idx] = usum + GX
-        d_av[d_idx] = vsum + GY
-        d_aw[d_idx] = wsum + GZ
-        ''').replace('GX', str(self.gx)).\
-        replace('GY', str(self.gy)).\
-        replace('GZ', str(self.gz))
-        
-        return dict(temporaries=temp, loop=loop, arrays=arrays,
-                    post=post, variables=variables)
 
 class XSPHCorrection(Equation):
     def __init__(self, dest, sources, eps=0.5):
-        Equation.__init__(self, dest, sources)
         self.eps = eps
-
-        self.arrays = self.arrays + ['d_ax', 'd_ay', 'd_az']
+        super(XSPHCorrection, self).__init__(dest, sources)
         
-    def cython_code(self):
-        variables = [Variable(type='double', name='xsum', default=0.0),
-                     Variable(type='double', name='ysum', default=0.0),
-                     Variable(type='double', name='zsum', default=0.0)]
-        
-        temp = [ Temporary(type='double', name='tmp', default=0.0),
-                 Temporary(type='double', name='wij', default=0.0),
-                 Temporary(type='double', name='rhoij', default=0.0),
-                 Temporary(type='double', name='hij', default=0.0),
-                 Temporary(type='double[3]', name='vij', default=None)]
-
-        loop = dedent("""\
-
-        hij = 0.5*(s_h[s_idx] + d_h[d_idx])
-        rhoij = 0.5*(s_rho[s_idx] + d_rho[d_idx])
-
-        # relative velocity vector
-        vij[0] = d_u[d_idx] - s_u[s_idx]
-        vij[1] = d_v[d_idx] - s_v[s_idx]
-        vij[2] = d_w[d_idx] - s_w[s_idx]
+    def setup(self):
+        code = dedent("""\
 
         rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
 
-        wij =  KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx],
-        s_x[s_idx], s_y[s_idx], s_z[s_idx], hij)
+        tmp = eps*s_m[s_idx]*WIJ/rhoij
 
-        tmp = EPS*s_m[s_idx]*wij/rhoij
+        d_ax[d_idx] -= tmp*VIJ[0]
+        d_ay[d_idx] -= tmp*VIJ[1]
+        d_az[d_idx] -= tmp*VIJ[2]
 
-        xsum = xsum - tmp*vij[0]
-        ysum = ysum - tmp*vij[1]
-        zsum = zsum - tmp*vij[2]
-
-        """).replace('EPS', str(self.eps))
-
-        post = dedent('''\
-        # XSPH corrections
-        d_ax[d_idx] = xsum + d_u[d_idx]
-        d_ay[d_idx] = ysum + d_v[d_idx]
-        d_az[d_idx] = zsum + d_w[d_idx]
-        ''')
+        """)
+        self.loop = CodeBlock(code=code, eps=self.eps, rhoij=0.0, tmp=0.0)
         
-        return dict(temporaries=temp, loop=loop, arrays=self.arrays,
-                    post=post, variables=variables)    
+
+if __name__ == '__main__':
+    # Simple demonstration of one of the equations.
+    e = ContinuityEquation(dest='fluid', sources=['fluid'])
+    print e.loop(DWIJ=[1,1,1], XIJ=[1,1,1], s_m=[1,1])
