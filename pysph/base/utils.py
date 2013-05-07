@@ -108,7 +108,7 @@ def get_particle_array_wcsph(name="", **props):
         np = data.size
 
         if prop in ['tag']:
-            prop_dict[prop] = {'data':data),
+            prop_dict[prop] = {'data':data,
                                'type': 'long',
                                'name':prop}
         if prop in ['gid']:
