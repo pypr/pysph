@@ -2,6 +2,7 @@
 
 from pysph.base.carray cimport IntArray, DoubleArray, LongArray
 from pysph.base.particle_array cimport ParticleArray
+from pysph.base.nnps cimport NNPS
 
 cdef class WCSPHRK2Integrator:
     ############################################################
@@ -9,6 +10,7 @@ cdef class WCSPHRK2Integrator:
     ############################################################
     cdef public list particles
     cdef public object evaluator
+    cdef public NNPS nnps
 
     # particle properties used for time stepping
     cdef DoubleArray x, x0, ax
@@ -23,3 +25,9 @@ cdef class WCSPHRK2Integrator:
     # Member functions
     ############################################################
     cpdef integrate(self, double dt)
+
+    # set the values at the start of a time step
+    cdef _set_initial_values(self)
+
+    # reset accelerations before computing 
+    cdef _reset_accelerations(self)

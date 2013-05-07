@@ -149,6 +149,10 @@ class SPHEval(object):
         template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names, 
                                pa_names=pa_names, locator=locator, object=self)
+
+    def set_nnps(self, nnps):
+        self.nnps = nnps
+        self.calc.set_nnps(nnps)
         
     def compute(self):
         self.sph_compute()

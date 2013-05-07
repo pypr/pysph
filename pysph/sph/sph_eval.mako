@@ -7,20 +7,21 @@ ${' '*4*level}${l}
 
 from libc.math cimport pow, sqrt
 cimport numpy
-from pysph.base.carray cimport DoubleArray, LongArray, IntArray
-from pysph.base.carray import DoubleArray, LongArray, IntArray
+from pysph.base.carray cimport DoubleArray, IntArray, UIntArray
 from pysph.base.particle_array cimport ParticleArray
-from pysph.base.particle_array import ParticleArray
+from pysph.base.nnps cimport NNPS
 
 ${helpers}
 
 # #############################################################################
 cdef class ParticleArrayWrapper:
+    cdef public int index
     cdef public ParticleArray array
     cdef public IntArray tag, pid
     cdef public DoubleArray ${array_names}
     
-    def __init__(self, pa):
+    def __init__(self, pa, index):
+        self.index = index
         self.array = pa
         props = set(pa.properties.keys())
         props = props.union(['tag', 'pid'])
@@ -31,20 +32,31 @@ cdef class ParticleArrayWrapper:
         return self.array.get_number_of_particles()
         
         
-${locator}
+#${locator}
 
 # #############################################################################
 cdef class SPHCalc:
     cdef public ParticleArrayWrapper ${pa_names}
+    cdef public NNPS nnps
+    cdef UIntArray nbrs
     
     def __init__(self, *particle_arrays):
-        for pa in particle_arrays:
+        for i, pa in enumerate(particle_arrays):
             name = pa.name
-            setattr(self, name, ParticleArrayWrapper(pa))
+            setattr(self, name, ParticleArrayWrapper(pa, i))
+
+        self.nbrs = UIntArray()
+
+    def set_nnps(self, NNPS nnps):
+        self.nnps = nnps            
     
     cpdef compute(self):
-        cdef long s_idx, d_idx, nbr_idx, NP_SRC, NP_DEST
-        cdef LongArray nbrs = LongArray()
+        cdef long nbr_idx, NP_SRC, NP_DEST
+        cdef int s_idx, d_idx
+        cdef UIntArray nbrs = self.nbrs
+        cdef NNPS nnps = self.nnps
+        cdef ParticleArrayWrapper src, dst
+
         #######################################################################
         ##  Declare all the arrays.
         #######################################################################
@@ -54,6 +66,8 @@ cdef class SPHCalc:
         ## Declare any variables.
         #######################################################################
         # Variables.\
+
+        cdef int src_array_index, dst_array_index
         ${indent(object.get_variable_declarations(), 2)}
         #######################################################################
         ## Iterate over groups:
@@ -71,7 +85,11 @@ cdef class SPHCalc:
         #######################################################################
         ## Setup destination array pointers.
         #######################################################################
+
+        dst = self.${dest}
         ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources), 2)}
+        dst_array_index = dst.index
+
         #######################################################################
         ## Handle all the equations that do not have a source.
         #######################################################################
@@ -88,12 +106,16 @@ cdef class SPHCalc:
         #######################################################################
         ## Setup source array pointers.
         #######################################################################
+        
+        src = self.${source}
         ${indent(object.get_src_array_setup(source, eq_group), 2)}
+        src_array_index = src.index
+        
         # Locator.\
         #######################################################################
         ## Create the locator
         #######################################################################
-        ${indent(object.get_locator_code(source, dest), 2)}
+        #${indent(object.get_locator_code(source, dest), 2)}
         #######################################################################
         ## Iterate over destination particles.
         #######################################################################
@@ -103,9 +125,12 @@ cdef class SPHCalc:
             ###################################################################
             ## Find and iterate over neighbors.
             ###################################################################
-            locator.get_neighbors(d_idx, nbrs)
-            for nbr_idx in range(nbrs.length):
-                s_idx = nbrs[nbr_idx]
+            #locator.get_neighbors(d_idx, nbrs)
+            nnps.get_nearest_particles(
+                src_array_index, dst_array_index, d_idx, nbrs)
+
+            for nbr_idx in range(nbrs._length):
+                s_idx = <int>nbrs.data[nbr_idx]
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
                 ###############################################################

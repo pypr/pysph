@@ -37,11 +37,20 @@ include_dirs = [numpy.get_include()]
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
-
+    # base module
     Extension( name="pysph.base.carray",
                sources=["pysph/base/carray.pyx"]),
+
     Extension( name="pysph.base.particle_array",
                sources=["pysph/base/particle_array.pyx"]),
+
+    Extension( name="pysph.base.point",
+               sources=["pysph/base/point.pyx"]),
+
+    Extension( name="pysph.base.nnps",
+               sources=["pysph/base/nnps.pyx"]),
+    
+    # sph module
     Extension( name="pysph.sph.integrator",
                sources=["pysph/sph/integrator.pyx"])
     ]
