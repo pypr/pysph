@@ -5,6 +5,10 @@ cimport numpy as np
 # malloc and friends
 from libc.stdlib cimport malloc, free
 
+# cpython
+from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
+from cpython.list cimport PyList_GetItem
+
 cdef extern from 'math.h':
     int abs(int)
     double ceil(double)
@@ -383,7 +387,7 @@ cdef class NNPS:
         cdef UIntArray indices
 
         # clear the cells dict
-        cells.clear()
+        PyDict_Clear( cells )
 
         # compute the cell size
         self._compute_cell_size()
@@ -421,10 +425,10 @@ cdef class NNPS:
         cdef size_t num_particles, indexi, i
 
         cdef cIntPoint _cid
-        cdef IntPoint cid = IntPoint()
+        cdef IntPoint cid
 
         cdef Cell cell
-        cdef int narrays = self.narrays
+        cdef int ierr, narrays = self.narrays
 
         # now bin the particles
         num_particles = indices.length
@@ -436,17 +440,14 @@ cdef class NNPS:
 
             cid = IntPoint_from_cIntPoint(_cid)
 
-            if not cells.has_key( cid ):
+            ierr = PyDict_Contains(cells, cid)
+            if ierr == 0:
                 cell = Cell(cid, cell_size, narrays)
-                lindices = UIntArray()
-                gindices = UIntArray()
-
-                cell.set_indices( pa_index, lindices, gindices )
                 cells[ cid ] = cell
 
             # add this particle to the list of indicies
-            cell = cells[ cid ]
-            lindices = cell.lindices[pa_index]
+            cell = <Cell>PyDict_GetItem( cells, cid )
+            lindices = <UIntArray>PyList_GetItem( cell.lindices, pa_index )
 
             lindices.append( <ZOLTAN_ID_TYPE> i )
             #gindices.append( gid.data[i] )
@@ -542,16 +543,19 @@ cdef class NNPS:
         cdef double hi, hj
         hi = radius_scale * d_h.data[d_idx]
 
-        cdef int nnbrs = 0
+        cdef int ierr, nnbrs = 0
 
         cdef int ix, iy
         for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
             for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
                 cellid.data.x = ix; cellid.data.y = iy
 
-                if cells.has_key( cellid ):
-                    cell = cells[ cellid ]
-                    lindices = cell.lindices[src_index]
+                ierr = PyDict_Contains( cells, cellid )
+                if ierr == 1:
+
+                    cell = <Cell>PyDict_GetItem( cells, cellid )
+                    lindices = <UIntArray>PyList_GetItem( cell.lindices, src_index )
+
                     for indexj in range( lindices.length ):
                         j = lindices.data[indexj]
 
