@@ -2,6 +2,8 @@ import numpy
 from particle_array import ParticleArray
 from carray import LongArray
 
+UINT_MAX = (1<<32) - 1
+
 class ParticleTAGS:
     Local = 0
     Remote = 1
@@ -92,5 +94,54 @@ def get_particle_array(cl_precision="double", **props):
     # add the constants
     for prop in constants:
         pa.constants[prop] = constants[prop]
+
+    return pa
+
+def get_particle_array_wcsph(name="", **props):
+    """Return a particle array for the WCSPH formulation"""
+    nprops = len(props)
+    np = 0
+
+    prop_dict = {}
+    for prop in props.keys():
+        data = numpy.asarray(props[prop])
+        np = data.size
+
+        if prop in ['tag']:
+            prop_dict[prop] = {'data':data),
+                               'type': 'long',
+                               'name':prop}
+        if prop in ['gid']:
+            prop_dict[prop] = {'data':data.astype(numpy.uint32),
+                               'type': 'unsigned int',
+                               'name':prop}
+        else:
+            prop_dict[prop] = {'data':data,
+                               'type':'double',
+                               'name':prop}
+
+    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'h', 'rho', 'm',
+                     'p', 'cs', 'ax', 'ay', 'az', 'au', 'av', 'aw',
+                     'x0','y0', 'z0','u0', 'v0','w0',
+                     'arho', 'rho0', 'div', 'gid','pid', 'tag']
+
+    for prop in default_props:
+        if not prop in prop_dict:
+            if prop in ["pid"]:
+                prop_dict[prop] = {'name':prop, 'type':'int',
+                                   'default':0}
+
+            elif prop in ['gid']:
+                data = numpy.ones(shape=np, dtype=numpy.uint32)
+                data[:] = UINT_MAX
+
+                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
+                                   'data':data}
+
+            else:
+                prop_dict[prop] = {'name':prop, 'type':'double',
+                                   'default':0}
+    # create the particle array
+    pa = ParticleArray(name="",**prop_dict)
 
     return pa
