@@ -9,28 +9,6 @@ from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
 
-# Dummy Evaluator and ParticleArray wrapper
-class DummyParticleArrayWrapper(object):
-    def __init__(self, pa):
-        self.x = pa.get_carray('x')
-        self.y = pa.get_carray('y')
-        self.z = pa.get_carray('z')
-        self.h = pa.get_carray('h')
-
-class DummyCalc(object):
-    def __init__(self, pa):
-        setattr( self, pa.name, DummyParticleArrayWrapper(pa) )
-
-class DummySPHEval(object):
-    def __init__(self, particles):
-        self.particles = particles
-
-        for pa in particles:
-            self.calc = DummyCalc( pa )
-
-    def set_nnps(self, nps):
-        self.nnps = nps
-
 numPoints = 1<<10
 dx = numpy.sqrt( 1.0/numPoints )
 
@@ -46,10 +24,7 @@ gid = UIntArray(numPoints); gid.set_data(gida)
 
 # Create the NNPS object
 pa = get_particle_array(x=xa, y=ya, h=ha, gid=gida)
-particles = [pa,]
-evaluator = DummySPHEval(particles)
-nps = nnps.NNPS(dim=2,
-                particles=particles, radius_scale=2.0)
+nps = nnps.NNPS(dim=2, particles=[pa,], radius_scale=2.0)
 
 nbrs1 = UIntArray()
 nbrs2 = UIntArray()
