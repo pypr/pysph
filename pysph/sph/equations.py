@@ -134,46 +134,60 @@ def precomputed_symbols():
     """Return a collection of predefined symbols that can be used in equations.    
     """
     c = Context()
-    c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(s_h[s_idx] + d_h[d_idx])", HIJ=0.0)
+    c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h.data[d_idx] + s_h.data[s_idx])", HIJ=0.0)
     c.XIJ = BasicCodeBlock(code=dedent("""
-                XIJ[0] = d_x[d_idx] - s_x[s_idx]
-                XIJ[1] = d_y[d_idx] - s_y[s_idx]
-                XIJ[2] = d_z[d_idx] - s_z[s_idx]
+
+                XIJ[0] = d_x.data[d_idx] - s_x.data[s_idx]
+                XIJ[1] = d_y.data[d_idx] - s_y.data[s_idx]
+                XIJ[2] = d_z.data[d_idx] - s_z.data[s_idx]
+
                 """), 
                 XIJ=[0.0, 0.0, 0.0])
+
     c.VIJ = BasicCodeBlock(code=dedent("""
-                VIJ[0] = d_u[d_idx] - s_u[s_idx]
-                VIJ[1] = d_v[d_idx] - s_v[s_idx]
-                VIJ[2] = d_w[d_idx] - s_w[s_idx]
+
+                VIJ[0] = d_u.data[d_idx] - s_u.data[s_idx]
+                VIJ[1] = d_v.data[d_idx] - s_v.data[s_idx]
+                VIJ[2] = d_w.data[d_idx] - s_w.data[s_idx]
+
                 """),
                 VIJ=[0.0, 0.0, 0.0])
+
     c.RIJ = BasicCodeBlock(code=dedent("""
+
                 RIJ = sqrt(XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2])
+
                 """),
                 RIJ=0.0)
+
     c.WIJ = BasicCodeBlock(
-                code="WIJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ)",
+                code="WIJ = KERNEL(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                        "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], HIJ)",
                 WIJ=0.0)
+
     c.WI = BasicCodeBlock(
-                code="WI = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx])",
+                code="WI = KERNEL(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                        "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], d_h.data[d_idx])",
                 WI=0.0)
+
     c.WJ = BasicCodeBlock(
-                code="WJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx])",
+                code="WJ = KERNEL(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                    "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], s_h.data[s_idx])",
                 WJ=0.0)
+
     c.DWIJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ, DWIJ)",
+                code="GRADIENT(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                    "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], HIJ, DWIJ)",
                 DWIJ=[0.0, 0.0, 0.0])
+
     c.DWI = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx], DWI)",
+                code="GRADIENT(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                    "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], d_h.data[d_idx], DWI)",
                 DWI=[0.0, 0.0, 0.0])
+
     c.DWJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx], DWJ)",
+                code="GRADIENT(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx], "\
+                        "s_x.data[s_idx], s_y.data[s_idx], s_z.data[s_idx], s_h.data[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
     return c
 
@@ -401,8 +415,6 @@ class Group(object):
         import math
         ignore += [x for x in dir(math) if not x.startswith('_') 
                                             and callable(getattr(math, x))]
-        ignore.remove('gamma')
-        ignore.remove('lgamma')
         filtered_vars = [x for x in filtered_vars if x not in ignore]
                             
         return filtered_vars
@@ -437,7 +449,8 @@ class Group(object):
     def get_array_declarations(self, names):
         decl = []
         for arr in sorted(names):
-            decl.append('cdef double* %s'%arr)
+            #decl.append('cdef double* %s'%arr)
+            decl.append('cdef DoubleArray %s'%arr)
         return '\n'.join(decl)
         
     def get_variable_declarations(self, context):
@@ -463,9 +476,10 @@ class Group(object):
 class ContinuityEquation(Equation):
     def setup(self):
         code = dedent("""
-        vijdotdwij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
 
-        d_arho[d_idx] += s_m[s_idx]*vijdotdwij
+        vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
+        d_arho.data[d_idx] += s_m.data[s_idx]*vijdotdwij
+
         """)
 
         self.loop = CodeBlock(code=code, vijdotdwij=0.0)
@@ -473,7 +487,9 @@ class ContinuityEquation(Equation):
 class SummationDensity(Equation):
     def setup(self):
         code = dedent('''
+
         d_rho[d_idx] += s_m[s_idx]*WIJ
+
         ''')
         self.loop = CodeBlock(code=code)
 
@@ -489,11 +505,13 @@ class TaitEOS(Equation):
         
     def setup(self):
         code = dedent("""
-        ratio = d_rho[d_idx]/rho0
+
+        ratio = d_rho.data[d_idx]/rho0
         tmp = pow(ratio, gamma)
 
-        d_p[d_idx] = B * (tmp -1)
-        d_cs[d_idx] = c0 * pow( ratio, gamma1 )
+        d_p.data[d_idx] = B * (tmp - 1.0)
+        d_cs.data[d_idx] = c0 * pow( ratio, gamma1 )
+
         """)
         self.loop = CodeBlock(code=code,
                               rho0=self.rho0, c0=self.c0, B=self.B,
@@ -513,29 +531,27 @@ class MomentumEquation(Equation):
 
     def setup(self):
         code = dedent("""
+
+        rhoi21 = 1.0/(d_rho.data[d_idx]*d_rho.data[d_idx])
+        rhoj21 = 1.0/(s_rho.data[s_idx]*s_rho.data[s_idx])
+
         vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
-
-        rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
-        rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
-
-        tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
         piij = 0.0
         if vijdotxij < 0:
-            rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
-            cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
+            rhoij = 0.5 * (d_rho.data[d_idx] + s_rho.data[s_idx])
+            cij = 0.5 * (d_cs.data[d_idx] + s_cs.data[s_idx])
 
             muij = (HIJ * vijdotxij)/(RIJ*RIJ + eta*eta*HIJ*HIJ)
 
             piij = -alpha*cij*muij + beta*muij*muij
             piij = piij/rhoij
 
-        tmp = tmp + piij
-        tmp = -s_m[s_idx] * tmp
+        tmp = d_p.data[d_idx] * rhoi21 + s_p.data[s_idx] * rhoj21
 
-        d_au[d_idx] = d_au[d_idx] + tmp*DWIJ[0]
-        d_av[d_idx] = d_av[d_idx] + tmp*DWIJ[1]
-        d_aw[d_idx] = d_aw[d_idx] + tmp*DWIJ[2]
+        d_au.data[d_idx] += -s_m.data[s_idx] * (tmp + piij) * DWIJ[0]
+        d_av.data[d_idx] += -s_m.data[s_idx] * (tmp + piij) * DWIJ[1]
+        d_aw.data[d_idx] += -s_m.data[s_idx] * (tmp + piij) * DWIJ[2]
 
         """)
 
@@ -545,9 +561,9 @@ class MomentumEquation(Equation):
                               vsum=0.0, wsum=0.0)
 
         code = dedent("""
-        d_au[d_idx] = d_au[d_idx] + gx
-        d_av[d_idx] = d_av[d_idx] + gy
-        d_aw[d_idx] = d_aw[d_idx] + gz
+        d_au.data[d_idx] +=  gx
+        d_av.data[d_idx] +=  gy
+        d_aw.data[d_idx] +=  gz
         """)
         self.post_loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, 
                                    gz=self.gz)
@@ -560,17 +576,23 @@ class XSPHCorrection(Equation):
     def setup(self):
         code = dedent("""\
 
-        rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
+        rhoij = 0.5 * (d_rho.data[d_idx] + s_rho.data[s_idx])
+        tmp = -eps * s_m.data[s_idx]*WIJ/rhoij
 
-        tmp = eps*s_m[s_idx]*WIJ/rhoij
-
-        d_ax[d_idx] -= tmp*VIJ[0]
-        d_ay[d_idx] -= tmp*VIJ[1]
-        d_az[d_idx] -= tmp*VIJ[2]
+        d_ax.data[d_idx] += tmp * VIJ[0]
+        d_ay.data[d_idx] += tmp * VIJ[1]
+        d_az.data[d_idx] += tmp * VIJ[2]
 
         """)
         self.loop = CodeBlock(code=code, eps=self.eps, rhoij=0.0, tmp=0.0)
-        
+
+        code = dedent("""\
+        d_ax.data[d_idx] += d_u.data[d_idx]
+        d_ay.data[d_idx] += d_v.data[d_idx]
+        d_az.data[d_idx] += d_w.data[d_idx]
+
+        """)
+        self.post_loop = CodeBlock(code=code)
 
 if __name__ == '__main__':
     # Simple demonstration of one of the equations.
