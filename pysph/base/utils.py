@@ -2,6 +2,11 @@ import numpy
 from particle_array import ParticleArray
 from carray import LongArray
 
+class ParticleTAGS:
+    Local = 0
+    Remote = 1
+    Ghost = 2
+
 def arange_long(start, stop=-1):
     """ Creates a LongArray working same as builtin range with upto 2 arguments
     both expected to be positive
