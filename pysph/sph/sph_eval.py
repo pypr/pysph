@@ -124,7 +124,6 @@ class SPHEval(object):
             s, d = g.get_array_names()
             dest_arrays.update(d)
         lines = ['NP_DEST = self.%s.size()'%dest_name]
-        #lines += ['%s = self.%s.%s.get_data_ptr()'%(n, dest_name, n[2:])
         lines += ['%s = dst.%s.data'%(n, n[2:])
                  for n in dest_arrays]
         return '\n'.join(lines)
@@ -132,7 +131,6 @@ class SPHEval(object):
     def get_src_array_setup(self, src_name, eq_group):
         src_arrays, dest = eq_group.get_array_names()        
         lines = ['NP_SRC = self.%s.size()'%src_name]
-        #lines += ['%s = self.%s.%s.get_data_ptr()'%(n, src_name, n[2:])
         lines += ['%s = src.%s.data'%(n, n[2:])
                  for n in src_arrays]
         return '\n'.join(lines)

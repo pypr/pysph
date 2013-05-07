@@ -77,33 +77,33 @@ cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size):
     return p
 
 cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
-        """ Get the centroid of the cell.
+    """ Get the centroid of the cell.
 
-        Parameters:
-        -----------
-
-        cell_size : double (input)
-            Cell size used for binning
-
-        cid : cPoint (input)
-            Spatial index for a cell
-
-        Returns:
-        ---------
-        
-        centroid : cPoint 
-             
-        Notes:
-        ------
-        The centroid in any coordinate direction is defined to be the
-        origin plus half the cell size in that direction
-
-        """
-        centroid = cPoint_new(0.0, 0.0, 0.0)
-        centroid.x = (<double>cid.x + 0.5)*cell_size
-        centroid.y = (<double>cid.y + 0.5)*cell_size
-
-        return centroid
+    Parameters:
+    -----------
+    
+    cell_size : double (input)
+    Cell size used for binning
+    
+    cid : cPoint (input)
+    Spatial index for a cell
+    
+    Returns:
+    ---------
+    
+    centroid : cPoint 
+    
+    Notes:
+    ------
+    The centroid in any coordinate direction is defined to be the
+    origin plus half the cell size in that direction
+    
+    """
+    centroid = cPoint_new(0.0, 0.0, 0.0)
+    centroid.x = (<double>cid.x + 0.5)*cell_size
+    centroid.y = (<double>cid.y + 0.5)*cell_size
+    
+    return centroid
 
 def get_centroid(double cell_size, IntPoint cid):
     """ Get the centroid of the cell.
@@ -341,7 +341,7 @@ cdef class NNPS:
             Dimension (Not sure if this is really needed)
 
         particles : list
-            The list of particles we're working on
+            The list of particles we are working on
 
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2

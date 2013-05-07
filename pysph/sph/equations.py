@@ -450,7 +450,6 @@ class Group(object):
         decl = []
         for arr in sorted(names):
             decl.append('cdef double* %s'%arr)
-            #decl.append('cdef DoubleArray %s'%arr)
         return '\n'.join(decl)
         
     def get_variable_declarations(self, context):
@@ -557,8 +556,7 @@ class MomentumEquation(Equation):
 
         self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
                               eta=self.eta, muij=0.0, piij=0.0, cij=0.0, 
-                              arhoij=0.0, tmp=0.0, vijdotxij=0.0, usum=0.0,
-                              vsum=0.0, wsum=0.0)
+                              arhoij=0.0, tmp=0.0, vijdotxij=0.0)
 
         code = dedent("""
         d_au[d_idx] +=  gx

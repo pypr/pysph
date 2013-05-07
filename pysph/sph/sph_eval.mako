@@ -31,8 +31,6 @@ cdef class ParticleArrayWrapper:
     cpdef long size(self):
         return self.array.get_number_of_particles()
         
-        
-#${locator}
 
 # #############################################################################
 cdef class SPHCalc:
@@ -111,11 +109,6 @@ cdef class SPHCalc:
         ${indent(object.get_src_array_setup(source, eq_group), 2)}
         src_array_index = src.index
         
-        # Locator.\
-        #######################################################################
-        ## Create the locator
-        #######################################################################
-        #${indent(object.get_locator_code(source, dest), 2)}
         #######################################################################
         ## Iterate over destination particles.
         #######################################################################
@@ -125,7 +118,6 @@ cdef class SPHCalc:
             ###################################################################
             ## Find and iterate over neighbors.
             ###################################################################
-            #locator.get_neighbors(d_idx, nbrs)
             nnps.get_nearest_particles(
                 src_array_index, dst_array_index, d_idx, nbrs)
 
