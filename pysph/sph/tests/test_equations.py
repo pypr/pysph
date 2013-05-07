@@ -138,7 +138,7 @@ class TestEquations(TestBase):
         self.assertEqual(r.d_arho[0], 0.0)
         self.assertEqual(r.d_arho[1], 0.0)
         # Now call with specific arguments.
-        r = e.loop(DWIJ=[1,1,1], XIJ=[1,1,1], s_m=[1,1])
+        r = e.loop(DWIJ=[1,1,1], VIJ=[1,1,1], s_m=[1,1])
         self.assertEqual(r.vijdotdwij, 3)
         self.assertEqual(r.d_arho[0], 3.0)
         self.assertEqual(r.d_arho[1], 0.0)
@@ -259,7 +259,7 @@ class TestGroup(TestBase):
         g = Group([e1, e2])
         result = g.get_loop_code(k)
         expect = dedent('''\
-            HIJ = 0.5*(s_h[s_idx] + d_h[d_idx])
+            HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])
             WIJ = CubicSplineKernel(d_x[d_idx], d_y[d_idx], d_z[d_idx], s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ)
 
             # TestEq1.

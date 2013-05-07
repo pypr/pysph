@@ -308,12 +308,12 @@ class Group(object):
         names.sort()
         for var in names:
             value = context[var]
-            if type(value) == int:
+            if isinstance(value, int):
                 declare = 'cdef long ' if mode == 'declare' else ''
                 decl.append('{declare}{var} = {value}'.format(declare=declare,
                                                               var=var, 
                                                               value=value))                    
-            elif type(value) == float:
+            elif isinstance(value, float):
                 declare = 'cdef double ' if mode == 'declare' else ''
                 decl.append('{declare}{var} = {value}'.format(declare=declare,
                                                               var=var, 
@@ -415,6 +415,8 @@ class Group(object):
         import math
         ignore += [x for x in dir(math) if not x.startswith('_') 
                                             and callable(getattr(math, x))]
+        ignore.remove('gamma')
+        ignore.remove('lgamma')
         filtered_vars = [x for x in filtered_vars if x not in ignore]
                             
         return filtered_vars

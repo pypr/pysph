@@ -30,7 +30,7 @@ def get_array_names(particle_arrays):
     for array in particle_arrays:
         for name in array.properties.keys():
             props.add(name)
-    props.difference_update(set(('tag', 'group', 'local', 'pid', 'idx')))
+    props.difference_update(set(('tag', 'pid', 'gid')))
     array_names = ', '.join(sorted(props))
     return array_names    
 
@@ -75,6 +75,8 @@ class SPHEval(object):
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
             for equation in equations:
+                if equation.dest != dest:
+                    continue
                 if equation.no_source:
                     eqs_with_no_source.append(equation)
                 else:

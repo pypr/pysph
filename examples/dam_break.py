@@ -140,6 +140,8 @@ evaluator = SPHEval(particles, equations, AllPairLocator(), kernel)
 
 # create the NNPS object
 nnps = NNPS(dim=2, particles=particles, radius_scale=2.0)
+# Set NNPS for SPHEval and the calc
+evaluator.set_nnps(nnps)
 
 with open('db.pyx', 'w') as f:
     print >> f, evaluator.ext_mod.code

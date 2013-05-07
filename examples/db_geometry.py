@@ -147,11 +147,11 @@ class DamBreak2DGeometry(object):
     def create_particles(self, nboundary_layers=2, nfluid_offset=2,
                          hdx=1.5):
         xf, yf = self.get_fluid(nfluid_offset)
-        fluid = get_particle_array_wcsph(x=xf, y=yf)
+        fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
         nfluid = self.nfluid            
 
         xb, yb = self.get_wall(nboundary_layers)
-        boundary = get_particle_array_wcsph(x=xb, y=yb)
+        boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
 
         dx, dy, ro = self.dx, self.dy, self.ro
 

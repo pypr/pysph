@@ -142,6 +142,6 @@ def get_particle_array_wcsph(name="", **props):
                 prop_dict[prop] = {'name':prop, 'type':'double',
                                    'default':0}
     # create the particle array
-    pa = ParticleArray(name="",**prop_dict)
+    pa = ParticleArray(name=name, **prop_dict)
 
     return pa
