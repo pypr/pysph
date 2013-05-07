@@ -62,17 +62,15 @@ class CubicSpline(object):
                 fac = 2./3 * h1
 
             # compute the gradient
-            if ( q >= 2.0 ):
-                val = 0.0
-
-            elif ( rij > 1e-8 ):
-                if ( q >= 1.0 ):
+            if (rij > 1e-8):
+                if (q >= 2.0):
+                    val = 0.0
+                elif ( q >= 1.0 ):
                     val = -0.75 * (2-q)*(2-q) * h1/rij
-
                 else:
-                    val = 3.0 * (0.75 * q - 1.0) * h1 * h1
+                    val = -3.0*q * (1 - 0.75*q) * h1/rij
             else:
-                val = 0.0            
+                val = 0.0
 
             tmp = val * fac
             grad[0] = tmp * xij
