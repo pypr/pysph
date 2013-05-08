@@ -438,8 +438,12 @@ class Group(object):
         import math
         ignore += [x for x in dir(math) if not x.startswith('_') 
                                             and callable(getattr(math, x))]
-        ignore.remove('gamma')
-        ignore.remove('lgamma')
+        try:
+            ignore.remove('gamma')
+            ignore.remove('lgamma')
+        except ValueError:
+            # Older Python's don't have gamma/lgamma.
+            pass
         filtered_vars = [x for x in filtered_vars if x not in ignore]
                             
         return filtered_vars
