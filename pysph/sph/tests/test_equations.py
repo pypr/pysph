@@ -144,10 +144,21 @@ class TestEquations(TestBase):
         self.assertEqual(r.d_arho[1], 0.0)
         
     def test_order_of_precomputed(self):
-        pre_comp = CodeBlock.pre_comp
-        input = dict((x, pre_comp[x]) for x in ['WIJ', 'DWIJ', 'XIJ', 'HIJ'])
-        pre = sort_precomputed(input)
-        self.assertEqual(pre.keys(), ['HIJ', 'XIJ', 'DWIJ', 'WIJ'])
+        try:
+            pre_comp = CodeBlock.pre_comp
+            pre_comp.AIJ = BasicCodeBlock(code=dedent("""
+                AIJ[0] = XIJ[0]/RIJ
+                AIJ[1] = XIJ[1]/RIJ
+                AIJ[2] = XIJ[2]/RIJ
+                """),
+                AIJ=[1.0, 0.0, 0.0])
+            input = dict((x, pre_comp[x]) for x in ['RIJ', 'R2IJ', 
+                                                    'XIJ', 'HIJ', 'AIJ'])
+            pre = sort_precomputed(input)
+            self.assertEqual(pre.keys(), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ'])
+        finally:            
+            from pysph.sph.equations import precomputed_symbols
+            CodeBlock.pre_comp = precomputed_symbols()
 
 
 class TestEq1(Equation):

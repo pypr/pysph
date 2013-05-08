@@ -1,6 +1,6 @@
 # System library imports.
 import ast
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import itertools
 import numpy
@@ -153,10 +153,15 @@ def precomputed_symbols():
                 """),
                 VIJ=[0.0, 0.0, 0.0])
 
+    c.R2IJ = BasicCodeBlock(code=dedent("""
+
+                R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]
+
+                """),
+                R2IJ=0.0)
+
     c.RIJ = BasicCodeBlock(code=dedent("""
-
-                RIJ = sqrt(XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2])
-
+                RIJ = sqrt(R2IJ)
                 """),
                 RIJ=0.0)
 
@@ -226,27 +231,46 @@ class CodeBlock(BasicCodeBlock):
             context[p] = cb.context[p]
 
 
-def sort_precomputed(precomputed):
-    """Sorts the precomputed equations in the given dictionary and
-    returns an ordered dict 
-    """
-    first = set()
-    other = set()
+def sort_precomputed(precomputed):    
+    """Sorts the precomputed equations in the given dictionary as per the
+    dependencies of the symbols and returns an ordered dict. 
+    """    
+    weights = dict((x, None) for x in precomputed)
     pre_comp = CodeBlock.pre_comp
+    # Find the dependent pre-computed symbols for each in the precomputed.
+    depends = dict((x, None) for x in precomputed)
     for pre, cb in precomputed.iteritems():
-        precomp_symbols = [x for x in cb.symbols if x in pre_comp and x != pre]
-        if len(precomp_symbols) > 0:
-            other.add(pre)
-        else:
-            first.add(pre)
+        depends[pre] = [x for x in cb.symbols if x in pre_comp and x != pre]
+
+    # The basic algorithm is to assign weights to each of the precomputed
+    # symbols based on the maximum weight of the dependencies of the
+    # precomputed symbols.  This way, those with no dependencies have weight
+    # zero and those with more have heigher weights. The `levels` dict stores
+    # a list of precomputed symbols for each  weight.  These are then stored
+    # in an ordered dict in the order of the weights to produce the output.
+    levels = defaultdict(list)
+    pre_comp_names = list(precomputed.keys())
+    while pre_comp_names:
+        for name in pre_comp_names[:]:
+            wts = [weights[x] for x in depends[name]]
+            if len(wts) == 0:
+                weights[name] = 0
+                levels[0].append(name)
+                pre_comp_names.remove(name)
+            elif None in wts:
+                continue
+            else:
+                level = max(wts) + 1
+                weights[name] = level
+                levels[level].append(name)
+                pre_comp_names.remove(name)
+    
     result = OrderedDict()
-    for s in sorted(first):
-        result[s] = pre_comp[s]
-    for s in sorted(other):
-        result[s] = pre_comp[s]
+    for level in range(len(levels)):
+        for name in sorted(levels[level]):
+            result[name] = pre_comp[name]
 
     return result
-
 
 
 ##############################################################################
