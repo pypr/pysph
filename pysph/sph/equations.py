@@ -135,6 +135,11 @@ def precomputed_symbols():
     """
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
+
+    c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])", RHOIJ=0.0)
+
+    c.RHOIJ1 = BasicCodeBlock(code="RHOIJ1 = 1.0/RHOIJ", RHOIJ1=0.0)
+
     c.XIJ = BasicCodeBlock(code=dedent("""
 
                 XIJ[0] = d_x[d_idx] - s_x[s_idx]
@@ -533,13 +538,12 @@ class MomentumEquation(Equation):
 
         piij = 0.0
         if vijdotxij < 0:
-            rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
             muij = (HIJ * vijdotxij)/(RIJ*RIJ + eta*eta*HIJ*HIJ)
 
             piij = -alpha*cij*muij + beta*muij*muij
-            piij = piij/rhoij
+            piij = piij*RHOIJ1
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
@@ -550,8 +554,8 @@ class MomentumEquation(Equation):
         """)
 
         self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
-                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0, 
-                              arhoij=0.0, tmp=0.0, vijdotxij=0.0)
+                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0,
+                              tmp=0.0, vijdotxij=0.0)
 
         code = dedent("""
         d_au[d_idx] +=  gx
@@ -569,15 +573,14 @@ class XSPHCorrection(Equation):
     def setup(self):
         code = dedent("""\
 
-        rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
-        tmp = -eps * s_m[s_idx]*WIJ/rhoij
+        tmp = -eps * s_m[s_idx]*WIJ*RHOIJ1
 
         d_ax[d_idx] += tmp * VIJ[0]
         d_ay[d_idx] += tmp * VIJ[1]
         d_az[d_idx] += tmp * VIJ[2]
 
         """)
-        self.loop = CodeBlock(code=code, eps=self.eps, rhoij=0.0, tmp=0.0)
+        self.loop = CodeBlock(code=code, eps=self.eps, tmp=0.0)
 
         code = dedent("""\
         d_ax[d_idx] += d_u[d_idx]
