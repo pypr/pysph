@@ -72,6 +72,7 @@ XSPH Correction:
 eps = 0.5
 
  """
+from time import time
 import numpy
 from db_geometry import DamBreak2DGeometry
 
@@ -124,11 +125,11 @@ equations = [
 
     # Continuity equation
     ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-    ContinuityEquation(dest='boundary', sources=['boundary']),
+    ContinuityEquation(dest='boundary', sources=['fluid']),
 
     # Momentum equation
     MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta),
+                     alpha=alpha, beta=beta, gy=-4.9),
 
     # Position step with XSPH
     XSPHCorrection(dest='fluid', sources=['fluid'])
@@ -148,3 +149,18 @@ with open('db.pyx', 'w') as f:
 
 # set the integrator
 integrator = WCSPHRK2Integrator(evaluator=evaluator, particles=particles)    
+
+t1 = time()
+t = 0.0
+for i in range(10000):
+    integrator.integrate(1e-4)
+    t += 1e-4
+
+elapsed = time() - t1
+print "Dam break %g s for t = %g"%(elapsed, t)
+
+f = particles[0]; b = particles[1]
+numpy.savez(
+    'db_solution.npz',
+    x=numpy.concatenate( [f.x, b.x] ),
+    y=numpy.concatenate( [f.y, b.y] ) )

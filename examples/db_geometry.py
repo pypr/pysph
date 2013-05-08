@@ -171,7 +171,7 @@ class DamBreak2DGeometry(object):
 
         if self.with_obstacle:
             xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
-            obstacle = get_particle_array_wcsph(x=xo, y=yo)
+            obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
 
             obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
             obstacle.m[:] = dx * dy * 0.5 * ro

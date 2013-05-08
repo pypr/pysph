@@ -135,6 +135,11 @@ def precomputed_symbols():
     """
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
+
+    c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])", RHOIJ=0.0)
+
+    c.RHOIJ1 = BasicCodeBlock(code="RHOIJ1 = 1.0/RHOIJ", RHOIJ1=0.0)
+
     c.XIJ = BasicCodeBlock(code=dedent("""
 
                 XIJ[0] = d_x[d_idx] - s_x[s_idx]
@@ -166,33 +171,27 @@ def precomputed_symbols():
                 RIJ=0.0)
 
     c.WIJ = BasicCodeBlock(
-                code="WIJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ)",
+                code="WIJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], HIJ)",
                 WIJ=0.0)
 
     c.WI = BasicCodeBlock(
-                code="WI = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx])",
+                code="WI = KERNEL(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx])",
                 WI=0.0)
 
     c.WJ = BasicCodeBlock(
-                code="WJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx])",
+                code="WJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx])",
                 WJ=0.0)
 
     c.DWIJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ, DWIJ)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], HIJ, DWIJ)",
                 DWIJ=[0.0, 0.0, 0.0])
 
     c.DWI = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx], DWI)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx], DWI)",
                 DWI=[0.0, 0.0, 0.0])
 
     c.DWJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx], DWJ)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
     return c
 
@@ -522,6 +521,7 @@ class TaitEOS(Equation):
     def __init__(self, dest, sources,
                  rho0=1000.0, c0=1.0, gamma=7.0):
         self.rho0 = rho0
+        self.rho01 = 1.0/rho0
         self.c0 = c0
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
@@ -531,7 +531,7 @@ class TaitEOS(Equation):
     def setup(self):
         code = dedent("""
 
-        ratio = d_rho[d_idx]/rho0
+        ratio = d_rho[d_idx] * rho01
         tmp = pow(ratio, gamma)
 
         d_p[d_idx] = B * (tmp - 1.0)
@@ -539,7 +539,7 @@ class TaitEOS(Equation):
 
         """)
         self.loop = CodeBlock(code=code,
-                              rho0=self.rho0, c0=self.c0, B=self.B,
+                              rho01=self.rho01, c0=self.c0, B=self.B,
                               gamma=self.gamma, gamma1=self.gamma1,
                               ratio=0.0, tmp=0.0)
 
@@ -564,13 +564,12 @@ class MomentumEquation(Equation):
 
         piij = 0.0
         if vijdotxij < 0:
-            rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
             muij = (HIJ * vijdotxij)/(RIJ*RIJ + eta*eta*HIJ*HIJ)
 
             piij = -alpha*cij*muij + beta*muij*muij
-            piij = piij/rhoij
+            piij = piij*RHOIJ1
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
@@ -581,8 +580,8 @@ class MomentumEquation(Equation):
         """)
 
         self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
-                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0, 
-                              arhoij=0.0, tmp=0.0, vijdotxij=0.0)
+                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0,
+                              tmp=0.0, vijdotxij=0.0)
 
         code = dedent("""
         d_au[d_idx] +=  gx
@@ -600,15 +599,14 @@ class XSPHCorrection(Equation):
     def setup(self):
         code = dedent("""\
 
-        rhoij = 0.5 * (d_rho[d_idx] + s_rho[s_idx])
-        tmp = -eps * s_m[s_idx]*WIJ/rhoij
+        tmp = -eps * s_m[s_idx]*WIJ*RHOIJ1
 
         d_ax[d_idx] += tmp * VIJ[0]
         d_ay[d_idx] += tmp * VIJ[1]
         d_az[d_idx] += tmp * VIJ[2]
 
         """)
-        self.loop = CodeBlock(code=code, eps=self.eps, rhoij=0.0, tmp=0.0)
+        self.loop = CodeBlock(code=code, eps=self.eps, tmp=0.0)
 
         code = dedent("""\
         d_ax[d_idx] += d_u[d_idx]

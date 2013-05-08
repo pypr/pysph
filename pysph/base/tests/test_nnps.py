@@ -1,5 +1,4 @@
 """Simple test for the NNPS class"""
-from mpi4py import MPI as mpi
 import numpy
 
 from numpy import random
