@@ -161,33 +161,27 @@ def precomputed_symbols():
                 RIJ=0.0)
 
     c.WIJ = BasicCodeBlock(
-                code="WIJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ)",
+                code="WIJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], HIJ)",
                 WIJ=0.0)
 
     c.WI = BasicCodeBlock(
-                code="WI = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx])",
+                code="WI = KERNEL(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx])",
                 WI=0.0)
 
     c.WJ = BasicCodeBlock(
-                code="WJ = KERNEL(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx])",
+                code="WJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx])",
                 WJ=0.0)
 
     c.DWIJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], HIJ, DWIJ)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], HIJ, DWIJ)",
                 DWIJ=[0.0, 0.0, 0.0])
 
     c.DWI = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                    "s_x[s_idx], s_y[s_idx], s_z[s_idx], d_h[d_idx], DWI)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx], DWI)",
                 DWI=[0.0, 0.0, 0.0])
 
     c.DWJ = BasicCodeBlock(
-                code="GRADIENT(d_x[d_idx], d_y[d_idx], d_z[d_idx], "\
-                        "s_x[s_idx], s_y[s_idx], s_z[s_idx], s_h[s_idx], DWJ)",
+                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
     return c
 
