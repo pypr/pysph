@@ -10,7 +10,7 @@ class CubicSpline(object):
         code = dedent('''\
         from libc.math cimport fabs, sqrt, M_1_PI
             
-        cdef double CubicSplineKernel(double xij, double yij, double zij, double h):
+        cdef inline double CubicSplineKernel(double xij, double yij, double zij, double h):
             cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
             cdef double h1 = 1./h
@@ -39,8 +39,8 @@ class CubicSpline(object):
             return val * fac
 
 
-        cdef CubicSplineGradient(double xij, double yij, double zij, double h,
-                                 double* grad):
+        cdef inline CubicSplineGradient(double xij, double yij, double zij, double h,
+                                        double* grad):
             cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
             cdef double h1 = 1./h
