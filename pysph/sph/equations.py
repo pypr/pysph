@@ -496,6 +496,7 @@ class TaitEOS(Equation):
     def __init__(self, dest, sources,
                  rho0=1000.0, c0=1.0, gamma=7.0):
         self.rho0 = rho0
+        self.rho01 = 1.0/rho0
         self.c0 = c0
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
@@ -505,7 +506,7 @@ class TaitEOS(Equation):
     def setup(self):
         code = dedent("""
 
-        ratio = d_rho[d_idx]/rho0
+        ratio = d_rho[d_idx] * rho01
         tmp = pow(ratio, gamma)
 
         d_p[d_idx] = B * (tmp - 1.0)
@@ -513,7 +514,7 @@ class TaitEOS(Equation):
 
         """)
         self.loop = CodeBlock(code=code,
-                              rho0=self.rho0, c0=self.c0, B=self.B,
+                              rho01=self.rho01, c0=self.c0, B=self.B,
                               gamma=self.gamma, gamma1=self.gamma1,
                               ratio=0.0, tmp=0.0)
 
