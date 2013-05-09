@@ -2,12 +2,14 @@
 cimport numpy as np
 
 # PyZoltan
-from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
-from pyzoltan.sph.particle_array cimport ParticleArray
-from pyzoltan.core.point cimport *
-from pyzoltan.czoltan.zoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
-from pyzoltan.czoltan cimport czoltan
 from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
+from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
+
+from pyzoltan.sph.particle_array cimport ParticleArray
+
+# Point
+from point cimport *
 
 cdef inline int real_to_int(double val, double step)
 cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)

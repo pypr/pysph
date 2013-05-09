@@ -1,7 +1,7 @@
 """Cython wrapper for the Zoltan Distributed Directory"""
 
 from mpi4py.mpi_c cimport MPI_Comm
-from zoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR
+from czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR
 
 cdef extern from "zoltan_dd.h":
 

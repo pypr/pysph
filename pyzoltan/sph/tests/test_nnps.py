@@ -3,7 +3,7 @@ import numpy
 from numpy import random
 
 from pyzoltan.core.carray import UIntArray, DoubleArray
-from pyzoltan.core.point import IntPoint, Point
+from pyzoltan.sph.point import IntPoint, Point
 from pyzoltan.sph.nnps import NNPSParticleGeometric, Cell
 from pyzoltan.sph.nnps_utils import get_particle_array
 

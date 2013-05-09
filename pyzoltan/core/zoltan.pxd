@@ -2,11 +2,11 @@ cimport mpi4py.MPI as mpi
 from mpi4py cimport mpi_c as mpic
 
 # Zoltan imports
-cimport czoltan
-from czoltan cimport Zoltan_Struct
+from pyzoltan.czoltan cimport czoltan
+from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 
 # Zoltan type imports
-from zoltan_types cimport ZOLTAN_ID_PTR, ZOLTAN_ID_TYPE, \
+from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_PTR, ZOLTAN_ID_TYPE, \
      ZOLTAN_OK, ZOLTAN_WARN, ZOLTAN_FATAL, ZOLTAN_MEMERR
 
 # NUMPY

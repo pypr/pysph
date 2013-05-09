@@ -5,8 +5,8 @@ import numpy
 from numpy import random
 from numpy import savez, load
 
-from pyzoltan.core.point import Point
 from pyzoltan.core.carray import UIntArray
+from pyzoltan.sph.point import Point
 from pyzoltan.sph.kernels import CubicSpline
 from pyzoltan.sph.nnps import NNPSParticleGeometric
 from pyzoltan.sph.nnps_utils import get_particle_array

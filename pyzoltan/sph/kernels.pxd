@@ -1,4 +1,4 @@
-from pyzoltan.core.point cimport cPoint
+from point cimport cPoint
 
 ##############################################################################
 #`Kernel`

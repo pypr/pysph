@@ -15,7 +15,7 @@ from libc.stdlib cimport malloc, free
 # Zoltan config imports
 ZOLTAN_UNSIGNED_INT=True
 try:
-    from zoltan_config cimport UNSIGNED_INT_GLOBAL_IDS
+    from pyzoltan.czoltan.czoltan_config cimport UNSIGNED_INT_GLOBAL_IDS
 except ImportError:
     ZOLTAN_UNSIGNED_INT=False
 

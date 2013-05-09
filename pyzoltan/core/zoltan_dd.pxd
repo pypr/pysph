@@ -3,7 +3,7 @@ cimport mpi4py.MPI as mpi
 from mpi4py.mpi_c cimport MPI_Comm
 
 from pyzoltan.czoltan.czoltan_dd cimport *
-from pyzoltan.czoltan.zoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR
+from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR
 
 from carray cimport UIntArray, IntArray
 

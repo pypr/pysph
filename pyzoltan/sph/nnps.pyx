@@ -9,6 +9,7 @@ cimport numpy as np
 import mpi4py.MPI as mpi
 
 # PyZoltan
+from pyzoltan.czoltan cimport czoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core.zoltan cimport ZoltanGeometricPartitioner
 from pyzoltan.core import zoltan_utils

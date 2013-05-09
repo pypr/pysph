@@ -2,8 +2,7 @@ cimport numpy
 import numpy
 
 # local imports
-from pyzoltan.core.point cimport cPoint_new, cPoint_distance, cPoint_sub, \
-     Point
+from point cimport cPoint_new, cPoint_distance, cPoint_sub, Point
 
 cdef extern from "math.h":
     double sqrt(double)

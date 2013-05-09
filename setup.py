@@ -44,10 +44,6 @@ cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
     # core modules
-    Extension( name="pyzoltan.core.point",
-               sources=["pyzoltan/core/point.pyx"],
-               include_dirs = include_dirs),
-
     Extension( name="pyzoltan.core.carray",
                sources=["pyzoltan/core/carray.pyx"],
                include_dirs = include_dirs),
@@ -65,6 +61,10 @@ ext_modules = [
                libraries=['zoltan', 'mpi']),
 
     # sph modules
+    Extension( name="pyzoltan.sph.point",
+               sources=["pyzoltan/sph/point.pyx"],
+               include_dirs = include_dirs),
+    
     Extension( name="pyzoltan.sph.kernels",
                sources=["pyzoltan/sph/kernels.pyx"],
                include_dirs = include_dirs),
