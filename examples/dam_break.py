@@ -72,17 +72,15 @@ XSPH Correction:
 eps = 0.5
 
  """
-from time import time
 import numpy
 from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline
-from pysph.base.nnps import NNPS
-from pysph.sph.sph_eval import SPHEval
-from pysph.base.locators import AllPairLocator
-from pysph.sph.integrator import WCSPHRK2Integrator
 from pysph.sph.equations import TaitEOS, ContinuityEquation, MomentumEquation,\
      XSPHCorrection
+     
+from pysph.solver.application import Application
+from pysph.solver.solver import Solver
 
 dim = 2
 fluid_column_height = 2.0
@@ -90,6 +88,9 @@ fluid_column_width  = 1.0
 container_height = 3.0
 container_width  = 4.0
 nboundary_layers=2
+
+dt = 1e-4
+tf = 0.1
 
 #h = 0.0156
 h = 0.0390
@@ -110,11 +111,18 @@ geom = DamBreak2DGeometry(
     nboundary_layers=nboundary_layers, ro=ro, co=co,
     with_obstacle=False)
 
-# create the list of particles
-particles = geom.create_particles(hdx=hdx)
 
-# set the kernel
+# Create the application.
+app = Application()
+
+# Create the kernel
 kernel = CubicSpline(dim=2)
+
+# Create a solver.
+solver = Solver(kernel=kernel, dim=dim)
+# Setup default parameters.
+solver.set_time_step(dt)
+solver.set_final_time(tf)
 
 # create the equations
 equations = [
@@ -133,34 +141,13 @@ equations = [
 
     # Position step with XSPH
     XSPHCorrection(dest='fluid', sources=['fluid'])
+    ]    
 
-    ]
-
-# Create the SPHEval object
-evaluator = SPHEval(particles, equations, AllPairLocator(), kernel)
-
-# create the NNPS object
-nnps = NNPS(dim=2, particles=particles, radius_scale=2.0)
-# Set NNPS for SPHEval and the calc
-evaluator.set_nnps(nnps)
+# Setup the application and solver.  This also generates the particles.
+app.setup(solver=solver, equations=equations, 
+          particle_factory=geom.create_particles, hdx=hdx)
 
 with open('db.pyx', 'w') as f:
-    print >> f, evaluator.ext_mod.code
+    app.dump_code(f)
 
-# set the integrator
-integrator = WCSPHRK2Integrator(evaluator=evaluator, particles=particles)    
-
-t1 = time()
-t = 0.0
-for i in range(10000):
-    integrator.integrate(1e-4)
-    t += 1e-4
-
-elapsed = time() - t1
-print "Dam break %g s for t = %g"%(elapsed, t)
-
-f = particles[0]; b = particles[1]
-numpy.savez(
-    'db_solution.npz',
-    x=numpy.concatenate( [f.x, b.x] ),
-    y=numpy.concatenate( [f.y, b.y] ) )
+app.run()

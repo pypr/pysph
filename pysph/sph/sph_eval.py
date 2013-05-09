@@ -98,7 +98,8 @@ class SPHEval(object):
         helpers = []
         helpers.extend(get_code(self.kernel, 'helper'))
         
-        helpers.extend(get_code(self.locator, 'helper'))
+        if self.locator is not None:
+            helpers.extend(get_code(self.locator, 'helper'))
         
         return '\n'.join(helpers)
         
@@ -146,7 +147,10 @@ class SPHEval(object):
         array_names =  get_array_names(self.particle_arrays)
         parrays = [pa.name for pa in self.particle_arrays]
         pa_names = ', '.join(parrays)
-        locator = '\n'.join(get_code(self.locator, 'code'))
+        if self.locator is None:
+            locator = ''
+        else:
+            locator = '\n'.join(get_code(self.locator, 'code'))
         path = join(dirname(__file__), 'sph_eval.mako')
         template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names, 

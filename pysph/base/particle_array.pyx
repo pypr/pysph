@@ -520,7 +520,6 @@ cdef class ParticleArray:
             props = [i for i in self.properties.keys()]
         else:
             props = [i for i in self.properties.keys() if not i.startswith('_')]
-            props += ['_tmpx', '_tmpy', '_tmpz']
         
         for prop in props:
             ret[prop] = self.properties[prop].get_npy_array()

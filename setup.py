@@ -78,10 +78,10 @@ setup(name='PySPH',
       #setup_requires=['Cython>=0.14', 'setuptools>=0.6c1'],
       #extras_require={'3D': 'Mayavi>=3.0'},
       zip_safe = False,
-      #entry_points = """
-      #    [console_scripts]
-      #    pysph_viewer = pysph.tools.mayavi_viewer:main
-      #    """,
+      entry_points = """
+          [console_scripts]
+          pysph_viewer = pysph.tools.mayavi_viewer:main
+          """,
       platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
       classifiers = [c.strip() for c in """\
         Development Status :: 3 - Alpha

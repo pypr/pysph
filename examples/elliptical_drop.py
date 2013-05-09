@@ -1,20 +1,17 @@
 """Elliptical drop example"""
 
-from numpy import ones_like, mgrid, sqrt, arange, array, savez
+from numpy import ones_like, mgrid, sqrt, array, savez
 from pysph.base.utils import get_particle_array
 from pysph.base.carray import LongArray
 
 from pysph.base.kernels import CubicSpline
-from pysph.base.locators import AllPairLocator
-from pysph.base.nnps import NNPS
+from pysph.solver.application import Application
+from pysph.solver.solver import Solver
 
 from time import time
 
 from pysph.sph.equations import (TaitEOS, ContinuityEquation, MomentumEquation,
     XSPHCorrection)
-
-from pysph.sph.integrator import WCSPHRK2Integrator
-from pysph.sph.sph_eval import SPHEval
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """ Exact solution for the the elliptical drop equations """
@@ -101,43 +98,32 @@ def get_circular_patch(name="", type=0, dx=0.025,
 
     return [pa,]
 
-particles = get_circular_patch(name="fluid")
+# Create the application.
+app = Application()
+
+# Create the kernel
 kernel = CubicSpline(dim=2)
+
+# Create a solver.
+solver = Solver(kernel=kernel, dim=2)
+# Setup default parameters.
+solver.set_time_step(1e-5)
+solver.set_final_time(0.0075)
 
 equations = [TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
              ContinuityEquation(dest='fluid',  sources=['fluid',]),
              MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
              XSPHCorrection(dest='fluid', sources=['fluid']),
             ]
-
-# Create the Locator and SPHEval object
-locator = AllPairLocator()
-evaluator = SPHEval(particles, equations, locator, kernel)
-
-# Create the NNPS object
-nnps = NNPS(dim=2, particles=particles, radius_scale=2.0)
-
-# Set NNPS for SPHEval and the calc
-evaluator.set_nnps(nnps)
+            
+# Setup the application and solver.  This also generates the particles.
+app.setup(solver=solver, equations=equations, 
+          particle_factory=get_circular_patch, name='fluid')
 
 with open('test.pyx', 'w') as f:
-    print >> f, evaluator.ext_mod.code
+    app.dump_code(f)
 
-# set the integrator
-integrator = WCSPHRK2Integrator(evaluator=evaluator, particles=particles)
-
-pa = particles[0]
-ex, ey, ep = exact_solution()
 t1 = time()
-for i in range(750):
-    integrator.integrate(1e-5)
-    if i % 50 == 0:
-        savez('solution%03d.npz'%i, x=pa.x, y=pa.y, ex=ex, ey=ey)
-
+app.run()
 elapsed = time() - t1
-savez('solution%03d.npz'%i, x=pa.x, y=pa.y, ex=ex, ey=ey)
-
 print "750 iterations in %gs, avg = %g s/iteration"%(elapsed, elapsed/750)
-
-# f = evaluator.calc.fluid
-# print type(f), f, f.x
