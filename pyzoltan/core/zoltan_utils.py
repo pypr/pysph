@@ -2,44 +2,6 @@
 import numpy
 from mpi4py import MPI
 
-def count_recv_data(
-    comm, recv, numImport, importProcs):
-    """Count the data to be received from different processors.
-
-    Parameters:
-    -----------
-
-    comm : mpi.Comm
-        MPI communicator
-
-    recv : dict
-        Upon output, will contain keys corresponding to processors and
-        values indicating number of objects to receive from that proc.
-
-    numImport : int
-        Zoltan generated total number of objects to be imported
-        to the calling proc
-
-    importProcs : DoubleArray
-        Zoltan generated list for processors from where objects are
-        to be received.
-
-    """
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-
-    recv.clear()
-    for processor in range(size):
-        recv[processor] = 0
-
-    for i in range(numImport):
-        processor = importProcs[i]
-        recv[processor] += 1
-        
-    for processor in recv.keys():
-        if recv[processor] == 0:
-            del recv[processor]
-
 def get_num_objects_per_proc(comm, num_objects):
     """Utility function to get number of objects on each processor.
 

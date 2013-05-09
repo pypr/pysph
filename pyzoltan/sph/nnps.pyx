@@ -243,7 +243,7 @@ cdef class ParticleArrayExchange:
         cdef object comm = self.comm
 
         # count the number of objects to receive from remote procesors
-        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
+        nnps_utils.count_recv_data(comm, recv, numImport, importProcs)
 
         # Remove particles to be exported
         pa.remove_particles( exportLocalids )
@@ -299,7 +299,7 @@ cdef class ParticleArrayExchange:
         cdef object comm = self.comm
 
         # count the number of objects to receive from remote procesors
-        zoltan_utils.count_recv_data(comm, recv, numImport, importProcs)
+        nnps_utils.count_recv_data(comm, recv, numImport, importProcs)
 
         # resize the arrays
         newsize = current_size + numImport

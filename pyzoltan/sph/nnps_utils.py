@@ -10,6 +10,44 @@ class ParticleTAGS:
     Remote = 1          # Remote particles for computations
     Ghost = 2           # Ghost particles for periodicity
 
+def count_recv_data(
+    comm, recv, numImport, importProcs):
+    """Count the data to be received from different processors.
+
+    Parameters:
+    -----------
+
+    comm : mpi.Comm
+        MPI communicator
+
+    recv : dict
+        Upon output, will contain keys corresponding to processors and
+        values indicating number of objects to receive from that proc.
+
+    numImport : int
+        Zoltan generated total number of objects to be imported
+        to the calling proc
+
+    importProcs : DoubleArray
+        Zoltan generated list for processors from where objects are
+        to be received.
+
+    """
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    recv.clear()
+    for processor in range(size):
+        recv[processor] = 0
+
+    for i in range(numImport):
+        processor = importProcs[i]
+        recv[processor] += 1
+        
+    for processor in recv.keys():
+        if recv[processor] == 0:
+            del recv[processor]    
+
 def get_send_data(
     comm, pa, lb_props, _exportIndices, _exportProcs):
     """Collect the data to send in a dictionary.
