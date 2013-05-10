@@ -99,7 +99,7 @@ setup(name='PyZoltan',
       packages = find_packages(),
 
       # include Cython headers in the install directory
-      package_data={'czoltan' : 'pyzoltan/czoltan/*.pxd'},
+      package_data={'' : ['*.pxd']},
 
       ext_modules = ext_modules,
       
