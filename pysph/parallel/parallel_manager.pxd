@@ -19,60 +19,23 @@ cpdef UIntArray arange_uint(int start, int stop=*)
 cdef class ParticleArrayWrapper:
     cdef ParticleArray pa
     cdef public str name
-    cdef public DoubleArray x, y, z, h
-    cdef public UIntArray gid
-    cdef public IntArray tag
 
-# Domain limits
-cdef class DomainLimits:
-    cdef public double xmin, xmax
-    cdef public double ymin, ymax
-    cdef public double zmin, zmax
-
-    cdef public double xtranslate
-    cdef public double ytranslate
-    cdef public double ztranslate
-
-    cdef public int dim
-    cdef public bint is_periodic
-
-# basic cell data structure
-cdef class Cell:
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef cIntPoint _cid                 # Spatial index for the cell
-    cdef public bint is_boundary        # Flag to indicate boundary cells
-    cdef int narrays                    # number of arrays
-    cdef public list lindices           # Local indices for particles
-    cdef public list gindices           # Global indices for binned particles
-    cdef list nparticles                # Number of particles in the cell
-    cdef double cell_size               # bin size
-    cdef public cPoint centroid         # Centroid computed from indices
-    cdef cPoint boxmin                  # Bounding box min for the cell
-    cdef cPoint boxmax                  # Bounding box max for the cell
-    cdef int layers                     # Layers to compute bounding box
-    cdef IntArray nbrprocs              # List of neighboring processors
-
-    ############################################################################
-    # Member functions
-    ############################################################################
-    # set the indices for the cell
-    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices)
-
-    # compute the bounding box for a cell. Layers is used to determine
-    # the factor times the cell size the bounding box is offset from
-    # the cell.
-    cdef _compute_bounding_box(self, double cell_size,
-                               int layers)
+    # load balancing properties
+    cdef public DoubleArray x, y, z, ax, ay, az    # coordinates
+    cdef public DoubleArray u, v, w, au, av, aw    # velocities
+    cdef public DoubleArray rho, h, arho, ah       # density and smoothing lengths
+    cdef public DoubleArray e, ae                  # thermal energy
+    cdef public DoubleArray m                      # mass
+    cdef public UIntArray gid                      # particle global id
+    cdef public IntArray tag                       # particle identifier tag
 
 cdef class ParticleArrayExchange:
     ############################################################################
     # Data Attributes
     ############################################################################
     cdef public ParticleArray pa                   # Particle data
-    cdef public ParticleArrayWrapper pa_wrapper    # wrapper for data access
-
+    cdef public ParticleArrayWrapper               # wrapper to exchange data
+    
     cdef public size_t num_local         # Total number of particles
     cdef public size_t num_global        # Global number of particles
     cdef public size_t num_remote        # Number of remote particles

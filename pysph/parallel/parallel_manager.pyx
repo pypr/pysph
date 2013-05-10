@@ -18,6 +18,7 @@ from pyzoltan.core import zoltan_utils
 # PySPH imports
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.carray cimport UIntArray, IntArray, LongArray, DoubleArray
+from pysph.base.nnps cimport DomainLimits, Cell
 from pysph.base.point cimport *
 
 # local imports
@@ -152,18 +153,34 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
     return arange
 
-################################################################
-# ParticleArrayWrapper
-################################################################w
 cdef class ParticleArrayWrapper:
     def __init__(self, ParticleArray pa):
         self.pa = pa
         self.name = pa.name
 
+        # set up the load balancing props for the particle array
         self.x = pa.get_carray('x')
         self.y = pa.get_carray('y')
         self.z = pa.get_carray('z')
+
+        self.ax = pa.get_carray('ax')
+        self.ay = pa.get_carray('ay')
+        self.az = pa.get_carray('az')
+
+        self.u = pa.get_carray('u')
+        self.v = pa.get_carray('v')
+        self.w = pa.get_carray('w')
+
+        self.au = pa.get_carray('au')
+        self.av = pa.get_carray('av')
+        self.aw = pa.get_carray('aw')
+
+        self.rho = pa.get_carray('rho')
+        self.arho = pa.get_carray('arho')
+        
         self.h = pa.get_carray('h')
+        self.m = pa.get_carray('m')
+
         self.gid = pa.get_carray('gid')
         self.tag = pa.get_carray('tag')
 
@@ -173,6 +190,7 @@ cdef class ParticleArrayWrapper:
 cdef class ParticleArrayExchange:
     def __init__(self, ParticleArray pa, object comm, lb_props=None):
         self.pa = pa
+
         self.pa_wrapper = ParticleArrayWrapper( pa )
 
         self.comm = comm
@@ -198,7 +216,10 @@ cdef class ParticleArrayExchange:
 
         # load balancing props
         if lb_props is None:
-            self.lb_props = ['x','y','h','gid']
+            self.lb_props = ['x','y', 'z', 'ax', 'ay', 'az',
+                             'u', 'v', 'w', 'au', 'av', 'aw',
+                             'rho', 'arho', 
+                             'm', 'h', 'gid', 'tag']
         else:
             self.lb_props = lb_props
 
@@ -441,164 +462,9 @@ cdef class ParticleArrayExchange:
         # set the number of local and global objects
         self.num_global = num_global_objects
 
-#################################################################
-# NNPS extension classes
-#################################################################
-cdef class DomainLimits:
-    """This class determines the limits of the solution domain.
-
-    We expect all simulations to have well defined domain limits
-    beyond which we are either not interested or the solution is
-    invalid to begin with. Thus, if a particle leaves the domain,
-    the simulation should be considered invalid.
-
-    The initial domain limits could be given explicitly or asked to be
-    computed from the particle arrays. The domain could be periodic.
-
-    """
-    def __init__(self, int dim=1, double xmin=-1000, double xmax=1000, double ymin=0,
-                 double ymax=0, double zmin=0, double zmax=0, is_periodic=False):
-        """Constructor"""
-        self._check_limits(dim, xmin, xmax, ymin, ymax, zmin, zmax)
-        
-        self.xmin = xmin; self.xmax = xmax
-        self.ymin = ymin; self.ymax = ymax
-        self.zmin = zmin; self.zmax = zmax
-
-        # Indicates if the domain is periodic
-        self.is_periodic = is_periodic
-
-        # get the translates in each coordinate direction
-        self.xtranslate = xmax - xmin
-        self.ytranslate = ymax - ymin
-        self.ztranslate = zmax - zmin
-
-        # store the dimension
-        self.dim = dim
-
-    def _check_limits(self, dim, xmin, xmax, ymin, ymax, zmin, zmax):
-        """Sanity check on the limits"""
-        if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
-            raise ValueError("Invalid domain limits!")
-
-cdef class Cell:
-    """Basic indexing structure.
-
-    For a spatial indexing based on the box-sort algorithm, this class
-    defines the spatial data structure used to hold particle indices
-    (local and global) that are within this cell. 
-
-    """
-    def __init__(self, IntPoint cid, double cell_size, int narrays=1,
-                 int layers=2):
-        """Constructor
-
-        Parameters:
-        -----------
-
-        cid : IntPoint
-            Spatial index (unflattened) for the cell
-
-        cell_size : double
-            Spatial extent of the cell in each dimension
-
-        narrays : int default (1)
-            Number of arrays
-
-        layers : int default (2)
-            Factor to compute the bounding box        
-
-        """
-        self._cid = cIntPoint_new(cid.x, cid.y, cid.z)
-        self.cell_size = cell_size
-
-        self.narrays = narrays
-
-        self.lindices = [UIntArray() for i in range(narrays)]
-        self.gindices = [UIntArray() for i in range(narrays)]
-
-        self.nparticles = [0 for i in range(narrays)]
-        self.is_boundary = False
-
-        # compute the centroid for the cell
-        self.centroid = _get_centroid(cell_size, cid.data)
-
-        # cell bounding box
-        self.layers = layers
-        self._compute_bounding_box(cell_size, layers)
-
-        # list of neighboring processors
-        self.nbrprocs = IntArray(0)
-
-    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices):
-        """Set the global and local indices for the cell"""
-        self.lindices[index] = lindices
-        self.gindices[index] = gindices
-        self.nparticles[index] = lindices.length
-
-    def get_centroid(self, Point pnt):
-        """Utility function to get the centroid of the cell.
-
-        Parameters:
-        -----------
-
-        pnt : Point (input/output)
-            The centroid is cmoputed and stored in this object.
-
-        The centroid is defined as the origin plus half the cell size
-        in each dimension.
-        
-        """
-        cdef cPoint centroid = self.centroid
-        pnt.data = centroid
-
-    def get_bounding_box(self, Point boxmin, Point boxmax, int layers=2,
-                         cell_size=None):
-        """Compute the bounding box for the cell.
-
-        Parameters:
-        ------------
-
-        boxmin : Point (output)
-            The bounding box min coordinates are stored here
-
-        boxmax : Point (output)
-            The bounding box max coordinates are stored here
-
-        layers : int (input) default (2)
-            Number of offset layers to define the bounding box
-
-        cell_size : double (input) default (None)
-            Optional cell size to use to compute the bounding box.
-            If not provided, the cell's size will be used.        
-
-        """
-        if cell_size is None:
-            cell_size = self.cell_size
-
-        self._compute_bounding_box(cell_size, layers)
-        boxmin.data = self.boxmin
-        boxmax.data = self.boxmax
-
-    cdef _compute_bounding_box(self, double cell_size,
-                               int layers):
-        self.layers = layers
-        cdef cPoint centroid = self.centroid
-        cdef cPoint boxmin = cPoint_new(0., 0., 0.)
-        cdef cPoint boxmax = cPoint_new(0., 0., 0.)
-
-        boxmin.x = centroid.x - (layers+0.5) * cell_size
-        boxmax.x = centroid.x + (layers+0.5) * cell_size
-
-        boxmin.y = centroid.y - (layers+0.5) * cell_size
-        boxmax.y = centroid.y + (layers+0.5) * cell_size
-
-        boxmin.z = 0.
-        boxmax.z = 0.
-
-        self.boxmin = boxmin
-        self.boxmax = boxmax
-
+# #################################################################
+# # ParallelManager extension classes
+# #################################################################
 cdef class ParallelManager:
     """Base class for all parallel managers."""
     def __init__(self, int dim, list particles, object comm,
