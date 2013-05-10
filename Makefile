@@ -2,7 +2,7 @@ ROOT = $(shell pwd)
 MAKEFILE = $(ROOT)/Makefile
 SRC = $(ROOT)
 PKG = $(SRC)/pysph
-SUBPKG = base sph 
+SUBPKG = base sph parallel
 DIRS := $(foreach dir,$(SUBPKG),$(PKG)/$(dir))
 
 # this is used for cython files on recursive call to make
