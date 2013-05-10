@@ -98,6 +98,9 @@ setup(name='PyZoltan',
       test_suite = "nose.collector",
       packages = find_packages(),
 
+      # include Cython headers in the install directory
+      package_data={'czoltan' : 'pyzoltan/czoltan/*.pxd'},
+
       ext_modules = ext_modules,
       
       include_package_data = True,
