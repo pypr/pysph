@@ -7,9 +7,10 @@ ${' '*4*level}${l}
 
 from libc.math cimport pow, sqrt
 cimport numpy
-from pysph.base.carray cimport DoubleArray, IntArray, UIntArray
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
+
+from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray
 
 ${helpers}
 

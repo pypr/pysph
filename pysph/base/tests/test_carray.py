@@ -11,7 +11,7 @@ import unittest
 import numpy
 
 # local imports
-from pysph.base.carray import LongArray
+from pyzoltan.core.carray import LongArray
 
 class TestLongArray(unittest.TestCase):
     """

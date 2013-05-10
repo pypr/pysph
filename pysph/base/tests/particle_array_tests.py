@@ -9,8 +9,9 @@ import numpy
 # local imports
 import pysph
 from pysph.base import particle_array
-from pysph.base.carray import LongArray, IntArray, DoubleArray
-from pysph.base import carray
+
+from pyzoltan.core import carray
+from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
 
 import pickle
 

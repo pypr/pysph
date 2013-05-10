@@ -14,8 +14,6 @@ from utils import PBar, savez, load
 import logging
 logger = logging.getLogger()
 
-
-
 class Solver(object):
     """ Base class for all PySPH Solvers
 
@@ -244,6 +242,10 @@ class Solver(object):
         bar = PBar(1000 + int(dt/bt), show=show_progress)
 
         self.dump_output(dt, *self.print_properties)
+        self.comm.barrier() # everybody waits for this to complete
+
+        # the parallel manager
+        pm = self.pm
 
         # set the time for the integrator
         #self.integrator.time = self.t
@@ -271,6 +273,11 @@ class Solver(object):
             # dump output
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)
+                self.comm.barrier() # everybody waits for this to complete
+
+            # re-distribute particles if valid parallel manager
+            if self.pm:
+                pm.update()                
 
             bcount += int(self.dt/bt)
             while bcount > 0:
@@ -420,6 +427,9 @@ class Solver(object):
 
         self.t = float(data["solver_data"]['t'])
         self.count = int(data["solver_data"]['count'])
+
+    def set_parallel_manager(self, pm):
+        self.pm = pm
 
     def get_options(self, opt_parser):
         """ Implement this to add additional options for the application """

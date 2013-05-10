@@ -32,8 +32,10 @@ logger = logging.getLogger()
 cimport numpy
 import numpy
 
+# PyZoltan imports
+from pyzoltan.core.carray cimport *
+
 # Local imports
-from carray cimport *
 from cpython cimport PyObject
 from cpython cimport *
 from cython cimport *

@@ -90,7 +90,7 @@ container_width  = 4.0
 nboundary_layers=2
 
 dt = 1e-4
-tf = 0.1
+tf = 1.0
 
 #h = 0.0156
 h = 0.0390

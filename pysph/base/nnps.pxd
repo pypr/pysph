@@ -1,8 +1,10 @@
 # numpy
 cimport numpy as np
 
+# PyZoltan CArrays
+from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+
 # local imports
-from carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from particle_array cimport ParticleArray
 from point cimport *
 

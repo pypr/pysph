@@ -15,7 +15,7 @@ cdef class WCSPHRK2Integrator:
         cdef object evaluator = self.evaluator
         cdef NNPS nnps = self.nnps
         cdef str name
-        
+
         # Particle properties
         cdef DoubleArray x, y, z, u, v, w, rho
 

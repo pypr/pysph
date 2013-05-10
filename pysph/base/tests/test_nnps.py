@@ -3,10 +3,11 @@ import numpy
 
 from numpy import random
 
-from pysph.base.carray import UIntArray, DoubleArray
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
+
+from pyzoltan.core.carray import UIntArray, DoubleArray
 
 numPoints = 1<<10
 dx = numpy.sqrt( 1.0/numPoints )

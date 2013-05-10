@@ -1,6 +1,7 @@
 import numpy
 from particle_array import ParticleArray
-from carray import LongArray
+
+from pyzoltan.core.carray import LongArray
 
 UINT_MAX = (1<<32) - 1
 
@@ -84,10 +85,6 @@ def get_particle_array(cl_precision="double", **props):
             prop_dict[prop] = {'name':prop, 'type':'double',
                                'default':default_props[prop]}
 
-    # handle the name separately
-    if props.has_key('name'):
-        name = props['name']
-
     pa = ParticleArray(name=name, 
                        cl_precision=cl_precision, **prop_dict)
 
@@ -97,8 +94,16 @@ def get_particle_array(cl_precision="double", **props):
 
     return pa
 
-def get_particle_array_wcsph(name="", **props):
+def get_particle_array_wcsph(cl_precision="single", **props):
     """Return a particle array for the WCSPH formulation"""
+
+    # handle the name separately
+    if props.has_key('name'):
+        name = props['name']
+        props.pop('name')
+    else:
+        name = ""
+
     nprops = len(props)
     np = 0
 
@@ -141,6 +146,7 @@ def get_particle_array_wcsph(name="", **props):
             else:
                 prop_dict[prop] = {'name':prop, 'type':'double',
                                    'default':0}
+
     # create the particle array
     pa = ParticleArray(name=name, **prop_dict)
 

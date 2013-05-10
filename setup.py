@@ -57,8 +57,8 @@ cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
     # base module
-    Extension( name="pysph.base.carray",
-               sources=["pysph/base/carray.pyx"]),
+    # Extension( name="pysph.base.carray",
+    #            sources=["pysph/base/carray.pyx"]),
 
     Extension( name="pysph.base.particle_array",
                sources=["pysph/base/particle_array.pyx"]),

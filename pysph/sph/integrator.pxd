@@ -1,8 +1,10 @@
 """Common integrators for 2D SPH"""
 
-from pysph.base.carray cimport IntArray, DoubleArray, LongArray
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
+
+# PyZoltan
+from pyzoltan.core.carray cimport IntArray, DoubleArray, LongArray
 
 cdef class WCSPHRK2Integrator:
     ############################################################

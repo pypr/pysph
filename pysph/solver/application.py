@@ -12,19 +12,13 @@ from pysph.solver.controller import CommandManager
 import pysph.base.kernels as kernels
 from utils import mkdir
 
+# conditional parallel imports
+from pysph import Has_MPI, Has_Zoltan
+if (Has_MPI and Has_Zoltan):
+    from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
+
 integration_methods = ['RK2']
 kernel_names = ['CubicSpline']
-
-
-# MPI conditional imports
-HAS_MPI = True
-try:
-    from mpi4py import MPI
-except ImportError:
-    HAS_MPI = False
-else:
-    # Add parallel module imports.
-    pass
 
 def list_option_callback(option, opt, value, parser):
     val = value.split(',')
@@ -60,7 +54,7 @@ class Application(object):
         self.comm = None
         self.num_procs = 1
         self.rank = 0
-        if HAS_MPI:
+        if Has_MPI:
             self.comm = comm = MPI.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
@@ -281,16 +275,37 @@ class Application(object):
         arrays that are created.
         """
 
+        solver = self._solver
         num_procs = self.num_procs
         rank = self.rank
+        comm = self.comm
+
         if rank == 0:
             # Only master creates the particles.
-            pa = particle_factory(*args, **kw)
-        if num_procs > 1:
-            # FIXME: this needs to do the right thing for multiple processors.
-            pass
+            self.particles = particle_factory(*args, **kw)
+        else:
+            # everyone else creates empty containers
+            self.particles = particle_factory(empty=True, *args, **kw)
 
-        self.particles = pa
+        # Instantiate the Parallel Manager here and do an initial LB
+        self.pm = None
+        if num_procs > 1:
+            if not (Has_Zoltan and Has_MPI):
+                raise RuntimeError("Cannot run in parallel!")
+
+            # create the parallel manager
+            self.pm = pm = ZoltanParallelManagerGeometric(
+                dim=solver.dim, particles=self.particles, comm=comm)
+
+            # do an initial load balance
+            pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
+            pm.update()
+
+            # wait till the initial partition is done
+            comm.barrier()
+
+        # set the solver's parallel manager
+        solver.set_parallel_manager(self.pm)
 
         return self.particles
 
@@ -356,13 +371,8 @@ class Application(object):
         self._solver.setup_solver(options.__dict__)
 
         if nnps is None:
-            if self.num_procs == 1:
-                nnps = NNPS(dim=solver.dim, particles=self.particles, 
-                            radius_scale=2.0)
-            else:
-                nnps = None
-                # FIXME. add parallel stuff here.
-                pass
+            nnps = NNPS(dim=solver.dim, particles=self.particles, 
+                        radius_scale=2.0)
         self.nnps = nnps
 
         dt = options.time_step
@@ -376,7 +386,7 @@ class Application(object):
         # Setup the solver output file name
         fname = options.output
         
-        if HAS_MPI:
+        if Has_MPI:
             rank = self.rank
             if self.num_procs > 1:
                 fname += '_' + str(rank)
@@ -424,6 +434,7 @@ class Application(object):
             pass
         
         # setup the solver
+        print "proc %d, creating eval"%(self.rank)
         solver.setup(particles=self.particles, equations=equations, nnps=nnps)
         
         # add solver interfaces

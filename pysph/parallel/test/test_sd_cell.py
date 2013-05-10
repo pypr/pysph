@@ -6,11 +6,14 @@ import numpy
 from numpy import random
 from numpy import savez, load
 
+# Cython kernel function from PyZoltan
+from pyzoltan.sph.kernels import CubicSpline
 from pyzoltan.core.carray import UIntArray
 from pyzoltan.sph.point import Point
-from pyzoltan.sph.kernels import CubicSpline
-from pyzoltan.sph.nnps import ZoltanParallelManagerGeometric
-from pyzoltan.sph.nnps_utils import get_particle_array
+
+# PySPH imports
+from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
+from pysph.base.utils import get_particle_array_wcsph
 
 """Utility to compute summation density"""
 def sd_evaluate(nps, mass):
@@ -67,7 +70,7 @@ data = load('random.npz'); global_x = data['x']; global_y = data['y']
 global_gid = numpy.array( range(numGlobalPoints), dtype=numpy.uint32 )
 global_h = numpy.ones_like(global_x) * 1.2*dx
 
-PA = get_particle_array(x=global_x, y=global_y, h=global_h, gid=global_gid)
+PA = get_particle_array_wcsph(x=global_x, y=global_y, h=global_h, gid=global_gid)
 NPS = ZoltanParallelManagerGeometric(dim=2, particles=[PA,], comm=comm)
 
 if rank == 0:
@@ -79,10 +82,10 @@ if rank == 0:
 comm.barrier()    
 
 # create the local particle arrays
-pa = get_particle_array(x=global_x[rank*numMyPoints:(rank+1)*numMyPoints],
-                        y=global_y[rank*numMyPoints:(rank+1)*numMyPoints],
-                        h=global_h[rank*numMyPoints:(rank+1)*numMyPoints],
-                        gid=global_gid[rank*numMyPoints:(rank+1)*numMyPoints])
+pa = get_particle_array_wcsph(x=global_x[rank*numMyPoints:(rank+1)*numMyPoints],
+                              y=global_y[rank*numMyPoints:(rank+1)*numMyPoints],
+                              h=global_h[rank*numMyPoints:(rank+1)*numMyPoints],
+                              gid=global_gid[rank*numMyPoints:(rank+1)*numMyPoints])
 
 # create the local nnps object
 nps = ZoltanParallelManagerGeometric(dim=2, comm=comm, particles=[pa,])

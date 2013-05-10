@@ -9,6 +9,8 @@ import sys
 import os
 import platform
 import commands
+import tempfile
+import zipfile
 from numpy.lib import format
 
 HAS_PBAR = True
@@ -26,7 +28,6 @@ def check_array(x, y):
 
 
 def zipfile_factory(*args, **kwargs):
-    import zipfile
     if sys.version_info >= (2, 5):
         kwargs['allowZip64'] = True
     return zipfile.ZipFile(*args, **kwargs)
@@ -137,12 +138,6 @@ def savez_compressed(file, *args, **kwds):
     _savez(file, args, kwds, True)
 
 def _savez(file, args, kwds, compress):
-    # Import is postponed to here since zipfile depends on gzip, an optional
-    # component of the so-called standard library.
-    import zipfile
-    # Import deferred for startup time improvement
-    import tempfile
-
     if isinstance(file, basestring):
         if not file.endswith('.npz'):
             file = file + '.npz'

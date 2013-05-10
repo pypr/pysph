@@ -6,6 +6,7 @@ syntax: glob
 *.so
 *.orig
 *.npz
+*.log
 test.pyx
 PySPH.egg-info/
 build/

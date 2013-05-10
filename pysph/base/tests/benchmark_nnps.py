@@ -3,7 +3,8 @@ import numpy
 from time import time
 from numpy import random
 
-from pysph.base.carray import UIntArray, DoubleArray
+from pyzoltan.core.carray import UIntArray, DoubleArray
+
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base.nnps import NNPS
@@ -12,7 +13,7 @@ times = []
 _numPoints = [1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
 for numPoints in _numPoints:
 
-    dx = numpy.power( numPoints, 1.0/3.0 )
+    dx = numpy.power( 1./numPoints, 1.0/3.0 )
     
     xa = random.random(numPoints)
     ya = random.random(numPoints)

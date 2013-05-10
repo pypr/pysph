@@ -11,15 +11,10 @@ import mpi4py.MPI as mpi
 # PyZoltan
 from pyzoltan.czoltan cimport czoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
-from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
-from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 from pyzoltan.core import zoltan_utils
 
 # PySPH imports
-from pysph.base.particle_array cimport ParticleArray
-from pysph.base.carray cimport UIntArray, IntArray, LongArray, DoubleArray
 from pysph.base.nnps cimport DomainLimits, Cell
-from pysph.base.point cimport *
 
 # local imports
 import parallel_utils
@@ -581,7 +576,7 @@ cdef class ParallelManager:
             Setting cell size to 1"""%(cell_size)
             print msg
             cell_size = 1.0
-        self.cell_size = cell_size        
+        self.cell_size = cell_size
 
     def update_cell_gids(self):
         """Update global indices for the cells dictionary.
@@ -723,7 +718,7 @@ cdef class ParallelManager:
         cdef ParticleArray pa
         cdef UIntArray indices
 
-        # clear the indices for the cells. 
+        # clear the indices for the cells.
         self.cells.clear()
 
         # compute the cell size
@@ -795,14 +790,14 @@ cdef class ParallelManager:
                 cell = Cell(cid=cid, cell_size=cell_size,
                             narrays=self.narrays, layers=layers)
 
-                lindices = UIntArray()
-                gindices = UIntArray()
-
-                cell.set_indices( pa_index, lindices, gindices )
+                #lindices = UIntArray()
+                #gindices = UIntArray()
+                #cell.set_indices( pa_index, lindices, gindices )
                 cells[ cid ] = cell
 
             # add this particle to the list of indicies
             cell = cells[ cid ]
+
             lindices = cell.lindices[pa_index]
             gindices = cell.gindices[pa_index]
 
@@ -900,49 +895,62 @@ cdef class ParallelManager:
         cdef list pa_wrappers = self.pa_wrappers
         cdef ParticleArrayWrapper pa
         cdef DoubleArray x, y, z, h
-        
-        mx = np.inf; my = np.inf; mz = np.inf
-        Mx = -np.inf; My = -np.inf; Mz = -np.inf; Mh = -np.inf
+
+        # set some high and low values
+        cdef double high = -1e20, low = 1e20
+        mx = low; my = low; mz = low
+        Mx = high; My = high; Mz = high; Mh = high
 
         # find the local min and max for all arrays on this proc
         for pa in pa_wrappers:
             x = pa.x; y = pa.y; z = pa.z; h = pa.h
-            x.update_min_max(); y.update_min_max()
-            z.update_min_max(); h.update_min_max()
+            if x.length > 0:
+                x.update_min_max(); y.update_min_max()
+                z.update_min_max(); h.update_min_max()
 
-            if x.minimum < mx: mx = x.minimum
-            if x.maximum > Mx: Mx = x.maximum
+                if x.minimum < mx: mx = x.minimum
+                if x.maximum > Mx: Mx = x.maximum
             
-            if y.minimum < my: my = y.minimum
-            if y.maximum > My: My = y.maximum
+                if y.minimum < my: my = y.minimum
+                if y.maximum > My: My = y.maximum
             
-            if z.minimum < mz: mz = z.minimum
-            if z.maximum > Mz: Mz = z.maximum
+                if z.minimum < mz: mz = z.minimum
+                if z.maximum > Mz: Mz = z.maximum
             
-            if h.maximum > Mh: Mh = h.maximum
+                if h.maximum > Mh: Mh = h.maximum
 
         self.minx[0] = mx; self.miny[0] = my; self.minz[0] = mz
         self.maxx[0] = Mx; self.maxy[0] = My; self.maxz[0] = Mz
-        self.maxh[0] = Mh            
+        self.maxh[0] = Mh
 
         # now compute global min and max if in parallel
         comm = self.comm
         if self.in_parallel:
 
+            # revc buffers for all reduce
+            _minx = np.zeros_like(self.minx)
+            _miny = np.zeros_like(self.miny)
+            _minz = np.zeros_like(self.minz)
+
+            _maxx = np.zeros_like(self.maxx)
+            _maxy = np.zeros_like(self.maxy)
+            _maxz = np.zeros_like(self.maxz)
+            _maxh = np.zeros_like(self.maxh)
+
             # global reduction for minimum values
-            comm.Allreduce(sendbuf=self.minx, recvbuf=self.minx, op=mpi.MIN)
-            comm.Allreduce(sendbuf=self.miny, recvbuf=self.miny, op=mpi.MIN)
-            comm.Allreduce(sendbuf=self.minz, recvbuf=self.minz, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.minx, recvbuf=_minx, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.miny, recvbuf=_miny, op=mpi.MIN)
+            comm.Allreduce(sendbuf=self.minz, recvbuf=_minz, op=mpi.MIN)
 
             # global reduction for maximum values
-            comm.Allreduce(sendbuf=self.maxx, recvbuf=self.maxx, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxy, recvbuf=self.maxy, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxz, recvbuf=self.maxz, op=mpi.MAX)
-            comm.Allreduce(sendbuf=self.maxh, recvbuf=self.maxh, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxx, recvbuf=_maxx, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxy, recvbuf=_maxy, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxz, recvbuf=_maxz, op=mpi.MAX)
+            comm.Allreduce(sendbuf=self.maxh, recvbuf=_maxh, op=mpi.MAX)
             
-        self.mx = self.minx[0]; self.my = self.miny[0]; self.mz = self.minz[0]
-        self.Mx = self.maxx[0]; self.My = self.maxy[0]; self.Mz = self.maxz[0]
-        self.Mh = self.maxh[0]
+        self.mx = _minx[0]; self.my = _miny[0]; self.mz = _minz[0]
+        self.Mx = _maxx[0]; self.My = _maxy[0]; self.Mz = _maxz[0]
+        self.Mh = _maxh[0]
 
     ######################################################################
     # Neighbor location routines
@@ -1029,7 +1037,7 @@ cdef class ParallelManager:
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs            
 
-cdef class ZoltanParallelManager:
+cdef class ZoltanParallelManager(ParallelManager):
     """Base class for Zoltan enabled parallel cell managers.
 
     To partition a list of arrays, we do an NNPS like box sort on all

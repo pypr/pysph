@@ -1,9 +1,14 @@
 # Numpy
 cimport numpy as np
 
-# PyZoltan Imports
-from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
+Has_Zoltan=True
+try:
+    import pyzoltan
+except ImportError:
+    Has_Zoltan=False
+
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
 from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 
 # PySPH imports
@@ -34,7 +39,7 @@ cdef class ParticleArrayExchange:
     # Data Attributes
     ############################################################################
     cdef public ParticleArray pa                   # Particle data
-    cdef public ParticleArrayWrapper               # wrapper to exchange data
+    cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
     
     cdef public size_t num_local         # Total number of particles
     cdef public size_t num_global        # Global number of particles
@@ -132,7 +137,7 @@ cdef class ParallelManager:
     ############################################################################
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
-    cdef _bin(self, int index, UIntArray indices)
+    cdef _bin(self, int pa_index, UIntArray indices)
     
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
