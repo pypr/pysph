@@ -544,6 +544,30 @@ cdef extern from "zoltan.h":
 
     # /*****************************************************************************/
     # /*
+    # *  Wrapper around Zoltan_Invert_Lists, appropriate only when 
+    # *  number of partitions == number of processors (or when partition information
+    #                                                  *  is not desired).
+    # *
+    # *  Input and Output:
+    # *    Arguments are analogous to Zoltan_Invert_Lists.  Arrays import_to_part
+    # *    and export_to_part are not included, as Zoltan_Compute_Destinations 
+    # *    assumes partitions and processors are equivalent.
+    # *  Returned value:       --  Error code
+    # */        
+    extern int Zoltan_Compute_Destinations(
+        Zoltan_Struct *zz,
+        int num_input, 
+        ZOLTAN_ID_PTR input_global_ids,
+        ZOLTAN_ID_PTR input_local_ids, 
+        int *input_procs, 
+        int *num_output, 
+        ZOLTAN_ID_PTR *output_global_ids,
+        ZOLTAN_ID_PTR *output_local_ids,
+        int **output_procs
+        )
+
+    # /*****************************************************************************/
+    # /*
     #  *  Routine to free the data arrays returned by Zoltan_LB_Partition, 
     #  *  Zoltan_LB_Balance, Zoltan_Invert_Lists, and 
     #  *  Zoltan_Compute_Destinations.  The arrays

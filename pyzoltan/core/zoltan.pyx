@@ -326,21 +326,18 @@ cdef class PyZoltan:
         cython.declare(_importGlobalids=ZOLTAN_ID_PTR,
                        _importLocalids=ZOLTAN_ID_PTR,
                        _importProcs=cython.p_int,
-                       _importParts=cython.p_int,
                        numImport=cython.int)
 
-        ierr = czoltan.Zoltan_Invert_Lists(
+        ierr = czoltan.Zoltan_Compute_Destinations(
             zz,
             numExport,
             exportGlobalids.data,
             exportLocalids.data,
             exportProcs.data,
-            exportProcs.data,
             &numImport,
             &_importGlobalids,
             &_importLocalids,
             &_importProcs,
-            &_importParts
             )
         
         _check_error(ierr)
@@ -362,7 +359,7 @@ cdef class PyZoltan:
             &_importGlobalids,
             &_importLocalids,
             &_importProcs,
-            &_importParts
+            NULL,
             )
 
         _check_error(ierr)
