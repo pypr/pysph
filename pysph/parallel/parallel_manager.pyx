@@ -214,7 +214,7 @@ cdef class ParticleArrayExchange:
             self.lb_props = ['x','y', 'z', 'ax', 'ay', 'az',
                              'u', 'v', 'w', 'au', 'av', 'aw',
                              'rho', 'arho', 
-                             'm', 'h', 'gid', 'tag']
+                             'm', 'h', 'gid', 'tag', 'pid']
         else:
             self.lb_props = lb_props
 
@@ -254,8 +254,8 @@ cdef class ParticleArrayExchange:
         cdef dict recv = {}
 
         # collect the data to send
-        cdef dict send = parallel_utils.get_send_data(self.comm, pa, self.lb_props, exportLocalids,
-                                                  exportProcs)
+        cdef dict send = parallel_utils.get_send_data(
+            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
 
         # current number of particles
         cdef int current_size = self.num_local
@@ -664,17 +664,18 @@ cdef class ParallelManager:
             self.load_balance()
 
             # move the particle data one by one
-            for i in range(self.narrays):
+            if self.changes is 1:
+                for i in range(self.narrays):
 
-                # create the particle lists from the cell lists
-                self.create_particle_lists(i)
+                    # create the particle lists from the cell lists
+                    self.create_particle_lists(i)
 
-                # move the particle data
-                pa_exchange = self.pa_exchanges[i]
-                pa_exchange.lb_exchange_data()
+                    # move the particle data
+                    pa_exchange = self.pa_exchanges[i]
+                    pa_exchange.lb_exchange_data()
 
-            # update the local cell map after data movement
-            self.update_local_data()
+                # update the local cell map after data movement
+                self.update_local_data()
 
             # compute remote particles and exchange data
             for i in range(self.narrays):
@@ -812,6 +813,7 @@ cdef class ParallelManager:
         structure is then used to compute remote particles.
 
         """
+        cdef ParticleArray pa
         cdef ParticleArrayExchange pa_exchange
         cdef int num_particles, i
         cdef UIntArray indices
@@ -821,7 +823,11 @@ cdef class ParallelManager:
 
         for i in range(self.narrays):
             pa_exchange = self.pa_exchanges[i]
-            num_particles = pa_exchange.num_local
+            num_particles = pa_exchange.num_local            
+
+            # set the rank of the local particles
+            pa = pa_exchange.pa
+            pa.set_pid( self.rank )
 
             # set the number of local and global particles
             self.num_local[i] = pa_exchange.num_local
@@ -1144,8 +1150,8 @@ cdef class ZoltanParallelManager(ParallelManager):
             export_proc = exportCellProcs.data[indexi] # processor to export cell to
             lindices = cell.lindices[pa_index]               # local particle  indices in cell
             gindices = cell.gindices[pa_index]               # global particle indices in cell
-            nindices = lindices.length
 
+            nindices = lindices.length
             for j in range( nindices ):
                 _exportLocalids.append( lindices.data[j] )
                 _exportGlobalids.append( gindices.data[j] )
@@ -1325,7 +1331,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         self.set_data()
 
         # call Zoltan to get the cell import/export lists
-        pz.Zoltan_LB_Balance()
+        self.changes = pz.Zoltan_LB_Balance()
 
         # copy the Zoltan export lists to the cell lists
         self.numCellExport = pz.numExport

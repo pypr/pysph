@@ -48,10 +48,10 @@ cdef class ParticleArrayExchange:
 
     # mpi.Comm object and associated rank and size
     cdef public object comm
-    cdef public int rank, size    
+    cdef public int rank, size
 
     # Zoltan interface definitions
-    cdef public list lb_props                      # list of load balancing props
+    cdef public list lb_props                # list of load balancing props
 
     # Zoltan Import/Export lists for particles
     cdef public UIntArray exportParticleGlobalids
@@ -158,6 +158,7 @@ cdef class ZoltanParallelManager(ParallelManager):
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public int changes              # logical (0,1) if the partition changes
     cdef public PyZoltan pz              # the PyZoltan wrapper for lb etc
 
 # Class of geometric load balancers

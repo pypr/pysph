@@ -16,7 +16,8 @@ from utils import mkdir
 from pysph import Has_MPI, Has_Zoltan
 if (Has_MPI and Has_Zoltan):
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
-
+    import mpi4py.MPI as mpi
+    
 integration_methods = ['RK2']
 kernel_names = ['CubicSpline']
 
@@ -55,7 +56,7 @@ class Application(object):
         self.num_procs = 1
         self.rank = 0
         if Has_MPI:
-            self.comm = comm = MPI.COMM_WORLD
+            self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
         
@@ -295,7 +296,8 @@ class Application(object):
 
             # create the parallel manager
             self.pm = pm = ZoltanParallelManagerGeometric(
-                dim=solver.dim, particles=self.particles, comm=comm)
+                dim=solver.dim, particles=self.particles, comm=comm,
+                lb_props=None)
 
             # do an initial load balance
             pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
@@ -433,7 +435,7 @@ class Application(object):
             #solver.integrator_type = integration_methods[options.integration]
             pass
         
-        # setup the solver
+        # setup the solver. This is where the code is compiled
         print "proc %d, creating eval"%(self.rank)
         solver.setup(particles=self.particles, equations=equations, nnps=nnps)
         

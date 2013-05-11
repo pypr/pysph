@@ -43,7 +43,7 @@ def exact_solution(tf=0.0075, dt=1e-4):
     return anew*numpy.cos(theta), 1/anew*numpy.sin(theta), po
 
 co = 1400.0; ro = 1.0
-hdx = 2.0
+hdx = 1.3
 def get_circular_patch(
     name="fluid", dx=0.025, cl_precision="single", empty=False, **kwargs):
     
@@ -76,6 +76,8 @@ def get_circular_patch(
         la.set_data(array(indices))
 
         pa.remove_particles(la)
+
+        print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
 
     # add requisite variables
     pa.add_property( {'name': 'arho'} )
