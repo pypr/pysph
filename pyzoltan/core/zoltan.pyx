@@ -241,6 +241,9 @@ cdef class PyZoltan:
 
         _check_error(ierr)
 
+        # return changes to determine if we need to do data movement
+        return changes
+
     def reset_Zoltan_lists(self):
         """Reset all Zoltan interface lists"""
         self.exportGlobalids.reset()
