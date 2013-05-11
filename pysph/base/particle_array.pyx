@@ -1101,7 +1101,7 @@ cdef class ParticleArray:
         cdef IntArray pid_arr = self.properties['pid']
         cdef long a
 
-        for a in range(self.num_real_particles):
+        for a in range(pid_arr.length):
             pid_arr.data[a] = pid
 
     cpdef remove_property(self, str prop_name):

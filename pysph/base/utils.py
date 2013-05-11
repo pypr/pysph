@@ -116,6 +116,12 @@ def get_particle_array_wcsph(cl_precision="single", **props):
             prop_dict[prop] = {'data':data,
                                'type': 'long',
                                'name':prop}
+
+        if prop in ['pid']:
+            prop_dict[prop] = {'data':data,
+                               'type':'int',
+                               'name':prop}
+                               
         if prop in ['gid']:
             prop_dict[prop] = {'data':data.astype(numpy.uint32),
                                'type': 'unsigned int',
@@ -142,6 +148,9 @@ def get_particle_array_wcsph(cl_precision="single", **props):
 
                 prop_dict[prop] = {'name':prop, 'type':'unsigned int',
                                    'data':data}
+
+            elif prop in ['tag']:
+                prop_dict[prop] = {'name':prop, 'type':'long',}
 
             else:
                 prop_dict[prop] = {'name':prop, 'type':'double',

@@ -301,6 +301,7 @@ class Application(object):
 
             # do an initial load balance
             pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
+            pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
             pm.update()
 
             # wait till the initial partition is done
@@ -436,7 +437,6 @@ class Application(object):
             pass
         
         # setup the solver. This is where the code is compiled
-        print "proc %d, creating eval"%(self.rank)
         solver.setup(particles=self.particles, equations=equations, nnps=nnps)
         
         # add solver interfaces

@@ -299,7 +299,7 @@ def load(fname):
     object as value.
 
     """
-    from pysph.base.utils import get_particle_array
+    from pysph.base.utils import get_particle_array_wcsph
     data = numpy.load(fname)
 
     ret = {"arrays":{}}
@@ -321,9 +321,9 @@ def load(fname):
         solver_data = solver_data[0]
 
         for array_name in arrays:
-            array = get_particle_array(name=array_name,
-                                       cl_precision="single",
-                                       **arrays[array_name])
+            array = get_particle_array_wcsph(name=array_name,
+                                             cl_precision="single",
+                                             **arrays[array_name])
             
             ret["arrays"][array_name] = array
             

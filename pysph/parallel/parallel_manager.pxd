@@ -40,6 +40,10 @@ cdef class ParticleArrayExchange:
     ############################################################################
     cdef public ParticleArray pa                   # Particle data
     cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
+
+    # flags to indicate whether data needs to be exchanged
+    cdef public bint lb_exchange
+    cdef public bint remote_exchange
     
     cdef public size_t num_local         # Total number of particles
     cdef public size_t num_global        # Global number of particles

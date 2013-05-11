@@ -145,39 +145,57 @@ class DamBreak2DGeometry(object):
         return x, y
 
     def create_particles(self, nboundary_layers=2, nfluid_offset=2,
-                         hdx=1.5):
-        xf, yf = self.get_fluid(nfluid_offset)
-        fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
-        nfluid = self.nfluid            
+                         hdx=1.5, empty=False, **kwargs):
+        if empty:
+            fluid = get_particle_array_wcsph(name="fluid")
+            boundary = get_particle_array_wcsph(name="boundary")
 
-        xb, yb = self.get_wall(nboundary_layers)
-        boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
+            particles = [fluid, boundary]
 
-        dx, dy, ro = self.dx, self.dy, self.ro
+            if self.with_obstacle:
+                 particles.append(get_particle_array_wcsph(name="obstacle"))
+        else:
+        
+            xf, yf = self.get_fluid(nfluid_offset)
+            fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
+            nfluid = self.nfluid
 
-        # smoothing length, mass and density
-        fluid.h[:] = numpy.ones_like(xf) * hdx * dx
-        fluid.m[:] = dx * dy * 0.5 * ro
-        fluid.rho[:] = ro
-        fluid.rho0[:] = ro
+            np = nfluid
+            
+            xb, yb = self.get_wall(nboundary_layers)
+            boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
 
-        boundary.h[:] = numpy.ones_like(xb) * hdx * dx
-        boundary.m[:] = dx * dy * 0.5 * ro
-        boundary.rho[:] = ro
-        boundary.rho0[:] = ro
+            np += boundary.get_number_of_particles()
 
-        # create the particles list
-        particles = [fluid, boundary]
+            dx, dy, ro = self.dx, self.dy, self.ro
 
-        if self.with_obstacle:
-            xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
-            obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
+            # smoothing length, mass and density
+            fluid.h[:] = numpy.ones_like(xf) * hdx * dx
+            fluid.m[:] = dx * dy * 0.5 * ro
+            fluid.rho[:] = ro
+            fluid.rho0[:] = ro
+            
+            boundary.h[:] = numpy.ones_like(xb) * hdx * dx
+            boundary.m[:] = dx * dy * 0.5 * ro
+            boundary.rho[:] = ro
+            boundary.rho0[:] = ro
 
-            obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
-            obstacle.m[:] = dx * dy * 0.5 * ro
-            obstacle.rho[:] = ro
-            obstacle.rho0[:] = ro
+            # create the particles list
+            particles = [fluid, boundary]
 
-            particles.append( obstacle )
+            if self.with_obstacle:
+                xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
+                obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
+
+                obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
+                obstacle.m[:] = dx * dy * 0.5 * ro
+                obstacle.rho[:] = ro
+                obstacle.rho0[:] = ro
+
+                particles.append( obstacle )
+
+                np += obstacle.get_number_of_particles()
+
+            print "2D dam break with %d number of particles"%(np), fluid.get_number_of_particles(), boundary.get_number_of_particles()
 
         return particles
