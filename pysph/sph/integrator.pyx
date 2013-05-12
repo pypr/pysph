@@ -108,9 +108,6 @@ cdef class WCSPHRK2Integrator:
                 # Update densities and smoothing lengths from the accelerations
                 rho.data[i] = rho0.data[i] + dt * arho.data[i]
 
-        # Re-bin because particles have moved
-        nnps.update()
-
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef _set_initial_values(self):
