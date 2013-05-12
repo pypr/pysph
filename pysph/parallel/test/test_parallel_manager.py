@@ -17,10 +17,10 @@ from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
 from pysph.base.utils import get_particle_array_wcsph
 
 """Utility to compute summation density"""
-def sd_evaluate(pm, mass, src_index, dst_index):
+def sd_evaluate(nnps, pm, mass, src_index, dst_index):
     # the destination particle array
-    dst = pm.particles[ dst_index ]
-    src = pm.particles[ src_index ]
+    dst = nnps.particles[ dst_index ]
+    src = nnps.particles[ src_index ]
 
     # particle coordinates
     dx, dy, dh, drho = dst.get('x', 'y','h', 'rho', only_real_particles=True)
@@ -30,18 +30,19 @@ def sd_evaluate(pm, mass, src_index, dst_index):
     cubic = CubicSpline(dim=2)
 
     # compute density for each destination particle
-    num_particles = pm.num_local[dst_index]
+    num_particles = dst.num_real_particles
 
     # the number of local particles should have tag Local
-    assert( num_particles == dx.size )
+    assert( num_particles == pm.num_local[dst_index] )
     
     for i in range(num_particles):
         
         xi = Point( dx[i], dy[i], 0.0 )
         hi = dh[i]
 
-        pm.get_nearest_particles(src_index=src_index, dst_index=dst_index, i=i,
-                                  nbrs=neighbors)
+        nnps.get_nearest_particles(
+            src_index, dst_index, i, neighbors)
+
         nnbrs = neighbors._length
 
         rho_sum = 0.0
@@ -61,7 +62,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 # number of particles per array
-numMyPoints = 1<<12
+numMyPoints = 1<<10
 numGlobalPoints = size * numMyPoints
 
 dx = numpy.sqrt( 1.0/numGlobalPoints )
@@ -96,14 +97,18 @@ comm.Gatherv( sendbuf=y2, recvbuf=Y2 )
 # create the particle arrays and PM
 PA1 = get_particle_array_wcsph(x=X1, y=Y1, h=H1)
 PA2 = get_particle_array_wcsph(x=X2, y=Y2, h=H2)
-PM = ZoltanParallelManagerGeometric(dim=2, particles=[PA1,PA2], comm=comm)
+
+particles = [PA1, PA2]
+PM = ZoltanParallelManagerGeometric(dim=2, particles=particles, comm=comm)
+Nnps = NNPS(dim=2, particles=particles)
+Nnps.update()
 
 # only root computes summation density
 if rank == 0:
-    sd_evaluate(PM, mass, src_index=1, dst_index=0)
+    sd_evaluate(Nnps, PM, mass, src_index=1, dst_index=0)
     RHO1 = PA1.rho
 
-    sd_evaluate(PM, mass, src_index=0, dst_index=1)
+    sd_evaluate(Nnps, PM, mass, src_index=0, dst_index=1)
     RHO2 = PA2.rho
 
 # be nice to the root...
@@ -112,20 +117,24 @@ comm.barrier()
 # create the local particle arrays
 particles = [pa1, pa2]
 
-# create the local nnps object
+# create the local nnps object and parallel manager
 pm = ZoltanParallelManagerGeometric(dim=2, comm=comm, particles=particles)
+nnps = NNPS(dim=2, particles=particles)
 
 # set the Zoltan parameters (Optional)
 pz = pm.pz
 pz.set_lb_method("RCB")
 pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
 
-# CALL NNPS update
+# Update the parallel manager (distribute particles)
 pm.update()
 
+# update the local nnps
+nnps.update()
+
 # Compute summation density individually on each processor
-sd_evaluate(pm, mass, src_index=0, dst_index=1)
-sd_evaluate(pm, mass, src_index=1, dst_index=0)
+sd_evaluate(nnps, pm, mass, src_index=0, dst_index=1)
+sd_evaluate(nnps, pm, mass, src_index=1, dst_index=0)
 
 # gather the density and global ids
 rho1 = pa1.rho; tmp = comm.gather(rho1)
