@@ -92,8 +92,12 @@ cdef class ParallelManager:
     cdef public int rank
     cdef public int size
 
+    cdef public int ncells_local         # number of local cells
+    cdef public int ncells_remote        # number of remote cells
+    cdef public int ncells_total         # total number of cells
+    cdef public list cell_list           # list of cells
+
     cdef public dict cell_map            # index structure
-    cdef public list cell_list
     cdef public int ghost_layers         # BOunding box size
     cdef public double cell_size         # cell size used for binning
 
