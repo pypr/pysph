@@ -18,7 +18,7 @@ from pysph.base.utils import get_particle_array_wcsph
 """Utility to compute summation density"""
 def sd_evaluate(nps, mass):
     pa = nps.particles[0]
-    x, y, h, rho= pa.get('x', 'y','h', 'rho')
+    x, y, h, rho= pa.get('x', 'y','h', 'rho', only_real_particles=False)
 
     neighbors = UIntArray()
     cubic = CubicSpline(dim=2)

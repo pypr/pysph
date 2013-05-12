@@ -1,6 +1,9 @@
 # Numpy
 cimport numpy as np
 
+from cpython cimport dict
+from cpython cimport list
+
 Has_Zoltan=True
 try:
     import pyzoltan
@@ -89,7 +92,8 @@ cdef class ParallelManager:
     cdef public int rank
     cdef public int size
 
-    cdef public dict cells               # index structure
+    cdef public dict cell_map            # index structure
+    cdef public list cell_list
     cdef public int ghost_layers         # BOunding box size
     cdef public double cell_size         # cell size used for binning
 

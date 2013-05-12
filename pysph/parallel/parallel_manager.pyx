@@ -8,6 +8,8 @@ cimport numpy as np
 # MPI4PY
 import mpi4py.MPI as mpi
 
+from cpython.list cimport PyList_Append, PyList_GET_SIZE
+
 # PyZoltan
 from pyzoltan.czoltan cimport czoltan
 from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
@@ -549,9 +551,10 @@ cdef class ParallelManager:
         self.in_parallel = True
         if self.size == 1: self.in_parallel = False
 
-        # The cells dictionary, radius scale for binning and ghost
+        # The cell_map dictionary, radius scale for binning and ghost
         # layers for remote neighbors.
-        self.cells = {}
+        self.cell_map = {}
+        self.cell_list = []
         self.radius_scale = radius_scale
         self.ghost_layers = ghost_layers
 
@@ -584,7 +587,7 @@ cdef class ParallelManager:
         self.cell_size = cell_size
 
     def update_cell_gids(self):
-        """Update global indices for the cells dictionary.
+        """Update global indices for the cell_map dictionary.
 
         The objects to be partitioned in this class are the cells and
         we need to number them uniquely across processors. The
@@ -595,7 +598,7 @@ cdef class ParallelManager:
         # update the cell gids
         cdef PyZoltan pz = self.pz
 
-        pz.num_local_objects = len(self.cells)
+        pz.num_local_objects = PyList_GET_SIZE( self.cell_list )
         pz._update_gid( self.cell_gid )
 
     def update_particle_gids(self):
@@ -724,13 +727,14 @@ cdef class ParallelManager:
         a given list of particles to deal with.
 
         """
-        cdef dict cells = self.cells
+        cdef dict cell_map = self.cell_map
         cdef int num_particles
         cdef ParticleArray pa
         cdef UIntArray indices
 
-        # clear the indices for the cells.
-        self.cells.clear()
+        # clear the indices for the cell_map.
+        self.cell_map.clear()
+        self.cell_list = []
 
         # compute the cell size
         self.compute_cell_size()
@@ -773,7 +777,8 @@ cdef class ParallelManager:
         cdef DoubleArray z = pa_wrapper.z
         cdef UIntArray gid = pa_wrapper.gid
 
-        cdef dict cells = self.cells
+        cdef dict cell_map = self.cell_map
+        cdef list cell_list = self.cell_list
         cdef double cell_size = self.cell_size
 
         cdef UIntArray lindices, gindices
@@ -797,17 +802,20 @@ cdef class ParallelManager:
 
             cid = IntPoint_from_cIntPoint(_cid)
 
-            if not cells.has_key( cid ):
+            if not cell_map.has_key( cid ):
                 cell = Cell(cid=cid, cell_size=cell_size,
                             narrays=self.narrays, layers=layers)
+
+                # store this cell in the cells list
+                PyList_Append( cell_list, cell )
 
                 #lindices = UIntArray()
                 #gindices = UIntArray()
                 #cell.set_indices( pa_index, lindices, gindices )
-                cells[ cid ] = cell
+                cell_map[ cid ] = cell
 
             # add this particle to the list of indicies
-            cell = cells[ cid ]
+            cell = cell_map[ cid ]
 
             lindices = cell.lindices[pa_index]
             gindices = cell.gindices[pa_index]
@@ -828,8 +836,9 @@ cdef class ParallelManager:
         cdef int num_particles, i
         cdef UIntArray indices
 
-        # clear the local cells dict
-        self.cells.clear()
+        # clear the local cell_map dict
+        self.cell_map.clear()
+        self.cell_list = []
 
         for i in range(self.narrays):
             pa_exchange = self.pa_exchanges[i]
@@ -837,7 +846,6 @@ cdef class ParallelManager:
 
             # set the rank of the local particles
             pa = pa_exchange.pa
-            #print "LB::Proc %d, Array %s, num_tot = %d, num_local = %d PAE: num_local = %d, num_global = %d"%(self.rank, pa.name, pa.get_number_of_particles(), pa.num_real_particles, pa_exchange.num_local, pa_exchange.num_global)
 
             # set the number of local and global particles
             self.num_local[i] = pa_exchange.num_local
@@ -867,8 +875,6 @@ cdef class ParallelManager:
             # get the number of local and remote particles
             num_local = pa_exchange.num_local
             num_remote = pa_exchange.num_remote
-
-            #print "Remote::Proc %d, PA %s, num_local = %d, num_tot = %d. PAE: num_local = %d, num_remote = %d, num_global = %d"%(self.rank, pa.name, pa.num_real_particles, pa.get_number_of_particles(), pa_exchange.num_local, pa_exchange.num_remote, pa_exchange.num_global)
 
             # update the number of local/remote particles
             self.num_local[i] = num_local
@@ -995,7 +1001,7 @@ cdef class ParallelManager:
             Neighbors for the requested particle are stored here.
 
         """
-        cdef dict cells = self.cells
+        cdef dict cell_map = self.cell_map
         cdef Cell cell
 
         cdef ParticleArrayWrapper src = self.pa_wrappers[ src_index ]
@@ -1035,8 +1041,8 @@ cdef class ParallelManager:
             for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
                 cellid.data.x = ix; cellid.data.y = iy
 
-                if cells.has_key( cellid ):
-                    cell = cells[ cellid ]
+                if cell_map.has_key( cellid ):
+                    cell = cell_map[ cellid ]
                     lindices = cell.lindices[src_index]
                     for indexj in range( lindices.length ):
                         j = lindices.data[indexj]
@@ -1061,8 +1067,8 @@ cdef class ZoltanParallelManager(ParallelManager):
     """Base class for Zoltan enabled parallel cell managers.
 
     To partition a list of arrays, we do an NNPS like box sort on all
-    arrays to create a global spatial indexing structure. The cells
-    are then used as 'objects' to be partitioned by Zoltan. The cells
+    arrays to create a global spatial indexing structure. The cell_map
+    are then used as 'objects' to be partitioned by Zoltan. The cell_map
     dictionary (cell-map) need not be unique across processors. We are
     responsible for assignning unique global ids for the cells.
 
@@ -1135,9 +1141,8 @@ cdef class ZoltanParallelManager(ParallelManager):
         cdef int numCellExport = self.numCellExport
 
         # the local cell map and cellids
-        cdef dict cell_map = self.cells
-        cdef list cellids = cell_map.keys()
-        cdef list cells = cell_map.values()
+        cdef list cell_list = self.cell_list
+
         cdef IntPoint cellid
         cdef Cell cell
 
@@ -1157,7 +1162,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         # iterate over the Zoltan generated export lists
         for indexi in range(numCellExport):
             i = exportCellLocalids[indexi]             # local index for the cell to export
-            cell = cells[ i ]                      # local cell to export
+            cell = cell_list[i]                            # local cell to export
             export_proc = exportCellProcs.data[indexi] # processor to export cell to
             lindices = cell.lindices[pa_index]               # local particle  indices in cell
             gindices = cell.gindices[pa_index]               # global particle indices in cell
@@ -1169,10 +1174,6 @@ cdef class ZoltanParallelManager(ParallelManager):
                 _exportProcs.append( export_proc )
 
                 _numExport = _numExport + 1
-
-            # remove the cell from the local cell map
-            #cellid = cellids[ i ]
-            #cell_map.pop( cellid )
 
         # resize the export lists and copy
         pz.numExport =  _numExport
@@ -1228,7 +1229,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         cdef int rank = self.rank
         cdef int size = self.size
         
-        cdef dict cells = self.cells
+        cdef dict cell_map = self.cell_map
         cdef IntPoint cid
         cdef UIntArray lindices, gindices
 
@@ -1253,8 +1254,8 @@ cdef class ZoltanParallelManager(ParallelManager):
         # the procs and parts array from PyZoltan
         procs = pz.procs; parts = pz.parts
         
-        for cid in cells:
-            cell = cells[ cid ]
+        for cid in cell_map:
+            cell = cell_map[ cid ]
 
             # # initialize the procs and parts
             procs[:] = -1; parts[:] = -1
@@ -1376,7 +1377,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None, str lb_method='RCB'):
+                 lb_props=None, str lb_method='RIB'):
 
         # initialize the base class
         super(ZoltanParallelManagerGeometric, self).__init__(
@@ -1400,9 +1401,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
         """
         cdef ZoltanGeometricPartitioner pz = self.pz
-        
-        cdef dict cell_map = self.cells
-        cdef list cells = cell_map.values()
+        cdef list cell_list = self.cell_list
 
         cdef int num_local_objects = pz.num_local_objects
 
@@ -1419,7 +1418,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
         # populate the arrays
         for i in range( num_local_objects ):
-            cell = cells[ i ]
+            cell = cell_list[ i ]
             centroid = cell.centroid
 
             x.data[i] = centroid.x
