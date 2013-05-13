@@ -270,14 +270,14 @@ class Solver(object):
             for func in self.post_step_functions:
                 func.eval(self)
 
+            # re-distribute particles if valid parallel manager
+            if self.pm:
+                pm.update()
+
             # dump output
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)
-                self.comm.barrier() # everybody waits for this to complete
-
-            # re-distribute particles if valid parallel manager
-            if self.pm:
-                pm.update()                
+                self.comm.barrier()                
 
             bcount += int(self.dt/bt)
             while bcount > 0:
@@ -332,12 +332,15 @@ class Solver(object):
         array['x']
 
         """
-
         fname = self.fname + '_' 
         props = {"arrays":{}, "solver_data":{}}
 
         _fname = os.path.join(self.output_directory,
                               fname  + str(self.count) +'.npz')
+
+        # save the cell partitions
+        if self.in_parallel:
+            self.pm.save_partition(self.output_directory, self.count)
 
         if self.detailed_output:
             for array in self.particles:

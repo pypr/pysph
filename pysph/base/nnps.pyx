@@ -165,6 +165,9 @@ cdef class NNPSParticleArrayWrapper:
         self.z = pa.get_carray('z')
         self.h = pa.get_carray('h')
 
+        self.gid = pa.get_carray('gid')
+        self.tag = pa.get_carray('tag')
+
         self.np = pa.get_number_of_particles()
         
 cdef class DomainLimits:
@@ -350,6 +353,7 @@ cdef class NNPS:
             Optional limits for the domain            
 
         """
+        self.in_parallel = False
         # store the list of particles and number of arrays
         self.particles = particles
         self.narrays = len( particles )
@@ -519,12 +523,14 @@ cdef class NNPS:
         cdef DoubleArray s_y = src.y
         cdef DoubleArray s_z = src.z
         cdef DoubleArray s_h = src.h
+        cdef UIntArray s_gid = src.gid
 
         # Destination particle arrays
         cdef DoubleArray d_x = dst.x
         cdef DoubleArray d_y = dst.y
         cdef DoubleArray d_z = dst.z
         cdef DoubleArray d_h = dst.h
+        cdef UIntArray d_gid = dst.gid
 
         cdef double radius_scale = self.radius_scale
         cdef double cell_size = self.cell_size
@@ -622,3 +628,6 @@ cdef class NNPS:
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
         return nbrs
+
+    def set_in_parallel(self, bint in_parallel):
+        self.in_parallel = in_parallel

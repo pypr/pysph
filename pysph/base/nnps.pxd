@@ -14,7 +14,9 @@ cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
     cdef public DoubleArray x,y,z,h
-    cdef ParticleArray pa
+    cdef public UIntArray gid
+    cdef public IntArray tag
+    cdef public ParticleArray pa
     cdef str name
     cdef int np    
 

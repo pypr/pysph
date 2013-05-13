@@ -376,7 +376,11 @@ class Application(object):
         if nnps is None:
             nnps = NNPS(dim=solver.dim, particles=self.particles, 
                         radius_scale=2.0)
-        self.nnps = nnps
+
+        if self.num_procs > 1:
+            nnps.set_in_parallel(True)
+
+        self.nnps = nnps            
 
         dt = options.time_step
         if dt is not None:
