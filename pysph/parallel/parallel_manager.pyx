@@ -190,9 +190,13 @@ cdef class ParticleArrayWrapper:
 ################################################################w
 cdef class ParticleArrayExchange:
     def __init__(self, int pa_index, ParticleArray pa, object comm, lb_props=None):
+        # a large number to 
         self.pa_index = pa_index
-        self.pa = pa
 
+        self.data_tag = pa_index + 1
+        self.msglength_tag = pa_index + 100
+
+        self.pa = pa
         self.pa_wrapper = ParticleArrayWrapper( pa )
 
         self.comm = comm
@@ -230,6 +234,9 @@ cdef class ParticleArrayExchange:
         self.doublebuf = DoubleArray()
         self.longbuf = LongArray()
 
+        # receive counts
+        self.recv_count = np.zeros(shape=self.size, dtype=np.int32)
+
         # exchange flags
         self.lb_exchange = True
         self.remote_exchange = True
@@ -249,47 +256,39 @@ cdef class ParticleArrayExchange:
         # data array
         cdef ParticleArray pa = self.pa
         
-        # Zoltan generated lists
+        # Export lists for the particles
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
         cdef IntArray exportProcs = self.exportParticleProcs
         cdef int numExport = self.numParticleExport
-
-        cdef UIntArray importGlobalids = self.importParticleGlobalids
-        cdef UIntArray importLocalids = self.importParticleLocalids
-        cdef IntArray importProcs = self.importParticleProcs
-        cdef int numImport = self.numParticleImport
-
-        # dicts to send/recv data 
-        cdef dict recv = {}
 
         # collect the data to send
         cdef dict send = parallel_utils.get_send_data(
             self.comm, pa, self.lb_props, exportLocalids,exportProcs)
 
         # current number of particles
-        cdef int current_size = self.num_local
-        cdef int count, new_size
+        cdef int count, newsize, current_size = self.num_local
 
         # MPI communicator
         cdef object comm = self.comm
 
-        # count the number of objects to receive from remote procesors
-        parallel_utils.count_recv_data(comm, recv, numImport, importProcs)
-
         # Remove particles to be exported
         pa.remove_particles( exportLocalids )
 
-        # resize the arrays
-        newsize = current_size - numExport + numImport
-        count = current_size - numExport
+        # exchange the data
+        cdef int ltag = self.msglength_tag + 100
+        cdef int dtag = self.data_tag + 50
 
-        pa.resize( newsize )
+        count = current_size - numExport
+        self._exchange_data(count, send, ltag, dtag)
+
+        # set the tags for the extended array
+        cdef int[:] recv_count = self.recv_count
+        cdef int numImport = np.sum( recv_count )
+
+        newsize = count + numImport
         self.set_tag(count, newsize, Local)
         pa.align_particles()
-        
-        # exchange the data
-        self._exchange_data(count, send, recv)
 
         # update the number of particles
         self.num_local = newsize
@@ -309,18 +308,12 @@ cdef class ParticleArrayExchange:
         # data arrays
         cdef ParticleArray pa = self.pa
         
-        # Import/Export lists
+        # Export lists
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
         cdef IntArray exportProcs = self.exportParticleProcs
 
-        cdef UIntArray importGlobalids = self.importParticleGlobalids
-        cdef UIntArray importLocalids = self.importParticleLocalids
-        cdef IntArray importProcs = self.importParticleProcs
-        cdef int numImport = self.numParticleImport
-
         # collect the data to send
-        cdef dict recv = {}
         cdef dict send = parallel_utils.get_send_data(
             self.comm, pa, self.lb_props, exportLocalids,exportProcs)
 
@@ -331,24 +324,24 @@ cdef class ParticleArrayExchange:
         # MPI communicator
         cdef object comm = self.comm
 
-        # count the number of objects to receive from remote procesors
-        parallel_utils.count_recv_data(comm, recv, numImport, importProcs)
-
-        # resize the arrays
-        newsize = current_size + numImport
+        # share the data
+        cdef int ltag = self.msglength_tag + 200
+        cdef int dtag = self.data_tag + 250
         count = current_size
+        self._exchange_data(count, send, ltag, dtag)
 
-        pa.resize( newsize )
+        # count the number of particles to be imported
+        cdef int[:] recv_count = self.recv_count
+        cdef int numImport = np.sum( recv_count )
+
+        newsize = count + numImport
         self.set_tag(count, newsize, Remote)
         pa.align_particles()
-
-        # share the data
-        self._exchange_data(count, send, recv)
 
         # store the number of remote particles
         self.num_remote = newsize - current_size
 
-    cdef _exchange_data(self, int count, dict send, dict recv):
+    cdef _exchange_data(self, int count, dict send, int ltag, int dtag):
         """New send and receive."""
         # data arrays
         cdef ParticleArray pa = self.pa
@@ -364,7 +357,11 @@ cdef class ParticleArrayExchange:
 
         cdef int rank = self.rank
         cdef int size = self.size
-        cdef int i, j
+        cdef int i=0, j=0
+
+        # reset the recv_count array
+        cdef int[:] recv_count = self.recv_count
+        recv_count[:] = 0
 
         ctype_map = {'unsigned int':uintbuf,
                      'double':doublebuf,
@@ -378,10 +375,18 @@ cdef class ParticleArrayExchange:
             
         ############### SEND AND RECEIVE START ########################
         # Receive from processors with a lower rank
-        for i in recv.keys():
+        i = 0
+        while i < size:
             if i < rank:
+                # get the message length
+                msglength = comm.recv(source=i, tag=ltag)
+
+                # extend the array
+                self.extend(count, msglength)
+
+                # receive each property in turn
                 for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( recv[i] )
+                    recvbuf.resize( msglength )
 
                     parallel_utils.Recv(
                         comm=comm,
@@ -389,33 +394,50 @@ cdef class ParticleArrayExchange:
                         localbufsize=count,
                         recvbuf=recvbuf,
                         source=i,
-                        tag=self.pa_index)
+                        tag=dtag)
                     
                 # update the local buffer size
-                count = count + recv[i]
+                count = count + msglength
+                recv_count[i] = msglength
+
+                i = i + 1
+            else:
+                break
 
         # Send the data across
-        for pid in send.keys():
-            for prop in props:
-                sendbuf = send[pid][prop]
-                comm.Send( sendbuf, dest=pid, tag=self.pa_index )
+        for pid in range(size):
+            if pid != rank:
+                comm.send(obj=send[pid]['msglength'], dest=pid, tag=ltag)
+
+                msglength = send[pid]['msglength']
+                for prop in props:
+                    sendbuf = send[pid][prop]
+                    comm.Send( buf=sendbuf, dest=pid, tag=dtag )
                     
         # recv from procs with higher rank i value as set in first loop
-        for i in recv.keys():
-            if i > rank:
+        for j in range(i, size):
+            if j != rank:
+                # get the length of the message to be received
+                msglength = comm.recv(source=j, tag=ltag)
+
+                # extend the array
+                self.extend(count, msglength)
+
+                #  receive each property in turn
                 for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( recv[i] )
+                    recvbuf.resize( msglength )
 
                     parallel_utils.Recv(
                         comm=comm,
                         localbuf=pa.get_carray(prop),
                         localbufsize=count,
                         recvbuf=recvbuf,
-                        source=i,
-                        tag=self.pa_index)
+                        source=j,
+                        tag=dtag)
 
                 # update to the new length
-                count = count + recv[i]
+                count = count + msglength
+                recv_count[j] = msglength
 
         ############### SEND AND RECEIVE STOP ########################
 
@@ -472,6 +494,22 @@ cdef class ParticleArrayExchange:
 
         # set the number of local and global objects
         self.num_global = num_global_objects
+
+    def reset_lists(self):
+        """Reset the particle lists"""
+        self.numParticleExport = 0
+        self.numParticleImport = 0
+
+        self.exportParticleGlobalids.reset()
+        self.exportParticleLocalids.reset()
+        self.exportParticleProcs.reset()
+
+        self.importParticleGlobalids.reset()
+        self.importParticleLocalids.reset()
+        self.importParticleProcs.reset()
+
+    def extend(self, int current_length, int new_length):
+        self.pa.resize( current_length + new_length )
 
 # #################################################################
 # # ParallelManager extension classes
@@ -597,7 +635,7 @@ cdef class ParallelManager:
             Setting cell size to 1"""%(cell_size)
             print msg
             cell_size = 1.0
-        self.cell_size = cell_size
+        self.cell_size = cell_size        
 
     def update_cell_gids(self):
         """Update global indices for the cell_map dictionary.
@@ -680,7 +718,6 @@ cdef class ParallelManager:
         self.update_cell_gids()
 
         if self.in_parallel:
-
             # use Zoltan to get the cell import/export lists
             self.load_balance()
 
@@ -793,7 +830,8 @@ cdef class ParallelManager:
         cdef double cell_size = self.cell_size
 
         cdef UIntArray lindices, gindices
-        cdef size_t num_particles, indexi, i
+        cdef size_t num_particles, indexi
+        cdef ZOLTAN_ID_TYPE i
 
         cdef Cell cell
         cdef cIntPoint _cid
@@ -809,7 +847,7 @@ cdef class ParallelManager:
         for indexi in range(num_particles):
             i = indices.data[indexi]
 
-            pnt = cPoint_new( x.data[i], y.data[i], 0.0 )
+            pnt = cPoint_new( x.data[i], y.data[i], z.data[i] )
             _cid = find_cell_id( pnt, cell_size )
 
             cid = IntPoint_from_cIntPoint(_cid)
@@ -830,7 +868,7 @@ cdef class ParallelManager:
             lindices = cell.lindices[pa_index]
             gindices = cell.gindices[pa_index]
 
-            lindices.append( <ZOLTAN_ID_TYPE> i )
+            lindices.append( i )
             gindices.append( gid.data[i] )
 
         # update the total number of cells
@@ -1172,9 +1210,6 @@ cdef class ZoltanParallelManager(ParallelManager):
         lists.
 
         """
-        # PyZoltan reference
-        cdef PyZoltan pz = self.pz
-        
         # these are the Zoltan generated lists that correspond to cells
         cdef UIntArray exportCellLocalids = self.exportCellLocalids
         cdef UIntArray exportCellGlobalids = self.exportCellGlobalids
@@ -1183,30 +1218,28 @@ cdef class ZoltanParallelManager(ParallelManager):
 
         # the local cell map and cellids
         cdef list cell_list = self.cell_list
+        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
 
-        cdef IntPoint cellid
-        cdef Cell cell
+        # initialize the particle lists
+        pa_exchange.reset_lists()
 
-        # reset the Zoltan lists
-        pz.reset_Zoltan_lists()
-        cdef UIntArray exportLocalids = pz.exportLocalids
-        cdef UIntArray exportGlobalids = pz.exportGlobalids
-        cdef IntArray exportProcs = pz.exportProcs
-        cdef int _numExport = 0
+        cdef UIntArray exportLocalids = pa_exchange.exportParticleLocalids
+        cdef UIntArray exportGlobalids = pa_exchange.exportParticleGlobalids
+        cdef IntArray exportProcs = pa_exchange.exportParticleProcs
+        cdef int numExport = 0
 
         cdef int indexi, i, j, export_proc, nindices
         cdef UIntArray lindices, gindices
-        cdef int ierr
+        cdef IntPoint cellid
+        cdef Cell cell
 
-        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
-
-        # iterate over the Zoltan generated export lists
+        # get the particle export lists from Zoltan generated cell export lists
         for indexi in range(numCellExport):
-            i = exportCellLocalids[indexi]             # local index for the cell to export
+            i = <int>exportCellLocalids[indexi]            # local index for the cell to export
             cell = cell_list[i]                            # local cell to export
-            export_proc = exportCellProcs.data[indexi] # processor to export cell to
-            lindices = cell.lindices[pa_index]               # local particle  indices in cell
-            gindices = cell.gindices[pa_index]               # global particle indices in cell
+            export_proc = exportCellProcs.data[indexi]     # processor to export cell to
+            lindices = cell.lindices[pa_index]             # local particle  indices in cell
+            gindices = cell.gindices[pa_index]             # global particle indices in cell
 
             nindices = lindices.length
             for j in range( nindices ):
@@ -1214,35 +1247,11 @@ cdef class ZoltanParallelManager(ParallelManager):
                 exportGlobalids.append( gindices.data[j] )
                 exportProcs.append( export_proc )
 
-                _numExport = _numExport + 1
+                numExport = numExport + 1
 
-        # resize the export lists and copy
-        pz.numExport =  _numExport
+        # save the number of particles to export from this proc
+        pa_exchange.numParticleExport = numExport
 
-        # invert the lists
-        pz.Zoltan_Invert_Lists()
-
-        # now copy over to the particle lists
-        pa_exchange.numParticleExport = pz.numExport
-        pa_exchange.exportParticleGlobalids.resize( pz.numExport )
-        pa_exchange.exportParticleGlobalids.copy_subset( pz.exportGlobalids )
-        
-        pa_exchange.exportParticleLocalids.resize( pz.numExport )
-        pa_exchange.exportParticleLocalids.copy_subset( pz.exportLocalids )
-            
-        pa_exchange.exportParticleProcs.resize( pz.numExport )
-        pa_exchange.exportParticleProcs.copy_subset( pz.exportProcs )
-        
-        pa_exchange.numParticleImport = pz.numImport
-        pa_exchange.importParticleGlobalids.resize( pz.numImport )
-        pa_exchange.importParticleGlobalids.copy_subset( pz.importGlobalids )
-        
-        pa_exchange.importParticleLocalids.resize( pz.numImport )
-        pa_exchange.importParticleLocalids.copy_subset( pz.importLocalids )
-        
-        pa_exchange.importParticleProcs.resize( pz.numImport )
-        pa_exchange.importParticleProcs.copy_subset( pz.importProcs )
-        
     def compute_remote_particles(self, int pa_index):
         """Compute remote particles.
 
@@ -1253,8 +1262,6 @@ cdef class ZoltanParallelManager(ParallelManager):
         """
         cdef PyZoltan pz = self.pz
         cdef Zoltan_Struct* zz = pz._zstruct.zz
-        cdef UIntArray exportGlobalids, exportLocalids
-        cdef IntArray exportProcs
 
         cdef Cell cell
         cdef cPoint boxmin, boxmax
@@ -1270,7 +1277,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         cdef np.ndarray nbrprocs
         cdef np.ndarray[ndim=1, dtype=np.int32_t] procs, parts
         
-        cdef int nbrproc, num_particles
+        cdef int nbrproc, num_particles, indexi
         cdef ZOLTAN_ID_TYPE i
 
         cdef int *_procs, *_parts
@@ -1279,17 +1286,17 @@ cdef class ZoltanParallelManager(ParallelManager):
 
         cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
 
-        # reset the Zoltan lists
-        pz.reset_Zoltan_lists()
-        exportGlobalids = pz.exportGlobalids
-        exportLocalids = pz.exportLocalids
-        exportProcs = pz.exportProcs
+        # reset the export lists
+        pa_exchange.reset_lists()
+        cdef UIntArray exportGlobalids = pa_exchange.exportParticleGlobalids
+        cdef UIntArray exportLocalids = pa_exchange.exportParticleLocalids
+        cdef IntArray exportProcs = pa_exchange.exportParticleProcs
 
         # the procs and parts array from PyZoltan
         procs = pz.procs; parts = pz.parts
         
         for cell in cell_list:
-            # # initialize the procs and parts
+            # initialize the procs and parts
             procs[:] = -1; parts[:] = -1
 
             _procs = <int*>procs.data
@@ -1326,35 +1333,9 @@ cdef class ZoltanParallelManager(ParallelManager):
                         exportLocalids.append( i )
                         exportProcs.append( nbrproc )
 
-        # set the numImport and numExport
-        pz.numImport = 0
-        pz.numExport = exportProcs.length
+        # set the numExport
+        pa_exchange.numParticleExport = exportProcs.length
 
-        # Invert the lists...
-        pz.Zoltan_Invert_Lists()
-
-        # copy the lists to the particle lists
-        pa_exchange.numParticleExport = pz.numExport
-        pa_exchange.numParticleImport = pz.numImport
-        
-        pa_exchange.exportParticleGlobalids.resize( pz.numExport )
-        pa_exchange.exportParticleGlobalids.copy_subset( pz.exportGlobalids )
-        
-        pa_exchange.exportParticleLocalids.resize( pz.numExport )
-        pa_exchange.exportParticleLocalids.copy_subset( pz.exportLocalids )
-        
-        pa_exchange.exportParticleProcs.resize( pz.numExport )
-        pa_exchange.exportParticleProcs.copy_subset( pz.exportProcs )
-        
-        pa_exchange.importParticleGlobalids.resize( pz.numImport )
-        pa_exchange.importParticleGlobalids.copy_subset( pz.importGlobalids )
-        
-        pa_exchange.importParticleLocalids.resize( pz.numImport )
-        pa_exchange.importParticleLocalids.copy_subset( pz.importLocalids )
-        
-        pa_exchange.importParticleProcs.resize( pz.numImport )
-        pa_exchange.importParticleProcs.copy_subset( pz.importProcs )
-        
     def load_balance(self):
         """Use Zoltan to generate import/export lists for the cells.
 
@@ -1455,4 +1436,4 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
             x.data[i] = centroid.x
             y.data[i] = centroid.y
-            z.data[i] = 0.0
+            z.data[i] = centroid.z

@@ -11,6 +11,56 @@ class ParticleTAGS:
     Remote = 1          # Remote particles for computations
     Ghost = 2           # Ghost particles for periodicity
 
+def invert_export_lists(comm, exportProcs, recv_count):
+    """Invert a given set of export indices.
+
+    Parameters:
+    ------------
+
+    comm : mpi4py.MPI.Comm
+        A valid MPI communicator
+
+    exportProcs : IntArray
+        A list of processors to send objects to
+
+    recv_count : np.ndarray (out)
+        Return array of length size which upon output, gives the number of
+        objects to be received from a given processor.
+
+    Given a list of objects that need to be exported to remote processors,
+    the job of invert lists is to inform each processor the number of
+    objects it will receive from other processors. This situation arises
+    for example in the cell based partitioning in PySPH. From the cell
+    export lists, we have a list of particle indices that need to be
+    exported to remote neighbors. 
+
+    """
+    # reset the recv_counts to 0
+    recv_count[:] = 0
+    
+    # get the rank and size for the communicator
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+
+    # count the number of objects we need to send to each processor
+    send_count = np.zeros(shape=size, dtype=np.uint32)
+    numExport = exportProcs.length
+
+    for i in range(numExport):
+        pid = exportProcs[i]
+        send_count[pid] += 1
+
+    # receive buffer for all gather
+    recvbuf = np.zeros(shape=size*size, dtype=np.uint32)
+
+    # do an all gather to receive the data
+    comm.Allgather(sendbuf=send_count, recvbuf=recvbuf)
+
+    # store the number of objects to be received from each processor
+    for i in range(size):
+        proc_send_count = recvbuf[i*size:(i+1)*size]
+        recv_count[i] = proc_send_count[rank]    
+
 def count_recv_data(
     comm, recv, numImport, importProcs):
     """Count the data to be received from different processors.
@@ -89,13 +139,14 @@ def get_send_data(
     send = {}
     for pid in range(size):
         indices = numpy.where( procs == pid )[0]
-        if len(indices) > 0:
-            send[pid] = {}
-            for prop, prop_array in props.iteritems():
-                send[pid][prop] = prop_array[ exportIndices[indices] ]
+        #if len(indices) > 0:
+        send[pid] = {}
+        for prop, prop_array in props.iteritems():
+            send[pid][prop] = prop_array[ exportIndices[indices] ]
 
-            # save the local ids exported to each processor
-            send[pid]['lid'] = exportIndices[indices]
+        # save the local ids exported to each processor
+        send[pid]['lid'] = exportIndices[indices]
+        send[pid]['msglength'] = exportIndices[indices].size
 
     return send
 
@@ -139,7 +190,7 @@ def Recv(comm, localbuf, recvbuf, source, localbufsize=0, tag=0):
     _recvbuf = recvbuf.get_npy_array()
 
     # Receive the Numpy buffer from source
-    comm.Recv( _recvbuf, source, tag )
+    comm.Recv( buf=_recvbuf, source=source, tag=tag )
 
     # add the contents to the local buffer. If localbufsize is 0, then
     # the two arrays are the same.

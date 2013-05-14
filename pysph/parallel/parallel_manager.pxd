@@ -41,6 +41,8 @@ cdef class ParticleArrayExchange:
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public int msglength_tag                  # tag for message length
+    cdef public int data_tag                       # tag for data send/recv
     cdef public int pa_index                       # Particle index
     cdef public ParticleArray pa                   # Particle data
     cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
@@ -58,10 +60,10 @@ cdef class ParticleArrayExchange:
     cdef public object comm
     cdef public int rank, size
 
-    # Zoltan interface definitions
-    cdef public list lb_props                # list of load balancing props
+    # list of load balancing props
+    cdef public list lb_props           
 
-    # Zoltan Import/Export lists for particles
+    # Import/Export lists for particles
     cdef public UIntArray exportParticleGlobalids
     cdef public UIntArray exportParticleLocalids
     cdef public IntArray exportParticleProcs
@@ -72,16 +74,20 @@ cdef class ParticleArrayExchange:
     cdef public IntArray importParticleProcs
     cdef public int numParticleImport
 
-    cdef public DoubleArray doublebuf        # temp buffer to import data
-    cdef public UIntArray uintbuf            # temp buffer to import id info
-    cdef public IntArray intbuf              # temp buffer for integer arrays
-    cdef public LongArray longbuf            # temp buffer for long arrays
+    # temp buffers to import data
+    cdef public DoubleArray doublebuf
+    cdef public UIntArray uintbuf
+    cdef public IntArray intbuf
+    cdef public LongArray longbuf
+
+    # array of number of objects to receive
+    cdef public int[:] recv_count
 
     ############################################################################
     # Member functions
     ############################################################################
     # exchange data given send and receive lists
-    cdef _exchange_data(self, int count, dict send, dict recv)
+    cdef _exchange_data(self, int count, dict send, int ltag, int dtag)
 
 # base class for all parallel managers
 cdef class ParallelManager:
