@@ -189,7 +189,8 @@ cdef class ParticleArrayWrapper:
 # ParticleArrayExchange
 ################################################################w
 cdef class ParticleArrayExchange:
-    def __init__(self, ParticleArray pa, object comm, lb_props=None):
+    def __init__(self, int pa_index, ParticleArray pa, object comm, lb_props=None):
+        self.pa_index = pa_index
         self.pa = pa
 
         self.pa_wrapper = ParticleArrayWrapper( pa )
@@ -382,12 +383,14 @@ cdef class ParticleArrayExchange:
                 for prop, recvbuf in props.iteritems():
                     recvbuf.resize( recv[i] )
 
-                    parallel_utils.Recv(comm=comm,
-                                    localbuf=pa.get_carray(prop),
-                                    localbufsize=count,
-                                    recvbuf=recvbuf,
-                                    source=i)
-                
+                    parallel_utils.Recv(
+                        comm=comm,
+                        localbuf=pa.get_carray(prop),
+                        localbufsize=count,
+                        recvbuf=recvbuf,
+                        source=i,
+                        tag=self.pa_index)
+                    
                 # update the local buffer size
                 count = count + recv[i]
 
@@ -395,7 +398,7 @@ cdef class ParticleArrayExchange:
         for pid in send.keys():
             for prop in props:
                 sendbuf = send[pid][prop]
-                comm.Send( sendbuf, dest=pid )
+                comm.Send( sendbuf, dest=pid, tag=self.pa_index )
                     
         # recv from procs with higher rank i value as set in first loop
         for i in recv.keys():
@@ -403,11 +406,13 @@ cdef class ParticleArrayExchange:
                 for prop, recvbuf in props.iteritems():
                     recvbuf.resize( recv[i] )
 
-                    parallel_utils.Recv(comm=comm,
-                                    localbuf=pa.get_carray(prop),
-                                    localbufsize=count,
-                                    recvbuf=recvbuf,
-                                    source=i)
+                    parallel_utils.Recv(
+                        comm=comm,
+                        localbuf=pa.get_carray(prop),
+                        localbufsize=count,
+                        recvbuf=recvbuf,
+                        source=i,
+                        tag=self.pa_index)
 
                 # update to the new length
                 count = count + recv[i]
@@ -509,7 +514,8 @@ cdef class ParallelManager:
         self.particles = particles
 
         # particle array exchange instances
-        self.pa_exchanges = [ParticleArrayExchange(pa, comm, lb_props) for pa in particles]
+        self.pa_exchanges = [ParticleArrayExchange(i, pa, comm, lb_props) \
+                             for i, pa in enumerate(particles)]
 
         # particle array wrappers
         self.pa_wrappers = [exchange.pa_wrapper for exchange in self.pa_exchanges]
@@ -525,7 +531,7 @@ cdef class ParallelManager:
         # cell coordinate values used for load balancing
         self.cx = DoubleArray()
         self.cy = DoubleArray()
-        self.cy = DoubleArray()
+        self.cz = DoubleArray()
 
         # minimum and maximum arrays for MPI reduce operations. These
         # are used to find global bounds across processors.
@@ -1431,6 +1437,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
         cdef DoubleArray x = self.cx
         cdef DoubleArray y = self.cy
+        cdef DoubleArray z = self.cz
 
         cdef int i
         cdef Cell cell
@@ -1439,6 +1446,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
         # resize the coordinate arrays
         x.resize( num_local_objects )
         y.resize( num_local_objects )
+        z.resize( num_local_objects )
 
         # populate the arrays
         for i in range( num_local_objects ):
@@ -1447,3 +1455,4 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
             x.data[i] = centroid.x
             y.data[i] = centroid.y
+            z.data[i] = 0.0

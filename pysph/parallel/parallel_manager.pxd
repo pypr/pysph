@@ -41,6 +41,7 @@ cdef class ParticleArrayExchange:
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public int pa_index                       # Particle index
     cdef public ParticleArray pa                   # Particle data
     cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
 
