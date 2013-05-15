@@ -409,7 +409,7 @@ cdef class PyZoltan:
 
     def _set_default(self):
         self.ZOLTAN_DEBUG_LEVEL = "1"
-        self.Zoltan_Set_Param("DEBUG_LEVEL", "1")
+        self.Zoltan_Set_Param("DEBUG_LEVEL", "0")
         
         self.ZOLTAN_OBJ_WEIGHT_DIM = "0"
         self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", "0")
@@ -507,8 +507,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         changing for each time step.
 
         """
-        self._cdata.numGlobalPoints = <ZOLTAN_ID_TYPE>self.num_global_objects
-        self._cdata.numMyPoints = <ZOLTAN_ID_TYPE>self.num_local_objects
+        self._cdata.numGlobalPoints = <int>self.num_global_objects
+        self._cdata.numMyPoints = <int>self.num_local_objects
         
         self._cdata.myGlobalIDs = self.gid.data
         self._cdata.x = self.x.data
@@ -518,7 +518,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         """Resonable defaults?"""
         PyZoltan._set_default(self)
 
+        self.ZOLTAN_LB_METHOD = "RCB"
+        self.Zoltan_Set_Param("LB_METHOD", "RCB")
+
         self.ZOLTAN_KEEP_CUTS = "1"
         self.Zoltan_Set_Param("KEEP_CUTS", "1")
-
-        self.ZOLTAN_LB_METHOD = "RCB"
