@@ -6,7 +6,7 @@ from pysph.base.nnps cimport NNPS
 # PyZoltan
 from pyzoltan.core.carray cimport IntArray, DoubleArray, LongArray
 
-cdef class WCSPHRK2Integrator:
+cdef class Integrator:
     ############################################################
     # Data attributes
     ############################################################
@@ -33,3 +33,9 @@ cdef class WCSPHRK2Integrator:
 
     # reset accelerations before computing 
     cdef _reset_accelerations(self)
+
+cdef class WCSPHRK2Integrator(Integrator):
+    pass
+
+cdef class EulerIntegrator(Integrator):
+    pass
