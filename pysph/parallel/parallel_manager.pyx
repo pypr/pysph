@@ -190,14 +190,17 @@ cdef class ParticleArrayWrapper:
 ################################################################w
 cdef class ParticleArrayExchange:
     def __init__(self, int pa_index, ParticleArray pa, object comm, lb_props=None):
-        # a large number to 
         self.pa_index = pa_index
-
-        self.data_tag = pa_index + 1
-        self.msglength_tag = pa_index + 100
-
         self.pa = pa
         self.pa_wrapper = ParticleArrayWrapper( pa )
+
+        # unique data and message length tags for MPI communications
+        name = pa.name
+        self.msglength_tag_remote = sum( [ord(c) for c in name + '_msglength_remote'] )
+        self.data_tag_remote = sum( [ord(c) for c in name + '_data_remote'] )
+
+        self.msglength_tag_lb = sum( [ord(c) for c in name + '_msglength_lb'] )
+        self.data_tag_lb = sum( [ord(c) for c in name + '_data_lb'] )
 
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -276,8 +279,8 @@ cdef class ParticleArrayExchange:
         pa.remove_particles( exportLocalids )
 
         # exchange the data
-        cdef int ltag = self.msglength_tag + 100
-        cdef int dtag = self.data_tag + 50
+        cdef int ltag = self.msglength_tag_lb
+        cdef int dtag = self.data_tag_lb
 
         count = current_size - numExport
         self._exchange_data(count, send, ltag, dtag)
@@ -325,8 +328,8 @@ cdef class ParticleArrayExchange:
         cdef object comm = self.comm
 
         # share the data
-        cdef int ltag = self.msglength_tag + 200
-        cdef int dtag = self.data_tag + 250
+        cdef int ltag = self.msglength_tag_remote
+        cdef int dtag = self.data_tag_remote
         count = current_size
         self._exchange_data(count, send, ltag, dtag)
 
@@ -1061,7 +1064,7 @@ cdef class ParallelManager:
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t i, UIntArray nbrs):
+                                size_t d_idx, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1073,7 +1076,7 @@ cdef class ParallelManager:
         dst_index : int
             Index of the destination particle array in the particles list
 
-        i : int (input)
+        d_idx : int (input)
             Particle for which neighbors are sought.
 
         nbrs : UIntArray (output)
@@ -1102,7 +1105,7 @@ cdef class ParallelManager:
         cdef size_t indexj
         cdef ZOLTAN_ID_TYPE j
 
-        cdef cPoint xi = cPoint_new(d_x.data[i], d_y.data[i], 0.0)
+        cdef cPoint xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx], 0.0)
         cdef cIntPoint _cid = find_cell_id( xi, cell_size )
         cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
         cdef IntPoint cellid = IntPoint(0, 0, 0)
@@ -1111,7 +1114,7 @@ cdef class ParallelManager:
         cdef double xij
 
         cdef double hi, hj
-        hi = radius_scale * d_h.data[i]
+        hi = radius_scale * d_h.data[d_idx]
 
         cdef int nnbrs = 0
 
@@ -1140,7 +1143,7 @@ cdef class ParallelManager:
                             nnbrs = nnbrs + 1
 
         # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs            
+        nbrs._length = nnbrs
 
 cdef class ZoltanParallelManager(ParallelManager):
     """Base class for Zoltan enabled parallel cell managers.
@@ -1261,7 +1264,6 @@ cdef class ZoltanParallelManager(ParallelManager):
         
         """
         cdef PyZoltan pz = self.pz
-        cdef Zoltan_Struct* zz = pz._zstruct.zz
 
         cdef Cell cell
         cdef cPoint boxmin, boxmax
@@ -1280,7 +1282,6 @@ cdef class ZoltanParallelManager(ParallelManager):
         cdef int nbrproc, num_particles, indexi
         cdef ZOLTAN_ID_TYPE i
 
-        cdef int *_procs, *_parts
         cdef int numprocs = 0
         cdef int numparts = 0
 
@@ -1296,22 +1297,23 @@ cdef class ZoltanParallelManager(ParallelManager):
         procs = pz.procs; parts = pz.parts
         
         for cell in cell_list:
-            # initialize the procs and parts
-            procs[:] = -1; parts[:] = -1
-
-            _procs = <int*>procs.data
-            _parts = <int*>parts.data
 
             # get the bounding box for this cell
             boxmin = cell.boxmin; boxmax = cell.boxmax
 
-            czoltan.Zoltan_LB_Box_PP_Assign(
-                zz,
+            numprocs = pz.Zoltan_Box_PP_Assign(
                 boxmin.x, boxmin.y, boxmin.z,
-                boxmax.x, boxmax.y, boxmax.z,
-                _procs, &numprocs,
-                _parts, &numparts
-                )                
+                boxmax.x, boxmax.y, boxmax.z)
+
+            procs = pz.procs
+                
+            # czoltan.Zoltan_LB_Box_PP_Assign(
+            #     zz,
+            #     boxmin.x, boxmin.y, boxmin.z,
+            #     boxmax.x, boxmax.y, boxmax.z,
+            #     _procs, &numprocs,
+            #     _parts, &numparts
+            #     )
 
             # array of neighboring processors
             nbrprocs = procs[np.where( (procs != -1) * (procs != rank) )[0]]

@@ -41,8 +41,12 @@ cdef class ParticleArrayExchange:
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public int msglength_tag                  # tag for message length
-    cdef public int data_tag                       # tag for data send/recv
+    cdef public int msglength_tag_remote           # msg length tag for remote_exchange
+    cdef public int data_tag_remote                # data tag for remote_exchange
+
+    cdef public int msglength_tag_lb               # msg length tag for lb_exchange
+    cdef public int data_tag_lb                    # data tag for lb_exchange
+    
     cdef public int pa_index                       # Particle index
     cdef public ParticleArray pa                   # Particle data
     cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
@@ -170,7 +174,7 @@ cdef class ParallelManager:
     # nearest neighbor search routines taking into account multiple
     # particle arrays
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t i, UIntArray nbrs)    
+                                size_t d_idx, UIntArray nbrs)    
 
 # Zoltan based parallel cell manager for SPH simulations
 cdef class ZoltanParallelManager(ParallelManager):
