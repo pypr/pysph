@@ -466,6 +466,35 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         # register the query functions with Zoltan
         self._Zoltan_register_query_functions()
 
+    def Zoltan_Box_PP_Assign(self, double xmin, double ymin, double zmin,
+                             double xmax, double ymax, double zmax):
+        """Find the processors that intersect with a box"""
+        cdef Zoltan_Struct* zz = self._zstruct.zz
+
+        cdef np.ndarray[ndim=1, dtype=np.int32_t] procs = self.procs
+        cdef np.ndarray[ndim=1, dtype=np.int32_t] parts = self.parts
+
+        cdef int numprocs = 0
+        cdef int numparts = 0
+
+        cdef int ierr
+
+        # initialize procs and parts
+        procs[:] = -1
+        parts[:] = -1
+
+        ierr = czoltan.Zoltan_LB_Box_PP_Assign(
+            zz,
+            xmin, ymin, zmin,
+            xmax, ymax, zmax,
+            <int*>procs.data, &numprocs,
+            <int*>parts.data, &numparts
+            )
+
+        _check_error(ierr)
+
+        return numprocs
+
     #######################################################################
     # Private interface
     #######################################################################
