@@ -23,8 +23,8 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
     src = nnps.particles[ src_index ]
 
     # particle coordinates
-    dx, dy, dh, drho = dst.get('x', 'y','h', 'rho', only_real_particles=True)
-    sx, sy, sh, srho = src.get('x', 'y','h', 'rho', only_real_particles=False)
+    dx, dy, dz, dh, drho = dst.get('x', 'y', 'z', 'h', 'rho', only_real_particles=True)
+    sx, sy, sz, sh, srho = src.get('x', 'y', 'z', 'h', 'rho', only_real_particles=False)
 
     neighbors = UIntArray()
     cubic = CubicSpline(dim=2)
@@ -37,7 +37,7 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
     
     for i in range(num_particles):
         
-        xi = Point( dx[i], dy[i], 0.0 )
+        xi = Point( dx[i], dy[i], dz[i] )
         hi = dh[i]
 
         nnps.get_nearest_particles(
@@ -49,12 +49,12 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
         for indexj in range(nnbrs):
             j = neighbors[indexj]
 
-            xj = Point(sx[j], sy[j], 0.0)
+            xj = Point(sx[j], sy[j], sz[i])
             wij = cubic.py_function(xi, xj, hi)
 
             rho_sum = rho_sum + mass *  wij
 
-        drho[i] = rho_sum
+        drho[i] += rho_sum
 
 # Initialize MPI and find out number of local particles
 comm = mpi.COMM_WORLD
@@ -75,43 +75,58 @@ if numGlobalPoints % size != 0:
 # everybody creates two particle arrays with numMyPoints
 x1 = random.random( numMyPoints ); y1 = random.random( numMyPoints )
 h1 = numpy.ones_like(x1) * hdx * dx
+rho1 = numpy.zeros_like(x1)
 
 x2 = random.random( numMyPoints ); y2 = random.random( numMyPoints )
 h2 = numpy.ones_like(x2) * hdx * dx
+rho2 = numpy.zeros_like(x2)
 
 # local particle arrays
-pa1 = get_particle_array_wcsph(x=x1, y=y1, h=h1)
-pa2 = get_particle_array_wcsph(x=x2, y=y2, h=h2)
+pa1 = get_particle_array_wcsph(x=x1, y=y1, h=h1, rho=rho1)
+pa2 = get_particle_array_wcsph(x=x2, y=y2, h=h2, rho=rho2)
 
 # gather the data on root
 X1 = numpy.zeros( numGlobalPoints ); Y1 = numpy.zeros( numGlobalPoints )
 H1 = numpy.ones_like(X1) * hdx * dx
+RHO1 = numpy.zeros_like(X1)
+
 comm.Gatherv( sendbuf=x1, recvbuf=X1 )
 comm.Gatherv( sendbuf=y1, recvbuf=Y1 )
+comm.Gatherv( sendbuf=rho1, recvbuf=RHO1)
 
 X2 = numpy.zeros( numGlobalPoints ); Y2 = numpy.zeros( numGlobalPoints )
 H2 = numpy.ones_like(X2) * hdx * dx
+RHO2 = numpy.zeros_like(X2)
+
 comm.Gatherv( sendbuf=x2, recvbuf=X2 )
 comm.Gatherv( sendbuf=y2, recvbuf=Y2 )
+comm.Gatherv( sendbuf=rho2, recvbuf=RHO2)
 
 # create the particle arrays and PM
-PA1 = get_particle_array_wcsph(x=X1, y=Y1, h=H1)
-PA2 = get_particle_array_wcsph(x=X2, y=Y2, h=H2)
+PA1 = get_particle_array_wcsph(x=X1, y=Y1, h=H1, rho=RHO1)
+PA2 = get_particle_array_wcsph(x=X2, y=Y2, h=H2, rho=RHO2)
 
-particles = [PA1, PA2]
-PM = ZoltanParallelManagerGeometric(dim=2, particles=particles, comm=comm)
-Nnps = NNPS(dim=2, particles=particles)
+# create the parallel manager
+PARTICLES = [PA1, PA2]
+PM = ZoltanParallelManagerGeometric(dim=2, particles=PARTICLES, comm=comm)
+
+# create the local NNPS object with all the particles
+Nnps = NNPS(dim=2, particles=PARTICLES)
 Nnps.update()
 
 # only root computes summation density
 if rank == 0:
+    assert numpy.allclose(PA1.rho, 0)
     sd_evaluate(Nnps, PM, mass, src_index=1, dst_index=0)
+    sd_evaluate(Nnps, PM, mass, src_index=0, dst_index=0)
     RHO1 = PA1.rho
 
+    assert numpy.allclose(PA2.rho, 0)
     sd_evaluate(Nnps, PM, mass, src_index=0, dst_index=1)
+    sd_evaluate(Nnps, PM, mass, src_index=1, dst_index=1)
     RHO2 = PA2.rho
 
-# be nice to the root...
+# wait for the root...
 comm.barrier()    
 
 # create the local particle arrays
@@ -134,6 +149,9 @@ nnps.update()
 
 # Compute summation density individually on each processor
 sd_evaluate(nnps, pm, mass, src_index=0, dst_index=1)
+sd_evaluate(nnps, pm, mass, src_index=1, dst_index=1)
+
+sd_evaluate(nnps, pm, mass, src_index=0, dst_index=0)
 sd_evaluate(nnps, pm, mass, src_index=1, dst_index=0)
 
 # gather the density and global ids
