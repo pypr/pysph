@@ -10,6 +10,7 @@ cdef class Integrator:
     ############################################################
     # Data attributes
     ############################################################
+    cdef public object pm
     cdef public list particles
     cdef public object evaluator
     cdef public NNPS nnps

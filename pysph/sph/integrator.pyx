@@ -9,6 +9,9 @@ cdef class Integrator:
         self.particles = particles
         self.nnps = evaluator.nnps
 
+    def set_parallel_manager(self, object pm):
+        self.pm = pm
+
     cpdef integrate(self, double dt):
         raise RuntimeError("Integrator::integrate called!")
 
@@ -83,6 +86,7 @@ cdef class WCSPHRK2Integrator(Integrator):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
+        cdef object pm = self.pm
         cdef NNPS nnps = self.nnps
         cdef str name
 

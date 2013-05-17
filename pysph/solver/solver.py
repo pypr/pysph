@@ -133,8 +133,10 @@ class Solver(object):
         self.sph_eval.set_nnps(nnps)
 
         # instantiate the Integrator
-        self.integrator = self.integrator_type(evaluator=self.sph_eval, 
-                                               particles=particles)
+        self.integrator = integrator = self.integrator_type(evaluator=self.sph_eval, 
+                                                            particles=particles)
+        # set the parallel manager for the integrator
+        integrator.set_parallel_manager(self.pm)        
 
     def add_print_properties(self, props):
         """ Add a list of properties to print """
