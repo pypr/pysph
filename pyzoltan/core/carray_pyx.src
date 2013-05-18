@@ -503,8 +503,8 @@ cdef class CLASSNAME(BaseArray):
         cdef ARRAY_TYPE min_val, max_val
 
         if self.length == 0:
-            self.minimum = <ARRAY_TYPE>-1e20
-            self.maximum = <ARRAY_TYPE>1e20
+            self.minimum = <ARRAY_TYPE>0
+            self.maximum = <ARRAY_TYPE>0
             return
 
         min_val = self.data[0]
