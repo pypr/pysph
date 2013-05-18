@@ -56,9 +56,6 @@ include_dirs = [numpy.get_include()]
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
-    # base module
-    # Extension( name="pysph.base.carray",
-    #            sources=["pysph/base/carray.pyx"]),
 
     Extension( name="pysph.base.particle_array",
                sources=["pysph/base/particle_array.pyx"]),
@@ -72,6 +69,7 @@ ext_modules = [
     # sph module
     Extension( name="pysph.sph.integrator",
                sources=["pysph/sph/integrator.pyx"])
+
     ]
 
 # add the include dirs for the extension modules
@@ -83,7 +81,11 @@ parallel_modules = [
                sources=["pysph/parallel/parallel_manager.pyx"],
                include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
                library_dirs = zoltan_library_dirs,
-               libraries = ['zoltan', 'mpi'] )
+               libraries = ['zoltan', 'mpi'] ),
+
+    Extension( name="pysph.parallel._kernels",
+               sources=["pysph/parallel/_kernels.pyx"]
+               ),
     ]
 
 # currently we depend on PyZoltan

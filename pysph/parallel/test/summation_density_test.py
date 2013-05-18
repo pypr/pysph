@@ -6,15 +6,16 @@ import numpy
 from numpy import random
 from numpy import savez, load
 
-# Cython kernel function from PyZoltan
-from pyzoltan.sph.kernels import CubicSpline
+# Carray from PyZoltan
 from pyzoltan.core.carray import UIntArray
-from pyzoltan.sph.point import Point
 
 # PySPH imports
+from pysph.base.point import Point
 from pysph.base.nnps import NNPS
 from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
 from pysph.base.utils import get_particle_array_wcsph
+
+from pysph.parallel._kernels import CubicSpline
 
 """Utility to compute summation density"""
 def sd_evaluate(nnps, pm, mass, src_index, dst_index):
