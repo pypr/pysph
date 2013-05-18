@@ -75,8 +75,10 @@ cdef void get_obj_list(void* data, int sizeGID, int sizeLID,
 
 cdef int get_num_geom(void* data, int* ierr):
     """Return the dimensionality of the problem."""
+    cdef CoordinateData* _data = <CoordinateData *>data
+    cdef int dim = _data.dim
     ierr[0] = 0
-    return 2
+    return dim
 
 cdef void get_geometry_list(void* data, int sizeGID, int sizeLID, int num_obj,
                             ZOLTAN_ID_PTR globalID, ZOLTAN_ID_PTR localID,
@@ -87,11 +89,21 @@ cdef void get_geometry_list(void* data, int sizeGID, int sizeLID, int num_obj,
 
     """
     cdef CoordinateData* _data = <CoordinateData *>data
-    cdef int i
+    cdef int i, dim = _data.dim
 
-    for i in range( num_obj ):
-        geom_vec[2*i + 0] = _data.x[i]
-        geom_vec[2*i + 1] = _data.y[i]
+    if dim == 2:
+        for i in range( num_obj ):
+            geom_vec[2*i + 0] = _data.x[i]
+            geom_vec[2*i + 1] = _data.y[i]
+
+    elif dim == 3:
+        for i in range( num_obj ):
+            geom_vec[3*i + 0] = _data.x[i]
+            geom_vec[3*i + 1] = _data.y[i]
+            geom_vec[3*i + 2] = _data.z[i]
+
+    else:
+        raise ValueError("Dimension %d invalid for PyZoltan!"%dim)
 
 #########################################################################
 # The actual Zoltan Wrapper
@@ -536,19 +548,21 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         changing for each time step.
 
         """
+        self._cdata.dim = <int>self.dim
         self._cdata.numGlobalPoints = <int>self.num_global_objects
         self._cdata.numMyPoints = <int>self.num_local_objects
         
         self._cdata.myGlobalIDs = self.gid.data
         self._cdata.x = self.x.data
         self._cdata.y = self.y.data
+        self._cdata.z = self.z.data
 
     def _set_default(self):
         """Resonable defaults?"""
         PyZoltan._set_default(self)
 
         self.ZOLTAN_LB_METHOD = "RCB"
-        self.Zoltan_Set_Param("LB_METHOD", "RCB")
+        #self.Zoltan_Set_Param("LB_METHOD", "RCB")
 
         self.ZOLTAN_KEEP_CUTS = "1"
         self.Zoltan_Set_Param("KEEP_CUTS", "1")

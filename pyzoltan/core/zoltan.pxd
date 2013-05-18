@@ -83,12 +83,14 @@ cdef class PyZoltan:
 
 # User defined data for the RCB, RIB and HSFC methods
 cdef struct CoordinateData:
+    int dim
     int numGlobalPoints
     int numMyPoints
 
     ZOLTAN_ID_PTR myGlobalIDs
     double* x
     double* y
+    double *z
     
 cdef class ZoltanGeometricPartitioner(PyZoltan):
     # data arrays for the coordinates
