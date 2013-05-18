@@ -102,6 +102,7 @@ cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
     centroid = cPoint_new(0.0, 0.0, 0.0)
     centroid.x = (<double>cid.x + 0.5)*cell_size
     centroid.y = (<double>cid.y + 0.5)*cell_size
+    centroid.z = (<double>cid.z + 0.5)*cell_size
     
     return centroid
 

@@ -18,8 +18,6 @@ from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTA
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.point cimport *
 
-cdef inline int real_to_int(double val, double step)
-cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
 cpdef UIntArray arange_uint(int start, int stop=*)
 
 # Simple ParticleArray wrapper class to hold particle data. For NNPS,

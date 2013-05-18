@@ -142,6 +142,7 @@ cdef class WCSPHRK2Integrator(Integrator):
                 rho.data[i] = rho0.data[i] + dtb2 * arho.data[i]
 
         # Update NNPS since particles have moved
+        if pm: pm.update()
         nnps.update()
                 
         # compute accelerations
@@ -187,6 +188,7 @@ cdef class EulerIntegrator(Integrator):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
+        cdef object pm = self.pm
         cdef NNPS nnps = self.nnps
         cdef str name
 
@@ -207,6 +209,7 @@ cdef class EulerIntegrator(Integrator):
         self._set_initial_values()
 
         # Update NNPS since particles have moved
+        if pm: pm.update()
         nnps.update()
                 
         # compute accelerations

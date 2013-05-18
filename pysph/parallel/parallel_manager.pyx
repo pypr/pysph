@@ -16,7 +16,7 @@ from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core import zoltan_utils
 
 # PySPH imports
-from pysph.base.nnps cimport DomainLimits, Cell
+from pysph.base.nnps cimport DomainLimits, Cell, find_cell_id
 from pysph.solver.utils import savez
 
 # local imports
@@ -35,106 +35,6 @@ cdef extern from 'math.h':
 cdef extern from 'limits.h':
     cdef int INT_MAX
     cdef unsigned int UINT_MAX
-
-cdef inline int real_to_int(double real_val, double step):
-    """ Return the bin index to which the given position belongs.
-
-    Parameters:
-    -----------
-    val -- The coordinate location to bin
-    step -- the bin size    
-
-    Example:
-    --------
-    real_val = 1.5, step = 1.0 --> ret_val = 1
-
-    real_val = -0.5, step = 1.0 --> real_val = -1
-    
-    """
-    cdef int ret_val = <int>floor( real_val/step )
-
-    return ret_val
-
-cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size):
-    """ Find the cell index for the corresponding point 
-
-    Parameters:
-    -----------
-    pnt -- the point for which the index is sought
-    cell_size -- the cell size to use
-    id -- output parameter holding the cell index 
-
-    Algorithm:
-    ----------
-    performs a box sort based on the point and cell size
-
-    Notes:
-    ------
-    Uses the function  `real_to_int`
-    
-    """
-    cdef cIntPoint p = cIntPoint(real_to_int(pnt.x, cell_size),
-                                 real_to_int(pnt.y, cell_size),
-                                 0)
-    return p
-
-cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
-        """ Get the centroid of the cell.
-
-        Parameters:
-        -----------
-
-        cell_size : double (input)
-            Cell size used for binning
-
-        cid : cPoint (input)
-            Spatial index for a cell
-
-        Returns:
-        ---------
-        
-        centroid : cPoint 
-             
-        Notes:
-        ------
-        The centroid in any coordinate direction is defined to be the
-        origin plus half the cell size in that direction
-
-        """
-        centroid = cPoint_new(0.0, 0.0, 0.0)
-        centroid.x = (<double>cid.x + 0.5)*cell_size
-        centroid.y = (<double>cid.y + 0.5)*cell_size
-
-        return centroid
-
-def get_centroid(double cell_size, IntPoint cid):
-    """ Get the centroid of the cell.
-    
-    Parameters:
-    -----------
-    
-    cell_size : double (input)
-        Cell size used for binning
-    
-    cid : IntPoint (input)
-        Spatial index for a cell
-    
-    Returns:
-    ---------
-    
-    centroid : Point 
-    
-    Notes:
-    ------
-    The centroid in any coordinate direction is defined to be the
-    origin plus half the cell size in that direction
-    
-    """
-    cdef cPoint _centroid = _get_centroid(cell_size, cid.data)
-    centroid = Point_new(0.0, 0.0, 0.0)
-
-    centroid.data = _centroid
-    return centroid
 
 cpdef UIntArray arange_uint(int start, int stop=-1):
     """Utility function to return a numpy.arange for a UIntArray"""
@@ -227,7 +127,9 @@ cdef class ParticleArrayExchange:
         if lb_props is None:
             self.lb_props = ['x','y', 'z', 'ax', 'ay', 'az',
                              'u', 'v', 'w', 'au', 'av', 'aw',
-                             'rho', 'arho', 'm', 'h', 'gid']
+                             'rho', 'arho', 'm', 'h', 'gid',
+                             'x0', 'y0', 'z0', 'u0', 'v0','w0',
+                             'rho0']
         else:
             self.lb_props = lb_props
 
