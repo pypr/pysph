@@ -59,25 +59,6 @@ ext_modules = [
                include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
                library_dirs = zoltan_library_dirs,
                libraries=['zoltan', 'mpi']),
-
-    # sph modules
-    Extension( name="pyzoltan.sph.point",
-               sources=["pyzoltan/sph/point.pyx"],
-               include_dirs = include_dirs),
-    
-    Extension( name="pyzoltan.sph.kernels",
-               sources=["pyzoltan/sph/kernels.pyx"],
-               include_dirs = include_dirs),
-    
-    Extension( name="pyzoltan.sph.particle_array",
-               sources=["pyzoltan/sph/particle_array.pyx"],
-               include_dirs = include_dirs),
-
-    Extension( name="pyzoltan.sph.nnps",
-               sources=["pyzoltan/sph/nnps.pyx"],
-               include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
-               library_dirs = zoltan_library_dirs,
-               libraries = ['zoltan', 'mpi'])
     ]
 
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
