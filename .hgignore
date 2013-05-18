@@ -20,6 +20,6 @@ dist/
 build/
 
 syntax: regexp
-^source/.*\.html$
+^pyzoltan/.*\.html$
 ^examples/.*_output
 
