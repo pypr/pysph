@@ -108,7 +108,7 @@ class Application(object):
                           dest="print_log", default=False,
                           help="Print log messages to stderr.")
         # --final-time
-        parser.add_option("--final-time", action="store",
+        parser.add_option("--tf", action="store",
                           type="float",
                           dest="final_time",
                           default=None,
@@ -300,6 +300,7 @@ class Application(object):
                 lb_props=None)
 
             # do an initial load balance
+            pm.pz.set_lb_method("RIB")
             pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
             pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
             pm.update()
