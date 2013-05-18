@@ -626,27 +626,22 @@ cdef class ParallelManager:
             # use Zoltan to get the cell import/export lists
             self.load_balance()
 
-            # move the particle data one by one
+            # move the data to the new partitions
             if self.changes == 1:
+                self.create_particle_lists()
+
+                # exchange the data for each array
                 for i in range(self.narrays):
-
-                    # create the particle lists from the cell lists
-                    self.create_particle_lists(i)
-
-                    # exchange the data for this array
-                    pa_exchange = self.pa_exchanges[i]
-                    pa_exchange.lb_exchange_data()
+                    self.pa_exchanges[i].lb_exchange_data()
 
                 # update the local cell map after data movement
                 self.update_local_data()
 
             # compute remote particles and exchange data
-            for i in range(self.narrays):
-                self.compute_remote_particles(i)
+            self.compute_remote_particles()
 
-                # exchange the remote particle data
-                pa_exchange = self.pa_exchanges[i]
-                pa_exchange.remote_exchange_data()
+            for i in range(self.narrays):
+                self.pa_exchanges[i].remote_exchange_data()
 
             # update the local cell map to accomodate remote particles
             self.update_remote_data()
@@ -1100,7 +1095,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         # Initialize the base PyZoltan class. 
         self.pz = PyZoltan(comm)
 
-    def create_particle_lists(self, int pa_index):
+    def create_particle_lists(self):
         """Create particle export/import lists
 
         For the cell based partitioner, Zoltan generated import and
@@ -1122,42 +1117,54 @@ cdef class ZoltanParallelManager(ParallelManager):
         cdef int numCellExport = self.numCellExport
 
         # the local cell map and cellids
+        cdef int narrays = self.narrays
         cdef list cell_list = self.cell_list
-        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
+        cdef ParticleArrayExchange pa_exchange
 
-        # initialize the particle lists
-        pa_exchange.reset_lists()
+        cdef UIntArray exportLocalids, exportGlobalids
+        cdef IntArray exportProcs
 
-        cdef UIntArray exportLocalids = pa_exchange.exportParticleLocalids
-        cdef UIntArray exportGlobalids = pa_exchange.exportParticleGlobalids
-        cdef IntArray exportProcs = pa_exchange.exportParticleProcs
-        cdef int numExport = 0
-
-        cdef int indexi, i, j, export_proc, nindices
+        cdef int indexi, i, j, export_proc, nindices, pa_index
         cdef UIntArray lindices, gindices
         cdef IntPoint cellid
         cdef Cell cell
 
-        # get the particle export lists from Zoltan generated cell export lists
+        # initialize the particle export lists
+        for pa_index in range(self.narrays):
+            pa_exchange = self.pa_exchanges[pa_index]
+            pa_exchange.reset_lists()
+
+        # Iterate over the cells to be exported
         for indexi in range(numCellExport):
             i = <int>exportCellLocalids[indexi]            # local index for the cell to export
             cell = cell_list[i]                            # local cell to export
             export_proc = exportCellProcs.data[indexi]     # processor to export cell to
-            lindices = cell.lindices[pa_index]             # local particle  indices in cell
-            gindices = cell.gindices[pa_index]             # global particle indices in cell
 
-            nindices = lindices.length
-            for j in range( nindices ):
-                exportLocalids.append( lindices.data[j] )
-                exportGlobalids.append( gindices.data[j] )
-                exportProcs.append( export_proc )
+            # populate the export lists for each array in this cell
+            for pa_index in range(self.narrays):
+                # the ParticleArrayExchange object for this array
+                pa_exchange = self.pa_exchanges[pa_index]
 
-                numExport = numExport + 1
+                exportLocalids = pa_exchange.exportParticleLocalids
+                exportGlobalids = pa_exchange.exportParticleGlobalids
+                exportProcs = pa_exchange.exportParticleProcs
 
-        # save the number of particles to export from this proc
-        pa_exchange.numParticleExport = numExport
+                # local and global indices in this cell
+                lindices = cell.lindices[pa_index]
+                gindices = cell.gindices[pa_index]
+                nindices = lindices.length
+                
+                for j in range( nindices ):
+                    exportLocalids.append( lindices.data[j] )
+                    exportGlobalids.append( gindices.data[j] )
+                    exportProcs.append( export_proc )
 
-    def compute_remote_particles(self, int pa_index):
+        # save the number of particles
+        for pa_index in range(narrays):
+            pa_exchange = self.pa_exchanges[pa_index]
+            pa_exchange.numParticleExport = pa_exchange.exportParticleProcs.length
+
+    def compute_remote_particles(self):
         """Compute remote particles.
 
         Particles to be exported are determined by flagging individual
@@ -1165,39 +1172,36 @@ cdef class ZoltanParallelManager(ParallelManager):
         requirements.
         
         """
+        # the PyZoltan object used to find intersections
         cdef PyZoltan pz = self.pz
 
         cdef Cell cell
         cdef cPoint boxmin, boxmax
 
         cdef object comm = self.comm
-        cdef int rank = self.rank
-        cdef int size = self.size
-        
+        cdef int rank = self.rank, narrays = self.narrays
+
         cdef list cell_list = self.cell_list
-        cdef IntPoint cid
         cdef UIntArray lindices, gindices
 
         cdef np.ndarray nbrprocs
-        cdef np.ndarray[ndim=1, dtype=np.int32_t] procs, parts
+        cdef np.ndarray[ndim=1, dtype=np.int32_t] procs
         
-        cdef int nbrproc, num_particles, indexi
+        cdef int nbrproc, num_particles, indexi, pa_index
         cdef ZOLTAN_ID_TYPE i
 
         cdef int numprocs = 0
-        cdef int numparts = 0
 
-        cdef ParticleArrayExchange pa_exchange = self.pa_exchanges[pa_index]
+        cdef ParticleArrayExchange pa_exchange
+        cdef UIntArray exportGlobalids, exportLocalids
+        cdef IntArray exportProcs
 
         # reset the export lists
-        pa_exchange.reset_lists()
-        cdef UIntArray exportGlobalids = pa_exchange.exportParticleGlobalids
-        cdef UIntArray exportLocalids = pa_exchange.exportParticleLocalids
-        cdef IntArray exportProcs = pa_exchange.exportParticleProcs
+        for pa_index in range(narrays):
+            pa_exchange = self.pa_exchanges[pa_index]
+            pa_exchange.reset_lists()
 
-        # the procs and parts array from PyZoltan
-        procs = pz.procs; parts = pz.parts
-        
+        # Chaeck for each cell
         for cell in cell_list:
 
             # get the bounding box for this cell
@@ -1207,38 +1211,44 @@ cdef class ZoltanParallelManager(ParallelManager):
                 boxmin.x, boxmin.y, boxmin.z,
                 boxmax.x, boxmax.y, boxmax.z)
 
+            # the array of processors that this box intersects with
             procs = pz.procs
                 
-            # czoltan.Zoltan_LB_Box_PP_Assign(
-            #     zz,
-            #     boxmin.x, boxmin.y, boxmin.z,
-            #     boxmax.x, boxmax.y, boxmax.z,
-            #     _procs, &numprocs,
-            #     _parts, &numparts
-            #     )
-
             # array of neighboring processors
             nbrprocs = procs[np.where( (procs != -1) * (procs != rank) )[0]]
 
             if nbrprocs.size > 0:
                 cell.is_boundary = True
 
-                lindices = cell.lindices[pa_index]
-                gindices = cell.gindices[pa_index]
+                # store the neighboring processors for this cell
                 cell.nbrprocs.resize( nbrprocs.size )
                 cell.nbrprocs.set_data( nbrprocs )
-                
-                num_particles = lindices.length
-                for nbrproc in nbrprocs:
-                    for indexi in range( num_particles ):
-                        i = lindices.data[indexi]
 
-                        exportGlobalids.append( gindices.data[indexi] )
-                        exportLocalids.append( i )
-                        exportProcs.append( nbrproc )
+                # populate the particle export lists for each array
+                for pa_index in range(narrays):
+                    pa_exchange = self.pa_exchanges[pa_index]
 
-        # set the numExport
-        pa_exchange.numParticleExport = exportProcs.length
+                    exportGlobalids = pa_exchange.exportParticleGlobalids
+                    exportLocalids = pa_exchange.exportParticleLocalids
+                    exportProcs = pa_exchange.exportParticleProcs
+
+                    # local and global indices in this cell
+                    lindices = cell.lindices[pa_index]
+                    gindices = cell.gindices[pa_index]
+                    num_particles = lindices.length
+
+                    for nbrproc in nbrprocs:
+                        for indexi in range( num_particles ):
+                            i = lindices.data[indexi]
+
+                            exportLocalids.append( i )
+                            exportGlobalids.append( gindices.data[indexi] )
+                            exportProcs.append( nbrproc )
+
+        # set the numParticleExport for each array
+        for pa_index in range(narrays):
+            pa_exchange = self.pa_exchanges[pa_index]
+            pa_exchange.numParticleExport = pa_exchange.exportParticleProcs.length
 
     def load_balance(self):
         """Use Zoltan to generate import/export lists for the cells.
