@@ -29,7 +29,7 @@ $(DIRS) :
 	python `which cython` --cplus -I$(SRC) -I$(MPI4PY_INCL) $<
 
 %.html : %.pyx
-	python `which cython` --cplus -I$(SRC) -I$(MPI4PY_INCL) -a $<
+	python `which cython` -I$(SRC) -I$(MPI4PY_INCL) -a $<
 
 cython : $(PYX:.pyx=.c)
 

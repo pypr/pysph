@@ -272,10 +272,6 @@ class Solver(object):
             for func in self.post_step_functions:
                 func.eval(self)
 
-            # re-distribute particles if valid parallel manager
-            if self.pm:
-                pm.update()
-
             # dump output
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)

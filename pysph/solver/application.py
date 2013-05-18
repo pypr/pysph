@@ -125,12 +125,12 @@ class Application(object):
                          help="Do not print any progress information.")
 
         # -o/ --output
-        parser.add_option("-o", "--output", action="store",
+        parser.add_option("-o", "--fname", action="store",
                           dest="output", default=self.fname,
                           help="File name to use for output")
 
         # --output-freq.
-        parser.add_option("--freq", action="store",
+        parser.add_option("--pfreq", action="store",
                           dest="freq", default=20, type="int",
                           help="Printing frequency for the output")
         
