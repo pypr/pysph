@@ -129,7 +129,7 @@ cdef class ParticleArrayExchange:
                              'u', 'v', 'w', 'au', 'av', 'aw',
                              'rho', 'arho', 'm', 'h', 'gid',
                              'x0', 'y0', 'z0', 'u0', 'v0','w0',
-                             'rho0']
+                             'rho0', 'p', 'cs']
         else:
             self.lb_props = lb_props
 

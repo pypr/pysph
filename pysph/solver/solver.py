@@ -136,7 +136,8 @@ class Solver(object):
         self.integrator = integrator = self.integrator_type(evaluator=self.sph_eval, 
                                                             particles=particles)
         # set the parallel manager for the integrator
-        integrator.set_parallel_manager(self.pm)        
+        integrator.set_parallel_manager(self.pm)
+        integrator.set_solver(self)
 
     def add_print_properties(self, props):
         """ Add a list of properties to print """
@@ -263,7 +264,7 @@ class Solver(object):
             logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
                                                            self.rank))
             # perform the integration and update the time.
-            self.integrator.integrate(dt)
+            self.integrator.integrate(dt, self.count)
 
             # update the time for all arrays
             self.update_particle_time()
@@ -337,8 +338,8 @@ class Solver(object):
                               fname  + str(self.count) +'.npz')
 
         # save the cell partitions
-        if self.in_parallel:
-            self.pm.save_partition(self.output_directory, self.count)
+        #if self.in_parallel:
+        #    self.pm.save_partition(self.output_directory, self.count)
 
         if self.detailed_output:
             for array in self.particles:

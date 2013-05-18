@@ -13,6 +13,7 @@ cdef class Integrator:
     cdef public object pm
     cdef public list particles
     cdef public object evaluator
+    cdef public object solver
     cdef public NNPS nnps
 
     # particle properties used for time stepping
@@ -27,7 +28,7 @@ cdef class Integrator:
     ############################################################
     # Member functions
     ############################################################
-    cpdef integrate(self, double dt)
+    cpdef integrate(self, double dt, int count)
 
     # set the values at the start of a time step
     cdef _set_initial_values(self)

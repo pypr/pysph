@@ -12,7 +12,10 @@ cdef class Integrator:
     def set_parallel_manager(self, object pm):
         self.pm = pm
 
-    cpdef integrate(self, double dt):
+    def set_solver(self, object solver):
+        self.solver = solver
+
+    cpdef integrate(self, double dt, int count):
         raise RuntimeError("Integrator::integrate called!")
 
     @cython.boundscheck(False)
@@ -82,7 +85,7 @@ cdef class Integrator:
                 arho.data[i] = 0.0
 
 cdef class WCSPHRK2Integrator(Integrator):
-    cpdef integrate(self, double dt):
+    cpdef integrate(self, double dt, int count):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
@@ -144,7 +147,7 @@ cdef class WCSPHRK2Integrator(Integrator):
         # Update NNPS since particles have moved
         if pm: pm.update()
         nnps.update()
-                
+
         # compute accelerations
         self._reset_accelerations()
         evaluator.compute()
@@ -184,7 +187,7 @@ cdef class WCSPHRK2Integrator(Integrator):
                 rho.data[i] = rho0.data[i] + dt * arho.data[i]
 
 cdef class EulerIntegrator(Integrator):
-    cpdef integrate(self, double dt):
+    cpdef integrate(self, double dt, int count):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
