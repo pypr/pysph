@@ -152,19 +152,19 @@ class DamBreak2DGeometry(object):
 
             particles = [fluid, boundary]
 
-            if self.with_obstacle:
-                 particles.append(get_particle_array_wcsph(name="obstacle"))
         else:
-        
+
+            nfluid = self.nfluid
             xf, yf = self.get_fluid(nfluid_offset)
             fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
-            nfluid = self.nfluid
+
+            fluid.gid[:] = range(fluid.get_number_of_particles())
 
             np = nfluid
             
             xb, yb = self.get_wall(nboundary_layers)
             boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
-
+            
             np += boundary.get_number_of_particles()
 
             dx, dy, ro = self.dx, self.dy, self.ro
@@ -185,6 +185,8 @@ class DamBreak2DGeometry(object):
 
             if self.with_obstacle:
                 xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
+                gido = numpy.array( range(xo.size), dtype=numpy.uint32 )
+                
                 obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
 
                 obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
@@ -192,10 +194,16 @@ class DamBreak2DGeometry(object):
                 obstacle.rho[:] = ro
                 obstacle.rho0[:] = ro
 
-                particles.append( obstacle )
+                # add the obstacle to the boundary particles
+                boundary.append_parray( obstacle )
 
                 np += obstacle.get_number_of_particles()
 
-            print "2D dam break with %d number of particles"%(np), fluid.get_number_of_particles(), boundary.get_number_of_particles()
+            # set the gid for the boundary particles
+            boundary.gid[:] = range( boundary.get_number_of_particles() )
+
+            print "2D dam break with %d fluid, %d boundary particles"%(
+                fluid.get_number_of_particles(),
+                boundary.get_number_of_particles())
 
         return particles
