@@ -69,9 +69,17 @@ cdef void get_obj_list(void* data, int sizeGID, int sizeLID,
     cdef int numMyPoints = _data.numMyPoints
     cdef int i
 
+    # check object weight dimensions
+    if wgt_dim > 1:
+        raise ValueError("Object weight %d not supported"%wgt_dim)
+
     for i in range (numMyPoints):
         globalID[i] = _data.myGlobalIDs[i]
         localID[i] = <ZOLTAN_ID_TYPE>i
+
+        # set the object weights
+        if _data.with_weights:
+            obj_wts[i] = <float>_data.obj_wts[i]
 
 cdef int get_num_geom(void* data, int* ierr):
     """Return the dimensionality of the problem."""
@@ -109,7 +117,9 @@ cdef void get_geometry_list(void* data, int sizeGID, int sizeLID, int num_obj,
 # The actual Zoltan Wrapper
 #########################################################################
 cdef class PyZoltan:
-    def __init__(self, object comm):
+    def __init__(self, object comm, str obj_weight_dim="0",
+                 str edge_weight_dim="0", debug_level="0",
+                 str return_lists="ALL"):
         """Initialize the Zoltan wrapper."""
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -125,6 +135,10 @@ cdef class PyZoltan:
         self._setup_zoltan_arrays()
 
         # set default values
+        self.edge_weight_dim = edge_weight_dim
+        self.obj_weight_dim = obj_weight_dim
+        self.return_lists = return_lists
+        self.debug_level = debug_level
         self._set_default()
 
     #######################################################################
@@ -183,7 +197,6 @@ cdef class PyZoltan:
         self.lb_method = value
         
         self.Zoltan_Set_Param(name, value)
-        self.ZOLTAN_LB_METHOD = value
 
     def Zoltan_Destroy(self):
         """Destroy the Zoltan struct"""
@@ -419,18 +432,17 @@ cdef class PyZoltan:
         self.procs = np.ones(shape=self.size, dtype=np.int32)
         self.parts = np.ones(shape=self.size, dtype=np.int32)
 
+        # object weight arrays
+        self.weights = DoubleArray()
+
     def _set_default(self):
-        self.ZOLTAN_DEBUG_LEVEL = "1"
-        self.Zoltan_Set_Param("DEBUG_LEVEL", "0")
+        self.Zoltan_Set_Param("DEBUG_LEVEL", self.debug_level)
+
+        self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", self.obj_weight_dim)
+
+        self.Zoltan_Set_Param("EDGE_WEIGHT_DIM", self.edge_weight_dim)
         
-        self.ZOLTAN_OBJ_WEIGHT_DIM = "0"
-        self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", "0")
-        
-        self.ZOLTAN_EDGE_WEIGHT_DIM = "0"
-        self.Zoltan_Set_Param("EDGE_WEIGHT_DIM", "0")
-        
-        self.ZOLTAN_RETURN_LISTS = "ALL"
-        self.Zoltan_Set_Param("RETURN_LISTS", "ALL")
+        self.Zoltan_Set_Param("RETURN_LISTS", self.return_lists)
 
     def _set_data(self):
         raise NotImplementedError("PyZoltan::_set_data should not be called!")
@@ -447,7 +459,12 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
     """
     def __init__(self, int dim, object comm, DoubleArray x, DoubleArray y,
-                 DoubleArray z, UIntArray gid):
+                 DoubleArray z, UIntArray gid,
+                 str obj_weight_dim="0",
+                 str return_lists="ALL",
+                 str lb_method="RCB",
+                 str keep_cuts="1"
+                 ):
         """Constructor
 
         Parameters:
@@ -464,16 +481,38 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         gid : UIntArray
             Global indices for the objects to be partitioned
+
+        obj_weight_dim : str
+            Optional weights for the objects (this should be 1 at most)
+
+        return_lists : str
+            Specify lists requested from Zoltan (Import/Export)
+
+        lb_method : str
+            String specifying the load balancing method to use
+
+        keep_cuts : str
+            Parameter used for adding items to a decomposition
+            
         """
-        super(ZoltanGeometricPartitioner, self).__init__(comm)
+        # values needed for defaults
+        self.lb_method = lb_method
+        self.keep_cuts = keep_cuts
+
+        super(ZoltanGeometricPartitioner, self).__init__(
+            comm, obj_weight_dim=obj_weight_dim, return_lists=return_lists)
+
+        # set the problem dimensionality
         self.dim = dim
 
-        self.x = x
-        self.y = y
-        self.z = z
-        self.gid = gid
+        # set the data arrays
+        self.x = x; self.y = y; self.z = z; self.gid = gid
 
-        self.num_local_objects = x.length
+        # initiali number of local objects
+        self.num_local_objects = num_local_objects = x.length
+
+        # object weights. If obj_weight_dim == "0" this array should be 0
+        self.weights.resize( num_local_objects )
 
         # register the query functions with Zoltan
         self._Zoltan_register_query_functions()
@@ -557,12 +596,21 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         self._cdata.y = self.y.data
         self._cdata.z = self.z.data
 
+        cdef int i
+        cdef DoubleArray weights = self.weights
+
+        # object weights.
+        if self.obj_weight_dim == "0":
+            self._cdata.with_weights=False
+        else:
+            self._cdata.with_weights=True
+        
+        self._cdata.obj_wts = weights.data
+
     def _set_default(self):
         """Resonable defaults?"""
         PyZoltan._set_default(self)
 
-        self.ZOLTAN_LB_METHOD = "RCB"
-        #self.Zoltan_Set_Param("LB_METHOD", "RCB")
+        self.Zoltan_Set_Param("LB_METHOD", self.lb_method)
 
-        self.ZOLTAN_KEEP_CUTS = "1"
-        self.Zoltan_Set_Param("KEEP_CUTS", "1")
+        self.Zoltan_Set_Param("KEEP_CUTS", self.keep_cuts)

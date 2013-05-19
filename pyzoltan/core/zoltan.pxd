@@ -24,7 +24,7 @@ cdef struct _Zoltan_Struct:
     czoltan.Zoltan_Struct* zz
 
 cdef class PyZoltan:
-    # dimension
+    # problem dimensionsionality
     cdef public int dim
 
     # version number
@@ -55,11 +55,14 @@ cdef class PyZoltan:
     cdef public np.ndarray procs             # processors of range size
     cdef public np.ndarray parts             # partitions of range size
 
+    # data array for the object weights
+    cdef public DoubleArray weights    
+
     # General Zoltan parameters (refer the user guide)
-    cdef public str ZOLTAN_DEBUG_LEVEL
-    cdef public str ZOLTAN_OBJ_WEIGHT_DIM
-    cdef public str ZOLTAN_EDGE_WEIGHT_DIM
-    cdef public str ZOLTAN_RETURN_LISTS
+    cdef public str debug_level
+    cdef public str obj_weight_dim
+    cdef public str edge_weight_dim
+    cdef public str return_lists
 
     ###############################################################
     # Member functions
@@ -83,11 +86,19 @@ cdef class PyZoltan:
 
 # User defined data for the RCB, RIB and HSFC methods
 cdef struct CoordinateData:
+    # using object weights
+    bint with_weights
+    
+    # dimensionality of the problem
     int dim
+
+    # number of local/global points
     int numGlobalPoints
     int numMyPoints
 
+    # pointers to the object data
     ZOLTAN_ID_PTR myGlobalIDs
+    double* obj_wts
     double* x
     double* y
     double *z
@@ -106,6 +117,5 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
     cdef public int num_global_objects, num_local_objects
 
     # ZOLTAN parameters for Geometric partitioners
-    cdef public str ZOLTAN_KEEP_CUTS
-    cdef public str ZOLTAN_LB_METHOD
+    cdef public str keep_cuts
     
