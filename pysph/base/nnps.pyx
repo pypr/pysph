@@ -257,6 +257,9 @@ cdef class Cell:
         # list of neighboring processors
         self.nbrprocs = IntArray(0)
 
+        # current size of the cell
+        self.size = 0
+
     cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices):
         """Set the global and local indices for the cell"""
         self.lindices[index] = lindices

@@ -174,6 +174,28 @@ class Application(object):
                           help="""Use 'collected' to dump one output at
                           root or 'distributed' for every processor. """)
 
+        # Zoltan Options
+        zoltan = OptionGroup(parser, "PyZoltan",
+                             "Zoltan load balancing options")
+
+        zoltan.add_option("--with_zoltan", action="store_true",
+                          dest="with_zoltan", default=True,
+                          help=("""Use PyZoltan for dynamic load balancing """))
+
+        zoltan.add_option("--zoltan_lb_method", action="store",
+                          dest="zoltan_lb_method", default="RCB",
+                          help=("""Choose the Zoltan load balancnig method"""))
+
+        zoltan.add_option("--zoltan_weights", action="store_false",
+                          dest="zoltan_weights", default=True,
+                          help=("""Switch between using weights for input to Zoltan.
+                          defaults to True"""))
+
+        zoltan.add_option("--zoltan_debug_level", action="store",
+                          dest="zoltan_debug_level", default="0",
+                          help=("""Zoltan debugging level""")) 
+
+        parser.add_option_group( zoltan )
 
         # solver interfaces
         interfaces = OptionGroup(parser, "Interfaces",
@@ -291,18 +313,40 @@ class Application(object):
         # Instantiate the Parallel Manager here and do an initial LB
         self.pm = None
         if num_procs > 1:
-            if not (Has_Zoltan and Has_MPI):
-                raise RuntimeError("Cannot run in parallel!")
+            options = self.options
+
+            if options.with_zoltan:
+                if not (Has_Zoltan and Has_MPI):
+                    raise RuntimeError("Cannot run in parallel!")
+
+            else:
+                raise ValueError("""Sorry. You're stuck with Zoltan for now
+                
+                use the option '--with_zoltan' for parallel runs
+                
+                """)
 
             # create the parallel manager
+            obj_weight_dim = "0"
+            if options.zoltan_weights:
+                obj_weight_dim = "1"
+
+            zoltan_lb_method = options.zoltan_lb_method
+            zoltan_debug_level = options.zoltan_debug_level
+            zoltan_obj_wgt_dim = obj_weight_dim
+
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles, comm=comm,
-                lb_props=None)
+                lb_props=None,
+                lb_method=zoltan_lb_method,
+                obj_weight_dim=obj_weight_dim,
+                )
+
+            # set zoltan options
+            pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
+            pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
 
             # do an initial load balance
-            pm.pz.set_lb_method("RIB")
-            pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", "0")
-            pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
             pm.update()
 
             # wait till the initial partition is done

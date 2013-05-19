@@ -771,6 +771,10 @@ cdef class ParallelManager:
             lindices.append( i )
             gindices.append( gid.data[i] )
 
+            # increment the size of the cells to reflect the added
+            # particle. The size will be used to set the weights.
+            cell.size += 1
+
         # update the total number of cells
         self.ncells_total = self.ncells_total + ncells_total
 
@@ -1302,7 +1306,11 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None, str lb_method='RCB'):
+                 lb_props=None,
+                 str lb_method='RCB',
+                 str keep_cuts="1",
+                 str obj_weight_dim="1",
+                 ):
 
         # initialize the base class
         super(ZoltanParallelManagerGeometric, self).__init__(
@@ -1311,11 +1319,11 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
         # concrete implementation of a PyZoltan class
         self.pz = ZoltanGeometricPartitioner(
-            dim, self.comm, self.cx, self.cy, self.cz, self.cell_gid)
+            dim, self.comm, self.cx, self.cy, self.cz, self.cell_gid,
+            obj_weight_dim=obj_weight_dim,
+            keep_cuts=keep_cuts,
+            lb_method=lb_method)
 
-        # sett the initial load balancing method
-        self.pz.set_lb_method(lb_method)
-                                                
     def set_data(self):
         """Set the user defined particle data structure for Zoltan.
 
@@ -1329,24 +1337,34 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
         cdef list cell_list = self.cell_list
 
         cdef int num_local_objects = pz.num_local_objects
+        cdef double num_global_objects1 = 1.0/pz.num_global_objects
+        cdef double weight
 
         cdef DoubleArray x = self.cx
         cdef DoubleArray y = self.cy
         cdef DoubleArray z = self.cz
 
+        # the weights array for PyZoltan
+        cdef DoubleArray weights = pz.weights
+
         cdef int i
         cdef Cell cell
         cdef cPoint centroid
 
-        # resize the coordinate arrays
+        # resize the coordinate and PyZoltan weight arrays
         x.resize( num_local_objects )
         y.resize( num_local_objects )
         z.resize( num_local_objects )
+
+        weights.resize( num_local_objects )
 
         # populate the arrays
         for i in range( num_local_objects ):
             cell = cell_list[ i ]
             centroid = cell.centroid
+
+            # weights are defined as cell.size/num_total 
+            weights.data[i] = num_global_objects1 * cell.size
 
             x.data[i] = centroid.x
             y.data[i] = centroid.y
