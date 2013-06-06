@@ -1,6 +1,12 @@
 # System library imports.
 import ast
-from collections import OrderedDict, defaultdict
+
+from collections import defaultdict
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 from copy import deepcopy
 import itertools
 import numpy
@@ -8,7 +14,6 @@ from textwrap import dedent
 
 # Local imports.
 from ast_utils import get_symbols
-
 
 ##############################################################################
 # `Context` class.
@@ -549,7 +554,8 @@ class TaitEOS(Equation):
 
 class MomentumEquation(Equation):
     def __init__(self, dest, sources,
-                 alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0):
+                 alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
+                 c0=1.0):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
@@ -570,10 +576,16 @@ class MomentumEquation(Equation):
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(RIJ*RIJ + eta*eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij)/(R2IJ + eta*eta*HIJ*HIJ)
 
             piij = -alpha*cij*muij + beta*muij*muij
             piij = piij*RHOIJ1
+
+        # compute the CFL time step factor
+        _dt_fac = 0.0
+        if R2IJ > 1e-12:
+            _dt_fac = fabs( HIJ * vijdotxij/R2IJ )
+            dt_fac = max(_dt_fac, dt_fac)
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
@@ -591,6 +603,7 @@ class MomentumEquation(Equation):
         d_au[d_idx] +=  gx
         d_av[d_idx] +=  gy
         d_aw[d_idx] +=  gz
+
         """)
         self.post_loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, 
                                    gz=self.gz)
