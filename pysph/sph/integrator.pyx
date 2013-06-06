@@ -9,11 +9,17 @@ cdef class Integrator:
         self.particles = particles
         self.nnps = evaluator.nnps
 
+        # default cfl number
+        self.cfl = 0.5
+
     def set_parallel_manager(self, object pm):
         self.pm = pm
 
     def set_solver(self, object solver):
         self.solver = solver
+
+    def set_cfl_number(self, double cfl):
+        self.cfl = cfl
 
     cpdef integrate(self, double dt, int count):
         raise RuntimeError("Integrator::integrate called!")
@@ -83,6 +89,9 @@ cdef class Integrator:
                 aw.data[i] = 0.0
                 
                 arho.data[i] = 0.0
+
+    def compute_time_step(self, double dt):
+        raise RuntimeError("Integrator::compute_time_step called!")
 
 cdef class WCSPHRK2Integrator(Integrator):
     cpdef integrate(self, double dt, int count):
@@ -186,6 +195,30 @@ cdef class WCSPHRK2Integrator(Integrator):
                 # Update densities and smoothing lengths from the accelerations
                 rho.data[i] = rho0.data[i] + dt * arho.data[i]
 
+    def compute_time_step(self, double dt, double c0):
+        """Compute a stable time step"""
+        cdef double cfl = self.cfl
+        cdef double dt_cfl = self.evaluator.dt_cfl
+        cdef DoubleArray h
+        cdef double hmin = 1.0
+
+        # if the dt_cfl is not defined, return default dt
+        if dt_cfl < 0:
+            return dt
+
+        # iterate over particles and find the stable time step
+        for pa in self.particles:
+            pa_wrapper = getattr(self.evaluator.calc, pa.name)
+
+            h = pa_wrapper.h
+            h.update_min_max()
+
+            if h.minimum < hmin:
+                hmin = h.minimum
+
+        # return the courant limited time step
+        return cfl * hmin/dt_cfl
+
 cdef class EulerIntegrator(Integrator):
     cpdef integrate(self, double dt, int count):
         """Main step routine"""
@@ -251,4 +284,7 @@ cdef class EulerIntegrator(Integrator):
                 z.data[i] = z0.data[i] + dt * az.data[i]
 
                 # Update densities and smoothing lengths from the accelerations
-                rho.data[i] = rho0.data[i] + dt * arho.data[i]        
+                rho.data[i] = rho0.data[i] + dt * arho.data[i]
+
+    def compute_time_step(self, double dt):
+        return dt

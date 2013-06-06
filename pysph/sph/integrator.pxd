@@ -10,6 +10,8 @@ cdef class Integrator:
     ############################################################
     # Data attributes
     ############################################################
+    cdef double cfl             # cfl for stable time steps
+    
     cdef public object pm
     cdef public list particles
     cdef public object evaluator
