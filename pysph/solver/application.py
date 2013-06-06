@@ -178,20 +178,20 @@ class Application(object):
         zoltan = OptionGroup(parser, "PyZoltan",
                              "Zoltan load balancing options")
 
-        zoltan.add_option("--with_zoltan", action="store_true",
+        zoltan.add_option("--with-zoltan", action="store_true",
                           dest="with_zoltan", default=True,
                           help=("""Use PyZoltan for dynamic load balancing """))
 
-        zoltan.add_option("--zoltan_lb_method", action="store",
+        zoltan.add_option("--zoltan-lb-method", action="store",
                           dest="zoltan_lb_method", default="RCB",
                           help=("""Choose the Zoltan load balancnig method"""))
 
-        zoltan.add_option("--zoltan_weights", action="store_false",
+        zoltan.add_option("--zoltan-weights", action="store_false",
                           dest="zoltan_weights", default=True,
                           help=("""Switch between using weights for input to Zoltan.
                           defaults to True"""))
 
-        zoltan.add_option("--zoltan_debug_level", action="store",
+        zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
                           help=("""Zoltan debugging level""")) 
 
