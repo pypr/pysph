@@ -148,12 +148,18 @@ gid = UIntArray(numMyPoints); gid.set_data(_gid)
 
 pz = zoltan.ZoltanGeometricPartitioner(dim=2, comm=comm, x=x, y=y, z=z, gid=gid)
 
+# set the weights to 0 by default
+weights = pz.weights.get_npy_array()
+weights[:] = 0
+
 pz.set_lb_method("RCB")
 pz.Zoltan_Set_Param("DEBUG_LEVEL","0")
 pz.Zoltan_LB_Balance()
 
 if rank == 0:
     print "\nMesh partition before Zoltan\n"
+
+comm.barrier()
 
 show_mesh(rank, numMyPoints, myGlobalIds, parts)
 

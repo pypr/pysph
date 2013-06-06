@@ -86,9 +86,9 @@ cdef class PyZoltan:
 
 # User defined data for the RCB, RIB and HSFC methods
 cdef struct CoordinateData:
-    # using object weights
-    bint with_weights
-    
+    # flag for using weights
+    bint use_weights
+
     # dimensionality of the problem
     int dim
 

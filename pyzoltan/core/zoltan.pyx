@@ -78,7 +78,7 @@ cdef void get_obj_list(void* data, int sizeGID, int sizeLID,
         localID[i] = <ZOLTAN_ID_TYPE>i
 
         # set the object weights
-        if _data.with_weights:
+        if _data.use_weights:
             obj_wts[i] = <float>_data.obj_wts[i]
 
 cdef int get_num_geom(void* data, int* ierr):
@@ -599,13 +599,12 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         cdef int i
         cdef DoubleArray weights = self.weights
 
-        # object weights.
-        if self.obj_weight_dim == "0":
-            self._cdata.with_weights=False
-        else:
-            self._cdata.with_weights=True
-        
+        # set the weights
         self._cdata.obj_wts = weights.data
+
+        self._cdata.use_weights = True
+        if self.obj_weight_dim == "0":
+            self._cdata.use_weights = False
 
     def _set_default(self):
         """Resonable defaults?"""
