@@ -81,7 +81,9 @@ parallel_modules = [
                sources=["pysph/parallel/parallel_manager.pyx"],
                include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
                library_dirs = zoltan_library_dirs,
-               libraries = ['zoltan', 'mpi'] ),
+               libraries = ['zoltan', 'mpi'],
+               extra_link_args=mpi_link_args,
+               extra_compile_args=mpi_compile_args),
 
     Extension( name="pysph.parallel._kernels",
                sources=["pysph/parallel/_kernels.pyx"]
