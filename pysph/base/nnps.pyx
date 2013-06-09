@@ -73,7 +73,7 @@ cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size):
     """
     cdef cIntPoint p = cIntPoint(real_to_int(pnt.x, cell_size),
                                  real_to_int(pnt.y, cell_size),
-                                 0)
+                                 real_to_int(pnt.z, cell_size))
     return p
 
 cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
@@ -323,8 +323,8 @@ cdef class Cell:
         boxmin.y = centroid.y - (layers+0.5) * cell_size
         boxmax.y = centroid.y + (layers+0.5) * cell_size
 
-        boxmin.z = 0.
-        boxmax.z = 0.
+        boxmin.z = centroid.z - (layers + 0.5) * cell_size
+        boxmax.z = centroid.z + (layers + 0.5) * cell_size
 
         self.boxmin = boxmin
         self.boxmax = boxmax
@@ -425,6 +425,7 @@ cdef class NNPS:
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[ pa_index ]
         cdef DoubleArray x = pa_wrapper.x
         cdef DoubleArray y = pa_wrapper.y
+        cdef DoubleArray z = pa_wrapper.z
 
         cdef dict cells = self.cells
         cdef double cell_size = self.cell_size
@@ -443,7 +444,7 @@ cdef class NNPS:
         for indexi in range(num_particles):
             i = indices.data[indexi]
 
-            pnt = cPoint_new( x.data[i], y.data[i], 0.0 )
+            pnt = cPoint_new( x.data[i], y.data[i], z.data[i] )
             _cid = find_cell_id( pnt, cell_size )
 
             cid = IntPoint_from_cIntPoint(_cid)
@@ -555,32 +556,33 @@ cdef class NNPS:
 
         cdef int ierr, nnbrs = 0
 
-        cdef int ix, iy
+        cdef int ix, iy, iz
         for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
             for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
-                cellid.data.x = ix; cellid.data.y = iy
+                for iz in [cid.data.z - 1, cid.data.z, cid.data.z + 1]:
+                    cellid.data.x = ix; cellid.data.y = iy; cellid.data.z = iz
 
-                ierr = PyDict_Contains( cells, cellid )
-                if ierr == 1:
+                    ierr = PyDict_Contains( cells, cellid )
+                    if ierr == 1:
 
-                    cell = <Cell>PyDict_GetItem( cells, cellid )
-                    lindices = <UIntArray>PyList_GetItem( cell.lindices, src_index )
+                        cell = <Cell>PyDict_GetItem( cells, cellid )
+                        lindices = <UIntArray>PyList_GetItem( cell.lindices, src_index )
 
-                    for indexj in range( lindices.length ):
-                        j = lindices.data[indexj]
+                        for indexj in range( lindices.length ):
+                            j = lindices.data[indexj]
 
-                        xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-                        xij = cPoint_distance( xi, xj )
+                            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
+                            xij = cPoint_distance( xi, xj )
 
-                        hj = radius_scale * s_h.data[j]
+                            hj = radius_scale * s_h.data[j]
 
-                        if ( (xij < hi) or (xij < hj) ):
-                            if nnbrs == nbrs.length:
-                                nbrs.resize( nbrs.length + 50 )
-                                print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+                            if ( (xij < hi) or (xij < hj) ):
+                                if nnbrs == nbrs.length:
+                                    nbrs.resize( nbrs.length + 50 )
+                                    print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
-                            nbrs.data[ nnbrs ] = j
-                            nnbrs = nnbrs + 1
+                                nbrs.data[ nnbrs ] = j
+                                nnbrs = nnbrs + 1
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs

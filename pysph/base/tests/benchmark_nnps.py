@@ -29,7 +29,7 @@ for numPoints in _numPoints:
     
     # Create the NNPS object
     pa = get_particle_array(x=xa, y=ya, h=ha, gid=gida)
-    nps = NNPS(dim=2, particles=[pa,], radius_scale=2.0)
+    nps = NNPS(dim=3, particles=[pa,], radius_scale=2.0)
 
     # calculate the time to get neighbors
     t1 = time()

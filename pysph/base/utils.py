@@ -74,6 +74,11 @@ def get_particle_array(cl_precision="double", **props):
             if not isinstance(props[prop], numpy.ndarray):
                 constants[prop] = props[prop]
                 continue
+
+            if prop in ['gid']:
+                prop_dict[prop] = {'data':data.astype(numpy.uint32),
+                                   'type': 'unsigned int',
+                                   'name':prop}
             
             else:
                 data = numpy.asarray(props[prop])
