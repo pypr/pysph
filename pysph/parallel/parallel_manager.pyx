@@ -16,7 +16,7 @@ from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core import zoltan_utils
 
 # PySPH imports
-from pysph.base.nnps cimport DomainLimits, Cell, find_cell_id
+from pysph.base.nnps cimport DomainLimits, Cell, find_cell_id, arange_uint
 from pysph.solver.utils import savez
 
 # local imports
@@ -35,24 +35,6 @@ cdef extern from 'math.h':
 cdef extern from 'limits.h':
     cdef int INT_MAX
     cdef unsigned int UINT_MAX
-
-cpdef UIntArray arange_uint(int start, int stop=-1):
-    """Utility function to return a numpy.arange for a UIntArray"""
-    cdef int size
-    cdef UIntArray arange
-    cdef int i = 0
-
-    if stop == -1:
-        arange = UIntArray(start)
-        for i in range(start):
-            arange.data[i] = <unsigned int>i
-    else:
-        size = stop-start
-        arange = UIntArray(size)
-        for i in range(size):
-            arange.data[i] = <unsigned int>(start + i)
-
-    return arange
 
 cdef class ParticleArrayWrapper:
     def __init__(self, ParticleArray pa):
@@ -993,11 +975,13 @@ cdef class ParallelManager:
         # Source data arrays
         cdef DoubleArray s_x = src.x
         cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_z = src.z
         cdef DoubleArray s_h = src.h
 
         # Destination particle arrays
         cdef DoubleArray d_x = dst.x
         cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_z = dst.z
         cdef DoubleArray d_h = dst.h
 
         cdef double radius_scale = self.radius_scale
@@ -1006,7 +990,7 @@ cdef class ParallelManager:
         cdef size_t indexj
         cdef ZOLTAN_ID_TYPE j
 
-        cdef cPoint xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx], 0.0)
+        cdef cPoint xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx])
         cdef cIntPoint _cid = find_cell_id( xi, cell_size )
         cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
         cdef IntPoint cellid = IntPoint(0, 0, 0)
@@ -1019,29 +1003,31 @@ cdef class ParallelManager:
 
         cdef int nnbrs = 0
 
-        cdef int ix, iy
+        cdef int ix, iy, iz
         for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
             for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
-                cellid.data.x = ix; cellid.data.y = iy
+                for iz in [cid.data.z -1, cid.data.z, cid.data.z + 1]:
+                    cellid.data.x = ix; cellid.data.y = iy
+                    cellid.data.z = iz
 
-                if cell_map.has_key( cellid ):
-                    cell = cell_map[ cellid ]
-                    lindices = cell.lindices[src_index]
-                    for indexj in range( lindices.length ):
-                        j = lindices.data[indexj]
+                    if cell_map.has_key( cellid ):
+                        cell = cell_map[ cellid ]
+                        lindices = cell.lindices[src_index]
+                        for indexj in range( lindices.length ):
+                            j = lindices.data[indexj]
 
-                        xj = cPoint_new( s_x.data[j], s_y.data[j], 0.0 )
-                        xij = cPoint_distance( xi, xj )
+                            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
+                            xij = cPoint_distance( xi, xj )
 
-                        hj = radius_scale * s_h.data[j]
+                            hj = radius_scale * s_h.data[j]
 
-                        if ( (xij < hi) or (xij < hj) ):
-                            if nnbrs == nbrs.length:
-                                nbrs.resize( nbrs.length + 50 )
-                                print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
+                            if ( (xij < hi) or (xij < hj) ):
+                                if nnbrs == nbrs.length:
+                                    nbrs.resize( nbrs.length + 50 )
+                                    print """Neighbor search :: Extending the neighbor list to %d"""%(nbrs.length)
 
-                            nbrs.data[ nnbrs ] = j
-                            nnbrs = nnbrs + 1
+                                nbrs.data[ nnbrs ] = j
+                                nnbrs = nnbrs + 1
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs

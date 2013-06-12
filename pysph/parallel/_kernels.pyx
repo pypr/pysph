@@ -100,7 +100,7 @@ cdef class CubicSpline(Kernel):
         elif dim == 2:
             self.fac = 10*PIb1/7.0
         else:
-            raise ValueError("Only 2D for now")
+            self.fac = PIb1
         
         self.radius = 2.0
 
