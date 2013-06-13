@@ -75,4 +75,65 @@ class CubicSpline(object):
         '''.replace("DIM", str(self.dim)))
         return dict(helper=code)
 
+class WendlendQuintic(object):
+    def __init__(self, dim=2):
+        if dim == 1:
+            raise ValueError("Dim %d not supported"%dim)
+        self.dim = dim
+    def cython_code(self):
+        code = dedent('''\
+        from libc.math cimport fabs, sqrt, M_1_PI
+            
+        cdef inline double CubicSplineKernel(double xij, double yij, double zij, double h):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0
+            cdef double fac
+
+            if DIM == 3:
+                fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
+
+            elif DIM == 2:
+                fac = 7.0*M_1_PI/4.0 * h1 * h1
+
+            if ( q >= 2.0 ):
+                val = 0.0
+
+            else:
+                val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2q + 1)
+
+            return val * fac
+
+
+        cdef inline CubicSplineGradient(double xij, double yij, double zij, double h,
+                                        double* grad):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0, fac, tmp
+
+            if DIM == 3:
+                fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
+
+            elif DIM == 2:
+                fac = 7.0*M_1_PI/4.0 * h1 * h1
+
+            # compute the gradient
+            if (rij > 1e-12):
+                if (q >= 2.0):
+                    val = 0.0
+                else:
+                    val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
+
+            tmp = val * fac
+            grad[0] = tmp * xij
+            grad[1] = tmp * yij
+            grad[2] = tmp * zij
+            
+        '''.replace("DIM", str(self.dim)))
+        return dict(helper=code)
+
 
