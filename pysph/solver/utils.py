@@ -406,3 +406,65 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
         ret = arrays_by_rank[0]
 
     return ret
+
+# SPH interpolation of data
+from pyzoltan.core.carray import UIntArray
+from pysph.parallel._kernels import Gaussian
+from pysph.base.nnps import NNPS
+from pysph.base.point import Point
+class SPHInterpolate(object):
+    """Class to perform SPH interpolation
+
+    Given solution data on possibly a scattered set, SPHInterpolate
+    can be used to interpolate solution data on a regular grid.
+
+    """
+    def __init__(self, dim, dst, src, kernel=None):
+        self.dst = dst; self.src = src
+        if kernel is None:
+            self.kernel = Gaussian(dim)
+        
+        # create the neighbor locator object
+        self.nnps = nnps = NNPS(dim=dim, particles=[dst, src], radius_scale=self.kernel.radius)
+        nnps.update()
+        
+    def interpolate(self, arr):
+        """Interpolate data given in arr onto coordinate positions"""
+        # the result array
+        np = self.dst.get_number_of_particles()
+        result = numpy.zeros(np)
+
+        nbrs = UIntArray()
+
+        # source arrays
+        src = self.src
+        sx, sy, sz, sh = src.x, src.y, src.z, src.h
+
+        # dest arrays
+        dst = self.dst
+        dx, dy, dz, dh = dst.x, dst.y, dst.z, dst.h
+
+        # kernel
+        kernel = self.kernel
+
+        for i in range(np):
+            xi = Point( dx[i], dy[i], dz[i] )
+
+            self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
+            nnbrs = nbrs._length
+
+            _wij = 0.0; _sum = 0.0
+            for indexj in range(nnbrs):
+                j  = nbrs[indexj]
+                xj = Point( sx[j], sy[j], sz[j] )
+
+                hij = 0.5 * (sh[j] + dh[i])
+                
+                wij = kernel.py_function(xi, xj, hij)
+                _wij += wij
+                _sum += arr[j] * wij
+
+            # save the result
+            result[i] = _sum/_wij
+            
+        return result
