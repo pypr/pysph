@@ -5,6 +5,7 @@ from textwrap import dedent
 ###############################################################################
 class CubicSpline(object):
     def __init__(self, dim=1):
+        self.radius_scale = 2.0
         self.dim = dim
     def cython_code(self):
         code = dedent('''\
@@ -75,8 +76,9 @@ class CubicSpline(object):
         '''.replace("DIM", str(self.dim)))
         return dict(helper=code)
 
-class WendlendQuintic(object):
+class WendlandQuintic(object):
     def __init__(self, dim=2):
+        self.radius_scale = 2.0
         if dim == 1:
             raise ValueError("Dim %d not supported"%dim)
         self.dim = dim
@@ -84,7 +86,7 @@ class WendlendQuintic(object):
         code = dedent('''\
         from libc.math cimport fabs, sqrt, M_1_PI
             
-        cdef inline double CubicSplineKernel(double xij, double yij, double zij, double h):
+        cdef inline double WendlandQuinticKernel(double xij, double yij, double zij, double h):
             cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
             cdef double h1 = 1./h
@@ -102,12 +104,12 @@ class WendlendQuintic(object):
                 val = 0.0
 
             else:
-                val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2q + 1)
+                val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2*q + 1)
 
             return val * fac
 
 
-        cdef inline CubicSplineGradient(double xij, double yij, double zij, double h,
+        cdef inline WendlandQuinticGradient(double xij, double yij, double zij, double h,
                                         double* grad):
             cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
@@ -127,6 +129,57 @@ class WendlendQuintic(object):
                     val = 0.0
                 else:
                     val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
+
+            tmp = val * fac
+            grad[0] = tmp * xij
+            grad[1] = tmp * yij
+            grad[2] = tmp * zij
+            
+        '''.replace("DIM", str(self.dim)))
+        return dict(helper=code)
+
+class Gaussian(object):
+    def __init__(self, dim=2):
+        self.radius_scale = 3.0
+        self.dim = dim
+    def cython_code(self):
+        code = dedent('''\
+        from libc.math cimport fabs, sqrt, exp, M_2_SQRTPI
+            
+        cdef inline double GaussianKernel(double xij, double yij, double zij, double h):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0
+            cdef double fac
+
+            fac = (0.5 * M_2_SQRTPI * h1)**DIM
+
+            if ( q >= 3.0 ):
+                val = 0.0
+
+            else:
+                val = exp(-q*q)
+
+            return val * fac
+
+        cdef inline GaussianGradient(double xij, double yij, double zij, double h,
+                                        double* grad):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0, fac, tmp
+
+            fac = (0.5 * M_2_SQRTPI * h1)**DIM
+
+            # compute the gradient
+            if (rij > 1e-12):
+                if (q >= 3.0):
+                    val = 0.0
+                else:
+                    val = -2 * q * exp(-q*q) * h1/rij
 
             tmp = val * fac
             grad[0] = tmp * xij

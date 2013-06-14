@@ -419,8 +419,9 @@ class Application(object):
         self._solver.setup_solver(options.__dict__)
 
         if nnps is None:
+            kernel = self._solver.kernel
             nnps = NNPS(dim=solver.dim, particles=self.particles, 
-                        radius_scale=2.0)
+                        radius_scale=kernel.radius_scale)
 
         if self.num_procs > 1:
             nnps.set_in_parallel(True)
