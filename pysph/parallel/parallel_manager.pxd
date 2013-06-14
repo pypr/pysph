@@ -18,8 +18,6 @@ from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTA
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.point cimport *
 
-cpdef UIntArray arange_uint(int start, int stop=*)
-
 # Simple ParticleArray wrapper class to hold particle data. For NNPS,
 # we hold only essential data like x, y, z, h and gid
 cdef class ParticleArrayWrapper:
