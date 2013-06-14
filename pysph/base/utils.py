@@ -56,7 +56,13 @@ def get_particle_array(cl_precision="double", **props):
     nprops = len(props)
 
     prop_dict = {}
-    name = ""
+
+    # handle the name separately
+    if props.has_key('name'):
+        name = props['name']
+        props.pop('name')
+    else:
+        name = "array"
 
     default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
                      'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,'e':0.0,
