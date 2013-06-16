@@ -11,6 +11,8 @@ from point cimport *
 cdef inline int real_to_int(double val, double step)
 cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
+cpdef UIntArray arange_uint(int start, int stop=*)
+
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
     cdef public DoubleArray x,y,z,h
@@ -31,6 +33,7 @@ cdef class DomainLimits:
     cdef public double ztranslate
 
     cdef public int dim
+    cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
 
 # Cell to hold particle indices
@@ -79,6 +82,7 @@ cdef class NNPS:
     cdef public int size                 # MPI size
 
     cdef public DomainLimits domain      # Domain limits for the geometry
+    cdef public bint is_periodic         # flag for periodicity
 
     cdef int dim                         # Dimensionality of the problem 
     cdef public dict cells

@@ -184,7 +184,8 @@ cdef class DomainLimits:
 
     """
     def __init__(self, int dim=1, double xmin=-1000, double xmax=1000, double ymin=0,
-                 double ymax=0, double zmin=0, double zmax=0, is_periodic=False):
+                 double ymax=0, double zmin=0, double zmax=0, 
+                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
         """Constructor"""
         self._check_limits(dim, xmin, xmax, ymin, ymax, zmin, zmax)
         
@@ -193,7 +194,10 @@ cdef class DomainLimits:
         self.zmin = zmin; self.zmax = zmax
 
         # Indicates if the domain is periodic
-        self.is_periodic = is_periodic
+        self.periodic_in_x = periodic_in_x
+        self.periodic_in_y = periodic_in_y
+        self.periodic_in_z = periodic_in_z
+        self.is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
 
         # get the translates in each coordinate direction
         self.xtranslate = xmax - xmin
@@ -373,6 +377,9 @@ cdef class NNPS:
         if domain is None:
             self.domain = DomainLimits(dim)
 
+        # periodicity
+        self.is_periodic = self.domain.is_periodic
+
         # initialize the cells dict
         self.cells = {}
 
@@ -400,6 +407,18 @@ cdef class NNPS:
         # compute the cell size
         self._compute_cell_size()
 
+        # Periodicity is handled by adjusting particles according to a
+        # given cubic domain box
+        if self.is_periodic and not self.in_parallel:
+            # remove periodic ghost particles from a previous step
+            self.remove_periodic_ghosts()
+
+            # adjust current particles for periodicity
+            self.adjust_particles()
+
+            # create new periodic ghosts
+            self.create_periodic_ghosts()
+        
         # indices on which to bin
         for i in range(self.narrays):
             pa = self.particles[i]
@@ -637,3 +656,204 @@ cdef class NNPS:
 
     def set_in_parallel(self, bint in_parallel):
         self.in_parallel = in_parallel
+
+    ####################################################################
+    # Functions for periodicity
+    ####################################################################
+    def remove_periodic_ghosts(self):
+        """Remove all particles with the Ghost """
+        for pa in self.particles:
+            pa.remove_tagged_particles(Ghost)
+
+    def adjust_particles(self):
+        """Adjust particles for periodicity"""
+        cdef DomainLimits domain = self.domain
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
+
+        cdef double xmin = domain.xmin, xmax = domain.xmax
+        cdef double ymin = domain.ymin, ymax = domain.ymax,
+        cdef double zmin = domain.zmin, zmax = domain.zmax
+        cdef double xtranslate = domain.xtranslate
+        cdef double ytranslate = domain.ytranslate
+        cdef double ztranslate = domain.ztranslate
+
+        cdef bint periodic_in_x = domain.periodic_in_x
+        cdef bint periodic_in_y = domain.periodic_in_y
+        cdef bint periodic_in_z = domain.periodic_in_z
+        
+        cdef double xi, yi, zi
+
+        cdef int i, np
+
+        for pa_wrapper in self.pa_wrappers:
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+            
+            np = x.length
+            for i in range(np):
+                
+                if periodic_in_x:
+                    if x.data[i] < xmin : x.data[i] += xtranslate
+                    if x.data[i] > xmax : x.data[i] -= xtranslate
+
+                    if periodic_in_y:
+                        if y.data[i] < ymin : y.data[i] += ytranslate
+                        if y.data[i] > ymax : y.data[i] -= ytranslate
+                        
+                if periodic_in_y:
+                    if y.data[i] < ymin : y.data[i] += ytranslate
+                    if y.data[i] > ymax : y.data[i] -= ytranslate
+        
+    def create_periodic_ghosts(self):
+        """Create new ghost particles"""
+        cdef DomainLimits domain = self.domain
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef DoubleArray x, y, z
+
+        cdef double xmin = domain.xmin, xmax = domain.xmax
+        cdef double ymin = domain.ymin, ymax = domain.ymax,
+        cdef double zmin = domain.zmin, zmax = domain.zmax
+        cdef double xtranslate = domain.xtranslate
+        cdef double ytranslate = domain.ytranslate
+        cdef double ztranslate = domain.ztranslate
+
+        cdef bint periodic_in_x = domain.periodic_in_x
+        cdef bint periodic_in_y = domain.periodic_in_y
+        cdef bint periodic_in_z = domain.periodic_in_z
+
+        cdef double xi, yi, zi
+        cdef double cell_size = self.cell_size
+
+        cdef int i, np, nghost = 0
+
+        # temporary indices for particles to be replicated
+        cdef LongArray left, right, top, bottom, lt, rt, lb, rb
+
+        for pa_wrapper in self.pa_wrappers:
+            pa = pa_wrapper.pa
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+
+            left = LongArray(); right = LongArray()
+            top = LongArray(); bottom = LongArray()
+
+            lt = LongArray(); rt = LongArray()
+            lb = LongArray(); rb = LongArray()
+
+            np = x.length
+            for i in range(np):
+                xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
+                
+                # X-Periodic
+                if periodic_in_x and not periodic_in_y:
+                    if ( (xi - xmin) <= cell_size ): left.append(i)
+                    if ( (xmax - xi) <= cell_size ): right.append(i)
+                    
+                # Y-Periodic
+                if periodic_in_y and not periodic_in_x:
+                    if ( (yi - ymin) <= cell_size ): bottom.append(i)
+                    if ( (ymax - yi) <= cell_size ): top.append(i)
+                        
+                # X&Y-Periodic
+                if periodic_in_x and periodic_in_y:
+                    # particle near the left end
+                    if ( (xi - xmin) <= cell_size ): 
+                        left.append(i)
+
+                        # left bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            lb.append(i)
+
+                        # left top corner
+                        if ( (ymax - yi) < cell_size ):
+                            lt.append( i )
+                        
+                    # particle near the right
+                    if ( (xmax - xi) <= cell_size ): 
+                        right.append(i)
+                    
+                        # right bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            rb.append(i)
+
+                        # right top corner
+                        if ( (ymax - yi) < cell_size ):
+                            rt.append( i )
+                            
+                    # particle near the top
+                    if ( (ymax - yi) < cell_size ):
+                        top.append(i)
+                    
+                    # particle near the bottom
+                    if ( (yi - ymin) < cell_size ):
+                        bottom.append(i)
+                        
+            # now treat each case separately and count the number of ghosts
+
+            # left
+            copy = pa.extract_particles( left )
+            copy.x += xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right
+            copy = pa.extract_particles( right )
+            copy.x -= xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # top
+            copy = pa.extract_particles( top )
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # bottom
+            copy = pa.extract_particles( bottom )
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # left top
+            copy = pa.extract_particles( lt )
+            copy.x += xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # left bottom
+            copy = pa.extract_particles( lb )
+            copy.x += xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right top
+            copy = pa.extract_particles( rt )
+            copy.x -= xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right bottom
+            copy = pa.extract_particles( rb )
+            copy.x -= xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
