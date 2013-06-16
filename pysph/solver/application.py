@@ -33,7 +33,7 @@ class Application(object):
     """ Class used by any SPH application.
     """
 
-    def __init__(self, fname=None):
+    def __init__(self, fname=None, domain=None):
         """ Constructor
 
         Parameters
@@ -41,6 +41,11 @@ class Application(object):
         fname : file name to use.
 
         """
+        self.is_periodic = False
+        self.domain = domain
+        if domain is not None:
+            self.is_periodic = domain.is_periodic
+
         self._solver = None
         self._parallel_manager = None
 
@@ -420,12 +425,16 @@ class Application(object):
 
         if nnps is None:
             kernel = self._solver.kernel
-            nnps = NNPS(dim=solver.dim, particles=self.particles, 
-                        radius_scale=kernel.radius_scale)
 
+            # create the NNPS object
+            nnps = NNPS(dim=solver.dim, particles=self.particles, 
+                        radius_scale=kernel.radius_scale, domain=self.domain)
+
+        # inform NNPS if it's working in parallel
         if self.num_procs > 1:
             nnps.set_in_parallel(True)
 
+        # save the NNPS with the application
         self.nnps = nnps            
 
         dt = options.time_step

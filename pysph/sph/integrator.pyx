@@ -21,7 +21,7 @@ cdef class Integrator:
     def set_cfl_number(self, double cfl):
         self.cfl = cfl
 
-    cpdef integrate(self, double dt, int count):
+    cpdef integrate(self, double t, double dt, int count):
         raise RuntimeError("Integrator::integrate called!")
 
     @cython.boundscheck(False)
@@ -94,7 +94,7 @@ cdef class Integrator:
         raise RuntimeError("Integrator::compute_time_step called!")
 
 cdef class WCSPHRK2Integrator(Integrator):
-    cpdef integrate(self, double dt, int count):
+    cpdef integrate(self, double t, double dt, int count):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
@@ -159,7 +159,7 @@ cdef class WCSPHRK2Integrator(Integrator):
 
         # compute accelerations
         self._reset_accelerations()
-        evaluator.compute()
+        evaluator.compute(t, dt)
 
         #############################################################
         # Corrector
@@ -220,7 +220,7 @@ cdef class WCSPHRK2Integrator(Integrator):
         return cfl * hmin/dt_cfl
 
 cdef class EulerIntegrator(Integrator):
-    cpdef integrate(self, double dt, int count):
+    cpdef integrate(self, double t, double dt, int count):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
@@ -241,16 +241,13 @@ cdef class EulerIntegrator(Integrator):
         cdef size_t npart
         cdef size_t i
 
-        # save the values at the beginning of a time step
-        self._set_initial_values()
-
         # Update NNPS since particles have moved
         if pm: pm.update()
         nnps.update()
                 
         # compute accelerations
         self._reset_accelerations()
-        evaluator.compute()
+        evaluator.compute(t, dt)
 
         #############################################################
         # integrate
@@ -262,11 +259,9 @@ cdef class EulerIntegrator(Integrator):
             rho = pa_wrapper.rho; rho0 = pa_wrapper.rho0; arho=pa_wrapper.arho
 
             x = pa_wrapper.x  ; y = pa_wrapper.y  ; z = pa_wrapper.z
-            x0 = pa_wrapper.x0; y0 = pa_wrapper.y0; z0 = pa_wrapper.z0
             ax = pa_wrapper.ax; ay = pa_wrapper.ay; az = pa_wrapper.az
 
             u = pa_wrapper.u  ; v = pa_wrapper.v  ; w = pa_wrapper.w
-            u0 = pa_wrapper.u0; v0 = pa_wrapper.v0; w0 = pa_wrapper.w0
             au = pa_wrapper.au; av = pa_wrapper.av; aw = pa_wrapper.aw
 
             npart = pa.get_number_of_particles()
@@ -274,17 +269,17 @@ cdef class EulerIntegrator(Integrator):
             for i in range(npart):
 
                 # Update velocities
-                u.data[i] = u0.data[i] + dt*au.data[i]
-                v.data[i] = v0.data[i] + dt*av.data[i]
-                w.data[i] = w0.data[i] + dt*aw.data[i]
+                u.data[i] += dt*au.data[i]
+                v.data[i] += dt*av.data[i]
+                w.data[i] += dt*aw.data[i]
 
                 # Positions are updated using the velocities and XSPH
-                x.data[i] = x0.data[i] + dt * ax.data[i]
-                y.data[i] = y0.data[i] + dt * ay.data[i]
-                z.data[i] = z0.data[i] + dt * az.data[i]
+                x.data[i] += dt * ax.data[i]
+                y.data[i] += dt * ay.data[i]
+                z.data[i] += dt * az.data[i]
 
                 # Update densities and smoothing lengths from the accelerations
-                rho.data[i] = rho0.data[i] + dt * arho.data[i]
+                rho.data[i] = dt * arho.data[i]
 
     def compute_time_step(self, double dt):
         return dt
@@ -305,7 +300,7 @@ cdef class TransportVelocityIntegrator(Integrator):
 
             pa_wrapper = getattr(self.evaluator.calc, pa.name)
 
-            if name == 'solid':
+            if name != 'fluid':
                 u = pa_wrapper.u; v = pa_wrapper.v
                 p = pa_wrapper.p; wij = pa_wrapper.wij
 
@@ -333,7 +328,7 @@ cdef class TransportVelocityIntegrator(Integrator):
                     V.data[i] = 0.0
                     rho.data[i] = 0.0
 
-    cpdef integrate(self, double dt, int count):
+    cpdef integrate(self, double t, double dt, int count):
         """Main step routine"""
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
@@ -396,7 +391,7 @@ cdef class TransportVelocityIntegrator(Integrator):
 
         # compute accelerations
         self._reset_accelerations()
-        evaluator.compute()
+        evaluator.compute(t, dt)
 
         #############################################################
         # Kick

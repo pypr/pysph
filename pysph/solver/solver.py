@@ -264,7 +264,7 @@ class Solver(object):
             logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
                                                            self.rank))
             # perform the integration and update the time.
-            self.integrator.integrate(dt, self.count)
+            self.integrator.integrate(self.t, dt, self.count)
 
             # update the time for all arrays
             self.update_particle_time()

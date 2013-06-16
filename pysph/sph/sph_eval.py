@@ -48,7 +48,7 @@ class SPHEval(object):
         self.equation_groups = group_equations(equations)
         self.locator = locator
         self.kernel = kernel
-        
+
         all_equations = []
         for group in self.equation_groups:
             all_equations.extend(group.equations)
@@ -105,6 +105,13 @@ class SPHEval(object):
         
         if self.locator is not None:
             helpers.extend(get_code(self.locator, 'helper'))
+
+        # get helpers from the Equations
+        for equation in self.all_group.equations:
+            try:
+                helpers.extend(get_code(equation, 'helper'))
+            except:
+                pass
         
         return '\n'.join(helpers)
         
@@ -165,5 +172,5 @@ class SPHEval(object):
         self.nnps = nnps
         self.calc.set_nnps(nnps)
         
-    def compute(self):
-        self.sph_compute()
+    def compute(self, t, dt):
+        self.sph_compute(t, dt)

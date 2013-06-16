@@ -30,7 +30,7 @@ cdef class Integrator:
     ############################################################
     # Member functions
     ############################################################
-    cpdef integrate(self, double dt, int count)
+    cpdef integrate(self, double t, double dt, int count)
 
     # set the values at the start of a time step
     cdef _set_initial_values(self)
