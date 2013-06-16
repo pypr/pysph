@@ -136,7 +136,7 @@ class Application(object):
 
         # --output-freq.
         parser.add_option("--pfreq", action="store",
-                          dest="freq", default=20, type="int",
+                          dest="freq", default=100, type="int",
                           help="Printing frequency for the output")
         
         # -d/ --detailed-output.
