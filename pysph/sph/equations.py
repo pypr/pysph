@@ -526,6 +526,24 @@ class SummationDensity(Equation):
         ''')
         self.loop = CodeBlock(code=code)
 
+class BodyForce(Equation):
+    def __init__(self, dest, sources, 
+                 fx=0.0, fy=0.0, fz=0.0):
+        self.fx = fx
+        self.fy = fy
+        self.fz = fz
+        super(BodyForce, self).__init__(dest, sources)
+
+    def setup(self):
+        code = dedent('''
+
+        d_au[d_idx] += fx
+        d_av[d_idx] += fy
+        d_aw[d_idx] += fz
+
+        ''')
+        self.loop = CodeBlock(code=code, fx=self.fx, fy=self.fy, fz=self.fz)
+
 class TaitEOS(Equation):
     def __init__(self, dest, sources,
                  rho0=1000.0, c0=1.0, gamma=7.0):
