@@ -74,8 +74,12 @@ ext_modules = [
 
     # sph module
     Extension( name="pysph.sph.integrator",
-               sources=["pysph/sph/integrator.pyx"])
+               sources=["pysph/sph/integrator.pyx"]),
 
+    # kernels used for tests
+    Extension( name="pysph.parallel._kernels",
+               sources=["pysph/parallel/_kernels.pyx"]
+               ),
     ]
 
 # add the include dirs for the extension modules
@@ -90,10 +94,6 @@ parallel_modules = [
                libraries = ['zoltan', 'mpi'],
                extra_link_args=mpi_link_args,
                extra_compile_args=mpi_compile_args),
-
-    Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"]
-               ),
     ]
 
 # currently we depend on PyZoltan
