@@ -47,7 +47,7 @@ if Have_MPI:
 
 # Zoltan Headers
 pyzoltan_include = []
-if Have_Zoltan:
+if Have_Zoltan and Have_MPI:
     zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
     zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
 
