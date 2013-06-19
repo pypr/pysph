@@ -34,6 +34,15 @@ dx = 0.05
 ghost_extent = 5 * dx
 hdx = 1.2
 
+# adaptive time steps
+h0 = hdx * dx
+dt_cfl = 0.25 * h0/( c0 + Vmax )
+dt_viscous = 0.25 * h0**2/nu
+dt_force = 1.0
+
+tf = 5.0
+dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+
 def create_particles(empty=False, **kwargs):
     if empty:
         fluid = get_particle_array(name='fluid')
@@ -139,8 +148,8 @@ solver = Solver(
     kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator)
 
 # Setup default parameters.
-solver.set_time_step(1e-5)
-solver.set_final_time(2.0)
+solver.set_time_step(dt)
+solver.set_final_time(tf)
 
 equations = [
 

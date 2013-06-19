@@ -31,6 +31,15 @@ nx = 100; dx = L/nx
 ghost_extent = 5 * dx
 hdx = 1.2
 
+# adaptive time steps
+h0 = hdx * dx
+dt_cfl = 0.25 * h0/( c0 + Umax )
+dt_viscous = 0.25 * h0**2/nu
+dt_force = 1.0
+
+tf = 5.0
+dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+
 def create_particles(empty=False, **kwargs):
     if empty:
         fluid = get_particle_array(name='fluid')
@@ -56,9 +65,9 @@ def create_particles(empty=False, **kwargs):
         fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
         solid.remove_particles(to_extract)
         
-        print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d"%(
+        print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles())
+            solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -131,8 +140,8 @@ solver = Solver(
     kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator)
 
 # Setup default parameters.
-solver.set_time_step(1e-5)
-solver.set_final_time(5)
+solver.set_time_step(dt)
+solver.set_final_time(tf)
 
 equations = [
 

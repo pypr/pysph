@@ -21,20 +21,29 @@ import numpy as np
 # domain and reference values
 gy = -1.0
 Lx = 1.0; Ly = 2.0
-Re = 420; Umax = np.sqrt(2*abs(gy)*Ly)
-nu = Umax*Ly/Re
+Re = 420; Vmax = np.sqrt(2*abs(gy)*Ly)
+nu = Vmax*Ly/Re
 
 # density for the two phases
 rho1 = 1.8; rho2 = 1.0
 
 # speed of sound and reference pressure
-c0 = 10 * Umax
+c0 = 10 * Vmax
 p0 = c0**2
 
 # Numerical setup
 nx = 50; dx = Lx/nx
 ghost_extent = 5 * dx
 hdx = 1.2
+
+# adaptive time steps
+h0 = hdx * dx
+dt_cfl = 0.25 * h0/( c0 + Vmax )
+dt_viscous = 0.25 * h0**2/nu
+dt_force = 0.25 * np.sqrt(h0/abs(gy))
+
+tf = 5.0
+dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -70,9 +79,9 @@ def create_particles(empty=False, **kwargs):
             else:
                 fluid.rho[i] = rho2
         
-        print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d"%(
+        print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles())
+            solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -136,8 +145,8 @@ solver = Solver(
     kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator)
 
 # Setup default parameters.
-solver.set_time_step(7.5e-4)
-solver.set_final_time(30)
+solver.set_time_step(dt)
+solver.set_final_time(tf)
 
 equations = [
 
