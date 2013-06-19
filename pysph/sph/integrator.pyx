@@ -300,7 +300,7 @@ cdef class TransportVelocityIntegrator(Integrator):
 
             pa_wrapper = getattr(self.evaluator.calc, pa.name)
 
-            if name != 'fluid':
+            if not name.startswith('fluid'):
                 u = pa_wrapper.u; v = pa_wrapper.v
                 p = pa_wrapper.p; wij = pa_wrapper.wij
 
@@ -355,7 +355,7 @@ cdef class TransportVelocityIntegrator(Integrator):
         for pa in self.particles:
             name = pa.name
 
-            if name != 'fluid':
+            if not name.startswith('fluid'):
                 continue
 
             pa_wrapper = getattr(self.evaluator.calc, name)
@@ -399,7 +399,7 @@ cdef class TransportVelocityIntegrator(Integrator):
         for pa in self.particles:
             name = pa.name
 
-            if name != 'fluid':
+            if not name.startswith('fluid'):
                 continue
 
             pa_wrapper = getattr(self.evaluator.calc, name)

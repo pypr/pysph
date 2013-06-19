@@ -13,23 +13,27 @@ class TransportVelocitySummationDensity(Equation):
         code = dedent('''
 
         d_V[d_idx] += WIJ
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+        d_rho[d_idx] += d_m[d_idx]*WIJ
 
         ''')
         self.loop = CodeBlock(code=code)
 
         code = dedent("""
         # update the pressure using the equation of state
-        d_p[d_idx] = c0*c0*( d_rho[d_idx]/rho0 - 1 )
+        d_p[d_idx] = d_p0[d_idx] * ( d_rho[d_idx]/d_rho0[d_idx] - 1 )
 
         """)
 
         self.post_loop = CodeBlock(code=code, rho0=self.rho0, c0=self.c0)
 
 class TransportVelocitySolidWall(Equation):
-    def __init__(self, dest, sources, rho0=1.0, p0=100.0):
+    def __init__(self, dest, sources, rho0=1.0, p0=100.0,
+                 gx=0.0, gy=0.0, gz=0.0, ax=0.0, ay=0.0, az=0.0):
         self.rho0 = rho0
         self.p0 = p0
+        self.gx = gx; self.ax = ax 
+        self.gy = gy; self.ay = ay
+        self.gz = gz; self.az = az
         super(TransportVelocitySolidWall, self).__init__(dest, sources)
 
     def setup(self):
@@ -40,18 +44,20 @@ class TransportVelocitySolidWall(Equation):
         d_v[d_idx] += s_v[s_idx]*WIJ
 
         # smooth pressure
-        d_p[d_idx] += s_p[s_idx]*WIJ
+        gdotxij = (gx-ax)*XIJ[0] + (gy-ay)*XIJ[1] + (gz-az)*XIJ[2]
+        d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx] * gdotxij * WIJ
 
         # denominator
         d_wij[d_idx] += WIJ
 
         ''')
-        self.loop = CodeBlock(code=code)
+        self.loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, gz=self.gz,
+                              ax=self.ax, ay=self.ay, az=self.az, gdotxij=0.0)
 
         code = dedent("""
        
         # smooth velocity at the wall particle
-        if d_wij[d_idx] == 0:
+        if d_wij[d_idx] < 1e-14:
             pass
 
         else:
@@ -66,7 +72,7 @@ class TransportVelocitySolidWall(Equation):
             d_p[d_idx] /= d_wij[d_idx]
 
         # update the density from the pressure
-        d_rho[d_idx] = rho0 * (d_p[d_idx]/p0 + 1.0)
+        d_rho[d_idx] = s_rho0[0] * (d_p[d_idx]/s_p[0] + 1.0)
 
         """)
                       
@@ -123,7 +129,7 @@ class TransportVelocityMomentumEquation(Equation):
         # contribution due to the background pressure
         d_auhat[d_idx] += -pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[0]
         d_avhat[d_idx] += -pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[1]
- 
+
         """)
 
         self.loop = CodeBlock(code=code, pb=self.pb, nu=self.nu, rhoi=0.0, rhoj=0., 
