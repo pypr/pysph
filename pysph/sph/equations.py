@@ -600,10 +600,10 @@ class MomentumEquation(Equation):
             piij = piij*RHOIJ1
 
         # compute the CFL time step factor
-        _dt_fac = 0.0
-        if R2IJ > 1e-12:
-            _dt_fac = fabs( HIJ * vijdotxij/R2IJ )
-            dt_fac = max(_dt_fac, dt_fac)
+        # _dt_fac = 0.0
+        # if R2IJ > 1e-12:
+        #     _dt_fac = fabs( HIJ * vijdotxij/R2IJ )
+        #     dt_fac = max(_dt_fac, dt_fac)
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
