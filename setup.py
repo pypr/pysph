@@ -16,6 +16,8 @@ for more information.
 import numpy
 import commands
 import os
+import sys
+from os import path
 
 from setuptools import find_packages, setup
 from numpy.distutils.extension import Extension
@@ -38,17 +40,18 @@ mpi_compile_args = []
 mpi_link_args = []
 
 mpic = 'mpicc'
-mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
-mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
-mpi_inc_dirs.append(mpi4py.get_include())
+if Have_MPI:
+    mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
+    mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
+    mpi_inc_dirs.append(mpi4py.get_include())
 
 # Zoltan Headers
-zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
-zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
-
-# PyZoltan includes
 pyzoltan_include = []
 if Have_Zoltan:
+    zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
+    zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
+
+    # PyZoltan includes
     pyzoltan_include = [pyzoltan.get_include()]
 
 include_dirs = [numpy.get_include()] + pyzoltan_include
@@ -65,7 +68,10 @@ ext_modules = [
 
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
-    
+
+    Extension( name="pysph.base.carray",
+               sources=["pysph/base/carray.pyx"]),
+
     # sph module
     Extension( name="pysph.sph.integrator",
                sources=["pysph/sph/integrator.pyx"])
@@ -93,6 +99,12 @@ parallel_modules = [
 # currently we depend on PyZoltan
 if Have_MPI and Have_Zoltan:
     ext_modules += parallel_modules
+
+if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
+    generator = path.join( path.abspath('.'), 'pysph/base/generator.py' )
+    d = {'__file__': generator }
+    execfile(generator, d)
+    d['main'](None)
 
 setup(name='PySPH',
       version = '1.0alpha',
