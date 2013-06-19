@@ -21,36 +21,45 @@ from numpy.distutils.extension import Extension
 from Cython.Distutils import build_ext
 
 from os import path
+import commands
 
 mpi_inc_dirs = []
 mpi_compile_args = []
 mpi_link_args = []
-import mpi4py
-import commands
-mpic = 'mpicc'
 
-# MPI link and compile commands
-mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
-mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
+HAVE_MPI=True
+try:
+    import mpi4py
+except ImportError:
+    HAVE_MPI=False
 
-mpi_inc_dirs.append(mpi4py.get_include())
+if HAVE_MPI:
+    mpic = 'mpicc'
+
+    # MPI link and compile commands
+    mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
+    mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
+
+    mpi_inc_dirs.append(mpi4py.get_include())
+
+    zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
+    zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
+
+    zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
+    zoltan_include_dirs += zoltan_cython_include
 
 include_dirs = [numpy.get_include()]
-
-zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
-zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
-
-zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
-zoltan_include_dirs += zoltan_cython_include
 
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
-    # core modules
     Extension( name="pyzoltan.core.carray",
                sources=["pyzoltan/core/carray.pyx"],
                include_dirs = include_dirs),
+    ]
 
+# core modules
+zoltan_modules = [
     Extension( name="pyzoltan.core.zoltan",
                sources=["pyzoltan/core/zoltan.pyx"],
                include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
@@ -67,6 +76,9 @@ ext_modules = [
                extra_link_args=mpi_link_args,
                extra_compile_args=mpi_compile_args),
     ]
+
+if HAVE_MPI:
+    ext_modules += zoltan_modules
 
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
     generator = path.join( path.abspath('.'), 'pyzoltan/core/generator.py' )
