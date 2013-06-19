@@ -69,9 +69,6 @@ ext_modules = [
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
 
-    Extension( name="pysph.base.carray",
-               sources=["pysph/base/carray.pyx"]),
-
     # sph module
     Extension( name="pysph.sph.integrator",
                sources=["pysph/sph/integrator.pyx"]),
@@ -86,25 +83,20 @@ ext_modules = [
 for ext in ext_modules:
     ext.include_dirs = include_dirs
 
-parallel_modules = [
-    Extension( name="pysph.parallel.parallel_manager",
-               sources=["pysph/parallel/parallel_manager.pyx"],
-               include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
-               library_dirs = zoltan_library_dirs,
-               libraries = ['zoltan', 'mpi'],
-               extra_link_args=mpi_link_args,
-               extra_compile_args=mpi_compile_args),
-    ]
-
-# currently we depend on PyZoltan
+# currently we depend on PyZoltan for the parallel stuff
 if Have_MPI and Have_Zoltan:
-    ext_modules += parallel_modules
+    parallel_modules = [
 
-if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
-    generator = path.join( path.abspath('.'), 'pysph/base/generator.py' )
-    d = {'__file__': generator }
-    execfile(generator, d)
-    d['main'](None)
+        Extension( name="pysph.parallel.parallel_manager",
+                   sources=["pysph/parallel/parallel_manager.pyx"],
+                   include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
+                   library_dirs = zoltan_library_dirs,
+                   libraries = ['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+        ]
+    
+    ext_modules += parallel_modules
 
 setup(name='PySPH',
       version = '1.0alpha',
