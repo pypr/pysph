@@ -51,7 +51,7 @@ pyzoltan_include = []
 if Have_Zoltan:
     pyzoltan_include = [pyzoltan.get_include()]
 
-include_dirs = [numpy.get_include()]
+include_dirs = [numpy.get_include()] + pyzoltan_include
 
 cmdclass = {'build_ext': build_ext}
 
