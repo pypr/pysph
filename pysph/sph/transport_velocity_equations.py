@@ -24,7 +24,7 @@ class TransportVelocitySummationDensity(Equation):
 
         """)
 
-        self.post_loop = CodeBlock(code=code, rho0=self.rho0, c0=self.c0)
+        self.post_loop = CodeBlock(code=code)
 
 class TransportVelocitySolidWall(Equation):
     def __init__(self, dest, sources, rho0=1.0, p0=100.0,
@@ -76,10 +76,10 @@ class TransportVelocitySolidWall(Equation):
 
         """)
                       
-        self.post_loop = CodeBlock(code=code,rho0=self.rho0,p0=self.p0)
+        self.post_loop = CodeBlock(code=code)
 
 class TransportVelocityMomentumEquation(Equation):
-    def __init__(self, dest, sources, pb, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
+    def __init__(self, dest, sources, pb=0.0, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
         self.gx = gx
         self.gy = gy
         self.gz = gz
@@ -127,8 +127,8 @@ class TransportVelocityMomentumEquation(Equation):
         d_av[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * (-pij*DWIJ[1] + Ay + etaij*Fij/(R2IJ + 0.01 * HIJ * HIJ)*VIJ[1])
 
         # contribution due to the background pressure
-        d_auhat[d_idx] += -pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[0]
-        d_avhat[d_idx] += -pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[1]
+        d_auhat[d_idx] += -d_p0[d_idx]/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[0]
+        d_avhat[d_idx] += -d_p0[d_idx]/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[1]
 
         """)
 

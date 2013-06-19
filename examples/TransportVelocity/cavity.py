@@ -27,7 +27,7 @@ p0 = c0*c0/rho0
 Re = 1000; nu = Umax * L/Re
 
 # Numerical setup
-nx = 80; dx = L/nx
+nx = 100; dx = L/nx
 ghost_extent = 5 * dx
 hdx = 1.2
 
@@ -84,7 +84,11 @@ def create_particles(empty=False, **kwargs):
 
     # imopsed velocity on the solid
     solid.add_property( {'name': 'u0'} )
-    solid.add_property( {'name': 'v0'} )                         
+    solid.add_property( {'name': 'v0'} )
+
+    # reference densities and pressures
+    fluid.add_property( {'name': 'rho0'} )
+    fluid.add_property( {'name': 'p0'} )
         
     # setup the particle properties
     if not empty:
@@ -93,6 +97,10 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
+
+        # reference pressures and densities
+        fluid.rho0[:] = rho0
+        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -132,7 +140,7 @@ equations = [
     Group(
         equations=[
             TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid','solid'], rho0=rho0, c0=c0),
+                dest='fluid', sources=['fluid','solid'], c0=c0),
             ]),
     
     # boundary conditions for the solid wall
@@ -146,7 +154,7 @@ equations = [
     Group(
         equations=[
             TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid', 'solid'], nu=nu, pb=p0)
+                dest='fluid', sources=['fluid', 'solid'], nu=nu)
             ]),
     ]
 
