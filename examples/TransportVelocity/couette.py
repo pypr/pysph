@@ -104,6 +104,9 @@ def create_particles(empty=False, **kwargs):
     # reference densities and pressures
     fluid.add_property( {'name': 'rho0'} )
     fluid.add_property( {'name': 'p0'} )
+
+    # magnitude of velocity
+    fluid.add_property({'name':'vmag'})
         
     # setup the particle properties
     if not empty:

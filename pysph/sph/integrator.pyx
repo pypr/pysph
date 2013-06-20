@@ -1,5 +1,6 @@
 """Implementation for the integrator"""
 cimport cython
+from libc.math cimport sqrt
 
 cdef class Integrator:
 
@@ -338,6 +339,7 @@ cdef class TransportVelocityIntegrator(Integrator):
 
         # Particle properties
         cdef DoubleArray x, y, z, u, v, w, uhat, vhat
+        cdef DoubleArray vmag
 
         # accelerations for the variables
         cdef DoubleArray au, av, aw, auhat, avhat
@@ -367,6 +369,8 @@ cdef class TransportVelocityIntegrator(Integrator):
 
             uhat = pa_wrapper.uhat; vhat = pa_wrapper.vhat
             auhat = pa_wrapper.auhat; avhat = pa_wrapper.avhat
+
+            vmag = pa_wrapper.vmag
 
             npart = pa.get_number_of_particles()
 
@@ -412,3 +416,6 @@ cdef class TransportVelocityIntegrator(Integrator):
                 # Update velocities
                 u.data[i] = u.data[i] + dtb2*au.data[i]
                 v.data[i] = v.data[i] + dtb2*av.data[i]
+    
+                vmag.data[i] = sqrt( u.data[i]*u.data[i] + v.data[i]*v.data[i] )
+                                         

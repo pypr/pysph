@@ -114,7 +114,10 @@ def create_particles(empty=False, **kwargs):
 
     # imopsed velocity on the solid
     solid.add_property( {'name': 'u0'} )
-    solid.add_property( {'name': 'v0'} )                         
+    solid.add_property( {'name': 'v0'} )
+
+    # magnitude of velocity
+    fluid.add_property({'name':'vmag'})
         
     # setup the particle properties
     if not empty:
