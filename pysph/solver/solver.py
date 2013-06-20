@@ -245,7 +245,8 @@ class Solver(object):
         bar = PBar(1000 + int(dt/bt), show=show_progress)
 
         self.dump_output(dt, *self.print_properties)
-        self.comm.barrier() # everybody waits for this to complete
+        if self.comm:
+            self.comm.barrier() # everybody waits for this to complete
 
         # the parallel manager
         pm = self.pm
@@ -276,7 +277,8 @@ class Solver(object):
             # dump output
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)
-                self.comm.barrier()                
+                if self.comm:
+                    self.comm.barrier()                
 
             bcount += int(self.dt/bt)
             while bcount > 0:
