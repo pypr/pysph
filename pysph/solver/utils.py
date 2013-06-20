@@ -438,7 +438,7 @@ class SPHInterpolate(object):
 
         # source arrays
         src = self.src
-        sx, sy, sz, sh = src.x, src.y, src.z, src.h
+        sx, sy, sz, sh = src.get('x', 'y', 'z', 'h', only_real_particles=False)
 
         # dest arrays
         dst = self.dst
