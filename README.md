@@ -1,7 +1,15 @@
 README
 -------
 
-Experimental repo to try out code generation ideas for PySPH.
+This codebase represents a new approach for PySPH that is more heavily based
+on code generation.  It currently only supports Cython but can be configured
+to work well in parallel as well.
+
+The weakly compressible SPH formulation is the one implemented.  Free surface
+problems and the Transport Velocity formulation are implemented.
+
+**Please note this code is still very experimental and we will be changing
+  the API and basic pieces without warning.  Please bear with us.**
 
 Requirements
 -------------
@@ -9,14 +17,23 @@ Requirements
 The following Python packages are needed:
     
   - numpy
-  - Cython
-  - PySPH
+  - Cython (ideally version 0.19 and above)
   - Mako
 
-Build/install these packages using `pip`.
+Optional dependencies:
 
-To test this out you can simply try this:
-    
-    $ python sd.py
+  - mpi4py
+  - [PyZoltan](https://bitbucket.org/kunalp/pyzoltan)
+  - Mayavi2 (for visualization)
+  
+PyZoltan is used for parallel support.  You can still use PySPH without these
+optional dependencies.
 
-And you should see some output.
+Build
+-----
+
+Build/install these packages using `pip`.  Or from the source:
+
+   $ python setup.py install
+
+There are several examples to try inside the `examples` directory.
