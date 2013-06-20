@@ -468,3 +468,87 @@ class SPHInterpolate(object):
             result[i] = _sum/_wij
             
         return result
+
+    def gradient(self, arr):
+        """Compute the gradient on the interpolated data"""
+        # the result array
+        np = self.dst.get_number_of_particles()
+
+        # result arrays
+        resultx = numpy.zeros(np)
+        resulty = numpy.zeros(np)
+        resultz = numpy.zeros(np)
+
+        nbrs = UIntArray()
+
+        # data arrays
+        src = dst = self.dst
+        x, y, z, h, r, m = dst.get('x', 'y', 'z', 'h', 'rho', 'm')
+        f = dst.get(arr)
+
+        # kernel
+        kernel = self.kernel
+        
+        for i in range(np):
+            xi = Point( x[i], y[i], z[i] )
+
+            self.nnps.get_nearest_particles(
+                src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
+
+            nnbrs = nbrs._length
+            hij = h[i]
+
+            _wij = 0.0; _sumx = 0.0; _sumy = 0.0; _sumz = 0.0
+            for indexj in range(nnbrs):
+                j  = nbrs[indexj]
+                xj = Point( sx[j], sy[j], sz[j] )
+
+                rhoj = rho[j]; mj = m[j]
+                fji = f[j] - f[i]
+                
+                # kenrel gradient
+                dwij = kernel.py_gradient(xi, xj, hij)
+
+                _wij += wij
+                tmp = 1./rhoj * fji * mj
+
+                _sumx += tmp * dwij.x
+                _sumy += tmp * dwij.y
+                _sumz += tmp * dwij.z                
+
+            # save the result
+            resultx[i] = _sumx
+            resulty[i] = _sumy
+            resultz[i] = _sumz
+            
+        return resultx, resulty, resultz
+
+################################################################################
+# Get all solution files in a given directory
+############################################################################### 
+def get_files(dirname=None, fname=None, endswith=".npz"):
+
+    if dirname is None:
+        return []
+
+    if fname is None:
+        fname = dirname.split("_output")[0]
+
+    path = os.path.abspath( dirname )
+    files = os.listdir( path )
+
+    # get all the output files in the directory
+    files = [f for f in files if f.startswith(fname) and f.endswith(endswith) ]
+    files = [os.path.join(path, f) for f in files]
+
+    # sort the files
+    def _sort_func(x, y):
+        """Sort the files correctly."""
+        def _process(arg):
+            a = os.path.splitext(arg)[0]
+            return int(a[a.rfind('_')+1:])
+        return cmp(_process(x), _process(y))
+
+    files.sort(_sort_func)
+
+    return files
