@@ -59,25 +59,25 @@ ext_modules = [
     ]
 
 # core modules
-zoltan_modules = [
-    Extension( name="pyzoltan.core.zoltan",
-               sources=["pyzoltan/core/zoltan.pyx"],
-               include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
-               library_dirs = zoltan_library_dirs,
-               libraries=['zoltan', 'mpi'],
-               extra_link_args=mpi_link_args,
-               extra_compile_args=mpi_compile_args),
-
-    Extension( name="pyzoltan.core.zoltan_dd",
-               sources=["pyzoltan/core/zoltan_dd.pyx"],
-               include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-               library_dirs = zoltan_library_dirs,
-               libraries=['zoltan', 'mpi'],
-               extra_link_args=mpi_link_args,
-               extra_compile_args=mpi_compile_args),
-    ]
-
 if HAVE_MPI:
+    zoltan_modules = [
+        Extension( name="pyzoltan.core.zoltan",
+                   sources=["pyzoltan/core/zoltan.pyx"],
+                   include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+        
+        Extension( name="pyzoltan.core.zoltan_dd",
+                   sources=["pyzoltan/core/zoltan_dd.pyx"],
+                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+        ]
+    
     ext_modules += zoltan_modules
 
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
