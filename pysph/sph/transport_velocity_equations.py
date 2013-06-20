@@ -72,7 +72,7 @@ class TransportVelocitySolidWall(Equation):
             d_p[d_idx] /= d_wij[d_idx]
 
         # update the density from the pressure
-        d_rho[d_idx] = s_rho0[0] * (d_p[d_idx]/s_p[0] + 1.0)
+        d_rho[d_idx] = s_rho0[0] * (d_p[d_idx]/s_p0[0] + 1.0)
 
         """)
                       
