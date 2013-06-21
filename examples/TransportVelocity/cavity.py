@@ -21,7 +21,7 @@ import numpy as np
 # domain and reference values
 L = 1.0; Umax = 1.0
 c0 = 10 * Umax; rho0 = 1.0
-p0 = c0*c0/rho0
+p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
 Re = 1000; nu = Umax * L/Re

@@ -27,7 +27,7 @@ rho0 = 1.0; nu = 1.0
 
 # upper wall velocity based on the Reynolds number and channel width
 Vmax = nu*Re/(2*d)
-c0 = 10*Vmax; p0 = c0*c0/rho0
+c0 = 10*Vmax; p0 = c0*c0*ho0
 
 # Numerical setup
 dx = 0.05

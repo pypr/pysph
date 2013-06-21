@@ -25,7 +25,7 @@ Re = 0.0125
 d = 0.5; Ly = 2*d; Lx = 0.4*Ly
 rho0 = 1.0; nu = 1.0
 Vmax = nu*Re/(2*d)
-c0 = 10*Vmax; p0 = c0*c0/rho0
+c0 = 10*Vmax; p0 = c0*c0*rho0
 
 # The body force is adjusted to give the Required Reynold's number
 # based on the steady state maximum velocity Vmax:
@@ -168,7 +168,7 @@ equations = [
     Group(
         equations=[
             TransportVelocitySolidWall(
-                dest='channel', sources=['fluid',], rho0=rho0, p0=p0),
+                dest='channel', sources=['fluid',], rho0=rho0, p0=p0, gx=fx),
             ]),
     
     # acceleration equation
