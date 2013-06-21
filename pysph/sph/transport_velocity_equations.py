@@ -4,9 +4,10 @@ from textwrap import dedent
 from equations import Equation, CodeBlock
 
 class TransportVelocitySummationDensity(Equation):
-    def __init__(self, dest, sources, rho0=1.0, c0=10):
+    def __init__(self, dest, sources, rho0=1.0, c0=10, b=1.0):
         self.rho0 = rho0
         self.c0 = c0
+        self.b=b
         super(TransportVelocitySummationDensity, self).__init__(dest, sources)
 
     def setup(self):
@@ -20,17 +21,19 @@ class TransportVelocitySummationDensity(Equation):
 
         code = dedent("""
         # update the pressure using the equation of state
-        d_p[d_idx] = d_p0[d_idx] * ( d_rho[d_idx]/d_rho0[d_idx] - 1 )
+        d_p[d_idx] = d_p0[d_idx] * ( d_rho[d_idx]/d_rho0[d_idx] - b )
 
         """)
 
-        self.post_loop = CodeBlock(code=code)
+        self.post_loop = CodeBlock(code=code, b=self.b)
 
 class TransportVelocitySolidWall(Equation):
     def __init__(self, dest, sources, rho0=1.0, p0=100.0,
-                 gx=0.0, gy=0.0, gz=0.0, ax=0.0, ay=0.0, az=0.0):
+                 gx=0.0, gy=0.0, gz=0.0, ax=0.0, ay=0.0, az=0.0,
+                 b=1.0):
         self.rho0 = rho0
         self.p0 = p0
+        self.b=b
         self.gx = gx; self.ax = ax 
         self.gy = gy; self.ay = ay
         self.gz = gz; self.az = az
@@ -72,11 +75,11 @@ class TransportVelocitySolidWall(Equation):
             d_p[d_idx] /= d_wij[d_idx]
 
         # update the density from the pressure
-        d_rho[d_idx] = s_rho0[0] * (d_p[d_idx]/s_p0[0] + 1.0)
+        d_rho[d_idx] = s_rho0[0] * (d_p[d_idx]/s_p0[0] + b)
 
         """)
                       
-        self.post_loop = CodeBlock(code=code)
+        self.post_loop = CodeBlock(code=code, b=self.b)
 
 class TransportVelocityMomentumEquation(Equation):
     def __init__(self, dest, sources, pb=0.0, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
@@ -118,8 +121,17 @@ class TransportVelocityMomentumEquation(Equation):
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
         # artificial stress tensor
-        Ax = 0.5 * (rhoi*ui*(uhatj - uj)*DWIJ[0] + rhoi*ui*(vhatj - vj)*DWIJ[1] + rhoj*uj*(uhati - ui)*DWIJ[0] + rhoj*uj*(vhati - vi)*DWIJ[1])   
-        Ay = 0.5 * (rhoi*vi*(uhatj - uj)*DWIJ[0] + rhoi*vi*(vhatj - vj)*DWIJ[1] + rhoj*vj*(uhati - ui)*DWIJ[0] + rhoj*vj*(vhati - vi)*DWIJ[1])   
+        Axxi = rhoi*ui*(uhati - ui); Axyi = rhoi*ui*(vhati - vi)
+        Ayxi = rhoi*vi*(uhati - ui); Ayyi = rhoi*vi*(vhati - vi)
+
+        Axxj = rhoj*uj*(uhatj - uj); Axyj = rhoj*uj*(vhatj - vj)
+        Ayxj = rhoj*vj*(uhatj - uj); Ayyj = rhoj*vj*(vhatj - vj)
+
+        Ax = 0.5 * (Axxi + Axxj) * DWIJ[0] + 0.5 * (Axyi + Axyj) * DWIJ[1]
+        Ay = 0.5 * (Ayxi + Ayxj) * DWIJ[0] + 0.5 * (Ayyi + Ayyj) * DWIJ[1]
+
+        #Ax = 0.5 * (rhoi*ui*(uhatj - uj)*DWIJ[0] + rhoi*ui*(vhatj - vj)*DWIJ[1] + rhoj*uj*(uhati - ui)*DWIJ[0] + rhoj*uj*(vhati - vi)*DWIJ[1])
+        #Ay = 0.5 * (rhoi*vi*(uhatj - uj)*DWIJ[0] + rhoi*vi*(vhatj - vj)*DWIJ[1] + rhoj*vj*(uhati - ui)*DWIJ[0] + rhoj*vj*(vhati - vi)*DWIJ[1])
 
         # accelerations
         d_au[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * (-pij*DWIJ[0] + Ax + etaij*Fij/(R2IJ + 0.01 * HIJ * HIJ)*VIJ[0])
@@ -136,4 +148,7 @@ class TransportVelocityMomentumEquation(Equation):
                               pi=0., pj=0., pij=0., ui=0., uj=0., vi=0., vj=0., 
                               etai=0., etaj=0., etaij=0., uhati=0., uhatj=0., 
                               vhati=0., vhatj=0., Fij=0., Vi=0., Vj=0., Vi2=0., 
-                              Vj2=0., Ax=0., Ay=0.)
+                              Vj2=0., Ax=0., Ay=0., 
+                              Axxi=0., Axyi=0., Ayxi=0., Ayyi=0.,
+                              Axxj=0., Axyj=0., Ayxj=0., Ayyj=0.)
+
