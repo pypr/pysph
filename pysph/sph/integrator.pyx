@@ -1,10 +1,16 @@
 """Implementation for the integrator"""
 cimport cython
-from libc.math cimport sqrt
+from libc.math cimport sqrt, sin, M_PI
+
+cdef double damping_function(double t, double tdamp):
+    if t < tdamp:
+        return 0.5 * ( sin((-0.5*t/tdamp)*M_PI) + 1.0 )
+    else:
+        return 1.0
 
 cdef class Integrator:
 
-    def __init__(self, object evaluator, list particles):
+    def __init__(self, object evaluator, list particles, double tdamp):
         """Constructor for the Integrator"""
         self.evaluator = evaluator
         self.particles = particles
@@ -12,6 +18,9 @@ cdef class Integrator:
 
         # default cfl number
         self.cfl = 0.5
+
+        # solution damping time
+        self.tdamp = tdamp
 
     def set_parallel_manager(self, object pm):
         self.pm = pm
@@ -257,13 +266,12 @@ cdef class EulerIntegrator(Integrator):
             name = pa.name
             pa_wrapper = getattr(self.evaluator.calc, name)
 
-            rho = pa_wrapper.rho; rho0 = pa_wrapper.rho0; arho=pa_wrapper.arho
-
             x = pa_wrapper.x  ; y = pa_wrapper.y  ; z = pa_wrapper.z
-            ax = pa_wrapper.ax; ay = pa_wrapper.ay; az = pa_wrapper.az
 
             u = pa_wrapper.u  ; v = pa_wrapper.v  ; w = pa_wrapper.w
             au = pa_wrapper.au; av = pa_wrapper.av; aw = pa_wrapper.aw
+
+            rho = pa_wrapper.rho; arho = pa_wrapper.arho
 
             npart = pa.get_number_of_particles()
             
@@ -274,13 +282,12 @@ cdef class EulerIntegrator(Integrator):
                 v.data[i] += dt*av.data[i]
                 w.data[i] += dt*aw.data[i]
 
-                # Positions are updated using the velocities and XSPH
-                x.data[i] += dt * ax.data[i]
-                y.data[i] += dt * ay.data[i]
-                z.data[i] += dt * az.data[i]
+                # Positions are updated using the velocities
+                x.data[i] += dt * u.data[i]
+                y.data[i] += dt * v.data[i]
+                z.data[i] += dt * w.data[i]
 
-                # Update densities and smoothing lengths from the accelerations
-                rho.data[i] = dt * arho.data[i]
+                rho.data[i] += dt * arho.data[i]
 
     def compute_time_step(self, double dt):
         return dt
@@ -351,6 +358,9 @@ cdef class TransportVelocityIntegrator(Integrator):
         # half time step
         cdef double dtb2 = 0.5*dt
 
+        # damping constant
+        cdef double damping_constant = damping_function(t, self.tdamp)
+
         #############################################################
         # Kick
         #############################################################
@@ -413,9 +423,10 @@ cdef class TransportVelocityIntegrator(Integrator):
 
             npart = pa.get_number_of_particles()
             for i in range(npart):
-                # Update velocities
-                u.data[i] = u.data[i] + dtb2*au.data[i]
-                v.data[i] = v.data[i] + dtb2*av.data[i]
+                # Update velocities avoiding impulsive starts
+                u.data[i] = u.data[i] + dtb2*au.data[i]*damping_constant
+                v.data[i] = v.data[i] + dtb2*av.data[i]*damping_constant
     
-                vmag.data[i] = sqrt( u.data[i]*u.data[i] + v.data[i]*v.data[i] )
+                # magnitude of velocity squared
+                vmag.data[i] = u.data[i]*u.data[i] + v.data[i]*v.data[i]
                                          
