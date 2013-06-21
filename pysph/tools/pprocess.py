@@ -32,8 +32,9 @@ class Results(object):
 
     def get_ke_history(self, array_name):
         nfiles = self.nfiles
-        ke = np.zeros(nfiles, dtype=np.float64)
-        t = np.zeros(nfiles, dtype=np.float64)
+
+        self.ke = ke = np.zeros(nfiles, dtype=np.float64)
+        self.t = t = np.zeros(nfiles, dtype=np.float64)
 
         for i in range(nfiles):
             data = utils.load(self.files[i])
@@ -45,5 +46,3 @@ class Results(object):
             
             m, u, v, w = array.get('m', 'u', 'v', 'w')
             ke[i] = 0.5 * np.sum( m * (u**2 + v**2) )
-            
-        return t, ke
