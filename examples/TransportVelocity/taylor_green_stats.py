@@ -25,8 +25,10 @@ class TaylorGreenResults(pprocess.Results):
     def comute_stats(self, array="fluid"):
         files = self.files
         nfiles = self.nfiles
+
+        # compute the kinetic energy history for the array
+        self.get_ke_history(array)
         
-        times = np.zeros( nfiles )
         decay = np.zeros( nfiles )
         linf = np.zeros( nfiles )
         for i in range(nfiles):
@@ -36,14 +38,12 @@ class TaylorGreenResults(pprocess.Results):
             vmag = np.sqrt( pa.vmag )
             
             t = data['solver_data']['t']
-            times[i] = t
             decay[i] = vmag.max()
 
             # compute the error norm
             theoretical_max = self.U * np.exp(self.decay_rate_constant * t)
             linf[i] = abs( (vmag.max() - theoretical_max)/theoretical_max )
 
-        self.times = times
         self.decay = decay
         self.linf = linf
 
