@@ -5,15 +5,15 @@ from pyzoltan.core.carray import LongArray
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
+from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
 from pysph.sph.equations import Group
-from pysph.sph.transport_velocity_equations import TransportVelocitySummationDensity,\
-    TransportVelocitySolidWall, TransportVelocityMomentumEquation
+from pysph.sph.transport_velocity_equations import DensitySummation,\
+    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
 # numpy
 import numpy as np
@@ -34,11 +34,11 @@ hdx = 1.2
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Umax )
-dt_viscous = 0.25 * h0**2/nu
+dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 5.0
-dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -77,9 +77,6 @@ def create_particles(empty=False, **kwargs):
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
-
-    solid.add_property( {'name': 'uhat'} )
-    solid.add_property( {'name': 'vhat'} )
 
     fluid.add_property( {'name': 'auhat'} )
     fluid.add_property( {'name': 'avhat'} )
@@ -136,7 +133,7 @@ def create_particles(empty=False, **kwargs):
 app = Application()
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
+kernel = QuinticSpline(dim=2)
 
 # Create a solver.
 solver = Solver(
@@ -151,30 +148,32 @@ equations = [
     # Summation density for the fluid phase
     Group(
         equations=[
-            TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid','solid'], c0=c0),
+            DensitySummation(dest='fluid', sources=['fluid','solid'],)
+
             ]),
     
     # boundary conditions for the solid wall
     Group(
         equations=[
-            TransportVelocitySolidWall(
-                dest='solid', sources=['fluid',], rho0=rho0, p0=p0),
+
+            SolidWallBC(dest='solid', sources=['fluid',], b=1.0),
+
             ]),
     
     # acceleration equation
     Group(
         equations=[
-            TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid', 'solid'], nu=nu)
+            StateEquation(dest='fluid', sources=None, b=1.0),
+            
+            MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            
+            ArtificialStress(dest='fluid', sources=['fluid',]),
+            
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
-
-with open('cavity.pyx', 'w') as f:
-    app.dump_code(f)
 
 app.run()

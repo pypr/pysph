@@ -13,9 +13,8 @@ from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
 from pysph.sph.equations import Group
-from pysph.sph.equations import BodyForce
-from pysph.sph.transport_velocity_equations import TransportVelocitySummationDensity,\
-    TransportVelocitySolidWall, TransportVelocityMomentumEquation
+from pysph.sph.transport_velocity_equations import DensitySummation,\
+    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
 # numpy
 import numpy as np
@@ -27,7 +26,7 @@ rho0 = 1.0; nu = 1.0
 
 # upper wall velocity based on the Reynolds number and channel width
 Vmax = nu*Re/(2*d)
-c0 = 10*Vmax; p0 = c0*c0*ho0
+c0 = 10*Vmax; p0 = c0*c0*rho0
 
 # Numerical setup
 dx = 0.05
@@ -37,11 +36,11 @@ hdx = 1.2
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Vmax )
-dt_viscous = 0.25 * h0**2/nu
+dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
-tf = 5.0
-dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+tf = 2.0
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -71,9 +70,9 @@ def create_particles(empty=False, **kwargs):
         channel = get_particle_array(name='channel', x=cx, y=cy)
         fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
-        print "Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d"%(
+        print "Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
-            channel.get_number_of_particles())
+            channel.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -142,7 +141,7 @@ domain = DomainLimits(xmin=0, xmax=Lx, periodic_in_x=True)
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
+kernel = Gaussian(dim=2)
 
 print domain, kernel
 
@@ -159,30 +158,29 @@ equations = [
     # Summation density for the fluid phase
     Group(
         equations=[
-            TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid','channel'], rho0=rho0, c0=c0),
+            DensitySummation(dest='fluid', sources=['fluid','channel']),
             ]),
     
     # boundary conditions for the channel wall
     Group(
         equations=[
-            TransportVelocitySolidWall(
-                dest='channel', sources=['fluid',], rho0=rho0, p0=p0),
+            SolidWallBC(dest='channel', sources=['fluid',], b=1.0),
             ]),
     
     # acceleration equation
     Group(
         equations=[
-            TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid', 'channel'], nu=nu, pb=p0)
+            StateEquation(dest='fluid', sources=None, b=1.0),
+
+            MomentumEquation(dest='fluid', sources=['fluid', 'channel'], nu=nu),
+            
+            ArtificialStress(dest='fluid', sources=['fluid',])
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
-
-with open('couette.pyx', 'w') as f:
-    app.dump_code(f)
 
 app.run()

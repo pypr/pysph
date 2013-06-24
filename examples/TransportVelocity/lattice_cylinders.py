@@ -1,47 +1,46 @@
-"""Rayleigh-Taylor instability problem"""
+"""Incompressible flow past a periodic array of cylinders"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
 
 # PySPH imports
+from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegrator
+from pysph.sph.integrator import TransportVelocityIntegrator, AdamiVelocityVerletIntegrator
 
 # the eqations
 from pysph.sph.equations import Group, BodyForce
-from pysph.sph.transport_velocity_equations import DensitySummation,\
-    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
+from pysph.sph.transport_velocity_equations import ArtificialStress,\
+    DensitySummation, SolidWallBC, VolumeSummation, StateEquation, ContinuityEquation, MomentumEquation
 
 # numpy
 import numpy as np
 
 # domain and reference values
-gy = -1.0
-Lx = 1.0; Ly = 2.0
-Re = 420; Vmax = np.sqrt(2*abs(gy)*Ly)
-nu = Vmax*Ly/Re
+L = 0.1; Umax = 5e-5
+c0 = 10 * Umax; rho0 = 1000.0
+p0 = c0*c0*rho0
+a = 0.02; H = L
+fx = 1.5e-7
 
-# density for the two phases
-rho1 = 1.8; rho2 = 1.0
-
-# speed of sound and reference pressure
-c0 = 10 * Vmax
+# Reynolds number and kinematic viscosity
+Re = 1.0; nu = a*Umax/Re
 
 # Numerical setup
-nx = 50; dx = Lx/nx
-ghost_extent = 5 * dx
+nx = 100; dx = L/nx
+ghost_extent = 5 * 1.5 * dx
 hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Vmax )
+dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * np.sqrt(h0/abs(gy))
+dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 25
+tf = 1000.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
@@ -50,16 +49,18 @@ def create_particles(empty=False, **kwargs):
         solid = get_particle_array(name='solid')
     else:
         # create all the particles
-        _x = np.arange( -ghost_extent - dx/2, Lx + ghost_extent + dx/2, dx )
-        _y = np.arange( -ghost_extent - dx/2, Ly + ghost_extent + dx/2, dx )
+        _x = np.arange( dx/2, L, dx )
+        _y = np.arange( dx/2, H, dx)
         x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
         # sort out the fluid and the solid
         indices = []
+        cx = 0.5 * L; cy = 0.5 * H
         for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < Lx) ):
-                if ( (y[i] > 0.0)  and (y[i] < Ly) ):
-                    indices.append(i)
+            xi = x[i]; yi = y[i]
+            if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
+                #if ( (yi > 0) and (yi < H) ):
+                indices.append(i)
 
         to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
 
@@ -69,16 +70,8 @@ def create_particles(empty=False, **kwargs):
         # remove the fluid particles from the solid
         fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
         solid.remove_particles(to_extract)
-
-        # sort out the two fluid phases
-        indices = []
-        for i in range(fluid.get_number_of_particles()):
-            if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
-                fluid.rho[i] = rho1
-            else:
-                fluid.rho[i] = rho2
         
-        print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+        print "Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
 
@@ -97,13 +90,6 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
     fluid.add_property( {'name': 'aw'} )
-
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.rho0[:] = fluid.rho[:]
-
-    fluid.add_property( {'name': 'p0'} )
-    fluid.p0[:] = fluid.rho * c0**2
     
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
@@ -112,6 +98,13 @@ def create_particles(empty=False, **kwargs):
     solid.add_property( {'name': 'u0'} )
     solid.add_property( {'name': 'v0'} )
 
+    # reference densities and pressures
+    fluid.add_property( {'name': 'rho0'} )
+    fluid.add_property( {'name': 'p0'} )
+
+    # density acceleration
+    fluid.add_property( {'name':'arho'} )
+
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
         
@@ -119,8 +112,15 @@ def create_particles(empty=False, **kwargs):
     if not empty:
         volume = dx * dx
 
-        # mass is set to get the reference density of each phase
-        fluid.m[:] = volume * fluid.rho
+        # mass is set to get the reference density of rho0
+        fluid.m[:] = volume * rho0
+        solid.m[:] = volume * rho0
+        solid.rho[:] = rho0
+
+        # reference pressures and densities
+        fluid.rho0[:] = rho0
+        fluid.rho[:] = rho0
+        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -129,12 +129,16 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-                
-    # return the arrays
+        
+    # return the particle list
     return [fluid, solid]
 
+# domain for periodicity
+domain = DomainLimits(
+    xmin=0, xmax=L, ymin=0, ymax=H, periodic_in_x=True,periodic_in_y=True)
+
 # Create the application.
-app = Application()
+app = Application(domain=domain)
 
 # Create the kernel
 kernel = Gaussian(dim=2)
@@ -149,29 +153,34 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # Summation density for each phase
+    # State equation
     Group(
         equations=[
             DensitySummation(dest='fluid', sources=['fluid','solid']),
-            
+            #VolumeSummation(dest='fluid',sources=['fluid', 'solid'],),
+
             ]),
     
-    # boundary conditions for the solid wall from each phase
+    # solid wall bc
     Group(
         equations=[
-            SolidWallBC(dest='solid', sources=['fluid'], gy=gy),
+
+            SolidWallBC(dest='solid', sources=['fluid'], gx=fx),
+            #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
+
             ]),
     
-    # acceleration equations for each phase
+    # accelerations
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, b=1.0),
-
-            BodyForce(dest='fluid', sources=None, fy=gy),
-
+            BodyForce(dest='fluid', sources=None, fx=fx),
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-
             ArtificialStress(dest='fluid', sources=['fluid',])
+
+            # BodyForce(dest='fluid', sources=None, fx=fx),
+            # MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            # ContinuityEquation(dest='fluid', sources=['fluid', 'solid']),
 
             ]),
     ]

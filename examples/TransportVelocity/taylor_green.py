@@ -5,16 +5,16 @@ from pyzoltan.core.carray import LongArray
 
 # PySPH imports
 from pysph.base.nnps import DomainLimits
-from pysph.base.utils import get_particle_array_wcsph
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline, Gaussian
+from pysph.base.utils import get_particle_array
+from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
 from pysph.sph.equations import Group
-from pysph.sph.transport_velocity_equations import TransportVelocitySummationDensity,\
-    TransportVelocityMomentumEquation
+from pysph.sph.transport_velocity_equations import DensitySummation,\
+    StateEquation, MomentumEquation, ArtificialStress
 
 # numpy
 import numpy as np
@@ -34,15 +34,15 @@ hdx = 1.2
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + U )
-dt_viscous = 0.25 * h0**2/nu
+dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * 1.0
 
 tf = 5.0
-dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
-        fluid = get_particle_array_wcsph(name='fluid')
+        fluid = get_particle_array(name='fluid')
     else:
         # create the particles
         _x = np.arange( dx/2, L, dx )
@@ -50,7 +50,7 @@ def create_particles(empty=False, **kwargs):
         h = np.ones_like(x) * dx
 
         # create the arrays
-        fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
+        fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
     
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
@@ -112,9 +112,9 @@ domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
 app = Application(domain=domain)
 
 # Create the kernel
-#kernel = QuinticSpline(dim=2)
+kernel = QuinticSpline(dim=2)
 #kernel = WendlandQuintic(dim=2)
-kernel = Gaussian(dim=2)
+#kernel = Gaussian(dim=2)
 
 # Create a solver.
 solver = Solver(
@@ -126,25 +126,24 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # summation density
+    # density summation
     Group(
         equations=[
-            TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid'], c0=c0, b=b),
+            DensitySummation(dest='fluid', sources=['fluid']),
             ]),
 
     Group(
         equations=[
-            TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid'], nu=nu, pb=p0),
+            StateEquation(dest='fluid', sources=None),
+
+            MomentumEquation(dest='fluid', sources=['fluid'], nu=nu),
+
+            ArtificialStress(dest='fluid', sources=['fluid']),
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
-
-with open('taylorg.pyx', 'w') as f:
-    app.dump_code(f)
 
 app.run()

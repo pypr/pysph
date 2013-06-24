@@ -14,8 +14,8 @@ from pysph.sph.integrator import TransportVelocityIntegrator
 # the eqations
 from pysph.sph.equations import Group
 from pysph.sph.equations import BodyForce
-from pysph.sph.transport_velocity_equations import TransportVelocitySummationDensity,\
-    TransportVelocitySolidWall, TransportVelocityMomentumEquation
+from pysph.sph.transport_velocity_equations import DensitySummation,\
+    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
 # numpy
 import numpy as np
@@ -30,7 +30,7 @@ c0 = 10*Vmax; p0 = c0*c0*rho0
 # The body force is adjusted to give the Required Reynold's number
 # based on the steady state maximum velocity Vmax:
 # Vmax = fx/(2*nu)*(d^2) at the centerline
-fx = Vmax * 2*nu/rho0/(d**2)
+fx = Vmax * 2*nu/(d**2)
 
 # Numerical setup
 dx = 0.05
@@ -40,11 +40,11 @@ hdx = 1.2
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Vmax )
-dt_viscous = 0.25 * h0**2/nu
+dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/fx)
 
-tf = 5.0
-dt = 0.1 * min(dt_cfl, dt_viscous, dt_force)
+tf = 2.0
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -86,9 +86,6 @@ def create_particles(empty=False, **kwargs):
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
-
-    channel.add_property( {'name': 'uhat'} )
-    channel.add_property( {'name': 'vhat'} )
 
     fluid.add_property( {'name': 'auhat'} )
     fluid.add_property( {'name': 'avhat'} )
@@ -145,7 +142,7 @@ domain = DomainLimits(xmin=0, xmax=Lx, periodic_in_x=True)
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
+kernel = Gaussian(dim=2)
 
 # Create a solver.
 solver = Solver(
@@ -160,32 +157,32 @@ equations = [
     # Summation density for the fluid phase
     Group(
         equations=[
-            TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid','channel'], rho0=rho0, c0=c0),
+            DensitySummation(dest='fluid', sources=['fluid','channel']),
             ]),
     
     # boundary conditions for the channel wall
     Group(
         equations=[
-            TransportVelocitySolidWall(
-                dest='channel', sources=['fluid',], rho0=rho0, p0=p0, gx=fx),
+            SolidWallBC(
+                dest='channel', sources=['fluid',], gx=fx, b=1.0),
             ]),
     
     # acceleration equation
     Group(
         equations=[
+            StateEquation(dest='fluid', sources=None, b=1.0),
+
             BodyForce(dest='fluid', sources=None, fx=fx),
 
-            TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid', 'channel'], nu=nu, pb=p0)
+            MomentumEquation(dest='fluid', sources=['fluid', 'channel'], nu=nu, pb=p0),
+
+            ArtificialStress(dest='fluid', sources=['fluid']),
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
-
-with open('poiseuille.pyx', 'w') as f:
-    app.dump_code(f)
 
 app.run()
