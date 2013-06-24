@@ -81,13 +81,23 @@ def get_particle_array(cl_precision="double", **props):
                 constants[prop] = props[prop]
                 continue
 
+            data = numpy.asarray(props[prop])
             if prop in ['gid']:
-                prop_dict[prop] = {'data':data.astype(numpy.uint32),
+                prop_dict[prop] = {'data':data,
                                    'type': 'unsigned int',
+                                   'name':prop}
+
+            if prop in ['tag']:
+                prop_dict[prop] = {'data':data,
+                                   'type': 'long',
+                                   'name':prop}
+
+            if prop in ['pid']:
+                prop_dict[prop] = {'data':data,
+                                   'type':'int',
                                    'name':prop}
             
             else:
-                data = numpy.asarray(props[prop])
                 prop_dict[prop] = {'data':data, 'type':'double'}
             
     # Add the default props
