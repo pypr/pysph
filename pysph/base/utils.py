@@ -65,8 +65,8 @@ def get_particle_array(cl_precision="double", **props):
         name = "array"
 
     default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
-                     'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,'e':0.0,
-                     'rho':1.0, 'cs':0.0}
+                     'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,
+                     'rho':1.0, 'au':0.0, 'av':0.0, 'aw':0.0}
     
     #Add the properties requested
     np = 0

@@ -299,7 +299,7 @@ def load(fname):
     object as value.
 
     """
-    from pysph.base.utils import get_particle_array_wcsph
+    from pysph.base.utils import get_particle_array
     data = numpy.load(fname)
 
     ret = {"arrays":{}}
@@ -321,9 +321,9 @@ def load(fname):
         solver_data = solver_data[0]
 
         for array_name in arrays:
-            array = get_particle_array_wcsph(name=array_name,
-                                             cl_precision="single",
-                                             **arrays[array_name])
+            array = get_particle_array(name=array_name,
+                                       cl_precision="single",
+                                       **arrays[array_name])
             
             ret["arrays"][array_name] = array
             
@@ -538,7 +538,7 @@ def get_files(dirname=None, fname=None, endswith=".npz"):
     files = os.listdir( path )
 
     # get all the output files in the directory
-    files = [f for f in files if f.startswith(fname) and f.endswith(endswith) ]
+    files = [f for f in files if f.startswith(fname) and f.endswith(endswith)]
     files = [os.path.join(path, f) for f in files]
 
     # sort the files
