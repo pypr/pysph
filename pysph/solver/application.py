@@ -210,6 +210,10 @@ class Application(object):
                           help=("""Switch between using weights for input to Zoltan.
                           defaults to True"""))
 
+        zoltan.add_option("--ghost-layers", action='store', dest='ghost_layers',
+                          default=2.0, type='float', 
+                          help=('Number of ghost cells to share for remote neighbors'))
+
         zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
                           help=("""Zoltan debugging level""")) 
@@ -378,11 +382,15 @@ class Application(object):
             zoltan_debug_level = options.zoltan_debug_level
             zoltan_obj_wgt_dim = obj_weight_dim
 
+            # ghost layers 
+            ghost_layers = options.ghost_layers
+
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles, comm=comm,
                 lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
+                ghost_layers=ghost_layers
                 )
 
             # set zoltan options
