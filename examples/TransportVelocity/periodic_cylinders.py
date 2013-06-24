@@ -6,42 +6,42 @@ from pyzoltan.core.carray import LongArray
 # PySPH imports
 from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
+from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegrator
+from pysph.sph.integrator import TransportVelocityIntegrator, AdamiVelocityVerletIntegrator
 
 # the eqations
 from pysph.sph.equations import Group, BodyForce
-from pysph.sph.transport_velocity_equations import TransportVelocitySummationDensity,\
-    TransportVelocitySolidWall, TransportVelocityMomentumEquation
+from pysph.sph.transport_velocity_equations import ArtificialStress,\
+    DensitySummation, SolidWallBC, VolumeSummation, StateEquation, ContinuityEquation, MomentumEquation
 
 # numpy
 import numpy as np
 
 # domain and reference values
 L = 0.12; Umax = 1.2e-4
-c0 = 10 * Umax; rho0 = 1000.0
-p0 = c0*c0*rho0
 a = 0.02; H = 4*a
 fx = 2.5e-4
+c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
+p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-nu = 1e-4; Re = a*Umax/nu
+nu = 0.1/rho0; Re = a*Umax/nu
 
 # Numerical setup
-nx = 100; dx = L/nx
+nx = 144; dx = L/nx
 ghost_extent = 5 * 1.5 * dx
-hdx = 1.2
+hdx = 1.05
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.125 * h0/( c0 + Umax )
+dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.125 * np.sqrt(h0/abs(fx))
+dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
 tf = 20.0
-dt = 0.25 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -50,7 +50,7 @@ def create_particles(empty=False, **kwargs):
     else:
         # create all the particles
         _x = np.arange( dx/2, L, dx )
-        _y = np.arange( 0.0 -ghost_extent, H+ghost_extent, dx)
+        _y = np.arange( -ghost_extent, H+ghost_extent, dx )
         x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
         # sort out the fluid and the solid
@@ -84,9 +84,6 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
 
-    solid.add_property( {'name': 'uhat'} )
-    solid.add_property( {'name': 'vhat'} )
-
     fluid.add_property( {'name': 'auhat'} )
     fluid.add_property( {'name': 'avhat'} )
 
@@ -105,6 +102,9 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'rho0'} )
     fluid.add_property( {'name': 'p0'} )
 
+    # density acceleration
+    fluid.add_property( {'name':'arho'} )
+
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
         
@@ -115,9 +115,11 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
+        solid.rho[:] = rho0
 
         # reference pressures and densities
         fluid.rho0[:] = rho0
+        fluid.rho[:] = rho0
         fluid.p0[:] = p0
 
         # volume is set as dx^2
@@ -128,10 +130,6 @@ def create_particles(empty=False, **kwargs):
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
         
-        # imposed horizontal velocity on the lid
-        solid.u0[:] = 0.0
-        solid.v0[:] = 0.0
-                
     # return the particle list
     return [fluid, solid]
 
@@ -143,11 +141,13 @@ domain = DomainLimits(
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
+#kernel = Gaussian(dim=2)
+kernel = QuinticSpline(dim=2)
 
 # Create a solver.
 solver = Solver(
-    kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator)
+    kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator,
+    tdamp=0.0)
 
 # Setup default parameters.
 solver.set_time_step(dt)
@@ -155,34 +155,40 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # Summation density for the fluid phase
+    # State equation
     Group(
         equations=[
-            TransportVelocitySummationDensity(
-                dest='fluid', sources=['fluid','solid'], c0=c0),
+            DensitySummation(dest='fluid', sources=['fluid','solid']),
+            #VolumeSummation(dest='fluid',sources=['fluid', 'solid'],),
+
             ]),
     
-    # boundary conditions for the solid wall
+    # solid wall bc
     Group(
         equations=[
-            TransportVelocitySolidWall(
-                dest='solid', sources=['fluid',], rho0=rho0, p0=p0),
+
+            SolidWallBC(dest='solid', sources=['fluid'], gx=fx, b=1.0),
+            #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
+
             ]),
     
-    # acceleration equation
+    # accelerations
     Group(
         equations=[
+            StateEquation(dest='fluid', sources=None, b=1.0),
             BodyForce(dest='fluid', sources=None, fx=fx),
-            TransportVelocityMomentumEquation(
-                dest='fluid', sources=['fluid', 'solid'], nu=nu)
+            MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            ArtificialStress(dest='fluid', sources=['fluid',])
+
+            # BodyForce(dest='fluid', sources=None, fx=fx),
+            # MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            # ContinuityEquation(dest='fluid', sources=['fluid', 'solid']),
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
-
-with open('cylinder.pyx', 'w') as f:
-    app.dump_code(f)
 
 app.run()
