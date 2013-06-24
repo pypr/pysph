@@ -429,4 +429,143 @@ cdef class TransportVelocityIntegrator(Integrator):
     
                 # magnitude of velocity squared
                 vmag.data[i] = u.data[i]*u.data[i] + v.data[i]*v.data[i]
-                                         
+
+cdef class AdamiVelocityVerletIntegrator(Integrator):
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef _reset_accelerations(self):
+        cdef int i, npart
+        cdef object pa_wrapper
+        
+        # acc properties to reset
+        cdef DoubleArray au, av, aw, auhat, avhat, V, arho
+        cdef DoubleArray u, v, p, wij
+
+        for pa in self.particles:
+            name = pa.name
+
+            pa_wrapper = getattr(self.evaluator.calc, pa.name)
+
+            if not name.startswith('fluid'):
+                u = pa_wrapper.u; v = pa_wrapper.v
+                p = pa_wrapper.p; wij = pa_wrapper.wij
+
+                npart = pa.get_number_of_particles()
+                for i in range(npart):
+                    u.data[i] = 0.0
+                    v.data[i] = 0.0
+                    p.data[i] = 0.0
+                    wij.data[i] = 0.0
+
+            else:
+                au = pa_wrapper.au; av = pa_wrapper.av; aw = pa_wrapper.aw
+                auhat = pa_wrapper.auhat; avhat = pa_wrapper.avhat
+                arho = pa_wrapper.arho
+                
+                V = pa_wrapper.V
+
+                npart = pa.get_number_of_particles()
+                for i in range(npart):
+                    au.data[i] = 0.0
+                    av.data[i] = 0.0
+                    aw.data[i] = 0.0
+
+                    auhat.data[i] = 0.0
+                    avhat.data[i] = 0.0
+
+                    V.data[i] = 0.0
+                    arho.data[i] = 0.0
+
+    cpdef integrate(self, double t, double dt, int count):
+        """Main step routine"""
+        cdef object pa_wrapper
+        cdef object evaluator = self.evaluator
+        cdef object pm = self.pm
+        cdef NNPS nnps = self.nnps
+        cdef str name
+
+        # Particle properties
+        cdef DoubleArray x, y, z, u, v, w, uhat, vhat, rho
+        cdef DoubleArray vmag
+
+        # accelerations for the variables
+        cdef DoubleArray au, av, aw, auhat, avhat, arho
+
+        # number of particles
+        cdef size_t npart
+        cdef size_t i
+
+        # half time step
+        cdef double dtb2 = 0.5*dt
+
+        # damping constant
+        cdef double damping_constant = damping_function(t, self.tdamp)
+
+        #############################################################
+        # Predictor
+        #############################################################
+        for pa in self.particles:
+            name = pa.name
+
+            if not name.startswith('fluid'):
+                continue
+
+            pa_wrapper = getattr(self.evaluator.calc, name)
+
+            x = pa_wrapper.x  ; y = pa_wrapper.y  ; z = pa_wrapper.z
+
+            u = pa_wrapper.u  ; v = pa_wrapper.v  ; w = pa_wrapper.w
+            au = pa_wrapper.au; av = pa_wrapper.av; aw = pa_wrapper.aw
+
+            #uhat = pa_wrapper.uhat; vhat = pa_wrapper.vhat
+            #auhat = pa_wrapper.auhat; avhat = pa_wrapper.avhat
+
+            npart = pa.get_number_of_particles()
+            for i in range(npart):
+                # Update velocities
+                u.data[i] = u.data[i] + dtb2*au.data[i]
+                v.data[i] = v.data[i] + dtb2*av.data[i]
+
+                # udpate positions
+                x.data[i] = x.data[i] + dtb2 * u.data[i]
+                y.data[i] = y.data[i] + dtb2 * v.data[i]
+                
+        # Update NNPS since particles have moved
+        if pm: pm.update()
+        nnps.update()
+
+        # compute accelerations
+        self._reset_accelerations()
+        evaluator.compute(t, dt)
+
+        #############################################################
+        # Corrector
+        #############################################################
+        for pa in self.particles:
+            name = pa.name
+
+            if not name.startswith('fluid'):
+                continue
+
+            pa_wrapper = getattr(self.evaluator.calc, name)
+
+            u = pa_wrapper.u  ; v = pa_wrapper.v
+            au = pa_wrapper.au; av = pa_wrapper.av
+            arho = pa_wrapper.arho; rho = pa_wrapper.rho
+            vmag = pa_wrapper.vmag
+
+            npart = pa.get_number_of_particles()
+            for i in range(npart):
+                # Update velocities avoiding impulsive starts
+                u.data[i] = u.data[i] + dtb2*au.data[i]*damping_constant
+                v.data[i] = v.data[i] + dtb2*av.data[i]*damping_constant
+
+                # udpate positions
+                x.data[i] = x.data[i] + dtb2 * u.data[i]
+                y.data[i] = y.data[i] + dtb2 * v.data[i]
+
+                # update densities
+                rho.data[i] = rho.data[i] + dt * arho.data[i]
+    
+                # magnitude of velocity squared
+                vmag.data[i] = u.data[i]*u.data[i] + v.data[i]*v.data[i]

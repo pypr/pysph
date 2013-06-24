@@ -24,10 +24,10 @@ c0 = 10 * Umax; rho0 = 1.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-Re = 1000; nu = Umax * L/Re
+Re = 5000; nu = Umax * L/Re
 
 # Numerical setup
-nx = 100; dx = L/nx
+nx = 120; dx = L/nx
 ghost_extent = 5 * dx
 hdx = 1.2
 
