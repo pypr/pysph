@@ -16,6 +16,8 @@ for more information.
 import numpy
 import commands
 import os
+import sys
+from os import path
 
 from setuptools import find_packages, setup
 from numpy.distutils.extension import Extension
@@ -38,20 +40,21 @@ mpi_compile_args = []
 mpi_link_args = []
 
 mpic = 'mpicc'
-mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
-mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
-mpi_inc_dirs.append(mpi4py.get_include())
+if Have_MPI:
+    mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
+    mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
+    mpi_inc_dirs.append(mpi4py.get_include())
 
 # Zoltan Headers
-zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
-zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
-
-# PyZoltan includes
 pyzoltan_include = []
-if Have_Zoltan:
+if Have_Zoltan and Have_MPI:
+    zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
+    zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
+
+    # PyZoltan includes
     pyzoltan_include = [pyzoltan.get_include()]
 
-include_dirs = [numpy.get_include()]
+include_dirs = [numpy.get_include()] + pyzoltan_include
 
 cmdclass = {'build_ext': build_ext}
 
@@ -65,33 +68,34 @@ ext_modules = [
 
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
-    
+
     # sph module
     Extension( name="pysph.sph.integrator",
-               sources=["pysph/sph/integrator.pyx"])
+               sources=["pysph/sph/integrator.pyx"]),
 
+    # kernels used for tests
+    Extension( name="pysph.parallel._kernels",
+               sources=["pysph/parallel/_kernels.pyx"]
+               ),
     ]
 
 # add the include dirs for the extension modules
 for ext in ext_modules:
     ext.include_dirs = include_dirs
 
-parallel_modules = [
-    Extension( name="pysph.parallel.parallel_manager",
-               sources=["pysph/parallel/parallel_manager.pyx"],
-               include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
-               library_dirs = zoltan_library_dirs,
-               libraries = ['zoltan', 'mpi'],
-               extra_link_args=mpi_link_args,
-               extra_compile_args=mpi_compile_args),
-
-    Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"]
-               ),
-    ]
-
-# currently we depend on PyZoltan
+# currently we depend on PyZoltan for the parallel stuff
 if Have_MPI and Have_Zoltan:
+    parallel_modules = [
+
+        Extension( name="pysph.parallel.parallel_manager",
+                   sources=["pysph/parallel/parallel_manager.pyx"],
+                   include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
+                   library_dirs = zoltan_library_dirs,
+                   libraries = ['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+        ]
+    
     ext_modules += parallel_modules
 
 setup(name='PySPH',

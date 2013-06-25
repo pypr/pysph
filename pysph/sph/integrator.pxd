@@ -11,6 +11,8 @@ cdef class Integrator:
     # Data attributes
     ############################################################
     cdef double cfl             # cfl for stable time steps
+
+    cdef double tdamp           # solution damping interval
     
     cdef public object pm
     cdef public list particles

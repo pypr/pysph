@@ -39,6 +39,9 @@ cdef class SPHCalc:
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
     cdef UIntArray nbrs
+
+    # CFL time step conditions
+    cdef public double dt_cfl
     
     def __init__(self, *particle_arrays):
         for i, pa in enumerate(particle_arrays):
@@ -50,7 +53,7 @@ cdef class SPHCalc:
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps            
     
-    cpdef compute(self):
+    cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
         cdef int s_idx, d_idx
         cdef UIntArray nbrs = self.nbrs
@@ -127,8 +130,9 @@ cdef class SPHCalc:
                 s_idx = <int>nbrs.data[nbr_idx]
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
-                ###############################################################
+                ###############################################################                        
                 ${indent(eq_group.get_loop_code(object.kernel), 4)}
+
             ###################################################################
             ## Do any post neighbor loop assignments.
             ###################################################################

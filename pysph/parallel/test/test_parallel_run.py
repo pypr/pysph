@@ -100,7 +100,7 @@ class ExampleTestCase(unittest.TestCase):
     
     """
     def run_example(self, filename, tf=0.01, nprocs=2, load_func=load,
-                    timeout=300):
+                    timeout=300, ghost_layers=2):
         """Run an example and compare the results in serial and parallel.
 
         Parameters:
@@ -136,7 +136,8 @@ class ExampleTestCase(unittest.TestCase):
             args = ['--fname=%s'%prefix,
                     '--directory=%s'%dir1,
                     '--tf=%g'%(tf),
-                    '--pfreq=1000000']
+                    '--pfreq=1000000',
+                    '--ghost-layers=%g'%ghost_layers]
 
             # run the example script in serial
             _run_example_script(filename, args, 1, timeout)
@@ -187,7 +188,8 @@ class DamBreakTestCase(ExampleTestCase):
 
     @attr(slow=True, parallel=True)
     def test_db(self):
-        self.run_example('../../../examples/dam_break.py', nprocs=4, load_func=load, tf=0.01)
+        self.run_example('../../../examples/dam_break.py', 
+                         nprocs=4, load_func=load, tf=0.01, ghost_layers=1)
 
 if __name__ == "__main__":
     unittest.main()

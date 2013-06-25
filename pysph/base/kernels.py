@@ -189,4 +189,77 @@ class Gaussian(object):
         '''.replace("DIM", str(self.dim)))
         return dict(helper=code)
 
+class QuinticSpline(object):
+    def __init__(self, dim=2):
+        self.radius_scale = 3.0
+        self.dim = dim
+    def cython_code(self):
+        code = dedent('''\
+        from libc.math cimport fabs, sqrt, M_1_PI
+            
+        cdef inline double QuinticSplineKernel(double xij, double yij, double zij, double h):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0
+            cdef double fac
+
+            if DIM == 2:
+                fac = M_1_PI * 7./478.0 * h1 * h1
+
+            else:
+                raise ValueError
+
+            if ( q > 3.0 ):
+                val = 0.0
+
+            elif ( q > 2.0 ):
+                val = (3.0-q)**5
+
+            elif ( q > 1.0 ):
+                val = (3.0-q)**5 - 6.0*(2.0-q)**5
+
+            else:
+                val = (3.0-q)**5 - 6*(2.0-q)**5 + 15.0*(1.0-q)**5
+
+            return val * fac
+
+        cdef inline QuinticSplineGradient(double xij, double yij, double zij, double h,
+                                          double* grad):
+            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+
+            cdef double h1 = 1./h
+            cdef double q = rij*h1
+            cdef double val = 0.0, fac, tmp
+
+            if DIM == 2:
+                fac = M_1_PI * 7./478.0 * h1 * h1
+
+            else:
+                raise ValueError
+
+            # compute the gradient
+            if (rij > 1e-12):
+                if ( q > 3.0 ):
+                    val = 0.0
+
+                elif ( q > 2.0 ):
+                    val = -5.0 * (3.0 - q)**4 * h1/rij
+
+                elif ( q > 1.0 ):
+                    val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4) * h1/rij
+
+                else:
+                    val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4 - 75.0 * (1.0 - q)**4) * h1/rij
+
+            else:
+                val = 0.0
+
+            tmp = val * fac
+            grad[0] = tmp * xij
+            grad[1] = tmp * yij
+            grad[2] = tmp * zij
+            
+        '''.replace("DIM", str(self.dim)))
+        return dict(helper=code)

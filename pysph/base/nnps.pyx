@@ -692,15 +692,17 @@ cdef class NNPS:
             np = x.length
             for i in range(np):
                 
-                if periodic_in_x:
+                if ( (periodic_in_x and not periodic_in_y) ):
                     if x.data[i] < xmin : x.data[i] += xtranslate
                     if x.data[i] > xmax : x.data[i] -= xtranslate
-
-                    if periodic_in_y:
-                        if y.data[i] < ymin : y.data[i] += ytranslate
-                        if y.data[i] > ymax : y.data[i] -= ytranslate
                         
-                if periodic_in_y:
+                if ( (periodic_in_y and not periodic_in_x) ):
+                    if y.data[i] < ymin : y.data[i] += ytranslate
+                    if y.data[i] > ymax : y.data[i] -= ytranslate
+
+                if ( periodic_in_x and periodic_in_y ):
+                    if x.data[i] < xmin : x.data[i] += xtranslate
+                    if x.data[i] > xmax : x.data[i] -= xtranslate
                     if y.data[i] < ymin : y.data[i] += ytranslate
                     if y.data[i] > ymax : y.data[i] -= ytranslate
         
