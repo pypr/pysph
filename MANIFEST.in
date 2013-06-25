@@ -1,0 +1,5 @@
+include MANIFEST.in Makefile *.py *.txt pip_requirements.txt
+recursive-include examples *.py
+recursive-include docs *.* *
+include pysph/base/*.src
+recursive-include pysph *.pxd *.clt *.h *.c

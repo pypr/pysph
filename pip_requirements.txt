@@ -1,0 +1,6 @@
+numpy
+setuptools
+Cython>=0.17
+ordereddict
+mako
+numpydoc
