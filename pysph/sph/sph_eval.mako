@@ -21,7 +21,7 @@ cdef class ParticleArrayWrapper:
     cdef public IntArray tag, pid
     cdef public UIntArray gid
     cdef public DoubleArray ${array_names}
-    
+
     def __init__(self, pa, index):
         self.index = index
         self.array = pa
@@ -29,28 +29,30 @@ cdef class ParticleArrayWrapper:
         props = props.union(['tag', 'pid', 'gid'])
         for prop in props:
             setattr(self, prop, pa.get_carray(prop))
-        
+
     cpdef long size(self):
         return self.array.get_number_of_particles()
-        
+
 
 # #############################################################################
 cdef class SPHCalc:
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
     cdef UIntArray nbrs
-    
-    def __init__(self, *particle_arrays):
+    ${indent(object.get_equation_defs(), 1)}
+
+    def __init__(self, equations, *particle_arrays):
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
 
         self.nbrs = UIntArray()
+        ${indent(object.get_equation_init(), 2)}
 
     def set_nnps(self, NNPS nnps):
-        self.nnps = nnps            
-    
-    cpdef compute(self):
+        self.nnps = nnps
+
+    cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
         cdef int s_idx, d_idx
         cdef UIntArray nbrs = self.nbrs
@@ -73,7 +75,7 @@ cdef class SPHCalc:
         ## Iterate over groups:
         ## Groups are organized as {destination: (eqs_with_no_source, sources)}
         ## eqs_with_no_source: Group([equations]) all SPH Equations with no source.
-        ## sources are {source: Group([equations...])} 
+        ## sources are {source: Group([equations...])}
         #######################################################################
         % for g_idx, group in enumerate(object.groups):
         # Group ${g_idx}.
@@ -106,17 +108,15 @@ cdef class SPHCalc:
         #######################################################################
         ## Setup source array pointers.
         #######################################################################
-        
+
         src = self.${source}
         ${indent(object.get_src_array_setup(source, eq_group), 2)}
         src_array_index = src.index
-        
+
         #######################################################################
         ## Iterate over destination particles.
         #######################################################################
         for d_idx in range(NP_DEST):
-            # Initialize temp vars.\
-            ${indent(object.get_initialization(eq_group), 3)}
             ###################################################################
             ## Find and iterate over neighbors.
             ###################################################################
@@ -140,4 +140,3 @@ cdef class SPHCalc:
         % endfor
         # Group ${g_idx} done.
         % endfor
-        

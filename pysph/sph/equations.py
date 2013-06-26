@@ -7,13 +7,26 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
+import re
 from copy import deepcopy
+import inspect
 import itertools
 import numpy
 from textwrap import dedent
 
 # Local imports.
 from ast_utils import get_symbols
+from pysph.base.cython_generator import CythonGenerator
+
+def camel_to_underscore(name):
+    """Given a CamelCase name convert it to a name with underscores,
+    i.e. camel_case.
+    """
+    # From stackoverflow: :P
+    # http://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-camel-case
+    s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+
 
 ##############################################################################
 # `Context` class.
@@ -41,6 +54,15 @@ class Context(dict):
     def __setattr__(self, key, value):
         self[key] = value
 
+def get_array_names(symbols):
+    """Given a set of symbols, return a set of source array names and
+    a set of destination array names.
+    """
+    src_arrays = set(x for x in symbols
+                            if x.startswith('s_') and x != 's_idx')
+    dest_arrays = set(x for x in symbols
+                            if x.startswith('d_') and x != 'd_idx')
+    return src_arrays, dest_arrays
 
 ##############################################################################
 # `BasicCodeBlock` class.
@@ -107,10 +129,7 @@ class BasicCodeBlock(object):
         self.symbols = get_symbols(self.ast_tree)
 
         symbols = self.symbols
-        self.src_arrays = set(x for x in symbols
-                                if x.startswith('s_') and x != 's_idx')
-        self.dest_arrays = set(x for x in symbols
-                                if x.startswith('d_') and x != 'd_idx')
+        self.src_arrays, self.dest_arrays = get_array_names(symbols)
         self._setup_context()
 
     ##########################################################################
@@ -201,46 +220,12 @@ def precomputed_symbols():
     return c
 
 
-##############################################################################
-# `CodeBlock` class.
-##############################################################################
-class CodeBlock(BasicCodeBlock):
-
-    pre_comp = precomputed_symbols()
-
-    ##########################################################################
-    # Private interface.
-    ##########################################################################
-    def _setup_code(self, code):
-        super(CodeBlock, self)._setup_code(code)
-
-        # Calculate the precomputed symbols for this equation.
-        pre = self.pre_comp
-        precomputed = dict((s, pre[s]) for s in self.symbols if s in pre)
-
-        # Now find the precomputed symbols in the pre-computed symbols.
-        precomputed_symbols = set()
-        for cb in precomputed.values():
-            precomputed_symbols.update((s for s in cb.symbols if s in pre))
-
-        for s in precomputed_symbols:
-            if s not in precomputed:
-                precomputed[s] = pre[s]
-
-        self.precomputed = sort_precomputed(precomputed)
-
-        # Update the context.
-        context = self.context
-        for p, cb in self.precomputed.iteritems():
-            context[p] = cb.context[p]
-
-
 def sort_precomputed(precomputed):
     """Sorts the precomputed equations in the given dictionary as per the
     dependencies of the symbols and returns an ordered dict.
     """
     weights = dict((x, None) for x in precomputed)
-    pre_comp = CodeBlock.pre_comp
+    pre_comp = Group.pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
     depends = dict((x, None) for x in precomputed)
     for pre, cb in precomputed.iteritems():
@@ -292,25 +277,7 @@ class Equation(object):
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
         self.name = self.__class__.__name__ if name is None else name
-
-        # The initialization of any variables.  Should be a set of variables.
-        self.initialize_vars = None
-        # The loop code is run for each particle pair.
-        self.loop = None
-        # The post_loop code is run for each destination particle.
-        self.post_loop = None
-        self.setup()
-
-    ##########################################################################
-    # Public interface.
-    ##########################################################################
-    def setup(self):
-        """setup the code and context.
-        """
-        pass
-
-class VariableClashError(Exception):
-    pass
+        self.var_name = ''
 
 
 ###############################################################################
@@ -322,9 +289,13 @@ class Group(object):
     This class provides some support for the code generation for the
     collection of equations.
     """
+
+    pre_comp = precomputed_symbols()
+
     def __init__(self, equations):
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
+        self.context = Context()
         self.update()
 
     ##########################################################################
@@ -355,9 +326,9 @@ class Group(object):
         return '\n'.join(decl)
 
     def _get_code(self, kind='loop'):
-        assert kind in ('loop', 'post_loop')
+        assert kind in ('initiaize', 'loop', 'post_loop')
         # We assume here that precomputed quantities are only relevant
-        # for loops and not post_loops.
+        # for loops and not post_loops and initialization.
         pre = []
         if kind == 'loop':
             for p, cb in self.precomputed.iteritems():
@@ -366,10 +337,15 @@ class Group(object):
                 pre.append('')
         code = []
         for eq in self.equations:
-            cb = getattr(eq, kind)
-            if cb:
-                code.append('# %s.'%eq.name)
-                code.append(cb.code.strip())
+            meth = getattr(eq, kind, None)
+            if meth is not None:
+                args = inspect.getargspec(meth).args
+                if 'self' in args:
+                    args.remove('self')
+                call_args = ', '.join(args)
+                c = 'self.{eq_name}.{method}({args})'\
+                      .format(eq_name=eq.var_name, method=kind, args=call_args)
+                code.append(c)
         if len(code) > 0:
             code.append('')
         return '\n'.join(pre + code)
@@ -383,22 +359,40 @@ class Group(object):
         else:
             return code
 
+    def _setup_precomputed(self):
+        """Get the precomputed symbols for this group of equations.
+        """
+        # Calculate the precomputed symbols for this equation.
+        all_args = set()
+        for equation in self.equations:
+            args = inspect.getargspec(equation.loop).args
+            all_args.update(args)
+        all_args.discard('self')
+
+        pre = self.pre_comp
+        precomputed = dict((s, pre[s]) for s in all_args if s in pre)
+
+        # Now find the precomputed symbols in the pre-computed symbols.
+        precomputed_symbols = set()
+        for cb in precomputed.values():
+            precomputed_symbols.update((s for s in cb.symbols if s in pre))
+
+        for s in precomputed_symbols:
+            if s not in precomputed:
+                precomputed[s] = pre[s]
+
+        self.precomputed = sort_precomputed(precomputed)
+
+        # Update the context.
+        context = self.context
+        for p, cb in self.precomputed.iteritems():
+            context[p] = cb.context[p]
+
     ##########################################################################
     # Public interface.
     ##########################################################################
     def update(self):
-        precomp = {}
-        initialize_vars = set()
-        for equation in self.equations:
-            if equation.initialize_vars:
-                initialize_vars.update(equation.initialize_vars)
-            if equation.loop:
-                precomp.update(equation.loop.precomputed)
-            if equation.post_loop:
-                precomp.update(equation.post_loop.precomputed)
-
-        self.precomputed = sort_precomputed(precomp)
-        self.initialize_vars = initialize_vars
+        self._setup_precomputed()
 
     def get_array_names(self, recompute=False):
         """Returns two sets of array names, the first being source_arrays
@@ -409,28 +403,25 @@ class Group(object):
         src_arrays = set()
         dest_arrays = set()
         for equation in self.equations:
-            if equation.loop is not None:
-                src_arrays.update(equation.loop.src_arrays)
-                dest_arrays.update(equation.loop.dest_arrays)
-            if equation.post_loop is not None:
-                src_arrays.update(equation.post_loop.src_arrays)
-                dest_arrays.update(equation.post_loop.dest_arrays)
+            for meth_name in ('initialize', 'loop', 'post_loop'):
+                meth = getattr(equation, meth_name, None)
+                if meth is not None:
+                    args = inspect.getargspec(meth).args
+                    s, d = get_array_names(args)
+                    src_arrays.update(s)
+                    dest_arrays.update(d)
+
         for cb in self.precomputed.values():
             src_arrays.update(cb.src_arrays)
             dest_arrays.update(cb.dest_arrays)
 
         self.src_arrays = src_arrays
         self.dest_arrays = dest_arrays
-        return set(src_arrays), set(dest_arrays)
+        return src_arrays, dest_arrays
 
     def get_variable_names(self):
         # First get all the contexts and find the names.
         all_vars = set()
-        for equation in self.equations:
-            if equation.loop is not None:
-                all_vars.update(equation.loop.symbols)
-            if equation.post_loop is not None:
-                all_vars.update(equation.post_loop.symbols)
         for cb in self.precomputed.values():
             all_vars.update(cb.symbols)
 
@@ -453,33 +444,6 @@ class Group(object):
 
         return filtered_vars
 
-    def check_variables(self, variables):
-        """Given the sequence of variables, check for any conflicts
-        in the equations and returns the full context if there are no clashes.
-        """
-        context = Context()
-        seen = Context()
-        for equation in self.equations:
-            for var in variables:
-                for eq_kind in (equation.loop, equation.post_loop):
-                    if eq_kind is None or var not in eq_kind.context:
-                        continue
-                    eq_val = eq_kind.context[var]
-                    if var in context:
-                        ctx_val = context[var]
-                        if type(eq_val) != type(ctx_val):
-                            msg = 'Variable %s in %s has different type from '\
-                                'equation %s'%(var, equation.name, seen[var])
-                            raise VariableClashError(msg)
-                        elif eq_val != ctx_val:
-                            msg = 'Variable %s in %s has different value from '\
-                                'equation %s'%(var, equation.name, seen[var])
-                            raise VariableClashError(msg)
-                    else:
-                        context[var] = eq_val
-                        seen[var] = equation.name
-        return context
-
     def get_array_declarations(self, names):
         decl = []
         for arr in sorted(names):
@@ -489,19 +453,51 @@ class Group(object):
     def get_variable_declarations(self, context):
         return self._get_variable_decl(context, mode='declare')
 
-    def get_variable_initializations(self, context):
-        # Only initialize variables that are to be initialized
-        ctx = Context((x, context[x]) for x in context
-                                        if x in self.initialize_vars)
-        return self._get_variable_decl(ctx, mode='initialize')
+    def get_initialize_code(self, kernel=None):
+        code = self._get_code(kind='initialize')
+        return self._set_kernel(code, kernel)
 
     def get_loop_code(self, kernel=None):
-        code = self._get_code()
+        code = self._get_code(kind='loop')
         return self._set_kernel(code, kernel)
 
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
+
+    def get_equation_wrappers(self):
+        classes = defaultdict(lambda: 0)
+        eqs = {}
+        for equation in self.equations:
+            cls = equation.__class__
+            n = classes[cls]
+            equation.var_name = '%s%d'%(camel_to_underscore(equation.name), n)
+            classes[cls] += 1
+            eqs[cls] = equation
+        wrappers = []
+        code_gen = CythonGenerator()
+        for cls in classes:
+            code_gen.parse(eqs[cls])
+            wrappers.append(code_gen.get_code())
+        return '\n'.join(wrappers)
+
+    def get_equation_defs(self):
+        lines = []
+        for equation in self.equations:
+            code = 'cdef public {cls} {name}'.format(cls=equation.name,
+                                                     name=equation.var_name)
+            lines.append(code)
+        return '\n'.join(lines)
+
+    def get_equation_init(self):
+        lines = []
+        for i, equation in enumerate(self.equations):
+            code = 'self.{name} = {cls}(equations[{idx}])'\
+                        .format(name=equation.var_name, cls=equation.name,
+                                idx=i)
+            lines.append(code)
+        return '\n'.join(lines)
+
 
 ##############################################################################
 # `ContinuityEquation` class.
@@ -531,7 +527,7 @@ class BodyForce(Equation):
         d_aw[d_idx] += self.fz
 
 class TaitEOS(Equation):
-    def __init__(self, dest, sources,
+    def __init__(self, dest, sources=None,
                  rho0=1000.0, c0=1.0, gamma=7.0):
         self.rho0 = rho0
         self.rho01 = 1.0/rho0
@@ -539,7 +535,6 @@ class TaitEOS(Equation):
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
         self.B = rho0*c0*c0/gamma
-        self.ratio = 0.0
         super(TaitEOS, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_p, d_cs):
@@ -550,7 +545,7 @@ class TaitEOS(Equation):
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
 class MomentumEquation(Equation):
-    def __init__(self, dest, sources,
+    def __init__(self, dest, sources=None,
                  alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
                  c0=1.0):
         self.alpha = alpha
@@ -562,7 +557,8 @@ class MomentumEquation(Equation):
         self.dt_fac = 0.0
         super(MomentumEquation, self).__init__(dest, sources)
 
-    def loop(self, d_idx, s_idx, d_rho, d_cs, d_p, d_au, d_av, d_aw, s_m,
+    def loop(self, d_idx, s_idx, d_rho, d_cs,
+             d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ=[0.0, 0.0, 0.0],
              XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
              DWIJ=[1.0, 1.0, 1.0]):
@@ -600,7 +596,7 @@ class MomentumEquation(Equation):
 
 
 class XSPHCorrection(Equation):
-    def __init__(self, dest, sources, eps=0.5):
+    def __init__(self, dest, sources=None, eps=0.5):
         self.eps = eps
         super(XSPHCorrection, self).__init__(dest, sources)
 
