@@ -65,7 +65,7 @@ ext_modules = [
 
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
-    
+
     # sph module
     Extension( name="pysph.sph.integrator",
                sources=["pysph/sph/integrator.pyx"])
@@ -86,7 +86,8 @@ parallel_modules = [
                extra_compile_args=mpi_compile_args),
 
     Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"]
+               sources=["pysph/parallel/_kernels.pyx"],
+               include_dirs = include_dirs,
                ),
     ]
 
@@ -107,7 +108,7 @@ setup(name='PySPH',
       packages = find_packages(),
 
       ext_modules = ext_modules,
-      
+
       include_package_data = True,
       cmdclass=cmdclass,
       #install_requires=['mpi4py>=1.2', 'numpy>=1.0.3', 'Cython>=0.14'],
@@ -136,4 +137,3 @@ setup(name='PySPH',
         Topic :: Software Development :: Libraries
         """.splitlines() if len(c.split()) > 0],
       )
-
