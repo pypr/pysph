@@ -17,16 +17,16 @@ from ast_utils import get_symbols
 
 ##############################################################################
 # `Context` class.
-##############################################################################        
+##############################################################################
 class Context(dict):
     """Based on the Bunch receipe by Alex Martelli from Active State's recipes.
-    
-    A convenience class used to specify a context in which a code block will 
+
+    A convenience class used to specify a context in which a code block will
     execute.
-    
+
     Example
     -------
-    
+
     Basic usage::
         >>> c = Context(a=1, b=2)
         >>> c.a
@@ -44,22 +44,22 @@ class Context(dict):
 
 ##############################################################################
 # `BasicCodeBlock` class.
-##############################################################################        
+##############################################################################
 class BasicCodeBlock(object):
     """Encapsulates a string of code and the context in which it executes.
-    
+
     It also performs some simple analysis of the code that proves handy.
     """
-    
+
     ##########################################################################
     # `object` interface.
     ##########################################################################
     def __init__(self, code, **kwargs):
-        """Constructor. 
-        
+        """Constructor.
+
         Parameters
         ----------
-        
+
         code : str: source code.
         kwargs : values which define the context of the code.
         """
@@ -69,11 +69,11 @@ class BasicCodeBlock(object):
         """A simplistic test for the code that runs the code in the setup
         context with any additional arguments passed set in the context.
 
-        Note that this will make a deepcopy of the context to prevent any 
+        Note that this will make a deepcopy of the context to prevent any
         changes to the original context.
-        
+
         It returns a dictionary.
-        
+
         """
         context = deepcopy(dict(self.context))
         if kwargs:
@@ -92,7 +92,7 @@ class BasicCodeBlock(object):
         for index in ('s_idx', 'd_idx'):
             if index in symbols and index not in context:
                 context[index] = 0
-                
+
         for a_name in itertools.chain(self.src_arrays, self.dest_arrays):
             if a_name not in context:
                 context[a_name] = numpy.zeros(2, dtype=float)
@@ -105,11 +105,11 @@ class BasicCodeBlock(object):
         self.code = code
         self.ast_tree = ast.parse(code)
         self.symbols = get_symbols(self.ast_tree)
-        
+
         symbols = self.symbols
-        self.src_arrays = set(x for x in symbols 
+        self.src_arrays = set(x for x in symbols
                                 if x.startswith('s_') and x != 's_idx')
-        self.dest_arrays = set(x for x in symbols 
+        self.dest_arrays = set(x for x in symbols
                                 if x.startswith('d_') and x != 'd_idx')
         self._setup_context()
 
@@ -118,12 +118,12 @@ class BasicCodeBlock(object):
     ##########################################################################
     def setup(self, code, **kwargs):
         """Setup the code and context with the given arguments.
-        
+
         Parameters
         ----------
-        
+
         code : str: source code.
-        
+
         kwargs : values which define the context of the code.
         """
         self.context = Context(**kwargs)
@@ -136,7 +136,7 @@ class BasicCodeBlock(object):
 # Convenient precomputed symbols and their code.
 ##############################################################################
 def precomputed_symbols():
-    """Return a collection of predefined symbols that can be used in equations.    
+    """Return a collection of predefined symbols that can be used in equations.
     """
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
@@ -151,7 +151,7 @@ def precomputed_symbols():
                 XIJ[1] = d_y[d_idx] - s_y[s_idx]
                 XIJ[2] = d_z[d_idx] - s_z[s_idx]
 
-                """), 
+                """),
                 XIJ=[0.0, 0.0, 0.0])
 
     c.VIJ = BasicCodeBlock(code=dedent("""
@@ -203,17 +203,17 @@ def precomputed_symbols():
 
 ##############################################################################
 # `CodeBlock` class.
-##############################################################################        
+##############################################################################
 class CodeBlock(BasicCodeBlock):
-    
+
     pre_comp = precomputed_symbols()
-        
+
     ##########################################################################
     # Private interface.
     ##########################################################################
     def _setup_code(self, code):
         super(CodeBlock, self)._setup_code(code)
-        
+
         # Calculate the precomputed symbols for this equation.
         pre = self.pre_comp
         precomputed = dict((s, pre[s]) for s in self.symbols if s in pre)
@@ -235,10 +235,10 @@ class CodeBlock(BasicCodeBlock):
             context[p] = cb.context[p]
 
 
-def sort_precomputed(precomputed):    
+def sort_precomputed(precomputed):
     """Sorts the precomputed equations in the given dictionary as per the
-    dependencies of the symbols and returns an ordered dict. 
-    """    
+    dependencies of the symbols and returns an ordered dict.
+    """
     weights = dict((x, None) for x in precomputed)
     pre_comp = CodeBlock.pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
@@ -268,7 +268,7 @@ def sort_precomputed(precomputed):
                 weights[name] = level
                 levels[level].append(name)
                 pre_comp_names.remove(name)
-    
+
     result = OrderedDict()
     for level in range(len(levels)):
         for name in sorted(levels[level]):
@@ -279,9 +279,9 @@ def sort_precomputed(precomputed):
 
 ##############################################################################
 # `Equation` class.
-##############################################################################        
+##############################################################################
 class Equation(object):
-    
+
     ##########################################################################
     # `object` interface.
     ##########################################################################
@@ -292,7 +292,7 @@ class Equation(object):
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
         self.name = self.__class__.__name__ if name is None else name
-        
+
         # The initialization of any variables.  Should be a set of variables.
         self.initialize_vars = None
         # The loop code is run for each particle pair.
@@ -300,12 +300,12 @@ class Equation(object):
         # The post_loop code is run for each destination particle.
         self.post_loop = None
         self.setup()
-        
+
     ##########################################################################
     # Public interface.
     ##########################################################################
     def setup(self):
-        """setup the code and context.        
+        """setup the code and context.
         """
         pass
 
@@ -318,15 +318,15 @@ class VariableClashError(Exception):
 ###############################################################################
 class Group(object):
     """A group of equations.
-    
+
     This class provides some support for the code generation for the
-    collection of equations. 
+    collection of equations.
     """
     def __init__(self, equations):
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.update()
-        
+
     ##########################################################################
     # Non-public interface.
     ##########################################################################
@@ -339,12 +339,12 @@ class Group(object):
             if isinstance(value, int):
                 declare = 'cdef long ' if mode == 'declare' else ''
                 decl.append('{declare}{var} = {value}'.format(declare=declare,
-                                                              var=var, 
-                                                              value=value))                    
+                                                              var=var,
+                                                              value=value))
             elif isinstance(value, float):
                 declare = 'cdef double ' if mode == 'declare' else ''
                 decl.append('{declare}{var} = {value}'.format(declare=declare,
-                                                              var=var, 
+                                                              var=var,
                                                               value=value))
             elif isinstance(value, (list, tuple)):
                 if mode == 'declare':
@@ -353,7 +353,7 @@ class Group(object):
                 else:
                     pass
         return '\n'.join(decl)
-        
+
     def _get_code(self, kind='loop'):
         assert kind in ('loop', 'post_loop')
         # We assume here that precomputed quantities are only relevant
@@ -373,7 +373,7 @@ class Group(object):
         if len(code) > 0:
             code.append('')
         return '\n'.join(pre + code)
-        
+
     def _set_kernel(self, code, kernel):
         if kernel is not None:
             k_name = kernel.__class__.__name__
@@ -391,11 +391,11 @@ class Group(object):
         initialize_vars = set()
         for equation in self.equations:
             if equation.initialize_vars:
-                initialize_vars.update(equation.initialize_vars)   
+                initialize_vars.update(equation.initialize_vars)
             if equation.loop:
                 precomp.update(equation.loop.precomputed)
             if equation.post_loop:
-                precomp.update(equation.post_loop.precomputed)                
+                precomp.update(equation.post_loop.precomputed)
 
         self.precomputed = sort_precomputed(precomp)
         self.initialize_vars = initialize_vars
@@ -422,7 +422,7 @@ class Group(object):
         self.src_arrays = src_arrays
         self.dest_arrays = dest_arrays
         return set(src_arrays), set(dest_arrays)
-        
+
     def get_variable_names(self):
         # First get all the contexts and find the names.
         all_vars = set()
@@ -433,7 +433,7 @@ class Group(object):
                 all_vars.update(equation.post_loop.symbols)
         for cb in self.precomputed.values():
             all_vars.update(cb.symbols)
-            
+
         # Filter out all arrays.
         filtered_vars = [x for x in all_vars \
                          if not x.startswith(('s_', 'd_'))]
@@ -441,7 +441,7 @@ class Group(object):
         ignore = ['KERNEL', 'GRADIENT', 's_idx', 'd_idx']
         # Math functions.
         import math
-        ignore += [x for x in dir(math) if not x.startswith('_') 
+        ignore += [x for x in dir(math) if not x.startswith('_')
                                             and callable(getattr(math, x))]
         try:
             ignore.remove('gamma')
@@ -450,7 +450,7 @@ class Group(object):
             # Older Python's don't have gamma/lgamma.
             pass
         filtered_vars = [x for x in filtered_vars if x not in ignore]
-                            
+
         return filtered_vars
 
     def check_variables(self, variables):
@@ -485,64 +485,50 @@ class Group(object):
         for arr in sorted(names):
             decl.append('cdef double* %s'%arr)
         return '\n'.join(decl)
-        
+
     def get_variable_declarations(self, context):
         return self._get_variable_decl(context, mode='declare')
-        
+
     def get_variable_initializations(self, context):
         # Only initialize variables that are to be initialized
-        ctx = Context((x, context[x]) for x in context 
+        ctx = Context((x, context[x]) for x in context
                                         if x in self.initialize_vars)
         return self._get_variable_decl(ctx, mode='initialize')
 
     def get_loop_code(self, kernel=None):
         code = self._get_code()
         return self._set_kernel(code, kernel)
-            
+
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
 
 ##############################################################################
 # `ContinuityEquation` class.
-##############################################################################        
+##############################################################################
 class ContinuityEquation(Equation):
-    def setup(self):
-        code = dedent("""
-
+    def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
+             VIJ=[0.0, 0.0, 0.0]):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
-        """)
-
-        self.loop = CodeBlock(code=code, vijdotdwij=0.0)
 
 class SummationDensity(Equation):
-    def setup(self):
-        code = dedent('''
-
+    def loop(self, d_idx, d_rho, s_idx, s_m, WIJ=0.0):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
-        ''')
-        self.loop = CodeBlock(code=code)
-
 class BodyForce(Equation):
-    def __init__(self, dest, sources, 
+    def __init__(self, dest, sources,
                  fx=0.0, fy=0.0, fz=0.0):
         self.fx = fx
         self.fy = fy
         self.fz = fz
         super(BodyForce, self).__init__(dest, sources)
 
-    def setup(self):
-        code = dedent('''
-
-        d_au[d_idx] += fx
-        d_av[d_idx] += fy
-        d_aw[d_idx] += fz
-
-        ''')
-        self.loop = CodeBlock(code=code, fx=self.fx, fy=self.fy, fz=self.fz)
+    def loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] += self.fx
+        d_av[d_idx] += self.fy
+        d_aw[d_idx] += self.fz
 
 class TaitEOS(Equation):
     def __init__(self, dest, sources,
@@ -553,22 +539,15 @@ class TaitEOS(Equation):
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
         self.B = rho0*c0*c0/gamma
+        self.ratio = 0.0
         super(TaitEOS, self).__init__(dest, sources)
-        
-    def setup(self):
-        code = dedent("""
 
-        ratio = d_rho[d_idx] * rho01
-        tmp = pow(ratio, gamma)
+    def loop(self, d_idx, d_rho, d_p, d_cs):
+        ratio = d_rho[d_idx] * self.rho01
+        tmp = pow(ratio, self.gamma)
 
-        d_p[d_idx] = B * (tmp - 1.0)
-        d_cs[d_idx] = c0 * pow( ratio, gamma1 )
-
-        """)
-        self.loop = CodeBlock(code=code,
-                              rho01=self.rho01, c0=self.c0, B=self.B,
-                              gamma=self.gamma, gamma1=self.gamma1,
-                              ratio=0.0, tmp=0.0)
+        d_p[d_idx] = self.B * (tmp - 1.0)
+        d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
 class MomentumEquation(Equation):
     def __init__(self, dest, sources,
@@ -580,11 +559,13 @@ class MomentumEquation(Equation):
         self.gx = gx
         self.gy = gy
         self.gz = gz
+        self.dt_fac = 0.0
         super(MomentumEquation, self).__init__(dest, sources)
 
-    def setup(self):
-        code = dedent("""
-
+    def loop(self, d_idx, s_idx, d_rho, d_cs, d_p, d_au, d_av, d_aw, s_m,
+             s_rho, s_cs, s_p, VIJ=[0.0, 0.0, 0.0],
+             XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
+             DWIJ=[1.0, 1.0, 1.0]):
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
 
@@ -594,16 +575,16 @@ class MomentumEquation(Equation):
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(R2IJ + eta*eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
 
-            piij = -alpha*cij*muij + beta*muij*muij
+            piij = -self.alpha*cij*muij + self.beta*muij*muij
             piij = piij*RHOIJ1
 
         # compute the CFL time step factor
         _dt_fac = 0.0
         if R2IJ > 1e-12:
-            _dt_fac = fabs( HIJ * vijdotxij/R2IJ )
-            dt_fac = max(_dt_fac, dt_fac)
+            _dt_fac = abs( HIJ * vijdotxij/R2IJ )
+            self.dt_fac = max(_dt_fac, self.dt_fac)
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 
@@ -611,45 +592,32 @@ class MomentumEquation(Equation):
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[2]
 
-        """)
 
-        self.loop = CodeBlock(code=code, alpha=self.alpha, beta=self.beta,
-                              eta=self.eta, muij=0.0, piij=0.0, cij=0.0,
-                              tmp=0.0, vijdotxij=0.0)
+    def post_loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] +=  self.gx
+        d_av[d_idx] +=  self.gy
+        d_aw[d_idx] +=  self.gz
 
-        code = dedent("""
-        d_au[d_idx] +=  gx
-        d_av[d_idx] +=  gy
-        d_aw[d_idx] +=  gz
-
-        """)
-        self.post_loop = CodeBlock(code=code, gx=self.gx, gy=self.gy, 
-                                   gz=self.gz)
 
 class XSPHCorrection(Equation):
     def __init__(self, dest, sources, eps=0.5):
         self.eps = eps
         super(XSPHCorrection, self).__init__(dest, sources)
-        
-    def setup(self):
-        code = dedent("""\
 
-        tmp = -eps * s_m[s_idx]*WIJ*RHOIJ1
+    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ=1.0, RHOIJ1=1.0,
+             VIJ=[1.0,1,1]):
+        tmp = -self.eps * s_m[s_idx]*WIJ*RHOIJ1
 
         d_ax[d_idx] += tmp * VIJ[0]
         d_ay[d_idx] += tmp * VIJ[1]
         d_az[d_idx] += tmp * VIJ[2]
 
-        """)
-        self.loop = CodeBlock(code=code, eps=self.eps, tmp=0.0)
 
-        code = dedent("""\
+    def post_loop(self, d_idx, d_ax, d_ay, d_az, d_u, d_v, d_w):
         d_ax[d_idx] += d_u[d_idx]
         d_ay[d_idx] += d_v[d_idx]
         d_az[d_idx] += d_w[d_idx]
 
-        """)
-        self.post_loop = CodeBlock(code=code)
 
 if __name__ == '__main__':
     # Simple demonstration of one of the equations.
