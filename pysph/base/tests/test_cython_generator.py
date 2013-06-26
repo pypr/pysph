@@ -14,7 +14,7 @@ class BasicEq:
 
 class EqWithMethod(BasicEq):
     def func(self, d_idx=0, d_x=[0.0, 0.0]):
-        tmp = self.rho*self.c
+        tmp = abs(self.rho*self.c)
         d_x[d_idx] = d_x[d_idx]*tmp
 
 
@@ -41,7 +41,7 @@ class TestMiscUtils(TestBase):
                  (('s_something', None), 'double*'),
                  (('d_idx', 0), 'long'),
                  (('x', 1), 'long'),
-                 (('s', 'asdas'), 'basestring'),
+                 (('s', 'asdas'), 'str'),
                  (('junk', 1.0), 'double'),
                  (('y', [0.0, 1.0]), 'double[2]'),
                  (('y', [0.0, 1.0, 0.0]), 'double[3]'),
@@ -64,6 +64,7 @@ class TestMiscUtils(TestBase):
             def __init__(self, object obj):
                 for key in obj.__dict__:
                     setattr(self, key, getattr(obj, key))
+
             def f(self, x):
                 x += 1
                 return x+1
@@ -74,7 +75,7 @@ class TestMiscUtils(TestBase):
 class TestCythonCodeGenerator(TestBase):
     def test_simple_constructor(self):
         cg = CythonGenerator()
-        cg.parse(BasicEq)
+        cg.parse(BasicEq())
         expect = dedent("""
         cdef class BasicEq:
             cdef public double c
@@ -88,7 +89,7 @@ class TestCythonCodeGenerator(TestBase):
 
     def test_simple_method(self):
         cg = CythonGenerator()
-        cg.parse(EqWithMethod)
+        cg.parse(EqWithMethod())
         expect = dedent("""
         cdef class EqWithMethod:
             cdef public double c
@@ -97,9 +98,10 @@ class TestCythonCodeGenerator(TestBase):
             def __init__(self, object obj):
                 for key in obj.__dict__:
                     setattr(self, key, getattr(obj, key))
+
             cdef inline func(self, long d_idx, double* d_x):
                 cdef double tmp
-                tmp = self.rho*self.c
+                tmp = abs(self.rho*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())

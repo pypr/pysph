@@ -5,9 +5,11 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+import __builtin__
 import inspect
 import logging
 from mako.template import Template
+import math
 from textwrap import dedent
 
 from pysph.sph.ast_utils import get_symbols
@@ -29,11 +31,13 @@ cdef class ${class_name}:
     def __init__(self, object obj):
         for key in obj.__dict__:
             setattr(self, key, getattr(obj, key))
+
 %for defn, body in methods:
     ${defn}
     %for line in body.splitlines():
 ${line}
     %endfor
+
 %endfor
         """)
         t = Template(text=template)
@@ -62,20 +66,23 @@ def all_numeric(seq):
 class CodeGenerationError(Exception):
     pass
 
+class Undefined(object):
+    pass
+
 class CythonGenerator(object):
     def __init__(self):
         self.code = ''
 
-    def parse(self, cls):
+    def parse(self, obj):
+        cls = obj.__class__
         name = cls.__name__
-        public_vars = self._get_public_vars(cls)
+        public_vars = self._get_public_vars(obj)
         methods = self._get_methods(cls)
         helper = CythonClassHelper(name=name, public_vars=public_vars,
                                    methods=methods)
         self.code = helper.generate()
 
-    def _get_public_vars(self, cls):
-        obj = cls()
+    def _get_public_vars(self, obj):
         # For now get it all from the dict.
         data = obj.__dict__
         vars = dict((name, self.detect_type(name, data[name]))
@@ -101,7 +108,8 @@ class CythonGenerator(object):
         body = ''.join(lines)
         dedented_body = dedent(body)
         symbols = get_symbols(dedented_body)
-        undefined = symbols - args
+        standard_symbols = set(dir(__builtin__) + dir(math))
+        undefined = symbols - args - standard_symbols
         declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
         code = ''.join(declare) + body
         return code
@@ -112,15 +120,18 @@ class CythonGenerator(object):
         args = argspec.args
         if args and args[0] == 'self':
             args = args[1:]
-        defaults = argspec.defaults
-        if defaults is None or (len(args) != len(argspec.defaults)):
-            msg = 'Error in method {name}, not enough default '\
-                  'arguments specified.'.format(name=name)
-            raise CodeGenerationError(msg)
+        defaults = argspec.defaults if argspec.defaults is not None else []
+        call_args = {}
+        for i in range(1, len(defaults)+1):
+            call_args[args[-i]] = defaults[-i]
+
+        # Set the rest to Undefined
+        for i in range(len(args) - len(defaults)):
+            call_args[args[i]] = Undefined
 
         new_args = ['self']
-        for i, arg in enumerate(args):
-            value = defaults[i]
+        for arg in args:
+            value = call_args[arg]
             type = self.detect_type(arg, value)
 	    new_args.append('{type} {arg}'.format(type=type, arg=arg))
 
@@ -137,10 +148,17 @@ class CythonGenerator(object):
         """
         if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
             return 'double*'
-        if isinstance(value, int):
+        if name in ['s_idx', 'd_idx']:
             return 'long'
-        elif isinstance(value, basestring):
-            return 'basestring'
+        if value is Undefined:
+            raise CodeGenerationError('Unknown type, for %s'%name)
+
+        if isinstance(value, bool):
+            return 'int'
+        elif isinstance(value, int):
+            return 'long'
+        elif isinstance(value, str):
+            return 'str'
         elif isinstance(value, float):
             return 'double'
         elif isinstance(value, (list, tuple)):
