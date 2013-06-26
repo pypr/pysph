@@ -1,4 +1,5 @@
 # Automatically generated, do not edit.
+#cython: cdivision=True
 <%def name="indent(text, level=0)" buffered="True">
 % for l in text.splitlines():
 ${' '*4*level}${l}

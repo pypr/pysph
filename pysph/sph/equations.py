@@ -326,7 +326,7 @@ class Group(object):
         return '\n'.join(decl)
 
     def _get_code(self, kind='loop'):
-        assert kind in ('initiaize', 'loop', 'post_loop')
+        assert kind in ('initialize', 'loop', 'post_loop')
         # We assume here that precomputed quantities are only relevant
         # for loops and not post_loops and initialization.
         pre = []

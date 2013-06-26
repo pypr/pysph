@@ -136,7 +136,7 @@ class CythonGenerator(object):
 	    new_args.append('{type} {arg}'.format(type=type, arg=arg))
 
         arg_def = ', '.join(new_args)
-        defn = 'cdef inline {name}({arg_def}):'.format(name=name,
+        defn = 'cdef inline void {name}({arg_def}):'.format(name=name,
                                                        arg_def=arg_def)
         return defn
 
