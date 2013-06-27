@@ -36,37 +36,6 @@ cdef extern from 'limits.h':
     cdef int INT_MAX
     cdef unsigned int UINT_MAX
 
-cdef class ParticleArrayWrapper:
-    def __init__(self, ParticleArray pa):
-        self.pa = pa
-        self.name = pa.name
-
-        # set up the load balancing props for the particle array
-        self.x = pa.get_carray('x')
-        self.y = pa.get_carray('y')
-        self.z = pa.get_carray('z')
-
-        self.ax = pa.get_carray('ax')
-        self.ay = pa.get_carray('ay')
-        self.az = pa.get_carray('az')
-
-        self.u = pa.get_carray('u')
-        self.v = pa.get_carray('v')
-        self.w = pa.get_carray('w')
-
-        self.au = pa.get_carray('au')
-        self.av = pa.get_carray('av')
-        self.aw = pa.get_carray('aw')
-
-        self.rho = pa.get_carray('rho')
-        self.arho = pa.get_carray('arho')
-        
-        self.h = pa.get_carray('h')
-        self.m = pa.get_carray('m')
-
-        self.gid = pa.get_carray('gid')
-        self.tag = pa.get_carray('tag')
-
 ################################################################
 # ParticleArrayExchange
 ################################################################w
@@ -74,7 +43,7 @@ cdef class ParticleArrayExchange:
     def __init__(self, int pa_index, ParticleArray pa, object comm, lb_props=None):
         self.pa_index = pa_index
         self.pa = pa
-        self.pa_wrapper = ParticleArrayWrapper( pa )
+        self.pa_wrapper = NNPSParticleArrayWrapper( pa )
 
         # unique data and message length tags for MPI communications
         name = pa.name
@@ -257,7 +226,7 @@ cdef class ParticleArrayExchange:
 
         props = {}
         for prop in self.lb_props:
-            prop_array = pa.get_carray(prop)
+            prop_array = pa.properties[prop]
             props[ prop ] = ctype_map[ prop_array.get_c_type() ]
             
         ############### SEND AND RECEIVE START ########################
@@ -277,7 +246,7 @@ cdef class ParticleArrayExchange:
 
                     parallel_utils.Recv(
                         comm=comm,
-                        localbuf=pa.get_carray(prop),
+                        localbuf=pa.properties[prop],
                         localbufsize=count,
                         recvbuf=recvbuf,
                         source=i,
@@ -316,7 +285,7 @@ cdef class ParticleArrayExchange:
 
                     parallel_utils.Recv(
                         comm=comm,
-                        localbuf=pa.get_carray(prop),
+                        localbuf=pa.properties[prop],
                         localbufsize=count,
                         recvbuf=recvbuf,
                         source=j,
@@ -884,7 +853,7 @@ cdef class ParallelManager:
         cdef double Mx, My, Mz, Mh
 
         cdef list pa_wrappers = self.pa_wrappers
-        cdef ParticleArrayWrapper pa
+        cdef NNPSParticleArrayWrapper pa
         cdef DoubleArray x, y, z, h
 
         # set some high and low values
@@ -969,8 +938,8 @@ cdef class ParallelManager:
         cdef dict cell_map = self.cell_map
         cdef Cell cell
 
-        cdef ParticleArrayWrapper src = self.pa_wrappers[ src_index ]
-        cdef ParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
 
         # Source data arrays
         cdef DoubleArray s_x = src.x

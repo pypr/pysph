@@ -15,23 +15,9 @@ from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
 from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 
 # PySPH imports
+from pysph.base.nnps cimport NNPSParticleArrayWrapper
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.point cimport *
-
-# Simple ParticleArray wrapper class to hold particle data. For NNPS,
-# we hold only essential data like x, y, z, h and gid
-cdef class ParticleArrayWrapper:
-    cdef ParticleArray pa
-    cdef public str name
-
-    # load balancing properties
-    cdef public DoubleArray x, y, z, ax, ay, az    # coordinates
-    cdef public DoubleArray u, v, w, au, av, aw    # velocities
-    cdef public DoubleArray rho, h, arho, ah       # density and smoothing lengths
-    cdef public DoubleArray e, ae                  # thermal energy
-    cdef public DoubleArray m                      # mass
-    cdef public UIntArray gid                      # particle global id
-    cdef public IntArray tag                       # particle identifier tag
 
 cdef class ParticleArrayExchange:
     ############################################################################
@@ -45,7 +31,7 @@ cdef class ParticleArrayExchange:
     
     cdef public int pa_index                       # Particle index
     cdef public ParticleArray pa                   # Particle data
-    cdef public ParticleArrayWrapper pa_wrapper    # wrapper to exchange data
+    cdef public NNPSParticleArrayWrapper pa_wrapper    # wrapper to exchange data
 
     # flags to indicate whether data needs to be exchanged
     cdef public bint lb_exchange

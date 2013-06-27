@@ -1,43 +1,46 @@
-"""Lid driven cavity using the Transport Velocity formulation"""
+"""Incompressible flow past a periodic array of cylinders"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
 
 # PySPH imports
+from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegrator
+from pysph.sph.integrator import TransportVelocityIntegrator, AdamiVelocityVerletIntegrator
 
 # the eqations
-from pysph.sph.equations import Group
-from pysph.sph.transport_velocity_equations import DensitySummation,\
-    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
+from pysph.sph.equations import Group, BodyForce
+from pysph.sph.transport_velocity_equations import ArtificialStress,\
+    DensitySummation, SolidWallBC, VolumeSummation, StateEquation, ContinuityEquation, MomentumEquation
 
 # numpy
 import numpy as np
 
 # domain and reference values
-L = 1.0; Umax = 1.0
-c0 = 10 * Umax; rho0 = 1.0
+L = 0.12; Umax = 1.2e-4
+a = 0.02; H = 4*a
+fx = 2.5e-4
+c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-Re = 5000; nu = Umax * L/Re
+nu = 0.1/rho0; Re = a*Umax/nu
 
 # Numerical setup
-nx = 120; dx = L/nx
-ghost_extent = 5 * dx
-hdx = 1.2
+nx = 144; dx = L/nx
+ghost_extent = 5 * 1.5 * dx
+hdx = 1.05
 
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
+dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 5.0
+tf = 20.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
@@ -46,14 +49,17 @@ def create_particles(empty=False, **kwargs):
         solid = get_particle_array(name='solid')
     else:
         # create all the particles
-        _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        _x = np.arange( dx/2, L, dx )
+        _y = np.arange( -ghost_extent, H+ghost_extent, dx )
+        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
         # sort out the fluid and the solid
         indices = []
+        cx = 0.5 * L; cy = 0.5 * H
         for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < L) ):
-                if ( (y[i] > 0.0) and (y[i] < L) ):
+            xi = x[i]; yi = y[i]
+            if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
+                if ( (yi > 0) and (yi < H) ):
                     indices.append(i)
 
         to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
@@ -65,7 +71,7 @@ def create_particles(empty=False, **kwargs):
         fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
         solid.remove_particles(to_extract)
         
-        print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+        print "Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
 
@@ -96,6 +102,9 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'rho0'} )
     fluid.add_property( {'name': 'p0'} )
 
+    # density acceleration
+    fluid.add_property( {'name':'arho'} )
+
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
         
@@ -106,9 +115,11 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
+        solid.rho[:] = rho0
 
         # reference pressures and densities
         fluid.rho0[:] = rho0
+        fluid.rho[:] = rho0
         fluid.p0[:] = p0
 
         # volume is set as dx^2
@@ -119,25 +130,24 @@ def create_particles(empty=False, **kwargs):
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
         
-        # imposed horizontal velocity on the lid
-        solid.u0[:] = 0.0
-        solid.v0[:] = 0.0
-        for i in range(solid.get_number_of_particles()):
-            if solid.y[i] > L:
-                solid.u0[i] = Umax
-                
     # return the particle list
     return [fluid, solid]
 
+# domain for periodicity
+domain = DomainLimits(
+    xmin=0, xmax=L, periodic_in_x=True)
+
 # Create the application.
-app = Application()
+app = Application(domain=domain)
 
 # Create the kernel
+#kernel = Gaussian(dim=2)
 kernel = QuinticSpline(dim=2)
 
 # Create a solver.
 solver = Solver(
-    kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator)
+    kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator,
+    tdamp=0.0)
 
 # Setup default parameters.
 solver.set_time_step(dt)
@@ -145,30 +155,35 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # Summation density for the fluid phase
+    # State equation
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid'],)
+            DensitySummation(dest='fluid', sources=['fluid','solid']),
+            #VolumeSummation(dest='fluid',sources=['fluid', 'solid'],),
 
             ]),
     
-    # boundary conditions for the solid wall
+    # solid wall bc
     Group(
         equations=[
 
-            SolidWallBC(dest='solid', sources=['fluid',], b=1.0),
+            SolidWallBC(dest='solid', sources=['fluid'], gx=fx, b=1.0),
+            #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
 
             ]),
     
-    # acceleration equation
+    # accelerations
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, b=1.0),
-            
+            BodyForce(dest='fluid', sources=None, fx=fx),
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-            
-            ArtificialStress(dest='fluid', sources=['fluid',]),
-            
+            ArtificialStress(dest='fluid', sources=['fluid',])
+
+            # BodyForce(dest='fluid', sources=None, fx=fx),
+            # MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            # ContinuityEquation(dest='fluid', sources=['fluid', 'solid']),
+
             ]),
     ]
 

@@ -10,7 +10,7 @@ from pysph.base.particle_array import ParticleArray
 from pysph.base.nnps import NNPS
 from pysph.solver.controller import CommandManager
 import pysph.base.kernels as kernels
-from utils import mkdir
+from utils import mkdir, load
 
 # conditional parallel imports
 from pysph import Has_MPI, Has_Zoltan
@@ -129,12 +129,12 @@ class Application(object):
                          dest="quiet", default=False,
                          help="Do not print any progress information.")
 
-        # -o/ --output
+        # -o/ --fname
         parser.add_option("-o", "--fname", action="store",
                           dest="output", default=self.fname,
                           help="File name to use for output")
 
-        # --output-freq.
+        # --pfreq.
         parser.add_option("--pfreq", action="store",
                           dest="freq", default=100, type="int",
                           help="Printing frequency for the output")
@@ -179,6 +179,20 @@ class Application(object):
                           help="""Use 'collected' to dump one output at
                           root or 'distributed' for every processor. """)
 
+        # Restart options
+        restart = OptionGroup(parser, "Restart options",
+                              "Restart options for PySPH")
+
+        restart.add_option("--restart-file", action="store", dest="restart_file",
+                           default=None,
+                           help=("""Restart a PySPH simulation using a specified file """)),
+
+        restart.add_option("--rescale-dt", action="store", dest="rescale_dt",
+                           default=1.0, type="float",
+                           help=("Scale dt upon restarting by a numerical constant"))
+
+        parser.add_option_group( restart )
+
         # Zoltan Options
         zoltan = OptionGroup(parser, "PyZoltan",
                              "Zoltan load balancing options")
@@ -195,6 +209,10 @@ class Application(object):
                           dest="zoltan_weights", default=True,
                           help=("""Switch between using weights for input to Zoltan.
                           defaults to True"""))
+
+        zoltan.add_option("--ghost-layers", action='store', dest='ghost_layers',
+                          default=2.0, type='float', 
+                          help=('Number of ghost cells to share for remote neighbors'))
 
         zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
@@ -305,14 +323,38 @@ class Application(object):
 
         solver = self._solver
         num_procs = self.num_procs
+        options = self.options
         rank = self.rank
         comm = self.comm
 
+        # Only master creates the particles.
         if rank == 0:
-            # Only master creates the particles.
-            self.particles = particle_factory(*args, **kw)
+            if options.restart_file is not None:
+                data = load(options.restart_file)
+
+                arrays = data['arrays']
+                solver_data = data['solver_data']
+
+                # arrays and particles
+                particles = []
+                for array_name in arrays:
+                    particles.append( arrays[array_name] )
+
+                # save the particles list
+                self.particles = particles
+
+                # time, timestep and solver iteration count at restart
+                t, dt, count = solver_data['t'], solver_data['dt'], solver_data['count']
+                
+                # rescale dt at restart
+                dt *= options.rescale_dt
+                solver.t, solver.dt, solver.count  = t, dt, count
+
+            else:
+                self.particles = particle_factory(*args, **kw)
+
+        # everyone else creates empty containers
         else:
-            # everyone else creates empty containers
             self.particles = particle_factory(empty=True, *args, **kw)
 
         # Instantiate the Parallel Manager here and do an initial LB
@@ -340,11 +382,15 @@ class Application(object):
             zoltan_debug_level = options.zoltan_debug_level
             zoltan_obj_wgt_dim = obj_weight_dim
 
+            # ghost layers 
+            ghost_layers = options.ghost_layers
+
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles, comm=comm,
                 lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
+                ghost_layers=ghost_layers
                 )
 
             # set zoltan options
@@ -418,9 +464,10 @@ class Application(object):
 
         options = self.options
 
-        if particle_factory:
-            self._create_particles(particle_factory, *args, **kwargs)
-        
+        # Create particles either from scratch or restart
+        self._create_particles(particle_factory, *args, **kwargs)
+
+        # setup the solver using any options
         self._solver.setup_solver(options.__dict__)
 
         if nnps is None:
@@ -478,17 +525,17 @@ class Application(object):
         solver.set_parallel_output_mode(options.parallel_output_mode)
 
         # default kernel
-        if options.kernel is not None:
-            solver.kernel = getattr(kernels,
-                                kernel_names[options.kernel])(dim=solver.dim)
+        # if options.kernel is not None:
+        #     solver.kernel = getattr(kernels,
+        #                         kernel_names[options.kernel])(dim=solver.dim)
         
-        if options.resume is not None:
-            solver.particles = self.particles # needed to be able to load particles
-            r = solver.load_output(options.resume)
-            if r is not None:
-                print 'available files for resume:'
-                print r
-                sys.exit(0)
+        # if options.resume is not None:
+        #     solver.particles = self.particles # needed to be able to load particles
+        #     r = solver.load_output(options.resume)
+        #     if r is not None:
+        #         print 'available files for resume:'
+        #         print r
+        #         sys.exit(0)
 
         if options.integration is not None:
             # FIXME, this is bogus

@@ -42,7 +42,7 @@ class Solver(object):
     """
     
     def __init__(self, integrator_type=WCSPHRK2Integrator, kernel=None, 
-                 dim=2):
+                 dim=2, tdamp=0.0):
         """Constructor
         
         Parameters
@@ -109,6 +109,9 @@ class Solver(object):
         # output drectory
         self.output_directory = self.fname+'_output'
 
+        # solution damping to avoid impulsive starts
+        self.tdamp = tdamp
+
     def setup(self, particles, equations, nnps, kernel=None, 
               integrator_type=None):
         """ Setup the solver.
@@ -133,8 +136,8 @@ class Solver(object):
         self.sph_eval.set_nnps(nnps)
 
         # instantiate the Integrator
-        self.integrator = integrator = self.integrator_type(evaluator=self.sph_eval, 
-                                                            particles=particles)
+        self.integrator = integrator = self.integrator_type(
+            evaluator=self.sph_eval, particles=particles,tdamp=self.tdamp)
         # set the parallel manager for the integrator
         integrator.set_parallel_manager(self.pm)
         integrator.set_solver(self)
@@ -226,7 +229,7 @@ class Solver(object):
         self.execute_commands = callable
         self.command_interval = command_interval
 
-    def solve(self, show_progress=False):
+    def solve(self, show_progress=True):
         """ Solve the system
 
         Notes
@@ -245,7 +248,8 @@ class Solver(object):
         bar = PBar(1000 + int(dt/bt), show=show_progress)
 
         self.dump_output(dt, *self.print_properties)
-        self.comm.barrier() # everybody waits for this to complete
+        if self.comm:
+            self.comm.barrier() # everybody waits for this to complete
 
         # the parallel manager
         pm = self.pm
@@ -276,7 +280,8 @@ class Solver(object):
             # dump output
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)
-                self.comm.barrier()                
+                if self.comm:
+                    self.comm.barrier()                
 
             bcount += int(self.dt/bt)
             while bcount > 0:
@@ -292,7 +297,7 @@ class Solver(object):
     def update_particle_time(self):
         for array in self.particles:
             array.set_time(self.t)
-
+            
     def dump_output(self, dt, *print_properties):
         """ Print output based on level of detail required
         
