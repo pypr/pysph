@@ -1,20 +1,16 @@
-To do List
+To-do List
 ============
 
-  - Proper test framework:
-    - equations,
-    - sph_eval.
+  - Cleanup:
+    - kernel implementation should use pure python and generate code.
+    - the cython_code helper functions should not be used.
 
-  - Add logging support.
-  
-  - Clean.
-  
-  - Make proper Python package.
+  - Add support for initialization of variables.
+
+  - Cleanup the integrator.
+
+  - Make parallel support generic so all examples just work.
+
+  - Symmetric interactions.
 
   - Multi-step integrators.
-  
-  - PyZoltan parallel support.
-    - Make separate PyZoltan project and finish that.
-  
-  - Integrate into PySPH.
-  
