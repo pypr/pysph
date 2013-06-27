@@ -168,8 +168,4 @@ class CythonGenerator(object):
             else:
                 return 'list' if isinstance(value, list) else 'tuple'
         else:
-            msg = 'Sorry "{name}" is {value} ({type}) which is not implemented.'\
-                    '  Treating as object.'\
-                    .format(name=name, value=value, type=type(value))
-            logger.warn(msg)
             return 'object'
