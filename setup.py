@@ -75,7 +75,8 @@ ext_modules = [
 
     # kernels used for tests
     Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"]
+               sources=["pysph/parallel/_kernels.pyx"],
+               include_dirs = include_dirs,
                ),
     ]
 
@@ -95,7 +96,7 @@ if Have_MPI and Have_Zoltan:
                    extra_link_args=mpi_link_args,
                    extra_compile_args=mpi_compile_args),
         ]
-    
+
     ext_modules += parallel_modules
 
 setup(name='PySPH',
@@ -111,7 +112,7 @@ setup(name='PySPH',
       packages = find_packages(),
 
       ext_modules = ext_modules,
-      
+
       include_package_data = True,
       cmdclass=cmdclass,
       #install_requires=['mpi4py>=1.2', 'numpy>=1.0.3', 'Cython>=0.14'],
@@ -140,4 +141,3 @@ setup(name='PySPH',
         Topic :: Software Development :: Libraries
         """.splitlines() if len(c.split()) > 0],
       )
-
