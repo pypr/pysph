@@ -99,7 +99,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key in obj.__dict__:
                     setattr(self, key, getattr(obj, key))
 
-            cdef inline func(self, long d_idx, double* d_x):
+            cdef inline void func(self, long d_idx, double* d_x):
                 cdef double tmp
                 tmp = abs(self.rho*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
