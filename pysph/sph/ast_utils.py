@@ -67,3 +67,26 @@ def get_aug_assign_symbols(code):
     n = AugAssignLister()
     n.visit(tree)
     return n.names
+
+def has_node(code, node):
+    """Given an AST or code string returns True if the code contains
+    any particular node statement.
+
+    Parameters
+    ----------
+
+    code: A code string or the result of an ast.parse.
+
+    node: A node type or tuple of node types to check for.  If a tuple is passed
+    it returns True if any one of them is in the code.
+    """
+    tree = ast.parse(code) if isinstance(code, basestring) else code
+    for n in ast.walk(tree):
+        if isinstance(n, node):
+            return True
+    return False
+
+def has_return(code):
+    """Returns True of the node has a return statement.
+    """
+    return has_node(code, ast.Return)

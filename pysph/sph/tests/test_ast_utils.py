@@ -3,7 +3,8 @@ import ast
 from textwrap import dedent
 import unittest
 
-from pysph.sph.ast_utils import get_aug_assign_symbols, get_symbols
+from pysph.sph.ast_utils import (get_aug_assign_symbols, get_symbols, 
+    has_node, has_return)
 
 
 class TestASTUtils(unittest.TestCase):
@@ -44,8 +45,34 @@ class TestASTUtils(unittest.TestCase):
         result.sort()
         expect = ['d_x', 'x']
         self.assertEqual(result, expect)
-        
-        
+
+    def test_has_return(self):
+        code = dedent('''
+                x = 1
+                ''')
+        self.assertFalse(has_return(code))
+        code = dedent('''
+                def f():
+                    pass
+                ''')
+        self.assertFalse(has_return(code))
+        code = dedent('''
+                def f(x):
+                    return x+1
+                ''')
+        self.assertTrue(has_return(code))
+
+    def test_has_node(self):
+        code = dedent('''
+                x = 1
+                ''')
+        self.assertFalse(has_node(code, (ast.Return, ast.AugAssign)))
+        code = dedent('''
+                def f():
+                    pass
+                ''')
+        self.assertTrue(has_node(code, (ast.AugAssign, ast.FunctionDef)))
+
 
 if __name__ == '__main__':
     unittest.main()
