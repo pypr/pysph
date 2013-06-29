@@ -12,7 +12,7 @@ from mako.template import Template
 import math
 from textwrap import dedent
 
-from pysph.sph.ast_utils import get_symbols
+from pysph.sph.ast_utils import get_symbols, has_return
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,8 @@ class Undefined(object):
 class CythonGenerator(object):
     def __init__(self):
         self.code = ''
+        # Methods to not wrap.
+        self.ignore_methods = ['cython_code']
 
     def parse(self, obj):
         cls = obj.__class__
@@ -96,9 +98,12 @@ class CythonGenerator(object):
                 continue
             meth = getattr(cls, name)
             if callable(meth):
+                if name in self.ignore_methods:
+                    continue
+
                 sourcelines = inspect.getsourcelines(meth)[0]
                 defn, lines = get_func_definition(sourcelines)
-                defn = self._get_method_spec(meth)
+                defn = self._get_method_spec(meth, lines)
                 body = self._get_method_body(meth, lines)
                 methods.append((defn, body))
         return methods
@@ -108,14 +113,19 @@ class CythonGenerator(object):
         body = ''.join(lines)
         dedented_body = dedent(body)
         symbols = get_symbols(dedented_body)
-        standard_symbols = set(dir(__builtin__) + dir(math))
+        c_math = ['M_E', 'M_LOG2E', 'M_LOG10E', 'M_LN2', 'M_LN10', 'M_PI'
+                 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI', 'M_2_SQRTPI',
+                 'M_SQRT2', 'M_SQRT1_2']
+        standard_symbols = set(dir(__builtin__) + dir(math) + c_math)
         undefined = symbols - args - standard_symbols
         declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
         code = ''.join(declare) + body
         return code
 
-    def _get_method_spec(self, meth):
+    def _get_method_spec(self, meth, lines):
         name = meth.__name__
+        body = ''.join(lines)
+        dedented_body = dedent(body)
         argspec = inspect.getargspec(meth)
         args = argspec.args
         if args and args[0] == 'self':
@@ -135,9 +145,10 @@ class CythonGenerator(object):
             type = self.detect_type(arg, value)
 	    new_args.append('{type} {arg}'.format(type=type, arg=arg))
 
+        ret = 'double' if has_return(dedented_body) else 'void'
         arg_def = ', '.join(new_args)
-        defn = 'cdef inline void {name}({arg_def}):'.format(name=name,
-                                                       arg_def=arg_def)
+        defn = 'cdef inline {ret} {name}({arg_def}):'\
+                    .format(ret=ret, name=name, arg_def=arg_def)
         return defn
 
     def get_code(self):
@@ -164,7 +175,7 @@ class CythonGenerator(object):
         elif isinstance(value, (list, tuple)):
             if all_numeric(value):
                 # We don't deal with integer lists for now.
-                return 'double[{size}]'.format(size=len(value))
+                return 'double*'
             else:
                 return 'list' if isinstance(value, list) else 'tuple'
         else:

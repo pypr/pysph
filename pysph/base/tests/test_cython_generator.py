@@ -17,6 +17,9 @@ class EqWithMethod(BasicEq):
         tmp = abs(self.rho*self.c)
         d_x[d_idx] = d_x[d_idx]*tmp
 
+class EqWithReturn(BasicEq):
+    def func(self, d_idx=0, d_x=[0.0, 0.0]):
+        return d_x[d_idx]
 
 class TestBase(unittest.TestCase):
     def assert_code_equal(self, result, expect):
@@ -43,8 +46,8 @@ class TestMiscUtils(TestBase):
                  (('x', 1), 'long'),
                  (('s', 'asdas'), 'str'),
                  (('junk', 1.0), 'double'),
-                 (('y', [0.0, 1.0]), 'double[2]'),
-                 (('y', [0.0, 1.0, 0.0]), 'double[3]'),
+                 (('y', [0.0, 1]), 'double*'),
+                 (('y', [0, 1, 0]), 'double*'),
                  (('y', None), 'object'),
                 ]
         cg = CythonGenerator()
@@ -106,6 +109,22 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
+    def test_method_with_return(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithReturn())
+        expect = dedent("""
+        cdef class EqWithReturn:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, object obj):
+                for key in obj.__dict__:
+                    setattr(self, key, getattr(obj, key))
+
+            cdef inline double func(self, long d_idx, double* d_x):
+                return d_x[d_idx]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
 if __name__ == '__main__':
     unittest.main()

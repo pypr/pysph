@@ -42,14 +42,16 @@ cdef class SPHCalc:
     cdef UIntArray nbrs
     # CFL time step conditions
     cdef public double dt_cfl
+    ${indent(object.get_kernel_defs(), 1)}
     ${indent(object.get_equation_defs(), 1)}
 
-    def __init__(self, equations, *particle_arrays):
+    def __init__(self, kernel, equations, *particle_arrays):
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
 
         self.nbrs = UIntArray()
+        ${indent(object.get_kernel_init(), 2)}
         ${indent(object.get_equation_init(), 2)}
 
     def set_nnps(self, NNPS nnps):

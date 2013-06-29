@@ -153,8 +153,9 @@ class TestGroup(TestBase):
 
     def test_precomputed(self):
         g = self.group
-        self.assertEqual(len(g.precomputed), 3)
-        self.assertEqual(g.precomputed.keys(), ['HIJ', 'XIJ', 'WIJ'])
+        self.assertEqual(len(g.precomputed), 5)
+        self.assertEqual(g.precomputed.keys(),
+                         ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'WIJ'])
 
     def test_array_names(self):
         g = self.group
@@ -167,7 +168,7 @@ class TestGroup(TestBase):
     def test_variable_names(self):
         g = self.group
         names = g.get_variable_names()
-        expect = ['WIJ', 'XIJ', 'HIJ']
+        expect = ['WIJ', 'RIJ', 'R2IJ', 'XIJ', 'HIJ']
         self.assert_seq_equal(names, expect)
 
     def test_array_declarations(self):
@@ -206,7 +207,9 @@ class TestGroup(TestBase):
             XIJ[0] = d_x[d_idx] - s_x[s_idx]
             XIJ[1] = d_y[d_idx] - s_y[s_idx]
             XIJ[2] = d_z[d_idx] - s_z[s_idx]
-            WIJ = CubicSplineKernel(XIJ[0], XIJ[1], XIJ[2], HIJ)
+            R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]
+            RIJ = sqrt(R2IJ)
+            WIJ = self.kernel.kernel(XIJ, RIJ, HIJ)
 
             self.test_eq10.loop(WIJ)
             self.test_eq20.loop(d_idx, s_idx)

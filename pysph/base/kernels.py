@@ -1,4 +1,8 @@
 from textwrap import dedent
+from math import pi, sqrt, exp
+
+M_1_PI = 1.0/pi
+M_2_SQRTPI = 2.0/sqrt(pi)
 
 ###############################################################################
 # `CubicSpline` class.
@@ -7,259 +11,225 @@ class CubicSpline(object):
     def __init__(self, dim=1):
         self.radius_scale = 2.0
         self.dim = dim
-    def cython_code(self):
-        code = dedent('''\
-        from libc.math cimport fabs, sqrt, M_1_PI
-            
-        cdef inline double CubicSplineKernel(double xij, double yij, double zij, double h):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0
-            cdef double fac
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
 
-            if DIM == 3:
-                fac = M_1_PI * h1 * h1 * h1
+        if self.dim == 3:
+            fac = M_1_PI * h1 * h1 * h1
 
-            elif DIM == 2:
-                fac = 10*M_1_PI/7.0 * h1 * h1
+        elif self.dim == 2:
+            fac = 10*M_1_PI/7.0 * h1 * h1
 
-            else:
-                fac = 2./3 * h1
+        else:
+            fac = 2./3 * h1
 
-            if ( q >= 2.0 ):
+        if ( q >= 2.0 ):
+            val = 0.0
+
+        elif ( q >= 1.0 ):
+            val = 0.25 * ( 2-q ) * ( 2-q ) * ( 2-q )
+
+        else:
+            val = 1 - 1.5 * q * q * (1 - 0.5 * q)
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+        h1 = 1./h
+        q = rij*h1
+
+        if self.dim == 3:
+            fac = M_1_PI * h1 * h1 * h1
+
+        elif self.dim == 2:
+            fac = 10*M_1_PI/7.0 * h1 * h1
+
+        else:
+            fac = 2./3 * h1
+
+        # compute the gradient
+        if (rij > 1e-8):
+            if (q >= 2.0):
                 val = 0.0
-
             elif ( q >= 1.0 ):
-                val = 0.25 * ( 2-q ) * ( 2-q ) * ( 2-q )
-
+                val = -0.75 * (2-q)*(2-q) * h1/rij
             else:
-                val = 1 - 1.5 * q * q * (1 - 0.5 * q)
+                val = -3.0*q * (1 - 0.75*q) * h1/rij
+        else:
+            val = 0.0
 
-            return val * fac
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
 
-
-        cdef inline CubicSplineGradient(double xij, double yij, double zij, double h,
-                                        double* grad):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
-
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0, fac, tmp
-
-            if DIM == 3:
-                fac = M_1_PI * h1 * h1 * h1
-
-            elif DIM == 2:
-                fac = 10*M_1_PI/7.0 * h1 * h1
-
-            else:
-                fac = 2./3 * h1
-
-            # compute the gradient
-            if (rij > 1e-8):
-                if (q >= 2.0):
-                    val = 0.0
-                elif ( q >= 1.0 ):
-                    val = -0.75 * (2-q)*(2-q) * h1/rij
-                else:
-                    val = -3.0*q * (1 - 0.75*q) * h1/rij
-            else:
-                val = 0.0
-
-            tmp = val * fac
-            grad[0] = tmp * xij
-            grad[1] = tmp * yij
-            grad[2] = tmp * zij
-            
-        '''.replace("DIM", str(self.dim)))
+    def cython_code(self):
+        code = dedent('''
+        from libc.math cimport M_1_PI
+        ''')
         return dict(helper=code)
+
 
 class WendlandQuintic(object):
     def __init__(self, dim=2):
         self.radius_scale = 2.0
         if dim == 1:
-            raise ValueError("Dim %d not supported"%dim)
+            raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
         self.dim = dim
-    def cython_code(self):
-        code = dedent('''\
-        from libc.math cimport fabs, sqrt, M_1_PI
-            
-        cdef inline double WendlandQuinticKernel(double xij, double yij, double zij, double h):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0
-            cdef double fac
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1.0/h
+        q = rij*h1
 
-            if DIM == 3:
-                fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
+        if self.dim == 3:
+            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
 
-            elif DIM == 2:
-                fac = 7.0*M_1_PI/4.0 * h1 * h1
+        elif self.dim == 2:
+            fac = 7.0*M_1_PI/4.0 * h1 * h1
 
-            if ( q >= 2.0 ):
+        if ( q >= 2.0 ):
+            val = 0.0
+
+        else:
+            val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2*q + 1)
+
+        return val * fac
+
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+        h1 = 1./h
+        q = rij*h1
+
+        if self.dim == 3:
+            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
+
+        elif self.dim == 2:
+            fac = 7.0*M_1_PI/4.0 * h1 * h1
+
+        # compute the gradient
+        if (rij > 1e-12):
+            if (q >= 2.0):
                 val = 0.0
-
             else:
-                val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2*q + 1)
+                val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
 
-            return val * fac
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
 
-
-        cdef inline WendlandQuinticGradient(double xij, double yij, double zij, double h,
-                                        double* grad):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
-
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0, fac, tmp
-
-            if DIM == 3:
-                fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
-
-            elif DIM == 2:
-                fac = 7.0*M_1_PI/4.0 * h1 * h1
-
-            # compute the gradient
-            if (rij > 1e-12):
-                if (q >= 2.0):
-                    val = 0.0
-                else:
-                    val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
-
-            tmp = val * fac
-            grad[0] = tmp * xij
-            grad[1] = tmp * yij
-            grad[2] = tmp * zij
-            
-        '''.replace("DIM", str(self.dim)))
+    def cython_code(self):
+        code = dedent('''
+        from libc.math cimport M_1_PI
+        ''')
         return dict(helper=code)
 
 class Gaussian(object):
     def __init__(self, dim=2):
         self.radius_scale = 3.0
         self.dim = dim
-    def cython_code(self):
-        code = dedent('''\
-        from libc.math cimport fabs, sqrt, exp, M_2_SQRTPI
-            
-        cdef inline double GaussianKernel(double xij, double yij, double zij, double h):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0
-            cdef double fac
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
 
-            fac = (0.5 * M_2_SQRTPI * h1)**DIM
+        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
 
-            if ( q >= 3.0 ):
+        if ( q >= 3.0 ):
+            val = 0.0
+
+        else:
+            val = exp(-q*q)
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0., 0, 0]):
+        h1 = 1./h
+        q = rij*h1
+
+        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
+
+        # compute the gradient
+        if (rij > 1e-12):
+            if (q >= 3.0):
                 val = 0.0
-
             else:
-                val = exp(-q*q)
+                val = -2 * q * exp(-q*q) * h1/rij
 
-            return val * fac
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
 
-        cdef inline GaussianGradient(double xij, double yij, double zij, double h,
-                                        double* grad):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
-
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0, fac, tmp
-
-            fac = (0.5 * M_2_SQRTPI * h1)**DIM
-
-            # compute the gradient
-            if (rij > 1e-12):
-                if (q >= 3.0):
-                    val = 0.0
-                else:
-                    val = -2 * q * exp(-q*q) * h1/rij
-
-            tmp = val * fac
-            grad[0] = tmp * xij
-            grad[1] = tmp * yij
-            grad[2] = tmp * zij
-            
-        '''.replace("DIM", str(self.dim)))
+    def cython_code(self):
+        code = dedent('''
+        from libc.math cimport exp, M_2_SQRTPI
+        ''')
         return dict(helper=code)
 
 class QuinticSpline(object):
     def __init__(self, dim=2):
         self.radius_scale = 3.0
+        if dim != 2:
+            raise NotImplementedError('Quintic spline only supports 2D kernels.')
         self.dim = dim
-    def cython_code(self):
-        code = dedent('''\
-        from libc.math cimport fabs, sqrt, M_1_PI
-            
-        cdef inline double QuinticSplineKernel(double xij, double yij, double zij, double h):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
 
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0
-            cdef double fac
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
 
-            if DIM == 2:
-                fac = M_1_PI * 7./478.0 * h1 * h1
+        if self.dim == 2:
+            fac = M_1_PI * 7./478.0 * h1 * h1
 
-            else:
-                raise ValueError
 
+        if ( q > 3.0 ):
+            val = 0.0
+
+        elif ( q > 2.0 ):
+            val = (3.0-q)**5
+
+        elif ( q > 1.0 ):
+            val = (3.0-q)**5 - 6.0*(2.0-q)**5
+
+        else:
+            val = (3.0-q)**5 - 6*(2.0-q)**5 + 15.0*(1.0-q)**5
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0., 0, 0]):
+        h1 = 1./h
+        q = rij*h1
+
+        if self.dim == 2:
+            fac = M_1_PI * 7./478.0 * h1 * h1
+
+
+        # compute the gradient
+        if (rij > 1e-12):
             if ( q > 3.0 ):
                 val = 0.0
 
             elif ( q > 2.0 ):
-                val = (3.0-q)**5
+                val = -5.0 * (3.0 - q)**4 * h1/rij
 
             elif ( q > 1.0 ):
-                val = (3.0-q)**5 - 6.0*(2.0-q)**5
+                val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4) * h1/rij
 
             else:
-                val = (3.0-q)**5 - 6*(2.0-q)**5 + 15.0*(1.0-q)**5
+                val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4 - 75.0 * (1.0 - q)**4) * h1/rij
 
-            return val * fac
+        else:
+            val = 0.0
 
-        cdef inline QuinticSplineGradient(double xij, double yij, double zij, double h,
-                                          double* grad):
-            cdef double rij = sqrt( xij*xij + yij*yij + zij*zij )
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
 
-            cdef double h1 = 1./h
-            cdef double q = rij*h1
-            cdef double val = 0.0, fac, tmp
-
-            if DIM == 2:
-                fac = M_1_PI * 7./478.0 * h1 * h1
-
-            else:
-                raise ValueError
-
-            # compute the gradient
-            if (rij > 1e-12):
-                if ( q > 3.0 ):
-                    val = 0.0
-
-                elif ( q > 2.0 ):
-                    val = -5.0 * (3.0 - q)**4 * h1/rij
-
-                elif ( q > 1.0 ):
-                    val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4) * h1/rij
-
-                else:
-                    val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4 - 75.0 * (1.0 - q)**4) * h1/rij
-
-            else:
-                val = 0.0
-
-            tmp = val * fac
-            grad[0] = tmp * xij
-            grad[1] = tmp * yij
-            grad[2] = tmp * zij
-            
-        '''.replace("DIM", str(self.dim)))
+    def cython_code(self):
+        code = dedent('''
+        from libc.math cimport M_1_PI
+        ''')
         return dict(helper=code)
