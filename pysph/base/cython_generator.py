@@ -12,7 +12,7 @@ from mako.template import Template
 import math
 from textwrap import dedent
 
-from pysph.sph.ast_utils import get_symbols, has_return
+from pysph.sph.ast_utils import get_assigned, has_return
 
 logger = logging.getLogger(__name__)
 
@@ -112,12 +112,8 @@ class CythonGenerator(object):
         args = set(inspect.getargspec(meth).args)
         body = ''.join(lines)
         dedented_body = dedent(body)
-        symbols = get_symbols(dedented_body)
-        c_math = ['M_E', 'M_LOG2E', 'M_LOG10E', 'M_LN2', 'M_LN10', 'M_PI'
-                 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI', 'M_2_SQRTPI',
-                 'M_SQRT2', 'M_SQRT1_2']
-        standard_symbols = set(dir(__builtin__) + dir(math) + c_math)
-        undefined = symbols - args - standard_symbols
+        symbols = get_assigned(dedented_body)
+        undefined = symbols - args
         declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
         code = ''.join(declare) + body
         return code

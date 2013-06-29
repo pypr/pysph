@@ -10,7 +10,7 @@ class NameLister(ast.NodeVisitor):
     def __init__(self, ctx=(ast.Load, ast.Store)):
         self.names = set()
         self.ctx = ctx
-        
+
     def visit_Name(self, node):
         if isinstance(node.ctx, self.ctx):
             self.names.add(node.id)
@@ -22,7 +22,7 @@ class AugAssignLister(ast.NodeVisitor):
     """
     def __init__(self):
         self.names = set()
-        
+
     def visit_AugAssign(self, node):
         if isinstance(node.target, ast.Name):
             self.names.add(node.target.id)
@@ -30,15 +30,33 @@ class AugAssignLister(ast.NodeVisitor):
             self.names.add(node.target.value.id)
         self.generic_visit(node)
 
+class AssignLister(ast.NodeVisitor):
+    """Utility class to collect the augmented assignments.
+    """
+    def __init__(self):
+        self.names = set()
+
+    def visit_Assign(self, node):
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                self.names.add(target.id)
+            elif isinstance(target, ast.Subscript):
+                self.names.add(target.value.id)
+            elif isinstance(target, (ast.List, ast.Tuple)):
+                for n in target.elts:
+                    if isinstance(n, ast.Name):
+                        self.names.add(n.id)
+        self.generic_visit(node)
+
 
 def get_symbols(code, ctx=(ast.Load, ast.Store)):
     """Given an AST or code string return the symbols used therein.
-    
+
     Parameters
     ----------
-    
+
     code: A code string or the result of an ast.parse.
-    
+
     ctx: The context of the names, can be one of ast.Load, ast.Store, ast.Del.
     """
     if isinstance(code, basestring):
@@ -50,15 +68,15 @@ def get_symbols(code, ctx=(ast.Load, ast.Store)):
     return n.names
 
 def get_aug_assign_symbols(code):
-    
+
     """Given an AST or code string return the symbols that are augmented
     assign.
-    
+
     Parameters
     ----------
-    
+
     code: A code string or the result of an ast.parse.
-    
+
     """
     if isinstance(code, basestring):
         tree = ast.parse(code)
@@ -67,6 +85,27 @@ def get_aug_assign_symbols(code):
     n = AugAssignLister()
     n.visit(tree)
     return n.names
+
+def get_assigned(code):
+    """Given an AST or code string return the symbols that are augmented
+    assigned or assigned.
+
+    Parameters
+    ----------
+
+    code: A code string or the result of an ast.parse.
+
+    """
+    if isinstance(code, basestring):
+        tree = ast.parse(code)
+    else:
+        tree = code
+    result = set()
+    for l in (AugAssignLister(), AssignLister()):
+        l.visit(tree)
+        result.update(l.names)
+
+    return result
 
 def has_node(code, node):
     """Given an AST or code string returns True if the code contains

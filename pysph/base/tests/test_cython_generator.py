@@ -2,6 +2,7 @@
 """
 import unittest
 from textwrap import dedent
+from math import pi, sin
 
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
     all_numeric)
@@ -14,7 +15,7 @@ class BasicEq:
 
 class EqWithMethod(BasicEq):
     def func(self, d_idx=0, d_x=[0.0, 0.0]):
-        tmp = abs(self.rho*self.c)
+        tmp = abs(self.rho*self.c)*sin(pi*self.c)
         d_x[d_idx] = d_x[d_idx]*tmp
 
 class EqWithReturn(BasicEq):
@@ -104,7 +105,7 @@ class TestCythonCodeGenerator(TestBase):
 
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double tmp
-                tmp = abs(self.rho*self.c)
+                tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
