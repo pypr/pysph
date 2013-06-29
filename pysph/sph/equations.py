@@ -160,32 +160,27 @@ def precomputed_symbols():
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
 
-    c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])", RHOIJ=0.0)
+    c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])",
+                             RHOIJ=0.0)
 
     c.RHOIJ1 = BasicCodeBlock(code="RHOIJ1 = 1.0/RHOIJ", RHOIJ1=0.0)
 
     c.XIJ = BasicCodeBlock(code=dedent("""
-
                 XIJ[0] = d_x[d_idx] - s_x[s_idx]
                 XIJ[1] = d_y[d_idx] - s_y[s_idx]
                 XIJ[2] = d_z[d_idx] - s_z[s_idx]
-
                 """),
                 XIJ=[0.0, 0.0, 0.0])
 
     c.VIJ = BasicCodeBlock(code=dedent("""
-
                 VIJ[0] = d_u[d_idx] - s_u[s_idx]
                 VIJ[1] = d_v[d_idx] - s_v[s_idx]
                 VIJ[2] = d_w[d_idx] - s_w[s_idx]
-
                 """),
                 VIJ=[0.0, 0.0, 0.0])
 
     c.R2IJ = BasicCodeBlock(code=dedent("""
-
                 R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]
-
                 """),
                 R2IJ=0.0)
 
@@ -195,27 +190,27 @@ def precomputed_symbols():
                 RIJ=0.0)
 
     c.WIJ = BasicCodeBlock(
-                code="WIJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], HIJ)",
+                code="WIJ = KERNEL(XIJ, RIJ, HIJ)",
                 WIJ=0.0)
 
     c.WI = BasicCodeBlock(
-                code="WI = KERNEL(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx])",
+                code="WI = KERNEL(XIJ, RIJ, d_h[d_idx])",
                 WI=0.0)
 
     c.WJ = BasicCodeBlock(
-                code="WJ = KERNEL(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx])",
+                code="WJ = KERNEL(XIJ, RIJ, s_h[s_idx])",
                 WJ=0.0)
 
     c.DWIJ = BasicCodeBlock(
-                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], HIJ, DWIJ)",
+                code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
                 DWIJ=[0.0, 0.0, 0.0])
 
     c.DWI = BasicCodeBlock(
-                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], d_h[d_idx], DWI)",
+                code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
                 DWI=[0.0, 0.0, 0.0])
 
     c.DWJ = BasicCodeBlock(
-                code="GRADIENT(XIJ[0], XIJ[1], XIJ[2], s_h[s_idx], DWJ)",
+                code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
     return c
 
@@ -223,6 +218,10 @@ def precomputed_symbols():
 def sort_precomputed(precomputed):
     """Sorts the precomputed equations in the given dictionary as per the
     dependencies of the symbols and returns an ordered dict.
+
+    Note that this will not deal with finding any precomputed symbols that
+    are dependent on other precomputed symbols.  It only sorts them in the
+    right order.
     """
     weights = dict((x, None) for x in precomputed)
     pre_comp = Group.pre_comp
@@ -352,9 +351,8 @@ class Group(object):
 
     def _set_kernel(self, code, kernel):
         if kernel is not None:
-            k_name = kernel.__class__.__name__
-            k_func = k_name + 'Kernel'
-            g_func = k_name + 'Gradient'
+            k_func = 'self.kernel.kernel'
+            g_func = 'self.kernel.gradient'
             return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
         else:
             return code
@@ -373,13 +371,21 @@ class Group(object):
         precomputed = dict((s, pre[s]) for s in all_args if s in pre)
 
         # Now find the precomputed symbols in the pre-computed symbols.
-        precomputed_symbols = set()
-        for cb in precomputed.values():
-            precomputed_symbols.update((s for s in cb.symbols if s in pre))
-
-        for s in precomputed_symbols:
-            if s not in precomputed:
-                precomputed[s] = pre[s]
+        done = False
+        found_precomp = set(precomputed.keys())
+        while not done:
+            done = True
+            all_new = set()
+            for sym in found_precomp:
+                code_block = pre[sym]
+                new = set([s for s in code_block.symbols
+                            if s in pre and s not in precomputed])
+                all_new.update(new)
+            if len(all_new) > 0:
+                done = False
+                for s in all_new:
+                    precomputed[s] = pre[s]
+            found_precomp = all_new
 
         self.precomputed = sort_precomputed(precomputed)
 

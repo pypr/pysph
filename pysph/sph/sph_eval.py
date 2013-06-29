@@ -9,6 +9,7 @@ from os.path import dirname, join
 
 from pysph.sph.equations import Group
 from pysph.base.ext_module import ExtModule
+from pysph.base.cython_generator import CythonGenerator
 
 ###############################################################################
 def group_equations(equations):
@@ -22,10 +23,12 @@ def group_equations(equations):
 
 ###############################################################################
 def get_code(obj, key):
-    code = obj.cython_code()
-    doc = '# From %s'%obj.__class__.__name__
-    src = code.get(key, '')
-    return [doc, src] if len(src) > 0 else []
+    if hasattr(obj, 'cython_code'):
+        code = obj.cython_code()
+        doc = '# From %s'%obj.__class__.__name__
+        src = code.get(key, '')
+        return [doc, src] if len(src) > 0 else []
+    return []
 
 ###############################################################################
 def get_array_names(particle_arrays):
@@ -64,7 +67,8 @@ class SPHEval(object):
         code = self.get_code()
         self.ext_mod = ExtModule(code, verbose=True)
         mod = self.ext_mod.load()
-        self.calc = mod.SPHCalc(self.all_group.equations, *self.particle_arrays)
+        self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
+                                *self.particle_arrays)
         self.sph_compute = self.calc.compute
 
     def _make_group(self, group):
@@ -108,11 +112,14 @@ class SPHEval(object):
 
         # get helpers from the Equations
         for equation in self.all_group.equations:
-            try:
-                helpers.extend(get_code(equation, 'helper'))
-            except:
-                pass
+            helpers.extend(get_code(equation, 'helper'))
 
+        # Kernel wrappers.
+        cg = CythonGenerator()
+        cg.parse(self.kernel)
+        helpers.append(cg.get_code())
+
+        # Equation wrappers.
         helpers.append(self.all_group.get_equation_wrappers())
 
         return '\n'.join(helpers)
@@ -122,6 +129,12 @@ class SPHEval(object):
 
     def get_equation_init(self):
         return self.all_group.get_equation_init()
+
+    def get_kernel_defs(self):
+        return 'cdef public %s kernel'%(self.kernel.__class__.__name__)
+
+    def get_kernel_init(self):
+        return 'self.kernel = %s(kernel)'%(self.kernel.__class__.__name__)
 
     def get_variable_declarations(self):
         group = self.all_group
