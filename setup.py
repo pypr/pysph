@@ -76,6 +76,14 @@ if HAVE_MPI:
                    libraries=['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
                    extra_compile_args=mpi_compile_args),
+
+        Extension( name="pyzoltan.core.zoltan_comm",
+                   sources=["pyzoltan/core/zoltan_comm.pyx"],
+                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
         ]
     
     ext_modules += zoltan_modules
