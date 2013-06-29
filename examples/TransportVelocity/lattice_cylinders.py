@@ -1,4 +1,4 @@
-"""Incompressible flow past a periodic array of cylinders"""
+"""Incompressible flow past a periodic lattice of cylinders"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
@@ -40,7 +40,7 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 1000.0
+tf = 100.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
@@ -98,10 +98,6 @@ def create_particles(empty=False, **kwargs):
     solid.add_property( {'name': 'u0'} )
     solid.add_property( {'name': 'v0'} )
 
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.add_property( {'name': 'p0'} )
-
     # density acceleration
     fluid.add_property( {'name':'arho'} )
 
@@ -118,9 +114,7 @@ def create_particles(empty=False, **kwargs):
         solid.rho[:] = rho0
 
         # reference pressures and densities
-        fluid.rho0[:] = rho0
         fluid.rho[:] = rho0
-        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -165,7 +159,7 @@ equations = [
     Group(
         equations=[
 
-            SolidWallBC(dest='solid', sources=['fluid'], gx=fx),
+            SolidWallBC(dest='solid', sources=['fluid'], gx=fx, rho0=rho0, p0=p0),
             #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
 
             ]),
@@ -173,7 +167,7 @@ equations = [
     # accelerations
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0),
+            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
             BodyForce(dest='fluid', sources=None, fx=fx),
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
             ArtificialStress(dest='fluid', sources=['fluid',])

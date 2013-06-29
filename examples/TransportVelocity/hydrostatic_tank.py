@@ -96,10 +96,6 @@ def create_particles(empty=False, **kwargs):
     solid.add_property( {'name': 'u0'} )
     solid.add_property( {'name': 'v0'} )
 
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.add_property( {'name': 'p0'} )
-
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
         
@@ -110,10 +106,6 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
-
-        # reference pressures and densities
-        fluid.rho0[:] = rho0
-        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -154,13 +146,13 @@ equations = [
     Group(
         equations=[
             SolidWallBC(
-                dest='solid', sources=['fluid',], gy=gy),
+                dest='solid', sources=['fluid',], gy=gy, rho0=rho0, p0=p0),
             ]),
     
     # acceleration equation
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0),
+            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
 
             BodyForce(dest='fluid', sources=None, fy=gy),
 

@@ -24,10 +24,10 @@ c0 = 10 * Umax; rho0 = 1.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-Re = 5000; nu = Umax * L/Re
+Re = 100; nu = Umax * L/Re
 
 # Numerical setup
-nx = 120; dx = L/nx
+nx = 50; dx = L/nx
 ghost_extent = 5 * dx
 hdx = 1.2
 
@@ -38,7 +38,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 5.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
     if empty:
@@ -92,10 +92,6 @@ def create_particles(empty=False, **kwargs):
     solid.add_property( {'name': 'u0'} )
     solid.add_property( {'name': 'v0'} )
 
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.add_property( {'name': 'p0'} )
-
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
         
@@ -106,10 +102,6 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
-
-        # reference pressures and densities
-        fluid.rho0[:] = rho0
-        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -156,14 +148,14 @@ equations = [
     Group(
         equations=[
 
-            SolidWallBC(dest='solid', sources=['fluid',], b=1.0),
+            SolidWallBC(dest='solid', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
 
             ]),
     
     # acceleration equation
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0),
+            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
             
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
             

@@ -19,13 +19,14 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += d_m[d_idx] * Vj * vijdotdwij
 
 class StateEquation(Equation):
-    def __init__(self, dest, sources=None, b=1.0):
+    def __init__(self, dest, sources=None, p0=1.0, rho0=1.0, b=1.0):
         self.b=b
+        self.p0 = p0
+        self.rho0 = rho0
         super(StateEquation, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_p, d_p0, d_rho, d_rho0):
-        # update the pressure using the reference density
-        d_p[d_idx] = d_p0[d_idx] * ( d_rho[d_idx]/d_rho0[d_idx] - self.b )
+    def loop(self, d_idx, d_p, d_rho):
+        d_p[d_idx] = self.p0 * ( d_rho[d_idx]/self.rho0 - self.b )
 
 class SolidWallBC(Equation):
     def __init__(self, dest, sources=None, rho0=1.0, p0=100.0,
@@ -47,7 +48,9 @@ class SolidWallBC(Equation):
 
         # smooth pressure
         gdotxij = (self.gx-self.ax)*XIJ[0] + \
-                    (self.gy-self.ay)*XIJ[1] + (self.gz-self.az)*XIJ[2]
+            (self.gy-self.ay)*XIJ[1] + \
+            (self.gz-self.az)*XIJ[2] 
+
         d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx] * gdotxij * WIJ
 
         # denominator
@@ -67,8 +70,7 @@ class SolidWallBC(Equation):
             d_p[d_idx] /= d_wij[d_idx]
 
         # update the density from the pressure
-        d_rho[d_idx] = self.rho0 * (d_p[d_idx]/self.p0 + 1.0)
-
+        d_rho[d_idx] = self.rho0 * (d_p[d_idx]/self.p0 + self.b)
 
 class MomentumEquation(Equation):
     def __init__(self, dest, sources=None, pb=0.0, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
@@ -117,7 +119,6 @@ class ArtificialStress(Equation):
     def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_V, d_uhat, d_vhat,
              d_au, d_av, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
              DWIJ=[0, 0, 0]):
-        # averaged pressure
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
 
         ui = d_u[d_idx]; uhati = d_uhat[d_idx]

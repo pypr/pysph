@@ -68,13 +68,6 @@ def create_particles(empty=False, **kwargs):
         fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
         fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-        # reference pressures and sound speeds
-        fluid.add_property( {'name':'p0'} )
-        fluid.add_property( {'name':'rho0'} )
-        
-        fluid.p0[:] = p0
-        fluid.rho0[:] = rho0
-
         # add requisite properties to the arrays:
         # particle volume
         fluid.add_property( {'name': 'V'} )
@@ -134,11 +127,12 @@ equations = [
 
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None),
+            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
 
             MomentumEquation(dest='fluid', sources=['fluid'], nu=nu),
 
             ArtificialStress(dest='fluid', sources=['fluid']),
+
             ]),
     ]
 

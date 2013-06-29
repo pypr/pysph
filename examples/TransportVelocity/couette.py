@@ -91,7 +91,6 @@ def create_particles(empty=False, **kwargs):
 
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
-    fluid.add_property( {'name': 'aw'} )
     
     # kernel summation correction for the channel
     channel.add_property( {'name': 'wij'} )
@@ -99,10 +98,6 @@ def create_particles(empty=False, **kwargs):
     # imopsed velocity on the channel
     channel.add_property( {'name': 'u0'} )
     channel.add_property( {'name': 'v0'} )
-
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.add_property( {'name': 'p0'} )
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
@@ -114,10 +109,6 @@ def create_particles(empty=False, **kwargs):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         channel.m[:] = volume * rho0
-
-        # reference pressures and densities
-        fluid.rho0[:] = rho0
-        fluid.p0[:] = p0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -164,13 +155,13 @@ equations = [
     # boundary conditions for the channel wall
     Group(
         equations=[
-            SolidWallBC(dest='channel', sources=['fluid',], b=1.0),
+            SolidWallBC(dest='channel', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
             ]),
     
     # acceleration equation
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0),
+            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
 
             MomentumEquation(dest='fluid', sources=['fluid', 'channel'], nu=nu),
             
