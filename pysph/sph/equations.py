@@ -324,6 +324,12 @@ class Group(object):
                     pass
         return '\n'.join(decl)
 
+    def _has_code(self, kind='loop'):
+        assert kind in ('initialize', 'loop', 'post_loop')
+        for equation in self.equations:
+            if hasattr(equation, kind):
+                return True
+
     def _get_code(self, kind='loop'):
         assert kind in ('initialize', 'loop', 'post_loop')
         # We assume here that precomputed quantities are only relevant
@@ -459,13 +465,22 @@ class Group(object):
     def get_variable_declarations(self, context):
         return self._get_variable_decl(context, mode='declare')
 
+    def has_initialize(self):
+        return self._has_code('initialize')
+
     def get_initialize_code(self, kernel=None):
         code = self._get_code(kind='initialize')
         return self._set_kernel(code, kernel)
 
+    def has_loop(self):
+        return self._has_code('loop')
+
     def get_loop_code(self, kernel=None):
         code = self._get_code(kind='loop')
         return self._set_kernel(code, kernel)
+
+    def has_post_loop(self):
+        return self._has_code('post_loop')
 
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
