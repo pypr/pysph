@@ -78,16 +78,19 @@ cdef class SPHCalc:
         ${indent(object.get_variable_declarations(), 2)}
         #######################################################################
         ## Iterate over groups:
-        ## Groups are organized as {destination: (eqs_with_no_source, sources)}
+        ## Groups are organized as {destination: (eqs_with_no_source, sources, all_eqs)}
         ## eqs_with_no_source: Group([equations]) all SPH Equations with no source.
         ## sources are {source: Group([equations...])}
+        ## all_eqs is a Group of all equations having this destination.
         #######################################################################
         % for g_idx, group in enumerate(object.groups):
+        # ---------------------------------------------------------------------
         # Group ${g_idx}.
         #######################################################################
         ## Iterate over destinations in this group.
         #######################################################################
-        % for dest, (eqs_with_no_source, sources) in group.iteritems():
+        % for dest, (eqs_with_no_source, sources, all_eqs) in group.iteritems():
+        # ---------------------------------------------------------------------
         # Destination ${dest}.\
         #######################################################################
         ## Setup destination array pointers.
@@ -97,6 +100,14 @@ cdef class SPHCalc:
         ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources), 2)}
         dst_array_index = dst.index
 
+        #######################################################################
+        ## Initialize all equations for this destination.
+        #######################################################################
+        % if all_eqs.has_initialize():
+        # Initialization for destination ${dest}.
+        for d_idx in range(NP_DEST):
+            ${indent(all_eqs.get_initialize_code(object.kernel), 3)}
+        % endif
         #######################################################################
         ## Handle all the equations that do not have a source.
         #######################################################################
@@ -109,6 +120,7 @@ cdef class SPHCalc:
         ## Iterate over sources.
         #######################################################################
         % for source, eq_group in sources.iteritems():
+        # --------------------------------------
         # Source ${source}.\
         #######################################################################
         ## Setup source array pointers.
@@ -135,14 +147,20 @@ cdef class SPHCalc:
                 ###############################################################
                 ${indent(eq_group.get_loop_code(object.kernel), 4)}
 
-            ###################################################################
-            ## Do any post neighbor loop assignments.
-            ###################################################################
-            # Post-loop code.\
-            ${indent(eq_group.get_post_loop_code(object.kernel), 3)}
         # Source ${source} done.
+        # --------------------------------------
         % endfor
+        ###################################################################
+        ## Do any post_loop assignments for the destination.
+        ###################################################################
+        % if all_eqs.has_post_loop():
+        # Post loop for destination ${dest}.
+        for d_idx in range(NP_DEST):
+            ${indent(all_eqs.get_post_loop_code(object.kernel), 3)}
+        % endif
         # Destination ${dest} done.
+        # ---------------------------------------------------------------------
         % endfor
         # Group ${g_idx} done.
+        # ---------------------------------------------------------------------
         % endfor

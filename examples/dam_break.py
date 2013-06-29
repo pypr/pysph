@@ -78,7 +78,7 @@ from db_geometry import DamBreak2DGeometry
 from pysph.base.kernels import CubicSpline
 from pysph.sph.equations import TaitEOS, ContinuityEquation, MomentumEquation,\
      XSPHCorrection
-     
+
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
@@ -137,14 +137,14 @@ equations = [
 
     # Momentum equation
     MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gy=-4.9),
+                     alpha=alpha, beta=beta, gy=-9.81),
 
     # Position step with XSPH
     XSPHCorrection(dest='fluid', sources=['fluid'])
-    ]    
+    ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=geom.create_particles, hdx=hdx)
 
 with open('db.pyx', 'w') as f:

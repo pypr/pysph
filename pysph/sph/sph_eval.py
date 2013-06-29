@@ -83,9 +83,11 @@ class SPHEval(object):
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
+            all_eqs = set()
             for equation in equations:
                 if equation.dest != dest:
                     continue
+                all_eqs.add(equation)
                 if equation.no_source:
                     eqs_with_no_source.append(equation)
                 else:
@@ -96,7 +98,8 @@ class SPHEval(object):
                 eqs = sources[src]
                 sources[src] = Group(eqs)
 
-            dests[dest] = (Group(eqs_with_no_source), sources)
+            dests[dest] = (Group(eqs_with_no_source), sources,
+                           Group(list(all_eqs)))
 
         return dests
 
