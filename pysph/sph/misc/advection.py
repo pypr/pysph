@@ -1,7 +1,7 @@
 """Functions for advection"""
 
 from textwrap import dedent
-from equations import Equation
+from pysph.sph.equation import Equation
 from numpy import cos, pi
 
 class Advect(Equation):

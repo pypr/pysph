@@ -7,7 +7,7 @@ except ImportError:
 from mako.template import Template
 from os.path import dirname, join
 
-from pysph.sph.equations import Group
+from pysph.sph.equation import Group
 from pysph.base.ext_module import ExtModule
 from pysph.base.cython_generator import CythonGenerator
 

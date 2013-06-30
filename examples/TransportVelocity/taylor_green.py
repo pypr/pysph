@@ -12,8 +12,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
-from pysph.sph.equations import Group
-from pysph.sph.transport_velocity_equations import DensitySummation,\
+from pysph.sph.equation import Group
+from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, MomentumEquation, ArtificialStress
 
 # numpy
@@ -51,7 +51,7 @@ def create_particles(empty=False, **kwargs):
 
         # create the arrays
         fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
-    
+
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
 
@@ -71,14 +71,14 @@ def create_particles(empty=False, **kwargs):
         # reference pressures and sound speeds
         fluid.add_property( {'name':'p0'} )
         fluid.add_property( {'name':'rho0'} )
-        
+
         fluid.p0[:] = p0
         fluid.rho0[:] = rho0
 
         # add requisite properties to the arrays:
         # particle volume
         fluid.add_property( {'name': 'V'} )
-        
+
         # advection velocities and accelerations
         fluid.add_property( {'name': 'uhat'} )
         fluid.add_property( {'name': 'vhat'} )
@@ -100,12 +100,12 @@ def create_particles(empty=False, **kwargs):
 
         # smoothing lengths
         fluid.h[:] = hdx * dx
-                
+
     # return the particle list
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L, 
+domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
@@ -143,7 +143,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

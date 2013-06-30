@@ -29,8 +29,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import EulerIntegrator
 
 # the eqations
-from pysph.sph.equations import Group
-from pysph.sph.advection_equations import Advect
+from pysph.sph.equation import Group
+from pysph.sph.misc.advection import Advect
 
 # numpy
 import numpy as np
@@ -57,14 +57,14 @@ def create_particles(empty=False, **kwargs):
             xi = x[i]; yi = y[i]
             if ( (xi - cx)**2 + (yi - cy)**2 > 0.25**2 ):
                 indices.append(i)
-                
+
         # create the arrays
         fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
-        
+
         # remove particles outside the circular patch
         to_remove = LongArray(len(indices)); to_remove.set_data(np.array(indices))
         fluid.remove_particles(to_remove)
-    
+
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
         fluid.add_property( {'name': 'ax'} )
@@ -80,15 +80,15 @@ def create_particles(empty=False, **kwargs):
         # color
         fluid.color[:] = cos(2*pi*fluid.x) * cos(2*pi*fluid.y)
         fluid.u[:] = 1.0; fluid.v[:] = 1.0
-        
-        # mass 
+
+        # mass
         fluid.m[:] = dx**2 * 1.0
 
     # return the particle list
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=1.0, ymin=0, ymax=1.0, 
+domain = DomainLimits(xmin=0, xmax=1.0, ymin=0, ymax=1.0,
                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
@@ -116,7 +116,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 with open('test.pyx', 'w') as f:

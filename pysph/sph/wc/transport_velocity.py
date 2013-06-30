@@ -1,6 +1,7 @@
-"""Functions for the transport velocity formulation of Adami et. al."""
+"""Functions for the transport velocity formulation of Adami et. al.
+"""
 
-from equations import Equation
+from pysph.sph.equation import Equation
 
 class DensitySummation(Equation):
     def loop(self, d_idx, d_V, d_rho, d_m, WIJ=1.0):

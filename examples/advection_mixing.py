@@ -31,8 +31,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import EulerIntegrator
 
 # the eqations
-from pysph.sph.equations import Group
-from pysph.sph.advection_equations import Advect, MixingVelocityUpdate
+from pysph.sph.equation import Group
+from pysph.sph.misc.advection import Advect, MixingVelocityUpdate
 
 # numpy
 import numpy as np
@@ -55,7 +55,7 @@ def create_particles(empty=False, **kwargs):
 
         # create the arrays
         fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
-    
+
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
         fluid.add_property( {'name': 'ax'} )
@@ -77,12 +77,12 @@ def create_particles(empty=False, **kwargs):
         # velocities
         fluid.u0[:] = +sin(pi*x)*sin(pi*x) * sin(2*pi*y)
         fluid.v0[:] = -sin(pi*y)*sin(pi*y) * sin(2*pi*x)
-                
+
     # return the particle list
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L, 
+domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
@@ -109,11 +109,11 @@ equations = [
 
             Advect(dest='fluid', sources=None)
             ])
-    
+
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 with open('mixing.pyx', 'w') as f:

@@ -12,9 +12,11 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator, AdamiVelocityVerletIntegrator
 
 # the eqations
-from pysph.sph.equations import Group, BodyForce
-from pysph.sph.transport_velocity_equations import ArtificialStress,\
-    DensitySummation, SolidWallBC, VolumeSummation, StateEquation, ContinuityEquation, MomentumEquation
+from pysph.sph.equation import Group
+from pysph.sph.wc.basic import BodyForce
+from pysph.sph.wc.transport_velocity import (ArtificialStress,
+    DensitySummation, SolidWallBC, VolumeSummation, StateEquation,
+    ContinuityEquation, MomentumEquation)
 
 # numpy
 import numpy as np
@@ -70,7 +72,7 @@ def create_particles(empty=False, **kwargs):
         # remove the fluid particles from the solid
         fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
         solid.remove_particles(to_extract)
-        
+
         print "Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
@@ -79,7 +81,7 @@ def create_particles(empty=False, **kwargs):
     # particle volume
     fluid.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
@@ -90,7 +92,7 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
     fluid.add_property( {'name': 'aw'} )
-    
+
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
 
@@ -107,7 +109,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -129,7 +131,7 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        
+
     # return the particle list
     return [fluid, solid]
 
@@ -162,7 +164,7 @@ equations = [
             #VolumeSummation(dest='fluid',sources=['fluid', 'solid'],),
 
             ]),
-    
+
     # solid wall bc
     Group(
         equations=[
@@ -171,7 +173,7 @@ equations = [
             #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
 
             ]),
-    
+
     # accelerations
     Group(
         equations=[
@@ -188,7 +190,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

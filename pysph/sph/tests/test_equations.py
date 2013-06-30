@@ -5,7 +5,7 @@ from textwrap import dedent
 import unittest
 
 # Local imports.
-from pysph.sph.equations import (BasicCodeBlock, Context, Equation,
+from pysph.sph.equation import (BasicCodeBlock, Context, Equation,
     Group, sort_precomputed)
 
 
@@ -101,7 +101,7 @@ class TestEquations(TestBase):
         self.assertEqual(eq.no_source, True)
 
     def test_continuity_equation(self):
-        from pysph.sph.equations import ContinuityEquation
+        from pysph.sph.wc.basic import ContinuityEquation
         e = ContinuityEquation(dest='fluid', sources=['fluid'])
         # Call the loop code.
 
@@ -131,7 +131,7 @@ class TestEquations(TestBase):
             pre = sort_precomputed(input)
             self.assertEqual(pre.keys(), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ'])
         finally:
-            from pysph.sph.equations import precomputed_symbols
+            from pysph.sph.equation import precomputed_symbols
             Group.pre_comp = precomputed_symbols()
 
 
@@ -148,7 +148,7 @@ class TestEq2(Equation):
 
 class TestGroup(TestBase):
     def setUp(self):
-        from pysph.sph.equations import SummationDensity, TaitEOS, Group
+        from pysph.sph.wc.basic import SummationDensity, TaitEOS
         self.group = Group([SummationDensity('f', ['f']), TaitEOS('f', None)])
 
     def test_precomputed(self):
