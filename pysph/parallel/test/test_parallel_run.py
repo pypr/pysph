@@ -194,9 +194,9 @@ class DamBreakTestCase(ExampleTestCase):
 class LDCavityTestCase(ExampleTestCase):
 
     @attr(slow=True, parallel=True)
-    def _test_cavity(self):
+    def test_cavity(self):
         self.run_example('../../../examples/TransportVelocity/cavity.py', 
-                         nprocs=4, load_func=load, tf=0.01, ghost_layers=2.0)
+                         nprocs=4, load_func=load, tf=0.025, ghost_layers=3.0)
 
 if __name__ == "__main__":
     unittest.main()
