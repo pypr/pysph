@@ -66,7 +66,8 @@ def get_particle_array(cl_precision="double", **props):
 
     default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
                      'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,
-                     'rho':1.0, 'au':0.0, 'av':0.0, 'aw':0.0}
+                     'rho':1.0, 'au':0.0, 'av':0.0, 'aw':0.0,
+                     'gid':UINT_MAX, 'pid':0, 'tag':0}
     
     #Add the properties requested
     np = 0
@@ -103,8 +104,25 @@ def get_particle_array(cl_precision="double", **props):
     # Add the default props
     for prop in default_props:
         if prop not in props.keys():
-            prop_dict[prop] = {'name':prop, 'type':'double',
-                               'default':default_props[prop]}
+
+            if prop in ["pid"]:
+                prop_dict[prop] = {'name':prop, 'type':'int',
+                                   'default':default_props[prop]}
+
+            elif prop in ['gid']:
+                data = numpy.ones(shape=np, dtype=numpy.uint32)
+                data[:] = UINT_MAX
+
+                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
+                                   'data':data}
+
+            elif prop in ['tag']:
+                prop_dict[prop] = {'name':prop, 'type':'long',
+                                   'default':default_props[prop]}
+
+            else:
+                prop_dict[prop] = {'name':prop, 'type':'double',
+                                   'default':default_props[prop]}
 
     pa = ParticleArray(name=name, 
                        cl_precision=cl_precision, **prop_dict)
