@@ -15,7 +15,7 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from ast_utils import get_symbols
+from pysph.base.ast_utils import get_symbols
 from pysph.base.cython_generator import CythonGenerator
 
 def camel_to_underscore(name):

@@ -3,7 +3,7 @@ import ast
 from textwrap import dedent
 import unittest
 
-from pysph.sph.ast_utils import (get_assigned, get_aug_assign_symbols, get_symbols,
+from pysph.base.ast_utils import (get_assigned, get_aug_assign_symbols, get_symbols,
     has_node, has_return)
 
 
