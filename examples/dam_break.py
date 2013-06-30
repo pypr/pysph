@@ -76,7 +76,7 @@ import numpy
 from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline
-from pysph.sph.equations import TaitEOS, ContinuityEquation, MomentumEquation,\
+from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
      XSPHCorrection
 
 from pysph.solver.application import Application

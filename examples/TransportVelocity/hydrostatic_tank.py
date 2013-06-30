@@ -11,8 +11,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
-from pysph.sph.equations import Group, BodyForce
-from pysph.sph.transport_velocity_equations import DensitySummation,\
+from pysph.sph.equation import Group, BodyForce
+from pysph.sph.wc.transport_velocity_equation import DensitySummation,\
     SolidWallBC, MomentumEquation, StateEquation, ArtificialStress
 
 # numpy
@@ -77,7 +77,7 @@ def create_particles(empty=False, **kwargs):
     # particle volume
     fluid.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
@@ -88,7 +88,7 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
     fluid.add_property( {'name': 'aw'} )
-    
+
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
 
@@ -102,7 +102,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -122,7 +122,7 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        
+
     # return the particle list
     return [fluid, solid]
 
@@ -149,14 +149,14 @@ equations = [
             DensitySummation(
                 dest='fluid', sources=['fluid','solid']),
             ]),
-    
+
     # boundary conditions for the solid wall
     Group(
         equations=[
             SolidWallBC(
                 dest='solid', sources=['fluid',], gy=gy),
             ]),
-    
+
     # acceleration equation
     Group(
         equations=[
@@ -173,7 +173,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

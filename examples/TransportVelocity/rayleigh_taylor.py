@@ -11,8 +11,9 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
-from pysph.sph.equations import Group, BodyForce
-from pysph.sph.transport_velocity_equations import DensitySummation,\
+from pysph.sph.equation import Group
+from pyface.sph.wc.basic import BodyForce
+from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
 # numpy
@@ -77,7 +78,7 @@ def create_particles(empty=False, **kwargs):
                 fluid.rho[i] = rho1
             else:
                 fluid.rho[i] = rho2
-        
+
         print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
@@ -86,7 +87,7 @@ def create_particles(empty=False, **kwargs):
     # particle volume
     fluid.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
@@ -104,7 +105,7 @@ def create_particles(empty=False, **kwargs):
 
     fluid.add_property( {'name': 'p0'} )
     fluid.p0[:] = fluid.rho * c0**2
-    
+
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
 
@@ -114,7 +115,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -129,7 +130,7 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-                
+
     # return the arrays
     return [fluid, solid]
 
@@ -153,15 +154,15 @@ equations = [
     Group(
         equations=[
             DensitySummation(dest='fluid', sources=['fluid','solid']),
-            
+
             ]),
-    
+
     # boundary conditions for the solid wall from each phase
     Group(
         equations=[
             SolidWallBC(dest='solid', sources=['fluid'], gy=gy),
             ]),
-    
+
     # acceleration equations for each phase
     Group(
         equations=[
@@ -177,7 +178,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

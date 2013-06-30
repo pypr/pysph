@@ -11,8 +11,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
-from pysph.sph.equations import Group
-from pysph.sph.transport_velocity_equations import DensitySummation,\
+from pysph.sph.equation import Group
+from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
 # numpy
@@ -64,7 +64,7 @@ def create_particles(empty=False, **kwargs):
         # remove the fluid particles from the solid
         fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
         solid.remove_particles(to_extract)
-        
+
         print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
@@ -73,7 +73,7 @@ def create_particles(empty=False, **kwargs):
     # particle volume
     fluid.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
@@ -84,7 +84,7 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
     fluid.add_property( {'name': 'aw'} )
-    
+
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
 
@@ -98,7 +98,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -118,14 +118,14 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        
+
         # imposed horizontal velocity on the lid
         solid.u0[:] = 0.0
         solid.v0[:] = 0.0
         for i in range(solid.get_number_of_particles()):
             if solid.y[i] > L:
                 solid.u0[i] = Umax
-                
+
     # return the particle list
     return [fluid, solid]
 
@@ -151,7 +151,7 @@ equations = [
             DensitySummation(dest='fluid', sources=['fluid','solid'],)
 
             ]),
-    
+
     # boundary conditions for the solid wall
     Group(
         equations=[
@@ -159,21 +159,21 @@ equations = [
             SolidWallBC(dest='solid', sources=['fluid',], b=1.0),
 
             ]),
-    
+
     # acceleration equation
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, b=1.0),
-            
+
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-            
+
             ArtificialStress(dest='fluid', sources=['fluid',]),
-            
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

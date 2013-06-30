@@ -5,14 +5,12 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
-import __builtin__
 import inspect
 import logging
 from mako.template import Template
-import math
 from textwrap import dedent
 
-from pysph.sph.ast_utils import get_assigned, has_return
+from ast_utils import get_assigned, has_return
 
 logger = logging.getLogger(__name__)
 
