@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sat Mar 23 20:03:12 2013
+# Sat Jun 29 11:48:11 2013
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -484,8 +484,8 @@ cdef class IntArray(BaseArray):
         cdef int min_val, max_val
 
         if self.length == 0:
-            self.minimum = <int>-1e20
-            self.maximum = <int>1e20
+            self.minimum = <int>0
+            self.maximum = <int>0
             return
 
         min_val = self.data[0]
@@ -819,8 +819,8 @@ cdef class DoubleArray(BaseArray):
         cdef double min_val, max_val
 
         if self.length == 0:
-            self.minimum = <double>-1e20
-            self.maximum = <double>1e20
+            self.minimum = <double>0
+            self.maximum = <double>0
             return
 
         min_val = self.data[0]
@@ -1154,8 +1154,8 @@ cdef class FloatArray(BaseArray):
         cdef float min_val, max_val
 
         if self.length == 0:
-            self.minimum = <float>-1e20
-            self.maximum = <float>1e20
+            self.minimum = <float>0
+            self.maximum = <float>0
             return
 
         min_val = self.data[0]
@@ -1489,8 +1489,8 @@ cdef class LongArray(BaseArray):
         cdef long min_val, max_val
 
         if self.length == 0:
-            self.minimum = <long>-1e20
-            self.maximum = <long>1e20
+            self.minimum = <long>0
+            self.maximum = <long>0
             return
 
         min_val = self.data[0]
@@ -1824,8 +1824,8 @@ cdef class UIntArray(BaseArray):
         cdef unsigned int min_val, max_val
 
         if self.length == 0:
-            self.minimum = <unsigned int>-1e20
-            self.maximum = <unsigned int>1e20
+            self.minimum = <unsigned int>0
+            self.maximum = <unsigned int>0
             return
 
         min_val = self.data[0]
