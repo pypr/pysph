@@ -89,6 +89,9 @@ class WendlandQuintic(object):
         elif self.dim == 2:
             fac = 7.0*M_1_PI/4.0 * h1 * h1
 
+        else:
+            raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
+
         if ( q >= 2.0 ):
             val = 0.0
 
@@ -108,12 +111,18 @@ class WendlandQuintic(object):
         elif self.dim == 2:
             fac = 7.0*M_1_PI/4.0 * h1 * h1
 
+        else:
+            raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
+
         # compute the gradient
         if (rij > 1e-12):
             if (q >= 2.0):
                 val = 0.0
             else:
                 val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
+
+        else:
+            val = 0.0
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
@@ -158,6 +167,9 @@ class Gaussian(object):
             else:
                 val = -2 * q * exp(-q*q) * h1/rij
 
+        else:
+            val = 0.0
+
         tmp = val * fac
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
@@ -183,6 +195,8 @@ class QuinticSpline(object):
         if self.dim == 2:
             fac = M_1_PI * 7./478.0 * h1 * h1
 
+        else:
+            raise NotImplementedError('Quintic spline only supports 2D kernels.')
 
         if ( q > 3.0 ):
             val = 0.0
@@ -205,6 +219,8 @@ class QuinticSpline(object):
         if self.dim == 2:
             fac = M_1_PI * 7./478.0 * h1 * h1
 
+        else:
+            raise NotImplementedError('Quintic spline only supports 2D kernels.')
 
         # compute the gradient
         if (rij > 1e-12):

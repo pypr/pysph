@@ -51,7 +51,7 @@ def create_particles(empty=False, **kwargs):
 
         # create the arrays
         fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
-
+    
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
 
@@ -68,17 +68,10 @@ def create_particles(empty=False, **kwargs):
         fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
         fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-        # reference pressures and sound speeds
-        fluid.add_property( {'name':'p0'} )
-        fluid.add_property( {'name':'rho0'} )
-
-        fluid.p0[:] = p0
-        fluid.rho0[:] = rho0
-
         # add requisite properties to the arrays:
         # particle volume
         fluid.add_property( {'name': 'V'} )
-
+        
         # advection velocities and accelerations
         fluid.add_property( {'name': 'uhat'} )
         fluid.add_property( {'name': 'vhat'} )
@@ -100,12 +93,12 @@ def create_particles(empty=False, **kwargs):
 
         # smoothing lengths
         fluid.h[:] = hdx * dx
-
+                
     # return the particle list
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
+domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L, 
                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
@@ -134,16 +127,17 @@ equations = [
 
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None),
+            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
 
             MomentumEquation(dest='fluid', sources=['fluid'], nu=nu),
 
             ArtificialStress(dest='fluid', sources=['fluid']),
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
+app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
 
 app.run()

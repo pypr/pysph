@@ -17,11 +17,8 @@ from pyzoltan.core import zoltan_utils
 
 # PySPH imports
 from pysph.base.nnps cimport DomainLimits, Cell, find_cell_id, arange_uint
+from pysph.base.utils import ParticleTAGS
 from pysph.solver.utils import savez
-
-# local imports
-import parallel_utils
-from parallel_utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
@@ -75,23 +72,7 @@ cdef class ParticleArrayExchange:
         self.numParticleImport = 0
 
         # load balancing props
-        if lb_props is None:
-            self.lb_props = ['x','y', 'z', 'ax', 'ay', 'az',
-                             'u', 'v', 'w', 'au', 'av', 'aw',
-                             'rho', 'arho', 'm', 'h', 'gid',
-                             'x0', 'y0', 'z0', 'u0', 'v0','w0',
-                             'rho0', 'p', 'cs']
-        else:
-            self.lb_props = lb_props
-
-        # temporary buffers
-        self.uintbuf = UIntArray()
-        self.intbuf = IntArray()
-        self.doublebuf = DoubleArray()
-        self.longbuf = LongArray()
-
-        # receive counts
-        self.recv_count = np.zeros(shape=self.size, dtype=np.int32)
+        self.lb_props = lb_props
 
         # exchange flags
         self.lb_exchange = True
@@ -116,33 +97,37 @@ cdef class ParticleArrayExchange:
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
         cdef IntArray exportProcs = self.exportParticleProcs
-        cdef int numExport = self.numParticleExport
-
-        # collect the data to send
-        cdef dict send = parallel_utils.get_send_data(
-            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
-
-        # current number of particles
-        cdef int count, newsize, current_size = self.num_local
+        cdef int numImport, numExport = self.numParticleExport
 
         # MPI communicator
         cdef object comm = self.comm
 
-        # Remove particles to be exported
-        pa.remove_particles( exportLocalids )
-
-        # exchange the data
-        cdef int ltag = self.msglength_tag_lb
+        # message tags
         cdef int dtag = self.data_tag_lb
 
-        count = current_size - numExport
-        self._exchange_data(count, send, ltag, dtag)
+        # create the zoltan communicator and get number of objects to import
+        cdef ZComm zcomm = ZComm(comm, dtag, numExport, exportProcs.get_npy_array())
+        numImport = zcomm.nreturn
 
-        # set the tags for the extended array
-        cdef int[:] recv_count = self.recv_count
-        cdef int numImport = np.sum( recv_count )
+        # extract particles to be exported
+        cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
-        newsize = count + numImport
+        # remove particles to be exported
+        pa.remove_particles(exportLocalids)
+        pa.align_particles()
+
+        # old and new sizes
+        cdef int current_size = self.num_local
+        cdef int count = current_size - numExport
+        cdef int newsize = count + numImport
+
+        # resize the particle array to accomodate the receive
+        pa.resize( newsize )
+
+        # exchange data
+        self.exchange_data(zcomm, sendbufs, count)
+
+        # set all particle tags to local
         self.set_tag(count, newsize, Local)
         pa.align_particles()
 
@@ -168,10 +153,7 @@ cdef class ParticleArrayExchange:
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
         cdef IntArray exportProcs = self.exportParticleProcs
-
-        # collect the data to send
-        cdef dict send = parallel_utils.get_send_data(
-            self.comm, pa, self.lb_props, exportLocalids,exportProcs)
+        cdef int numImport, numExport = self.numParticleExport
 
         # current number of particles
         cdef int current_size = self.num_local
@@ -180,122 +162,49 @@ cdef class ParticleArrayExchange:
         # MPI communicator
         cdef object comm = self.comm
 
-        # share the data
-        cdef int ltag = self.msglength_tag_remote
+        # zoltan communicator
         cdef int dtag = self.data_tag_remote
+        cdef ZComm zcomm = ZComm(comm, dtag, numExport, exportProcs.get_npy_array())
+        numImport = zcomm.nreturn
+        
+        # old and new sizes
         count = current_size
-        self._exchange_data(count, send, ltag, dtag)
+        newsize = current_size + numImport
 
-        # count the number of particles to be imported
-        cdef int[:] recv_count = self.recv_count
-        cdef int numImport = np.sum( recv_count )
+        # copy particles to be exported
+        cdef dict sendbufs = self.get_sendbufs( exportLocalids )
 
-        newsize = count + numImport
+        # update the size of the array
+        pa.resize( newsize )
+        self.exchange_data(zcomm, sendbufs, count)
+
+        # set tags for all received particles as Remote
         self.set_tag(count, newsize, Remote)
         pa.align_particles()
 
         # store the number of remote particles
         self.num_remote = newsize - current_size
 
-    cdef _exchange_data(self, int count, dict send, int ltag, int dtag):
-        """New send and receive."""
-        # data arrays
+    cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count):
         cdef ParticleArray pa = self.pa
+        cdef str prop
+        cdef int nbytes
 
-        # MPI communicator
-        cdef object comm = self.comm
+        cdef np.ndarray prop_arr, sendbuf, recvbuf
 
-        # temp buffers to store info
-        cdef DoubleArray doublebuf = self.doublebuf
-        cdef UIntArray uintbuf = self.uintbuf
-        cdef LongArray longbuf = self.longbuf
-        cdef IntArray intbuf = self.intbuf
+        for prop in sendbufs:
+            prop_arr = pa.properties[prop].get_npy_array()
+            nbytes = prop_arr.dtype.itemsize
 
-        cdef int rank = self.rank
-        cdef int size = self.size
-        cdef int i=0, j=0
-
-        # reset the recv_count array
-        cdef int[:] recv_count = self.recv_count
-        recv_count[:] = 0
-
-        ctype_map = {'unsigned int':uintbuf,
-                     'double':doublebuf,
-                     'long':longbuf,
-                     'int':intbuf}
-
-        props = {}
-        for prop in self.lb_props:
-            prop_array = pa.properties[prop]
-            props[ prop ] = ctype_map[ prop_array.get_c_type() ]
+            # the send and receive buffers
+            sendbuf = sendbufs[prop]
+            recvbuf = prop_arr[count:]
             
-        ############### SEND AND RECEIVE START ########################
-        # Receive from processors with a lower rank
-        i = 0
-        while i < size:
-            if i < rank:
-                # get the message length
-                msglength = comm.recv(source=i, tag=ltag)
-
-                # extend the array
-                self.extend(count, msglength)
-
-                # receive each property in turn
-                for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( msglength )
-
-                    parallel_utils.Recv(
-                        comm=comm,
-                        localbuf=pa.properties[prop],
-                        localbufsize=count,
-                        recvbuf=recvbuf,
-                        source=i,
-                        tag=dtag)
-                    
-                # update the local buffer size
-                count = count + msglength
-                recv_count[i] = msglength
-
-                i = i + 1
-            else:
-                break
-
-        # Send the data across
-        for pid in range(size):
-            if pid != rank:
-                comm.send(obj=send[pid]['msglength'], dest=pid, tag=ltag)
-
-                msglength = send[pid]['msglength']
-                for prop in props:
-                    sendbuf = send[pid][prop]
-                    comm.Send( buf=sendbuf, dest=pid, tag=dtag )
-                    
-        # recv from procs with higher rank i value as set in first loop
-        for j in range(i, size):
-            if j != rank:
-                # get the length of the message to be received
-                msglength = comm.recv(source=j, tag=ltag)
-
-                # extend the array
-                self.extend(count, msglength)
-
-                #  receive each property in turn
-                for prop, recvbuf in props.iteritems():
-                    recvbuf.resize( msglength )
-
-                    parallel_utils.Recv(
-                        comm=comm,
-                        localbuf=pa.properties[prop],
-                        localbufsize=count,
-                        recvbuf=recvbuf,
-                        source=j,
-                        tag=dtag)
-
-                # update to the new length
-                count = count + msglength
-                recv_count[j] = msglength
-
-        ############### SEND AND RECEIVE STOP ########################
+            # set the nbytes for the zoltan communicator
+            zcomm.set_nbytes( nbytes )
+            
+            # exchange the data
+            zcomm.Comm_Do( sendbuf, recvbuf )
 
     def remove_remote_particles(self):
         cdef int num_local = self.num_local
@@ -364,8 +273,21 @@ cdef class ParticleArrayExchange:
         self.importParticleLocalids.reset()
         self.importParticleProcs.reset()
 
-    def extend(self, int current_length, int new_length):
-        self.pa.resize( current_length + new_length )
+    def extend(self, int currentsize, int newsize):
+        self.pa.resize( newsize )
+
+    def get_sendbufs(self, UIntArray exportIndices):
+        cdef ParticleArray pa = self.pa
+        cdef dict sendbufs = {}
+        cdef str prop
+        
+        cdef np.ndarray indices = exportIndices.get_npy_array()
+
+        for prop in pa.properties:
+            prop_arr = pa.properties[prop].get_npy_array()
+            sendbufs[prop] = prop_arr[ indices ]
+            
+        return sendbufs
 
 # #################################################################
 # # ParallelManager extension classes

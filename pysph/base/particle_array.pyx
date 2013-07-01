@@ -126,7 +126,7 @@ cdef class ParticleArray:
             dictionary of properties for every particle in this array
 
         """
-        self.properties = {'tag':IntArray(0),'pid':IntArray(0)}
+        self.properties = {'tag':IntArray(0),'pid':IntArray(0), 'gid':UIntArray(0)}
         self.default_values = {'tag':default_particle_tag, 'pid':0}
         
         self.constants = {}

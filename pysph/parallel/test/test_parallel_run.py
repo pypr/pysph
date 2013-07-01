@@ -100,7 +100,7 @@ class ExampleTestCase(unittest.TestCase):
     
     """
     def run_example(self, filename, tf=0.01, nprocs=2, load_func=load,
-                    timeout=300, ghost_layers=2):
+                    timeout=300, ghost_layers=2, dt=1e-4):
         """Run an example and compare the results in serial and parallel.
 
         Parameters:
@@ -137,7 +137,8 @@ class ExampleTestCase(unittest.TestCase):
                     '--directory=%s'%dir1,
                     '--tf=%g'%(tf),
                     '--pfreq=1000000',
-                    '--ghost-layers=%g'%ghost_layers]
+                    '--ghost-layers=%g'%ghost_layers,
+                    '--timestep=%g'%dt]
 
             # run the example script in serial
             _run_example_script(filename, args, 1, timeout)
@@ -177,12 +178,11 @@ class ExampleTestCase(unittest.TestCase):
         self.assertTrue( xs.size,xp.size )
         np = xs.size
 
-        places = 10
+        places = 14
         for i in range(np):
             self.assertAlmostEqual( xs[ gid[i] ], xp[i], places )
             self.assertAlmostEqual( ys[ gid[i] ], yp[i], places )
             self.assertAlmostEqual( zs[ gid[i] ], zp[i], places )
-            self.assertAlmostEqual( rhos[ gid[i] ], rhop[i], places )
 
 class DamBreakTestCase(ExampleTestCase):
 
@@ -190,6 +190,13 @@ class DamBreakTestCase(ExampleTestCase):
     def test_db(self):
         self.run_example('../../../examples/dam_break.py', 
                          nprocs=4, load_func=load, tf=0.01, ghost_layers=1)
+
+class LDCavityTestCase(ExampleTestCase):
+
+    @attr(slow=True, parallel=True)
+    def test_cavity(self):
+        self.run_example('../../../examples/TransportVelocity/cavity.py', 
+                         nprocs=4, load_func=load, tf=0.025, ghost_layers=3.0)
 
 if __name__ == "__main__":
     unittest.main()
