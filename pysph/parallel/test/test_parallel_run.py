@@ -166,15 +166,24 @@ class ExampleTestCase(unittest.TestCase):
 
 class ParallelTests(ExampleTestCase):
 
+    @attr(slow=True, very_slow=True, parallel=True)
+    def test_3Ddam_break_example(self):
+        dt = 1e-5; tf = 250 * dt
+        self.run_example('./dambreak3D.py', 
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1,
+                         timeout=900)
+    
     @attr(slow=True, parallel=True)
-    def test_2Ddam_break_example(self):
+    def _test_2Ddam_break_example(self):
+        dt = 1e-4; tf = 250*dt
         self.run_example('../../../examples/dam_break.py', 
-                         nprocs=4, load_func=load, tf=0.01, ghost_layers=1)
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1)
 
     @attr(slow=True, parallel=True)
-    def test_ldcavity_example(self):
+    def _test_ldcavity_example(self):
+        dt=1e-4; tf=250*dt
         self.run_example('../../../examples/TransportVelocity/cavity.py', 
-                         nprocs=4, load_func=load, tf=0.025, ghost_layers=3.0)
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=3.0)
 
 if __name__ == "__main__":
     unittest.main()
