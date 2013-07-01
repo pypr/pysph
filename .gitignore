@@ -1,11 +1,15 @@
 *.pyc
 *.o
 *.c
+*.cpp
 *~
 *.so
 *.orig
 *.npz
 *.log
+*.npz
+*.pyd
+*.pdf
 test.pyx
 PySPH.egg-info/
 build/
