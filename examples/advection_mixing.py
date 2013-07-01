@@ -116,7 +116,4 @@ equations = [
 app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
-with open('mixing.pyx', 'w') as f:
-    app.dump_code(f)
-
 app.run()
