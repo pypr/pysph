@@ -167,12 +167,12 @@ class ExampleTestCase(unittest.TestCase):
 class ParallelTests(ExampleTestCase):
 
     @attr(slow=True, parallel=True)
-    def test_db(self):
+    def test_2Ddam_break_example(self):
         self.run_example('../../../examples/dam_break.py', 
                          nprocs=4, load_func=load, tf=0.01, ghost_layers=1)
 
     @attr(slow=True, parallel=True)
-    def test_cavity(self):
+    def test_ldcavity_example(self):
         self.run_example('../../../examples/TransportVelocity/cavity.py', 
                          nprocs=4, load_func=load, tf=0.025, ghost_layers=3.0)
 
