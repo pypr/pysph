@@ -24,34 +24,13 @@ import numpy
 
 from nose.plugins.attrib import attr
 
-from pysph.solver.utils import load
+from pysph.solver.utils import load, get_files
 
 directory = os.path.dirname(os.path.abspath(__file__))
 
 def kill_process(process):
     print 'KILLING PROCESS ON TIMEOUT'
     process.kill()
-
-def get_files(fname):
-
-    files = os.listdir( '.' )
-    path = os.path.abspath( '.' )
-
-    # get all the output files in the directory
-    files = [f for f in files if f.startswith(fname) and f.endswith('.npz') ]
-    files = [os.path.join(path, f) for f in files]
-
-    # sort the files
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
-
-    files.sort(_sort_func)
-
-    return files    
 
 def _run_example_script(filename, args=[], nprocs=2, timeout=20.0, path=None):
     """ run a file python script
@@ -148,16 +127,17 @@ class ExampleTestCase(unittest.TestCase):
             _run_example_script(filename, args, nprocs, timeout)
 
             # get the serial and parallel results
-            os.chdir( dir1 )
-            file = get_files(prefix)[-1]
-            serial = load(file)
+            dir1path = os.path.abspath(dir1)
+            dir2path = os.path.abspath(dir2)
 
+            # load the serial output
+            file = get_files(dirname=dir1path, fname=prefix)[-1]
+            serial = load(file)
             serial = serial['arrays']['fluid']
 
-            os.chdir( dir2 )
-            file = get_files(prefix)[-1]
+            # load the parallel output
+            file = get_files(dirname=dir2path, fname=prefix)[-1]
             parallel = load(file)
-
             parallel = parallel['arrays']['fluid']
             
         finally:
@@ -184,19 +164,26 @@ class ExampleTestCase(unittest.TestCase):
             self.assertAlmostEqual( ys[ gid[i] ], yp[i], places )
             self.assertAlmostEqual( zs[ gid[i] ], zp[i], places )
 
-class DamBreakTestCase(ExampleTestCase):
+class ParallelTests(ExampleTestCase):
 
+    @attr(slow=True, very_slow=True, parallel=True)
+    def test_3Ddam_break_example(self):
+        dt = 1e-5; tf = 250 * dt
+        self.run_example('./dambreak3D.py', 
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1,
+                         timeout=900)
+    
     @attr(slow=True, parallel=True)
-    def test_db(self):
+    def _test_2Ddam_break_example(self):
+        dt = 1e-4; tf = 250*dt
         self.run_example('../../../examples/dam_break.py', 
-                         nprocs=4, load_func=load, tf=0.01, ghost_layers=1)
-
-class LDCavityTestCase(ExampleTestCase):
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1)
 
     @attr(slow=True, parallel=True)
-    def test_cavity(self):
+    def _test_ldcavity_example(self):
+        dt=1e-4; tf=250*dt
         self.run_example('../../../examples/TransportVelocity/cavity.py', 
-                         nprocs=4, load_func=load, tf=0.025, ghost_layers=3.0)
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=3.0)
 
 if __name__ == "__main__":
     unittest.main()

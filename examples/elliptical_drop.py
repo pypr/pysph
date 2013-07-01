@@ -123,9 +123,6 @@ app.setup(solver=solver, equations=equations,
           particle_factory=get_circular_patch,
           name='fluid')
 
-with open('test.pyx', 'w') as f:
-    app.dump_code(f)
-
 t1 = time()
 app.run()
 elapsed = time() - t1
