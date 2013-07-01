@@ -53,10 +53,6 @@ def get_particle_array(cl_precision="double", **props):
  
     """ 
         
-    nprops = len(props)
-
-    prop_dict = {}
-
     # handle the name separately
     if props.has_key('name'):
         name = props['name']
@@ -64,54 +60,59 @@ def get_particle_array(cl_precision="double", **props):
     else:
         name = "array"
 
-    default_props = {'x':0.0, 'y':0.0, 'z':0.0, 'u':0.0, 'v':0.0 ,
-                     'w':0.0, 'm':1.0, 'h':1.0, 'p':0.0,
-                     'rho':1.0, 'au':0.0, 'av':0.0, 'aw':0.0}
-    
-    #Add the properties requested
     np = 0
+    nprops = len(props)
 
-    constants = {}
-
+    prop_dict = {}
     for prop in props.keys():
-        if prop == 'name':
-            pass
+        data = numpy.asarray(props[prop])
+        np = data.size
+
+        if prop in ['tag']:
+            prop_dict[prop] = {'data':data,
+                               'type':'int',
+                               'name':prop}
+
+        if prop in ['pid']:
+            prop_dict[prop] = {'data':data,
+                               'type':'int',
+                               'name':prop}
+
+        if prop in ['gid']:
+            prop_dict[prop] = {'data':data.astype(numpy.uint32),
+                               'type':'unsigned int',
+                               'name':prop}
         else:
-            if not isinstance(props[prop], numpy.ndarray):
-                constants[prop] = props[prop]
-                continue
+            prop_dict[prop] = {'data':data, 
+                               'type':'double',
+                               'name':prop}
 
-            data = numpy.asarray(props[prop])
-            if prop in ['gid']:
-                prop_dict[prop] = {'data':data,
-                                   'type': 'unsigned int',
-                                   'name':prop}
-
-            if prop in ['tag']:
-                prop_dict[prop] = {'data':data,
-                                   'type': 'long',
-                                   'name':prop}
-
-            if prop in ['pid']:
-                prop_dict[prop] = {'data':data,
-                                   'type':'int',
-                                   'name':prop}
-            
-            else:
-                prop_dict[prop] = {'data':data, 'type':'double'}
+    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
+                     'au', 'av', 'aw', 'gid', 'pid', 'tag']
             
     # Add the default props
     for prop in default_props:
-        if prop not in props.keys():
-            prop_dict[prop] = {'name':prop, 'type':'double',
-                               'default':default_props[prop]}
+        if not prop in prop_dict:
+            if prop in ["pid"]:
+                prop_dict[prop] = {'name':prop, 'type':'int',
+                                   'default':0}
 
-    pa = ParticleArray(name=name, 
-                       cl_precision=cl_precision, **prop_dict)
+            elif prop in ['gid']:
+                data = numpy.ones(shape=np, dtype=numpy.uint32)
+                data[:] = UINT_MAX
 
-    # add the constants
-    for prop in constants:
-        pa.constants[prop] = constants[prop]
+                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
+                                   'data':data}
+
+            elif prop in ['tag']:
+                prop_dict[prop] = {'name':prop, 'type':'int'}
+
+            else:
+                prop_dict[prop] = {'name':prop, 'type':'double',
+                                   'default':0}
+
+    # create the particle array
+    pa = ParticleArray(name=name, **prop_dict)
 
     return pa
 
@@ -135,7 +136,7 @@ def get_particle_array_wcsph(cl_precision="single", **props):
 
         if prop in ['tag']:
             prop_dict[prop] = {'data':data,
-                               'type': 'long',
+                               'type':'int',
                                'name':prop}
 
         if prop in ['pid']:
@@ -171,7 +172,7 @@ def get_particle_array_wcsph(cl_precision="single", **props):
                                    'data':data}
 
             elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'long',}
+                prop_dict[prop] = {'name':prop, 'type':'int',}
 
             else:
                 prop_dict[prop] = {'name':prop, 'type':'double',

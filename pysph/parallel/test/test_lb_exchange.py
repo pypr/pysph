@@ -156,4 +156,3 @@ for i in range(numParticles):
     assert( abs(X[pa.gid[i]] - pa.x[i]) < 1e-15 )
     assert( abs(Y[pa.gid[i]] - pa.y[i]) < 1e-15 )
     assert( GID[pa.gid[i]] == pa.gid[i] )
-

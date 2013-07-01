@@ -324,7 +324,6 @@ def load(fname):
             array = get_particle_array(name=array_name,
                                        cl_precision="single",
                                        **arrays[array_name])
-            
             ret["arrays"][array_name] = array
             
         ret["solver_data"] = solver_data

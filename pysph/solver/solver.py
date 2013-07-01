@@ -294,6 +294,9 @@ class Solver(object):
 
         bar.finish()
 
+        # final output save
+        self.dump_output(dt, *self.print_properties)
+
     def update_particle_time(self):
         for array in self.particles:
             array.set_time(self.t)

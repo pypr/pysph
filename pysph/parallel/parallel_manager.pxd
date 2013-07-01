@@ -4,14 +4,10 @@ cimport numpy as np
 from cpython cimport dict
 from cpython cimport list
 
-Has_Zoltan=True
-try:
-    import pyzoltan
-except ImportError:
-    Has_Zoltan=False
-
+# PyZoltan
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
+from pyzoltan.core.zoltan_comm cimport ZComm
 from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 
 # PySPH imports
@@ -28,7 +24,7 @@ cdef class ParticleArrayExchange:
 
     cdef public int msglength_tag_lb               # msg length tag for lb_exchange
     cdef public int data_tag_lb                    # data tag for lb_exchange
-    
+
     cdef public int pa_index                       # Particle index
     cdef public ParticleArray pa                   # Particle data
     cdef public NNPSParticleArrayWrapper pa_wrapper    # wrapper to exchange data
@@ -60,20 +56,11 @@ cdef class ParticleArrayExchange:
     cdef public IntArray importParticleProcs
     cdef public int numParticleImport
 
-    # temp buffers to import data
-    cdef public DoubleArray doublebuf
-    cdef public UIntArray uintbuf
-    cdef public IntArray intbuf
-    cdef public LongArray longbuf
-
-    # array of number of objects to receive
-    cdef public int[:] recv_count
-
     ############################################################################
     # Member functions
     ############################################################################
     # exchange data given send and receive lists
-    cdef _exchange_data(self, int count, dict send, int ltag, int dtag)
+    cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count)
 
 # base class for all parallel managers
 cdef class ParallelManager:

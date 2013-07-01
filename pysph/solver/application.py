@@ -211,7 +211,7 @@ class Application(object):
                           defaults to True"""))
 
         zoltan.add_option("--ghost-layers", action='store', dest='ghost_layers',
-                          default=2.0, type='float', 
+                          default=3.0, type='float', 
                           help=('Number of ghost cells to share for remote neighbors'))
 
         zoltan.add_option("--zoltan-debug-level", action="store",

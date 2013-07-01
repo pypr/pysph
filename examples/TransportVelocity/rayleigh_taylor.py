@@ -12,7 +12,7 @@ from pysph.sph.integrator import TransportVelocityIntegrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pyface.sph.wc.basic import BodyForce
+from pysph.sph.wc.basic import BodyForce
 from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
 
@@ -30,6 +30,8 @@ rho1 = 1.8; rho2 = 1.0
 
 # speed of sound and reference pressure
 c0 = 10 * Vmax
+p1 = c0**2 * rho1
+p2 = c0**2 * rho2
 
 # Numerical setup
 nx = 50; dx = Lx/nx
@@ -75,36 +77,48 @@ def create_particles(empty=False, **kwargs):
         indices = []
         for i in range(fluid.get_number_of_particles()):
             if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
-                fluid.rho[i] = rho1
-            else:
-                fluid.rho[i] = rho2
+                indices.append(i)
+                
+        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))                
+
+        fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
+        fluid2 = fluid
+        fluid2.set_name('fluid2')
+        fluid2.remove_particles(to_extract)
+
+        fluid1.rho[:] = rho1
+        fluid2.rho[:] = rho2
 
         print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
+            Re, fluid1.get_number_of_particles() + fluid2.get_number_of_particles(),
             solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
-    fluid.add_property( {'name': 'V'} )
+    fluid1.add_property( {'name': 'V'} )
+    fluid2.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-
+        
     # advection velocities and accelerations
-    fluid.add_property( {'name': 'uhat'} )
-    fluid.add_property( {'name': 'vhat'} )
+    fluid1.add_property( {'name': 'uhat'} )
+    fluid1.add_property( {'name': 'vhat'} )
 
-    fluid.add_property( {'name': 'auhat'} )
-    fluid.add_property( {'name': 'avhat'} )
+    fluid2.add_property( {'name': 'uhat'} )
+    fluid2.add_property( {'name': 'vhat'} )
 
-    fluid.add_property( {'name': 'au'} )
-    fluid.add_property( {'name': 'av'} )
-    fluid.add_property( {'name': 'aw'} )
+    fluid1.add_property( {'name': 'auhat'} )
+    fluid1.add_property( {'name': 'avhat'} )
 
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.rho0[:] = fluid.rho[:]
+    fluid2.add_property( {'name': 'auhat'} )
+    fluid2.add_property( {'name': 'avhat'} )
 
-    fluid.add_property( {'name': 'p0'} )
-    fluid.p0[:] = fluid.rho * c0**2
+    fluid1.add_property( {'name': 'au'} )
+    fluid1.add_property( {'name': 'av'} )
+    fluid1.add_property( {'name': 'aw'} )
+
+    fluid2.add_property( {'name': 'au'} )
+    fluid2.add_property( {'name': 'av'} )
+    fluid2.add_property( {'name': 'aw'} )
 
     # kernel summation correction for the solid
     solid.add_property( {'name': 'wij'} )
@@ -114,25 +128,29 @@ def create_particles(empty=False, **kwargs):
     solid.add_property( {'name': 'v0'} )
 
     # magnitude of velocity
-    fluid.add_property({'name':'vmag'})
-
+    fluid1.add_property({'name':'vmag'})
+    fluid2.add_property({'name':'vmag'})
+        
     # setup the particle properties
     if not empty:
         volume = dx * dx
 
         # mass is set to get the reference density of each phase
-        fluid.m[:] = volume * fluid.rho
+        fluid1.m[:] = volume * rho1
+        fluid2.m[:] = volume * rho2
 
         # volume is set as dx^2
-        fluid.V[:] = 1./volume
+        fluid1.V[:] = 1./volume
+        fluid2.V[:] = 1./volume
         solid.V[:] = 1./volume
 
         # smoothing lengths
-        fluid.h[:] = hdx * dx
+        fluid1.h[:] = hdx * dx
+        fluid2.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-
+                
     # return the arrays
-    return [fluid, solid]
+    return [fluid1, fluid2, solid]
 
 # Create the application.
 app = Application()
@@ -153,32 +171,36 @@ equations = [
     # Summation density for each phase
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid']),
-
+            DensitySummation(dest='fluid1', sources=['fluid1','fluid2','solid']),
+            DensitySummation(dest='fluid2', sources=['fluid1','fluid2','solid']),
             ]),
-
+    
     # boundary conditions for the solid wall from each phase
     Group(
         equations=[
-            SolidWallBC(dest='solid', sources=['fluid'], gy=gy),
+            SolidWallBC(dest='solid', sources=['fluid1', 'fluid2'], gy=gy, rho0=rho1, p0=p1),
             ]),
-
+    
     # acceleration equations for each phase
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0),
+            StateEquation(dest='fluid1', sources=None, b=1.0, rho0=rho1, p0=p1),
+            StateEquation(dest='fluid2', sources=None, b=1.0, rho0=rho2, p0=p2),
 
-            BodyForce(dest='fluid', sources=None, fy=gy),
+            BodyForce(dest='fluid1', sources=None, fy=gy),
+            BodyForce(dest='fluid2', sources=None, fy=gy),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            MomentumEquation(dest='fluid1', sources=['fluid1', 'fluid2', 'solid'], nu=nu),
+            MomentumEquation(dest='fluid2', sources=['fluid1', 'fluid2', 'solid'], nu=nu),
 
-            ArtificialStress(dest='fluid', sources=['fluid',])
+            ArtificialStress(dest='fluid1', sources=['fluid1','fluid2']),
+            ArtificialStress(dest='fluid2', sources=['fluid1','fluid2'])
 
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
+app.setup(solver=solver, equations=equations, 
           particle_factory=create_particles)
 
 app.run()
