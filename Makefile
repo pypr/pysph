@@ -1,9 +1,12 @@
 ROOT = $(shell pwd)
 MAKEFILE = $(ROOT)/Makefile
 SRC = $(ROOT)
-PKG = $(SRC)/pysph
-SUBPKG = base sph parallel
-DIRS := $(foreach dir,$(SUBPKG),$(PKG)/$(dir))
+PKG2 = $(SRC)/pysph
+SUBPKG2 = base sph parallel
+PKG1 = $(SRC)/pyzoltan
+SUBPKG1 = core sph
+DIRS := $(foreach dir,$(SUBPKG1),$(PKG1)/$(dir)) \
+        $(foreach dir,$(SUBPKG2),$(PKG2)/$(dir))
 
 # this is used for cython files on recursive call to make
 PYX = $(wildcard *.pyx)
@@ -18,8 +21,8 @@ all : build
 build :
 	python setup.py build_ext --inplace
 
-$(DIRS) : 
-	cd $@;  python $(ROOT)/source/pysph/base/generator.py
+$(DIRS) :
+	cd $@;  python $(ROOT)/pyzoltan/core/generator.py
 	$(MAKE) -f $(MAKEFILE) -C $@ cythoncpp ROOT=$(ROOT)
 
 %.c : %.pyx
@@ -40,7 +43,7 @@ _annotate : $(PYX:.pyx=.html)
 annotate :
 	for f in $(DIRS); do $(MAKE) -f $(MAKEFILE) -C $${f} _annotate ROOT=$(ROOT); done
 
-clean : 
+clean :
 	python setup.py clean
 	-for dir in $(DIRS); do rm -f $$dir/*.c; done
 	-for dir in $(DIRS); do rm -f $$dir/*.cpp; done
@@ -68,8 +71,6 @@ install :
 	python setup.py install
 
 clang :
-	python $(ROOT)/source/pysph/base/generator.py
+	python $(ROOT)/pyzoltan/core/generator.py
 	for f in $(DIRS); do $(MAKE) -f $(MAKEFILE) -C $${f} cythoncpp ROOT=$(ROOT); done
-	cd source/pysph/; for f in */*.cpp */*/*.cpp; do clang++ -g -O2 -shared -fPIC -o $${f%.*}.so $$f -I /usr/include/python2.7/ $(shell mpicxx --showme:compile) $(shell mpicxx --showme:link); done
-
-
+	cd pysph/; for f in */*.cpp */*/*.cpp; do clang++ -g -O2 -shared -fPIC -o $${f%.*}.so $$f -I /usr/include/python2.7/ $(shell mpicxx --showme:compile) $(shell mpicxx --showme:link); done

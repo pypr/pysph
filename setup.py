@@ -29,36 +29,31 @@ try:
 except ImportError:
     Have_MPI = False
 
-Have_Zoltan=True
-try:
-    import pyzoltan
-except ImportError:
-    Have_Zoltan=False
-
 mpi_inc_dirs = []
 mpi_compile_args = []
 mpi_link_args = []
 
-mpic = 'mpicc'
 if Have_MPI:
+    mpic = 'mpicc'
     mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
     mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
     mpi_inc_dirs.append(mpi4py.get_include())
 
-# Zoltan Headers
-pyzoltan_include = []
-if Have_Zoltan and Have_MPI:
     zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
     zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
 
     # PyZoltan includes
-    pyzoltan_include = [pyzoltan.get_include()]
+    zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
+    zoltan_include_dirs += zoltan_cython_include
 
-include_dirs = [numpy.get_include()] + pyzoltan_include
+include_dirs = [numpy.get_include()]
 
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
+    Extension( name="pyzoltan.core.carray",
+               sources=["pyzoltan/core/carray.pyx"],
+               include_dirs = include_dirs),
 
     Extension( name="pysph.base.particle_array",
                sources=["pysph/base/particle_array.pyx"]),
@@ -84,20 +79,52 @@ ext_modules = [
 for ext in ext_modules:
     ext.include_dirs = include_dirs
 
-# currently we depend on PyZoltan for the parallel stuff
-if Have_MPI and Have_Zoltan:
+if Have_MPI:
+    zoltan_modules = [
+        Extension( name="pyzoltan.core.zoltan",
+                   sources=["pyzoltan/core/zoltan.pyx"],
+                   include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+
+        Extension( name="pyzoltan.core.zoltan_dd",
+                   sources=["pyzoltan/core/zoltan_dd.pyx"],
+                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+
+        Extension( name="pyzoltan.core.zoltan_comm",
+                   sources=["pyzoltan/core/zoltan_comm.pyx"],
+                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+                   library_dirs = zoltan_library_dirs,
+                   libraries=['zoltan', 'mpi'],
+                   extra_link_args=mpi_link_args,
+                   extra_compile_args=mpi_compile_args),
+        ]
+
     parallel_modules = [
 
         Extension( name="pysph.parallel.parallel_manager",
                    sources=["pysph/parallel/parallel_manager.pyx"],
-                   include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs + pyzoltan_include,
+                   include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
                    library_dirs = zoltan_library_dirs,
                    libraries = ['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
                    extra_compile_args=mpi_compile_args),
         ]
 
-    ext_modules += parallel_modules
+    ext_modules += zoltan_modules + parallel_modules
+
+if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
+    generator = path.join( path.abspath('.'), 'pyzoltan/core/generator.py' )
+    d = {'__file__': generator }
+    execfile(generator, d)
+    d['main'](None)
+
 
 setup(name='PySPH',
       version = '1.0alpha',
@@ -110,6 +137,8 @@ setup(name='PySPH',
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
       packages = find_packages(),
+      # include Cython headers in the install directory
+      package_data={'' : ['*.pxd']},
 
       ext_modules = ext_modules,
 
