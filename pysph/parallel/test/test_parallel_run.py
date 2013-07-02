@@ -174,13 +174,13 @@ class ParallelTests(ExampleTestCase):
                          timeout=900)
     
     @attr(slow=True, parallel=True)
-    def _test_2Ddam_break_example(self):
+    def test_2Ddam_break_example(self):
         dt = 1e-4; tf = 250*dt
         self.run_example('../../../examples/dam_break.py', 
                          nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1)
 
     @attr(slow=True, parallel=True)
-    def _test_ldcavity_example(self):
+    def test_ldcavity_example(self):
         dt=1e-4; tf=250*dt
         self.run_example('../../../examples/TransportVelocity/cavity.py', 
                          nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=3.0)
