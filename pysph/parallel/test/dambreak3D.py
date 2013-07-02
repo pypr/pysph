@@ -20,7 +20,7 @@ dim = 3
 dt = 3e-5
 tf = 1.0
 
-hdx = 1.1
+hdx = 1.2
 ro = 1000.0
 co = 10.0 * np.sqrt(9.81*0.3)
 gamma = 7.0
@@ -31,7 +31,8 @@ B = co*co*ro/gamma
 def create_particles(empty=False, **kwargs):
     ns = 13987
     dx = dy = dz = 0.0225
-    h0 = 0.9 * np.sqrt(3 * dx**2)
+    #h0 = 0.9 * np.sqrt(3 * dx**2)
+    h0 = hdx * dx
 
     if empty:
         fluid = gpa(name='fluid')
@@ -111,7 +112,7 @@ equations = [
 
     # Momentum equation
     MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gy=-9.81),
+                     alpha=alpha, beta=beta, gz=-9.81),
 
     # Position step with XSPH
     XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.5)
