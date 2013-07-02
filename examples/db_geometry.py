@@ -21,6 +21,7 @@ Y
 """
 
 import numpy
+from numpy import concatenate, where, array
 from pysph.base.utils import get_particle_array_wcsph
 
 def create_2D_tank(x1,y1,x2,y2,dx):
@@ -205,5 +206,158 @@ class DamBreak2DGeometry(object):
             print "2D dam break with %d fluid, %d boundary particles"%(
                 fluid.get_number_of_particles(),
                 boundary.get_number_of_particles())
+
+        return particles
+
+from pyzoltan.core.carray import LongArray
+class DamBreak3DGeometry(object):
+    def __init__(
+        self, container_height=1.0, container_width=1.0, container_length=3.22,
+        fluid_column_height=0.55, fluid_column_width=1.0, fluid_column_length=1.228,
+        obstacle_center_x=2.5, obstacle_center_y=0,
+        obstacle_length=0.16, obstacle_height=0.161, obstacle_width=0.4,
+        nboundary_layers=5, dx=0.02, hdx=1.2, rho0=1000.0):
+        
+        # save the geometry details
+        self.container_width = container_width
+        self.container_length = container_length
+        self.container_height = container_height
+
+        self.fluid_column_length=fluid_column_length
+        self.fluid_column_width=fluid_column_width
+        self.fluid_column_height=fluid_column_height
+
+        self.obstacle_center_x = obstacle_center_x
+        self.obstacle_center_y = obstacle_center_y
+
+        self.obstacle_width=obstacle_width
+        self.obstacle_length=obstacle_length
+        self.obstacle_height=obstacle_height
+
+        self.nboundary_layers=nboundary_layers
+        self.dx=dx
+        
+        self.hdx = hdx
+        self.rho0 = rho0
+
+    def get_max_speed(self, g=9.81):
+        return numpy.sqrt( 2 * g * self.fluid_column_height )
+
+    def create_particles(self, empty=False, **kwargs):
+        fluid_column_height=self.fluid_column_height
+        fluid_column_width=self.fluid_column_width
+        fluid_column_length=self.fluid_column_length
+
+        container_height = self.container_height
+        container_length = self.container_length
+        container_width = self.container_width
+
+        obstacle_height = self.obstacle_height
+        obstacle_length = self.obstacle_length
+        obstacle_width = self.obstacle_width
+        
+        obstacle_center_x = self.obstacle_center_x
+        obstacle_center_y = self.obstacle_center_y
+        
+        nboundary_layers = self.nboundary_layers
+        dx = self.dx
+
+        if empty:
+            fluid = get_particle_array_wcsph(name="fluid")
+            boundary = get_particle_array_wcsph(name="boundary")
+            obstacle = get_particle_array_wcsph(name='obstacle')
+
+            particles = [fluid, boundary, obstacle]
+        else:
+            # get the domain limits
+            ghostlims = nboundary_layers * dx
+            
+            xmin, xmax = 0.0 -ghostlims, container_length + ghostlims
+            zmin, zmax = 0.0 - ghostlims, container_height + ghostlims
+            
+            cw2 = 0.5 * container_width
+            ymin, ymax = -cw2 - ghostlims, cw2 + ghostlims
+        
+            # create all particles
+            eps = 0.1 * dx
+            xx, yy, zz = numpy.mgrid[xmin:xmax+eps:dx,
+                                     ymin:ymax+eps:dx,
+                                     zmin:zmax+eps:dx]
+
+            x = xx.ravel(); y = yy.ravel(); z = zz.ravel()
+
+            # create a dummy particle array from which we'll sort
+            pa = get_particle_array_wcsph(name='block', x=x, y=y, z=z)
+            
+            # get the individual arrays
+            indices = []
+            findices = []
+            oindices = []
+
+            obw2 = 0.5 * obstacle_width
+            obl2 = 0.5 * obstacle_length
+            obh = obstacle_height
+            ocx = obstacle_center_x
+            ocy = obstacle_center_y
+
+            for i in range(x.size):
+                xi = x[i]; yi = y[i]; zi = z[i]
+
+                # fluid
+                if ( (0 < xi <= fluid_column_length) and \
+                         (-cw2 < yi < cw2) and \
+                         (0 < zi <= fluid_column_height) ):
+
+                    findices.append(i)
+                
+                # obstacle
+                if ( (ocx-obl2 <= xi <= ocx+obl2) and \
+                         (ocy-obw2 <= yi <= ocy+obw2) and \
+                         (0 < zi <= obh) ):
+
+                    oindices.append(i)
+                        
+            # extract the individual arrays
+            fa = LongArray(len(findices)); fa.set_data(numpy.array(findices))
+            fluid = pa.extract_particles(fa)
+            fluid.set_name('fluid')
+
+            oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
+            obstacle = pa.extract_particles(oa)
+            obstacle.set_name('obstacle')
+            
+            indices = concatenate( (where( y <= -cw2 )[0],
+                                    where( y >= cw2 )[0],
+                                    where( x >= container_length )[0],
+                                    where( x <= 0 )[0],
+                                    where( z <= 0 )[0]) )
+
+            # remove duplicates
+            indices = array(list(set(indices)))
+
+            wa = LongArray(indices.size); wa.set_data(indices)
+            boundary = pa.extract_particles(wa)
+            boundary.set_name('boundary')
+
+            # create the particles
+            particles = [fluid, boundary, obstacle]
+
+            # set up particle properties
+            h0 = self.hdx * dx
+            
+            volume = dx**3
+            m0 = self.rho0 * volume
+            
+            for pa in particles:
+                pa.m[:] = m0
+                pa.h[:] = h0
+
+                pa.rho[:] = self.rho0
+
+            nf = fluid.num_real_particles
+            nb = boundary.num_real_particles
+            no = obstacle.num_real_particles
+
+            print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
 
         return particles
