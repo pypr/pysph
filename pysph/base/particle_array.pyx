@@ -127,7 +127,7 @@ cdef class ParticleArray:
 
         """
         self.properties = {'tag':IntArray(0),'pid':IntArray(0), 'gid':UIntArray(0)}
-        self.default_values = {'tag':default_particle_tag, 'pid':0}
+        self.default_values = {'tag':default_particle_tag, 'pid':0, 'gid':_UINT_MAX}
         
         self.constants = {}
         self.constants.update(constants)
