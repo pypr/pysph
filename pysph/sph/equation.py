@@ -493,14 +493,14 @@ class Group(object):
         classes = defaultdict(lambda: 0)
         eqs = {}
         for equation in self.equations:
-            cls = equation.__class__
+            cls = equation.__class__.__name__
             n = classes[cls]
             equation.var_name = '%s%d'%(camel_to_underscore(equation.name), n)
             classes[cls] += 1
             eqs[cls] = equation
         wrappers = []
         code_gen = CythonGenerator()
-        for cls in classes:
+        for cls in sorted(classes.keys()):
             code_gen.parse(eqs[cls])
             wrappers.append(code_gen.get_code())
         return '\n'.join(wrappers)
