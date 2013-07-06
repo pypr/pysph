@@ -38,7 +38,12 @@ def create_particles(empty=False, **kwargs):
         fluid = gpa(name='fluid')
         solid = gpa(name='boundary')
     else:
-        ipart = np.loadtxt('IPART.txt.gz')
+        import os
+        path = os.path.dirname(os.path.abspath(__file__))
+
+        ipart = os.path.join(path, 'IPART.txt.gz')
+        ipart = np.loadtxt(ipart)
+
         x = ipart[:, 0]; y = ipart[:, 1]; z = ipart[:, 2]
         u = ipart[:, 3]; v = ipart[:, 4]; w = ipart[:, 5]
         rho = ipart[:, 6]; p = ipart[:, 7]; m = ipart[:, 8]

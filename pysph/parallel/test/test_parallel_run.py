@@ -13,59 +13,19 @@ except ImportError:
     reason = "mpi4py not installed"
     raise skip.SkipTest(reason)
 
-import unittest
-from subprocess import Popen, PIPE
-from threading import Timer
-import os
-import sys
 import tempfile
 import shutil
+import os
+import unittest
 import numpy
 
 from nose.plugins.attrib import attr
 
 from pysph.solver.utils import load, get_files
+from pysph.tools import run_parallel_script
 
-directory = os.path.dirname(os.path.abspath(__file__))
 
-def kill_process(process):
-    print 'KILLING PROCESS ON TIMEOUT'
-    process.kill()
-
-def _run_example_script(filename, args=[], nprocs=2, timeout=20.0, path=None):
-    """ run a file python script
-    
-    Parameters:
-    -----------
-    filename - filename of python script to run under mpi
-    nprocs - (2) number of processes of the script to run (0 => serial non-mpi run)
-    timeout - (5) time in seconds to wait for the script to finish running,
-        else raise a RuntimeError exception
-    path - the path under which the script is located
-        Defaults to the location of this file (__file__), not curdir
-    
-    """
-    path = directory
-    path = os.path.join(path, filename)
-    cmd = ['mpiexec','-n', str(nprocs), sys.executable, path] + args
-
-    print 'running test:', cmd
-
-    process = Popen(cmd, stdout=PIPE, stderr=PIPE)
-    timer = Timer(timeout, kill_process, [process])
-    timer.start()
-    out, err = process.communicate()
-    timer.cancel()
-    retcode = process.returncode
-    if retcode:
-        msg = 'test ' + filename + ' failed with returncode ' + str(retcode)
-        print out
-        print err
-        print '#'*80
-        print msg
-        print '#'*80
-        raise RuntimeError, msg
-    return retcode, out, err
+path = run_parallel_script.get_directory(__file__)
 
 class ExampleTestCase(unittest.TestCase):
     """ A script to run an example in serial and parallel and compare results.
@@ -120,11 +80,13 @@ class ExampleTestCase(unittest.TestCase):
                     '--timestep=%g'%dt]
 
             # run the example script in serial
-            _run_example_script(filename, args, 1, timeout)
+            run_parallel_script.run(
+                filename=filename, args=args, nprocs=1, timeout=timeout, path=path)
 
             # run the example script in parallel
             args[1] = '--directory=%s'%dir2
-            _run_example_script(filename, args, nprocs, timeout)
+            run_parallel_script.run(
+                filename=filename, args=args, nprocs=nprocs, timeout=timeout, path=path)
 
             # get the serial and parallel results
             dir1path = os.path.abspath(dir1)
