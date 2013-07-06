@@ -100,4 +100,4 @@ if rank == 0:
 
     plt.title('Final Distribution')
     plt.savefig( 'final.pdf' )
-    plt.show()
+    #plt.show()

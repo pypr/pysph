@@ -1,33 +1,28 @@
-"""Simple tests for the Zoltan wrapper"""
-import mpi4py.MPI as mpi
-from pyzoltan.core import zoltan
+"""Running script for Zoltan"""
+from pysph.tools import run_parallel_script
 
-comm = mpi.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+import unittest
+from nose.plugins.attrib import attr
 
-def test_PyZoltan():
-    """Basic tests for the PyZoltan wrapper"""
-    pz = zoltan.PyZoltan( comm=comm )
+path = run_parallel_script.get_directory(__file__)
+print path
 
-    # test rank and size
-    assert( pz.rank == rank )
-    assert( pz.size == size )
+class PyZoltanTests(unittest.TestCase):
+    
+    @attr(slow=False, parallel=True)
+    def _test_zoltan_geometric_partitioner(self):
+        run_parallel_script.run(
+            path=path, filename='geometric_partitioner.py', nprocs=4, args=['>mesh.out'])
 
-    # test the zoltan arrays 
-    assert( pz.exportLocalids.length == 0 )
-    assert( pz.exportGlobalids.length == 0 )
-    assert( pz.exportProcs.length == 0 )
+    @attr(slow=True, parallel=True)
+    def test_zoltan_partition(self):
+        run_parallel_script.run(
+            path=path, filename='3d_partition.py', nprocs=4)
 
-    assert( pz.importLocalids.length == 0 )
-    assert( pz.importGlobalids.length == 0 )
-    assert( pz.importProcs.length == 0 )
-
-    assert( pz.procs.size == size )
-    assert( pz.parts.size == size )
-
+    @attr(slow=False, parallel=True)
+    def test_zoltan_zcomm(self):
+        run_parallel_script.run(
+            path=path, filename='zcomm.py', nprocs=4)
+        
 if __name__ == '__main__':
-    test_PyZoltan()
-
-    if rank == 0:
-        print "OK"
+    unittest.main()
