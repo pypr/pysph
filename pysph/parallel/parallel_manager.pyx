@@ -545,6 +545,15 @@ cdef class ParallelManager:
                 pa = self.particles[i]
                 pa.set_pid( self.rank )
 
+    def static_update(self):
+        cdef int i, narrays = self.narrays
+        self.remove_remote_particles()
+        cdef ParticleArrayExchange pa_exchange
+        
+        for i in range(narrays):
+            pa_exchange = self.pa_exchanges[i]
+            pa_exchange.remote_exchange_data()
+
     def remove_remote_particles(self):
         """Remove remote particles"""
         cdef int narrays = self.narrays

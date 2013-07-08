@@ -56,6 +56,9 @@ cdef class ParticleArray:
     # the number of real particles.
     cdef public long num_real_particles
 
+    # indicates whether the array is static
+    cdef public bint is_static
+
     ########################################
     # OpenCL related attributes.
 
@@ -91,6 +94,8 @@ cdef class ParticleArray:
     # set/get the time
     cpdef set_time(self, double time)
     cpdef double get_time(self)
+
+    cpdef set_static(self, bint is_static)
 
     cpdef set_name(self, str name)
 

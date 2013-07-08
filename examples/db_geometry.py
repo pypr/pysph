@@ -360,4 +360,8 @@ class DamBreak3DGeometry(object):
 
             print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
 
+        # static particles
+        boundary.set_static(True)
+        obstacle.set_static(True)
+
         return particles

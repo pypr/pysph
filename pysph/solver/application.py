@@ -373,8 +373,18 @@ class Application(object):
         else:
             self.particles = particle_factory(empty=True, *args, **kw)
 
+        # static and dynamic particle arrays
+        self.particles_static = []
+        self.particles_dynamic = []
+        for pa in self.particles:
+            if pa.is_static:
+                self.particles_static.append(pa)
+            else:
+                self.particles_dynamic.append(pa)
+
         # Instantiate the Parallel Manager here and do an initial LB
         self.pm = None
+        self.pm_static = None
         if num_procs > 1:
             options = self.options
 
@@ -405,7 +415,7 @@ class Application(object):
             radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
 
             self.pm = pm = ZoltanParallelManagerGeometric(
-                dim=solver.dim, particles=self.particles, comm=comm,
+                dim=solver.dim, particles=self.particles_dynamic, comm=comm,
                 lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
@@ -422,11 +432,30 @@ class Application(object):
             pm.update()
             pm.initial_update = False
 
+            # static particle arrays
+            if len(self.particles_static) > 0:
+                self.pm_static = pm_static = ZoltanParallelManagerGeometric(
+                    dim=solver.dim, particles=self.particles_static, comm=comm,
+                    lb_props=None,
+                    lb_method=zoltan_lb_method,
+                    obj_weight_dim=obj_weight_dim,
+                    ghost_layers=ghost_layers,
+                    update_cell_sizes=options.update_cell_sizes,
+                    radius_scale=radius_scale,
+                    )
+
+                pm_static.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
+                pm_static.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
+
+                pm_static.update()
+                pm.initial_update = False
+
             # wait till the initial partition is done
             comm.barrier()
 
         # set the solver's parallel manager
         solver.set_parallel_manager(self.pm)
+        solver.set_parallel_manager_static(self.pm_static)
 
         return self.particles
 
