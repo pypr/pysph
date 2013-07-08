@@ -169,7 +169,7 @@ cdef class WCSPHRK2Integrator(Integrator):
                 rho.data[i] = rho0.data[i] + dtb2 * arho.data[i]
 
         # Update NNPS since particles have moved
-        if pm_static: pm_static.update()
+        if pm_static: pm_static.static_update()
         if pm: pm.update()
 
         nnps.update()

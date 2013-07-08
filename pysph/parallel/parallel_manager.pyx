@@ -77,11 +77,7 @@ cdef class ParticleArrayExchange:
             lb_props.sort()
 
         self.lb_props = lb_props
-
-        # property tags
-        self.prop_tags = {}
-        for prop in lb_props:
-            self.prop_tags[prop] = sum( [ord(c) for c in prop] )
+        self.nprops = len( lb_props )
 
         # exchange flags
         self.lb_exchange = True
@@ -197,15 +193,15 @@ cdef class ParticleArrayExchange:
     cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count):
         cdef ParticleArray pa = self.pa
         cdef str prop
-        cdef int nbytes
-        cdef int prop_tag
+        cdef int prop_tag, nbytes, i, nprops = self.nprops
 
         cdef np.ndarray prop_arr, sendbuf, recvbuf
 
         cdef list props = self.lb_props
-        cdef dict prop_tags = self.prop_tags
 
-        for prop in props:
+        for i in range(nprops):
+            prop = props[i]
+
             prop_arr = pa.properties[prop].get_npy_array()
             nbytes = prop_arr.dtype.itemsize
 
@@ -214,7 +210,7 @@ cdef class ParticleArrayExchange:
             recvbuf = prop_arr[count:]
 
             # tag for this property
-            prop_tag = prop_tags[ prop ]
+            prop_tag = i
 
             # set the nbytes and tag for the zoltan communicator
             zcomm.set_nbytes( nbytes )
