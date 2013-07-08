@@ -22,6 +22,7 @@ cdef class ParticleArrayWrapper:
     cdef public IntArray tag, pid
     cdef public UIntArray gid
     cdef public DoubleArray ${array_names}
+    cdef public str name
 
     def __init__(self, pa, index):
         self.index = index
@@ -30,6 +31,8 @@ cdef class ParticleArrayWrapper:
         props = props.union(['tag', 'pid', 'gid'])
         for prop in props:
             setattr(self, prop, pa.get_carray(prop))
+
+        self.name = pa.name
 
     cpdef long size(self):
         return self.array.get_number_of_particles()

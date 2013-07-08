@@ -15,6 +15,7 @@ cdef class Integrator:
     cdef double tdamp           # solution damping interval
     
     cdef public object pm
+    cdef public object pm_static
     cdef public list particles
     cdef public object evaluator
     cdef public object solver

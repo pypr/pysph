@@ -74,6 +74,8 @@ import numpy
 from db_geometry import DamBreak3DGeometry
 
 from pysph.base.kernels import CubicSpline
+
+from pysph.sph.equation import Group
 from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
      XSPHCorrection
 
@@ -120,22 +122,27 @@ solver.set_final_time(tf)
 equations = [
 
     # Equation of state
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-    TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-    TaitEOS(dest='obstacle', sources=None, rho0=ro, c0=co, gamma=gamma),
+    Group(equations=[
 
-    # Continuity equation
-    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-    ContinuityEquation(dest='boundary', sources=['fluid']),
-    ContinuityEquation(dest='obstacle', sources=['fluid']),
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='obstacle', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-    # Momentum equation
-    MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
-                     alpha=alpha, beta=beta, gz=-9.81),
+            ]),
 
-    # Position step with XSPH
-    XSPHCorrection(dest='fluid', sources=['fluid'])
+    # Continuity, momentum and xsph equations
+    Group(equations=[
 
+            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle']),
+            ContinuityEquation(dest='boundary', sources=['fluid']),
+            ContinuityEquation(dest='obstacle', sources=['fluid']),
+
+            MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
+                             alpha=alpha, beta=beta, gz=-9.81),
+
+            XSPHCorrection(dest='fluid', sources=['fluid'])
+
+            ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.

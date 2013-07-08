@@ -38,12 +38,14 @@ cdef class ParticleArrayExchange:
     cdef public size_t num_remote        # Number of remote particles
     cdef public size_t num_ghost         # Number of ghost particles
 
+    
     # mpi.Comm object and associated rank and size
     cdef public object comm
     cdef public int rank, size
 
     # list of load balancing props
-    cdef public list lb_props           
+    cdef public list lb_props
+    cdef public int nprops
 
     # Import/Export lists for particles
     cdef public UIntArray exportParticleGlobalids
@@ -92,6 +94,9 @@ cdef class ParallelManager:
     cdef public list num_global
 
     cdef public double radius_scale      # Radius scale for kernel
+
+    cdef public bint initial_update
+    cdef public bint update_cell_sizes
 
     # number of arrays
     cdef int narrays

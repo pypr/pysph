@@ -138,8 +138,12 @@ class Solver(object):
         # instantiate the Integrator
         self.integrator = integrator = self.integrator_type(
             evaluator=self.sph_eval, particles=particles,tdamp=self.tdamp)
+
         # set the parallel manager for the integrator
         integrator.set_parallel_manager(self.pm)
+        integrator.set_parallel_manager_static(self.pm_static)
+
+        # set the integrator's solver
         integrator.set_solver(self)
 
     def add_print_properties(self, props):
@@ -440,6 +444,9 @@ class Solver(object):
 
     def set_parallel_manager(self, pm):
         self.pm = pm
+
+    def set_parallel_manager_static(self, pm_static):
+        self.pm_static = pm_static
 
     def get_options(self, opt_parser):
         """ Implement this to add additional options for the application """

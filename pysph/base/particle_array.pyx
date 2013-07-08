@@ -153,6 +153,9 @@ cdef class ParticleArray:
         self.cl_properties = {}
         self.cl_setup_done=False
 
+        # static particle arrays
+        self.is_static = False
+
         if props:
             self.initialize(**props)
 
@@ -252,6 +255,9 @@ cdef class ParticleArray:
 
     cpdef set_name(self, str name):
         self.name = name
+
+    cpdef set_static(self, bint is_static):
+        self.is_static = is_static
 
     def initialize(self, **props):
         """ Initialize the particle array with the given props

@@ -20,7 +20,7 @@ cdef class ZComm:
         
         self.tag = tag
         self.nsend = nsend
-        self.proclist = proclist
+        self.proclist = proclist.astype(np.int32)
 
         self.nreturn = 0
     
@@ -67,7 +67,7 @@ cdef class ZComm:
         cdef char* send_data = _sendbuf.data
         cdef char* recv_data = _recvbuf.data
         cdef int ierr, tag = self.tag, nbytes = self.nbytes
-        
+
         ierr = zcomm.Zoltan_Comm_Do(
             _zoltan_comm_obj,
             tag, 
@@ -76,6 +76,9 @@ cdef class ZComm:
             recv_data)
 
         _check_error(ierr)
-
+        
     def set_nbytes(self, int nbytes):
         self.nbytes = nbytes
+
+    def set_tag(self, int tag):
+        self.tag = tag
