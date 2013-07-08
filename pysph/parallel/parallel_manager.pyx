@@ -72,7 +72,16 @@ cdef class ParticleArrayExchange:
         self.numParticleImport = 0
 
         # load balancing props
+        if lb_props is None:
+            lb_props = pa.properties.keys()
+            lb_props.sort()
+
         self.lb_props = lb_props
+
+        # property tags
+        self.prop_tags = {}
+        for prop in lb_props:
+            self.prop_tags[prop] = sum( [ord(c) for c in prop] )
 
         # exchange flags
         self.lb_exchange = True
@@ -189,19 +198,27 @@ cdef class ParticleArrayExchange:
         cdef ParticleArray pa = self.pa
         cdef str prop
         cdef int nbytes
+        cdef int prop_tag
 
         cdef np.ndarray prop_arr, sendbuf, recvbuf
 
-        for prop in sendbufs:
+        cdef list props = self.lb_props
+        cdef dict prop_tags = self.prop_tags
+
+        for prop in props:
             prop_arr = pa.properties[prop].get_npy_array()
             nbytes = prop_arr.dtype.itemsize
 
             # the send and receive buffers
             sendbuf = sendbufs[prop]
             recvbuf = prop_arr[count:]
-            
-            # set the nbytes for the zoltan communicator
+
+            # tag for this property
+            prop_tag = prop_tags[ prop ]
+
+            # set the nbytes and tag for the zoltan communicator
             zcomm.set_nbytes( nbytes )
+            zcomm.set_tag( prop_tag )
             
             # exchange the data
             zcomm.Comm_Do( sendbuf, recvbuf )
@@ -297,7 +314,7 @@ cdef class ParallelManager:
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None):
+                 lb_props=None, bint update_cell_sizes=True):
         """Constructor.
 
         Parameters:
@@ -389,6 +406,10 @@ cdef class ParallelManager:
 
         # setup cell import/export lists
         self._setup_arrays()
+
+        # flags to re-compute cell sizes
+        self.initial_update = True
+        self.update_cell_sizes = update_cell_sizes
 
         # update the particle global ids at startup
         self.update_particle_gids()
@@ -555,7 +576,8 @@ cdef class ParallelManager:
         self.ncells_total = 0
 
         # compute the cell size
-        self.compute_cell_size()
+        if self.initial_update or self.update_cell_sizes:
+            self.compute_cell_size()
 
         # # deal with ghosts
         # if self.is_periodic:
@@ -942,7 +964,7 @@ cdef class ZoltanParallelManager(ParallelManager):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None):
+                 lb_props=None, bint update_cell_sizes=True):
         """Constructor.
 
         Parameters:
@@ -971,7 +993,7 @@ cdef class ZoltanParallelManager(ParallelManager):
 
         """
         super(ZoltanParallelManager, self).__init__(
-            dim, particles, comm, radius_scale, ghost_layers, lb_props)
+            dim, particles, comm, radius_scale, ghost_layers, domain, lb_props, update_cell_sizes)
 
         # Initialize the base PyZoltan class. 
         self.pz = PyZoltan(comm)
@@ -1187,12 +1209,13 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
                  str lb_method='RCB',
                  str keep_cuts="1",
                  str obj_weight_dim="1",
+                 bint update_cell_sizes=True
                  ):
 
         # initialize the base class
         super(ZoltanParallelManagerGeometric, self).__init__(
             dim, particles, comm, radius_scale, ghost_layers, domain,
-            lb_props)
+            lb_props, update_cell_sizes)
 
         # concrete implementation of a PyZoltan class
         self.pz = ZoltanGeometricPartitioner(

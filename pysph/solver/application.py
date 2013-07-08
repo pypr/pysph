@@ -168,17 +168,6 @@ class Application(object):
                           default=False, help=""" Use OpenCL to run the
                           simulation on an appropriate device """)
 
-        # --parallel-mode
-        parser.add_option("--parallel-mode", action="store",
-                          dest="parallel_mode", default="auto",
-                          help = """Use specified parallel mode.""")
-
-        # --parallel-output-mode
-        parser.add_option("--parallel-output-mode", action="store",
-                          dest="parallel_output_mode", default="collected",
-                          help="""Use 'collected' to dump one output at
-                          root or 'distributed' for every processor. """)
-
         # Restart options
         restart = OptionGroup(parser, "Restart options",
                               "Restart options for PySPH")
@@ -219,6 +208,33 @@ class Application(object):
                           help=("""Zoltan debugging level""")) 
 
         parser.add_option_group( zoltan )
+
+        # Options to control parallel execution
+        parallel_options=OptionGroup(parser, "Parallel Options")
+        
+        # --update-cell-sizes
+        parallel_options.add_option("--update-cell-sizes", action='store_true',
+                                    dest='update_cell_sizes', default=False,
+                                    help=("Recompute cell sizes for binning in parallel"))
+
+        # --parallel-scale-factor
+        parallel_options.add_option("--parallel-scale-factor", action="store",
+                                    dest="parallel_scale_factor", default=2.0, type='float',
+                                    help=("""Kernel scale factor for the parallel update"""))                                    
+
+        # --parallel-mode
+        parallel_options.add_option("--parallel-mode", action="store",
+                            dest="parallel_mode", default="auto",
+                            help = """Use specified parallel mode.""")
+
+        # --parallel-output-mode
+        parallel_options.add_option("--parallel-output-mode", action="store",
+                            dest="parallel_output_mode", default="collected",
+                            help="""Use 'collected' to dump one output at
+                          root or 'distributed' for every processor. """)
+
+        parser.add_option_group( parallel_options )
+                                     
 
         # solver interfaces
         interfaces = OptionGroup(parser, "Interfaces",
@@ -385,12 +401,17 @@ class Application(object):
             # ghost layers 
             ghost_layers = options.ghost_layers
 
+            # radius scale for the parallel update
+            radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
+
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles, comm=comm,
                 lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
-                ghost_layers=ghost_layers
+                ghost_layers=ghost_layers,
+                update_cell_sizes=options.update_cell_sizes,
+                radius_scale=radius_scale,
                 )
 
             # set zoltan options
@@ -399,6 +420,7 @@ class Application(object):
 
             # do an initial load balance
             pm.update()
+            pm.initial_update = False
 
             # wait till the initial partition is done
             comm.barrier()
