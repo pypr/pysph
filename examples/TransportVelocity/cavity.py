@@ -119,6 +119,9 @@ def create_particles(empty=False, **kwargs):
                 solid.u0[i] = Umax
                 
     # return the particle list
+    fluid.set_lb_props( fluid.properties.keys() )
+    solid.set_lb_props( solid.properties.keys() )
+
     return [fluid, solid]
 
 # Create the application.

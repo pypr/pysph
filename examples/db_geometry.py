@@ -364,4 +364,11 @@ class DamBreak3DGeometry(object):
         boundary.set_static(True)
         obstacle.set_static(True)
 
+        # load balancing props for the arrays
+        fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'gid',
+                            'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'])
+
+        boundary.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
+        obstacle.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
+
         return particles

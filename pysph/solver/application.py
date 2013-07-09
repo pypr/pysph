@@ -367,12 +367,12 @@ class Application(object):
                 solver.t, solver.dt, solver.count  = t, dt, count
 
             else:
-                self.particles = particle_factory(*args, **kw)
+                self.particles = particle_factory(empty=False, *args, **kw)
 
         # everyone else creates empty containers
         else:
             self.particles = particle_factory(empty=True, *args, **kw)
-
+            
         # static and dynamic particle arrays
         self.particles_static = []
         self.particles_dynamic = []
@@ -416,7 +416,6 @@ class Application(object):
 
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles_dynamic, comm=comm,
-                lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
                 ghost_layers=ghost_layers,
@@ -436,7 +435,6 @@ class Application(object):
             if len(self.particles_static) > 0:
                 self.pm_static = pm_static = ZoltanParallelManagerGeometric(
                     dim=solver.dim, particles=self.particles_static, comm=comm,
-                    lb_props=None,
                     lb_method=zoltan_lb_method,
                     obj_weight_dim=obj_weight_dim,
                     ghost_layers=ghost_layers,

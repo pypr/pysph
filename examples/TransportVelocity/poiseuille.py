@@ -119,7 +119,11 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         channel.h[:] = hdx * dx
-        
+
+    # load balancing props
+    fluid.set_lb_props( fluid.properties.keys() )
+    channel.set_lb_props( solid.properties.keys() )
+
     # return the particle list
     return [fluid, channel]
 

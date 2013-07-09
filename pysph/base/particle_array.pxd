@@ -59,6 +59,9 @@ cdef class ParticleArray:
     # indicates whether the array is static
     cdef public bint is_static
 
+    # a list of props to be used for load balancing
+    cdef public list lb_props
+
     ########################################
     # OpenCL related attributes.
 

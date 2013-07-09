@@ -37,7 +37,7 @@ cdef extern from 'limits.h':
 # ParticleArrayExchange
 ################################################################w
 cdef class ParticleArrayExchange:
-    def __init__(self, int pa_index, ParticleArray pa, object comm, lb_props=None):
+    def __init__(self, int pa_index, ParticleArray pa, object comm):
         self.pa_index = pa_index
         self.pa = pa
         self.pa_wrapper = NNPSParticleArrayWrapper( pa )
@@ -71,10 +71,9 @@ cdef class ParticleArrayExchange:
         self.importParticleProcs = IntArray()
         self.numParticleImport = 0
 
-        # load balancing props
-        if lb_props is None:
-            lb_props = pa.properties.keys()
-            lb_props.sort()
+        # load balancing props are taken from the particle array
+        lb_props = pa.lb_props
+        lb_props.sort()
 
         self.lb_props = lb_props
         self.nprops = len( lb_props )
@@ -310,7 +309,7 @@ cdef class ParallelManager:
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None, bint update_cell_sizes=True):
+                 bint update_cell_sizes=True):
         """Constructor.
 
         Parameters:
@@ -334,16 +333,13 @@ cdef class ParallelManager:
         domain : DomainLimits, default (None)
             Optional limits for the domain
 
-        lb_props : list
-            optional list of properties required for load balancing
-
         """
         # number of arrays and a reference to the particle list
         self.narrays = len(particles)
         self.particles = particles
 
         # particle array exchange instances
-        self.pa_exchanges = [ParticleArrayExchange(i, pa, comm, lb_props) \
+        self.pa_exchanges = [ParticleArrayExchange(i, pa, comm) \
                              for i, pa in enumerate(particles)]
 
         # particle array wrappers
@@ -969,7 +965,7 @@ cdef class ZoltanParallelManager(ParallelManager):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None, bint update_cell_sizes=True):
+                 bint update_cell_sizes=True):
         """Constructor.
 
         Parameters:
@@ -993,12 +989,9 @@ cdef class ZoltanParallelManager(ParallelManager):
         domain : DomainLimits, default (None)
             Optional limits for the domain
 
-        lb_props : list
-            optional list of properties required for load balancing
-
         """
         super(ZoltanParallelManager, self).__init__(
-            dim, particles, comm, radius_scale, ghost_layers, domain, lb_props, update_cell_sizes)
+            dim, particles, comm, radius_scale, ghost_layers, domain, update_cell_sizes)
 
         # Initialize the base PyZoltan class. 
         self.pz = PyZoltan(comm)
@@ -1210,7 +1203,6 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
     def __init__(self, int dim, list particles, object comm,
                  double radius_scale=2.0,
                  int ghost_layers=2, domain=None,
-                 lb_props=None,
                  str lb_method='RCB',
                  str keep_cuts="1",
                  str obj_weight_dim="1",
@@ -1220,7 +1212,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
         # initialize the base class
         super(ZoltanParallelManagerGeometric, self).__init__(
             dim, particles, comm, radius_scale, ghost_layers, domain,
-            lb_props, update_cell_sizes)
+            update_cell_sizes)
 
         # concrete implementation of a PyZoltan class
         self.pz = ZoltanGeometricPartitioner(

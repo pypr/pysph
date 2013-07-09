@@ -121,6 +121,10 @@ def create_particles(empty=False, **kwargs):
         # channel velocity on upper portion
         indices = np.where(channel.y > d)[0]
         channel.u0[indices] = Vmax
+
+    # load balancing props
+    fluid.set_lb_props( fluid.properties.keys() )
+    channel.set_lb_props( solid.properties.keys() )
                 
     # return the particle list
     return [fluid, channel]
