@@ -74,6 +74,9 @@ cdef class ParallelManager:
     cdef public int rank
     cdef public int size
 
+    cdef public int lb_freq              # load balancing frequency
+    cdef public int lb_count             # counter for current lb step
+
     cdef public int ncells_local         # number of local cells
     cdef public int ncells_remote        # number of remote cells
     cdef public int ncells_total         # total number of cells

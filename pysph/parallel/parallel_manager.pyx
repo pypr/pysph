@@ -24,7 +24,6 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 
 cdef extern from 'math.h':
-    int abs(int)
     cdef double ceil(double)
     cdef double floor(double)
     cdef double fabs(double)
@@ -50,6 +49,7 @@ cdef class ParticleArrayExchange:
         self.msglength_tag_lb = sum( [ord(c) for c in name + '_msglength_lb'] )
         self.data_tag_lb = sum( [ord(c) for c in name + '_data_lb'] )
 
+        # MPI comm rank and size
         self.comm = comm
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
@@ -392,7 +392,8 @@ cdef class ParallelManager:
         self.ncells_local = 0
         self.ncells_remote = 0
         self.ncells_total = 0
-        
+
+        # radius scale and ghost layers
         self.radius_scale = radius_scale
         self.ghost_layers = ghost_layers
 
@@ -406,6 +407,10 @@ cdef class ParallelManager:
         # update the particle global ids at startup
         self.update_particle_gids()
         self.local_bin()
+
+        # load balancing frequency and counter
+        self.lb_count = 0
+        self.lb_freq = 1
 
     cpdef compute_cell_size(self):
         """Compute the cell size for the binning.
@@ -452,7 +457,23 @@ cdef class ParallelManager:
             self.num_local[i] = pa_exchange.num_local
             self.num_global[i] = pa_exchange.num_global
 
-    def update(self, initial=False):
+    def update(self):
+        cdef int lb_freq = self.lb_freq
+        cdef int lb_count = self.lb_count
+        
+        lb_count += 1
+
+        # remove remote particles from a previous step
+        self.remove_remote_particles()
+
+        if ( lb_count == lb_freq ):
+            self.update_partition()
+            self.lb_count = 0
+        else:
+            self.migrate_partition()
+            self.lb_count = lb_count
+
+    def update_partition(self):
         """Update the partition.
 
         This is the main entry point for the parallel manager. Given
@@ -500,9 +521,6 @@ cdef class ParallelManager:
         have a sufficiently large halo region around them.
         
         """
-        # remove remote particles from a previous step
-        self.remove_remote_particles()
-
         # update particle gids, bin particles and update cell gids
         #self.update_particle_gids()
         self.local_bin()
@@ -536,6 +554,25 @@ cdef class ParallelManager:
             for i in range(self.narrays):
                 pa = self.particles[i]
                 pa.set_pid( self.rank )
+
+    def migrate_partition(self):
+        # migrate particles
+        self.migrate_particles()
+
+        # update local data
+        self.update_local_data()
+
+        # compute remote particles and exchange data
+        self.compute_remote_particles()
+        for i in range(self.narrays):
+            self.pa_exchanges[i].remote_exchange_data()
+            
+        # update the local cell map to accomodate remotes
+        self.update_remote_data()
+
+        # set the particle pids
+        for i in range(self.narrays):
+            self.particles[i].set_pid( self.rank )
 
     def static_update(self):
         cdef int i, narrays = self.narrays
@@ -615,7 +652,7 @@ cdef class ParallelManager:
             Subset of particles to bin
 
         """
-        cdef pa_wrapper = self.pa_wrappers[ pa_index ]
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[ pa_index ]
         cdef DoubleArray x = pa_wrapper.x
         cdef DoubleArray y = pa_wrapper.y
         cdef DoubleArray z = pa_wrapper.z
@@ -651,7 +688,7 @@ cdef class ParallelManager:
             if not cell_map.has_key( cid ):
                 cell = Cell(cid=cid, cell_size=cell_size,
                             narrays=self.narrays, layers=layers)
-
+                
                 # store this cell in the cells list and cell map
                 PyList_Append( cell_list, cell )
                 cell_map[ cid ] = cell
@@ -761,6 +798,9 @@ cdef class ParallelManager:
         savez(fname,
               x=x, y=y, lid=lid, tag=tag, cell_size=cell_size,
               ncells_local=self.ncells_local, ncells_total=self.ncells_total)
+
+    def set_lb_freq(self, int lb_freq):
+        self.lb_freq = lb_freq
 
     def load_balance(self):
         raise NotImplementedError("ParallelManager::load_balance")
@@ -1193,6 +1233,9 @@ cdef class ZoltanParallelManager(ParallelManager):
         self.importCellProcs.resize( pz.numImport )
         self.importCellProcs.copy_subset( pz.importProcs )
 
+    def migrate_particles(self):
+        raise NotImplementedError("ZoltanParallelManager::migrate_particles called")
+
 cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
     """Zoltan enabled parallel manager for use with geometric load balancing.
 
@@ -1266,3 +1309,53 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
             x.data[i] = centroid.x
             y.data[i] = centroid.y
             z.data[i] = centroid.z
+
+    def migrate_particles(self):
+        """Update an existing partition"""
+        cdef PyZoltan pz = self.pz
+        cdef int pa_index, narrays=self.narrays
+        cdef double xi, yi, zi
+
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArrayExchange pa_exchange
+
+        cdef UIntArray exportGlobalids, exportLocalids
+        cdef IntArray exportParticleProcs
+
+        cdef DoubleArray x, y, z
+        cdef UIntArray gid
+
+        cdef ZOLTAN_ID_TYPE local_id, global_id
+
+        cdef int num_particles, i, proc
+        cdef int rank = self.rank
+
+        # iterate over all arrays
+        for pa_index in range(narrays):
+            pa_exchange = self.pa_exchanges[ pa_index ]
+            pa_wrapper = self.pa_wrappers[ pa_index ]
+
+            # reset the export lists
+            pa_exchange.reset_lists()
+            exportGlobalids = pa_exchange.exportParticleGlobalids
+            exportLocalids = pa_exchange.exportParticleLocalids
+            exportProcs = pa_exchange.exportParticleProcs
+
+            # particle arrays
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+            gid = pa_wrapper.gid            
+
+            num_particles = self.num_local[pa_index]
+            for i in range(num_particles):
+                xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
+
+                # find the processor to which this point belongs
+                proc = pz.Zoltan_Point_PP_Assign(xi, yi, zi)
+                if proc != rank:
+                    exportGlobalids.append( gid.data[i] )
+                    exportLocalids.append( <ZOLTAN_ID_TYPE>i )
+                    exportProcs.append(proc)
+
+            # exchange the data given the export lists
+            pa_exchange.numParticleExport = exportProcs.length
+            pa_exchange.lb_exchange_data()

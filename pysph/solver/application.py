@@ -203,6 +203,10 @@ class Application(object):
                           default=3.0, type='float', 
                           help=('Number of ghost cells to share for remote neighbors'))
 
+        zoltan.add_option("--lb-freq", action='store', dest='lb_freq',
+                          default=10, type='int',
+                          help=('The frequency for load balancing'))
+
         zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
                           help=("""Zoltan debugging level""")) 
@@ -430,6 +434,11 @@ class Application(object):
             # do an initial load balance
             pm.update()
             pm.initial_update = False
+
+            # set subsequent load balancing frequency
+            lb_freq = options.lb_freq
+            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
+            pm.set_lb_freq( lb_freq )
 
             # static particle arrays
             if len(self.particles_static) > 0:
