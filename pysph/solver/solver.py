@@ -141,7 +141,6 @@ class Solver(object):
 
         # set the parallel manager for the integrator
         integrator.set_parallel_manager(self.pm)
-        integrator.set_parallel_manager_static(self.pm_static)
 
         # set the integrator's solver
         integrator.set_solver(self)
@@ -272,6 +271,7 @@ class Solver(object):
             logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
                                                            self.rank))
             # perform the integration and update the time.
+            #print self.count, self.t
             self.integrator.integrate(self.t, dt, self.count)
 
             # update the time for all arrays
@@ -444,9 +444,6 @@ class Solver(object):
 
     def set_parallel_manager(self, pm):
         self.pm = pm
-
-    def set_parallel_manager_static(self, pm_static):
-        self.pm_static = pm_static
 
     def get_options(self, opt_parser):
         """ Implement this to add additional options for the application """
