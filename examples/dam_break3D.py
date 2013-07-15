@@ -73,7 +73,7 @@ eps = 0.5
 import numpy
 from db_geometry import DamBreak3DGeometry
 
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, WendlandQuintic, QuinticSpline, Gaussian
 
 from pysph.sph.equation import Group
 from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
@@ -109,7 +109,7 @@ B = co*co*ro/gamma
 app = Application()
 
 # Create the kernel
-kernel = CubicSpline(dim=dim)
+kernel = WendlandQuintic(dim=dim)
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim)

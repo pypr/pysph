@@ -148,6 +148,11 @@ def create_particles(empty=False, **kwargs):
         fluid1.h[:] = hdx * dx
         fluid2.h[:] = hdx * dx
         solid.h[:] = hdx * dx
+
+    # load balancing props
+    fluid1.set_lb_props( fluid1.properties.keys() )
+    fluid2.set_lb_props( fluid2.properties.keys() )
+    solid.set_lb_props( solid.properties.keys() )
                 
     # return the arrays
     return [fluid1, fluid2, solid]

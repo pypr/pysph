@@ -203,6 +203,10 @@ class Application(object):
                           default=3.0, type='float', 
                           help=('Number of ghost cells to share for remote neighbors'))
 
+        zoltan.add_option("--lb-freq", action='store', dest='lb_freq',
+                          default=10, type='int',
+                          help=('The frequency for load balancing'))
+
         zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
                           help=("""Zoltan debugging level""")) 
@@ -367,12 +371,12 @@ class Application(object):
                 solver.t, solver.dt, solver.count  = t, dt, count
 
             else:
-                self.particles = particle_factory(*args, **kw)
+                self.particles = particle_factory(empty=False, *args, **kw)
 
         # everyone else creates empty containers
         else:
             self.particles = particle_factory(empty=True, *args, **kw)
-
+            
         # static and dynamic particle arrays
         self.particles_static = []
         self.particles_dynamic = []
@@ -416,7 +420,6 @@ class Application(object):
 
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles_dynamic, comm=comm,
-                lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
                 ghost_layers=ghost_layers,
@@ -432,11 +435,15 @@ class Application(object):
             pm.update()
             pm.initial_update = False
 
+            # set subsequent load balancing frequency
+            lb_freq = options.lb_freq
+            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
+            pm.set_lb_freq( lb_freq )
+
             # static particle arrays
             if len(self.particles_static) > 0:
                 self.pm_static = pm_static = ZoltanParallelManagerGeometric(
                     dim=solver.dim, particles=self.particles_static, comm=comm,
-                    lb_props=None,
                     lb_method=zoltan_lb_method,
                     obj_weight_dim=obj_weight_dim,
                     ghost_layers=ghost_layers,

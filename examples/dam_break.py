@@ -75,7 +75,8 @@ eps = 0.5
 import numpy
 from db_geometry import DamBreak2DGeometry
 
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, WendlandQuintic
+from pysph.sph.equation import Group
 from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
      XSPHCorrection
 
@@ -116,7 +117,7 @@ geom = DamBreak2DGeometry(
 app = Application()
 
 # Create the kernel
-kernel = CubicSpline(dim=2)
+kernel = WendlandQuintic(dim=2)
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim)
@@ -128,19 +129,26 @@ solver.set_final_time(tf)
 equations = [
 
     # Equation of state
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-    TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+    Group(equations=[
 
-    # Continuity equation
-    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-    ContinuityEquation(dest='boundary', sources=['fluid']),
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-    # Momentum equation
-    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+            ]),
+
+    Group(equations=[
+
+            # Continuity equation
+            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+            ContinuityEquation(dest='boundary', sources=['fluid']),
+
+            # Momentum equation
+            MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
                      alpha=alpha, beta=beta, gy=-9.81),
 
-    # Position step with XSPH
-    XSPHCorrection(dest='fluid', sources=['fluid'])
+            # Position step with XSPH
+            XSPHCorrection(dest='fluid', sources=['fluid'])
+            ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.

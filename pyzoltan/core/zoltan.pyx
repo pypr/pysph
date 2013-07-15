@@ -546,6 +546,22 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         return numprocs
 
+    def Zoltan_Point_PP_Assign(self, double x, double y, double z):
+        """Find to which processor a given point must be sent to"""
+        cdef Zoltan_Struct* zz = self._zstruct.zz
+
+        cdef int ierr, proc = -1, part = -1
+        cdef double[3] coords
+
+        coords[0] = x; coords[1] = y; coords[2] = z
+
+        ierr = czoltan.Zoltan_LB_Point_PP_Assign(
+            zz, coords, &proc, &part)
+
+        _check_error(ierr)
+
+        return proc
+
     #######################################################################
     # Private interface
     #######################################################################

@@ -159,6 +159,9 @@ cdef class ParticleArray:
         if props:
             self.initialize(**props)
 
+        # default lb_props are all the arrays
+        self.lb_props = self.properties.keys()
+
     def __getattr__(self, name):
         """ Convenience, to access particle property arrays as an attribute
         
@@ -258,6 +261,9 @@ cdef class ParticleArray:
 
     cpdef set_static(self, bint is_static):
         self.is_static = is_static
+
+    def set_lb_props(self, list lb_props):
+        self.lb_props = lb_props
 
     def initialize(self, **props):
         """ Initialize the particle array with the given props
