@@ -25,9 +25,6 @@ cdef class Integrator:
     def set_parallel_manager(self, object pm):
         self.pm = pm
 
-    def set_parallel_manager_static(self, object pm_static):
-        self.pm_static = pm_static
-
     def set_solver(self, object solver):
         self.solver = solver
 
@@ -112,7 +109,6 @@ cdef class WCSPHRK2Integrator(Integrator):
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
         cdef object pm = self.pm
-        cdef object pm_static = self.pm_static
         cdef NNPS nnps = self.nnps
         cdef str name
 
@@ -169,7 +165,6 @@ cdef class WCSPHRK2Integrator(Integrator):
                 rho.data[i] = rho0.data[i] + dtb2 * arho.data[i]
 
         # Update NNPS since particles have moved
-        if pm_static: pm_static.static_update()
         if pm: pm.update()
 
         nnps.update()
