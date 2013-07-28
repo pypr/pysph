@@ -1,5 +1,5 @@
 """ 3D Dam Break Over a dry bed. The case is described as a SPHERIC
-benchmark https://wiki.manchester.ac.uk/spheric/index.php/Test2) 
+benchmark https://wiki.manchester.ac.uk/spheric/index.php/Test2)
 
 
 Setup:
@@ -138,7 +138,7 @@ equations = [
             ContinuityEquation(dest='obstacle', sources=['fluid']),
 
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
-                             alpha=alpha, beta=beta, gz=-9.81),
+                             alpha=alpha, beta=beta, gz=-9.81, c0=co),
 
             XSPHCorrection(dest='fluid', sources=['fluid'])
 

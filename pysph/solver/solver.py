@@ -18,13 +18,13 @@ class Solver(object):
     """ Base class for all PySPH Solvers
 
     **Attributes**
-    
+
     - particles -- the particle arrays to operate on
 
-    - integrator_type -- the class of the integrator. This may be one of any 
+    - integrator_type -- the class of the integrator. This may be one of any
       defined in solver/integrator.py
 
-    - kernel -- the kernel to be used throughout the calculations. This may 
+    - kernel -- the kernel to be used throughout the calculations. This may
       need to be modified to handle several kernels.
 
     - t -- the internal time step counter
@@ -40,14 +40,14 @@ class Solver(object):
     - pid -- the processor id if running in parallel
 
     """
-    
-    def __init__(self, integrator_type=WCSPHRK2Integrator, kernel=None, 
+
+    def __init__(self, integrator_type=WCSPHRK2Integrator, kernel=None,
                  dim=2, tdamp=0.0):
         """Constructor
-        
+
         Parameters
         -----------
-        
+
         integrator_type : The integrator to use.
         """
 
@@ -60,7 +60,7 @@ class Solver(object):
 
         # set the particles to None
         self.particles = None
-        
+
         # Set the SPHEval instance to None.
         self.sph_eval = None
 
@@ -100,7 +100,7 @@ class Solver(object):
         if self.dim > 2:
             self.print_properties.extend(['z','w'])
 
-        # flag to print all arrays 
+        # flag to print all arrays
         self.detailed_output = False
 
         # output filename
@@ -112,26 +112,26 @@ class Solver(object):
         # solution damping to avoid impulsive starts
         self.tdamp = tdamp
 
-    def setup(self, particles, equations, nnps, kernel=None, 
+    def setup(self, particles, equations, nnps, kernel=None,
               integrator_type=None):
         """ Setup the solver.
 
-        The solver's processor id is set if the in_parallel flag is set 
+        The solver's processor id is set if the in_parallel flag is set
         to true.
 
-        The order of the integrating calcs is determined by the solver's 
+        The order of the integrating calcs is determined by the solver's
         order attribute.
 
         This is usually called at the start of a PySPH simulation.
 
         """
-        
+
         self.particles = particles
         if integrator_type is not None:
             self.integrator_type = integrator_type
         if kernel is not None:
             self.kernel = kernel
-            
+
         self.sph_eval = SPHEval(particles, equations, None, self.kernel)
         self.sph_eval.set_nnps(nnps)
 
@@ -149,15 +149,15 @@ class Solver(object):
         """ Add a list of properties to print """
         for prop in props:
             if not prop in self.print_properties:
-                self.print_properties.append(prop)            
+                self.print_properties.append(prop)
 
     def append_particle_arrrays(self, arrays):
-        """ Append the particle arrays to the existing particle arrays 
+        """ Append the particle arrays to the existing particle arrays
         """
         if not self.particles:
             print 'Warning! Particles not defined.'
             return
-        
+
         for array in self.particles:
             array_name = array.name
             for arr in arrays:
@@ -183,12 +183,12 @@ class Solver(object):
         """
 
         available_arrays = [array.name for array in self.particles]
-        
+
         if array_names:
             for name in array_names:
                 if not name in available_arrays:
                     raise RuntimeError("Array %s not availabe"%(name))
-                
+
                 for arr in self.particles:
                     if arr.name == name:
                         array = arr
@@ -226,7 +226,7 @@ class Solver(object):
 
     def set_command_handler(self, callable, command_interval=1):
         """ set the `callable` to be called at every `command_interval` iteration
-        
+
         the `callable` is called with the solver instance as an argument
         """
         self.execute_commands = callable
@@ -238,7 +238,7 @@ class Solver(object):
         Notes
         -----
         Pre-stepping functions are those that need to be called before
-        the integrator is called. 
+        the integrator is called.
 
         Similarly, post step functions are those that are called after
         the stepping within the integrator.
@@ -274,10 +274,12 @@ class Solver(object):
             #print self.count, self.t
             self.integrator.integrate(self.t, dt, self.count)
 
+            self.dt = dt = self.integrator.compute_time_step(self.dt)
+
             # update the time for all arrays
             self.update_particle_time()
 
-            # perform any post step functions            
+            # perform any post step functions
             for func in self.post_step_functions:
                 func.eval(self)
 
@@ -285,13 +287,13 @@ class Solver(object):
             if self.count % self.pfreq == 0:
                 self.dump_output(dt, *self.print_properties)
                 if self.comm:
-                    self.comm.barrier()                
+                    self.comm.barrier()
 
             bcount += int(self.dt/bt)
             while bcount > 0:
                 bar.update()
                 bcount -= 1
-        
+
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)
@@ -304,13 +306,13 @@ class Solver(object):
     def update_particle_time(self):
         for array in self.particles:
             array.set_time(self.t)
-            
+
     def dump_output(self, dt, *print_properties):
         """ Print output based on level of detail required
-        
-        The default detail level (low) is the integrator's calc's update 
+
+        The default detail level (low) is the integrator's calc's update
         property for each named particle array.
-        
+
         The higher detail level dumps all particle array properties.
 
         Format:
@@ -338,12 +340,12 @@ class Solver(object):
 
         dt = data['solver_data']['dt']
         t = data['solver_data']['t']
-        
+
         array = data['arrays'][array_name].astype(object)
         array['x']
 
         """
-        fname = self.fname + '_' 
+        fname = self.fname + '_'
         props = {"arrays":{}, "solver_data":{}}
 
         _fname = os.path.join(self.output_directory,
@@ -368,13 +370,13 @@ class Solver(object):
         if self.parallel_output_mode == "collected" and self.in_parallel:
 
             comm = self.comm
-            
+
             arrays = props["arrays"]
             array_names = arrays.keys()
 
             # gather the data from all processors
             collected_data = comm.gather(arrays, root=0)
-            
+
             if self.rank == 0:
                 props["arrays"] = {}
                 size = comm.Get_size()
@@ -385,7 +387,7 @@ class Solver(object):
 
                     _props = collected_data[0][array_name].keys()
                     for prop in _props:
-                        data = [collected_data[pid][array_name][prop] 
+                        data = [collected_data[pid][array_name][prop]
                                         for pid in range(size)]
                         prop_arr = numpy.concatenate(data)
                         props["arrays"][array_name][prop] = prop_arr
@@ -402,7 +404,7 @@ class Solver(object):
         ----------
         count : string
             The iteration time from which to load the data. If time is
-            '?' then list of available data files is returned else 
+            '?' then list of available data files is returned else
              the latest available data file is used
 
         Notes
@@ -414,8 +416,8 @@ class Solver(object):
 
         """
         # get the list of available files
-        available_files = [i.rsplit('_',1)[1][:-4] 
-                            for i in os.listdir(self.output_directory) 
+        available_files = [i.rsplit('_',1)[1][:-4]
+                            for i in os.listdir(self.output_directory)
                              if i.startswith(self.fname) and i.endswith('.npz')]
 
         if count == '?':
@@ -433,7 +435,7 @@ class Solver(object):
         # load the output file
         data = load(os.path.join(self.output_directory,
                                  self.fname+'_'+str(count)+'.npz'))
-        
+
         arrays = [ data["arrays"][i] for i in array_names ]
 
         # set the Particle's arrays
@@ -450,9 +452,9 @@ class Solver(object):
         pass
 
     def setup_solver(self, options=None):
-        """ Implement the basic solvers here 
+        """ Implement the basic solvers here
 
-        All subclasses of Solver may implement this function to add the 
+        All subclasses of Solver may implement this function to add the
         necessary operations for the problem at hand.
 
         Look at solver/fluid_solver.py for an example.
@@ -463,6 +465,6 @@ class Solver(object):
             options set by the user using commandline (there is no guarantee
             of existence of any key)
         """
-        pass 
+        pass
 
 ############################################################################
