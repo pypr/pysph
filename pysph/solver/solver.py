@@ -42,13 +42,17 @@ class Solver(object):
     """
 
     def __init__(self, integrator_type=WCSPHRK2Integrator, kernel=None,
-                 dim=2, tdamp=0.0):
+                 dim=2, tdamp=0.0, **kwargs):
         """Constructor
+
+        Any additional keyword args are used to set the values of any
+        of the attributes.
 
         Parameters
         -----------
 
         integrator_type : The integrator to use.
+
         """
 
         self.integrator_type = integrator_type
@@ -112,6 +116,17 @@ class Solver(object):
         # solution damping to avoid impulsive starts
         self.tdamp = tdamp
 
+        # Use adaptive time steps
+        self.adaptive_timestep = False
+
+        # Set all extra keyword arguments
+        for attr, value in kwargs.iteritems():
+            if hasattr(self, attr):
+                setattr(self, attr, value)
+            else:
+                msg = 'Unknown keyword arg "%s" passed to constructor'%attr
+                raise TypeError(msg)
+
     def setup(self, particles, equations, nnps, kernel=None,
               integrator_type=None):
         """ Setup the solver.
@@ -165,6 +180,11 @@ class Solver(object):
                     array.append_parray(arr)
 
         self.setup(self.particles)
+
+    def set_adaptive_timestep(self, value):
+        """Set if we should use adaptive timesteps or not.
+        """
+        self.adaptive_timestep = value
 
     def set_final_time(self, tf):
         """ Set the final time for the simulation """
@@ -274,7 +294,8 @@ class Solver(object):
             #print self.count, self.t
             self.integrator.integrate(self.t, dt, self.count)
 
-            self.dt = dt = self.integrator.compute_time_step(self.dt)
+            if self.adaptive_timestep:
+                self.dt = dt = self.integrator.compute_time_step(self.dt)
 
             # update the time for all arrays
             self.update_particle_time()
