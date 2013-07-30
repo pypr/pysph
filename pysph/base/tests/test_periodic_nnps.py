@@ -81,7 +81,7 @@ for i in range(frho.size):
 
     for indexj in range(nnbrs):
         j = nbrs[indexj]
-        
+
         xj = Point( sx[j], sy[j] )
         hij = 0.5 * (hi + sh[j])
 
@@ -96,10 +96,10 @@ for i in range(frho.size):
 
     for indexj in range(nnbrs):
         j = nbrs[indexj]
-        
+
         xj = Point( sx[j], sy[j] )
         hij = 0.5 * (hi + sh[j])
-        
+
         frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
         fluid.V[i] += kernel.py_function(xi, xj, hij)
 

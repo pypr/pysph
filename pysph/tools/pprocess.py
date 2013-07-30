@@ -53,7 +53,7 @@ class Results(object):
             t[i] = data['solver_data']['t']
 
             array = data['arrays'][array_name]
-            
+
             m, u, v, w = array.get('m', 'u', 'v', 'w')
             ke[i] = 0.5 * np.sum( m * (u**2 + v**2) )
 
@@ -72,7 +72,7 @@ class Results(object):
         # create an output folder for the vtk files
         dirname = path.join(self.dirname, 'vtk')
         utils.mkdir(dirname)
-        
+
         nfiles = self.nfiles
         for i in range(nfiles):
             f = self.files[i]
@@ -80,13 +80,13 @@ class Results(object):
 
             array = data['arrays'][array_name]
             num_particles = array.num_real_particles
-            
+
             # save the points
             points = np.zeros( shape=(num_particles,3) )
             points[:, 0] = array.z
             points[:, 1] = array.y
             points[:, 2] = array.x
-            
+
             mesh = tvtk.PolyData(points=points)
 
             # add the scalar props
@@ -96,18 +96,18 @@ class Results(object):
                     numpy_array = np.sqrt(u**2 + v**2 + w**2)
                 else:
                     numpy_array = array.get(prop)
-                
+
                 vtkarray = array2vtk(numpy_array)
                 vtkarray.SetName(prop)
-            
+
                 # add the array as point data
                 mesh.point_data.add_array(vtkarray)
-                
+
             # set the last prop as the active scalar
             mesh.point_data.set_active_scalars(props[-1])
 
             # spit it out
             fileno = data['solver_data']['count']
             _fname = self.fname + '_%s_%s'%(array_name, fileno)
-            
+
             self._write_vtk_snapshot(mesh, dirname, _fname)

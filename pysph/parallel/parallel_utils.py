@@ -32,12 +32,12 @@ def invert_export_lists(comm, exportProcs, recv_count):
     objects it will receive from other processors. This situation arises
     for example in the cell based partitioning in PySPH. From the cell
     export lists, we have a list of particle indices that need to be
-    exported to remote neighbors. 
+    exported to remote neighbors.
 
     """
     # reset the recv_counts to 0
     recv_count[:] = 0
-    
+
     # get the rank and size for the communicator
     size = comm.Get_size()
     rank = comm.Get_rank()
@@ -59,7 +59,7 @@ def invert_export_lists(comm, exportProcs, recv_count):
     # store the number of objects to be received from each processor
     for i in range(size):
         proc_send_count = recvbuf[i*size:(i+1)*size]
-        recv_count[i] = proc_send_count[rank]    
+        recv_count[i] = proc_send_count[rank]
 
 def count_recv_data(
     comm, recv, numImport, importProcs):
@@ -94,10 +94,10 @@ def count_recv_data(
     for i in range(numImport):
         processor = importProcs[i]
         recv[processor] += 1
-        
+
     for processor in recv.keys():
         if recv[processor] == 0:
-            del recv[processor]    
+            del recv[processor]
 
 def get_send_data(
     comm, pa, lb_props, _exportIndices, _exportProcs):
@@ -169,7 +169,7 @@ def Recv(comm, localbuf, recvbuf, source, localbufsize=0, tag=0):
         processor from where the data originates
 
     localbufsize : int
-        Current length index for the local buffer. Defaults to 0        
+        Current length index for the local buffer. Defaults to 0
 
     tag : int
         optional message tag

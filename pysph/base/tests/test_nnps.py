@@ -58,7 +58,7 @@ def test_get_centroid():
     assert(abs(centroid.x - 0.05) < 1e-10)
     assert(abs(centroid.y - 0.05) < 1e-10)
     assert(abs(centroid.z - 0.05) < 1e-10)
-    
+
     cell = nnps.Cell(IntPoint(1, 2, 3), cell_size=0.5, narrays=1)
     cell.get_centroid(centroid)
 

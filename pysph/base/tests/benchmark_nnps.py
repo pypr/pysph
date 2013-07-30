@@ -14,19 +14,19 @@ _numPoints = [1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
 for numPoints in _numPoints:
 
     dx = numpy.power( 1./numPoints, 1.0/3.0 )
-    
+
     xa = random.random(numPoints)
     ya = random.random(numPoints)
     za = random.random(numPoints)
     ha = numpy.ones_like(xa) * 2*dx
     gida = numpy.arange(numPoints).astype(numpy.uint32)
-    
+
     x = DoubleArray(numPoints); x.set_data(xa)
     y = DoubleArray(numPoints); y.set_data(ya)
     z = DoubleArray(numPoints); z.set_data(za)
     h = DoubleArray(numPoints); h.set_data(ha)
     gid = UIntArray(numPoints); gid.set_data(gida)
-    
+
     # Create the NNPS object
     pa = get_particle_array(x=xa, y=ya, h=ha, gid=gida)
     nps = NNPS(dim=3, particles=[pa,], radius_scale=2.0)

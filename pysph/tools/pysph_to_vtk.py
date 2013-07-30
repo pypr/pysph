@@ -291,9 +291,9 @@ def extract_text(path, particle_idx, props=['x','y','u','v','p','rho','sigma00',
                         for prop in props:
                             file.write('\t')
                             file.write(str(d[prop][particle_idx[j]]))
-                    
+
                     d.close()
-                
+
                 for file in files:
                     file.close()
 
@@ -315,7 +315,7 @@ def test():
     assert set(vectors) == set(['x','XX'])
     assert set(tensors) == set(['S','T'])
 
-    
+
 if __name__ == '__main__':
     import sys
     pysph_to_vtk(path=sys.argv[1])

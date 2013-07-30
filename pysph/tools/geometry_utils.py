@@ -31,9 +31,9 @@ def create_2D_tank(x1,y1,x2,y2,dx):
     x1,y1,x2,y2 : Coordinates defining the rectangle in 2D
 
     dx : The spacing to use
-    
+
     """
-    
+
     yl = numpy.arange(y1, y2+dx/2, dx)
     xl = numpy.ones_like(yl) * x1
     nl = len(xl)
@@ -71,7 +71,7 @@ def create_3D_tank(x1, y1, z1, x2, y2, z2, dx):
     x1,y1,x2,y2,x3,y3 : Coordinates defining the rectangle in 2D
 
     dx : The spacing to use
-    
+
     """
 
     points = []
@@ -82,7 +82,7 @@ def create_3D_tank(x1, y1, z1, x2, y2, z2, dx):
 
     for i in range(len(x)):
         points.append( (x[i], y[i], z[i]) )
-        
+
     # create the front X-Z plane
     x, z = numpy.mgrid[x1:x2+dx/2:dx, z1:z2+dx/2:dx]
     x = x.ravel(); z = z.ravel()
@@ -122,7 +122,7 @@ def create_3D_tank(x1, y1, z1, x2, y2, z2, dx):
     z = numpy.array( [i[2] for i in points] )
 
     return x, y, z
-    
+
 def create_2D_filled_region(x1, y1, x2, y2, dx):
     x,y = numpy.mgrid[x1:x2+dx/2:dx, y1:y2+dx/2:dx]
     x = x.ravel(); y = y.ravel()
