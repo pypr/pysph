@@ -17,13 +17,13 @@ cdef class ZComm:
         self.comm = comm
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
-        
+
         self.tag = tag
         self.nsend = nsend
         self.proclist = proclist.astype(np.int32)
 
         self.nreturn = 0
-    
+
         # the size of each element to exchange
         self.nbytes = 8
 
@@ -32,10 +32,10 @@ cdef class ZComm:
     def __dealloc__(self):
         cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
         zcomm.Zoltan_Comm_Destroy(&_zoltan_comm_obj)
-        
+
     def initialize(self):
         cdef zcomm.ZOLTAN_COMM_OBJ** zoltan_comm_obj = &self._zoltan_comm_obj
-        
+
         cdef np.ndarray[ndim=1, dtype=np.int32_t] _proclist = self.proclist
         cdef int* proclist = <int*>_proclist.data
 
@@ -70,13 +70,13 @@ cdef class ZComm:
 
         ierr = zcomm.Zoltan_Comm_Do(
             _zoltan_comm_obj,
-            tag, 
+            tag,
             send_data,
             nbytes,
             recv_data)
 
         _check_error(ierr)
-        
+
     def set_nbytes(self, int nbytes):
         self.nbytes = nbytes
 

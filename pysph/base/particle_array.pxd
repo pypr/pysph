@@ -37,7 +37,7 @@ cdef class ParticleArray:
     # dictionary to hold the properties held per particle
     cdef public dict properties
     cdef public list property_arrays
-    
+
     # dictionary to hold the constants for all the particles
     cdef public dict constants
 
@@ -49,7 +49,7 @@ cdef class ParticleArray:
 
     # indicates if coordinates of particles has changed.
     cdef public bint is_dirty
-    
+
     # indicate if the particle configuration has changed.
     cdef public bint indices_invalid
 
@@ -75,7 +75,7 @@ cdef class ParticleArray:
     cdef public bint cl_setup_done
 
     # time for the particle array
-    cdef public double time 
+    cdef public double time
 
     # The OpenCL CommandQueue Context and Device
     cdef public object queue
@@ -110,11 +110,11 @@ cdef class ParticleArray:
     cpdef int get_number_of_particles(self)
     cpdef remove_particles(self, BaseArray index_list)
     cpdef remove_tagged_particles(self, int tag)
-    
+
     # function to add any property
     cpdef add_property(self, dict prop_info)
     cpdef remove_property(self, str prop_name)
-    
+
     # increase the number of particles by num_particles
     cpdef extend(self, int num_particles)
 
@@ -127,7 +127,7 @@ cdef class ParticleArray:
     cpdef int append_parray(self, ParticleArray parray) except -1
 
     # create a new particle array with the given particles indices and the
-    # properties. 
+    # properties.
     cpdef ParticleArray extract_particles(self, LongArray index_array, list
                                           props=*)
 

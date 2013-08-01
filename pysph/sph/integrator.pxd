@@ -13,7 +13,7 @@ cdef class Integrator:
     cdef double cfl             # cfl for stable time steps
 
     cdef double tdamp           # solution damping interval
-    
+
     cdef public object pm
     cdef public list particles
     cdef public object evaluator
@@ -37,7 +37,7 @@ cdef class Integrator:
     # set the values at the start of a time step
     cdef _set_initial_values(self)
 
-    # reset accelerations before computing 
+    # reset accelerations before computing
     cdef _reset_accelerations(self)
 
 cdef class WCSPHRK2Integrator(Integrator):

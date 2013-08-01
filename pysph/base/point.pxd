@@ -28,12 +28,12 @@ cdef inline double cPoint_norm(cPoint p):
 
 cdef inline double cPoint_distance(cPoint pa, cPoint pb):
     return sqrt((pa.x-pb.x)*(pa.x-pb.x) +
-                (pa.y-pb.y)*(pa.y-pb.y) + 
+                (pa.y-pb.y)*(pa.y-pb.y) +
                 (pa.z-pb.z)*(pa.z-pb.z)
                 )
 
 cdef inline double cPoint_distance2(cPoint pa, cPoint pb):
-    return ((pa.x-pb.x)*(pa.x-pb.x) + (pa.y-pb.y)*(pa.y-pb.y) + 
+    return ((pa.x-pb.x)*(pa.x-pb.x) + (pa.y-pb.y)*(pa.y-pb.y) +
                     (pa.z-pb.z)*(pa.z-pb.z))
 
 cdef inline double cPoint_length(cPoint pa):
@@ -80,12 +80,12 @@ cdef inline double Point_length2(Point p):
 
 cdef inline double Point_distance(Point pa, Point pb):
     return sqrt((pa.x-pb.x)*(pa.x-pb.x) +
-                (pa.y-pb.y)*(pa.y-pb.y) + 
+                (pa.y-pb.y)*(pa.y-pb.y) +
                 (pa.z-pb.z)*(pa.z-pb.z)
                 )
 
 cdef inline double Point_distance2(Point pa, Point pb):
-    return ((pa.x-pb.x)*(pa.x-pb.x) + (pa.y-pb.y)*(pa.y-pb.y) + 
+    return ((pa.x-pb.x)*(pa.x-pb.x) + (pa.y-pb.y)*(pa.y-pb.y) +
                     (pa.z-pb.z)*(pa.z-pb.z))
 
 cdef inline Point Point_from_cPoint(cPoint p):
@@ -118,7 +118,7 @@ cdef inline double cIntPoint_length(cIntPoint pa):
 
 cdef inline long cIntPoint_distance2(cIntPoint pa, cIntPoint pb):
     return ((pa.x-pb.x)*(pa.x-pb.x) +
-            (pa.y-pb.y)*(pa.y-pb.y) + 
+            (pa.y-pb.y)*(pa.y-pb.y) +
             (pa.z-pb.z)*(pa.z-pb.z))
 
 cdef inline double cIntPoint_distance(cIntPoint pa, cIntPoint pb):

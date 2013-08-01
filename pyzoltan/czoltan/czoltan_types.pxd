@@ -2,7 +2,7 @@ cdef extern from "zoltan_types.h":
 
     # basic type used by all of Zoltan
     ctypedef unsigned int ZOLTAN_ID_TYPE
-    
+
     # MPI data type
     cdef unsigned int ZOLTAN_ID_MPI_TYPE
 
@@ -20,14 +20,14 @@ cdef extern from "zoltan_types.h":
     #  *                   possible to try a different, more memory-friendly,
     #  *                   algorithm.
     #  */
-    # /*****************************************************************************/    
+    # /*****************************************************************************/
     cdef int ZOLTAN_OK
     cdef int ZOLTAN_WARN
     cdef int ZOLTAN_FATAL
     cdef int ZOLTAN_MEMERR
 
     # /*****************************************************************************/
-    # /* Hypergraph query function types 
+    # /* Hypergraph query function types
     #  */
     # /*****************************************************************************/
     cdef int _ZOLTAN_COMPRESSED_EDGE

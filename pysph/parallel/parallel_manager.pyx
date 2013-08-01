@@ -96,7 +96,7 @@ cdef class ParticleArrayExchange:
         """
         # data array
         cdef ParticleArray pa = self.pa
-        
+
         # Export lists for the particles
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
@@ -152,7 +152,7 @@ cdef class ParticleArrayExchange:
         """
         # data arrays
         cdef ParticleArray pa = self.pa
-        
+
         # Export lists
         cdef UIntArray exportGlobalids = self.exportParticleGlobalids
         cdef UIntArray exportLocalids = self.exportParticleLocalids
@@ -170,7 +170,7 @@ cdef class ParticleArrayExchange:
         cdef int dtag = self.data_tag_remote
         cdef ZComm zcomm = ZComm(comm, dtag, numExport, exportProcs.get_npy_array())
         numImport = zcomm.nreturn
-        
+
         # old and new sizes
         count = current_size
         newsize = current_size + numImport
@@ -214,7 +214,7 @@ cdef class ParticleArrayExchange:
             # set the nbytes and tag for the zoltan communicator
             zcomm.set_nbytes( nbytes )
             zcomm.set_tag( prop_tag )
-            
+
             # exchange the data
             zcomm.Comm_Do( sendbuf, recvbuf )
 
@@ -224,7 +224,7 @@ cdef class ParticleArrayExchange:
         # resize the particle array
         self.pa.resize( num_local )
         self.pa.align_particles()
-        
+
         # reset the number of remote particles
         self.num_remote = 0
 
@@ -259,7 +259,7 @@ cdef class ParticleArrayExchange:
 
         num_objects_data = zoltan_utils.get_num_objects_per_proc(
             comm, self.num_local)
-        
+
         num_local_objects = num_objects_data[ rank ]
         num_global_objects = np.sum( num_objects_data )
 
@@ -292,13 +292,13 @@ cdef class ParticleArrayExchange:
         cdef ParticleArray pa = self.pa
         cdef dict sendbufs = {}
         cdef str prop
-        
+
         cdef np.ndarray indices = exportIndices.get_npy_array()
 
         for prop in pa.properties:
             prop_arr = pa.properties[prop].get_npy_array()
             sendbufs[prop] = prop_arr[ indices ]
-            
+
         return sendbufs
 
 # #################################################################
@@ -321,7 +321,7 @@ cdef class ParallelManager:
         particles : list
             list of particle arrays to be managed.
 
-        comm : mpi4py.MPI.COMM, default 
+        comm : mpi4py.MPI.COMM, default
             MPI communicator for parallel invocations
 
         radius_scale : double, default (2)
@@ -431,7 +431,7 @@ cdef class ParallelManager:
             Setting cell size to 1"""%(cell_size)
             print msg
             cell_size = 1.0
-        self.cell_size = cell_size        
+        self.cell_size = cell_size
 
     def update_cell_gids(self):
         """Update global indices for the cell_map dictionary.
@@ -449,7 +449,7 @@ cdef class ParallelManager:
         pz._update_gid( self.cell_gid )
 
     def update_particle_gids(self):
-        """Update individual particle global indices"""        
+        """Update individual particle global indices"""
         for i in range(self.narrays):
             pa_exchange = self.pa_exchanges[i]
             pa_exchange.update_particle_gids()
@@ -460,7 +460,7 @@ cdef class ParallelManager:
     def update(self):
         cdef int lb_freq = self.lb_freq
         cdef int lb_count = self.lb_count
-        
+
         lb_count += 1
 
         # remove remote particles from a previous step
@@ -519,7 +519,7 @@ cdef class ParallelManager:
         should call 'update' only at the end of a time step. The idea
         of multiple ghost layers is to ensure that local particles
         have a sufficiently large halo region around them.
-        
+
         """
         # update particle gids, bin particles and update cell gids
         #self.update_particle_gids()
@@ -566,7 +566,7 @@ cdef class ParallelManager:
         self.compute_remote_particles()
         for i in range(self.narrays):
             self.pa_exchanges[i].remote_exchange_data()
-            
+
         # update the local cell map to accomodate remotes
         self.update_remote_data()
 
@@ -638,7 +638,7 @@ cdef class ParallelManager:
 
         pa_index : int
             Index of the particle array corresponding to the particles list
-        
+
         indices : UIntArray
             Subset of particles to bin
 
@@ -679,7 +679,7 @@ cdef class ParallelManager:
             if not cell_map.has_key( cid ):
                 cell = Cell(cid=cid, cell_size=cell_size,
                             narrays=self.narrays, layers=layers)
-                
+
                 # store this cell in the cells list and cell map
                 PyList_Append( cell_list, cell )
                 cell_map[ cid ] = cell
@@ -704,7 +704,7 @@ cdef class ParallelManager:
 
     def update_local_data(self):
         """Update the cell map after load balance.
-        
+
         After the load balancing step, each processor has a new set of
         local particles which need to be indexed. This new cell
         structure is then used to compute remote particles.
@@ -721,7 +721,7 @@ cdef class ParallelManager:
 
         for i in range(self.narrays):
             pa_exchange = self.pa_exchanges[i]
-            num_particles = pa_exchange.num_local            
+            num_particles = pa_exchange.num_local
 
             # set the number of local and global particles
             self.num_local[i] = pa_exchange.num_local
@@ -769,7 +769,7 @@ cdef class ParallelManager:
         cdef int ncells_total = self.ncells_total
         cdef int ncells_local = self.ncells_local
 
-        # cell centroid arrays 
+        # cell centroid arrays
         cdef double[:] x = np.zeros( shape=ncells_total, dtype=np.float64 )
         cdef double[:] y = np.zeros( shape=ncells_total, dtype=np.float64 )
         cdef int[:] lid = np.zeros( shape=ncells_total, dtype=np.int32 )
@@ -808,7 +808,7 @@ cdef class ParallelManager:
     def set_data(self):
         """Compute the user defined data for use with Zoltan"""
         raise NotImplementedError("ZoltanParallelManager::_set_data should not be called!")
-    
+
     def _setup_arrays(self):
         # Import/Export lists for cells
         self.exportCellGlobalids = UIntArray()
@@ -846,13 +846,13 @@ cdef class ParallelManager:
 
                 if x.minimum < mx: mx = x.minimum
                 if x.maximum > Mx: Mx = x.maximum
-            
+
                 if y.minimum < my: my = y.minimum
                 if y.maximum > My: My = y.maximum
-            
+
                 if z.minimum < mz: mz = z.minimum
                 if z.maximum > Mz: Mz = z.maximum
-            
+
                 if h.maximum > Mh: Mh = h.maximum
 
         self.minx[0] = mx; self.miny[0] = my; self.minz[0] = mz
@@ -883,7 +883,7 @@ cdef class ParallelManager:
             comm.Allreduce(sendbuf=self.maxy, recvbuf=_maxy, op=mpi.MAX)
             comm.Allreduce(sendbuf=self.maxz, recvbuf=_maxz, op=mpi.MAX)
             comm.Allreduce(sendbuf=self.maxh, recvbuf=_maxh, op=mpi.MAX)
-            
+
         self.mx = _minx[0]; self.my = _miny[0]; self.mz = _minz[0]
         self.Mx = _maxx[0]; self.My = _maxy[0]; self.Mz = _maxz[0]
         self.Mh = _maxh[0]
@@ -1008,7 +1008,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         particles : list
             list of particle arrays to be managed.
 
-        comm : mpi4py.MPI.COMM, default 
+        comm : mpi4py.MPI.COMM, default
             MPI communicator for parallel invocations
 
         radius_scale : double, default (2)
@@ -1024,7 +1024,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         super(ZoltanParallelManager, self).__init__(
             dim, particles, comm, radius_scale, ghost_layers, domain, update_cell_sizes)
 
-        # Initialize the base PyZoltan class. 
+        # Initialize the base PyZoltan class.
         self.pz = PyZoltan(comm)
 
     def create_particle_lists(self):
@@ -1085,7 +1085,7 @@ cdef class ZoltanParallelManager(ParallelManager):
                 lindices = cell.lindices[pa_index]
                 gindices = cell.gindices[pa_index]
                 nindices = lindices.length
-                
+
                 for j in range( nindices ):
                     exportLocalids.append( lindices.data[j] )
                     exportGlobalids.append( gindices.data[j] )
@@ -1102,7 +1102,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         Particles to be exported are determined by flagging individual
         cells and where they need to be shared to meet neighbor
         requirements.
-        
+
         """
         # the PyZoltan object used to find intersections
         cdef PyZoltan pz = self.pz
@@ -1118,7 +1118,7 @@ cdef class ZoltanParallelManager(ParallelManager):
 
         cdef np.ndarray nbrprocs
         cdef np.ndarray[ndim=1, dtype=np.int32_t] procs
-        
+
         cdef int nbrproc, num_particles, indexi, pa_index
         cdef ZOLTAN_ID_TYPE i
 
@@ -1145,7 +1145,7 @@ cdef class ZoltanParallelManager(ParallelManager):
 
             # the array of processors that this box intersects with
             procs = pz.procs
-                
+
             # array of neighboring processors
             nbrprocs = procs[np.where( (procs != -1) * (procs != rank) )[0]]
 
@@ -1294,7 +1294,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
             cell = cell_list[ i ]
             centroid = cell.centroid
 
-            # weights are defined as cell.size/num_total 
+            # weights are defined as cell.size/num_total
             weights.data[i] = num_global_objects1 * cell.size
 
             x.data[i] = centroid.x
@@ -1334,7 +1334,7 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
             # particle arrays
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
-            gid = pa_wrapper.gid            
+            gid = pa_wrapper.gid
 
             num_particles = self.num_local[pa_index]
             for i in range(num_particles):

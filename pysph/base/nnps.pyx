@@ -40,27 +40,27 @@ cdef inline int real_to_int(double real_val, double step):
     Parameters:
     -----------
     val -- The coordinate location to bin
-    step -- the bin size    
+    step -- the bin size
 
     Example:
     --------
     real_val = 1.5, step = 1.0 --> ret_val = 1
 
     real_val = -0.5, step = 1.0 --> real_val = -1
-    
+
     """
     cdef int ret_val = <int>floor( real_val/step )
 
     return ret_val
 
 cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size):
-    """ Find the cell index for the corresponding point 
+    """ Find the cell index for the corresponding point
 
     Parameters:
     -----------
     pnt -- the point for which the index is sought
     cell_size -- the cell size to use
-    id -- output parameter holding the cell index 
+    id -- output parameter holding the cell index
 
     Algorithm:
     ----------
@@ -69,7 +69,7 @@ cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size):
     Notes:
     ------
     Uses the function  `real_to_int`
-    
+
     """
     cdef cIntPoint p = cIntPoint(real_to_int(pnt.x, cell_size),
                                  real_to_int(pnt.y, cell_size),
@@ -81,53 +81,53 @@ cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
 
     Parameters:
     -----------
-    
+
     cell_size : double (input)
     Cell size used for binning
-    
+
     cid : cPoint (input)
     Spatial index for a cell
-    
+
     Returns:
     ---------
-    
-    centroid : cPoint 
-    
+
+    centroid : cPoint
+
     Notes:
     ------
     The centroid in any coordinate direction is defined to be the
     origin plus half the cell size in that direction
-    
+
     """
     centroid = cPoint_new(0.0, 0.0, 0.0)
     centroid.x = (<double>cid.x + 0.5)*cell_size
     centroid.y = (<double>cid.y + 0.5)*cell_size
     centroid.z = (<double>cid.z + 0.5)*cell_size
-    
+
     return centroid
 
 def get_centroid(double cell_size, IntPoint cid):
     """ Get the centroid of the cell.
-    
+
     Parameters:
     -----------
-    
+
     cell_size : double (input)
         Cell size used for binning
-    
+
     cid : IntPoint (input)
         Spatial index for a cell
-    
+
     Returns:
     ---------
-    
-    centroid : Point 
-    
+
+    centroid : Point
+
     Notes:
     ------
     The centroid in any coordinate direction is defined to be the
     origin plus half the cell size in that direction
-    
+
     """
     cdef cPoint _centroid = _get_centroid(cell_size, cid.data)
     centroid = Point_new(0.0, 0.0, 0.0)
@@ -170,7 +170,7 @@ cdef class NNPSParticleArrayWrapper:
         self.tag = pa.get_carray('tag')
 
         self.np = pa.get_number_of_particles()
-        
+
 cdef class DomainLimits:
     """This class determines the limits of the solution domain.
 
@@ -184,11 +184,11 @@ cdef class DomainLimits:
 
     """
     def __init__(self, int dim=1, double xmin=-1000, double xmax=1000, double ymin=0,
-                 double ymax=0, double zmin=0, double zmax=0, 
+                 double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
         """Constructor"""
         self._check_limits(dim, xmin, xmax, ymin, ymax, zmin, zmax)
-        
+
         self.xmin = xmin; self.xmax = xmax
         self.ymin = ymin; self.ymax = ymax
         self.zmin = zmin; self.zmax = zmax
@@ -217,7 +217,7 @@ cdef class Cell:
 
     For a spatial indexing based on the box-sort algorithm, this class
     defines the spatial data structure used to hold particle indices
-    (local and global) that are within this cell. 
+    (local and global) that are within this cell.
 
     """
     def __init__(self, IntPoint cid, double cell_size, int narrays,
@@ -237,7 +237,7 @@ cdef class Cell:
             Number of arrays being binned
 
         layers : int
-            Factor to compute the bounding box        
+            Factor to compute the bounding box
 
         """
         self._cid = cIntPoint_new(cid.x, cid.y, cid.z)
@@ -247,7 +247,7 @@ cdef class Cell:
 
         self.lindices = [UIntArray() for i in range(narrays)]
         self.gindices = [UIntArray() for i in range(narrays)]
-        
+
         self.nparticles = [lindices.length for lindices in self.lindices]
         self.is_boundary = False
 
@@ -281,7 +281,7 @@ cdef class Cell:
 
         The centroid is defined as the origin plus half the cell size
         in each dimension.
-        
+
         """
         cdef cPoint centroid = self.centroid
         pnt.data = centroid
@@ -304,7 +304,7 @@ cdef class Cell:
 
         cell_size : double (input) default (None)
             Optional cell size to use to compute the bounding box.
-            If not provided, the cell's size will be used.        
+            If not provided, the cell's size will be used.
 
         """
         if cell_size is None:
@@ -358,7 +358,7 @@ cdef class NNPS:
             Optional kernel radius scale. Defaults to 2
 
         domain : DomainLimits, default (None)
-            Optional limits for the domain            
+            Optional limits for the domain
 
         """
         self.in_parallel = False
@@ -418,7 +418,7 @@ cdef class NNPS:
 
             # create new periodic ghosts
             self.create_periodic_ghosts()
-        
+
         # indices on which to bin
         for i in range(self.narrays):
             pa = self.particles[i]
@@ -436,7 +436,7 @@ cdef class NNPS:
 
         pa_index : int
             Index of the particle array corresponding to the particles list
-        
+
         indices : UIntArray
             Subset of particles to bin
 
@@ -482,13 +482,13 @@ cdef class NNPS:
 
     cdef _compute_cell_size(self):
         """Compute the cell size for the binning.
-        
+
         The cell size is chosen as the kernel radius scale times the
         maximum smoothing length in the local processor. For parallel
         runs, we would need to communicate the maximum 'h' on all
         processors to decide on the appropriate binning size.
 
-        """        
+        """
         cdef list pa_wrappers = self.pa_wrappers
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef DoubleArray h
@@ -512,10 +512,10 @@ cdef class NNPS:
             cell_size = 1.0
 
         self.cell_size = cell_size
-        
+
     ######################################################################
     # Neighbor location routines
-    ######################################################################            
+    ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
@@ -610,7 +610,7 @@ cdef class NNPS:
                                 size_t d_idx, UIntArray nbrs):
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
         cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[dst_index]
-        
+
         cdef DoubleArray s_x = src.x
         cdef DoubleArray s_y = src.y
         cdef DoubleArray s_z = src.z
@@ -681,21 +681,21 @@ cdef class NNPS:
         cdef bint periodic_in_x = domain.periodic_in_x
         cdef bint periodic_in_y = domain.periodic_in_y
         cdef bint periodic_in_z = domain.periodic_in_z
-        
+
         cdef double xi, yi, zi
 
         cdef int i, np
 
         for pa_wrapper in self.pa_wrappers:
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
-            
+
             np = x.length
             for i in range(np):
-                
+
                 if ( (periodic_in_x and not periodic_in_y) ):
                     if x.data[i] < xmin : x.data[i] += xtranslate
                     if x.data[i] > xmax : x.data[i] -= xtranslate
-                        
+
                 if ( (periodic_in_y and not periodic_in_x) ):
                     if y.data[i] < ymin : y.data[i] += ytranslate
                     if y.data[i] > ymax : y.data[i] -= ytranslate
@@ -705,7 +705,7 @@ cdef class NNPS:
                     if x.data[i] > xmax : x.data[i] -= xtranslate
                     if y.data[i] < ymin : y.data[i] += ytranslate
                     if y.data[i] > ymax : y.data[i] -= ytranslate
-        
+
     def create_periodic_ghosts(self):
         """Create new ghost particles"""
         cdef DomainLimits domain = self.domain
@@ -745,21 +745,21 @@ cdef class NNPS:
             np = x.length
             for i in range(np):
                 xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
-                
+
                 # X-Periodic
                 if periodic_in_x and not periodic_in_y:
                     if ( (xi - xmin) <= cell_size ): left.append(i)
                     if ( (xmax - xi) <= cell_size ): right.append(i)
-                    
+
                 # Y-Periodic
                 if periodic_in_y and not periodic_in_x:
                     if ( (yi - ymin) <= cell_size ): bottom.append(i)
                     if ( (ymax - yi) <= cell_size ): top.append(i)
-                        
+
                 # X&Y-Periodic
                 if periodic_in_x and periodic_in_y:
                     # particle near the left end
-                    if ( (xi - xmin) <= cell_size ): 
+                    if ( (xi - xmin) <= cell_size ):
                         left.append(i)
 
                         # left bottom corner
@@ -769,11 +769,11 @@ cdef class NNPS:
                         # left top corner
                         if ( (ymax - yi) < cell_size ):
                             lt.append( i )
-                        
+
                     # particle near the right
-                    if ( (xmax - xi) <= cell_size ): 
+                    if ( (xmax - xi) <= cell_size ):
                         right.append(i)
-                    
+
                         # right bottom corner
                         if ( (yi - ymin) <= cell_size ):
                             rb.append(i)
@@ -781,15 +781,15 @@ cdef class NNPS:
                         # right top corner
                         if ( (ymax - yi) < cell_size ):
                             rt.append( i )
-                            
+
                     # particle near the top
                     if ( (ymax - yi) < cell_size ):
                         top.append(i)
-                    
+
                     # particle near the bottom
                     if ( (yi - ymin) < cell_size ):
                         bottom.append(i)
-                        
+
             # now treat each case separately and count the number of ghosts
 
             # left
