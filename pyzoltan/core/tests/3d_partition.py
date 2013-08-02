@@ -72,7 +72,7 @@ my_global_ids = list( gid )
 # remove points to be exported
 for i in range(pz.numExport):
     my_global_ids.remove( pz.exportGlobalids[i] )
-    
+
 # add points to be imported
 for i in range(pz.numImport):
     my_global_ids.append( pz.importGlobalids[i] )

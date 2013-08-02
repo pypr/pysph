@@ -128,7 +128,7 @@ def show_mesh(rank, numPoints, gids, parts):
                 print ("|     |     |     |     |")
 
         print ""
-    
+
 # read the input file and distribute objects across processors
 numMyPoints, myGlobalIds, x, y = read_input_file()
 rank = comm.Get_rank()

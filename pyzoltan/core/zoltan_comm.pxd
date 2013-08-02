@@ -14,10 +14,10 @@ cdef class ZComm:
 
     # tag for the communicator
     cdef public int tag
-    
+
     # number of objects to send
     cdef public int nsend
-    
+
     # processor list for particles to be exported
     cdef public np.ndarray proclist
 

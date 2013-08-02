@@ -10,7 +10,7 @@ cdef extern from "zoltan_dd.h":
 
     ctypedef Zoltan_DD_Struct Zoltan_DD_Directory
 
-    
+
     #/*********** Distributed Directory Function Prototypes ************/
     int Zoltan_DD_Create( Zoltan_DD_Directory** dd, MPI_Comm comm,
                           int num_gid, int num_lid, int user_length,
@@ -23,7 +23,7 @@ cdef extern from "zoltan_dd.h":
 
     int Zoltan_DD_Find (Zoltan_DD_Directory *dd, ZOLTAN_ID_PTR gid,
                         ZOLTAN_ID_PTR lid, char *data, int *partition, int count,
-                        int *owner) 
+                        int *owner)
 
     int Zoltan_DD_GetLocalKeys( Zoltan_DD_Directory* dd, ZOLTAN_ID_PTR* gid,
                                 int* size )

@@ -14,7 +14,7 @@ def arange_long(start, stop=-1):
     """ Creates a LongArray working same as builtin range with upto 2 arguments
     both expected to be positive
     """
-    
+
     if stop == -1:
         arange = LongArray(start)
         for i in range(start):
@@ -26,11 +26,11 @@ def arange_long(start, stop=-1):
         for i in range(size):
             arange.data[i] = start + i
         return arange
-        
+
 
 def get_particle_array(cl_precision="double", **props):
-    """ Create and return a particle array with default properties 
-    
+    """ Create and return a particle array with default properties
+
     Parameters
     ----------
 
@@ -50,9 +50,9 @@ def get_particle_array(cl_precision="double", **props):
 
     In [4]: pa
     Out[4]: <pysph.base.particle_array.ParticleArray object at 0x9ec302c>
- 
-    """ 
-        
+
+    """
+
     # handle the name separately
     if props.has_key('name'):
         name = props['name']
@@ -83,13 +83,13 @@ def get_particle_array(cl_precision="double", **props):
                                'type':'unsigned int',
                                'name':prop}
         else:
-            prop_dict[prop] = {'data':data, 
+            prop_dict[prop] = {'data':data,
                                'type':'double',
                                'name':prop}
 
     default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
                      'au', 'av', 'aw', 'gid', 'pid', 'tag']
-            
+
     # Add the default props
     for prop in default_props:
         if not prop in prop_dict:
@@ -143,7 +143,7 @@ def get_particle_array_wcsph(cl_precision="single", **props):
             prop_dict[prop] = {'data':data,
                                'type':'int',
                                'name':prop}
-                               
+
         if prop in ['gid']:
             prop_dict[prop] = {'data':data.astype(numpy.uint32),
                                'type': 'unsigned int',

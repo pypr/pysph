@@ -8,7 +8,7 @@ path = run_parallel_script.get_directory(__file__)
 print path
 
 class PyZoltanTests(unittest.TestCase):
-    
+
     @attr(slow=False, parallel=True)
     def _test_zoltan_geometric_partitioner(self):
         run_parallel_script.run(
@@ -23,6 +23,6 @@ class PyZoltanTests(unittest.TestCase):
     def test_zoltan_zcomm(self):
         run_parallel_script.run(
             path=path, filename='zcomm.py', nprocs=4)
-        
+
 if __name__ == '__main__':
     unittest.main()

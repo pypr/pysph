@@ -181,13 +181,13 @@ def _savez(file, args, kwds, compress):
 
 
 def get_distributed_particles(pa, comm, cell_size):
-    # FIXME: this can be removed once the examples all use Application. 
+    # FIXME: this can be removed once the examples all use Application.
     from pysph.parallel.load_balancer import LoadBalancer
     rank = comm.Get_rank()
     num_procs = comm.Get_size()
 
     if rank == 0:
-        lb = LoadBalancer.distribute_particles(pa, num_procs=num_procs, 
+        lb = LoadBalancer.distribute_particles(pa, num_procs=num_procs,
                                                block_size=cell_size)
     else:
         lb = None
@@ -199,7 +199,7 @@ def get_distributed_particles(pa, comm, cell_size):
 
 ################################################################################
 # `PBar` class.
-############################################################################### 
+###############################################################################
 class PBar(object):
     """A simple wrapper around the progressbar so it works if a user has
     it installed or not.
@@ -208,7 +208,7 @@ class PBar(object):
         bar = None
         self.count = 0
         self.maxval = maxval
-        self.show = show 
+        self.show = show
         if HAS_PBAR and show:
             widgets = [progressbar.Percentage(), ' ', progressbar.Bar(),
                        progressbar.ETA()]
@@ -234,7 +234,7 @@ class PBar(object):
 
 ##############################################################################
 # friendly mkdir  from http://code.activestate.com/recipes/82465/.
-############################################################################## 
+##############################################################################
 def mkdir(newdir):
     """works the way a good mkdir should :)
         - already exists, silently complete
@@ -264,14 +264,14 @@ def mkdir(newdir):
                     pass
                 else:
                     raise
-                
+
 
 
 ##############################################################################
 # read pickled data from a file
-############################################################################## 
+##############################################################################
 def get_pickled_data(fname):
-    
+
     f = open(fname, 'r')
     data = pickle.load(f)
     f.close()
@@ -280,12 +280,12 @@ def get_pickled_data(fname):
 
 
 def get_pysph_root():
-    return os.path.split(pysph.__file__)[0]    
-    
+    return os.path.split(pysph.__file__)[0]
+
 
 ##############################################################################
 # Load an output file
-############################################################################## 
+##############################################################################
 def load(fname):
     """ Load and return data from an  output (.npz) file dumped by PySPH.
 
@@ -307,7 +307,7 @@ def load(fname):
     if not 'version' in data.files:
         msg = "Wrong file type! No version nnumber recorded."
         raise RuntimeError(msg)
-    
+
     version = data['version']
 
     if version == 1:
@@ -325,7 +325,7 @@ def load(fname):
                                        cl_precision="single",
                                        **arrays[array_name])
             ret["arrays"][array_name] = array
-            
+
         ret["solver_data"] = solver_data
 
     else:
@@ -363,7 +363,7 @@ def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
         count = counts[-1]
 
     arrays_by_rank = {}
-    
+
     for rank in range(nprocs):
         fname = os.path.join(directory, prefix+'_'+str(rank)+'_'+str(count)+'.npz')
 
@@ -384,7 +384,7 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
 
     array_names = arrays_by_rank[0].keys()
     first_processors_arrays = arrays_by_rank[0]
-    
+
     if nprocs > 1:
         ret = {}
         for array_name in array_names:
@@ -398,7 +398,7 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
 
                 # remove the non local particles
                 first_array.remove_tagged_particles(1)
-                
+
             ret[array_name] = first_array
 
     else:
@@ -422,11 +422,11 @@ class SPHInterpolate(object):
         self.dst = dst; self.src = src
         if kernel is None:
             self.kernel = Gaussian(dim)
-        
+
         # create the neighbor locator object
         self.nnps = nnps = NNPS(dim=dim, particles=[dst, src], radius_scale=self.kernel.radius)
         nnps.update()
-        
+
     def interpolate(self, arr):
         """Interpolate data given in arr onto coordinate positions"""
         # the result array
@@ -458,14 +458,14 @@ class SPHInterpolate(object):
                 xj = Point( sx[j], sy[j], sz[j] )
 
                 hij = 0.5 * (sh[j] + dh[i])
-                
+
                 wij = kernel.py_function(xi, xj, hij)
                 _wij += wij
                 _sum += arr[j] * wij
 
             # save the result
             result[i] = _sum/_wij
-            
+
         return result
 
     def gradient(self, arr):
@@ -487,7 +487,7 @@ class SPHInterpolate(object):
 
         # kernel
         kernel = self.kernel
-        
+
         for i in range(np):
             xi = Point( x[i], y[i], z[i] )
 
@@ -504,7 +504,7 @@ class SPHInterpolate(object):
 
                 rhoj = rho[j]; mj = m[j]
                 fji = f[j] - f[i]
-                
+
                 # kenrel gradient
                 dwij = kernel.py_gradient(xi, xj, hij)
 
@@ -513,18 +513,18 @@ class SPHInterpolate(object):
 
                 _sumx += tmp * dwij.x
                 _sumy += tmp * dwij.y
-                _sumz += tmp * dwij.z                
+                _sumz += tmp * dwij.z
 
             # save the result
             resultx[i] = _sumx
             resulty[i] = _sumy
             resultz[i] = _sumz
-            
+
         return resultx, resulty, resultz
 
 ################################################################################
 # Get all solution files in a given directory
-############################################################################### 
+###############################################################################
 def get_files(dirname=None, fname=None, endswith=".npz"):
 
     if dirname is None:

@@ -3,12 +3,12 @@
 from mpi4py.mpi_c cimport MPI_Comm
 
 cdef extern from "zoltan_comm.h":
-    
+
     struct Zoltan_Comm_Obj:
         pass
 
     ctypedef Zoltan_Comm_Obj ZOLTAN_COMM_OBJ
-    
+
     #/* function prototypes */
 
     int Zoltan_Comm_Create(ZOLTAN_COMM_OBJ**, int, int*, MPI_Comm, int, int*)
@@ -26,5 +26,5 @@ cdef extern from "zoltan_comm.h":
 
     int Zoltan_Comm_Info(ZOLTAN_COMM_OBJ*, int*, int*, int*, int*, int*, int*, int*,
                          int*, int*, int*, int*, int*, int*)
-    
+
     int Zoltan_Comm_Invert_Plan(ZOLTAN_COMM_OBJ**)

@@ -13,7 +13,7 @@ import os.path
 
 from traits.api import (HasTraits, Instance, on_trait_change,
         List, Str, Int, Range, Float, Bool, Password, Property)
-from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor, 
+from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
     TitleEditor, HGroup)
 from mayavi.core.api import PipelineBase
 from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
@@ -51,7 +51,7 @@ def set_arrays(dataset, particle_array):
 
 ##############################################################################
 # `ParticleArrayHelper` class.
-############################################################################## 
+##############################################################################
 class ParticleArrayHelper(HasTraits):
     """
     This class manages a particle array and sets up the necessary
@@ -68,7 +68,7 @@ class ParticleArrayHelper(HasTraits):
     time = Float(0.0)
 
     # The active scalar to view.
-    scalar = Str('rho', desc='name of the active scalar to view') 
+    scalar = Str('rho', desc='name of the active scalar to view')
 
     # The mlab plot for this particle array.
     plot = Instance(PipelineBase)
@@ -88,7 +88,7 @@ class ParticleArrayHelper(HasTraits):
     show_time = Bool(False, desc='if the current time is displayed')
 
     # Do we show the hidden arrays?
-    show_hidden_arrays = Bool(False, 
+    show_hidden_arrays = Bool(False,
                               desc='if hidden arrays are to be listed')
 
     # Private attribute to store the Text module.
@@ -96,7 +96,7 @@ class ParticleArrayHelper(HasTraits):
 
     ########################################
     # View related code.
-    view = View(Item(name='name', 
+    view = View(Item(name='name',
                      show_label=False,
                      editor=TitleEditor()),
                 Group(
@@ -159,7 +159,7 @@ class ParticleArrayHelper(HasTraits):
         if value:
             self.scalar_list = sorted(sc_list)
         else:
-            self.scalar_list = sorted([x for x in sc_list 
+            self.scalar_list = sorted([x for x in sc_list
                                        if not x.startswith('_')])
 
     def _show_time_changed(self, value):
@@ -170,7 +170,7 @@ class ParticleArrayHelper(HasTraits):
                 txt.visible = True
             elif self.plot is not None:
                 mlab.get_engine().current_object = self.plot
-                txt = mlab.text(0.01, 0.01, 'Time = 0.0', 
+                txt = mlab.text(0.01, 0.01, 'Time = 0.0',
                                 width=0.35,
                                 color=(1,1,1))
                 self._text = txt
@@ -187,7 +187,7 @@ class ParticleArrayHelper(HasTraits):
 
 ##############################################################################
 # `MayaviViewer` class.
-############################################################################## 
+##############################################################################
 class MayaviViewer(HasTraits):
     """
     This class represents a Mayavi based viewer for the particles.  They
@@ -196,7 +196,7 @@ class MayaviViewer(HasTraits):
 
     particle_arrays = List(Instance(ParticleArrayHelper), [])
     pa_names = List(Str, [])
-    
+
     scene = Instance(MlabSceneModel, ())
 
     ########################################
@@ -212,7 +212,7 @@ class MayaviViewer(HasTraits):
     # Traits to view saved solver output.
     files = List(Str, [])
     current_file = Str('', desc='the file being viewed currently')
-    file_count = Range(low='_low', high='n_files', value=0, 
+    file_count = Range(low='_low', high='n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
     loop = Bool(False, desc='if the animation is looped')
@@ -226,7 +226,7 @@ class MayaviViewer(HasTraits):
     timer = Instance(Timer)
     interval = Range(0.5, 20.0, 2.0,
                      desc='frequency in seconds with which plot is updated')
-    
+
     ########################################
     # Solver info/control.
     current_time = Float(0.0, desc='the current time in the simulation')
@@ -271,7 +271,7 @@ class MayaviViewer(HasTraits):
                               Item(name='iteration'),
                               Item(name='pause_solver',
                                    enabled_when='n_files==-1'),
-                              Item(name='interval', 
+                              Item(name='interval',
                                    enabled_when='n_files==-1'),
                               label='Solver',
                              ),
@@ -323,7 +323,7 @@ class MayaviViewer(HasTraits):
         # No need to do this if files are being used.
         if self.n_files > -1:
             return
-        
+
         # do not update if solver is paused
         if self.pause_solver:
             return
@@ -335,7 +335,7 @@ class MayaviViewer(HasTraits):
         controller = self.controller
         if controller is None:
             return
-        
+
         self.current_time = t = controller.get_t()
         self.time_step = controller.get_dt()
         self.iteration = controller.get_count()
@@ -421,7 +421,7 @@ class MayaviViewer(HasTraits):
             return None
         else:
             return self.client.controller
-    
+
     def _client_changed(self, old, new):
         if self.n_files > -1:
             return
@@ -477,7 +477,7 @@ class MayaviViewer(HasTraits):
         self.n_files = len(value) - 1
         self.frame_interval = 1
         fc = self.file_count
-        self.file_count = 0 
+        self.file_count = 0
         if fc == 0:
             # Force an update when our original file count is 0.
             self._file_count_changed(fc)
@@ -508,13 +508,13 @@ class MayaviViewer(HasTraits):
             pas = []
             for name in names:
                 pa = arrays[name]
-                pah = ParticleArrayHelper(scene=self.scene, 
+                pah = ParticleArrayHelper(scene=self.scene,
                                           name=name)
                 # Must set this after setting the scene.
                 pah.set(particle_array=pa, time=t)
                 pas.append(pah)
                 # Turn on the legend for the first particle array.
-            
+
             if len(pas) > 0:
                 pas[0].set(show_legend=True, show_time=True)
             self.particle_arrays = pas
@@ -557,7 +557,7 @@ def usage():
 pysph_viewer [-v] <trait1=value> <trait2=value> [files.npz]
 
 If *.npz files are not supplied it will connect to a running solver, if not it
-will display the given files. 
+will display the given files.
 
 The arguments <trait1=value> are optional settings like host, port and authkey
 etc.  The following traits are available:
@@ -603,7 +603,7 @@ def main(args=None):
     if '-h' in args or '--help' in args:
         usage()
         sys.exit(0)
-    
+
     if '-v' in args:
         logger.addHandler(logging.StreamHandler())
         logger.setLevel(logging.INFO)

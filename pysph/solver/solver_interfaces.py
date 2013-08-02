@@ -10,7 +10,7 @@ from multiprocessing.managers import BaseManager, BaseProxy
 
 class MultiprocessingInterface(BaseManager):
     """ A multiprocessing interface to the solver controller
-    
+
     This object exports a controller instance proxy over the multiprocessing
     interface. Control actions can be performed by connecting to the interface
     and calling methods on the controller proxy instance """
@@ -21,7 +21,7 @@ class MultiprocessingInterface(BaseManager):
 
     def get_controller(self):
         return self.controller
-    
+
     def start(self, controller):
         self.controller = controller
         self.register('get_controller', self.get_controller)
@@ -40,10 +40,10 @@ class MultiprocessingInterface(BaseManager):
                     port += 1
                 else:
                     raise
-        
+
 class MultiprocessingClient(BaseManager):
     """ A client for the multiprocessing interface
-    
+
     Override the run() method to do appropriate actions on the proxy
     instance of the controller object or add an interface using the add_interface
     methods similar to the Controller.add_interface method """
@@ -51,21 +51,21 @@ class MultiprocessingClient(BaseManager):
         BaseManager.__init__(self, address, authkey, serializer)
         if start:
             self.start()
-    
+
     def start(self, connect=True):
         self.interfaces = []
-        
+
         # to work around a python caching bug
         # http://stackoverflow.com/questions/3649458/broken-pipe-when-using-python-multiprocessing-managers-basemanager-syncmanager
         if self.address in BaseProxy._address_to_local:
             del BaseProxy._address_to_local[self.address][0].connection
-        
+
         self.register('get_controller')
         if connect:
             self.connect()
             self.controller = self.get_controller()
         self.run(self.controller)
-    
+
     @staticmethod
     def is_available(address):
         try:
@@ -73,10 +73,10 @@ class MultiprocessingClient(BaseManager):
             return True
         except socket.error:
             return False
-    
+
     def run(self, controller):
         pass
-    
+
     def add_interface(self, callable):
         """ This makes it act as substitute for the actual command_manager """
         thr = threading.Thread(target=callable, args=(self.controller,))
@@ -87,7 +87,7 @@ class MultiprocessingClient(BaseManager):
 class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
                                       SimpleHTTPRequestHandler):
     """ SimpleXMLRPCRequestHandler subclass which attempts to do CORS
-    
+
     CORS is Cross-Origin-Resource-Sharing (http://www.w3.org/TR/cors/)
     which enables xml-rpc calls from a different domain than the xml-rpc server
     (such requests are otherwise denied)
@@ -100,7 +100,7 @@ class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
         #self.send_header("Access-Control-Max-Age", "60")
         self.send_header("Content-length", "0")
         self.end_headers()
-    
+
     def do_GET(self):
         """ Handle http requests to serve html/image files only """
         print self.path, self.translate_path(self.path)
@@ -109,17 +109,17 @@ class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
             self.send_error(404, 'File Not Found/Allowed')
         else:
             SimpleHTTPRequestHandler.do_GET(self)
-    
+
     def end_headers(self):
         """ End response header with adding Access-Control-Allow-Origin
-        
+
         This is done to enable CORS request from all clients """
         self.send_header("Access-Control-Allow-Origin", "*")
         SimpleXMLRPCRequestHandler.end_headers(self)
-    
+
 class XMLRPCInterface(SimpleXMLRPCServer):
     """ An XML-RPC interface to the solver controller
-    
+
     Currently cannot work with objects which cannot be marshalled
     (which is basically most custom classes, most importantly
     ParticleArray and numpy arrays) """
@@ -128,7 +128,7 @@ class XMLRPCInterface(SimpleXMLRPCServer):
                  encoding=None, bind_and_activate=True):
         SimpleXMLRPCServer.__init__(self, addr, requestHandler, logRequests,
                     allow_none, encoding, bind_and_activate)
-    
+
     def start(self, controller):
         self.register_instance(controller, allow_dotted_names=False)
         self.register_introspection_functions()
@@ -156,7 +156,7 @@ class CommandlineInterface(object):
                         pass
                     finally:
                         args2.append(arg)
-                
+
                 if cmd=='p' or cmd=='pause':
                     controller.pause_on_next()
                 elif cmd=='c' or cmd=='cont':
@@ -172,7 +172,7 @@ class CommandlineInterface(object):
             except Exception as e:
                 self.help()
                 print e
-    
+
     def help(self):
         print '''Valid commands are:
     p | pause

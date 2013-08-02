@@ -22,11 +22,11 @@ class TestLongArray(unittest.TestCase):
         Test the constructor.
         """
         l = LongArray(10)
-        
+
         self.assertEqual(l.length, 10)
         self.assertEqual(l.alloc, 10)
         self.assertEqual(len(l.get_npy_array()), 10)
-        
+
         l = LongArray()
 
         self.assertEqual(l.length, 0)
@@ -43,7 +43,7 @@ class TestLongArray(unittest.TestCase):
 
         self.assertEqual(l.get(0), 10)
         self.assertEqual(l.get(9), 1)
-        
+
         l[9] = 2
         self.assertEqual(l[9], 2)
 
@@ -60,7 +60,7 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(l[0], 1)
         self.assertEqual(l[1], 2)
         self.assertEqual(l[2], 3)
-    
+
     def test_reserve(self):
         """
         Tests the reserve function.
@@ -71,7 +71,7 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(l.alloc, 16)
         self.assertEqual(l.length, 0)
         self.assertEqual(len(l.get_npy_array()), 0)
-        
+
         l.reserve(20)
         self.assertEqual(l.alloc, 20)
         self.assertEqual(l.length,  0)
@@ -82,12 +82,12 @@ class TestLongArray(unittest.TestCase):
         Tests the resize function.
         """
         l = LongArray(0)
-        
+
         l.resize(20)
         self.assertEqual(l.length, 20)
         self.assertEqual(len(l.get_npy_array()), 20)
         self.assertEqual(l.alloc >= l.length, True)
-    
+
     def test_get_npy_array(self):
         """
         Tests the get_npy_array array.
@@ -96,13 +96,13 @@ class TestLongArray(unittest.TestCase):
         l[0] = 1
         l[1] = 2
         l[2] = 3
-        
+
         nparray = l.get_npy_array()
         self.assertEqual(len(nparray), 3)
-        
+
         for i in range(3):
             self.assertEqual(nparray[0], l[0])
-        
+
     def test_set_data(self):
         """
         Tests the set_data function.
@@ -130,29 +130,29 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(l.length, 6)
         self.assertEqual(l.alloc == l.length, True)
         self.assertEqual(len(l.get_npy_array()), 6)
-    
+
     def test_reset(self):
         """
         Tests the reset function.
         """
         l = LongArray(5)
         l.reset()
-        
+
         self.assertEqual(l.length, 0)
         self.assertEqual(l.alloc, 5)
         self.assertEqual(len(l.get_npy_array()), 0)
-    
+
     def test_extend(self):
         """
         Tests the extend function.
         """
         l1 = LongArray(5)
-        
+
         for i in range(5):
             l1[i] = i
-        
+
         l2 = LongArray(5)
-        
+
         for i in range(5):
             l2[i] = 5 + i
 
@@ -172,7 +172,7 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(l1.length, 7)
         self.assertEqual(numpy.allclose([7, 1, 2, 8, 9, 5, 6],
                                         l1.get_npy_array()), True)
-        
+
         l1.remove(numpy.array(rem, dtype=numpy.int))
         self.assertEqual(l1.length, 4)
         self.assertEqual(numpy.allclose([6, 1, 2, 5], l1.get_npy_array()), True)
@@ -192,10 +192,10 @@ class TestLongArray(unittest.TestCase):
         """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
-        
+
         new_indices = LongArray(10)
         new_indices.set_data(numpy.asarray([1, 5, 3, 2, 4, 7, 8, 6, 9, 0]))
-        
+
         l1.align_array(new_indices)
         self.assertEqual(numpy.allclose([1, 5, 3, 2, 4, 7, 8, 6, 9, 0],
                                         l1.get_npy_array()), True)
@@ -206,7 +206,7 @@ class TestLongArray(unittest.TestCase):
         """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
-        
+
         l2 = LongArray(4)
         l2[0] = 4
         l2[1] = 3
@@ -217,14 +217,14 @@ class TestLongArray(unittest.TestCase):
         l1.copy_subset(l2, 5, 9)
         self.assertEqual(numpy.allclose([0, 1, 2, 3, 4, 4, 3, 2, 1, 9],
                                         l1.get_npy_array()), True)
-        
+
         # try to copy different sized arrays without any index specification.
         l1.set_data(numpy.arange(10))
         # copy to the last k values of source array.
         l1.copy_subset(l2, start_index=6)
         self.assertEqual(numpy.allclose([0, 1, 2, 3, 4, 5, 4, 3, 2, 1],
                                         l1.get_npy_array()), True)
-        
+
         l1.set_data(numpy.arange(10))
         l1.copy_subset(l2, start_index=7)
         self.assertEqual(numpy.allclose([0, 1, 2, 3, 4, 5, 6, 4, 3, 2],
@@ -244,7 +244,7 @@ class TestLongArray(unittest.TestCase):
         """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
-        
+
         l1.update_min_max()
 
         self.assertEqual(l1.minimum, 0)
@@ -274,5 +274,5 @@ class TestLongArray(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-        
-        
+
+

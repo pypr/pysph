@@ -17,26 +17,26 @@ class TaylorGreenResults(pprocess.Results):
     def __init__(self, dirname=None, fname=None, endswith=".npz",
                  U=1, Re=100):
         super(TaylorGreenResults, self).__init__(dirname, fname, endswith)
-        
+
         self.U = U
         self.Re = Re
         self.decay_rate_constant = -8*np.pi**2/Re
-        
+
     def comute_stats(self, array="fluid"):
         files = self.files
         nfiles = self.nfiles
 
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
-        
+
         decay = np.zeros( nfiles )
         linf = np.zeros( nfiles )
         for i in range(nfiles):
             data = utils.load(files[i])
-            
+
             pa = data['arrays'][array]
             vmag = np.sqrt( pa.vmag )
-            
+
             t = data['solver_data']['t']
             decay[i] = vmag.max()
 
@@ -47,7 +47,7 @@ class TaylorGreenResults(pprocess.Results):
         self.decay = decay
         self.linf = linf
 
-        
 
-    
+
+
 

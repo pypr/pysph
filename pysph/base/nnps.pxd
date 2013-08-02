@@ -20,7 +20,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef public IntArray tag
     cdef public ParticleArray pa
     cdef str name
-    cdef int np    
+    cdef int np
 
 # Domain limits for the simulation
 cdef class DomainLimits:
@@ -53,7 +53,7 @@ cdef class Cell:
     cdef cPoint boxmax                  # Bounding box max for the cell
     cdef int layers                     # Layers to compute bounding box
     cdef IntArray nbrprocs              # List of neighboring processors
-    cdef public int size                # total number of particles in this cell 
+    cdef public int size                # total number of particles in this cell
 
     ############################################################################
     # Member functions
@@ -84,7 +84,7 @@ cdef class NNPS:
     cdef public DomainLimits domain      # Domain limits for the geometry
     cdef public bint is_periodic         # flag for periodicity
 
-    cdef int dim                         # Dimensionality of the problem 
+    cdef int dim                         # Dimensionality of the problem
     cdef public dict cells
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel

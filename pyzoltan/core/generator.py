@@ -23,7 +23,7 @@ tags. For example you can ``NOT`` write a loop like:
     <?py # End of loop ?>
 
   * The imports and globals defined are persisted through all code sections
-  
+
 
 When used to locate source files as a main program:
     The template files must have an extension '.src'.

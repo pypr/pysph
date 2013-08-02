@@ -25,7 +25,7 @@ def kill_process(process):
 
 def run(filename, args=[], nprocs=2, timeout=20.0, path=None):
     """ run a file python script
-    
+
     Parameters:
     -----------
     filename - filename of python script to run under mpi
@@ -34,7 +34,7 @@ def run(filename, args=[], nprocs=2, timeout=20.0, path=None):
         else raise a RuntimeError exception
     path - the path under which the script is located
         Defaults to the location of this file (__file__), not curdir
-    
+
     """
     path = os.path.join(path, filename)
     cmd = ['mpiexec','-n', str(nprocs), sys.executable, path] + args

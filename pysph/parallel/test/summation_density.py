@@ -35,9 +35,9 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
 
     # the number of local particles should have tag Local
     assert( num_particles == pm.num_local[dst_index] )
-    
+
     for i in range(num_particles):
-        
+
         xi = Point( dx[i], dy[i], dz[i] )
         hi = dh[i]
 
@@ -135,7 +135,7 @@ if rank == 0:
     RHO2 = PA2.rho
 
 # wait for the root...
-comm.barrier()    
+comm.barrier()
 
 # create the local particle arrays
 particles = [pa1, pa2]
@@ -229,7 +229,7 @@ if rank == 0:
         assert abs( global_x1[i] - X1[global_gid1[i]] ) < 1e-14
         assert abs( global_y1[i] - Y1[global_gid1[i]] ) < 1e-14
         assert abs( global_z1[i] - Z1[global_gid1[i]] ) < 1e-14
-        
+
         diff = abs( global_rho1[i] - RHO1[global_gid1[i]] )
         condition = diff < 1e-14
         assert condition, "diff = %g"%(diff)

@@ -44,7 +44,7 @@ cdef class SPHCalc:
     cdef public NNPS nnps
     cdef UIntArray nbrs
     # CFL time step conditions
-    cdef public double dt_cfl
+    cdef public double dt_cfl, dt_force, dt_viscous
     ${indent(object.get_kernel_defs(), 1)}
     ${indent(object.get_equation_defs(), 1)}
 
@@ -60,12 +60,25 @@ cdef class SPHCalc:
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
 
+    cdef initialize_dt_adapt(self, double* DT_ADAPT):
+        self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
+        DT_ADAPT[0] = self.dt_cfl
+        DT_ADAPT[1] = self.dt_force
+        DT_ADAPT[2] = self.dt_viscous
+
+    cdef set_dt_adapt(self, double* DT_ADAPT):
+        self.dt_cfl = DT_ADAPT[0]
+        self.dt_force = DT_ADAPT[1]
+        self.dt_viscous = DT_ADAPT[2]
+
     cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
         cdef int s_idx, d_idx
         cdef UIntArray nbrs = self.nbrs
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
+        cdef double[3] DT_ADAPT
+        self.initialize_dt_adapt(DT_ADAPT)
 
         #######################################################################
         ##  Declare all the arrays.
@@ -167,3 +180,4 @@ cdef class SPHCalc:
         # Group ${g_idx} done.
         # ---------------------------------------------------------------------
         % endfor
+        self.set_dt_adapt(DT_ADAPT)
