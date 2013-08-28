@@ -82,6 +82,7 @@ from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
+from pysph.sph.integrator import Integrator, WCSPHIntegratorStep
 
 dim = 2
 fluid_column_height = 2.0
@@ -119,8 +120,10 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
+integrator = Integrator(fluid=WCSPHIntegratorStep())
+
 # Create a solver.
-solver = Solver(kernel=kernel, dim=dim)
+solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
 # Setup default parameters.
 solver.set_time_step(dt)
 solver.set_final_time(tf)

@@ -4,15 +4,25 @@
 from pysph.sph.equation import Equation
 
 class DensitySummation(Equation):
+    def initialize(self, d_idx, d_V, d_rho):
+        d_V[d_idx] = 0.0
+        d_rho[d_idx] = 0.0
+
     def loop(self, d_idx, d_V, d_rho, d_m, WIJ=1.0):
         d_V[d_idx] += WIJ
         d_rho[d_idx] += d_m[d_idx]*WIJ
 
 class VolumeSummation(Equation):
+    def initialize(self, d_idx, d_V):
+        d_V[d_idx] = 0.0
+
     def loop(self, d_idx, d_V, WIJ=1.0):
         d_V[d_idx] += WIJ
 
 class ContinuityEquation(Equation):
+    def initialize(self, d_idx, d_arho):
+        d_arho[d_idx] = 0.0
+
     def loop(self, d_idx, s_idx, d_arho, d_m, s_V, VIJ=[0, 0, 0],
              DWIJ=[0, 0, 0]):
         Vj = 1./s_V[s_idx]
@@ -40,6 +50,12 @@ class SolidWallBC(Equation):
         self.gy = gy; self.ay = ay
         self.gz = gz; self.az = az
         super(SolidWallBC, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_u, d_v, d_p, d_wij):
+        d_u[d_idx] = 0.0
+        d_v[d_idx] = 0.0
+        d_p[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_u, d_v, d_p, d_wij, s_u, s_v, s_p, s_rho,
              WIJ=1.0, XIJ=[1,1,1]):
@@ -83,6 +99,12 @@ class MomentumEquation(Equation):
         self.pb = pb
         super(MomentumEquation, self).__init__(dest, sources)
 
+    def initialize(self, d_idx, d_au, d_av, d_auhat, d_avhat):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_auhat[d_idx] = 0.0
+        d_avhat[d_idx] = 0.0
+
     def loop(self, d_idx, s_idx, d_rho, d_p, d_u, d_v, d_V, d_au, d_av,
              d_auhat, d_avhat, d_m, d_uhat, d_vhat,
              s_rho, s_p, s_u, s_v, s_uhat, s_vhat, s_V,
@@ -117,6 +139,10 @@ class MomentumEquation(Equation):
 
 
 class ArtificialStress(Equation):
+    def initialize(self, d_idx, d_au, d_av):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+
     def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_V, d_uhat, d_vhat,
              d_au, d_av, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
              DWIJ=[0, 0, 0]):
