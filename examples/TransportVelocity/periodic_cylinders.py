@@ -9,7 +9,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegrator, AdamiVelocityVerletIntegrator
+from pysph.sph.integrator import TransportVelocityIntegratorStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -146,10 +146,11 @@ app = Application(domain=domain)
 #kernel = Gaussian(dim=2)
 kernel = QuinticSpline(dim=2)
 
+integrator = Integrator(fluid=TransportVelocityIntegratorStep(),
+                        solid=TransportVelocityIntegratorStep())
+
 # Create a solver.
-solver = Solver(
-    kernel=kernel, dim=2, integrator_type=TransportVelocityIntegrator,
-    tdamp=0.0)
+solver = Solver(kernel=kernel, dim=2, integrator=integrator, tdamp=0.0)
 
 # Setup default parameters.
 solver.set_time_step(dt)

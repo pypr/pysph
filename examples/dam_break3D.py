@@ -113,7 +113,9 @@ app = Application()
 kernel = WendlandQuintic(dim=dim)
 
 # Create the integrator.
-integrator = Integrator(fluid=WCSPHIntegratorStep())
+integrator = Integrator(fluid=WCSPHIntegratorStep(),
+                        boundary=WCSPHIntegratorStep(),
+                        obstacle=WCSPHIntegratorStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator)

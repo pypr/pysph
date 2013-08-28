@@ -120,7 +120,8 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
-integrator = Integrator(fluid=WCSPHIntegratorStep())
+integrator = Integrator(fluid=WCSPHIntegratorStep(),
+                        boundary=WCSPHIntegratorStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
