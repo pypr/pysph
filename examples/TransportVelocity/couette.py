@@ -9,7 +9,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegratorStep, Integrator
+from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -124,7 +124,7 @@ def create_particles(empty=False, **kwargs):
 
     # load balancing props
     fluid.set_lb_props( fluid.properties.keys() )
-    channel.set_lb_props( solid.properties.keys() )
+    channel.set_lb_props( channel.properties.keys() )
 
     # return the particle list
     return [fluid, channel]
@@ -140,8 +140,7 @@ kernel = Gaussian(dim=2)
 
 print domain, kernel
 
-integrator = Integrator(fluid=TransportVelocityIntegratorStep(),
-                        channel=TransportVelocityIntegratorStep())
+integrator = Integrator(fluid=TransportVelocityStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)

@@ -8,7 +8,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityIntegratorStep, Integrator
+from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -125,8 +125,7 @@ app = Application()
 # Create the kernel
 kernel = Gaussian(dim=2)
 
-integrator = Integrator(fluid=TransportVelocityIntegratorStep(),
-                        solid=TransportVelocityIntegratorStep())
+integrator = Integrator(fluid=TransportVelocityStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator, tdamp=tdamp)

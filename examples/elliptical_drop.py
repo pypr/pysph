@@ -6,7 +6,7 @@ from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import CubicSpline
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import WCSPHIntegratorStep, Integrator
+from pysph.sph.integrator import WCSPHStep, Integrator
 
 from pyzoltan.core.carray import LongArray
 
@@ -107,7 +107,7 @@ app = Application()
 # Create the kernel
 kernel = CubicSpline(dim=2)
 
-integrator = Integrator(fluid=WCSPHIntegratorStep())
+integrator = Integrator(fluid=WCSPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)

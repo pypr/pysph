@@ -26,10 +26,11 @@ class IntegratorStep(object):
     def corrector(self):
         pass
 
+
 ###############################################################################
-# `EulerIntegratorStep` class
+# `EulerStep` class
 ###############################################################################
-class EulerIntegratorStep(IntegratorStep):
+class EulerStep(IntegratorStep):
     def initialize(self):
         pass
     def predictor(self):
@@ -47,9 +48,9 @@ class EulerIntegratorStep(IntegratorStep):
         d_rho[d_idx] += dt*d_arho[d_idx]
 
 ###############################################################################
-# `WCSPHIntegratorStep` class
+# `WCSPHStep` class
 ###############################################################################
-class WCSPHIntegratorStep(IntegratorStep):
+class WCSPHStep(IntegratorStep):
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho):
         d_x0[d_idx] = d_x[d_idx]
@@ -94,9 +95,9 @@ class WCSPHIntegratorStep(IntegratorStep):
 
 
 ###############################################################################
-# `TransportVelocityIntegratorStep` class
+# `TransportVelocityStep` class
 ###############################################################################
-class TransportVelocityIntegratorStep(IntegratorStep):
+class TransportVelocityStep(IntegratorStep):
     def initialize(self):
         pass
 
@@ -122,9 +123,9 @@ class TransportVelocityIntegratorStep(IntegratorStep):
 
 
 ###############################################################################
-# `AdamiVelocityVerletIntegratorStep` class
+# `AdamiVerletStep` class
 ###############################################################################
-class AdamiVelocityVerletIntegratorStep(IntegratorStep):
+class AdamiVerletStep(IntegratorStep):
     def initialize(self):
         pass
 
@@ -161,6 +162,12 @@ class Integrator(object):
 
     def __init__(self, **kw):
         """Pass fluid names and suitable `IntegratorStep` instances.
+
+        For example::
+
+            >>> integrator = Integrator(fluid=WCSPHStep(), solid=WCSPHStep())
+
+        where "fluid" and "solid" are the names of the particle arrays.
         """
         self.cfl = 0.5
         self.steppers = kw
