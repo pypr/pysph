@@ -94,7 +94,7 @@ if rank == 2:
     exportLocalids = np.array( [0, 1, 2], dtype=np.uint32 )
     exportProcs = np.array( [3, 3, 1], dtype=np.int32 )
     numExport = 3
-    
+
     parts = np.ones(shape=numPoints, dtype=np.int32) * rank
 
 if rank == 3:
@@ -106,7 +106,7 @@ if rank == 3:
     exportLocalids = np.array( [0,1], dtype=np.uint32 )
     exportProcs = np.array( [1, 1], dtype=np.int32 )
     numExport = 2
-    
+
     parts = np.ones(shape=numPoints, dtype=np.int32) * rank
 
 # Gather the Global data on root

@@ -51,7 +51,7 @@ def create_particles(empty=False, **kwargs):
 
         # create the arrays
         fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
-    
+
         # add the requisite arrays
         fluid.add_property( {'name': 'color'} )
 
@@ -71,7 +71,7 @@ def create_particles(empty=False, **kwargs):
         # add requisite properties to the arrays:
         # particle volume
         fluid.add_property( {'name': 'V'} )
-        
+
         # advection velocities and accelerations
         fluid.add_property( {'name': 'uhat'} )
         fluid.add_property( {'name': 'vhat'} )
@@ -93,12 +93,15 @@ def create_particles(empty=False, **kwargs):
 
         # smoothing lengths
         fluid.h[:] = hdx * dx
-                
+
+    # load balancing props
+    fluid.set_lb_props( fluid.properties.keys() )
+
     # return the particle list
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L, 
+domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
@@ -137,7 +140,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

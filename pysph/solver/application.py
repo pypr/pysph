@@ -17,7 +17,7 @@ from pysph import Has_MPI, Has_Zoltan
 if (Has_MPI and Has_Zoltan):
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
-    
+
 integration_methods = ['RK2']
 kernel_names = ['CubicSpline']
 
@@ -28,7 +28,7 @@ def list_option_callback(option, opt, value, parser):
 
 ##############################################################################
 # `Application` class.
-############################################################################## 
+##############################################################################
 class Application(object):
     """ Class used by any SPH application.
     """
@@ -64,7 +64,7 @@ class Application(object):
             self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
-        
+
         self._log_levels = {'debug': logging.DEBUG,
                            'info': logging.INFO,
                            'warning': logging.WARNING,
@@ -75,16 +75,16 @@ class Application(object):
         self._setup_optparse()
 
         self.path = None
-    
+
     def _setup_optparse(self):
         usage = """
-        %prog [options] 
+        %prog [options]
 
         Note that you may run this program via MPI and the run will be
         automatically parallelized.  To do this run::
 
          $ mpirun -n 4 /path/to/your/python %prog [options]
-   
+
         Replace '4' above with the number of processors you have.
         Below are the options you may pass.
 
@@ -108,7 +108,7 @@ class Application(object):
                           default=None,
                           help="Log file to use for logging, set to "+
                                "empty ('') for no file logging.")
-        # -l 
+        # -l
         parser.add_option("-l", "--print-log", action="store_true",
                           dest="print_log", default=False,
                           help="Print log messages to stderr.")
@@ -124,6 +124,15 @@ class Application(object):
                           dest="time_step",
                           default=None,
                           help="Timestep to use for the simulation.")
+
+        # --adaptive-timestep
+        parser.add_option("--adaptive-timestep", action="store_true",
+                          dest="adaptive_timestep", default=None,
+                          help="Use adaptive time stepping.")
+        parser.add_option("--no-adaptive-timestep", action="store_false",
+                          dest="adaptive_timestep", default=None,
+                          help="Do not use adaptive time stepping.")
+
         # -q/--quiet.
         parser.add_option("-q", "--quiet", action="store_true",
                          dest="quiet", default=False,
@@ -138,7 +147,7 @@ class Application(object):
         parser.add_option("--pfreq", action="store",
                           dest="freq", default=100, type="int",
                           help="Printing frequency for the output")
-        
+
         # -d/ --detailed-output.
         parser.add_option("-d", "--detailed-output", action="store_true",
                          dest="detailed_output", default=False,
@@ -200,18 +209,22 @@ class Application(object):
                           defaults to True"""))
 
         zoltan.add_option("--ghost-layers", action='store', dest='ghost_layers',
-                          default=3.0, type='float', 
+                          default=3.0, type='float',
                           help=('Number of ghost cells to share for remote neighbors'))
+
+        zoltan.add_option("--lb-freq", action='store', dest='lb_freq',
+                          default=10, type='int',
+                          help=('The frequency for load balancing'))
 
         zoltan.add_option("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
-                          help=("""Zoltan debugging level""")) 
+                          help=("""Zoltan debugging level"""))
 
         parser.add_option_group( zoltan )
 
         # Options to control parallel execution
         parallel_options=OptionGroup(parser, "Parallel Options")
-        
+
         # --update-cell-sizes
         parallel_options.add_option("--update-cell-sizes", action='store_true',
                                     dest='update_cell_sizes', default=False,
@@ -220,7 +233,7 @@ class Application(object):
         # --parallel-scale-factor
         parallel_options.add_option("--parallel-scale-factor", action="store",
                                     dest="parallel_scale_factor", default=2.0, type='float',
-                                    help=("""Kernel scale factor for the parallel update"""))                                    
+                                    help=("""Kernel scale factor for the parallel update"""))
 
         # --parallel-mode
         parallel_options.add_option("--parallel-mode", action="store",
@@ -234,7 +247,7 @@ class Application(object):
                           root or 'distributed' for every processor. """)
 
         parser.add_option_group( parallel_options )
-                                     
+
 
         # solver interfaces
         interfaces = OptionGroup(parser, "Interfaces",
@@ -244,12 +257,12 @@ class Application(object):
                               dest="cmd_line", default=False,
                               help=("Add an interactive commandline interface "
                                     "to the solver"))
-        
+
         interfaces.add_option("--xml-rpc", action="store",
                               dest="xml_rpc", metavar='[HOST:]PORT',
                               help=("Add an XML-RPC interface to the solver; "
                                     "HOST=0.0.0.0 by default"))
-        
+
         interfaces.add_option("--multiproc", action="store",
                               dest="multiproc", metavar='[[AUTHKEY@]HOST:]PORT[+]',
                               default="pysph@0.0.0.0:8800+",
@@ -258,14 +271,14 @@ class Application(object):
                                     "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
                                     " default (8800+ means first available port "
                                     "number 8800 onwards)"))
-        
+
         interfaces.add_option("--no-multiproc", action="store_const",
                               dest="multiproc", const=None,
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
-        
+
         parser.add_option_group(interfaces)
-        
+
         # solver job resume support
         parser.add_option('--resume', action='store', dest='resume',
                           metavar='COUNT|count|?',
@@ -284,7 +297,7 @@ class Application(object):
         """
         (options, args) = self.opt_parse.parse_args(self.args)
         self.options = options
-        
+
         # Setup logging based on command line options.
         level = self._log_levels[options.loglevel]
 
@@ -299,7 +312,7 @@ class Application(object):
     def _setup_logging(self, filename=None, loglevel=logging.WARNING,
                        stream=True):
         """ Setup logging for the application.
-        
+
         Parameters
         ----------
         filename : The filename to log messages to.  If this is None
@@ -328,12 +341,12 @@ class Application(object):
             logger.addHandler(logging.StreamHandler())
 
     def _create_particles(self, particle_factory, *args, **kw):
-                          
+
         """ Create particles given a callable `particle_factory` and any
         arguments to it.
 
         This will also automatically distribute the particles among
-        processors if this is a parallel run.  Returns a list of particle 
+        processors if this is a parallel run.  Returns a list of particle
         arrays that are created.
         """
 
@@ -361,30 +374,20 @@ class Application(object):
 
                 # time, timestep and solver iteration count at restart
                 t, dt, count = solver_data['t'], solver_data['dt'], solver_data['count']
-                
+
                 # rescale dt at restart
                 dt *= options.rescale_dt
                 solver.t, solver.dt, solver.count  = t, dt, count
 
             else:
-                self.particles = particle_factory(*args, **kw)
+                self.particles = particle_factory(empty=False, *args, **kw)
 
         # everyone else creates empty containers
         else:
             self.particles = particle_factory(empty=True, *args, **kw)
 
-        # static and dynamic particle arrays
-        self.particles_static = []
-        self.particles_dynamic = []
-        for pa in self.particles:
-            if pa.is_static:
-                self.particles_static.append(pa)
-            else:
-                self.particles_dynamic.append(pa)
-
         # Instantiate the Parallel Manager here and do an initial LB
         self.pm = None
-        self.pm_static = None
         if num_procs > 1:
             options = self.options
 
@@ -394,9 +397,9 @@ class Application(object):
 
             else:
                 raise ValueError("""Sorry. You're stuck with Zoltan for now
-                
+
                 use the option '--with_zoltan' for parallel runs
-                
+
                 """)
 
             # create the parallel manager
@@ -408,7 +411,7 @@ class Application(object):
             zoltan_debug_level = options.zoltan_debug_level
             zoltan_obj_wgt_dim = obj_weight_dim
 
-            # ghost layers 
+            # ghost layers
             ghost_layers = options.ghost_layers
 
             # radius scale for the parallel update
@@ -416,7 +419,6 @@ class Application(object):
 
             self.pm = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles_dynamic, comm=comm,
-                lb_props=None,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
                 ghost_layers=ghost_layers,
@@ -432,36 +434,22 @@ class Application(object):
             pm.update()
             pm.initial_update = False
 
-            # static particle arrays
-            if len(self.particles_static) > 0:
-                self.pm_static = pm_static = ZoltanParallelManagerGeometric(
-                    dim=solver.dim, particles=self.particles_static, comm=comm,
-                    lb_props=None,
-                    lb_method=zoltan_lb_method,
-                    obj_weight_dim=obj_weight_dim,
-                    ghost_layers=ghost_layers,
-                    update_cell_sizes=options.update_cell_sizes,
-                    radius_scale=radius_scale,
-                    )
-
-                pm_static.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
-                pm_static.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
-
-                pm_static.update()
-                pm.initial_update = False
+            # set subsequent load balancing frequency
+            lb_freq = options.lb_freq
+            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
+            pm.set_lb_freq( lb_freq )
 
             # wait till the initial partition is done
             comm.barrier()
 
         # set the solver's parallel manager
         solver.set_parallel_manager(self.pm)
-        solver.set_parallel_manager_static(self.pm_static)
 
         return self.particles
 
     ######################################################################
     # Public interface.
-    ###################################################################### 
+    ######################################################################
     def set_args(self, args):
         self.args = args
 
@@ -476,7 +464,7 @@ class Application(object):
             for o in opt:
                 self.add_option(o)
 
-    def setup(self, solver, equations, nnps=None, particle_factory=None, 
+    def setup(self, solver, equations, nnps=None, particle_factory=None,
               *args, **kwargs):
         """Set the application's solver.  This will call the solver's
         `setup` method.
@@ -525,7 +513,7 @@ class Application(object):
             kernel = self._solver.kernel
 
             # create the NNPS object
-            nnps = NNPS(dim=solver.dim, particles=self.particles, 
+            nnps = NNPS(dim=solver.dim, particles=self.particles,
                         radius_scale=kernel.radius_scale, domain=self.domain)
 
         # inform NNPS if it's working in parallel
@@ -533,7 +521,7 @@ class Application(object):
             nnps.set_in_parallel(True)
 
         # save the NNPS with the application
-        self.nnps = nnps            
+        self.nnps = nnps
 
         dt = options.time_step
         if dt is not None:
@@ -545,7 +533,7 @@ class Application(object):
 
         # Setup the solver output file name
         fname = options.output
-        
+
         if Has_MPI:
             rank = self.rank
             if self.num_procs > 1:
@@ -575,11 +563,15 @@ class Application(object):
         # set parallel output mode
         solver.set_parallel_output_mode(options.parallel_output_mode)
 
+        # Set the adaptive timestep
+        if options.adaptive_timestep is not None:
+            solver.set_adaptive_timestep(options.adaptive_timestep)
+
         # default kernel
         # if options.kernel is not None:
         #     solver.kernel = getattr(kernels,
         #                         kernel_names[options.kernel])(dim=solver.dim)
-        
+
         # if options.resume is not None:
         #     solver.particles = self.particles # needed to be able to load particles
         #     r = solver.load_output(options.resume)
@@ -592,20 +584,20 @@ class Application(object):
             # FIXME, this is bogus
             #solver.integrator_type = integration_methods[options.integration]
             pass
-        
+
         # setup the solver. This is where the code is compiled
         solver.setup(particles=self.particles, equations=equations, nnps=nnps)
-        
+
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
         solver.set_command_handler(self.command_manager.execute_commands)
-        
+
         if self.rank == 0:
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
                 self.command_manager.add_interface(CommandlineInterface().start)
-        
+
             # XML-RPC interface
             if options.xml_rpc:
                 from pysph.solver.solver_interfaces import XMLRPCInterface
@@ -614,7 +606,7 @@ class Application(object):
                 host = "0.0.0.0" if idx == -1 else addr[:idx]
                 port = int(addr[idx+1:])
                 self.command_manager.add_interface(XMLRPCInterface((host,port)).start)
-        
+
             # python MultiProcessing interface
             if options.multiproc:
                 from pysph.solver.solver_interfaces import MultiprocessingInterface

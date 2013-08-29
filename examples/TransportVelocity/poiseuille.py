@@ -65,7 +65,7 @@ def create_particles(empty=False, **kwargs):
         # create the channel particles at the bottom
         _y = np.arange(-dx/2, -dx/2-ghost_extent, -dx)
         x, y = np.meshgrid(_x, _y); bx = x.ravel(); by = y.ravel()
-        
+
         # concatenate the top and bottom arrays
         cx = np.concatenate( (tx, bx) )
         cy = np.concatenate( (ty, by) )
@@ -82,7 +82,7 @@ def create_particles(empty=False, **kwargs):
     # particle volume
     fluid.add_property( {'name': 'V'} )
     channel.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid.add_property( {'name': 'uhat'} )
     fluid.add_property( {'name': 'vhat'} )
@@ -93,7 +93,7 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property( {'name': 'au'} )
     fluid.add_property( {'name': 'av'} )
     fluid.add_property( {'name': 'aw'} )
-    
+
     # kernel summation correction for the channel
     channel.add_property( {'name': 'wij'} )
 
@@ -103,7 +103,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -119,7 +119,11 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         channel.h[:] = hdx * dx
-        
+
+    # load balancing props
+    fluid.set_lb_props( fluid.properties.keys() )
+    channel.set_lb_props( solid.properties.keys() )
+
     # return the particle list
     return [fluid, channel]
 
@@ -147,14 +151,14 @@ equations = [
         equations=[
             DensitySummation(dest='fluid', sources=['fluid','channel']),
             ]),
-    
+
     # boundary conditions for the channel wall
     Group(
         equations=[
             SolidWallBC(
                 dest='channel', sources=['fluid',], gx=fx, b=1.0, rho0=rho0, p0=p0),
             ]),
-    
+
     # acceleration equation
     Group(
         equations=[
@@ -170,7 +174,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

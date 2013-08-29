@@ -57,13 +57,14 @@ class MomentumEquation(Equation):
         self.gy = gy
         self.gz = gz
         self.dt_fac = 0.0
+        self.c0 = c0
         super(MomentumEquation, self).__init__(dest, sources)
 
     def loop(self, d_idx, s_idx, d_rho, d_cs,
              d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ=[0.0, 0.0, 0.0],
              XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
-             DWIJ=[1.0, 1.0, 1.0]):
+             DWIJ=[1.0, 1.0, 1.0], DT_ADAPT=[0.0, 0.0, 0.0]):
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
 
@@ -79,10 +80,10 @@ class MomentumEquation(Equation):
             piij = piij*RHOIJ1
 
         # compute the CFL time step factor
-        # _dt_fac = 0.0
-        # if R2IJ > 1e-12:
-        #     _dt_fac = fabs( HIJ * vijdotxij/R2IJ )
-        #     dt_fac = max(_dt_fac, dt_fac)
+        _dt_fac = 0.0
+        if R2IJ > 1e-12:
+            _dt_fac = abs( HIJ * vijdotxij/R2IJ ) + self.c0
+            DT_ADAPT[0] = max(_dt_fac, DT_ADAPT[0])
 
         tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
 

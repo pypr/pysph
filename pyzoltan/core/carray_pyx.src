@@ -155,27 +155,27 @@ cdef class BaseArray:
     cpdef update_min_max(self):
         """ Update the min and max values of the array. """
         raise NotImplementedError, 'BaseArray::update_min_max'
-    
+
     def __len__(self):
         return self.length
-    
+
     def __iter__(self):
         """ Support the iteration protocol"""
         return BaseArrayIter(self)
-    
+
 cdef class BaseArrayIter:
     """ Iteration object to support iteration over BaseArray. """
     def __init__(self, BaseArray arr):
         self.arr = arr
         self.i = -1
-    
+
     def __next__(self):
         self.i = self.i+1
         if self.i < self.arr.length:
             return self.arr[self.i]
         else:
             raise StopIteration
-    
+
     def __iter__(self):
         return self
 
@@ -231,7 +231,7 @@ cdef class CLASSNAME(BaseArray):
     def __setitem__(self, long idx, ARRAY_TYPE value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, ARRAY_TYPE value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -239,11 +239,11 @@ cdef class CLASSNAME(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, ARRAY_TYPE value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}

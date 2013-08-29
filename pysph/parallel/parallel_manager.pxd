@@ -32,13 +32,13 @@ cdef class ParticleArrayExchange:
     # flags to indicate whether data needs to be exchanged
     cdef public bint lb_exchange
     cdef public bint remote_exchange
-    
+
     cdef public size_t num_local         # Total number of particles
     cdef public size_t num_global        # Global number of particles
     cdef public size_t num_remote        # Number of remote particles
     cdef public size_t num_ghost         # Number of ghost particles
 
-    
+
     # mpi.Comm object and associated rank and size
     cdef public object comm
     cdef public int rank, size
@@ -74,6 +74,9 @@ cdef class ParallelManager:
     cdef public int rank
     cdef public int size
 
+    cdef public int lb_freq              # load balancing frequency
+    cdef public int lb_count             # counter for current lb step
+
     cdef public int ncells_local         # number of local cells
     cdef public int ncells_remote        # number of remote cells
     cdef public int ncells_total         # total number of cells
@@ -105,8 +108,8 @@ cdef class ParallelManager:
     cdef bint in_parallel
 
     # Min and max across all processors
-    cdef np.ndarray minx, miny, minz     # min and max arrays used 
-    cdef np.ndarray maxx, maxy, maxz     # for MPI Allreduce 
+    cdef np.ndarray minx, miny, minz     # min and max arrays used
+    cdef np.ndarray maxx, maxy, maxz     # for MPI Allreduce
     cdef np.ndarray maxh                 # operations
 
     cdef public double mx, my, mz        # global min and max values
@@ -127,7 +130,7 @@ cdef class ParallelManager:
     cdef public UIntArray importCellGlobalids
     cdef public UIntArray importCellLocalids
     cdef public IntArray importCellProcs
-    cdef public int numCellImport    
+    cdef public int numCellImport
 
     ############################################################################
     # Member functions
@@ -135,7 +138,7 @@ cdef class ParallelManager:
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
     cdef _bin(self, int pa_index, UIntArray indices)
-    
+
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
     cpdef compute_cell_size(self)
@@ -148,7 +151,7 @@ cdef class ParallelManager:
     # nearest neighbor search routines taking into account multiple
     # particle arrays
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs)    
+                                size_t d_idx, UIntArray nbrs)
 
 # Zoltan based parallel cell manager for SPH simulations
 cdef class ZoltanParallelManager(ParallelManager):

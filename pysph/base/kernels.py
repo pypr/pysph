@@ -90,7 +90,7 @@ class WendlandQuintic(object):
             fac = 7.0*M_1_PI/4.0 * h1 * h1
 
         else:
-            raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
+            fac = 0.0
 
         if ( q >= 2.0 ):
             val = 0.0
@@ -112,7 +112,7 @@ class WendlandQuintic(object):
             fac = 7.0*M_1_PI/4.0 * h1 * h1
 
         else:
-            raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
+            fac = 0.0
 
         # compute the gradient
         if (rij > 1e-12):
@@ -185,7 +185,7 @@ class QuinticSpline(object):
     def __init__(self, dim=2):
         self.radius_scale = 3.0
         if dim != 2:
-            raise NotImplementedError('Quintic spline only supports 2D kernels.')
+            raise NotImplementedError('Quintic spline currently only supports 2D kernels.')
         self.dim = dim
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
@@ -196,7 +196,7 @@ class QuinticSpline(object):
             fac = M_1_PI * 7./478.0 * h1 * h1
 
         else:
-            raise NotImplementedError('Quintic spline only supports 2D kernels.')
+            fac = 0.0
 
         if ( q > 3.0 ):
             val = 0.0
@@ -220,7 +220,7 @@ class QuinticSpline(object):
             fac = M_1_PI * 7./478.0 * h1 * h1
 
         else:
-            raise NotImplementedError('Quintic spline only supports 2D kernels.')
+            fac = 0.0
 
         # compute the gradient
         if (rij > 1e-12):

@@ -36,10 +36,10 @@ class ExampleTestCase(unittest.TestCase):
     def test_elliptical_drop(self):
         self.run_example('../../../../examples/elliptical_drop.py',
                          timestep=1e-5, iters=100, nprocs=2, timeout=60)
-    
+
     """
     def run_example(self, filename, tf=0.01, nprocs=2, load_func=load,
-                    timeout=300, ghost_layers=2, dt=1e-4):
+                    timeout=300, ghost_layers=2, dt=1e-4, lb_freq=1):
         """Run an example and compare the results in serial and parallel.
 
         Parameters:
@@ -64,12 +64,12 @@ class ExampleTestCase(unittest.TestCase):
 
         """
         prefix = os.path.splitext(os.path.basename(filename))[0]
-        
+
         try:
             # dir1 is for the serial run
             dir1 = tempfile.mkdtemp()
 
-            # dir2 is for the parallel run 
+            # dir2 is for the parallel run
             dir2 = tempfile.mkdtemp()
 
             args = ['--fname=%s'%prefix,
@@ -77,7 +77,9 @@ class ExampleTestCase(unittest.TestCase):
                     '--tf=%g'%(tf),
                     '--pfreq=1000000',
                     '--ghost-layers=%g'%ghost_layers,
-                    '--timestep=%g'%dt]
+                    '--timestep=%g'%dt,
+                    '--lb-freq=%d'%lb_freq
+                    ]
 
             # run the example script in serial
             run_parallel_script.run(
@@ -101,7 +103,7 @@ class ExampleTestCase(unittest.TestCase):
             file = get_files(dirname=dir2path, fname=prefix)[-1]
             parallel = load(file)
             parallel = parallel['arrays']['fluid']
-            
+
         finally:
             shutil.rmtree(dir1, True)
             shutil.rmtree(dir2, True)
@@ -112,7 +114,7 @@ class ExampleTestCase(unittest.TestCase):
     def _test(self, serial, parallel):
         # make sure the arrays are at the same time
         self.assertAlmostEqual( serial.time, parallel.time, 8)
-        
+
         # test the results.
         xs, ys, zs, rhos  = serial.get("x","y", "z", "rho")
         xp, yp, zp, rhop, gid = parallel.get("x", "y", "z", "rho", 'gid')
@@ -130,22 +132,24 @@ class ParallelTests(ExampleTestCase):
 
     @attr(slow=True, very_slow=True, parallel=True)
     def test_3Ddam_break_example(self):
-        dt = 1e-5; tf = 250 * dt
-        self.run_example('./dambreak3D.py', 
+        dt = 1e-5; tf = 100*dt
+        self.run_example('./dambreak3D.py',
                          nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1,
-                         timeout=900)
-    
+                         timeout=900, lb_freq=5)
+
     @attr(slow=True, parallel=True)
     def test_2Ddam_break_example(self):
-        dt = 1e-4; tf = 250*dt
-        self.run_example('../../../examples/dam_break.py', 
-                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1)
+        dt = 1e-4; tf = 200*dt
+        self.run_example('../../../examples/dam_break.py',
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=1,
+                         lb_freq=5)
 
     @attr(slow=True, parallel=True)
     def test_ldcavity_example(self):
-        dt=1e-4; tf=250*dt
-        self.run_example('../../../examples/TransportVelocity/cavity.py', 
-                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=3.0)
+        dt=1e-4; tf=200*dt
+        self.run_example('../../../examples/TransportVelocity/cavity.py',
+                         nprocs=4, load_func=load, tf=tf, dt=dt, ghost_layers=3.0,
+                         lb_freq=5)
 
 if __name__ == "__main__":
     unittest.main()

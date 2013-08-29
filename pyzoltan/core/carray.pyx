@@ -141,27 +141,27 @@ cdef class BaseArray:
     cpdef update_min_max(self):
         """ Update the min and max values of the array. """
         raise NotImplementedError, 'BaseArray::update_min_max'
-    
+
     def __len__(self):
         return self.length
-    
+
     def __iter__(self):
         """ Support the iteration protocol"""
         return BaseArrayIter(self)
-    
+
 cdef class BaseArrayIter:
     """ Iteration object to support iteration over BaseArray. """
     def __init__(self, BaseArray arr):
         self.arr = arr
         self.i = -1
-    
+
     def __next__(self):
         self.i = self.i+1
         if self.i < self.arr.length:
             return self.arr[self.i]
         else:
             raise StopIteration
-    
+
     def __iter__(self):
         return self
 
@@ -212,7 +212,7 @@ cdef class IntArray(BaseArray):
     def __setitem__(self, long idx, int value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, int value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -220,11 +220,11 @@ cdef class IntArray(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, int value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}
@@ -547,7 +547,7 @@ cdef class DoubleArray(BaseArray):
     def __setitem__(self, long idx, double value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, double value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -555,11 +555,11 @@ cdef class DoubleArray(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, double value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}
@@ -882,7 +882,7 @@ cdef class FloatArray(BaseArray):
     def __setitem__(self, long idx, float value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, float value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -890,11 +890,11 @@ cdef class FloatArray(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, float value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}
@@ -1217,7 +1217,7 @@ cdef class LongArray(BaseArray):
     def __setitem__(self, long idx, long value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, long value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -1225,11 +1225,11 @@ cdef class LongArray(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, long value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}
@@ -1552,7 +1552,7 @@ cdef class UIntArray(BaseArray):
     def __setitem__(self, long idx, unsigned int value):
         """ Set location idx to value. """
         self.data[idx] = value
-    
+
     cpdef long index(self, unsigned int value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
@@ -1560,11 +1560,11 @@ cdef class UIntArray(BaseArray):
             if self.data[i] == value:
                 return i
         return -1
-    
+
     def __contains__(self, unsigned int value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
-    
+
     def __reduce__(self):
         """ Implemented to facilitate pickling. """
         d = {}

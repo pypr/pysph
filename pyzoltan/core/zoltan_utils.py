@@ -22,11 +22,11 @@ def get_num_objects_per_proc(comm, num_objects):
     """
     size = comm.Get_size()
     rank = comm.Get_rank()
-    
+
     send_data = numpy.zeros(shape=size, dtype=numpy.int32)
     send_data[rank] = num_objects
 
     num_objects_data = numpy.zeros(shape=size, dtype=numpy.int32)
     comm.Allreduce(send_data, num_objects_data, op=MPI.MAX)
-    
+
     return num_objects_data

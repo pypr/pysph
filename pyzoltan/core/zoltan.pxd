@@ -29,11 +29,11 @@ cdef class PyZoltan:
 
     # version number
     cdef public double version
-    
+
     # mpi.Comm object and associated rank and size
     cdef public object comm
     cdef public int rank, size
-    
+
     # Pointer to the Zoltan structure upon creation
     cdef _Zoltan_Struct _zstruct
 
@@ -56,7 +56,7 @@ cdef class PyZoltan:
     cdef public np.ndarray parts             # partitions of range size
 
     # data array for the object weights
-    cdef public DoubleArray weights    
+    cdef public DoubleArray weights
 
     # General Zoltan parameters (refer the user guide)
     cdef public str debug_level
@@ -70,7 +70,7 @@ cdef class PyZoltan:
     # after a load balance, copy the Zoltan allocated lists to local
     # numpy arrays. The Zoltan lists are freed after a call to LB_Balance
     cdef _set_Zoltan_lists(
-        self,                                           
+        self,
         int numExport,                          # number of objects to export
         ZOLTAN_ID_PTR _exportGlobal,            # global indices of export objects
         ZOLTAN_ID_PTR _exportLocal,             # local indices of export objects
@@ -82,7 +82,7 @@ cdef class PyZoltan:
         )
 
     # Invert the lists after computing remote particles
-    cpdef Zoltan_Invert_Lists(self)    
+    cpdef Zoltan_Invert_Lists(self)
 
 # User defined data for the RCB, RIB and HSFC methods
 cdef struct CoordinateData:
@@ -102,7 +102,7 @@ cdef struct CoordinateData:
     double* x
     double* y
     double *z
-    
+
 cdef class ZoltanGeometricPartitioner(PyZoltan):
     # data arrays for the coordinates
     cdef public DoubleArray x, y, z
@@ -118,4 +118,4 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
     # ZOLTAN parameters for Geometric partitioners
     cdef public str keep_cuts
-    
+

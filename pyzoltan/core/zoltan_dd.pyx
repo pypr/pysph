@@ -7,7 +7,7 @@ cdef class Zoltan_DD:
     The hash map is implemented as keys of type ZOLTAN_ID_TYPE which
     can be global indices for the objects being partitioned for
     example. Each entry is owned by a processor and has associated
-    with it, additional user data. 
+    with it, additional user data.
 
     """
     def __init__(self, mpi.Comm comm):
@@ -85,7 +85,7 @@ cdef class Zoltan_DD:
     def Zoltan_DD_Print(self):
         """Print the contents of the DD"""
         Zoltan_DD_Print( self.dd )
-        
+
     def __dealloc__(self):
         """Boom!"""
         Zoltan_DD_Destroy( &self.dd )

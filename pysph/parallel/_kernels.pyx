@@ -18,7 +18,7 @@ cdef:
     double PI = numpy.pi
     double PIb1 = 1.0/PI
     double SQRT_1_PI = 1.0/sqrt(PI)
-    double infty = numpy.inf    
+    double infty = numpy.inf
 
 cdef inline double h_dim(double h, int dim):
     cdef double h1 = 1.0/h
@@ -33,7 +33,7 @@ class AveragingType:
     NoAveraging = 0
     HAveraging = 1
     KAveraging = 2
-    SHAveraging = 3    
+    SHAveraging = 3
 
 cdef class Kernel:
     cdef double function(self, cPoint xi, cPoint xj, double h):
@@ -60,9 +60,9 @@ cdef class Kernel:
         grad.x = grad.x * val
         grad.y = grad.y * val
         grad.z = grad.z * val
-        
+
         return grad
-        
+
     cdef double gradient_h(self, cPoint xi, cPoint xj, double h):
         cdef double rij = cPoint_distance(xi, xj)
         cdef double fac = h_dim(h, self.dim) * self.fac
@@ -101,7 +101,7 @@ cdef class CubicSpline(Kernel):
             self.fac = 10*PIb1/7.0
         else:
             self.fac = PIb1
-        
+
         self.radius = 2.0
 
     cdef double _function(self, double q):
@@ -111,7 +111,7 @@ cdef class CubicSpline(Kernel):
             return 0.25 * (2-q)**3
         else:
             return 1 - 1.5*q*q * (1 - 0.5*q)
-        
+
     cdef double _gradient(self, double q):
         if q >= 2.0:
             return 0
@@ -165,7 +165,7 @@ cdef class QuarticSpline(Kernel):
 
         elif ( (q >= 0.5) and (q < 1.5) ):
             return -4*q1*q1*q1 + \
-                   20*q2*q2*q2                   
+                   20*q2*q2*q2
 
         elif ( (q >= 0) ):
             return -4*q1*q1*q1 + \
@@ -234,7 +234,7 @@ cdef class Gaussian(Kernel):
             self.fac = SQRT_1_PI**2
         else:
             raise ValueError("Only 2D for now")
-        
+
         self.radius = 3.1
 
     cdef double _function(self, double q):

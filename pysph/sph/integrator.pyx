@@ -25,9 +25,6 @@ cdef class Integrator:
     def set_parallel_manager(self, object pm):
         self.pm = pm
 
-    def set_parallel_manager_static(self, object pm_static):
-        self.pm_static = pm_static
-
     def set_solver(self, object solver):
         self.solver = solver
 
@@ -42,7 +39,7 @@ cdef class Integrator:
     cdef _set_initial_values(self):
         cdef int i, npart
         cdef object pa_wrapper
-        
+
         # Quantities at the start of a time step
         cdef DoubleArray x0, y0, z0, u0, v0, w0, rho0
 
@@ -70,7 +67,7 @@ cdef class Integrator:
                 u0.data[i] = u.data[i]
                 v0.data[i] = v.data[i]
                 w0.data[i] = w.data[i]
-                
+
                 rho0.data[i] = rho.data[i]
 
     @cython.boundscheck(False)
@@ -78,7 +75,7 @@ cdef class Integrator:
     cdef _reset_accelerations(self):
         cdef int i, npart
         cdef object pa_wrapper
-        
+
         # acc properties
         cdef DoubleArray ax, ay, az, au, av, aw, arho
 
@@ -100,7 +97,7 @@ cdef class Integrator:
                 au.data[i] = 0.0
                 av.data[i] = 0.0
                 aw.data[i] = 0.0
-                
+
                 arho.data[i] = 0.0
 
     def compute_time_step(self, double dt):
@@ -112,7 +109,6 @@ cdef class WCSPHRK2Integrator(Integrator):
         cdef object pa_wrapper
         cdef object evaluator = self.evaluator
         cdef object pm = self.pm
-        cdef object pm_static = self.pm_static
         cdef NNPS nnps = self.nnps
         cdef str name
 
@@ -169,7 +165,6 @@ cdef class WCSPHRK2Integrator(Integrator):
                 rho.data[i] = rho0.data[i] + dtb2 * arho.data[i]
 
         # Update NNPS since particles have moved
-        if pm_static: pm_static.static_update()
         if pm: pm.update()
 
         nnps.update()
@@ -197,7 +192,7 @@ cdef class WCSPHRK2Integrator(Integrator):
 
             # update only local particles
             npart = pa.num_real_particles
-            
+
             for i in range(npart):
 
                 # Update velocities
@@ -213,15 +208,15 @@ cdef class WCSPHRK2Integrator(Integrator):
                 # Update densities and smoothing lengths from the accelerations
                 rho.data[i] = rho0.data[i] + dt * arho.data[i]
 
-    def compute_time_step(self, double dt, double c0):
+    def compute_time_step(self, double dt):
         """Compute a stable time step"""
         cdef double cfl = self.cfl
-        cdef double dt_cfl = self.evaluator.dt_cfl
+        cdef double dt_cfl = self.evaluator.calc.dt_cfl
         cdef DoubleArray h
         cdef double hmin = 1.0
 
         # if the dt_cfl is not defined, return default dt
-        if dt_cfl < 0:
+        if dt_cfl <= 0.0:
             return dt
 
         # iterate over particles and find the stable time step
@@ -262,7 +257,7 @@ cdef class EulerIntegrator(Integrator):
         # Update NNPS since particles have moved
         if pm: pm.update()
         nnps.update()
-                
+
         # compute accelerations
         self._reset_accelerations()
         evaluator.compute(t, dt)
@@ -283,7 +278,7 @@ cdef class EulerIntegrator(Integrator):
 
             # update local paticles
             npart = pa.num_real_particles
-            
+
             for i in range(npart):
 
                 # Update velocities
@@ -307,7 +302,7 @@ cdef class TransportVelocityIntegrator(Integrator):
     cdef _reset_accelerations(self):
         cdef int i, npart
         cdef object pa_wrapper
-        
+
         # acc properties to reset
         cdef DoubleArray au, av, aw, auhat, avhat, V, rho
         cdef DoubleArray u, v, p, wij
@@ -438,7 +433,7 @@ cdef class TransportVelocityIntegrator(Integrator):
                 # Update velocities avoiding impulsive starts
                 u.data[i] = u.data[i] + dtb2*au.data[i]*damping_constant
                 v.data[i] = v.data[i] + dtb2*av.data[i]*damping_constant
-    
+
                 # magnitude of velocity squared
                 vmag.data[i] = u.data[i]*u.data[i] + v.data[i]*v.data[i]
 
@@ -448,7 +443,7 @@ cdef class AdamiVelocityVerletIntegrator(Integrator):
     cdef _reset_accelerations(self):
         cdef int i, npart
         cdef object pa_wrapper
-        
+
         # acc properties to reset
         cdef DoubleArray au, av, aw, auhat, avhat, V, arho
         cdef DoubleArray u, v, p, wij
@@ -473,7 +468,7 @@ cdef class AdamiVelocityVerletIntegrator(Integrator):
                 au = pa_wrapper.au; av = pa_wrapper.av; aw = pa_wrapper.aw
                 auhat = pa_wrapper.auhat; avhat = pa_wrapper.avhat
                 arho = pa_wrapper.arho
-                
+
                 V = pa_wrapper.V
 
                 npart = pa.get_number_of_particles()
@@ -541,7 +536,7 @@ cdef class AdamiVelocityVerletIntegrator(Integrator):
                 # udpate positions
                 x.data[i] = x.data[i] + dtb2 * u.data[i]
                 y.data[i] = y.data[i] + dtb2 * v.data[i]
-                
+
         # Update NNPS since particles have moved
         if pm: pm.update()
         nnps.update()
@@ -578,6 +573,6 @@ cdef class AdamiVelocityVerletIntegrator(Integrator):
 
                 # update densities
                 rho.data[i] = rho.data[i] + dt * arho.data[i]
-    
+
                 # magnitude of velocity squared
                 vmag.data[i] = u.data[i]*u.data[i] + v.data[i]*v.data[i]

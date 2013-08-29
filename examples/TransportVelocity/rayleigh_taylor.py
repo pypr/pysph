@@ -78,8 +78,8 @@ def create_particles(empty=False, **kwargs):
         for i in range(fluid.get_number_of_particles()):
             if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
                 indices.append(i)
-                
-        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))                
+
+        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
 
         fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
         fluid2 = fluid
@@ -98,7 +98,7 @@ def create_particles(empty=False, **kwargs):
     fluid1.add_property( {'name': 'V'} )
     fluid2.add_property( {'name': 'V'} )
     solid.add_property( {'name': 'V'} )
-        
+
     # advection velocities and accelerations
     fluid1.add_property( {'name': 'uhat'} )
     fluid1.add_property( {'name': 'vhat'} )
@@ -130,7 +130,7 @@ def create_particles(empty=False, **kwargs):
     # magnitude of velocity
     fluid1.add_property({'name':'vmag'})
     fluid2.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -148,7 +148,12 @@ def create_particles(empty=False, **kwargs):
         fluid1.h[:] = hdx * dx
         fluid2.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-                
+
+    # load balancing props
+    fluid1.set_lb_props( fluid1.properties.keys() )
+    fluid2.set_lb_props( fluid2.properties.keys() )
+    solid.set_lb_props( solid.properties.keys() )
+
     # return the arrays
     return [fluid1, fluid2, solid]
 
@@ -174,13 +179,13 @@ equations = [
             DensitySummation(dest='fluid1', sources=['fluid1','fluid2','solid']),
             DensitySummation(dest='fluid2', sources=['fluid1','fluid2','solid']),
             ]),
-    
+
     # boundary conditions for the solid wall from each phase
     Group(
         equations=[
             SolidWallBC(dest='solid', sources=['fluid1', 'fluid2'], gy=gy, rho0=rho1, p0=p1),
             ]),
-    
+
     # acceleration equations for each phase
     Group(
         equations=[
@@ -200,7 +205,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()

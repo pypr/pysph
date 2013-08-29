@@ -33,9 +33,9 @@ def create_2D_tank(x1,y1,x2,y2,dx):
     x1,y1,x2,y2 : Coordinates defining the rectangle in 2D
 
     dx : The spacing to use
-    
+
     """
-    
+
     yl = numpy.arange(y1, y2+dx/2, dx)
     xl = numpy.ones_like(yl) * x1
     nl = len(xl)
@@ -121,7 +121,7 @@ class DamBreak2DGeometry(object):
 
         x = numpy.concatenate(_x); y = numpy.concatenate(_y)
         self.nsolid = len(x)
-        
+
         return x, y
 
     def get_fluid(self, noffset=2):
@@ -142,7 +142,7 @@ class DamBreak2DGeometry(object):
 
         x = numpy.concatenate(_x); y = numpy.concatenate(_y)
         self.nfluid = len(x)
-        
+
         return x, y
 
     def create_particles(self, nboundary_layers=2, nfluid_offset=2,
@@ -162,10 +162,10 @@ class DamBreak2DGeometry(object):
             fluid.gid[:] = range(fluid.get_number_of_particles())
 
             np = nfluid
-            
+
             xb, yb = self.get_wall(nboundary_layers)
             boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
-            
+
             np += boundary.get_number_of_particles()
 
             dx, dy, ro = self.dx, self.dy, self.ro
@@ -175,7 +175,7 @@ class DamBreak2DGeometry(object):
             fluid.m[:] = dx * dy * 0.5 * ro
             fluid.rho[:] = ro
             fluid.rho0[:] = ro
-            
+
             boundary.h[:] = numpy.ones_like(xb) * hdx * dx
             boundary.m[:] = dx * dy * 0.5 * ro
             boundary.rho[:] = ro
@@ -187,7 +187,7 @@ class DamBreak2DGeometry(object):
             if self.with_obstacle:
                 xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
                 gido = numpy.array( range(xo.size), dtype=numpy.uint32 )
-                
+
                 obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
 
                 obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
@@ -217,7 +217,7 @@ class DamBreak3DGeometry(object):
         obstacle_center_x=2.5, obstacle_center_y=0,
         obstacle_length=0.16, obstacle_height=0.161, obstacle_width=0.4,
         nboundary_layers=5, dx=0.02, hdx=1.2, rho0=1000.0):
-        
+
         # save the geometry details
         self.container_width = container_width
         self.container_length = container_length
@@ -236,7 +236,7 @@ class DamBreak3DGeometry(object):
 
         self.nboundary_layers=nboundary_layers
         self.dx=dx
-        
+
         self.hdx = hdx
         self.rho0 = rho0
 
@@ -255,10 +255,10 @@ class DamBreak3DGeometry(object):
         obstacle_height = self.obstacle_height
         obstacle_length = self.obstacle_length
         obstacle_width = self.obstacle_width
-        
+
         obstacle_center_x = self.obstacle_center_x
         obstacle_center_y = self.obstacle_center_y
-        
+
         nboundary_layers = self.nboundary_layers
         dx = self.dx
 
@@ -271,13 +271,13 @@ class DamBreak3DGeometry(object):
         else:
             # get the domain limits
             ghostlims = nboundary_layers * dx
-            
+
             xmin, xmax = 0.0 -ghostlims, container_length + ghostlims
             zmin, zmax = 0.0 - ghostlims, container_height + ghostlims
-            
+
             cw2 = 0.5 * container_width
             ymin, ymax = -cw2 - ghostlims, cw2 + ghostlims
-        
+
             # create all particles
             eps = 0.1 * dx
             xx, yy, zz = numpy.mgrid[xmin:xmax+eps:dx,
@@ -288,7 +288,7 @@ class DamBreak3DGeometry(object):
 
             # create a dummy particle array from which we'll sort
             pa = get_particle_array_wcsph(name='block', x=x, y=y, z=z)
-            
+
             # get the individual arrays
             indices = []
             findices = []
@@ -309,14 +309,14 @@ class DamBreak3DGeometry(object):
                          (0 < zi <= fluid_column_height) ):
 
                     findices.append(i)
-                
+
                 # obstacle
                 if ( (ocx-obl2 <= xi <= ocx+obl2) and \
                          (ocy-obw2 <= yi <= ocy+obw2) and \
                          (0 < zi <= obh) ):
 
                     oindices.append(i)
-                        
+
             # extract the individual arrays
             fa = LongArray(len(findices)); fa.set_data(numpy.array(findices))
             fluid = pa.extract_particles(fa)
@@ -325,7 +325,7 @@ class DamBreak3DGeometry(object):
             oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
             obstacle = pa.extract_particles(oa)
             obstacle.set_name('obstacle')
-            
+
             indices = concatenate( (where( y <= -cw2 )[0],
                                     where( y >= cw2 )[0],
                                     where( x >= container_length )[0],
@@ -344,10 +344,10 @@ class DamBreak3DGeometry(object):
 
             # set up particle properties
             h0 = self.hdx * dx
-            
+
             volume = dx**3
             m0 = self.rho0 * volume
-            
+
             for pa in particles:
                 pa.m[:] = m0
                 pa.h[:] = h0
@@ -360,8 +360,14 @@ class DamBreak3DGeometry(object):
 
             print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
 
-        # static particles
-        boundary.set_static(True)
-        obstacle.set_static(True)
+        # load balancing props for the arrays
+        #fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'gid',
+        #                    'x0', 'y0', 'z0', 'u0', 'v0', 'w0', 'rho0'])
+        fluid.set_lb_props( fluid.properties.keys() )
+
+        #boundary.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
+        #obstacle.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
+        boundary.set_lb_props( boundary.properties.keys() )
+        obstacle.set_lb_props( obstacle.properties.keys() )
 
         return particles

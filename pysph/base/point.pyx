@@ -16,7 +16,7 @@ ctypedef numpy.float_t DTYPE_t
 
 ###############################################################################
 # `Point` class.
-############################################################################### 
+###############################################################################
 cdef class Point:
     """
     This class represents a Point in 3D space.
@@ -24,25 +24,25 @@ cdef class Point:
 
     # Declared in the .pxd file.
     #cdef public double x, y, z
-    
+
     property x:
         def __get__(Point self):
             return self.data.x
         def __set__(Point self, double x):
             self.data.x = x
-    
+
     property y:
         def __get__(Point self):
             return self.data.y
         def __set__(Point self, double y):
             self.data.y = y
-    
+
     property z:
         def __get__(Point self):
             return self.data.z
         def __set__(Point self, double z):
             self.data.z = z
-    
+
     ######################################################################
     # `object` interface.
     ######################################################################
@@ -101,7 +101,7 @@ cdef class Point:
             return False
         elif oper == 3: # !=
             if self.data.x == p.data.x and self.data.y == p.data.y and self.data.z == p.data.z:
-                return False 
+                return False
             return True
         else:
             raise TypeError('No ordering is possible for Points.')
@@ -139,12 +139,12 @@ cdef class Point:
         self.data.x = x
         self.data.y = y
         self.data.z = z
-    
+
     cdef set_from_cPoint(Point self, cPoint value):
         self.data.x = value.x
         self.data.y = value.y
         self.data.z = value.z
-    
+
     cpdef numpy.ndarray asarray(Point self):
         """Return a numpy array with the coordinates."""
         cdef numpy.ndarray[DTYPE_t, ndim=1] r = numpy.empty(3)
@@ -168,17 +168,17 @@ cdef class Point:
     cpdef Point cross(Point self, Point p):
         """Return the cross product of this point with another, i.e.
         `self` cross `p`."""
-        return Point_new(self.data.y*p.data.z - self.data.z*p.data.y, 
+        return Point_new(self.data.y*p.data.z - self.data.z*p.data.y,
                          self.data.z*p.data.x - self.data.x*p.data.z,
                          self.data.x*p.data.y - self.data.y*p.data.x)
 
     cpdef double distance(Point self, Point p):
         """Return the distance between this point and p"""
         return cPoint_distance(self.data, p.data)
-    
+
     cdef cPoint to_cPoint(Point self):
         return self.data
-    
+
     def normalize(self):
         """ Normalize the point """
         cdef double norm = cPoint_length(self.data)
@@ -188,19 +188,19 @@ cdef class Point:
         self.data.z /= norm
 
 cdef class IntPoint:
-    
+
     property x:
         def __get__(self):
             return self.data.x
-    
+
     property y:
         def __get__(self):
             return self.data.y
-    
+
     property z:
         def __get__(self):
             return self.data.z
-    
+
     def __init__(self, int x=0, int y=0, int z=0):
         self.data.x = x
         self.data.y = y
@@ -266,9 +266,9 @@ cdef class IntPoint:
 
     def py_is_equal(self, IntPoint p):
         return self.is_equal(p)
-    
+
     def py_diff(self, IntPoint p):
         return self.diff(p)
-        
+
     def py_copy(self):
         return self.copy()

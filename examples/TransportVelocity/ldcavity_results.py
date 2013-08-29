@@ -9,7 +9,7 @@ class LDCavityResults(pprocess.Results):
     def __init__(self, dirname='cavity_output', fname='cavity', endswith=".npz",
                  Re=100):
         super(LDCavityResults, self).__init__(dirname, fname, endswith)
-        
+
         self.Re = Re
         self.nu = 1./Re
 
@@ -19,7 +19,7 @@ class LDCavityResults(pprocess.Results):
 
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
-        
+
         # interpolated velocities
         dx = 0.01
         self._x = _x = np.linspace(0,1,101)
@@ -27,44 +27,44 @@ class LDCavityResults(pprocess.Results):
         xgrid = xx.ravel(); ygrid = yy.ravel()
         hgrid = np.ones_like(xgrid) * 1.3 * dx
         self.grid = grid = gpa('grid', x=xgrid, y=ygrid, h=hgrid)
-        
-        
+
+
         self.xx = xx; self.yy = yy
-        
+
         # take the last solution data
         fname = self.files[-1]
         data = utils.load(fname)
         self.pa = src = data['arrays'][array]
-        
+
         interp = utils.SPHInterpolate(dim=2, dst=grid, src=src)
         self.ui = ui = interp.interpolate(src.u)
         self.vi = vi = interp.interpolate(src.v)
-        
+
         ui.shape = 101,101
         vi.shape = 101,101
-        
+
         # velocity magnitude
         self.vmag = vmag = np.sqrt( ui**2 + vi**2 )
-        
+
     def streamplot(self, density=2):
         from streamplot import streamplot
         import matplotlib.pyplot as plt
-        
+
         f = plt.figure()
         streamplot(
-            self._x, self._x, self.ui, self.vi, 
+            self._x, self._x, self.ui, self.vi,
             color=self.vmag,density=(density, density),
             INTEGRATOR='RK4', linewidth=5*self.vmag/self.vmag.max() )
-        
+
         plt.show()
 
     def centerline_velocities(self):
         import matplotlib.pyplot as plt
         f = plt.figure()
-        
+
         ui = self.ui[:, 50]
         vi = self.vi[50]
-        
+
         s1 = plt.subplot(211)
         s1.plot(ui, self._x)
         s1.set_xlabel(r'$v_x$')
@@ -76,8 +76,8 @@ class LDCavityResults(pprocess.Results):
         s2.set_ylabel(r'$v_y$')
 
         plt.show()
-        
+
     def vorticity(self):
         """Get the Vorticity over the domain"""
         pass
-            
+

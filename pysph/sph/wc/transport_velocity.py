@@ -50,7 +50,7 @@ class SolidWallBC(Equation):
         # smooth pressure
         gdotxij = (self.gx-self.ax)*XIJ[0] + \
             (self.gy-self.ay)*XIJ[1] + \
-            (self.gz-self.az)*XIJ[2] 
+            (self.gz-self.az)*XIJ[2]
 
         d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx] * gdotxij * WIJ
 

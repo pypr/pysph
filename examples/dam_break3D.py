@@ -1,5 +1,5 @@
 """ 3D Dam Break Over a dry bed. The case is described as a SPHERIC
-benchmark https://wiki.manchester.ac.uk/spheric/index.php/Test2) 
+benchmark https://wiki.manchester.ac.uk/spheric/index.php/Test2)
 
 
 Setup:
@@ -73,7 +73,7 @@ eps = 0.5
 import numpy
 from db_geometry import DamBreak3DGeometry
 
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, WendlandQuintic, QuinticSpline, Gaussian
 
 from pysph.sph.equation import Group
 from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
@@ -109,7 +109,7 @@ B = co*co*ro/gamma
 app = Application()
 
 # Create the kernel
-kernel = CubicSpline(dim=dim)
+kernel = WendlandQuintic(dim=dim)
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim)
@@ -138,7 +138,7 @@ equations = [
             ContinuityEquation(dest='obstacle', sources=['fluid']),
 
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
-                             alpha=alpha, beta=beta, gz=-9.81),
+                             alpha=alpha, beta=beta, gz=-9.81, c0=co),
 
             XSPHCorrection(dest='fluid', sources=['fluid'])
 

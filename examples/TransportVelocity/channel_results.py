@@ -9,7 +9,7 @@ class PoieuilleChannelResults(pprocess.Results):
     def __init__(self, dirname='poiseuille_output', fname='poiseuille', endswith=".npz",
                  d=0.5, Re=0.0125, nu=1.0):
         super(PoieuilleChannelResults, self).__init__(dirname, fname, endswith)
-        
+
         self.d = d
         self.L = 2*d
         self.Re = Re
@@ -27,19 +27,19 @@ class PoieuilleChannelResults(pprocess.Results):
 
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
-        
+
         # interpolate the u-velocity profile along the centerline
         y = np.linspace(0,1,101)
         x = np.ones_like(y) * 0.2
         h = np.ones_like(y) * 1.5 * 0.01
-        
+
         dst = gpa('test', x=x, y=y, h=h)
-        
+
         # take the last solution data
         fname = self.files[-1]
         data = utils.load(fname)
         self.pa = src = data['arrays'][array]
-        
+
         interp = utils.SPHInterpolate(dim=2, dst=dst, src=src)
         self.ui = ui = interp.interpolate(src.u)
         self.y = y
@@ -53,7 +53,7 @@ class CouetteFlowResults(pprocess.Results):
     def __init__(self, dirname='couette_output', fname='couette', endswith=".npz",
                  d=0.5, Re=0.0125, nu=1.0):
         super(CouetteFlowResults, self).__init__(dirname, fname, endswith)
-        
+
         self.d = d
         self.L = 2*d
         self.Re = Re
@@ -68,19 +68,19 @@ class CouetteFlowResults(pprocess.Results):
 
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
-        
+
         # interpolate the u-velocity profile along the centerline
         y = np.linspace(0,1,101)
         x = np.ones_like(y) * 0.2
         h = np.ones_like(y) * 1.5 * 0.01
-        
+
         dst = gpa('test', x=x, y=y, h=h)
-        
+
         # take the last solution data
         fname = self.files[-1]
         data = utils.load(fname)
         self.pa = src = data['arrays'][array]
-        
+
         interp = utils.SPHInterpolate(dim=2, dst=dst, src=src)
         self.ui = ui = interp.interpolate(src.u)
         self.y = y
@@ -88,4 +88,4 @@ class CouetteFlowResults(pprocess.Results):
         # exact parabolic profile for the u-velocity
         self.ye = y
         self.ue = self.Vmax*y/self.L
-        
+

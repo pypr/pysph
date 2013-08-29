@@ -150,13 +150,13 @@ cdef class PyZoltan:
 
     def set_num_global_objects(self, int num_global_objects):
         """Set the number of global objects"""
-        self.num_global_objects = num_global_objects        
+        self.num_global_objects = num_global_objects
 
     def Zoltan_Initialize(self, int argc=0, args=''):
         """Initialize Zoltan"""
         cdef float version
         cdef char **c_argv
-        
+
         args = [ bytes(x) for x in args ]
         c_argv = <char**>malloc( sizeof(char*) *len(args) )
         if c_argv is NULL:
@@ -171,7 +171,7 @@ cdef class PyZoltan:
         error_code = cython.declare(cython.int)
         error_code = czoltan.Zoltan_Initialize(len(args), c_argv, &version)
         _check_error(error_code)
-        return version        
+        return version
 
     def Zoltan_Create(self, mpi.Comm comm):
         """Create the Zoltan struct"""
@@ -195,7 +195,7 @@ cdef class PyZoltan:
         """Set the Zoltan load balancing method"""
         cdef str name = "LB_METHOD"
         self.lb_method = value
-        
+
         self.Zoltan_Set_Param(name, value)
 
     def Zoltan_Destroy(self):
@@ -204,7 +204,7 @@ cdef class PyZoltan:
 
     def Zoltan_LB_Balance(self):
         """Call the Zoltan load balancing function.
-        
+
         After a call to this function, we get the import/export lists
         required for load balancing.
 
@@ -222,7 +222,7 @@ cdef class PyZoltan:
 
         cython.declare(importGlobal=ZOLTAN_ID_PTR,importLocal=ZOLTAN_ID_PTR,
                        exportGlobal=ZOLTAN_ID_PTR,exportLocal=ZOLTAN_ID_PTR)
-    
+
         cython.declare(importProcs=cython.p_int, exportProcs=cython.p_int)
 
         # call the load balance function
@@ -253,7 +253,7 @@ cdef class PyZoltan:
                                importGlobal,
                                importLocal,
                                importProcs)
-        
+
         # free the Zoltan allocated data
         ierr = czoltan.Zoltan_LB_Free_Data(
             &importGlobal,
@@ -343,7 +343,7 @@ cdef class PyZoltan:
         cdef UIntArray importGlobalids = self.importGlobalids
         cdef UIntArray importLocalids = self.importLocalids
         cdef IntArray importProcs = self.importProcs
-        
+
         cdef int numExport = self.numExport
         cdef int i, ierr
 
@@ -364,7 +364,7 @@ cdef class PyZoltan:
             &_importLocalids,
             &_importProcs,
             )
-        
+
         _check_error(ierr)
 
         # save the data in the local import lists
@@ -407,7 +407,7 @@ cdef class PyZoltan:
 
         num_objects_data = zoltan_utils.get_num_objects_per_proc(
              comm, self.num_local_objects)
-        
+
         num_local_objects = num_objects_data[ rank ]
         num_global_objects = np.sum( num_objects_data )
 
@@ -418,7 +418,7 @@ cdef class PyZoltan:
             gid.data[i] = <ZOLTAN_ID_TYPE> ( _sum + i )
 
         self.num_global_objects = num_global_objects
-        self.num_local_objects = num_local_objects        
+        self.num_local_objects = num_local_objects
 
     def _setup_zoltan_arrays(self):
         self.exportGlobalids = UIntArray()
@@ -441,7 +441,7 @@ cdef class PyZoltan:
         self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", self.obj_weight_dim)
 
         self.Zoltan_Set_Param("EDGE_WEIGHT_DIM", self.edge_weight_dim)
-        
+
         self.Zoltan_Set_Param("RETURN_LISTS", self.return_lists)
 
     def _set_data(self):
@@ -493,7 +493,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         keep_cuts : str
             Parameter used for adding items to a decomposition
-            
+
         """
         # values needed for defaults
         self.lb_method = lb_method
@@ -546,6 +546,22 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
         return numprocs
 
+    def Zoltan_Point_PP_Assign(self, double x, double y, double z):
+        """Find to which processor a given point must be sent to"""
+        cdef Zoltan_Struct* zz = self._zstruct.zz
+
+        cdef int ierr, proc = -1, part = -1
+        cdef double[3] coords
+
+        coords[0] = x; coords[1] = y; coords[2] = z
+
+        ierr = czoltan.Zoltan_LB_Point_PP_Assign(
+            zz, coords, &proc, &part)
+
+        _check_error(ierr)
+
+        return proc
+
     #######################################################################
     # Private interface
     #######################################################################
@@ -590,7 +606,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         self._cdata.dim = <int>self.dim
         self._cdata.numGlobalPoints = <int>self.num_global_objects
         self._cdata.numMyPoints = <int>self.num_local_objects
-        
+
         self._cdata.myGlobalIDs = self.gid.data
         self._cdata.x = self.x.data
         self._cdata.y = self.y.data

@@ -94,7 +94,7 @@ def create_particles(empty=False, **kwargs):
 
     # magnitude of velocity
     fluid.add_property({'name':'vmag'})
-        
+
     # setup the particle properties
     if not empty:
         volume = dx * dx
@@ -110,15 +110,18 @@ def create_particles(empty=False, **kwargs):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        
+
         # imposed horizontal velocity on the lid
         solid.u0[:] = 0.0
         solid.v0[:] = 0.0
         for i in range(solid.get_number_of_particles()):
             if solid.y[i] > L:
                 solid.u0[i] = Umax
-                
+
     # return the particle list
+    fluid.set_lb_props( fluid.properties.keys() )
+    solid.set_lb_props( solid.properties.keys() )
+
     return [fluid, solid]
 
 # Create the application.
@@ -143,7 +146,7 @@ equations = [
             DensitySummation(dest='fluid', sources=['fluid','solid'],)
 
             ]),
-    
+
     # boundary conditions for the solid wall
     Group(
         equations=[
@@ -151,21 +154,21 @@ equations = [
             SolidWallBC(dest='solid', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
 
             ]),
-    
+
     # acceleration equation
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
-            
+
             MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-            
+
             ArtificialStress(dest='fluid', sources=['fluid',]),
-            
+
             ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations, 
+app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
 
 app.run()
