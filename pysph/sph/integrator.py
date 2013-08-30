@@ -106,8 +106,8 @@ class TransportVelocityStep(IntegratorStep):
         dtb2 = 0.5*dt
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
-        d_uhat[d_idx] += dtb2*d_auhat[d_idx]
-        d_vhat[d_idx] += dtb2*d_avhat[d_idx]
+        d_uhat[d_idx] = d_u[d_idx] + dtb2*d_auhat[d_idx]
+        d_vhat[d_idx] = d_v[d_idx] + dtb2*d_avhat[d_idx]
 
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
