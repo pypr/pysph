@@ -4,6 +4,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.base.locators import AllPairLocator
 from pysph.sph.wc.basic import SummationDensity, TaitEOS
 from pysph.sph.sph_eval import SPHEval
+from pysph.sph.integrator import Integrator
 
 def make_particles():
     x = linspace(0, 1.0, 11); dx = x[1] - x[0]
@@ -22,7 +23,8 @@ equations = [SummationDensity(dest='fluid', sources=['fluid', 'solid']),
             ]
 
 locator = AllPairLocator()
-evaluator = SPHEval(particles, equations, locator, kernel)
+integrator = Integrator()
+evaluator = SPHEval(particles, equations, locator, kernel, integrator)
 evaluator.compute()
 
 print particles[0].rho

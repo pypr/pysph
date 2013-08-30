@@ -6,7 +6,6 @@ import numpy
 
 # PySPH imports
 from pysph.base.kernels import CubicSpline
-from pysph.sph.integrator import WCSPHRK2Integrator
 from pysph.sph.sph_eval import SPHEval
 
 from utils import PBar, savez, load
@@ -41,7 +40,7 @@ class Solver(object):
 
     """
 
-    def __init__(self, integrator_type=WCSPHRK2Integrator, kernel=None,
+    def __init__(self, integrator=None, kernel=None,
                  dim=2, tdamp=0.0, **kwargs):
         """Constructor
 
@@ -55,7 +54,7 @@ class Solver(object):
 
         """
 
-        self.integrator_type = integrator_type
+        self.integrator = integrator
         self.dim = dim
         if kernel is not None:
             self.kernel = kernel
@@ -127,8 +126,7 @@ class Solver(object):
                 msg = 'Unknown keyword arg "%s" passed to constructor'%attr
                 raise TypeError(msg)
 
-    def setup(self, particles, equations, nnps, kernel=None,
-              integrator_type=None):
+    def setup(self, particles, equations, nnps, kernel=None):
         """ Setup the solver.
 
         The solver's processor id is set if the in_parallel flag is set
@@ -142,23 +140,15 @@ class Solver(object):
         """
 
         self.particles = particles
-        if integrator_type is not None:
-            self.integrator_type = integrator_type
         if kernel is not None:
             self.kernel = kernel
 
-        self.sph_eval = SPHEval(particles, equations, None, self.kernel)
+        self.sph_eval = SPHEval(particles, equations, None, self.kernel,
+                                self.integrator)
         self.sph_eval.set_nnps(nnps)
 
-        # instantiate the Integrator
-        self.integrator = integrator = self.integrator_type(
-            evaluator=self.sph_eval, particles=particles,tdamp=self.tdamp)
-
         # set the parallel manager for the integrator
-        integrator.set_parallel_manager(self.pm)
-
-        # set the integrator's solver
-        integrator.set_solver(self)
+        self.integrator.set_parallel_manager(self.pm)
 
     def add_print_properties(self, props):
         """ Add a list of properties to print """

@@ -46,11 +46,13 @@ def get_array_names(particle_arrays):
 # `SPHEval` class.
 ###############################################################################
 class SPHEval(object):
-    def __init__(self, particle_arrays, equations, locator, kernel):
+    def __init__(self, particle_arrays, equations, locator, kernel, integrator):
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
         self.locator = locator
         self.kernel = kernel
+        self.nnps = None
+        self.integrator = integrator
 
         all_equations = []
         for group in self.equation_groups:
@@ -70,6 +72,8 @@ class SPHEval(object):
         self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
                                 *self.particle_arrays)
         self.sph_compute = self.calc.compute
+        integrator = mod.Integrator(self.calc, self.integrator.steppers)
+        self.integrator.set_integrator(integrator)
 
     def _make_group(self, group):
         equations = group.equations
@@ -124,6 +128,9 @@ class SPHEval(object):
 
         # Equation wrappers.
         helpers.append(self.all_group.get_equation_wrappers())
+
+        # Integrator wrappers
+        helpers.append(self.integrator.get_stepper_code())
 
         return '\n'.join(helpers)
 
@@ -183,11 +190,13 @@ class SPHEval(object):
         path = join(dirname(__file__), 'sph_eval.mako')
         template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names,
-                               pa_names=pa_names, locator=locator, object=self)
+                               pa_names=pa_names, locator=locator,
+                               object=self, integrator=self.integrator)
 
     def set_nnps(self, nnps):
         self.nnps = nnps
         self.calc.set_nnps(nnps)
+        self.integrator.integrator.set_nnps(nnps)
 
     def compute(self, t, dt):
         self.sph_compute(t, dt)
