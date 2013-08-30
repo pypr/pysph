@@ -26,7 +26,7 @@ from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import EulerIntegrator
+from pysph.sph.integrator import EulerStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -97,9 +97,11 @@ app = Application(domain=domain)
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
+# Create the integrator.
+integrator = Integrator(fluid=EulerStep())
+
 # Create a solver.
-solver = Solver(
-    kernel=kernel, dim=2, integrator_type=EulerIntegrator)
+solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 
 # Setup default parameters.
 tf = 5 * np.sqrt(2.0)

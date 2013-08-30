@@ -5,6 +5,9 @@ from pysph.sph.equation import Equation
 
 
 class ContinuityEquation(Equation):
+    def initialize(self, d_idx, d_arho):
+        d_arho[d_idx] = 0.0
+
     def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
              VIJ=[0.0, 0.0, 0.0]):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
@@ -12,6 +15,9 @@ class ContinuityEquation(Equation):
 
 
 class SummationDensity(Equation):
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ=0.0):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
@@ -22,6 +28,11 @@ class BodyForce(Equation):
         self.fy = fy
         self.fz = fz
         super(BodyForce, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] += self.fx
@@ -59,6 +70,11 @@ class MomentumEquation(Equation):
         self.dt_fac = 0.0
         self.c0 = c0
         super(MomentumEquation, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs,
              d_p, d_au, d_av, d_aw, s_m,
@@ -102,6 +118,11 @@ class XSPHCorrection(Equation):
     def __init__(self, dest, sources=None, eps=0.5):
         self.eps = eps
         super(XSPHCorrection, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_ax, d_ay, d_az):
+        d_ax[d_idx] = 0.0
+        d_ay[d_idx] = 0.0
+        d_az[d_idx] = 0.0
 
     def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ=1.0, RHOIJ1=1.0,
              VIJ=[1.0,1,1]):

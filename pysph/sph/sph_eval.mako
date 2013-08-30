@@ -40,6 +40,7 @@ cdef class ParticleArrayWrapper:
 
 # #############################################################################
 cdef class SPHCalc:
+    cdef public tuple particle_arrays
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
     cdef UIntArray nbrs
@@ -49,6 +50,7 @@ cdef class SPHCalc:
     ${indent(object.get_equation_defs(), 1)}
 
     def __init__(self, kernel, equations, *particle_arrays):
+        self.particle_arrays = particle_arrays
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
@@ -181,3 +183,62 @@ cdef class SPHCalc:
         # ---------------------------------------------------------------------
         % endfor
         self.set_dt_adapt(DT_ADAPT)
+
+
+# #############################################################################
+cdef class Integrator:
+    cdef public ParticleArrayWrapper ${pa_names}
+    cdef public SPHCalc sph_calc
+    cdef public object parallel_manager
+    cdef public NNPS nnps
+    cdef public double dt
+    ${indent(integrator.get_stepper_defs(), 1)}
+
+    def __init__(self, calc, steppers):
+        self.sph_calc = calc
+        % for name in pa_names.split():
+        self.${name} = calc.${name}
+        % endfor
+        ${indent(integrator.get_stepper_init(), 2)}
+
+    def set_nnps(self, NNPS nnps):
+        self.nnps = nnps
+
+    def set_parallel_manager(self, object pm):
+        self.parallel_manager = pm
+
+    cpdef integrate(self, double t, double dt, int count):
+        """Main step routine.
+        """
+        self.dt = dt
+        self.initialize()
+        self.predictor()
+
+        # Update NNPS since particles have moved
+        if self.parallel_manager:
+            self.parallel_manager.update()
+        self.nnps.update()
+        # compute accelerations
+        # XXX: Implement initialize for all equations.
+        self.sph_calc.compute(t, dt)
+
+        self.corrector()
+
+    % for method in ('initialize', 'predictor', 'corrector'):
+    cdef ${method}(self):
+        cdef long NP_DEST
+        cdef long d_idx
+        cdef ParticleArrayWrapper dst
+        cdef double dt = self.dt
+        ${indent(integrator.get_array_declarations(method), 2)}
+
+        % for dest in integrator.steppers:
+        # ---------------------------------------------------------------------
+        # Destination ${dest}.
+        dst = self.${dest}
+        NP_DEST = dst.size()
+        ${indent(integrator.get_array_setup(dest, method), 2)}
+        for d_idx in range(NP_DEST):
+            ${indent(integrator.get_stepper_loop(dest, method), 3)}
+        % endfor
+    % endfor
