@@ -1,10 +1,10 @@
 To-do List
 ============
 
-  - Cleanup the integrator.
+  - Documentation.
 
-  - Make parallel support generic so all examples just work.
+  - Easier installation and handling of Zoltan.
+
+  - No-ZOLTAN parallel mode.
 
   - Symmetric interactions.
-
-  - Multi-step integrators.

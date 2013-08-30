@@ -133,7 +133,7 @@ equations = [
         equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
 
-            MomentumEquation(dest='fluid', sources=['fluid'], nu=nu),
+            MomentumEquation(dest='fluid', sources=['fluid'], nu=nu, pb=p0),
 
             ArtificialStress(dest='fluid', sources=['fluid']),
 
