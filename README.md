@@ -63,12 +63,15 @@ You can verify the installation by exploring some examples:
     $ python cavity.py
 
 This runs the driven cavity problem using the transport velocity
-formulation of Adami et al. You can verify the results for the problem
-using the helper script `examples/TransportVelocity/ldcavity_results.py`
+formulation of Adami et al. You can verify the results for this
+problem using the helper script
+`examples/TransportVelocity/ldcavity_results.py` to plot, for example
+the streamlines:
 
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/ldc-streamlines.png)
 
-The auto-generated code is put in the directory `~/.pysph/source`. A
-not of caution however, it's not for the faint hearted.
+The auto-generated code for the example resides in the directory
+`~/.pysph/source`. A not of caution however, it's not for the faint
+hearted.
 
     
