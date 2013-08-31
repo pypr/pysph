@@ -10,7 +10,7 @@ Features
 
   - Solver framework to add arbitrary collection of particles
   - Flexibility to define arbitrary SPH equations operating on particles
-  - Seamless parallel integration using [Zoltan][http://www.cs.sandia.gov/zoltan/]
+  - Seamless parallel integration using [Zoltan](http://www.cs.sandia.gov/zoltan/)
 
 Solvers:
 ---------
@@ -26,7 +26,7 @@ Installation
 =============
 
 To install PySPH, you need a working Python environment. We recommend
-[Enthought Canopy][https://www.enthought.com/products/canopy/] if you
+[Enthought Canopy](https://www.enthought.com/products/canopy/) if you
 are new to Python. Additional dependencies to compile the code are:
 
   - Cython (ideally version 0.19 and above)
@@ -38,8 +38,8 @@ Optional dependencies:
 -----------------------
 
 If you want to use PySPH in parallel, you will need
-[mpi4py][http://mpi4py.scipy.org/] and the
-[Zoltan][http://www.cs.sandia.gov/zoltan/] data management library.
+[mpi4py](http://mpi4py.scipy.org/) and the
+[Zoltan](http://www.cs.sandia.gov/zoltan/) data management library.
 
 Building and linking PyZoltan
 -------------------------------
@@ -66,7 +66,7 @@ This runs the driven cavity problem using the transport velocity
 formulation of Adami et al. You can verify the results for the problem
 using the helper script `examples/TransportVelocity/ldcavity_results.py`
 
-![IMAGE]((https://bitbucket.org/kunalp/pysph/raw/default/docs/Images/ldc-streamlines.png)
+![IMAGE](https://bitbucket.org/kunalp/pysph/raw/default/docs/Images/ldc-streamlines.png)
 
 The auto-generated code is put in the directory `~/.pysph/source`. A
 not of caution however, it's not for the faint hearted.
