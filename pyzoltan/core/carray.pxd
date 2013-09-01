@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sat Jun 29 11:48:11 2013
+# Sun Sep  1 22:44:22 2013
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -175,4 +175,5 @@ cdef class UIntArray(BaseArray):
     cpdef long index(self, unsigned int value)
 
     cdef void _align_array(self, LongArray new_indices)
+
 
