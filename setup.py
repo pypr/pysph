@@ -33,18 +33,38 @@ mpi_inc_dirs = []
 mpi_compile_args = []
 mpi_link_args = []
 
+def get_zoltan_directory(varname):
+    d = os.environ.get(varname, '')
+    if len(d) == 0:
+        print "*"*80
+        print "Environment variable", varname, \
+              "not set, not using ZOLTAN!"
+        print "*"*80
+        return ''
+    if not path.exists(d):
+        print "*"*80
+        print varname, "incorrectly set, not using ZOLTAN!"
+        print "*"*80
+        return ''
+    return d
+
 if Have_MPI:
     mpic = 'mpicc'
     mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
     mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
     mpi_inc_dirs.append(mpi4py.get_include())
 
-    zoltan_include_dirs = [ os.environ['ZOLTAN_INCLUDE'] ]
-    zoltan_library_dirs = [ os.environ['ZOLTAN_LIBRARY'] ]
+    inc = get_zoltan_directory('ZOLTAN_INCLUDE')
+    lib = get_zoltan_directory('ZOLTAN_LIBRARY')
+    if len(inc) == 0 or len(lib) == 0:
+        Have_MPI = False
+    else:
+        zoltan_include_dirs = [ inc ]
+        zoltan_library_dirs = [ lib ]
 
-    # PyZoltan includes
-    zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
-    zoltan_include_dirs += zoltan_cython_include
+        # PyZoltan includes
+        zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
+        zoltan_include_dirs += zoltan_cython_include
 
 include_dirs = [numpy.get_include()]
 
