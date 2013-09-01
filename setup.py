@@ -64,10 +64,6 @@ ext_modules = [
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
 
-    # sph module
-    #Extension( name="pysph.sph.integrator",
-    #           sources=["pysph/sph/integrator.pyx"]),
-
     # kernels used for tests
     Extension( name="pysph.parallel._kernels",
                sources=["pysph/parallel/_kernels.pyx"],
