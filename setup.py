@@ -64,10 +64,6 @@ ext_modules = [
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"]),
 
-    # sph module
-    Extension( name="pysph.sph.integrator",
-               sources=["pysph/sph/integrator.pyx"]),
-
     # kernels used for tests
     Extension( name="pysph.parallel._kernels",
                sources=["pysph/parallel/_kernels.pyx"],
@@ -138,7 +134,7 @@ setup(name='PySPH',
       test_suite = "nose.collector",
       packages = find_packages(),
       # include Cython headers in the install directory
-      package_data={'' : ['*.pxd']},
+      package_data={'' : ['*.pxd', '*.mako']},
 
       ext_modules = ext_modules,
 

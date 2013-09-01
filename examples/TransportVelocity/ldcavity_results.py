@@ -5,6 +5,14 @@ from pysph.tools import pprocess
 from pysph.base.utils import get_particle_array as gpa
 import numpy as np
 
+MATPLOTLIB_STREAMPLOT=True
+import matplotlib.pyplot as plt
+if not hasattr(plt, 'streamplot'):
+    from streamplot import streamplot
+    MATPLOTLIB_STREAMPLOT=False
+else:
+    streamplot = plt.streamplot
+
 class LDCavityResults(pprocess.Results):
     def __init__(self, dirname='cavity_output', fname='cavity', endswith=".npz",
                  Re=100):
@@ -47,15 +55,18 @@ class LDCavityResults(pprocess.Results):
         self.vmag = vmag = np.sqrt( ui**2 + vi**2 )
 
     def streamplot(self, density=2):
-        from streamplot import streamplot
-        import matplotlib.pyplot as plt
-
         f = plt.figure()
-        streamplot(
-            self._x, self._x, self.ui, self.vi,
-            color=self.vmag,density=(density, density),
-            INTEGRATOR='RK4', linewidth=5*self.vmag/self.vmag.max() )
 
+        if not MATPLOTLIB_STREAMPLOT:
+            streamplot(
+                self._x, self._x, self.ui, self.vi,
+                color=self.vmag,density=(density, density),
+                INTEGRATOR='RK4', linewidth=5*self.vmag/self.vmag.max() )
+        else:
+            streamplot(
+                self._x, self._x, self.ui, self.vi, density=(density, density),
+                linewidth=5*self.vmag/self.vmag.max(),
+                color=self.vmag)
         plt.show()
 
     def centerline_velocities(self):
