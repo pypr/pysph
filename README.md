@@ -43,17 +43,18 @@ If you want to use PySPH in parallel, you will need
 
 Building and linking PyZoltan
 -------------------------------
+
  1. Build Zoltan with the following compile options:
 
+ ```
  $ ../configure --with-cflags=-fPIC --enable-mpi -with-mpi-incdir=/usr/include/openmpi-x86_64 --with-mpi-libdir=/usr/lib64/openmpi/lib --prefix=/home/<username>/usr/local/Zoltan --with-mpi-compilers=/usr/lib64/openmpi/bin/
+ ```
+ Of course, you have to provide the appropriate MPI directories on your system.
 
-Of course, you have to provide the appropriate MPI directories on your system. 
+ 2. Declare the environment variables `ZOLTAN_INCLUDE` and `ZOLTAN_LIBRARY`
 
-2. Declare the environment variables `ZOLTAN_INCLUDE` and
-`ZOLTAN_LIBRARY`
+ 3. Install PySPH. The PyZoltan wrappers will be compiled and available.
 
-3. Install PySPH. The PyZoltan wrappers will be compiled and available.	
-  
 Running the examples
 ---------------------
 
@@ -71,7 +72,5 @@ the streamlines:
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/ldc-streamlines.png)
 
 The auto-generated code for the example resides in the directory
-`~/.pysph/source`. A not of caution however, it's not for the faint
+`~/.pysph/source`. A note of caution however, it's not for the faint
 hearted.
-
-    
