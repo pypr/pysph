@@ -134,7 +134,7 @@ setup(name='PySPH',
       test_suite = "nose.collector",
       packages = find_packages(),
       # include Cython headers in the install directory
-      package_data={'' : ['*.pxd']},
+      package_data={'' : ['*.pxd', '*.mako']},
 
       ext_modules = ext_modules,
 
