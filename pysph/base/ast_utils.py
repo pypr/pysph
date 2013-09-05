@@ -41,7 +41,10 @@ class AssignLister(ast.NodeVisitor):
             if isinstance(target, ast.Name):
                 self.names.add(target.id)
             elif isinstance(target, ast.Subscript):
-                self.names.add(target.value.id)
+                n = target.value
+                while not isinstance(n, ast.Name):
+                    n = n.value
+                self.names.add(n.id)
             elif isinstance(target, (ast.List, ast.Tuple)):
                 for n in target.elts:
                     if isinstance(n, ast.Name):

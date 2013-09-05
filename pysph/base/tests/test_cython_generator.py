@@ -7,6 +7,9 @@ from math import pi, sin
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
     all_numeric)
 
+def declare(*args):
+    pass
+
 class BasicEq:
     def __init__(self, hidden=None, rho=0.0, c=0.0):
         self.rho = rho
@@ -21,6 +24,13 @@ class EqWithMethod(BasicEq):
 class EqWithReturn(BasicEq):
     def func(self, d_idx=0, d_x=[0.0, 0.0]):
         return d_x[d_idx]
+
+class EqWithMatrix:
+    def func(self, d_idx, d_x=[0.0, 0.0]):
+        mat = declare('matrix((2,2))')
+        mat[0][0] = d_x[d_idx]
+        vec = declare('matrix((3,))')
+        vec[0] = d_x[d_idx]
 
 class TestBase(unittest.TestCase):
     def assert_code_equal(self, result, expect):
@@ -126,6 +136,24 @@ class TestCythonCodeGenerator(TestBase):
                 return d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_method_with_matrix(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithMatrix())
+        expect = dedent("""
+        cdef class EqWithMatrix:
+            def __init__(self, object obj):
+                for key in obj.__dict__:
+                    setattr(self, key, getattr(obj, key))
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef double[2][2] mat
+                mat[0][0] = d_x[d_idx]
+                cdef double[3] vec
+                vec[0] = d_x[d_idx]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
 
 if __name__ == '__main__':
     unittest.main()
