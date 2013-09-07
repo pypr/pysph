@@ -61,6 +61,15 @@ def all_numeric(seq):
     """
     return all(type(x) in [int, float, long] for x in seq)
 
+def matrix(size):
+    sz = ''.join(['[%d]'%n for n in size])
+    return 'cdef double%s'%sz
+
+def declare(typedef):
+    if typedef.startswith('matrix'):
+        defn = eval(typedef)
+    return defn
+
 class CodeGenerationError(Exception):
     pass
 
@@ -106,14 +115,35 @@ class CythonGenerator(object):
                 methods.append((defn, body))
         return methods
 
+    def _process_line(self, line):
+        """Returns the name defined and the processed line itself.
+
+        This hack primarily lets us declare variables from Python and inject
+        them into Cython code.
+        """
+        if '=' in line:
+            words = [x.strip() for x in line.split('=')]
+            if words[1].startswith('declare'):
+                defn = eval(words[1])
+                name = words[0]
+                indent = line[:line.index(name)]
+                return name, indent + defn + ' ' + name + '\n'
+            else:
+                return '', line
+        else:
+            return '', line
+
     def _get_method_body(self, meth, lines):
         args = set(inspect.getargspec(meth).args)
+        src = [self._process_line(line) for line in lines]
+        declared = [x[0] for x in src if len(x[0]) > 0]
+        cython_body = ''.join([x[1] for x in src])
         body = ''.join(lines)
         dedented_body = dedent(body)
         symbols = get_assigned(dedented_body)
-        undefined = symbols - args
+        undefined = symbols - set(declared) - args
         declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
-        code = ''.join(declare) + body
+        code = ''.join(declare) + cython_body
         return code
 
     def _get_method_spec(self, meth, lines):
