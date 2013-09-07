@@ -147,9 +147,9 @@ class TestCythonCodeGenerator(TestBase):
                     setattr(self, key, getattr(obj, key))
 
             cdef inline void func(self, long d_idx, double* d_x):
-                cdef double[2][2] mat
+                cdef double mat[2][2]
                 mat[0][0] = d_x[d_idx]
-                cdef double[3] vec
+                cdef double vec[3]
                 vec[0] = d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
