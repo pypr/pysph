@@ -196,7 +196,7 @@ cdef cPoint get_eigenvalvec_np(cPoint d, cPoint s, double * R):
     ret.z = evals[2]
     return ret
 
-cdef _get_eigenvalvec(double *d, double *s, double *R, double *eigenvalues):
+cdef _get_eigenvalvec(double d[3], double s[3], double R[3][3], double eigenvalues[3]):
     """Return the eigenvalues and eigenvectors of a symmetric 3X3 matrix Aij
 
     Parameters:
@@ -223,7 +223,7 @@ cdef _get_eigenvalvec(double *d, double *s, double *R, double *eigenvalues):
     _s.x = s[0]; _s.y = s[1]; _s.z = s[2]
 
     # call the original function
-    ret = get_eigenvalvec(_d, _s, R)
+    ret = get_eigenvalvec(_d, _s, &R[0][0])
 
     # copy the eigenvalues
     eigenvalues[0] = ret.x

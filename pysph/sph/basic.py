@@ -63,9 +63,10 @@ class ContinuityEquation(Equation):
 
 
 class MonaghanArtificialViscosity(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
+    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0, eta=0.1):
         self.alpha = alpha
         self.beta = beta
+        self.eta = eta
         super(MonaghanArtificialViscosity, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):

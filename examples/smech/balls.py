@@ -30,8 +30,6 @@ co = numpy.sqrt(K/ro)
 deltap = 0.001
 fac=1e-10
 
-print "co, ro, G = ", co, ro, G
-
 def create_particles(two_arr=False, **kwargs):
     #x,y = numpy.mgrid[-1.05:1.05+1e-4:dx, -0.105:0.105+1e-4:dx]
     dx = 0.001 # 1mm
@@ -102,6 +100,7 @@ def create_particles(two_arr=False, **kwargs):
     pa.add_property( {'name':'s11'} )
     pa.add_property( {'name':'s12'} )
     pa.add_property( {'name':'s22'} )
+    pa.add_property( {'name':'s10'} )
 
     # deviatoric stress accelerations
     pa.add_property( {'name':'as00'} )
@@ -110,6 +109,7 @@ def create_particles(two_arr=False, **kwargs):
     pa.add_property( {'name':'as11'} )
     pa.add_property( {'name':'as12'} )
     pa.add_property( {'name':'as22'} )
+    pa.add_property( {'name':'as10'} )
 
     # deviatoric stress initial values
     pa.add_property( {'name':'s000'} )
@@ -185,7 +185,7 @@ equations = [
             
             # au, av
             MomentumEquationWithStress2D(
-                dest='solid', sources='solid', deltap=deltap, n=4),
+                dest='solid', sources=['solid',], n=4),
 
             # au, av
             MonaghanArtificialViscosity(

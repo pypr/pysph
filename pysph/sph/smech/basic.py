@@ -3,9 +3,6 @@
 from pysph.sph.equation import Equation
 from textwrap import dedent
 
-# SciPy's linalg module
-from scipy.linalg import eigh
-
 class MonaghanArtificialStress(Equation):
     def __init__(self, dest, sources=None, eps=0.3):
         self.eps = eps
@@ -14,7 +11,7 @@ class MonaghanArtificialStress(Equation):
     def cython_code(self):
         code = dedent("""
         from pysph.sph.smech.linalg cimport _get_eigenvalvec
-        from pysph.sph.smech.linalg cimport _transform2inv
+        from pysph.sph.smech.linalg cimport transform2inv
         """)
         return dict(helper=code)
 
@@ -75,7 +72,7 @@ class MonaghanArtificialStress(Equation):
                 rd[i] = 0.0
         
         # transform artificial stresses in original frame
-        _transform2inv(rd, R, Rab)
+        transform2inv(rd, R, Rab)
         
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
@@ -98,14 +95,14 @@ class MomentumEquationWithStress2D(Equation):
     Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
 
     """
-    def __init__(self, dest, sources=None, deltap=0, n=1):
-        self.deltap = deltap
+    def __init__(self, dest, sources=None, wdeltap=1, n=1):
+        self.wdeltap = wdeltap
         self.n = n
         super(MomentumEquationWithStress2D, self).__init__(dest, sources)
 
     def cython_code(self):
         code = dedent("""
-        from libc.cmath cimport pow
+        from libc.math cimport pow
         """)
         return dict(helper=code)
         
@@ -116,7 +113,10 @@ class MomentumEquationWithStress2D(Equation):
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p,
              d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
              d_r00, d_r01, d_r11, s_r00, s_r01, s_r11,
-             _XIJ=[0.0, 0.0, 0.0]):
+             d_au, d_av,
+             WIJ=0.0, DWIJ=[0.0, 0.0, 0.0]):
+
+        _XIJ = declare('matrix((3,))')
         
         pa = d_p[d_idx]
         pb = s_p[s_idx]
@@ -129,22 +129,22 @@ class MomentumEquationWithStress2D(Equation):
 
         s00a = d_s00[d_idx]
         s01a = d_s01[d_idx]
-        s10a = d_s10[d_idx]
+        s10a = d_s01[d_idx]
         s11a = d_s11[d_idx]
 
         s00b = s_s00[s_idx]
         s01b = s_s01[s_idx]
-        s10b = s_s10[s_idx]
+        s10b = s_s01[s_idx]
         s11b = s_s11[s_idx]
 
         r00a = d_r00[d_idx]
         r01a = d_r01[d_idx]
-        r10a = d_r10[d_idx]
+        r10a = d_r01[d_idx]
         r11a = d_r11[d_idx]
 
         r00b = s_r00[s_idx]
         r01b = s_r01[s_idx]
-        r10b = s_r10[s_idx]
+        r10b = s_r01[s_idx]
         r11b = s_r11[s_idx]
 
         # Add pressure to the deviatoric components
@@ -155,16 +155,13 @@ class MomentumEquationWithStress2D(Equation):
         s11b -= pb
 
         # compute the kernel correction term
-        if self.deltap > 0:
-            _XIJ[0] = _XIJ[1] = _XIJ[2] = 0.0
-            wdeltap = self.kernel.function(_XIJ, self.deltap, HIJ)
-             
-            fab = WIJ/wdeltap
+        if self.wdeltap > 0:
+            fab = WIJ/self.wdeltap
             fab = pow(fab, self.n)
             
             art_stress00 = fab * (r00a + r00b)
             art_stress01 = fab * (r01a + r01b)
-            art_stress02 = fab * (r11a + r11b)
+            art_stress11 = fab * (r11a + r11b)
 
         # compute accelerations
         mb = s_m[s_idx]
@@ -204,8 +201,9 @@ class HookesDeviatoricStressRate2D(Equation):
         super(HookesDeviatoricStressRate2D, self).__init__(dest, sources)
 
     
-    def loop(self, d_idx, d_s00, d_s01, d_s10, d_s11, 
-             d_v00, d_v01, d_v10, d_v11):
+    def loop(self, d_idx, d_s00, d_s01, d_s10, d_s11,
+             d_v00, d_v01, d_v10, d_v11,
+             d_as00, d_as01, d_as10, d_as11):
         
         v00 = d_v00[d_idx]
         v01 = d_v01[d_idx]
@@ -229,7 +227,7 @@ class HookesDeviatoricStressRate2D(Equation):
         omega10 = -omega01
         
         tmp = 2.0*self.shear_mod
-        trace = 1.0/3.0 * (eps_00 + eps_11)
+        trace = 1.0/3.0 * (eps00 + eps11)
 
         # S_00
         d_as00[d_idx] = tmp*( eps00 - trace ) + \
@@ -240,7 +238,7 @@ class HookesDeviatoricStressRate2D(Equation):
             ( s00*omega10 ) + ( s11*omega01 )        
 
         # S_10
-        d_as10[d_idx] = d_ad01[d_idx]
+        d_as10[d_idx] = d_as01[d_idx]
         
         # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \

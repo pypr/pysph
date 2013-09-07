@@ -11,7 +11,7 @@ cdef void eigen_decomposition(double A[3][3], double V[3][3], double d[3])
 
 # return the Eigenvalue and Eigenvectors
 cdef cPoint get_eigenvalvec(cPoint d, cPoint s, double * R)
-cdef _get_eigenvalvec(double* d, double* s, double* R, double* eigenvalues)
+cdef _get_eigenvalvec(double d[3], double s[3], double R[3][3], double eigenvalues[3])
 
 # compute the transformation P*A*P.T
 cdef void transform2inv(double A[3], double P[3][3], double res[3][3])
