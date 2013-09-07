@@ -93,6 +93,84 @@ class WCSPHStep(IntegratorStep):
         # Update densities and smoothing lengths from the accelerations
         d_rho[d_idx] = d_rho0[d_idx] + dt * d_arho[d_idx]
 
+###############################################################################
+# `SmechStep` class
+###############################################################################
+class SmechStep(IntegratorStep):
+    def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho,
+                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+                   d_s000, d_s010, d_s020, d_s110, d_s120, d_s220):
+        d_x0[d_idx] = d_x[d_idx]
+        d_y0[d_idx] = d_y[d_idx]
+        d_z0[d_idx] = d_z[d_idx]
+
+        d_u0[d_idx] = d_u[d_idx]
+        d_v0[d_idx] = d_v[d_idx]
+        d_w0[d_idx] = d_w[d_idx]
+
+        d_rho0[d_idx] = d_rho[d_idx]
+
+        d_s000[d_idx] = d_s00[d_idx]
+        d_s010[d_idx] = d_s01[d_idx]
+        d_s020[d_idx] = d_s02[d_idx]
+        d_s110[d_idx] = d_s11[d_idx]
+        d_s120[d_idx] = d_s12[d_idx]
+        d_s220[d_idx] = d_s22[d_idx]
+
+    def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+                  d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+                  d_aw, d_ax, d_ay, d_az, d_arho, 
+                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, 
+                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
+                  d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
+                  dt=0.0):
+        dtb2 = 0.5*dt
+        d_u[d_idx] = d_u0[d_idx] + dtb2*d_au[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dtb2*d_av[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dtb2*d_aw[d_idx]
+
+        d_x[d_idx] = d_x0[d_idx] + dtb2 * d_ax[d_idx]
+        d_y[d_idx] = d_y0[d_idx] + dtb2 * d_ay[d_idx]
+        d_z[d_idx] = d_z0[d_idx] + dtb2 * d_az[d_idx]
+
+        # Update densities and smoothing lengths from the accelerations
+        d_rho[d_idx] = d_rho0[d_idx] + dtb2 * d_arho[d_idx]
+
+        # update deviatoric stress components
+        d_s00[d_idx] = d_s000[d_idx] + dtb2 * d_as00[d_idx]
+        d_s01[d_idx] = d_s010[d_idx] + dtb2 * d_as01[d_idx]
+        d_s02[d_idx] = d_s020[d_idx] + dtb2 * d_as02[d_idx]
+        d_s11[d_idx] = d_s110[d_idx] + dtb2 * d_as11[d_idx]
+        d_s12[d_idx] = d_s120[d_idx] + dtb2 * d_as12[d_idx]
+        d_s22[d_idx] = d_s220[d_idx] + dtb2 * d_as22[d_idx]
+
+    def corrector(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+                  d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
+                  d_aw, d_ax, d_ay, d_az, d_arho, 
+                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
+                  d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
+                  dt=0.0):
+
+        d_u[d_idx] = d_u0[d_idx] + dt*d_au[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dt*d_av[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dt*d_aw[d_idx]
+
+        d_x[d_idx] = d_x0[d_idx] + dt * d_ax[d_idx]
+        d_y[d_idx] = d_y0[d_idx] + dt * d_ay[d_idx]
+        d_z[d_idx] = d_z0[d_idx] + dt * d_az[d_idx]
+
+        # Update densities and smoothing lengths from the accelerations
+        d_rho[d_idx] = d_rho0[d_idx] + dt * d_arho[d_idx]
+
+        # update deviatoric stress components
+        d_s00[d_idx] = d_s000[d_idx] + dt * d_as00[d_idx]
+        d_s01[d_idx] = d_s010[d_idx] + dt * d_as01[d_idx]
+        d_s02[d_idx] = d_s020[d_idx] + dt * d_as02[d_idx]
+        d_s11[d_idx] = d_s110[d_idx] + dt * d_as11[d_idx]
+        d_s12[d_idx] = d_s120[d_idx] + dt * d_as12[d_idx]
+        d_s22[d_idx] = d_s220[d_idx] + dt * d_as22[d_idx]
 
 ###############################################################################
 # `TransportVelocityStep` class

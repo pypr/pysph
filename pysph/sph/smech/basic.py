@@ -13,8 +13,8 @@ class MonaghanArtificialStress(Equation):
 
     def cython_code(self):
         code = dedent("""
-        from linalg cimport get_eigenvalvec
-        from linalg cimport _transform2inv
+        from pysph.sph.smech.linalg cimport _get_eigenvalvec
+        from pysph.sph.smech.linalg cimport _transform2inv
         """)
         return dict(helper=code)
 
@@ -69,12 +69,12 @@ class MonaghanArtificialStress(Equation):
         ss[2] = d_s01[d_idx]
 
         # compute the principle stresses
-        get_eigenvalvec(sd, ss, R0, R1, R2, S)
+        _get_eigenvalvec(sd, ss, R0, R1, R2, S)
 
         # correction
         for i in range(3):
             if S[i] > 0:
-                rd[i] = -self.eps * S[i] * rho2
+                rd[i] = -self.eps * S[i] * rho21
             else:
                 rd[i] = 0.0
         
@@ -83,9 +83,9 @@ class MonaghanArtificialStress(Equation):
         
         # store the values
         d_r00[d_idx] = rab_0[0]; d_r11[d_idx] = rab_1[1]; d_r22[d_idx] = rab_2[2]
-        d_r12[d_idx] = rab_2[1]; d_r02[d_idx] = rab_2[0]; d_r01[d_r01] = rab_1[0]
+        d_r12[d_idx] = rab_2[1]; d_r02[d_idx] = rab_2[0]; d_r01[d_idx] = rab_1[0]
         
-class MomentumEquationWithStress2D(SPHFunctionParticle):
+class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
 
     :math:`$
@@ -176,7 +176,7 @@ class MomentumEquationWithStress2D(SPHFunctionParticle):
         d_av[d_idx] += mb * (s10a*rhoa21 + s10b*rhob21 + art_stress01) * DWIJ[0] + \
             mb * (s11a*rhoa21 + s11b*rhob21 + art_stress11) * DWIJ[1]
 
-class HookesDeviatoricStressRate2D(SPHFunction):
+class HookesDeviatoricStressRate2D(Equation):
     r""" Compute the RHS for the rate of change of stress equation (2D)
 
     .. raw:: latex

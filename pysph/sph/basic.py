@@ -17,16 +17,17 @@ class VelocityGradient2D(Equation):
     :math:`$\frac{\partial w}{\partial y}$`
 
     """
-    def initialize(self, d_v00, d_v01, d_v10, d_11):
+    def initialize(self, d_idx, d_v00, d_v01, d_v10, d_v11):
         d_v00[d_idx] = 0.0
-        d_v01[d_v10] = 0.0
+        d_v01[d_idx] = 0.0
         d_v10[d_idx] = 0.0
         d_v11[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, s_m, s_rho, 
              d_v00, d_v01, d_v10, d_v11,
              DWIJ=[0.0, 0.0, 0.0], 
-             VIJ= [0.0, 0.0, 0.0]):
+             VIJ= [0.0, 0.0, 0.0],
+             s=[0.0, 0.0, 0.0]):
         
         tmp = s_m[s_idx]/s_rho[s_idx]
         
@@ -36,7 +37,7 @@ class VelocityGradient2D(Equation):
         d_v10[d_idx] += tmp * VIJ[1] * DWIJ[0]
         d_v11[d_idx] += tmp * VIJ[1] * DWIJ[1]
 
-def IsothermalEOS(Equation):
+class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
     :math:`$p = c_0^2(\rho_0 - rho)$`
@@ -66,7 +67,7 @@ class MonaghanArtificialViscosity(Equation):
     def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
         self.alpha = alpha
         self.beta = beta
-        super(MomentumEquation, self).__init__(dest, sources)
+        super(MonaghanArtificialViscosity, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0

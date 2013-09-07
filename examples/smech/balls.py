@@ -6,7 +6,7 @@ import numpy
 from pysph.sph.equation import Group
 from pysph.sph.basic import IsothermalEOS, ContinuityEquation, MonaghanArtificialViscosity,\
      XSPHCorrection, VelocityGradient2D
-from pysph.sph.smech import MomentumEquationWithStress2D, HookesDeviatoricStressRate2D,\
+from pysph.sph.smech.basic import MomentumEquationWithStress2D, HookesDeviatoricStressRate2D,\
     MonaghanArtificialStress
 
 from pysph.base.utils import get_particle_array
@@ -15,11 +15,15 @@ from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import Integrator, SmechStep
 
+def get_K(G, nu):
+    ''' Get the bulk modulus from shear modulus and Poisson ratio '''
+    return 2.0*G*(1+nu)/(3*(1-2*nu))
+
 # constants
 E = 1e7
 nu = 0.3975
 G = E/(2.0*(1+nu))
-K = sph.get_K(G, nu)
+K = get_K(G, nu)
 ro = 1.0
 co = numpy.sqrt(K/ro)
 
@@ -68,7 +72,7 @@ def create_particles(two_arr=False, **kwargs):
     h *= 1
     
     # create the particle array
-    pa = base.get_particle_array(
+    pa = get_particle_array(
         name="solid", x=x+spacing, y=y, m=m, rho=rho, h=h,
         p=p, cs=cs, u=z, v=v)
 
@@ -88,8 +92,8 @@ def create_particles(two_arr=False, **kwargs):
     pa.add_property( {'name':'r01'} )
     pa.add_property( {'name':'r02'} )
     pa.add_property( {'name':'r11'} )
-    pa.add_property( {'name':'v12'} )
-    pa.add_property( {'name':'v22'} )
+    pa.add_property( {'name':'r12'} )
+    pa.add_property( {'name':'r22'} )
 
     # deviatoric stress components
     pa.add_property( {'name':'s00'} )
@@ -133,7 +137,7 @@ def create_particles(two_arr=False, **kwargs):
     pa.add_property( {'name':'y0'} )
     pa.add_property( {'name':'z0'} )
 
-    return pa
+    return [pa]
 
 # create the Application
 app = Application()
@@ -150,8 +154,8 @@ solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 # default parameters
 dt = 1e-8
 tf = 1e-2
-s.set_time_step(dt)
-s.set_final_time(tf)
+solver.set_time_step(dt)
+solver.set_final_time(tf)
 
 # add the equations
 equations = [
@@ -167,37 +171,37 @@ equations = [
             
             # rij : requires properties r00, r01, r02, r11, r12, r22,
             #                           s00, s01, s02, s11, s12, s22            
-            MonaghanArtificialStress(
-                dest='solid', sources='solid', eps=0.3),
+            #MonaghanArtificialStress(
+            #    dest='solid', sources='solid', eps=0.3),
             ],
         ),
     
     # Acceleration variables are now computed
-    Group(
-        equations=[
+    # Group(
+    #     equations=[
 
-            # arho
-            ContinuityEquation(dest='solid', sources='solid'),
+    #         # arho
+    #         ContinuityEquation(dest='solid', sources='solid'),
             
-            # au, av
-            MomentumEquationWithStress2D(
-                dest='solid', sources='solid', deltap=deltap, n=n),
+    #         # au, av
+    #         MomentumEquationWithStress2D(
+    #             dest='solid', sources='solid', deltap=deltap, n=4),
 
-            # au, av
-            MonaghanArtificialViscosity(
-                dest='solid', sources='solid', alpha=1.0, beta=1.0),
+    #         # au, av
+    #         MonaghanArtificialViscosity(
+    #             dest='solid', sources='solid', alpha=1.0, beta=1.0),
             
-            # a_s00, a_s01, a_s11
-            HookesDeviatoricStressRate2D(
-                dest='solid', sources=None, shear_mod=G),
+    #         # a_s00, a_s01, a_s11
+    #         HookesDeviatoricStressRate2D(
+    #             dest='solid', sources=None, shear_mod=G),
 
-            # ax, ay, az
-            XSPHCorrection(
-                dest='solid', sources='solid', eps=0.5),
+    #         # ax, ay, az
+    #         XSPHCorrection(
+    #             dest='solid', sources='solid', eps=0.5),
 
-            ]
+    #         ]
 
-        ) # End Acceleration Group
+    #     ) # End Acceleration Group
 
     ] # End Group list
 
@@ -207,7 +211,4 @@ app.setup(
     name='fluid')
 
 # run
-t1 = time()
 app.run()
-elapsed = time() - t1
-print "Ran example in %gs"%(elapsed)

@@ -309,6 +309,7 @@ class Group(object):
         names.sort()
         for var in names:
             value = context[var]
+            print var, value
             if isinstance(value, int):
                 declare = 'cdef long ' if mode == 'declare' else ''
                 decl.append('{declare}{var} = {value}'.format(declare=declare,
