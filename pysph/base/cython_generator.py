@@ -61,15 +61,6 @@ def all_numeric(seq):
     """
     return all(type(x) in [int, float, long] for x in seq)
 
-def matrix(size):
-    sz = ''.join(['[%d]'%n for n in size])
-    return 'cdef double%s'%sz
-
-def declare(typedef):
-    if typedef.startswith('matrix'):
-        defn = eval(typedef)
-    return defn
-
 class CodeGenerationError(Exception):
     pass
 
@@ -115,7 +106,21 @@ class CythonGenerator(object):
                 methods.append((defn, body))
         return methods
 
-    def _process_line(self, line):
+    def _handle_declare_statement(self, name, declare):
+        def matrix(size):
+            sz = ''.join(['[%d]'%n for n in size])
+            return sz
+
+        # Remove the "declare('" and the trailing "')".
+        code = declare[9:-2]
+        if code.startswith('matrix'):
+            sz = matrix(eval(code[7:-1]))
+            defn = 'cdef double %s%s'%(name, sz)
+            return defn
+        else:
+            raise RuntimeError('Unknown declaration %s'%declare)
+
+    def _process_body_line(self, line):
         """Returns the name defined and the processed line itself.
 
         This hack primarily lets us declare variables from Python and inject
@@ -124,10 +129,11 @@ class CythonGenerator(object):
         if '=' in line:
             words = [x.strip() for x in line.split('=')]
             if words[1].startswith('declare'):
-                defn = eval(words[1])
                 name = words[0]
+                declare = words[1]
+                defn = self._handle_declare_statement(name, declare)
                 indent = line[:line.index(name)]
-                return name, indent + defn + ' ' + name + '\n'
+                return name, indent + defn + '\n'
             else:
                 return '', line
         else:
@@ -135,7 +141,7 @@ class CythonGenerator(object):
 
     def _get_method_body(self, meth, lines):
         args = set(inspect.getargspec(meth).args)
-        src = [self._process_line(line) for line in lines]
+        src = [self._process_body_line(line) for line in lines]
         declared = [x[0] for x in src if len(x[0]) > 0]
         cython_body = ''.join([x[1] for x in src])
         body = ''.join(lines)
