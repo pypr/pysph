@@ -137,7 +137,7 @@ def create_particles(two_arr=False, **kwargs):
     pa.add_property( {'name':'y0'} )
     pa.add_property( {'name':'z0'} )
 
-    return [pa]
+    return [pa,]
 
 # create the Application
 app = Application()
@@ -167,41 +167,41 @@ equations = [
             IsothermalEOS(dest='solid', sources=None, rho0=ro, c0=co),
 
             # vi,j : requires properties v00, v01, v10, v11
-            VelocityGradient2D(dest='solid', sources='solid'),
+            VelocityGradient2D(dest='solid', sources=['solid',]),
             
             # rij : requires properties r00, r01, r02, r11, r12, r22,
             #                           s00, s01, s02, s11, s12, s22            
-            #MonaghanArtificialStress(
-            #    dest='solid', sources='solid', eps=0.3),
+            MonaghanArtificialStress(
+               dest='solid', sources=None, eps=0.3),
             ],
         ),
     
     # Acceleration variables are now computed
-    # Group(
-    #     equations=[
+    Group(
+        equations=[
 
-    #         # arho
-    #         ContinuityEquation(dest='solid', sources='solid'),
+            # arho
+            ContinuityEquation(dest='solid', sources=['solid',]),
             
-    #         # au, av
-    #         MomentumEquationWithStress2D(
-    #             dest='solid', sources='solid', deltap=deltap, n=4),
+            # au, av
+            MomentumEquationWithStress2D(
+                dest='solid', sources='solid', deltap=deltap, n=4),
 
-    #         # au, av
-    #         MonaghanArtificialViscosity(
-    #             dest='solid', sources='solid', alpha=1.0, beta=1.0),
+            # au, av
+            MonaghanArtificialViscosity(
+                dest='solid', sources=['solid',], alpha=1.0, beta=1.0),
             
-    #         # a_s00, a_s01, a_s11
-    #         HookesDeviatoricStressRate2D(
-    #             dest='solid', sources=None, shear_mod=G),
+            # a_s00, a_s01, a_s11
+            HookesDeviatoricStressRate2D(
+                dest='solid', sources=None, shear_mod=G),
 
-    #         # ax, ay, az
-    #         XSPHCorrection(
-    #             dest='solid', sources='solid', eps=0.5),
+            # ax, ay, az
+            XSPHCorrection(
+                dest='solid', sources=['solid',], eps=0.5),
 
-    #         ]
+            ]
 
-    #     ) # End Acceleration Group
+        ) # End Acceleration Group
 
     ] # End Group list
 

@@ -26,8 +26,7 @@ class VelocityGradient2D(Equation):
     def loop(self, d_idx, s_idx, s_m, s_rho, 
              d_v00, d_v01, d_v10, d_v11,
              DWIJ=[0.0, 0.0, 0.0], 
-             VIJ= [0.0, 0.0, 0.0],
-             s=[0.0, 0.0, 0.0]):
+             VIJ= [0.0, 0.0, 0.0]):
         
         tmp = s_m[s_idx]/s_rho[s_idx]
         

@@ -18,13 +18,9 @@ class MonaghanArtificialStress(Equation):
         """)
         return dict(helper=code)
 
-    def loop(self, d_idx, s_idx, d_rho, d_p,
+    def loop(self, d_idx, d_rho, d_p,
              d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-             d_r00, d_r01, d_r02, d_r11, d_r12, d_r22,
-             sd = [0.0, 0.0, 0.0], ss=[0.0, 0.0, 0.0], rd=[0.0, 0.0, 0.0],
-             R0 = [0.0, 0.0, 0.0], R1=[0.0, 0.0, 0.0], R2=[0.0, 0.0, 0.0],
-             rab_0=[0.0, 0.0, 0.0], rab_1=[0.0, 0.0, 0.0], 
-             rab_2=[0.0, 0.0, 0.0], S=[0.0, 0.0 ,0.0]):
+             d_r00, d_r01, d_r02, d_r11, d_r12, d_r22):
         """Compute the stress terms
 
         Parameters:
@@ -36,28 +32,28 @@ class MonaghanArtificialStress(Equation):
         d_rxx : DoubleArray
             Artificial stress components (Symmetric)
 
-        sd : double[3]
-            Diagonal terms for the stress tensor
-
-        ss : double[3]
-            Off-diagonal terms for the stress tensor
-            
-        rd : double[3]
-            Artificial stress in the principle directions
-
-        Rx : double[3]
-            Eigenvector columns
-
-        rab_x : double[3]
-            Artificial stress in the original coordinates
-
-        Sx : double[3]
-            Eigenvalues
-
         """
         # 1/rho_a^2
         rho21 = 1./d_rho[d_idx]
         rho21 *= rho21
+
+        ## Matrix and vector declarations ##
+
+        # diagonal and off-diaognal terms for the stress tensor
+        sd = declare('matrix((3,))')
+        ss = declare('matrix((3,))')
+
+        # artificial stress in the principle directions
+        rd = declare('matrix((3,))')
+
+        # Matrix of Eigenvectors (columns)
+        R = declare('matrix((3,3))')
+
+        # Artificial stress in the original coordinates
+        Rab = declare('matrix((3,3))')
+
+        # Eigenvectors
+        S = declare('matrix((3,))')
 
         # get the diagonal terms for the stress tensor adding pressure
         sd[0] = d_s00[d_idx] - d_p[d_idx]
@@ -69,7 +65,7 @@ class MonaghanArtificialStress(Equation):
         ss[2] = d_s01[d_idx]
 
         # compute the principle stresses
-        _get_eigenvalvec(sd, ss, R0, R1, R2, S)
+        _get_eigenvalvec(sd, ss, R, S)
 
         # correction
         for i in range(3):
@@ -79,11 +75,14 @@ class MonaghanArtificialStress(Equation):
                 rd[i] = 0.0
         
         # transform artificial stresses in original frame
-        _transform2inv(rd, R0, R1, R2, rab_0, rab_1, rab_2)
+        _transform2inv(rd, R, Rab)
         
         # store the values
-        d_r00[d_idx] = rab_0[0]; d_r11[d_idx] = rab_1[1]; d_r22[d_idx] = rab_2[2]
-        d_r12[d_idx] = rab_2[1]; d_r02[d_idx] = rab_2[0]; d_r01[d_idx] = rab_1[0]
+        d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
+        d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
+
+        #d_r00[d_idx] = rab_0[0]; d_r11[d_idx] = rab_1[1]; d_r22[d_idx] = rab_2[2]
+        #d_r12[d_idx] = rab_2[1]; d_r02[d_idx] = rab_2[0]; d_r01[d_idx] = rab_1[0]
         
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
