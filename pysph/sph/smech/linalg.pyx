@@ -1,7 +1,5 @@
-"""Eigen decomposition code for symmetric 3x3 matrices, copied from the public
-domain Java Matrix library JAMA. 
-
-"""
+# Eigen decomposition code for symmetric 3x3 matrices, copied from the public
+#   domain Java Matrix library JAMA
 
 from libc.math cimport sqrt, cos, acos, sin, atan2
 cimport cython
@@ -13,6 +11,7 @@ import numpy
 
 from pysph.base.point cimport cPoint, cPoint_new, cPoint_sub, cPoint_dot, \
         cPoint_norm, cPoint_scale, cPoint_length, Point
+
 
 cdef extern:
     double fabs(double)
@@ -196,40 +195,6 @@ cdef cPoint get_eigenvalvec_np(cPoint d, cPoint s, double * R):
     ret.z = evals[2]
     return ret
 
-cdef _get_eigenvalvec(double d[3], double s[3], double R[3][3], double eigenvalues[3]):
-    """Return the eigenvalues and eigenvectors of a symmetric 3X3 matrix Aij
-
-    Parameters:
-    -----------
-
-    d : double[3]
-        Diagonal elements of the matrix 
-        
-    s : double[3]
-        Off-diagonal elements of the matrix : [A12, A02, A01]
-
-    R : double[3][3]
-        Output. Eigenvector column
-
-    eigenvalues : double[3]
-        Output. Eigenvalues        
-
-    """
-    cdef int i, j
-    cdef cPoint ret, _d, _s
-
-    # copy into points
-    _d.x = d[0]; _d.y = d[1]; _d.z = d[2]
-    _s.x = s[0]; _s.y = s[1]; _s.z = s[2]
-
-    # call the original function
-    ret = get_eigenvalvec(_d, _s, &R[0][0])
-
-    # copy the eigenvalues
-    eigenvalues[0] = ret.x
-    eigenvalues[1] = ret.y
-    eigenvalues[2] = ret.z
-
 cdef cPoint get_eigenvalvec(cPoint d, cPoint s, double * R):
     ''' get the eigenvalues and eigenvectors of symm 3x3 matrix
 
@@ -295,49 +260,7 @@ cdef void transform2(cPoint A, double P[3][3], double res[3][3]):
                 #for l in range(3):
                 res[i][j] += P[k][i]*(&A.x)[k]*P[k][j] # P.T*A*P
 
-# cdef void _transform2inv(double *_A, double *P0, double *P1, double * P2,
-#                         double *R0, double *R1, double * R2):
-#     """Compute the transformation P*A*P.T and add to the result"""
-    
-#     cdef cPoint A
-#     cdef double P[3][3]
-#     cdef double res[3][3]
-
-#     A.x = _A[0]; A.y = _A[1]; A.z = _A[2]
-    
-#     P[0][0] = P0[0]; P[1][0] = P0[1]; P[2][0] = P0[2]
-#     P[0][1] = P1[0]; P[1][1] = P1[1]; P[2][1] = P1[2]
-#     P[0][2] = P2[0]; P[1][2] = P2[1]; P[2][2] = P2[2]
-
-#     res[0][0] = R0[0]; res[1][0] = R0[1]; res[2][0] = R0[2]
-#     res[0][1] = R1[0]; res[1][1] = R1[1]; res[2][1] = R1[2]
-#     res[0][2] = R2[0]; res[1][2] = R2[1]; res[2][2] = R2[2]
-    
-#     # call the old function
-#     transform2inv(A, P, res)
-
-#     # store the values back for the calling function
-#     # P0[0] = P[0][0]; P0[1] = P[1][0]; P0[2] = P[2][0]
-#     # P1[0] = P[0][1]; P1[1] = P[1][1]; P1[2] = P[2][1]
-#     # P2[0] = P[0][2]; P2[1] = P[1][2]; P2[2] = P[2][2]
-
-#     R0[0] = res[0][0]; R0[1] = res[1][0]; R0[2] = res[2][0]
-#     R1[0] = res[0][1]; R1[1] = res[1][1]; R1[2] = res[2][1]
-#     R2[0] = res[0][2]; R2[1] = res[1][2]; R2[2] = res[2][2]
-
-# cdef void transform2inv(cPoint A, double P[3][3], double res[3][3]):
-#     ''' compute the transformation P*A*P.T and add it into result
-    
-#     A is diagonal '''
-#     for i in range(3):
-#         for j in range(3):
-#             #res[i][j] = 0
-#             for k in range(3):
-#                 # l = k
-#                 #for l in range(3):
-#                 res[i][j] += P[i][k]*(&A.x)[k]*P[j][k] # P.T*A*P
-
-cdef void transform2inv(double A[3], double P[3][3], double res[3][3]):
+cdef void transform2inv(cPoint A, double P[3][3], double res[3][3]):
     ''' compute the transformation P*A*P.T and add it into result
     
     A is diagonal '''
@@ -347,7 +270,7 @@ cdef void transform2inv(double A[3], double P[3][3], double res[3][3]):
             for k in range(3):
                 # l = k
                 #for l in range(3):
-                res[i][j] += P[i][k]*A[k]*P[j][k] # P.T*A*P
+                res[i][j] += P[i][k]*(&A.x)[k]*P[j][k] # P.T*A*P
 
 def py_transform2(A, P):
     cdef double res[3][3]
@@ -368,22 +291,22 @@ def py_transform2(A, P):
 def py_transform2inv(A, P):
     cdef double res[3][3]
     cdef double cP[3][3]
-    cdef double _A[3]
-
     for i in range(3):
         for j in range(3):
             res[i][j] = 0
             cP[i][j] = P[i][j]
     cdef Point cA = Point(*A)
     
-    #transform2inv(cA.data, cP, res)
-    transform2inv(_A, cP, res)
-    A.data.x = _A[0]; A.data.y = _A[1]; A.data.z = _A[2]
+    transform2inv(cA.data, cP, res)
     ret = empty((3,3))
     for i in range(3):
         for j in range(3):
             ret[i][j] = res[i][j]
     return ret
+
+
+
+
 
 cdef double * tred2(double V[n][n], double * d, double e[n]):
     ''' Symmetric Householder reduction to tridiagonal form '''

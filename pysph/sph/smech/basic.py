@@ -10,8 +10,10 @@ class MonaghanArtificialStress(Equation):
 
     def cython_code(self):
         code = dedent("""
-        from pysph.sph.smech.linalg cimport _get_eigenvalvec
+        cimport cython
+        from pysph.sph.smech.linalg cimport get_eigenvalvec
         from pysph.sph.smech.linalg cimport transform2inv
+        from pysph.base.point cimport cPoint
         """)
         return dict(helper=code)
 
@@ -31,17 +33,17 @@ class MonaghanArtificialStress(Equation):
 
         """
         # 1/rho_a^2
-        rho21 = 1./d_rho[d_idx]
-        rho21 *= rho21
+        rhoi = d_rho[d_idx]
+        rhoi21 = 1./(rhoi * rhoi)
 
         ## Matrix and vector declarations ##
 
         # diagonal and off-diaognal terms for the stress tensor
-        sd = declare('matrix((3,))')
-        ss = declare('matrix((3,))')
+        sd = declare('cPoint')
+        ss = declare('cPoint')
 
         # artificial stress in the principle directions
-        rd = declare('matrix((3,))')
+        rd = declare('cPoint')
 
         # Matrix of Eigenvectors (columns)
         R = declare('matrix((3,3))')
@@ -50,26 +52,37 @@ class MonaghanArtificialStress(Equation):
         Rab = declare('matrix((3,3))')
 
         # Eigenvectors
-        S = declare('matrix((3,))')
+        S = declare('cPoint')
+
+        # tmp
+        _d_s = declare('matrix((3,3))')
+
+        # initialize the artificial stress terms to 0
+        for i in range(3):
+            for j in range(3):
+                Rab[i][j] = 0
 
         # get the diagonal terms for the stress tensor adding pressure
-        sd[0] = d_s00[d_idx] - d_p[d_idx]
-        sd[1] = d_s11[d_idx] - d_p[d_idx]
-        sd[2] = d_s22[d_idx] - d_p[d_idx]
+        sd.x = d_s00[d_idx] - d_p[d_idx]
+        sd.y = d_s11[d_idx] - d_p[d_idx]
+        sd.z = d_s22[d_idx] - d_p[d_idx]
         
-        ss[0] = d_s12[d_idx]
-        ss[1] = d_s02[d_idx]
-        ss[2] = d_s01[d_idx]
+        ss.x = d_s12[d_idx]
+        ss.y = d_s02[d_idx]
+        ss.z = d_s01[d_idx]
 
         # compute the principle stresses
-        _get_eigenvalvec(sd, ss, R, S)
+        S = get_eigenvalvec(sd, ss, cython.address(R[0][0]))
 
-        # correction
-        for i in range(3):
-            if S[i] > 0:
-                rd[i] = -self.eps * S[i] * rho21
-            else:
-                rd[i] = 0.0
+        # artificial stress corrections
+        if S.x > 0: rd.x = -self.eps * S.x * rhoi21
+        else : rd.x = 0
+
+        if S.y > 0: rd.y = -self.eps * S.y * rhoi21
+        else : rd.y = 0
+
+        if S.z > 0: rd.z = -self.eps * S.z * rhoi21
+        else : rd.z = 0
         
         # transform artificial stresses in original frame
         transform2inv(rd, R, Rab)
@@ -77,9 +90,6 @@ class MonaghanArtificialStress(Equation):
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
         d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
-
-        #d_r00[d_idx] = rab_0[0]; d_r11[d_idx] = rab_1[1]; d_r22[d_idx] = rab_2[2]
-        #d_r12[d_idx] = rab_2[1]; d_r02[d_idx] = rab_2[0]; d_r01[d_idx] = rab_1[0]
         
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
@@ -95,9 +105,11 @@ class MomentumEquationWithStress2D(Equation):
     Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
 
     """
-    def __init__(self, dest, sources=None, wdeltap=1, n=1):
+    def __init__(self, dest, sources=None, wdeltap=-1, n=1):
         self.wdeltap = wdeltap
         self.n = n
+        if wdeltap < 0:
+            self.with_correction = False
         super(MomentumEquationWithStress2D, self).__init__(dest, sources)
 
     def cython_code(self):
@@ -148,20 +160,24 @@ class MomentumEquationWithStress2D(Equation):
         r11b = s_r11[s_idx]
 
         # Add pressure to the deviatoric components
-        s00a -= pa
-        s00b -= pb
+        s00a = s00a - pa
+        s00b = s00b - pb
 
-        s11a -= pa
-        s11b -= pb
+        s11a = s11a - pa
+        s11b = s11b - pb
 
         # compute the kernel correction term
-        if self.wdeltap > 0:
+        if self.with_correction:
             fab = WIJ/self.wdeltap
             fab = pow(fab, self.n)
             
             art_stress00 = fab * (r00a + r00b)
             art_stress01 = fab * (r01a + r01b)
             art_stress11 = fab * (r11a + r11b)
+        else:
+            art_stress00 = 0.0
+            art_stress01 = 0.0
+            art_stress11 = 0.0
 
         # compute accelerations
         mb = s_m[s_idx]

@@ -30,7 +30,7 @@ co = numpy.sqrt(K/ro)
 deltap = 0.001
 fac=1e-10
 
-def create_particles(two_arr=False, **kwargs):
+def create_particles(**kwargs):
     #x,y = numpy.mgrid[-1.05:1.05+1e-4:dx, -0.105:0.105+1e-4:dx]
     dx = 0.001 # 1mm
     ri = 0.03 # 3cm inner radius
@@ -46,11 +46,10 @@ def create_particles(two_arr=False, **kwargs):
     x = x[keep]
     y = y[keep]
 
-    print 'num_particles', len(x)*2
+    print 'num_particles', len(x)*2, x.size
     
-    if not two_arr:
-        x = numpy.concatenate([x-spacing,x+spacing])
-        y = numpy.concatenate([y,y])
+    x = numpy.concatenate([x-spacing,x+spacing])
+    y = numpy.concatenate([y,y])
 
     #print bdry, numpy.flatnonzero(bdry)
     m = numpy.ones_like(x)*dx*dx
