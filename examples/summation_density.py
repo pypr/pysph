@@ -2,7 +2,8 @@ from numpy import linspace, ones_like
 from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import CubicSpline
 from pysph.base.locators import AllPairLocator
-from pysph.sph.wc.basic import SummationDensity, TaitEOS
+from pysph.sph.basic import SummationDensity, TaitEOS
+from pysph.sph.wc.basic import TaitEOS
 from pysph.sph.sph_eval import SPHEval
 from pysph.sph.integrator import Integrator
 

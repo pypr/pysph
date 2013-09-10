@@ -54,9 +54,6 @@ class MonaghanArtificialStress(Equation):
         # Eigenvectors
         S = declare('cPoint')
 
-        # tmp
-        _d_s = declare('matrix((3,3))')
-
         # initialize the artificial stress terms to 0
         for i in range(3):
             for j in range(3):
@@ -86,7 +83,7 @@ class MonaghanArtificialStress(Equation):
         
         # transform artificial stresses in original frame
         transform2inv(rd, R, Rab)
-        
+
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
         d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
@@ -108,6 +105,7 @@ class MomentumEquationWithStress2D(Equation):
     def __init__(self, dest, sources=None, wdeltap=-1, n=1):
         self.wdeltap = wdeltap
         self.n = n
+        self.with_correction = True
         if wdeltap < 0:
             self.with_correction = False
         super(MomentumEquationWithStress2D, self).__init__(dest, sources)
@@ -128,8 +126,6 @@ class MomentumEquationWithStress2D(Equation):
              d_au, d_av,
              WIJ=0.0, DWIJ=[0.0, 0.0, 0.0]):
 
-        _XIJ = declare('matrix((3,))')
-        
         pa = d_p[d_idx]
         pb = s_p[s_idx]
 
@@ -217,9 +213,9 @@ class HookesDeviatoricStressRate2D(Equation):
         super(HookesDeviatoricStressRate2D, self).__init__(dest, sources)
 
     
-    def loop(self, d_idx, d_s00, d_s01, d_s10, d_s11,
+    def loop(self, d_idx, d_s00, d_s01, d_s11,
              d_v00, d_v01, d_v10, d_v11,
-             d_as00, d_as01, d_as10, d_as11):
+             d_as00, d_as01, d_as11):
         
         v00 = d_v00[d_idx]
         v01 = d_v01[d_idx]
@@ -228,7 +224,7 @@ class HookesDeviatoricStressRate2D(Equation):
 
         s00 = d_s00[d_idx]
         s01 = d_s01[d_idx]
-        s10 = d_s10[d_idx]
+        s10 = d_s01[d_idx]
         s11 = d_s11[d_idx]
 
         # strain rate tensor is symmetric
@@ -253,9 +249,6 @@ class HookesDeviatoricStressRate2D(Equation):
         d_as01[d_idx] = tmp*(eps01) + \
             ( s00*omega10 ) + ( s11*omega01 )        
 
-        # S_10
-        d_as10[d_idx] = d_as01[d_idx]
-        
         # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \
             ( s10*omega10 ) + ( s01*omega10 )

@@ -24,17 +24,18 @@ E = 1e7
 nu = 0.3975
 G = E/(2.0*(1+nu))
 K = get_K(G, nu)
-ro = 1.0
-co = numpy.sqrt(K/ro)
+rho0 = 1.0
+c0 = numpy.sqrt(K/rho0)
 
-deltap = 0.001
-fac=1e-10
+dx = 0.001
+hdx = 1.2
+
+# geometry
+ri = 0.03
+ro = 0.04
 
 def create_particles(**kwargs):
     #x,y = numpy.mgrid[-1.05:1.05+1e-4:dx, -0.105:0.105+1e-4:dx]
-    dx = 0.001 # 1mm
-    ri = 0.03 # 3cm inner radius
-    ro = 0.04 # 4cm outer radius
     spacing = 0.041 # spacing = 2*5cm
     
     x,y = numpy.mgrid[-ro:ro:dx, -ro:ro:dx]
@@ -45,15 +46,16 @@ def create_particles(**kwargs):
     keep = numpy.flatnonzero((ri*ri<=d) * (d<ro*ro))
     x = x[keep]
     y = y[keep]
-
-    print 'num_particles', len(x)*2, x.size
     
     x = numpy.concatenate([x-spacing,x+spacing])
     y = numpy.concatenate([y,y])
 
+    print 'Ellastic Collision with %d particles'%(x.size)
+    print "Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu)
+
     #print bdry, numpy.flatnonzero(bdry)
     m = numpy.ones_like(x)*dx*dx
-    h = numpy.ones_like(x)*1.4*dx
+    h = numpy.ones_like(x)*hdx*dx
     rho = numpy.ones_like(x)
     z = numpy.zeros_like(x)
 
@@ -73,7 +75,7 @@ def create_particles(**kwargs):
         name="solid", x=x+spacing, y=y, m=m, rho=rho, h=h,
         p=p, cs=cs, u=z, v=v)
 
-    pa.cs[:] = co
+    pa.cs[:] = c0
     pa.u = pa.cs*u_f*(2*(x<0)-1)
 
     # add requisite properties
@@ -99,7 +101,6 @@ def create_particles(**kwargs):
     pa.add_property( {'name':'s11'} )
     pa.add_property( {'name':'s12'} )
     pa.add_property( {'name':'s22'} )
-    pa.add_property( {'name':'s10'} )
 
     # deviatoric stress accelerations
     pa.add_property( {'name':'as00'} )
@@ -108,7 +109,6 @@ def create_particles(**kwargs):
     pa.add_property( {'name':'as11'} )
     pa.add_property( {'name':'as12'} )
     pa.add_property( {'name':'as22'} )
-    pa.add_property( {'name':'as10'} )
 
     # deviatoric stress initial values
     pa.add_property( {'name':'s000'} )
@@ -143,6 +143,7 @@ app = Application()
 
 # kernel
 kernel = CubicSpline(dim=2)
+wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
 # integrator
 integrator = Integrator(solid=SmechStep())
@@ -163,7 +164,7 @@ equations = [
     Group(
         equations=[
             # p
-            IsothermalEOS(dest='solid', sources=None, rho0=ro, c0=co),
+            IsothermalEOS(dest='solid', sources=None, rho0=rho0, c0=c0),
 
             # vi,j : requires properties v00, v01, v10, v11
             VelocityGradient2D(dest='solid', sources=['solid',]),
@@ -171,7 +172,7 @@ equations = [
             # rij : requires properties r00, r01, r02, r11, r12, r22,
             #                           s00, s01, s02, s11, s12, s22            
             MonaghanArtificialStress(
-               dest='solid', sources=None, eps=0.3),
+             dest='solid', sources=None, eps=0.3),
             ],
         ),
     
@@ -184,7 +185,7 @@ equations = [
             
             # au, av
             MomentumEquationWithStress2D(
-                dest='solid', sources=['solid',], n=4),
+                dest='solid', sources=['solid',], n=4, wdeltap=wdeltap),
 
             # au, av
             MonaghanArtificialViscosity(

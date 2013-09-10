@@ -2,6 +2,36 @@
 
 from pysph.sph.equation import Equation
 
+class SummationDensity(Equation):
+    r"""Goold old Summation density:
+
+    :math:`$\rho_a = \sum_b m_b W_{ab}$`
+
+    """
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
+    def loop(self, d_idx, d_rho, s_idx, s_m, WIJ=0.0):
+        d_rho[d_idx] += s_m[s_idx]*WIJ
+
+class BodyForce(Equation):
+    def __init__(self, dest, sources,
+                 fx=0.0, fy=0.0, fz=0.0):
+        self.fx = fx
+        self.fy = fy
+        self.fz = fz
+        super(BodyForce, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] += self.fx
+        d_av[d_idx] += self.fy
+        d_aw[d_idx] += self.fz
+
 class VelocityGradient2D(Equation):
     r""" Compute the SPH evaluation for the velocity gradient tensor in 2D.
 
@@ -30,18 +60,18 @@ class VelocityGradient2D(Equation):
         
         tmp = s_m[s_idx]/s_rho[s_idx]
         
-        d_v00[d_idx] += tmp * VIJ[0] * DWIJ[0]
-        d_v01[d_idx] += tmp * VIJ[0] * DWIJ[1]
+        d_v00[d_idx] += tmp * -VIJ[0] * DWIJ[0]
+        d_v01[d_idx] += tmp * -VIJ[0] * DWIJ[1]
 
-        d_v10[d_idx] += tmp * VIJ[1] * DWIJ[0]
-        d_v11[d_idx] += tmp * VIJ[1] * DWIJ[1]
+        d_v10[d_idx] += tmp * -VIJ[1] * DWIJ[0]
+        d_v11[d_idx] += tmp * -VIJ[1] * DWIJ[1]
 
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
     :math:`$p = c_0^2(\rho_0 - rho)$`
 
-    """    
+    """
     def __init__(self, dest, sources=None,
                  rho0=1000.0, c0=1.0):
         self.rho0 = rho0
@@ -53,6 +83,12 @@ class IsothermalEOS(Equation):
         d_p[d_idx] = self.c02 * (d_rho[d_idx] - self.rho0)
 
 class ContinuityEquation(Equation):
+    r"""Density rate:
+
+    :math:`$\frac{d\rho_a}{dt} = \sum_b m_b \boldsymbol{v}_{ab}\cdot
+    \nabla_a W_{ab} $`
+
+    """
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
