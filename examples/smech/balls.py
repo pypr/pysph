@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, SmechStep
+from pysph.sph.integrator import Integrator, SolidMechStep
 
 def get_K(G, nu):
     ''' Get the bulk modulus from shear modulus and Poisson ratio '''
@@ -146,7 +146,7 @@ kernel = CubicSpline(dim=2)
 wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
 # integrator
-integrator = Integrator(solid=SmechStep())
+integrator = Integrator(solid=SolidMechStep())
 
 # Create a solver
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)

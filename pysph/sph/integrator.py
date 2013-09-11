@@ -94,9 +94,9 @@ class WCSPHStep(IntegratorStep):
         d_rho[d_idx] = d_rho0[d_idx] + dt * d_arho[d_idx]
 
 ###############################################################################
-# `SmechStep` class
+# `SolidMechStep` class
 ###############################################################################
-class SmechStep(IntegratorStep):
+class SolidMechStep(IntegratorStep):
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho,
                    d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
