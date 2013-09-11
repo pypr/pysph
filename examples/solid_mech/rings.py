@@ -220,5 +220,4 @@ app.setup(
     name='fluid')
 
 # run
-print "running app"
 app.run()
