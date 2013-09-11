@@ -418,7 +418,7 @@ class Application(object):
             radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
 
             self.pm = pm = ZoltanParallelManagerGeometric(
-                dim=solver.dim, particles=self.particles_dynamic, comm=comm,
+                dim=solver.dim, particles=self.particles, comm=comm,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
                 ghost_layers=ghost_layers,
