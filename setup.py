@@ -89,6 +89,12 @@ ext_modules = [
                sources=["pysph/parallel/_kernels.pyx"],
                include_dirs = include_dirs,
                ),
+
+    # Eigen decomposition code
+    Extension( name="pysph.sph.solid_mech.linalg",
+               sources=["pysph/sph/solid_mech/linalg.pyx"],
+               include_dirs=include_dirs,
+               ),
     ]
 
 # add the include dirs for the extension modules
