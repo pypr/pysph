@@ -34,51 +34,57 @@ hdx = 1.5
 ri = 0.03
 ro = 0.04
 
-def create_particles(**kwargs):
+def create_particles(empty=False, **kwargs):
     #x,y = numpy.mgrid[-1.05:1.05+1e-4:dx, -0.105:0.105+1e-4:dx]
     spacing = 0.041 # spacing = 2*5cm
+
+    if empty:
+        pa = get_particle_array(name='solid')
+    else:
+        x,y = numpy.mgrid[-ro:ro:dx, -ro:ro:dx]
+        x = x.ravel()
+        y = y.ravel()
     
-    x,y = numpy.mgrid[-ro:ro:dx, -ro:ro:dx]
-    x = x.ravel()
-    y = y.ravel()
+        d = (x*x+y*y)
+        keep = numpy.flatnonzero((ri*ri<=d) * (d<ro*ro))
+        x = x[keep]
+        y = y[keep]
     
-    d = (x*x+y*y)
-    keep = numpy.flatnonzero((ri*ri<=d) * (d<ro*ro))
-    x = x[keep]
-    y = y[keep]
+        x = numpy.concatenate([x-spacing,x+spacing])
+        y = numpy.concatenate([y,y])
+        
+        print 'Ellastic Collision with %d particles'%(x.size)
+        print "Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu)
+
+        #print bdry, numpy.flatnonzero(bdry)
+        m = numpy.ones_like(x)*dx*dx
+        h = numpy.ones_like(x)*hdx*dx
+        rho = numpy.ones_like(x)
+        z = numpy.zeros_like(x)
+        
+        p = 0.5*1.0*100*100*(1 - (x**2 + y**2))
+        
+        cs = numpy.ones_like(x) * 10000.0
+        
+        # u is set later
+        v = z
+        u_f = 0.059
+
+        p *= 0
+        h *= 1
     
-    x = numpy.concatenate([x-spacing,x+spacing])
-    y = numpy.concatenate([y,y])
+        # create the particle array
+        pa = get_particle_array(
+            name="solid", x=x+spacing, y=y, m=m, rho=rho, h=h,
+            p=p, cs=cs, u=z, v=v)
 
-    print 'Ellastic Collision with %d particles'%(x.size)
-    print "Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu)
-
-    #print bdry, numpy.flatnonzero(bdry)
-    m = numpy.ones_like(x)*dx*dx
-    h = numpy.ones_like(x)*hdx*dx
-    rho = numpy.ones_like(x)
-    z = numpy.zeros_like(x)
-
-    p = 0.5*1.0*100*100*(1 - (x**2 + y**2))
-
-    cs = numpy.ones_like(x) * 10000.0
-
-    # u is set later
-    v = z
-    u_f = 0.059
-
-    p *= 0
-    h *= 1
-    
-    # create the particle array
-    pa = get_particle_array(
-        name="solid", x=x+spacing, y=y, m=m, rho=rho, h=h,
-        p=p, cs=cs, u=z, v=v)
-
-    pa.cs[:] = c0
-    pa.u = pa.cs*u_f*(2*(x<0)-1)
+        pa.cs[:] = c0
+        pa.u = pa.cs*u_f*(2*(x<0)-1)
 
     # add requisite properties
+
+    # sound speed
+    pa.add_property( {'name':'cs'} )
     
     # velocity gradient properties
     pa.add_property( {'name':'v00'} )
@@ -135,6 +141,9 @@ def create_particles(**kwargs):
     pa.add_property( {'name':'x0'} )
     pa.add_property( {'name':'y0'} )
     pa.add_property( {'name':'z0'} )
+
+    # load balancing properties
+    pa.set_lb_props( pa.properties.keys() )
 
     return [pa,]
 
