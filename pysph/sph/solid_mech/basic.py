@@ -11,8 +11,8 @@ class MonaghanArtificialStress(Equation):
     def cython_code(self):
         code = dedent("""
         cimport cython
-        from pysph.sph.smech.linalg cimport get_eigenvalvec
-        from pysph.sph.smech.linalg cimport transform2inv
+        from pysph.sph.solid_mech.linalg cimport get_eigenvalvec
+        from pysph.sph.solid_mech.linalg cimport transform2inv
         from pysph.base.point cimport cPoint
         """)
         return dict(helper=code)
@@ -53,11 +53,6 @@ class MonaghanArtificialStress(Equation):
 
         # Eigenvectors
         S = declare('cPoint')
-
-        # initialize the artificial stress terms to 0
-        for i in range(3):
-            for j in range(3):
-                Rab[i][j] = 0
 
         # get the diagonal terms for the stress tensor adding pressure
         sd.x = d_s00[d_idx] - d_p[d_idx]
@@ -166,7 +161,7 @@ class MomentumEquationWithStress2D(Equation):
         if self.with_correction:
             fab = WIJ/self.wdeltap
             fab = pow(fab, self.n)
-            
+
             art_stress00 = fab * (r00a + r00b)
             art_stress01 = fab * (r01a + r01b)
             art_stress11 = fab * (r11a + r11b)

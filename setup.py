@@ -91,8 +91,8 @@ ext_modules = [
                ),
 
     # Eigen decomposition code
-    Extension( name="pysph.sph.smech.linalg",
-               sources=["pysph/sph/smech/linalg.pyx"],
+    Extension( name="pysph.sph.solid_mech.linalg",
+               sources=["pysph/sph/solid_mech/linalg.pyx"],
                include_dirs=include_dirs,
                ),
     ]

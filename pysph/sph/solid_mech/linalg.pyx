@@ -203,7 +203,7 @@ cdef cPoint get_eigenvalvec(cPoint d, cPoint s, double * R):
     '''
     cdef cPoint ret, tmp
     cdef bint use_iter = False
-    cdef int i
+    cdef int i,j
     if s.x==s.y==s.z==0:
         # diagonal matrix
         ret = d
@@ -241,6 +241,7 @@ def py_get_eigenvalvec(d, s):
 
 cdef void transform(double A[3][3], double P[3][3], double res[3][3]):
     ''' compute the transformation P.T*A*P and add it into result '''
+    cdef int i, j, k, l
     for i in range(3):
         for j in range(3):
             #res[i][j] = 0
@@ -252,6 +253,7 @@ cdef void transform2(cPoint A, double P[3][3], double res[3][3]):
     ''' compute the transformation P.T*A*P and add it into result
     
     A is diagonal '''
+    cdef int i, j, k
     for i in range(3):
         for j in range(3):
             #res[i][j] = 0
@@ -264,6 +266,11 @@ cdef void transform2inv(cPoint A, double P[3][3], double res[3][3]):
     ''' compute the transformation P*A*P.T and add it into result
     
     A is diagonal '''
+    cdef int i, j, k
+    for i in range(3):
+        for j in range(3):
+            res[i][j] = 0.0
+
     for i in range(3):
         for j in range(3):
             #res[i][j] = 0
@@ -552,6 +559,7 @@ cdef void eigen_decomposition(double A[n][n], double V[n][n], double d[n]):
     ''' get eigenvalues and eigenvectors of matrix A
     V is output eigenvectors and d is eigenvalue '''
     cdef double e[n]
+    cdef int i, j
     for i in range(n):
         for j in range(n):
             V[i][j] = A[i][j]
@@ -569,7 +577,7 @@ cdef cPoint get_eigenvalvec_iter(cPoint d, cPoint s, double * R):
     '''
     cdef cPoint ret
     cdef double V[3][3]
-
+    cdef int i, j
     for i in range(3):
         V[i][i] = (&d.x)[i]
         for j in range(i):
@@ -610,6 +618,3 @@ cpdef test_main():
         print
     
     print
-
-
-

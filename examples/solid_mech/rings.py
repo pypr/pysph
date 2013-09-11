@@ -4,9 +4,9 @@ import numpy
 
 # SPH equations
 from pysph.sph.equation import Group
-from pysph.sph.basic import IsothermalEOS, ContinuityEquation, MonaghanArtificialViscosity,\
+from pysph.sph.basic_equations import IsothermalEOS, ContinuityEquation, MonaghanArtificialViscosity,\
      XSPHCorrection, VelocityGradient2D
-from pysph.sph.smech.basic import MomentumEquationWithStress2D, HookesDeviatoricStressRate2D,\
+from pysph.sph.solid_mech.basic import MomentumEquationWithStress2D, HookesDeviatoricStressRate2D,\
     MonaghanArtificialStress
 
 from pysph.base.utils import get_particle_array
@@ -28,7 +28,7 @@ rho0 = 1.0
 c0 = numpy.sqrt(K/rho0)
 
 dx = 0.001
-hdx = 1.2
+hdx = 1.5
 
 # geometry
 ri = 0.03

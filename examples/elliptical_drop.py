@@ -11,7 +11,7 @@ from pysph.sph.integrator import WCSPHStep, Integrator
 from pyzoltan.core.carray import LongArray
 
 from time import time
-from pysph.sph.basic import ContinuityEquation, XSPHCorrection
+from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 def exact_solution(tf=0.0075, dt=1e-4):
