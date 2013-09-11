@@ -3,42 +3,6 @@
 
 from pysph.sph.equation import Equation
 
-
-class ContinuityEquation(Equation):
-    def initialize(self, d_idx, d_arho):
-        d_arho[d_idx] = 0.0
-
-    def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
-             VIJ=[0.0, 0.0, 0.0]):
-        vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
-        d_arho[d_idx] += s_m[s_idx]*vijdotdwij
-
-
-class SummationDensity(Equation):
-    def initialize(self, d_idx, d_rho):
-        d_rho[d_idx] = 0.0
-
-    def loop(self, d_idx, d_rho, s_idx, s_m, WIJ=0.0):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
-
-class BodyForce(Equation):
-    def __init__(self, dest, sources,
-                 fx=0.0, fy=0.0, fz=0.0):
-        self.fx = fx
-        self.fy = fy
-        self.fz = fz
-        super(BodyForce, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
-
-    def loop(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] += self.fx
-        d_av[d_idx] += self.fy
-        d_aw[d_idx] += self.fz
-
 class TaitEOS(Equation):
     def __init__(self, dest, sources=None,
                  rho0=1000.0, c0=1.0, gamma=7.0):
@@ -112,28 +76,3 @@ class MomentumEquation(Equation):
         d_au[d_idx] +=  self.gx
         d_av[d_idx] +=  self.gy
         d_aw[d_idx] +=  self.gz
-
-
-class XSPHCorrection(Equation):
-    def __init__(self, dest, sources=None, eps=0.5):
-        self.eps = eps
-        super(XSPHCorrection, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_ax, d_ay, d_az):
-        d_ax[d_idx] = 0.0
-        d_ay[d_idx] = 0.0
-        d_az[d_idx] = 0.0
-
-    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ=1.0, RHOIJ1=1.0,
-             VIJ=[1.0,1,1]):
-        tmp = -self.eps * s_m[s_idx]*WIJ*RHOIJ1
-
-        d_ax[d_idx] += tmp * VIJ[0]
-        d_ay[d_idx] += tmp * VIJ[1]
-        d_az[d_idx] += tmp * VIJ[2]
-
-
-    def post_loop(self, d_idx, d_ax, d_ay, d_az, d_u, d_v, d_w):
-        d_ax[d_idx] += d_u[d_idx]
-        d_ay[d_idx] += d_v[d_idx]
-        d_az[d_idx] += d_w[d_idx]

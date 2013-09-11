@@ -117,6 +117,9 @@ class CythonGenerator(object):
             sz = matrix(eval(code[7:-1]))
             defn = 'cdef double %s%s'%(name, sz)
             return defn
+        elif code.startswith('cPoint'):
+            defn = 'cdef cPoint %s'%name
+            return defn
         else:
             raise RuntimeError('Unknown declaration %s'%declare)
 

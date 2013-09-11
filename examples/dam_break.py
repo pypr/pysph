@@ -77,8 +77,8 @@ from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
-from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
-     XSPHCorrection
+from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver

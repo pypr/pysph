@@ -71,6 +71,18 @@ the streamlines:
 
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/ldc-streamlines.png)
 
+
+If you want to use PySPH for elastic dynamics, you can try some of the
+examples from [Gray et al., Comput. Methods Appl. Mech. Engrg. 190
+(2001), 6641-6662]:
+
+    $ cd examples/solid_mech
+    $ python rings.py
+
+Which runs the problem of the collision of two elastic rings:
+
+![IMAGE](https://bitbucket.org/kunalp/pysph/raw/stress/docs/Images/rings-collision.png)
+
 The auto-generated code for the example resides in the directory
 `~/.pysph/source`. A note of caution however, it's not for the faint
 hearted.

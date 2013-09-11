@@ -14,5 +14,5 @@ test.pyx
 PySPH.egg-info/
 build/
 dist/
-examples/*.out
-examples/*_output
+*.out
+*_output
