@@ -216,8 +216,8 @@ class PBar(object):
                                           maxval=maxval).start()
         self.bar = bar
 
-    def update(self):
-        self.count += 1
+    def update(self, delta=1):
+        self.count += delta
         if self.bar is not None:
             self.bar.update(self.count)
         elif self.show:
@@ -231,6 +231,25 @@ class PBar(object):
             sys.stderr.write('\r100%\n')
 
             sys.stderr.flush()
+
+
+class FloatPBar(object):
+    def __init__(self, t_initial, t_final, show=True):
+        self.ticks = 1000
+        self.bar = PBar(self.ticks, show)
+        self.t_initial = t_initial
+        self.t_final = t_final
+        self.t_diff = t_final - t_initial
+
+    def update(self, time):
+        expected_count = int((time - self.t_initial)/self.t_diff*self.ticks)
+        expected_count = min(expected_count, self.ticks)
+        diff = max(expected_count - self.bar.count, 0)
+        if diff > 0:
+            self.bar.update(diff)
+
+    def finish(self):
+        self.bar.finish()
 
 ##############################################################################
 # friendly mkdir  from http://code.activestate.com/recipes/82465/.
