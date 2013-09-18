@@ -145,12 +145,12 @@ class Application(object):
 
         # --pfreq.
         parser.add_option("--pfreq", action="store",
-                          dest="freq", default=100, type="int",
+                          dest="freq", default=None, type="int",
                           help="Printing frequency for the output")
 
         # -d/ --detailed-output.
         parser.add_option("-d", "--detailed-output", action="store_true",
-                         dest="detailed_output", default=False,
+                         dest="detailed_output", default=None,
                          help="Dump detailed output.")
 
         # --directory
@@ -242,7 +242,7 @@ class Application(object):
 
         # --parallel-output-mode
         parallel_options.add_option("--parallel-output-mode", action="store",
-                            dest="parallel_output_mode", default="collected",
+                            dest="parallel_output_mode", default=None,
                             help="""Use 'collected' to dump one output at
                           root or 'distributed' for every processor. """)
 
@@ -552,16 +552,19 @@ class Application(object):
         solver.set_output_fname(fname)
 
         # output print frequency
-        solver.set_print_freq(options.freq)
+        if options.freq is not None:
+            solver.set_print_freq(options.freq)
 
         # output printing level (default is not detailed)
-        solver.set_output_printing_level(options.detailed_output)
+        if options.detailed_output is not None:
+            solver.set_output_printing_level(options.detailed_output)
 
         # output directory
         solver.set_output_directory(abspath(options.output_dir))
 
         # set parallel output mode
-        solver.set_parallel_output_mode(options.parallel_output_mode)
+        if options.parallel_output_mode is not None:
+            solver.set_parallel_output_mode(options.parallel_output_mode)
 
         # Set the adaptive timestep
         if options.adaptive_timestep is not None:
