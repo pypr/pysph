@@ -8,7 +8,7 @@ import numpy
 from pysph.base.kernels import CubicSpline
 from pysph.sph.sph_eval import SPHEval
 
-from utils import PBar, savez, load
+from utils import FloatPBar, savez, load
 
 import logging
 logger = logging.getLogger()
@@ -256,9 +256,11 @@ class Solver(object):
         """
         dt = self.dt
 
-        bt = (self.tf - self.t)/1000.0
-        bcount = 0.0
-        bar = PBar(1000 + int(dt/bt), show=show_progress)
+        if self.in_parallel:
+            show = False
+        else:
+            show = show_progress
+        bar = FloatPBar(self.t, self.tf, show=show)
 
         self.dump_output(dt, *self.print_properties)
         if self.comm:
@@ -300,10 +302,7 @@ class Solver(object):
                 if self.comm:
                     self.comm.barrier()
 
-            bcount += int(self.dt/bt)
-            while bcount > 0:
-                bar.update()
-                bcount -= 1
+            bar.update(self.t)
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
