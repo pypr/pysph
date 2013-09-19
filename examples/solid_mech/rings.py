@@ -88,8 +88,8 @@ def create_particles(empty=False, **kwargs):
 
     # add requisite properties
 
-    # sound speed
-    pa.add_property( {'name':'cs'} )
+    # sound speed etc.
+    add_properties(pa, 'cs', 'e' )
 
     # velocity gradient properties
     add_properties(pa, 'v00', 'v01', 'v10', 'v11')
@@ -107,10 +107,10 @@ def create_particles(empty=False, **kwargs):
     add_properties(pa, 's000', 's010', 's020', 's110', 's120', 's220')
 
     # standard acceleration variables
-    add_properties(pa, 'arho', 'au', 'av', 'aw', 'ax', 'ay', 'az')
+    add_properties(pa, 'arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae')
 
     # initial values
-    add_properties(pa, 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0')
+    add_properties(pa, 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0')
 
     # load balancing properties
     pa.set_lb_props( pa.properties.keys() )
