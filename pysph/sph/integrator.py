@@ -100,7 +100,8 @@ class SolidMechStep(IntegratorStep):
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho,
                    d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                   d_s000, d_s010, d_s020, d_s110, d_s120, d_s220):
+                   d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
+                   d_e0, d_e):
         d_x0[d_idx] = d_x[d_idx]
         d_y0[d_idx] = d_y[d_idx]
         d_z0[d_idx] = d_z[d_idx]
@@ -110,6 +111,7 @@ class SolidMechStep(IntegratorStep):
         d_w0[d_idx] = d_w[d_idx]
 
         d_rho0[d_idx] = d_rho[d_idx]
+        d_e0[d_idx] = d_e[d_idx]
 
         d_s000[d_idx] = d_s00[d_idx]
         d_s010[d_idx] = d_s01[d_idx]
@@ -120,7 +122,7 @@ class SolidMechStep(IntegratorStep):
 
     def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                  d_aw, d_ax, d_ay, d_az, d_arho, 
+                  d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_e0, d_ae,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, 
                   d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
                   d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
@@ -136,6 +138,7 @@ class SolidMechStep(IntegratorStep):
 
         # Update densities and smoothing lengths from the accelerations
         d_rho[d_idx] = d_rho0[d_idx] + dtb2 * d_arho[d_idx]
+        d_e[d_idx] = d_e0[d_idx] + dtb2 * d_ae[d_idx]
 
         # update deviatoric stress components
         d_s00[d_idx] = d_s000[d_idx] + dtb2 * d_as00[d_idx]
@@ -147,7 +150,7 @@ class SolidMechStep(IntegratorStep):
 
     def corrector(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
-                  d_aw, d_ax, d_ay, d_az, d_arho, 
+                  d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_ae, d_e0,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
                   d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
                   d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
@@ -163,6 +166,7 @@ class SolidMechStep(IntegratorStep):
 
         # Update densities and smoothing lengths from the accelerations
         d_rho[d_idx] = d_rho0[d_idx] + dt * d_arho[d_idx]
+        d_e[d_idx] = d_e0[d_idx] + dt * d_ae[d_idx]
 
         # update deviatoric stress components
         d_s00[d_idx] = d_s000[d_idx] + dt * d_as00[d_idx]

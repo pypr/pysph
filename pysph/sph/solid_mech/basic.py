@@ -207,6 +207,10 @@ class HookesDeviatoricStressRate2D(Equation):
         self.shear_mod = shear_mod
         super(HookesDeviatoricStressRate2D, self).__init__(dest, sources)
 
+    def initialize(self, d_idx, d_as00, d_as01, d_as11):
+        d_as00[d_idx] = 0.0
+        d_as01[d_idx] = 0.0
+        d_as11[d_idx] = 0.0
     
     def loop(self, d_idx, d_s00, d_s01, d_s11,
              d_v00, d_v01, d_v10, d_v11,
@@ -247,3 +251,74 @@ class HookesDeviatoricStressRate2D(Equation):
         # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \
             ( s10*omega10 ) + ( s01*omega10 )
+
+class EnergyEquationWithStress2D(Equation):
+    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0,
+                 eta=0.01):
+        self.alpha = alpha
+        self.beta = beta
+        self.eta = eta
+        super(EnergyEquationWithStress2D,self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_ae):
+        d_ae[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_p, s_p,
+             d_cs, s_cs, d_ae,
+             XIJ=[0.0, 0.0, 0.0], VIJ=[0.0, 0.0, 0.0],
+             DWIJ=[0.0, 0.0, 0.0], HIJ=0.0, R2IJ=0.0, RHOIJ1=0.0):
+
+        rhoa = d_rho[d_idx]
+        ca = d_cs[d_idx]
+        pa = d_p[d_idx]
+
+        rhob = s_rho[s_idx]
+        cb = s_cs[s_idx]
+        pb = s_p[s_idx]
+        mb = s_m[s_idx]
+
+        rhoa2 = 1./(rhoa*rhoa)
+        rhob2 = 1./(rhob*rhob)
+
+        # artificial viscosity
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+
+        piij = 0.0
+        if vijdotxij < 0:
+            cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
+
+            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
+
+            piij = -self.alpha*cij*muij + self.beta*muij*muij
+            piij = piij*RHOIJ1
+
+
+        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
+
+        # thermal energy contribution
+        d_ae[d_idx] += 0.5 * mb * (pa*rhoa2 + pb*rhob2 + piij)
+
+    def post_loop(self, d_idx, d_rho,
+                  d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
+                  d_v00, d_v01, d_v10, d_v11,
+                  d_ae):
+        
+        # particle density
+        rhoa = d_rho[d_idx]
+
+        # deviatoric stress rate (symmetric)
+        s00a = d_s00[d_idx]
+        s01a = d_s01[d_idx]
+        s10a = d_s01[d_idx]
+        s11a = d_s11[d_idx]
+
+        # strain rate tensor (symmetric)
+        eps00 = d_v00[d_idx]
+        eps01 = 0.5 * (d_v01[d_idx] + d_v10[d_idx])
+
+        eps10 = eps01
+        eps11 = d_v11[d_idx]
+        
+        # energy acclerations
+        sdoteij = s00a*eps00 +  s01a*eps01 + s10a*eps10 + s11a*eps11
+        d_ae[d_idx] += 1./rhoa * sdoteij
