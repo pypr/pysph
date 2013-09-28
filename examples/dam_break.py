@@ -76,9 +76,11 @@ import numpy
 from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline, WendlandQuintic
+from pysph.base.kernels import get_correction
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.wc.viscosity import LaminarViscosity
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -105,6 +107,7 @@ gamma = 7.0
 alpha = 0.5
 beta = 0.0
 B = co*co*ro/gamma
+p0 = 1000.0
 
 geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
@@ -119,6 +122,7 @@ app = Application()
 
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
+kfactor = get_correction(kernel=kernel,h0=h)
 
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep())
@@ -135,8 +139,8 @@ equations = [
     # Equation of state
     Group(equations=[
 
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma, p0=0.0),
+            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma, p0=0.0),
 
             ]),
 
@@ -148,7 +152,7 @@ equations = [
 
             # Momentum equation
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gy=-9.81, c0=co),
+                     alpha=1.0, beta=1.0, gy=-9.81, c0=co, kfactor=kfactor),
 
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])

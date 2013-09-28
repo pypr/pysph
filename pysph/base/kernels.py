@@ -4,6 +4,10 @@ from math import pi, sqrt, exp
 M_1_PI = 1.0/pi
 M_2_SQRTPI = 2.0/sqrt(pi)
 
+def get_correction(kernel, h0):
+    rij = kernel.deltap * h0
+    return kernel.kernel(rij=rij, h=h0)
+
 ###############################################################################
 # `CubicSpline` class.
 ###############################################################################
@@ -11,6 +15,7 @@ class CubicSpline(object):
     def __init__(self, dim=1):
         self.radius_scale = 2.0
         self.dim = dim
+        self.deltap = 2.0/3.0
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
@@ -78,6 +83,7 @@ class WendlandQuintic(object):
         if dim == 1:
             raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
         self.dim = dim
+        self.deltap=0.5
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0/h
@@ -139,6 +145,7 @@ class Gaussian(object):
     def __init__(self, dim=2):
         self.radius_scale = 3.0
         self.dim = dim
+        self.deltap = sqrt(0.5)
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
