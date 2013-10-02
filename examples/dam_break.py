@@ -78,9 +78,10 @@ from db_geometry import DamBreak2DGeometry
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.base.kernels import get_correction
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
+from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection, MonaghanArtificialViscosity
+from pysph.sph.boundary_equations import MonaghanKajtarBoundaryForce
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
-from pysph.sph.wc.viscosity import LaminarViscosity
+from pysph.sph.wc.viscosity import LaminarViscosity, MonaghanSignalViscosityFluids
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -94,11 +95,11 @@ container_width  = 4.0
 nboundary_layers=2
 
 dt = 1e-4
-tf = 1.0
+tf = 2.5
 
 #h = 0.0156
 h = 0.0390
-hdx = 1.3
+hdx = 1.5
 #h = 0.01
 dx = dy = h/hdx
 ro = 1000.0
@@ -113,9 +114,9 @@ geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
     fluid_column_height=fluid_column_height,
     fluid_column_width=fluid_column_width, dx=dx, dy=dy,
-    nboundary_layers=nboundary_layers, ro=ro, co=co,
-    with_obstacle=False)
-
+    nboundary_layers=1, ro=ro, co=co,
+    with_obstacle=False,
+    beta=2.0, nfluid_offset=1, hdx=hdx)
 
 # Create the application.
 app = Application()
@@ -140,20 +141,27 @@ equations = [
     Group(equations=[
 
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma, p0=0.0),
-            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma, p0=0.0),
 
             ]),
 
     Group(equations=[
 
             # Continuity equation
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-            ContinuityEquation(dest='boundary', sources=['fluid']),
+            ContinuityEquation(dest='fluid', sources=['fluid']),
 
             # Momentum equation
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=1.0, beta=1.0, gy=-9.81, c0=co, kfactor=kfactor),
+            MomentumEquation(dest='fluid', sources=['fluid'],
+                     alpha=0.0, beta=0.0, gy=-9.81, c0=co, kfactor=kfactor),
 
+            # Monaghan signal viscosity
+            MonaghanSignalViscosityFluids(dest='fluid', sources=['fluid'],
+                                          alpha=0.05, h=h),
+            # Boundary force and viscosity
+            MonaghanArtificialViscosity(dest='fluid', sources=['boundary'],
+                                        alpha=1.0, beta=0.0),
+            MonaghanKajtarBoundaryForce(dest='fluid', sources=['boundary'],
+                                        beta=2.0, K=0.3, h=h),
+            
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])
             ]),
@@ -161,6 +169,6 @@ equations = [
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
-          particle_factory=geom.create_particles, hdx=hdx)
+          particle_factory=geom.create_particles)
 
 app.run()

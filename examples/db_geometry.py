@@ -88,12 +88,18 @@ class DamBreak2DGeometry(object):
     def __init__(self, container_width=4.0, container_height=3.0,
                  fluid_column_width=1.0, fluid_column_height=2.0,
                  dx=0.03, dy=0.03, nboundary_layers=4,
-                 ro=1000.0, co=1.0, with_obstacle=False):
+                 ro=1000.0, co=1.0, with_obstacle=False,
+                 beta=1.0, nfluid_offset=2, hdx=1.5):
+
         self.container_width = container_width
         self.container_height = container_height
         self.fluid_column_height = fluid_column_height
         self.fluid_column_width = fluid_column_width
 
+        self.nboundary_layers=nboundary_layers
+        self.nfluid_offset=nfluid_offset
+        self.beta = beta
+        self.hdx = hdx
         self.dx = dx
         self.dy = dy
 
@@ -109,7 +115,7 @@ class DamBreak2DGeometry(object):
         container_width = self.container_width
         container_height = self.container_height
 
-        dx, dy = self.dx, self.dy
+        dx, dy = self.dx/self.beta, self.dy/self.beta
 
         _x = []; _y = []
         for i in range(nboundary_layers):
@@ -134,7 +140,8 @@ class DamBreak2DGeometry(object):
         for i in range(noffset):
             ii = i+1
             xf, yf = create_2D_filled_region(
-                x1=0.5*ii*dx, y1=0.5*ii*dx,
+                x1 = dx-0.5*i*dx, y1 = dx-0.5*i*dx,
+                #x1=0.5*ii*dx, y1=0.5*ii*dx,
                 x2=fluid_column_width+0.5*i*dx, y2=fluid_column_height,
                 dx=dx)
 
@@ -145,8 +152,10 @@ class DamBreak2DGeometry(object):
 
         return x, y
 
-    def create_particles(self, nboundary_layers=2, nfluid_offset=2,
-                         hdx=1.5, empty=False, **kwargs):
+    def create_particles(self, empty=False, **kwargs):
+        nboundary_layers = self.nboundary_layers
+        nfluid_offset=self.nfluid_offset
+        hdx = self.hdx
         if empty:
             fluid = get_particle_array_wcsph(name="fluid")
             boundary = get_particle_array_wcsph(name="boundary")
@@ -170,14 +179,16 @@ class DamBreak2DGeometry(object):
 
             dx, dy, ro = self.dx, self.dy, self.ro
 
+            m0 = dx*dy*ro/nfluid_offset
+
             # smoothing length, mass and density
             fluid.h[:] = numpy.ones_like(xf) * hdx * dx
-            fluid.m[:] = dx * dy * 0.5 * ro
+            fluid.m[:] = m0
             fluid.rho[:] = ro
             fluid.rho0[:] = ro
 
             boundary.h[:] = numpy.ones_like(xb) * hdx * dx
-            boundary.m[:] = dx * dy * 0.5 * ro
+            boundary.m[:] = m0
             boundary.rho[:] = ro
             boundary.rho0[:] = ro
 
@@ -191,7 +202,7 @@ class DamBreak2DGeometry(object):
                 obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
 
                 obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
-                obstacle.m[:] = dx * dy * 0.5 * ro
+                obstacle.m[:] = m0
                 obstacle.rho[:] = ro
                 obstacle.rho0[:] = ro
 

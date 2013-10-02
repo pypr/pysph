@@ -71,4 +71,40 @@ class MonaghanBoundaryForce(Equation):
         d_av[d_idx] += force * norm[1]
         d_aw[d_idx] += force * norm[2]
         
-            
+class MonaghanKajtarBoundaryForce(Equation):
+    def __init__(self, dest, sources=None, K=None, beta=None, h=None):
+        self.K = K
+        self.beta = beta
+        self.h = h
+
+        if None in [K, beta, h]:
+            raise ValueError("Invalid parameter values")
+        
+        super(MonaghanKajtarBoundaryForce,self).__init__(dest,sources)
+
+    def cython_code(self):
+        code = dedent("""
+cdef double wendland_quintic(double rij, double h):
+    cdef double q = rij/h
+    cdef double q1 = 2.0 - q
+    cdef double val = 0.0
+    if q < 2.0:
+        val = (1 + 2.5*q + 2*q*q)*q1*q1*q1*q1*q1
+
+    return val
+        """)
+        return dict(helper=code)
+
+    def loop(self, d_idx, s_idx, d_m, s_m, 
+             d_au, d_av, d_aw, 
+             RIJ=0.0, R2IJ=0.0, XIJ=[0.0, 0.0, 0.0]):
+
+        ma = d_m[d_idx]
+        mb = s_m[s_idx]
+
+        w = wendland_quintic(RIJ, self.h)
+        force = self.K/self.beta * w/R2IJ * 2*mb/(ma + mb)
+                      
+        d_au[d_idx] += force * XIJ[0]
+        d_av[d_idx] += force * XIJ[1]
+        d_aw[d_idx] += force * XIJ[2]
