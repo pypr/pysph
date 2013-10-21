@@ -50,8 +50,17 @@ def get_zoltan_directory(varname):
 
 if Have_MPI:
     mpic = 'mpicc'
-    mpi_link_args.append(commands.getoutput(mpic + ' --showme:link'))
-    mpi_compile_args.append(commands.getoutput(mpic +' --showme:compile'))
+    compiler = 'gcc'
+    if compiler == 'intel':
+        link_args = commands.getoutput(mpic + ' -cc=icc -link_info')
+        link_args = link_args[3:]
+        compile_args = commands.getoutput(mpic +' -cc=icc -compile_info')
+        compile_args = compile_args[3:]
+    else:
+        link_args = commands.getoutput(mpic + ' --showme:link')
+        compile_args = commands.getoutput(mpic +' --showme:compile')
+    mpi_link_args.append(link_args)
+    mpi_compile_args.append(compile_args)
     mpi_inc_dirs.append(mpi4py.get_include())
 
     inc = get_zoltan_directory('ZOLTAN_INCLUDE')
