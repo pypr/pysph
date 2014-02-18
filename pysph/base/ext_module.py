@@ -1,4 +1,5 @@
 from distutils.extension import Extension
+from distutils.sysconfig import get_config_var
 import hashlib
 import imp
 import numpy
@@ -60,7 +61,7 @@ class ExtModule(object):
     def _setup_filenames(self):
         base = self.name
         self.src_path = join(self.root, base + '.' + self.extension)
-        self.ext_path = join(self.root, base + '.' + 'so')
+        self.ext_path = join(self.root, base + get_config_var('SO'))
 
     def _create_source(self):
         # Create the source.

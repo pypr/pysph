@@ -1,3 +1,4 @@
+from distutils.sysconfig import get_config_var
 import os
 from os.path import join, exists
 import shutil
@@ -37,7 +38,8 @@ class TestExtModule(TestCase):
         expect_name = 'm_%s'%(s.hash)
         self.assertEqual(s.name, expect_name)
         self.assertEqual(s.src_path, join(self.root, expect_name +'.pyx'))
-        self.assertEqual(s.ext_path, join(self.root, expect_name +'.so'))
+        self.assertEqual(s.ext_path,
+                         join(self.root, expect_name + get_config_var('SO')))
 
         self.assertTrue(exists(s.src_path))
         self.assertEqual(data, open(s.src_path).read())
