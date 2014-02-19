@@ -89,7 +89,7 @@ class BoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.NNPS(dim=3, particles=self.particles, radius_scale=2.0)
+        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0)
         
     def test_neighbors_aa(self):
         """BoxSortNNPS :: neighbor test src = a, dst = a """

@@ -7,7 +7,7 @@ from pyzoltan.core.carray import UIntArray, DoubleArray
 
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
-from pysph.base.nnps import NNPS
+from pysph.base.nnps import BoxSortNNPS
 
 times = []
 _numPoints = [1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
@@ -29,7 +29,8 @@ for numPoints in _numPoints:
 
     # Create the NNPS object
     pa = get_particle_array(x=xa, y=ya, h=ha, gid=gida)
-    nps = NNPS(dim=3, particles=[pa,], radius_scale=2.0)
+    nps = BoxSortNNPS(
+        dim=3, particles=[pa,], radius_scale=2.0)
 
     # calculate the time to get neighbors
     t1 = time()

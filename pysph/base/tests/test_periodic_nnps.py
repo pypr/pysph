@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from pysph.base.nnps import DomainLimits, NNPS
+from pysph.base.nnps import DomainLimits, BoxSortNNPS
 from pysph.base.utils import get_particle_array
 from pysph.parallel._kernels import CubicSpline, Gaussian
 from pysph.base.point import Point
@@ -56,7 +56,8 @@ assert( domain.is_periodic )
 kernel = Gaussian(dim=2)
 
 # nnps
-nnps = NNPS(dim=2, particles=particles, domain=domain, radius_scale=kernel.radius)
+nnps = BoxSortNNPS(
+    dim=2, particles=particles, domain=domain, radius_scale=kernel.radius)
 
 assert (nnps.is_periodic)
 
