@@ -14,8 +14,11 @@ cdef extern from 'math.h':
     double ceil(double)
     double floor(double)
     double fabs(double)
+    double fmax(double, double)
+    double fmin(double, double)
 
 cdef extern from 'limits.h':
+    cdef unsigned int UINT_MAX
     cdef int INT_MAX
 
 # ZOLTAN ID TYPE AND PTR
@@ -29,10 +32,26 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
 
-cdef inline double fmin(double x, double y):
-    if x < y:
-        return x
-    else: return y
+# Helper functions
+# cdef inline double fmin(double x, double y):
+#     """Return the minimum between x and y"""
+#     if x < y:
+#         return x
+#     else: return y
+
+cdef inline int flatten(cIntPoint cid, IntArray ncells, int dim):
+    """Return a flattened index for a cell
+
+    The flattening is determined using the row-order indexing commonly
+    employed in SPH. This would need to be changed for hash functions
+    based on alternate orderings.
+
+    """
+    cdef int ncx = ncells[0]
+    cdef int ncy = ncells[1]
+    cdef int ncz = ncells[2]
+
+    return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
 
 cdef inline int real_to_int(double real_val, double step):
     """ Return the bin index to which the given position belongs.
@@ -171,13 +190,17 @@ cdef class NNPSParticleArrayWrapper:
 
         self.np = pa.get_number_of_particles()
 
+    cdef int get_number_of_particles(self):
+        cdef ParticleArray pa = self.pa
+        return pa.get_number_of_particles()
+
 cdef class DomainLimits:
     """This class determines the limits of the solution domain.
 
     We expect all simulations to have well defined domain limits
     beyond which we are either not interested or the solution is
     invalid to begin with. Thus, if a particle leaves the domain,
-    the simulation should be considered invalid.
+    the solution should be considered invalid (at least locally).
 
     The initial domain limits could be given explicitly or asked to be
     computed from the particle arrays. The domain could be periodic.
@@ -213,7 +236,7 @@ cdef class DomainLimits:
             raise ValueError("Invalid domain limits!")
 
 cdef class Cell:
-    """Basic indexing structure.
+    """Basic indexing structure for the box-sort NNPS.
 
     For a spatial indexing based on the box-sort algorithm, this class
     defines the spatial data structure used to hold particle indices
@@ -656,6 +679,639 @@ cdef class NNPS:
 
     def set_in_parallel(self, bint in_parallel):
         self.in_parallel = in_parallel
+
+    ####################################################################
+    # Functions for periodicity
+    ####################################################################
+    def remove_periodic_ghosts(self):
+        """Remove all particles with the Ghost """
+        for pa in self.particles:
+            pa.remove_tagged_particles(Ghost)
+
+    def adjust_particles(self):
+        """Adjust particles for periodicity"""
+        cdef DomainLimits domain = self.domain
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
+
+        cdef double xmin = domain.xmin, xmax = domain.xmax
+        cdef double ymin = domain.ymin, ymax = domain.ymax,
+        cdef double zmin = domain.zmin, zmax = domain.zmax
+        cdef double xtranslate = domain.xtranslate
+        cdef double ytranslate = domain.ytranslate
+        cdef double ztranslate = domain.ztranslate
+
+        cdef bint periodic_in_x = domain.periodic_in_x
+        cdef bint periodic_in_y = domain.periodic_in_y
+        cdef bint periodic_in_z = domain.periodic_in_z
+
+        cdef double xi, yi, zi
+
+        cdef int i, np
+
+        for pa_wrapper in self.pa_wrappers:
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+
+            np = x.length
+            for i in range(np):
+
+                if ( (periodic_in_x and not periodic_in_y) ):
+                    if x.data[i] < xmin : x.data[i] += xtranslate
+                    if x.data[i] > xmax : x.data[i] -= xtranslate
+
+                if ( (periodic_in_y and not periodic_in_x) ):
+                    if y.data[i] < ymin : y.data[i] += ytranslate
+                    if y.data[i] > ymax : y.data[i] -= ytranslate
+
+                if ( periodic_in_x and periodic_in_y ):
+                    if x.data[i] < xmin : x.data[i] += xtranslate
+                    if x.data[i] > xmax : x.data[i] -= xtranslate
+                    if y.data[i] < ymin : y.data[i] += ytranslate
+                    if y.data[i] > ymax : y.data[i] -= ytranslate
+
+    def create_periodic_ghosts(self):
+        """Create new ghost particles"""
+        cdef DomainLimits domain = self.domain
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef DoubleArray x, y, z
+
+        cdef double xmin = domain.xmin, xmax = domain.xmax
+        cdef double ymin = domain.ymin, ymax = domain.ymax,
+        cdef double zmin = domain.zmin, zmax = domain.zmax
+        cdef double xtranslate = domain.xtranslate
+        cdef double ytranslate = domain.ytranslate
+        cdef double ztranslate = domain.ztranslate
+
+        cdef bint periodic_in_x = domain.periodic_in_x
+        cdef bint periodic_in_y = domain.periodic_in_y
+        cdef bint periodic_in_z = domain.periodic_in_z
+
+        cdef double xi, yi, zi
+        cdef double cell_size = self.cell_size
+
+        cdef int i, np, nghost = 0
+
+        # temporary indices for particles to be replicated
+        cdef LongArray left, right, top, bottom, lt, rt, lb, rb
+
+        for pa_wrapper in self.pa_wrappers:
+            pa = pa_wrapper.pa
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+
+            left = LongArray(); right = LongArray()
+            top = LongArray(); bottom = LongArray()
+
+            lt = LongArray(); rt = LongArray()
+            lb = LongArray(); rb = LongArray()
+
+            np = x.length
+            for i in range(np):
+                xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
+
+                # X-Periodic
+                if periodic_in_x and not periodic_in_y:
+                    if ( (xi - xmin) <= cell_size ): left.append(i)
+                    if ( (xmax - xi) <= cell_size ): right.append(i)
+
+                # Y-Periodic
+                if periodic_in_y and not periodic_in_x:
+                    if ( (yi - ymin) <= cell_size ): bottom.append(i)
+                    if ( (ymax - yi) <= cell_size ): top.append(i)
+
+                # X&Y-Periodic
+                if periodic_in_x and periodic_in_y:
+                    # particle near the left end
+                    if ( (xi - xmin) <= cell_size ):
+                        left.append(i)
+
+                        # left bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            lb.append(i)
+
+                        # left top corner
+                        if ( (ymax - yi) < cell_size ):
+                            lt.append( i )
+
+                    # particle near the right
+                    if ( (xmax - xi) <= cell_size ):
+                        right.append(i)
+
+                        # right bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            rb.append(i)
+
+                        # right top corner
+                        if ( (ymax - yi) < cell_size ):
+                            rt.append( i )
+
+                    # particle near the top
+                    if ( (ymax - yi) < cell_size ):
+                        top.append(i)
+
+                    # particle near the bottom
+                    if ( (yi - ymin) < cell_size ):
+                        bottom.append(i)
+
+            # now treat each case separately and count the number of ghosts
+
+            # left
+            copy = pa.extract_particles( left )
+            copy.x += xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right
+            copy = pa.extract_particles( right )
+            copy.x -= xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # top
+            copy = pa.extract_particles( top )
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # bottom
+            copy = pa.extract_particles( bottom )
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # left top
+            copy = pa.extract_particles( lt )
+            copy.x += xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # left bottom
+            copy = pa.extract_particles( lb )
+            copy.x += xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right top
+            copy = pa.extract_particles( rt )
+            copy.x -= xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+            # right bottom
+            copy = pa.extract_particles( rb )
+            copy.x -= xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            nghost += copy.get_number_of_particles()
+
+cdef class LinkedListNNPS:
+    """Nearest neighbor query class using the linked list method.
+    """
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+                 int ghost_layers=1, domain=None, bint fixed_h=False,
+                 bint trace=False):
+        """Constructor for NNPS
+
+        Parameters:
+        -----------
+
+        dim : int
+            Dimension (Not sure if this is really needed)
+
+        particles : list
+            The list of particles we are working on
+
+        radius_scale : double, default (2)
+            Optional kernel radius scale. Defaults to 2
+
+        domain : DomainLimits, default (None)
+            Optional limits for the domain
+            
+        fixed_h : bint
+            Optional flag to use constant cell sizes throughout.
+
+        trace : bint
+            Flag for timing and debugging
+
+        """
+        self.trace = trace
+        self.in_parallel = False
+
+        # store the list of particles and number of arrays
+        self.particles = particles
+        self.narrays = len( particles )
+
+        # create the particle array wrappers
+        self.pa_wrappers = [NNPSParticleArrayWrapper(pa) for pa in particles]
+
+        # radius scale and problem dimensionality
+        self.radius_scale = radius_scale
+        self.dim = dim
+
+        # Domain extents for the problem
+        self.domain = domain
+        if domain is None:
+            self.domain = DomainLimits(dim)
+
+        # periodicity
+        self.is_periodic = self.domain.is_periodic
+
+        # initialize the head and next for each particle array
+        self.heads = [UIntArray() for i in range(self.narrays)]
+        self.nexts = [UIntArray() for i in range(self.narrays)]
+
+        # flag for constant smoothing lengths
+        self.fixed_h = fixed_h
+
+        # min and max coordinate values
+        self.xmin = DoubleArray(3)
+        self.xmax = DoubleArray(3)
+
+        # defaults
+        self.ncells = IntArray(3)
+        self.ncells_tot = 0
+
+        # compute the intial box sort for all local particles
+        self.update()
+
+    cpdef update(self):
+        """Update the local data after a parallel update.
+
+        We want the NNPS to be independent of the ParallelManager
+        which is solely responsible for distributing particles across
+        available processors. We assume therefore that after a
+        parallel update, each processor has all the local particle
+        information it needs.
+
+        """
+        cdef int i, num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        # compute the cell sizes
+        self._compute_cell_size()
+
+        # refresh the head and next arrays.
+        self._refresh()
+
+        # Periodicity is handled by adjusting particles according to a
+        # given cubic domain box
+        if self.is_periodic and not self.in_parallel:
+            # remove periodic ghost particles from a previous step
+            self.remove_periodic_ghosts()
+
+            # box-wrap current particles for periodicity
+            self.adjust_particles()
+
+            # create new periodic ghosts
+            self.create_periodic_ghosts()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa_index=i, indices=indices )
+
+    cdef _bin(self, int pa_index, UIntArray indices):
+        """Bin a given particle array with indices.
+
+        Parameters:
+        -----------
+
+        pa_index : int
+            Index of the particle array corresponding to the particles list
+
+        indices : UIntArray
+            Subset of particles to bin
+
+        """
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[ pa_index ]
+        cdef DoubleArray x = pa_wrapper.x
+        cdef DoubleArray y = pa_wrapper.y
+        cdef DoubleArray z = pa_wrapper.z
+
+        cdef DoubleArray xmin = self.xmin
+        cdef DoubleArray xmax = self.xmax
+        cdef IntArray ncells = self.ncells
+        cdef int dim = self.dim
+
+        # the head and next arrays for this particle array
+        cdef UIntArray head = self.heads[ pa_index ]
+        cdef UIntArray next = self.nexts[ pa_index ]
+        cdef double cell_size = self.cell_size
+
+        cdef UIntArray lindices, gindices
+        cdef size_t num_particles, indexi, i
+
+        # flattened cell index
+        cdef int cell_index
+
+        # now bin the particles
+        num_particles = indices.length
+        for indexi in range(num_particles):
+            i = indices.data[indexi]
+
+            # the flattened index is considered relative to the
+            # minimum along each co-ordinate direction
+            pnt = cPoint_new( 
+                x.data[i] - xmin.data[0], 
+                y.data[i] - xmin.data[1], 
+                z.data[i] - xmin.data[2] )
+
+            # flattened cell index
+            _cid = flatten( find_cell_id( pnt, cell_size ), ncells, dim )
+
+            # insert this particle
+            next[ i ] = head[ _cid ]
+            head[_cid] = i                
+
+    cdef _compute_cell_size(self):
+        """Compute the cell size for the binning.
+
+        The cell size is chosen as the kernel radius scale times the
+        maximum smoothing length in the local processor.
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray h, x, y, z
+        cdef double cell_size
+        cdef double hmax = -1.0
+        cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
+        cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
+
+        for pa_wrapper in pa_wrappers:
+            x = pa_wrapper.x 
+            y = pa_wrapper.y
+            z = pa_wrapper.z
+            h = pa_wrapper.h
+
+            # find min and max of variables
+            h.update_min_max()
+            x.update_min_max()
+            y.update_min_max()
+            z.update_min_max()
+
+            hmax = fmax(h.maximum, hmax)
+            
+            xmax = fmax(x.maximum, xmax)
+            ymax = fmax(y.maximum, ymax)
+            zmax = fmax(z.maximum, zmax)
+            
+            xmin = fmin(x.minimum, xmin)
+            ymin = fmin(y.minimum, ymin)
+            zmin = fmin(z.minimum, zmin)
+
+        # store the minimum and maximum of physical coordinates
+        self.xmin[0] = xmin; self.xmin[1] = ymin; self.xmin[2] = zmin
+        self.xmax[0] = xmax; self.xmax[1] = ymax; self.xmax[2] = zmax
+
+        # store the cell size
+        cell_size = self.radius_scale * hmax
+        if cell_size < 1e-6:
+            msg = """Cell size too small %g. Perhaps h = 0?
+            Setting cell size to 1"""%(cell_size)
+            print msg
+            cell_size = 1.0
+
+        self.cell_size = cell_size
+
+    cpdef _refresh(self):
+        """Refresh the head and next arrays locally"""
+        cdef DomainLimits domain = self.domain
+        cdef int narrays = self.narrays
+        cdef DoubleArray xmin = self.xmin
+        cdef DoubleArray xmax = self.xmax
+        cdef double cell_size = self.cell_size
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef list heads = self.heads
+        cdef list nexts = self.nexts
+        cdef int dim = self.dim
+
+        # locals
+        cdef int i, j, np
+        cdef int ncx, ncy, ncz, _ncells
+        cdef UIntArray head, next
+
+        # adjust xmin and xmax in each co-ordinate direction for periodicity
+        # if domain.periodic_in_x: xmin.data[0] = xmin.data[0] - 0.1*cell_size
+        # if domain.periodic_in_y: xmin.data[1] = xmin.data[1] - 0.1*cell_size
+        # if domain.periodic_in_z: xmin.data[2] = xmin.data[2] - 0.1*cell_size
+
+        # if domain.periodic_in_x: xmax.data[0] = xmax.data[0] + 0.1*cell_size
+        # if domain.periodic_in_y: xmax.data[1] = xmax.data[1] + 0.1*cell_size
+        # if domain.periodic_in_z: xmax.data[2] = xmax.data[2] + 0.1*cell_size
+
+        # calculate the number of cells.
+        ncx = <int>ceil( (xmax.data[0] - xmin.data[0])/cell_size )
+        ncy = <int>ceil( (xmax.data[1] - xmin.data[1])/cell_size )
+        ncz = <int>ceil( (xmax.data[2] - xmin.data[2])/cell_size )
+
+        # number of cells along each coordinate direction
+        self.ncells[0] = ncx; self.ncells[1] = ncy; self.ncells[2] = ncz
+        
+        # total number of cells
+        _ncells = ncx
+        if dim == 2: _ncells = ncx * ncy
+        if dim == 3: _ncells = ncx * ncy * ncz
+        self.ncells_tot = <int>_ncells
+
+        # initialize the head and next arrays
+        for i in range(narrays):
+            pa_wrapper = pa_wrappers[i]
+            np = pa_wrapper.get_number_of_particles()
+
+            # re-size the head and next arrays
+            head = heads[i]
+            next = nexts[i]
+
+            head.resize( _ncells )
+            next.resize( np )
+
+            # UINT_MAX is used to indicate an invalid index
+            for j in range(_ncells):
+                head.data[j] = UINT_MAX
+
+            for j in range(np):
+                next.data[j] = UINT_MAX
+
+    ######################################################################
+    # Neighbor location routines
+    ######################################################################
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs):
+        """Utility function to get near-neighbors for a particle.
+
+        Parameters:
+        -----------
+
+        src_index : int
+            Index of the source particle array in the particles list
+
+        dst_index : int
+            Index of the destination particle array in the particles list
+
+        d_idx : int (input)
+            Destination particle for which neighbors are sought.
+
+        nbrs : UIntArray (output)
+            Neighbors for the requested particle are stored here.
+
+        """
+        # src and dst particle arrays
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
+
+        # src and dst linked lists
+        cdef UIntArray next = self.nexts[ src_index ]
+        cdef UIntArray head = self.heads[ src_index ]
+
+        # Number of cells
+        cdef IntArray ncells = self.ncells
+        cdef int ncells_tot = self.ncells_tot
+        cdef int dim = self.dim
+
+        # Source data arrays
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_z = src.z
+        cdef DoubleArray s_h = src.h
+        cdef UIntArray s_gid = src.gid
+
+        # Destination particle arrays
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_z = dst.z
+        cdef DoubleArray d_h = dst.h
+        cdef UIntArray d_gid = dst.gid
+
+        # cell size and radius
+        cdef double radius_scale = self.radius_scale
+        cdef double cell_size = self.cell_size
+
+        # locals
+        cdef UIntArray lindices
+        cdef size_t indexj
+        cdef cPoint xj
+        cdef double xij
+        cdef double hi, hj
+        cdef int ierr, nnbrs
+        cdef unsigned int _next
+        cdef int ix, iy, iz
+
+        # get the un-flattened index for the destination particle
+        cdef cPoint xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx])
+        cdef cIntPoint _cid = find_cell_id( xi, cell_size )
+        cdef cIntPoint cid = cIntPoint_new(0, 0, 0)
+        cdef int cell_index
+
+        # gather search radius
+        hi = radius_scale * d_h.data[d_idx]
+
+        # Begin search through neighboring cells
+        nnbrs = 0
+        for ix in [-1, 0, 1]:
+            for iy in [-1, 0, 1]:
+                for iz in [-1, 0, 1]:
+                    cid.x = _cid.x + ix
+                    cid.y = _cid.y + iy
+                    cid.z = _cid.z + iz
+                    cell_index = flatten( cid, ncells, dim )
+
+                    # only use a valid cell index
+                    if -1 < cell_index < ncells_tot:
+                      
+                        # get the first particle and begin iteration
+                        _next = head.data[ cell_index ]
+                        while( _next != UINT_MAX ):
+                            xj = cPoint_new( s_x.data[_next], s_y.data[_next], s_z.data[_next] )
+                            xij = cPoint_distance( xi, xj )
+                            hj = radius_scale * s_h.data[_next]
+
+                            if ( (xij < hi) or (xij < hj) ):
+                                if nnbrs == nbrs.length:
+                                    nbrs.resize( nbrs.length + 50 )
+                                    print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+
+                                nbrs.data[ nnbrs ] = _next
+                                nnbrs = nnbrs + 1
+
+                            # get the 'next' particle in this cell
+                            _next = next[_next]
+
+        # update the _length for nbrs to indicate the number of neighbors
+        nbrs._length = nnbrs
+
+    cpdef brute_force_neighbors(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs):
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[dst_index]
+
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_z = src.z
+        cdef DoubleArray s_h = src.h
+
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_z = dst.z
+        cdef DoubleArray d_h = dst.h
+
+        cdef double cell_size = self.cell_size
+        cdef double radius_scale = self.radius_scale
+
+        cdef size_t num_particles, j
+
+        num_particles = d_x.length
+        cdef double xi = d_x.data[d_idx]
+        cdef double yi = d_y.data[d_idx]
+        cdef double zi = d_z.data[d_idx]
+
+        cdef double hi = d_h.data[d_idx] * radius_scale
+        cdef double xj, yj, hj, hj2
+
+        cdef double xij2
+        cdef double hi2 = hi*hi
+
+        # reset the neighbors
+        nbrs.reset()
+
+        for j in range(num_particles):
+            xj = s_x.data[j]; yj = s_y.data[j]; zj = s_z.data[j];
+            hj = s_h.data[j]
+
+            xij2 = (xi - xj)*(xi - xj) + \
+                   (yi - yj)*(yi - yj) + \
+                   (zi - zj)*(zi - zj)
+
+            hj2 = hj*hj
+            if ( (xij2 < hi2) or (xij2 < hj2) ):
+                nbrs.append( <ZOLTAN_ID_TYPE> j )
+
+        return nbrs
 
     ####################################################################
     # Functions for periodicity

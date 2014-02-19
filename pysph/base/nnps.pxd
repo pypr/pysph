@@ -21,6 +21,9 @@ cdef class NNPSParticleArrayWrapper:
     cdef public ParticleArray pa
     cdef str name
     cdef int np
+    
+    # get the number of particles
+    cdef int get_number_of_particles(self)
 
 # Domain limits for the simulation
 cdef class DomainLimits:
@@ -72,6 +75,7 @@ cdef class NNPS:
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public bint trace               # Flag for timing and debugging
     cdef public list particles           # list of particle arrays
     cdef public list pa_wrappers         # list of particle array wrappers
     cdef public int narrays              # Number of particle arrays
@@ -110,6 +114,67 @@ cdef class NNPS:
     # unsigned int to follow the type of the local and global ids.
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
+
+    # Testing function for brute force neighbor search. The return
+    # list is of the same type of the local and global ids (uint)
+    cpdef brute_force_neighbors(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs)
+
+# Nearest neighbor locator based on the classical linked list
+# algorithm, suitably modified to handle multiple particle arrays.
+cdef class LinkedListNNPS:
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef public bint trace               # Flag for timing and debugging
+    cdef int dim                         # Dimensionality of the problem
+    cdef public DomainLimits domain      # Domain limits for the geometry
+    cdef public bint is_periodic         # flag for periodicity
+
+    cdef public list particles           # list of particle arrays
+    cdef public list pa_wrappers         # list of particle array wrappers
+    cdef public int narrays              # Number of particle arrays    
+
+    cdef bint in_parallel                # Flag to determine if in parallel
+    cdef public object comm              # MPI communicator object
+    cdef public int rank                 # MPI rank
+    cdef public int size                 # MPI size
+
+    cdef DoubleArray xmin                # co-ordinate min values
+    cdef DoubleArray xmax                # co-ordinate max values
+    cdef IntArray ncells                 # number of cells in each direction
+    cdef int ncells_tot               # total number of cells
+    cdef public bint fixed_h             # Constant cell sizes
+    cdef public list heads               # Head arrays for the cells
+    cdef public list nexts               # Next arrays for the particles
+    cdef public double cell_size         # Cell size for binning
+    cdef public double radius_scale      # Radius scale for kernel
+
+    ############################################################################
+    # Member functions
+    ############################################################################
+    # Neighbor query function. Returns the list of neighbors for a
+    # requested particle. The returned list is assumed to be of type
+    # unsigned int to follow the type of the local and global ids.
+    cpdef get_nearest_particles(
+        self, int src_index, int dst_index, size_t d_idx, UIntArray nbrs)
+
+    # Compute the cell size across processors. The cell size is taken
+    # as H*radius_scale, where, H is the maximum h among all local
+    # particles
+    cdef _compute_cell_size(self)
+
+    # Main binning routine for local particles. This clears the
+    # current head and next data, re-computes the cell size and bins
+    # all particles locally.
+    cpdef update(self)
+
+    # Index particles given by a list of indices. The indices are
+    # assumed to be of type unsigned int and local to the NNPS object
+    cdef _bin(self, int pa_index, UIntArray indices)
+
+    # refresh head and next arrays
+    cpdef _refresh(self)
 
     # Testing function for brute force neighbor search. The return
     # list is of the same type of the local and global ids (uint)

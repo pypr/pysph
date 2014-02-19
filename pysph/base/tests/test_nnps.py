@@ -26,28 +26,37 @@ gid = UIntArray(numPoints); gid.set_data(gida)
 
 # Create the NNPS object
 pa = get_particle_array(x=xa, y=ya, z=za, h=ha, gid=gida)
-nps = nnps.NNPS(dim=3, particles=[pa,], radius_scale=2.0)
 
-nbrs1 = UIntArray()
-nbrs2 = UIntArray()
+def test_nnps_box_sort():
+    nps = nnps.NNPS(dim=3, particles=[pa,], radius_scale=2.0)
+    _test_nnps(nps)
+    
+def test_nnps_llist():
+    nps = nnps.LinkedListNNPS(dim=3, particles=[pa,], radius_scale=2.0)
+    _test_nnps(nps)
 
-for i in range(numPoints):
-    nps.get_nearest_particles(0, 0, i, nbrs1)
-    nps.brute_force_neighbors(0, 0, i, nbrs2)
+def _test_nnps(nps):
+    nbrs1 = UIntArray()
+    nbrs2 = UIntArray()
 
-    _nbrs1 = nbrs1.get_npy_array()
-    _nbrs2 = nbrs2.get_npy_array()
+    for i in range(numPoints):
+        nps.get_nearest_particles(0, 0, i, nbrs1)
+        nps.brute_force_neighbors(0, 0, i, nbrs2)
 
-    # make sure the size of the neighbor list is the same
-    assert( nbrs1._length == nbrs2.length )
+        _nbrs1 = nbrs1.get_npy_array()
+        _nbrs2 = nbrs2.get_npy_array()
 
-    # sort the neighbor lists
-    nnps_nbrs = _nbrs1[:nbrs1._length]; nnps_nbrs.sort()
-    brut_nbrs = _nbrs2; brut_nbrs.sort()
+        # make sure the size of the neighbor list is the same
+        assert( nbrs1._length == nbrs2.length )
 
-    # check each neighbor
-    for j in range(nbrs1._length):
-        assert( nnps_nbrs[j] == brut_nbrs[j] )
+        # sort the neighbor lists
+        nnps_nbrs = _nbrs1[:nbrs1._length]; nnps_nbrs.sort()
+        brut_nbrs = _nbrs2; brut_nbrs.sort()
+
+        # check each neighbor
+        for j in range(nbrs1._length):
+            assert( nnps_nbrs[j] == brut_nbrs[j] )
+    
 
 def test_get_centroid():
     """Tests the get_centroid function."""
@@ -99,6 +108,8 @@ def test_get_bbox():
     assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
 
+test_nnps_box_sort()
+test_nnps_llist()
 test_get_centroid()
 test_get_bbox()
 
