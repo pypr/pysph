@@ -649,30 +649,27 @@ cdef class NNPS:
 
         cdef size_t num_particles, j
 
-        num_particles = d_x.length
+        num_particles = s_x.length
         cdef double xi = d_x.data[d_idx]
         cdef double yi = d_y.data[d_idx]
         cdef double zi = d_z.data[d_idx]
 
-        cdef double hi = d_h.data[d_idx] * radius_scale
-        cdef double xj, yj, hj, hj2
-
-        cdef double xij2
-        cdef double hi2 = hi*hi
+        cdef double hi = d_h.data[d_idx] * radius_scale # gather radius
+        cdef double xj, yj, hj, xij2, xij
 
         # reset the neighbors
         nbrs.reset()
 
         for j in range(num_particles):
             xj = s_x.data[j]; yj = s_y.data[j]; zj = s_z.data[j];
-            hj = s_h.data[j]
+            hj = radius_scale * s_h.data[j] # scatter radius
 
             xij2 = (xi - xj)*(xi - xj) + \
                    (yi - yj)*(yi - yj) + \
                    (zi - zj)*(zi - zj)
-
-            hj2 = hj*hj
-            if ( (xij2 < hi2) or (xij2 < hj2) ):
+            xij = sqrt(xij2)
+            
+            if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
         return nbrs
@@ -1285,30 +1282,27 @@ cdef class LinkedListNNPS:
 
         cdef size_t num_particles, j
 
-        num_particles = d_x.length
+        num_particles = s_x.length
         cdef double xi = d_x.data[d_idx]
         cdef double yi = d_y.data[d_idx]
         cdef double zi = d_z.data[d_idx]
 
-        cdef double hi = d_h.data[d_idx] * radius_scale
-        cdef double xj, yj, hj, hj2
-
-        cdef double xij2
-        cdef double hi2 = hi*hi
+        cdef double hi = d_h.data[d_idx] * radius_scale # gather radius
+        cdef double xj, yj, hj, xij2, xij
 
         # reset the neighbors
         nbrs.reset()
 
         for j in range(num_particles):
             xj = s_x.data[j]; yj = s_y.data[j]; zj = s_z.data[j];
-            hj = s_h.data[j]
+            hj = radius_scale * s_h.data[j] # scatter radius
 
             xij2 = (xi - xj)*(xi - xj) + \
                    (yi - yj)*(yi - yj) + \
                    (zi - zj)*(zi - zj)
-
-            hj2 = hj*hj
-            if ( (xij2 < hi2) or (xij2 < hj2) ):
+            xij = sqrt(xij2)
+            
+            if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
         return nbrs
