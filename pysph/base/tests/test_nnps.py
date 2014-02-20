@@ -100,13 +100,9 @@ class NNPSTestCase(unittest.TestCase):
             nps.get_cell_indices(
                 cell_index, dst_index, cell_indices)
 
-            print 'Cell %d, num_particles = %d'%(cell_index, cell_indices._length)
-            
             # get the potential neighbors for this cell
             nps.get_cell_neighbors(
                 cell_index, src_index, potential_neighbors)
-
-            print 'Cell %d, potental nbrs = %d'%(cell_index, potential_neighbors._length)
 
             # now iterate over the particles in this cell and get the
             # neighbors
@@ -117,8 +113,6 @@ class NNPSTestCase(unittest.TestCase):
                 nps.get_nearest_particles_by_cell(
                     src_index, dst_index, particle_index, 
                     potential_neighbors, nbrs1)
-
-                print particle_index, nbrs1._length, potential_neighbors._length
 
                 # brute force neighbors
                 nps.brute_force_neighbors(
@@ -216,7 +210,6 @@ class LinkedListNNPSTestCase(NNPSTestCase):
             self.assertTrue( cid.x > -1 )
             self.assertTrue( cid.y > -1 )
             self.assertTrue( cid.z > -1 )
-            self.assertTrue( cid.x * cid.y * cid.z >= 0 )
 
 def test_flatten_unflatten():
     """Test the flattening and un-flattening functions"""

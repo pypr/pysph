@@ -1357,34 +1357,35 @@ cdef class LinkedListNNPS(NNPS):
                     cid.x = _cid.x + shifts.data[ix]
                     cid.y = _cid.y + shifts.data[iy]
                     cid.z = _cid.z + shifts.data[iz]
-                    cell_index = flatten( cid, ncells, dim )
 
-                    # only use a valid cell index
-                    if -1 < cell_index < ncells_tot:
+                    # Only consider valid cell indices
+                    if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
+                        cell_index = flatten( cid, ncells, dim )
+                        if -1 < cell_index < ncells_tot:
                       
-                        # get the first particle and begin iteration
-                        _next = head.data[ cell_index ]
-                        while( _next != UINT_MAX ):
-                            xj = cPoint_new( 
-                                s_x.data[_next], 
-                                s_y.data[_next], 
-                                s_z.data[_next] 
-                                )
+                            # get the first particle and begin iteration
+                            _next = head.data[ cell_index ]
+                            while( _next != UINT_MAX ):
+                                xj = cPoint_new( 
+                                    s_x.data[_next], 
+                                    s_y.data[_next], 
+                                    s_z.data[_next] 
+                                    )
 
-                            xij = cPoint_distance( xi, xj )
-                            hj = radius_scale * s_h.data[_next]
+                                xij = cPoint_distance( xi, xj )
+                                hj = radius_scale * s_h.data[_next]
 
-                            if ( (xij < hi) or (xij < hj) ):
-                                if nnbrs == nbrs.length:
-                                    nbrs.resize( nbrs.length + 50 )
-                                    if self.warn:
-                                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+                                if ( (xij < hi) or (xij < hj) ):
+                                    if nnbrs == nbrs.length:
+                                        nbrs.resize( nbrs.length + 50 )
+                                        if self.warn:
+                                            print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
-                                nbrs.data[ nnbrs ] = _next
-                                nnbrs = nnbrs + 1
+                                    nbrs.data[ nnbrs ] = _next
+                                    nnbrs = nnbrs + 1
 
-                            # get the 'next' particle in this cell
-                            _next = next.data[_next]
+                                # get the 'next' particle in this cell
+                                _next = next.data[_next]
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs
@@ -1438,24 +1439,25 @@ cdef class LinkedListNNPS(NNPS):
                     cid.x = _cid.x + shifts.data[ix]
                     cid.y = _cid.y + shifts.data[iy]
                     cid.z = _cid.z + shifts.data[iz]
-                    _cell_index = flatten( cid, ncells, dim )
-                    
+
                     # only use a valid cell index
-                    if -1 < _cell_index < ncells_tot:
+                    if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
+                        _cell_index = flatten( cid, ncells, dim )
+                        if -1 < _cell_index < ncells_tot:
                       
-                        # get the first particle and begin iteration
-                        _next = head.data[ _cell_index ]
-                        while( _next != UINT_MAX ):
-                            if nnbrs == nbrs.length:
-                                nbrs.resize( nbrs.length + 50 )
-                                if self.warn:
-                                    print """NNPS:: Extending the potential cell neighbor list to %d"""%(nbrs.length)
+                            # get the first particle and begin iteration
+                            _next = head.data[ _cell_index ]
+                            while( _next != UINT_MAX ):
+                                if nnbrs == nbrs.length:
+                                    nbrs.resize( nbrs.length + 50 )
+                                    if self.warn:
+                                        print """NNPS:: Extending the potential cell neighbor list to %d"""%(nbrs.length)
 
-                            nbrs.data[ nnbrs ] = _next
-                            nnbrs = nnbrs + 1
+                                nbrs.data[ nnbrs ] = _next
+                                nnbrs = nnbrs + 1
 
-                            # get the 'next' particle in this cell
-                            _next = next.data[_next]
+                                # get the 'next' particle in this cell
+                                _next = next.data[_next]
 
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs
