@@ -131,7 +131,8 @@ cdef class LinkedListNNPS(NNPS):
     cdef DoubleArray xmin                # co-ordinate min values
     cdef DoubleArray xmax                # co-ordinate max values
     cdef IntArray ncells                 # number of cells in each direction
-    cdef int ncells_tot                  # total number of cells
+    cdef IntArray cell_shifts            # cell shifts
+    cdef public int ncells_tot                  # total number of cells
     cdef public bint fixed_h             # Constant cell sizes
     cdef public list heads               # Head arrays for the cells
     cdef public list nexts               # Next arrays for the particles
@@ -141,3 +142,17 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     # refresh head and next arrays
     cpdef _refresh(self)
+
+    # get neighbors for a cell
+    cpdef get_cell_neighbors(
+        self, int cell_index, int pa_index, UIntArray nbrs)
+
+    # filter the potential neighbors for a particle given the cell
+    # neighbors
+    cpdef get_nearest_particles_by_cell(
+        self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
+        UIntArray nbrs)
+
+    # get the indices for a given cell
+    cpdef get_cell_indices(
+        self, int cell_index, int pa_index, UIntArray indices)

@@ -1,4 +1,4 @@
-"""Benchmark numbers for the base.nnps module."""
+"""Benchmark numbers for NNPS"""
 import numpy
 from time import time
 from numpy import random
@@ -9,9 +9,15 @@ from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 
-_numPoints = [1<<15, 1<<16, 1<<17, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
-bs_times = []
-ll_times = []
+# number of points. Be warned, 1<<20 is about a million particles
+# which can take a while to run. Hash out appropriately for your
+# machine
+_numPoints = [1<<15, 1<<16, 1<<17]#, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
+
+# time containers
+bs_update_times = []; bs_neighbor_times = []
+ll_update_times = []; ll_neighbor_times = []
+ll_update_times_cell = []; ll_neighbor_times_cell = []
 
 for numPoints in _numPoints:
     dx = numpy.power( 1./numPoints, 1.0/3.0 )
@@ -24,43 +30,61 @@ for numPoints in _numPoints:
     # create the particle array
     pa = get_particle_array(x=xa, y=ya, z=za, h=ha, gid=gida)
 
-    # the box-sort NNPS
+    ###### Update times #######
     nnps_boxs = BoxSortNNPS(
         dim=3, particles=[pa,], radius_scale=2.0)
 
-    # calculate the time to get neighbors
     t1 = time()
     nnps_boxs.update()
-    bs_times.append(time() - t1)
+    bs_update_times.append(time() - t1)
     
-    # the linked list NNPS
     nnps_llist = LinkedListNNPS(
         dim=3, particles=[pa,], radius_scale=2.0)
 
-    # calculate the time to get neighbors
     t1 = time()
     nnps_llist.update()
-    ll_times.append(time() - t1)
+    ll_update_times.append(time() - t1)
 
-scale_factors = numpy.array(bs_times[1:])/numpy.array(bs_times[:-1])
-scale_factors = list(scale_factors)
-scale_factors.insert(0, "---")
 
-print "Summation density benchmarks for BoxSortNNPS"
+    ###### Neighbor look up times #######
+    nbrs = UIntArray(1000)
+    t1 = time()
+    for i in range(numPoints):
+        nnps_boxs.get_nearest_particles(0, 0, i, nbrs)
+    bs_neighbor_times.append( time() - t1 )
+
+    nbrs = UIntArray(1000)
+    t1 = time()
+    for i in range(numPoints):
+        nnps_llist.get_nearest_particles(0, 0, i, nbrs)
+    ll_neighbor_times.append( time() - t1 )
+
+    ncells_tot = nnps_llist.ncells_tot
+    cell_indices = UIntArray(1000)
+    potential_nbrs = UIntArray(1000)
+    nbrs = UIntArray(1000)
+    t1 = time()
+    for i in range(ncells_tot):
+        nnps_llist.get_cell_indices(i, 0, cell_indices)     # indices in this cell
+        nnps_llist.get_cell_neighbors(i, 0, potential_nbrs) # potential neighbors
+
+        # get the indices for each particle
+        for particle_index in range( cell_indices._length ):
+            nnps_llist.get_nearest_particles_by_cell(
+                0, 0, particle_index, potential_nbrs, nbrs)
+        
+    ll_neighbor_times_cell.append( time() - t1 )
+        
+
+print "Benchmark :: Time taken for update"
+print "Scheme\tN_p\t time (s) \t time/particle"
 for i, numPoints in enumerate(_numPoints):
-    print "N_p = %d, time = %3.05g s, %3.03g s/particle, scale factor = %2.04s"%(numPoints,
-                                                                                 bs_times[i],
-                                                                                 bs_times[i]/numPoints,
-                                                                                 scale_factors[i])
+    print "BSort\t %d\t %g\t %g"%(numPoints, bs_update_times[i], bs_update_times[i]/numPoints)
+    print "LList\t %d\t %g\t %g"%(numPoints, ll_update_times[i], ll_update_times[i]/numPoints)
 
-scale_factors = numpy.array(ll_times[1:])/numpy.array(ll_times[:-1])
-scale_factors = list(scale_factors)
-scale_factors.insert(0, "---")
-
-print "\n\nSummation density benchmarks for LinkedListNNPS"
+print "\n\nBenchmark :: Time taken for neighbors"
+print "Scheme\tN_p\t time (s) \t time/particle"
 for i, numPoints in enumerate(_numPoints):
-    print "N_p = %d, time = %3.05g s, %3.03g s/particle, scale factor = %2.04s"%(numPoints,
-                                                                                 ll_times[i],
-                                                                                 ll_times[i]/numPoints,
-                                                                                 scale_factors[i])
-
+    print "BSort \t %d\t %g\t %g"%(numPoints, bs_neighbor_times[i], bs_neighbor_times[i]/numPoints)
+    print "LList\t %d\t %g\t %g"%(numPoints, ll_neighbor_times[i], ll_neighbor_times[i]/numPoints)
+    print "CLList\t %d\t %g\t %g"%(numPoints, ll_neighbor_times_cell[i], ll_neighbor_times_cell[i]/numPoints)

@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base import nnps
 
 # Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, DoubleArray
+from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
 
 # Python testing framework
 import unittest
@@ -59,9 +59,8 @@ class NNPSTestCase(unittest.TestCase):
 
         return pa
 
-    def _test_neighbors(
+    def _test_neighbors_by_particle(
         self, src_index, dst_index, dst_numPoints):
-        """"""
         # nnps and the two neighbor lists
         nps = self.nps
         nbrs1 = UIntArray()
@@ -85,6 +84,62 @@ class NNPSTestCase(unittest.TestCase):
             for j in range(nbrs1._length):
                 self.assertEqual( nnps_nbrs[j], brut_nbrs[j] )
 
+    def _test_neighbors_by_cell(self, src_index, dst_index):
+        # nnps and the two neighbor lists
+        nps = self.nps
+        nbrs1 = UIntArray(); nbrs2 = UIntArray()
+
+        potential_neighbors = UIntArray()
+        cell_indices = UIntArray()
+
+        # get the neighbors for each particle and compare with brute force
+        ncells_tot = nps.ncells_tot
+        for cell_index in range(ncells_tot):
+            
+            # get the dst particlces in this cell
+            nps.get_cell_indices(
+                cell_index, dst_index, cell_indices)
+
+            print 'Cell %d, num_particles = %d'%(cell_index, cell_indices._length)
+            
+            # get the potential neighbors for this cell
+            nps.get_cell_neighbors(
+                cell_index, src_index, potential_neighbors)
+
+            print 'Cell %d, potental nbrs = %d'%(cell_index, potential_neighbors._length)
+
+            # now iterate over the particles in this cell and get the
+            # neighbors
+            for indexi in range( cell_indices._length ):
+                particle_index = cell_indices[indexi]
+
+                # NNPS neighbors
+                nps.get_nearest_particles_by_cell(
+                    src_index, dst_index, particle_index, 
+                    potential_neighbors, nbrs1)
+
+                print particle_index, nbrs1._length, potential_neighbors._length
+
+                # brute force neighbors
+                nps.brute_force_neighbors(
+                    src_index, dst_index, particle_index, nbrs2)
+
+                # The rest is the same as before. We check for the
+                # neighbor list for the particle 'particle_index'
+                # ensure that the lengths of the arrays are the same
+                self.assertEqual( nbrs1._length, nbrs2.length )
+                
+                _nbrs1 = nbrs1.get_npy_array()
+                _nbrs2 = nbrs2.get_npy_array()
+
+                nnps_nbrs = _nbrs1[:nbrs1._length]; nnps_nbrs.sort()
+                brut_nbrs = _nbrs2; brut_nbrs.sort()
+
+                # check each neighbor
+                for j in range(nbrs1._length):
+                    self.assertEqual( nnps_nbrs[j], brut_nbrs[j] )
+        
+
 class BoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
@@ -93,19 +148,19 @@ class BoxSortNNPSTestCase(NNPSTestCase):
         
     def test_neighbors_aa(self):
         """BoxSortNNPS :: neighbor test src = a, dst = a """
-        self._test_neighbors(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_ab(self):
         """BoxSortNNPS :: neighbor test src = a, dst = b """
-        self._test_neighbors(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
 
     def test_neighbors_ba(self):
         """BoxSortNNPS :: neighbor test src = b, dst = a """
-        self._test_neighbors(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_bb(self):
         """BoxSortNNPS :: neighbor test src = b, dst = b """
-        self._test_neighbors(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
 
 class LinkedListNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
@@ -115,19 +170,35 @@ class LinkedListNNPSTestCase(NNPSTestCase):
         
     def test_neighbors_aa(self):
         """LinkedListNNPS :: neighbor test src = a, dst = a """
-        self._test_neighbors(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_ab(self):
         """LinkedListNNPS :: neighbor test src = a, dst = b """
-        self._test_neighbors(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
 
     def test_neighbors_ba(self):
         """LinkedListNNPS :: neighbor test src = b, dst = a """
-        self._test_neighbors(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_bb(self):
         """LinkedListNNPS :: neighbor test src = b, dst = b """
-        self._test_neighbors(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
+
+    def test_neighbors_by_cell_aa(self):
+        """LinkedListNNPS :: neighbor test by cell src = a, dst = a """
+        self._test_neighbors_by_cell(src_index=0, dst_index=0)
+
+    def test_neighbors_by_cell_ab(self):
+        """LinkedListNNPS :: neighbor test by cell src = a, dst = b """
+        self._test_neighbors_by_cell(src_index=0, dst_index=1)
+
+    def test_neighbors_by_cell_ba(self):
+        """LinkedListNNPS :: neighbor test by cell src = b, dst = a"""
+        self._test_neighbors_by_cell(src_index=1, dst_index=0)
+
+    def test_neighbors_by_cell_bb(self):
+        """LinkedListNNPS :: neighbor test by cell src = b, dst = b"""
+        self._test_neighbors_by_cell(src_index=1, dst_index=1)
 
 def test_get_centroid():
     """Test 'get_centroid'"""
