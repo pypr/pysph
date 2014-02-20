@@ -432,8 +432,8 @@ cdef class NNPS:
         # create the particle array wrappers
         self.pa_wrappers = [NNPSParticleArrayWrapper(pa) for pa in particles]
 
-        # radius scale and problem dimensionality
-        self.radius_scale = radius_scale
+        # radius scale and problem dimensionality.
+        self.radius_scale = radius_scale * 1.101
         self.dim = dim
 
         self.domain = domain
