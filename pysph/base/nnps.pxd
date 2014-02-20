@@ -89,7 +89,7 @@ cdef class NNPS:
     cdef public DomainLimits domain      # Domain limits for the geometry
     cdef public bint is_periodic         # flag for periodicity
 
-    cdef int dim                         # Dimensionality of the problem
+    cdef public int dim                  # Dimensionality of the problem
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel
 
@@ -129,11 +129,11 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef DoubleArray xmin                # co-ordinate min values
-    cdef DoubleArray xmax                # co-ordinate max values
-    cdef IntArray ncells                 # number of cells in each direction
+    cdef public DoubleArray xmin         # co-ordinate min values
+    cdef public DoubleArray xmax         # co-ordinate max values
+    cdef public IntArray ncells          # number of cells in each direction
     cdef IntArray cell_shifts            # cell shifts
-    cdef public int ncells_tot                  # total number of cells
+    cdef public int ncells_tot           # total number of cells
     cdef public bint fixed_h             # Constant cell sizes
     cdef public list heads               # Head arrays for the cells
     cdef public list nexts               # Next arrays for the particles

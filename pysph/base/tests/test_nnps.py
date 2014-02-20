@@ -200,6 +200,56 @@ class LinkedListNNPSTestCase(NNPSTestCase):
         """LinkedListNNPS :: neighbor test by cell src = b, dst = b"""
         self._test_neighbors_by_cell(src_index=1, dst_index=1)
 
+    def test_cell_indices(self):
+        """LinkedListNNPS :: test positivity for cell indices"""
+        nps = self.nps
+        ncells_tot = nps.ncells_tot
+        ncells = nps.ncells
+        dim = nps.dim
+
+        # cell indices should be positive. We iterate over the
+        # flattened indices, get the unflattened version and check
+        # that each component remains positive
+        for cell_index in range(ncells_tot):
+            cid = nnps.py_unflatten( cell_index, ncells, dim )
+            
+            self.assertTrue( cid.x > -1 )
+            self.assertTrue( cid.y > -1 )
+            self.assertTrue( cid.z > -1 )
+            self.assertTrue( cid.x * cid.y * cid.z >= 0 )
+
+def test_flatten_unflatten():
+    """Test the flattening and un-flattening functions"""
+    # first consider the 2D case where we assume a 4 X 5 grid of cells
+    dim = 2
+    ncells = IntArray(3)
+    ncells[0] = 4; ncells[1] = 5; ncells[2] = 0
+
+    # valid un-flattened cell indices
+    cids = [ [i, j] for i in range(4) for j in range(5) ]
+    for _cid in cids:
+        cid = IntPoint( _cid[0], _cid[1], 0)
+        flattened = nnps.py_flatten( cid, ncells, dim )
+        unflattened = nnps.py_unflatten( flattened, ncells, dim )
+
+        # the unflattened index should match with cid
+        assert( cid == unflattened )
+
+    # 3D
+    dim = 3
+    ncells = IntArray(3)
+    ncells[0] = 4; ncells[1] = 5; ncells[2] = 2
+    
+    # valid un-flattened indices
+    cids = [ [i, j, k] for i in range(4) for j in range(5) for k in range(2) ]
+    for _cid in cids:
+        cid = IntPoint( _cid[0], _cid[1], _cid[2])
+        flattened = nnps.py_flatten( cid, ncells, dim )
+        unflattened = nnps.py_unflatten( flattened, ncells, dim )
+
+        # the unflattened index should match with cid
+        assert( cid == unflattened )
+
 def test_get_centroid():
     """Test 'get_centroid'"""
     cell = nnps.Cell(IntPoint(0, 0, 0), cell_size=0.1, narrays=1)

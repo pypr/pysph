@@ -50,6 +50,12 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells, int dim):
 
     return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
 
+def py_flatten(IntPoint cid, IntArray ncells, int dim):
+    """Python wrapper"""
+    cdef cIntPoint _cid = cid.data
+    cdef int flattened_index = flatten( _cid, ncells, dim )
+    return flattened_index
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef inline cIntPoint unflatten(int cell_index, IntArray ncells, int dim):
@@ -76,6 +82,12 @@ cdef inline cIntPoint unflatten(int cell_index, IntArray ncells, int dim):
     
     # return the tuple cell index
     cid = cIntPoint_new( ix, iy, iz )
+    return cid
+
+def py_unflatten(int cell_index, IntArray ncells, int dim):
+    """Python wrapper"""
+    cdef cIntPoint _cid = unflatten( cell_index, ncells, dim )
+    cdef IntPoint cid = IntPoint_from_cIntPoint(_cid)
     return cid
 
 cdef inline int real_to_int(double real_val, double step):
@@ -1094,6 +1106,10 @@ cdef class LinkedListNNPS(NNPS):
 
         cdef UIntArray lindices, gindices
         cdef size_t num_particles, indexi, i
+
+        # point and flattened index
+        cdef cPoint pnt
+        cdef int _cid
 
         # flattened cell index
         cdef int cell_index
