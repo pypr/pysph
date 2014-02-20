@@ -32,19 +32,18 @@ for numPoints in _numPoints:
 
     ###### Update times #######
     nnps_boxs = BoxSortNNPS(
-        dim=3, particles=[pa,], radius_scale=2.0)
+        dim=3, particles=[pa,], radius_scale=2.0, warn=False)
 
     t1 = time()
     nnps_boxs.update()
     bs_update_times.append(time() - t1)
     
     nnps_llist = LinkedListNNPS(
-        dim=3, particles=[pa,], radius_scale=2.0)
+        dim=3, particles=[pa,], radius_scale=2.0, warn=False)
 
     t1 = time()
     nnps_llist.update()
     ll_update_times.append(time() - t1)
-
 
     ###### Neighbor look up times #######
     nbrs = UIntArray(1000)

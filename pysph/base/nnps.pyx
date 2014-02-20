@@ -390,7 +390,7 @@ cdef class NNPS:
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None):
+                 int ghost_layers=1, domain=None, bint warn=True):
         """Constructor for NNPS
 
         Parameters:
@@ -407,6 +407,9 @@ cdef class NNPS:
 
         domain : DomainLimits, default (None)
             Optional limits for the domain
+
+        warn : bint
+            Flag to warn when extending particle lists
 
         """
         self.in_parallel = False
@@ -427,6 +430,9 @@ cdef class NNPS:
 
         # periodicity
         self.is_periodic = self.domain.is_periodic
+
+        # warn
+        self.warn = warn
 
     cpdef update(self):
         raise RuntimeError("NNPS :: update called")
@@ -704,7 +710,7 @@ cdef class BoxSortNNPS(NNPS):
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None):
+                 int ghost_layers=1, domain=None, warn=True):
         """Constructor for NNPS
 
         Parameters:
@@ -725,7 +731,7 @@ cdef class BoxSortNNPS(NNPS):
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn)
         
         # default not in parallel
 
@@ -949,7 +955,8 @@ cdef class BoxSortNNPS(NNPS):
                             if ( (xij < hi) or (xij < hj) ):
                                 if nnbrs == nbrs.length:
                                     nbrs.resize( nbrs.length + 50 )
-                                    print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+                                    if self.warn:
+                                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
                                 nbrs.data[ nnbrs ] = j
                                 nnbrs = nnbrs + 1
@@ -963,7 +970,7 @@ cdef class LinkedListNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None,
-                 bint fixed_h=False):
+                 bint fixed_h=False, bint warn=True):
         """Constructor for NNPS
 
         Parameters:
@@ -990,7 +997,7 @@ cdef class LinkedListNNPS(NNPS):
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn)
 
         # initialize the head and next for each particle array
         self.heads = [UIntArray() for i in range(self.narrays)]
@@ -1354,7 +1361,8 @@ cdef class LinkedListNNPS(NNPS):
                             if ( (xij < hi) or (xij < hj) ):
                                 if nnbrs == nbrs.length:
                                     nbrs.resize( nbrs.length + 50 )
-                                    print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+                                    if self.warn:
+                                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
                                 nbrs.data[ nnbrs ] = _next
                                 nnbrs = nnbrs + 1
@@ -1424,7 +1432,8 @@ cdef class LinkedListNNPS(NNPS):
                         while( _next != UINT_MAX ):
                             if nnbrs == nbrs.length:
                                 nbrs.resize( nbrs.length + 50 )
-                                print """NNPS:: Extending the potential cell neighbor list to %d"""%(nbrs.length)
+                                if self.warn:
+                                    print """NNPS:: Extending the potential cell neighbor list to %d"""%(nbrs.length)
 
                             nbrs.data[ nnbrs ] = _next
                             nnbrs = nnbrs + 1
@@ -1486,7 +1495,8 @@ cdef class LinkedListNNPS(NNPS):
             if ( (xij < hi) or (xij < hj) ):
                 if nnbrs == nbrs.length:
                     nbrs.resize( nbrs.length + 50 )
-                    print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
+                    if self.warn:
+                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
                 nbrs.data[ nnbrs ] = j
                 nnbrs = nnbrs + 1
