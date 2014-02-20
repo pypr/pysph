@@ -447,20 +447,20 @@ cdef class NNPS:
         self.warn = warn
 
     cpdef update(self):
-        raise RuntimeError("NNPS :: update called")
+        raise NotImplementedError("NNPS :: update called")
 
     cdef _bin(self, int pa_index, UIntArray indices):
-        raise RuntimeError("NNPS :: _bin called")
+        raise NotImplementedError("NNPS :: _bin called")
 
     cdef _compute_cell_size(self):
-        raise RuntimeError("NNPS :: _compute_cell_size called")
+        raise NotImplementedError("NNPS :: _compute_cell_size called")
 
     ######################################################################
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
-        raise RuntimeError("NNPS :: get_nearest_particles called")
+        raise NotImplementedError("NNPS :: get_nearest_particles called")
 
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
