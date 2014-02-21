@@ -17,7 +17,8 @@ _numPoints = [1<<15, 1<<16, 1<<17]#, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
 # time containers
 bs_update_times = []; bs_neighbor_times = []
 ll_update_times = []; ll_neighbor_times = []
-ll_update_times_cell = []; ll_neighbor_times_cell = []
+ll_neighbor_times_cell = []
+bs_neighbor_times_cell = []
 
 for numPoints in _numPoints:
     dx = numpy.power( 1./numPoints, 1.0/3.0 )
@@ -46,22 +47,46 @@ for numPoints in _numPoints:
     ll_update_times.append(time() - t1)
 
     ###### Neighbor look up times #######
+
+    # BoxSort : Particle iteration
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(numPoints):
         nnps_boxs.get_nearest_particles(0, 0, i, nbrs)
     bs_neighbor_times.append( time() - t1 )
 
+    # LinkedList : Particle iteration
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(numPoints):
         nnps_llist.get_nearest_particles(0, 0, i, nbrs)
     ll_neighbor_times.append( time() - t1 )
 
+    # BoxSort : Cell iteration
+    cells = nnps_boxs.cells
+    cell_indices = UIntArray(1000)
+    potential_nbrs = UIntArray(1000)
+    nbrs = UIntArray(1000)
+
+    t1 = time()
+    for cell_index, cell in nnps_boxs.cells.iteritems():
+        nnps_boxs.get_particles_in_cell(cell_index, 0, cell_indices)
+        nnps_boxs.get_particles_in_neighboring_cells(cell_index, 0, potential_nbrs)
+
+        # get the indices for each particle
+        for particle_index in range( cell_indices.length ):
+            nnps_boxs.get_nearest_particles_filtered(
+                0, 0, particle_index, potential_nbrs, nbrs)
+        
+    bs_neighbor_times_cell.append( time() - t1 )
+
+    # LinkedList : Cell iteration
+
     ncells_tot = nnps_llist.ncells_tot
     cell_indices = UIntArray(1000)
     potential_nbrs = UIntArray(1000)
     nbrs = UIntArray(1000)
+
     t1 = time()
     for i in range(ncells_tot):
         nnps_llist.get_particles_in_cell(i, 0, cell_indices)     # indices in this cell
@@ -72,23 +97,22 @@ for numPoints in _numPoints:
             nnps_llist.get_nearest_particles_filtered(
                 0, 0, particle_index, potential_nbrs, nbrs)
         
-    ll_neighbor_times_cell.append( time() - t1 )
-        
+    ll_neighbor_times_cell.append( time() - t1 )        
 
 print "###Timing Benchmarks for a Random Distribuion###\n"
-print "\t\t update:"
-print "Scheme\t  N_p\t time (s) \t time/particle"
+print "update:"
+print "Scheme\t  N_p\t time (s)"
 for i, numPoints in enumerate(_numPoints):
-    print "BSort\t %d\t %0.5g\t %0.5g"%(numPoints, bs_update_times[i], bs_update_times[i]/numPoints)
-    print "LList\t %d\t %0.5g\t %0.5g\n"%(numPoints, ll_update_times[i], ll_update_times[i]/numPoints)
+    print "BSort\t %d\t %0.5g"%(numPoints, bs_update_times[i])
+    print "LList\t %d\t %0.5g\n"%(numPoints, ll_update_times[i])
 
-print "\n\t\t get_neighbors:"
-print "Scheme\t  N_p\t time (s) \t time/particle"
+print "\nget_neighbors:"
+print "Scheme\t  N_p\t time (s)"
 for i, numPoints in enumerate(_numPoints):
-    print "BSort\t %d\t %0.5g\t\t %0.5g"%(numPoints, bs_neighbor_times[i], bs_neighbor_times[i]/numPoints)
-    print "LList\t %d\t %0.5g\t\t %0.5g"%(numPoints, ll_neighbor_times[i], ll_neighbor_times[i]/numPoints)
-    print "CLList\t %d\t %0.5g\t\t %0.5g\n"%(numPoints, ll_neighbor_times_cell[i], ll_neighbor_times_cell[i]/numPoints)
-
+    print "BSort\t %d\t %0.5g"%(numPoints, bs_neighbor_times[i])
+    print "CBSort\t %d\t %0.5g"%(numPoints, bs_neighbor_times_cell[i])
+    print "LList\t %d\t %0.5g"%(numPoints, ll_neighbor_times[i])
+    print "CLList\t %d\t %0.5g\n"%(numPoints, ll_neighbor_times_cell[i])
 
 # Do the same but for a uniform distribution of particles
 bs_update_times = []; bs_neighbor_times = []
@@ -123,18 +147,40 @@ for numPoints in _numPoints:
     ll_update_times.append(time() - t1)
 
     ###### Neighbor look up times #######
+
+    # BoxSort : Particle iteration
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(numPoints):
         nnps_boxs.get_nearest_particles(0, 0, i, nbrs)
     bs_neighbor_times.append( time() - t1 )
 
+    # LinkedList : Particle iteration
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(numPoints):
         nnps_llist.get_nearest_particles(0, 0, i, nbrs)
     ll_neighbor_times.append( time() - t1 )
 
+    # BoxSort : Cell iteration
+    cells = nnps_boxs.cells
+    cell_indices = UIntArray(1000)
+    potential_nbrs = UIntArray(1000)
+    nbrs = UIntArray(1000)
+
+    t1 = time()
+    for cell_index, cell in nnps_boxs.cells.iteritems():
+        nnps_boxs.get_particles_in_cell(cell_index, 0, cell_indices)
+        nnps_boxs.get_particles_in_neighboring_cells(cell_index, 0, potential_nbrs)
+
+        # get the indices for each particle
+        for particle_index in range( cell_indices.length ):
+            nnps_boxs.get_nearest_particles_filtered(
+                0, 0, particle_index, potential_nbrs, nbrs)
+        
+    bs_neighbor_times_cell.append( time() - t1 )
+
+    # LinkedList : Cell iteration
     ncells_tot = nnps_llist.ncells_tot
     cell_indices = UIntArray(1000)
     potential_nbrs = UIntArray(1000)
@@ -153,15 +199,16 @@ for numPoints in _numPoints:
         
 
 print "\n\n###Timing Benchmarks for a Uniform Distribuion###\n"
-print "\t\t update:"
-print "Scheme\t  N_p\t time (s) \t time/particle"
+print "update:"
+print "Scheme\t  N_p\t time (s)"
 for i, numPoints in enumerate(_numPoints):
-    print "BSort\t %d\t %0.5g\t %0.5g"%(numPoints, bs_update_times[i], bs_update_times[i]/numPoints)
-    print "LList\t %d\t %0.5g\t %0.5g\n"%(numPoints, ll_update_times[i], ll_update_times[i]/numPoints)
+    print "BSort\t %d\t %0.5g"%(numPoints, bs_update_times[i])
+    print "LList\t %d\t %0.5g\n"%(numPoints, ll_update_times[i])
 
-print "\n\t\t get_neighbors:"
-print "Scheme\t  N_p\t time (s) \t time/particle"
+print "\nget_neighbors:"
+print "Scheme\t  N_p\t time (s)"
 for i, numPoints in enumerate(_numPoints):
-    print "BSort\t %d\t %0.5g\t\t %0.5g"%(numPoints, bs_neighbor_times[i], bs_neighbor_times[i]/numPoints)
-    print "LList\t %d\t %0.5g\t\t %0.5g"%(numPoints, ll_neighbor_times[i], ll_neighbor_times[i]/numPoints)
-    print "CLList\t %d\t %0.5g\t\t %0.5g\n"%(numPoints, ll_neighbor_times_cell[i], ll_neighbor_times_cell[i]/numPoints)
+    print "BSort\t %d\t %0.5g"%(numPoints, bs_neighbor_times[i])
+    print "CBSort\t %d\t %0.5g"%(numPoints, bs_neighbor_times_cell[i])
+    print "LList\t %d\t %0.5g"%(numPoints, ll_neighbor_times[i])
+    print "CLList\t %d\t %0.5g\n"%(numPoints, ll_neighbor_times_cell[i])

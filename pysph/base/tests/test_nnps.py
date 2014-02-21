@@ -88,6 +88,103 @@ class NNPSTestCase(unittest.TestCase):
             # ensure that the neighbor lists are the same
             self._assert_neighbors(nbrs1, nbrs2)
 
+class BoxSortNNPSTestCase(NNPSTestCase):
+    """Test for the original box-sort algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
+        
+    def test_neighbors_aa(self):
+        """NNPS :: neighbor test src = a, dst = a """
+        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
+
+    def test_neighbors_ab(self):
+        """NNPS :: neighbor test src = a, dst = b """
+        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
+
+    def test_neighbors_ba(self):
+        """NNPS :: neighbor test src = b, dst = a """
+        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
+
+    def test_neighbors_bb(self):
+        """NNPS :: neighbor test src = b, dst = b """
+        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
+
+    def test_neighbors_filtered_aa(self):
+        """NNPS :: neighbor test by cell src = a, dst = a """
+        self._test_neighbors_filtered(src_index=0, dst_index=0)
+
+    def test_neighbors_filtered_ab(self):
+        """NNPS :: neighbor test by cell src = a, dst = b """
+        self._test_neighbors_filtered(src_index=0, dst_index=1)
+
+    def test_neighbors_filtered_ba(self):
+        """NNPS :: neighbor test by cell src = b, dst = a"""
+        self._test_neighbors_filtered(src_index=1, dst_index=0)
+
+    def test_neighbors_filtered_bb(self):
+        """NNPS :: neighbor test by cell src = b, dst = b"""
+        self._test_neighbors_filtered(src_index=1, dst_index=1)
+
+    def _test_neighbors_filtered(self, src_index, dst_index):
+        # nnps and the two neighbor lists
+        nps = self.nps
+        nbrs1 = UIntArray(); nbrs2 = UIntArray()
+
+        potential_neighbors = UIntArray()
+        cell_indices = UIntArray()
+
+        # get the cells dict and iterate over them
+        cells_dict = nps.cells
+        for cell_index, cell in cells_dict.iteritems():
+            # get the dst particlces in this cell
+            nps.get_particles_in_cell(
+                cell_index, dst_index, cell_indices)
+
+            # get the potential neighbors for this cell
+            nps.get_particles_in_neighboring_cells(
+                cell_index, src_index, potential_neighbors)
+
+            # now iterate over the particles in this cell and get the
+            # neighbors
+            for indexi in range( cell_indices.length ):
+                particle_index = cell_indices[indexi]
+
+                # NNPS neighbors
+                nps.get_nearest_particles_filtered(
+                    src_index, dst_index, particle_index, 
+                    potential_neighbors, nbrs1)
+
+                # brute force neighbors
+                nps.brute_force_neighbors(
+                    src_index, dst_index, particle_index, nbrs2)
+
+                # check the neighbors
+                self._assert_neighbors(nbrs1, nbrs2)
+
+class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
+    """Test for the original box-sort algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.LinkedListNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
+        
+    def test_cell_indices(self):
+        """LinkedListNNPS :: test positivity for cell indices"""
+        nps = self.nps
+        ncells_tot = nps.ncells_tot
+        ncells_per_dim = nps.ncells_per_dim
+        dim = nps.dim
+
+        # cell indices should be positive. We iterate over the
+        # flattened indices, get the unflattened version and check
+        # that each component remains positive
+        for cell_index in range(ncells_tot):
+            cid = nnps.py_unflatten( cell_index, ncells_per_dim, dim )
+            
+            self.assertTrue( cid.x > -1 )
+            self.assertTrue( cid.y > -1 )
+            self.assertTrue( cid.z > -1 )
+
     def _test_neighbors_filtered(self, src_index, dst_index):
         # nnps and the two neighbor lists
         nps = self.nps
@@ -123,68 +220,7 @@ class NNPSTestCase(unittest.TestCase):
                     src_index, dst_index, particle_index, nbrs2)
 
                 # check the neighbors
-                self._assert_neighbors(nbrs1, nbrs2)        
-
-class BoxSortNNPSTestCase(NNPSTestCase):
-    """Test for the original box-sort algorithm"""
-    def setUp(self):
-        NNPSTestCase.setUp(self)
-        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
-        
-    def test_neighbors_aa(self):
-        """NNPS :: neighbor test src = a, dst = a """
-        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
-
-    def test_neighbors_ab(self):
-        """NNPS :: neighbor test src = a, dst = b """
-        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
-
-    def test_neighbors_ba(self):
-        """NNPS :: neighbor test src = b, dst = a """
-        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
-
-    def test_neighbors_bb(self):
-        """NNPS :: neighbor test src = b, dst = b """
-        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
-
-class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
-    """Test for the original box-sort algorithm"""
-    def setUp(self):
-        NNPSTestCase.setUp(self)
-        self.nps = nnps.LinkedListNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
-        
-    def test_neighbors_filtered_aa(self):
-        """LinkedListNNPS :: neighbor test by cell src = a, dst = a """
-        self._test_neighbors_filtered(src_index=0, dst_index=0)
-
-    def test_neighbors_filtered_ab(self):
-        """LinkedListNNPS :: neighbor test by cell src = a, dst = b """
-        self._test_neighbors_filtered(src_index=0, dst_index=1)
-
-    def test_neighbors_filtered_ba(self):
-        """LinkedListNNPS :: neighbor test by cell src = b, dst = a"""
-        self._test_neighbors_filtered(src_index=1, dst_index=0)
-
-    def test_neighbors_filtered_bb(self):
-        """LinkedListNNPS :: neighbor test by cell src = b, dst = b"""
-        self._test_neighbors_filtered(src_index=1, dst_index=1)
-
-    def test_cell_indices(self):
-        """LinkedListNNPS :: test positivity for cell indices"""
-        nps = self.nps
-        ncells_tot = nps.ncells_tot
-        ncells_per_dim = nps.ncells_per_dim
-        dim = nps.dim
-
-        # cell indices should be positive. We iterate over the
-        # flattened indices, get the unflattened version and check
-        # that each component remains positive
-        for cell_index in range(ncells_tot):
-            cid = nnps.py_unflatten( cell_index, ncells_per_dim, dim )
-            
-            self.assertTrue( cid.x > -1 )
-            self.assertTrue( cid.y > -1 )
-            self.assertTrue( cid.z > -1 )
+                self._assert_neighbors(nbrs1, nbrs2)
 
 def test_flatten_unflatten():
     """Test the flattening and un-flattening functions"""

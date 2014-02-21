@@ -446,6 +446,13 @@ cdef class NNPS:
         # warn
         self.warn = warn
 
+        # cell shifts. Indicates the shifting value for cell indices
+        # in each co-ordinate direction.
+        self.cell_shifts = IntArray(3)
+        self.cell_shifts.data[0] = -1
+        self.cell_shifts.data[1] = 0
+        self.cell_shifts.data[2] = 1
+
     cpdef update(self):
         raise NotImplementedError("NNPS :: update called")
 
@@ -461,6 +468,78 @@ cdef class NNPS:
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         raise NotImplementedError("NNPS :: get_nearest_particles called")
+
+    cpdef get_nearest_particles_filtered(
+        self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
+        UIntArray nbrs):
+        """Filter the nearest neighbors from a list of potential neighbors
+        
+        For cell based iteration, the nearest neighbors for a given
+        particle, using the cell iteration (which is faster) is
+        obtained in the following way:
+
+        (a) For each cell (cell_index), we first get the indices for
+        the destination particle array within that cell using
+        'nnps.get_particles_in_cell(cell_index, ...)
+        
+        (b) The list of potential neighbors from the source array,
+        with respect to this cell is then sought using
+        'nnps.get_particles_in_neighboring_cells(cell_index, ...)'
+
+        (c) Now we iterate over each destination particle (obtained
+        from step (a) above) and filter the neighbors based on a
+        gather and scatter approach using
+        'nnps.get_nearest_particles_filtered(...)'
+
+        """
+        # src and dst particle arrays
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
+        
+        # Source data arrays
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_z = src.z
+        cdef DoubleArray s_h = src.h
+        cdef UIntArray s_gid = src.gid
+
+        # Destination data arrays
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_z = dst.z
+        cdef DoubleArray d_h = dst.h
+        cdef UIntArray d_gid = dst.gid
+
+        # cell size and radius_scale 
+        cdef double cell_size = self.cell_size
+        cdef double radius_scale = self.radius_scale
+
+        # locals
+        cdef cPoint xi, xj
+        cdef double hi, hj, xij
+        cdef int npotential_nbrs = potential_nbrs.length
+        cdef int indexj, j
+        cdef int nnbrs
+
+        # gather search radius for particle 'i'
+        xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx],  d_z.data[d_idx])
+        hi = radius_scale * d_h.data[d_idx]
+
+        # reset the nbr array length
+        nbrs.reset()
+
+        # search for true neighbors
+        for indexj in range( npotential_nbrs ):
+            j = potential_nbrs.data[indexj]
+            
+            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
+            hj = radius_scale * s_h.data[j]
+            
+            xij = cPoint_distance(xi, xj)
+
+            # select neighbor
+            if ( (xij < hi) or (xij < hj) ):
+                nbrs.append( j )
 
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -889,6 +968,78 @@ cdef class BoxSortNNPS(NNPS):
     ######################################################################
     # Neighbor location routines
     ######################################################################
+    cpdef get_particles_in_cell(
+        self, IntPoint cell_index, int pa_index, UIntArray indices):
+        """Return the indices for the particles within this cell"""
+        cdef dict cells = self.cells
+        
+        # locals
+        cdef int i
+        cdef Cell cell = <Cell>PyDict_GetItem( cells, cell_index )
+        cdef UIntArray cell_indices = cell.lindices[ pa_index ]
+        cdef int nindices = cell_indices.length
+        
+        # reset the indices to 0
+        indices.reset()
+
+        # now add indices from this cell
+        for i in range( nindices ):
+            indices.append( cell_indices.data[i] )
+
+    cpdef get_particles_in_neighboring_cells(
+        self, IntPoint cell_index, int pa_index, UIntArray nbrs):
+        """Return indices for particles in neighboring cells.
+
+        Parameters:
+        -----------
+
+        cell_index : IntPoint
+            Cell index in the range [0,ncells_tot]
+
+        pa_index : int
+            Index of the particle array in the particles list
+
+        nbrs : UIntArray (output)
+            Neighbors for the requested particle are stored here.
+
+        """
+        cdef dict cells = self.cells
+        cdef IntArray shifts = self.cell_shifts
+
+        # locals
+        cdef int ierr, i, j, k
+        cdef Cell cell
+        cdef IntPoint _cid = IntPoint_new(0, 0, 0)
+        cdef UIntArray cell_indices
+        cdef int num_indices, local_index
+
+        cdef int cx = cell_index.data.x
+        cdef int cy = cell_index.data.y
+        cdef int cz = cell_index.data.z
+
+        # reset the nbr array length to 0
+        nbrs.reset()
+
+        # search for potential neighbors
+        for i in range(3):
+            for j in range(3):
+                for k in range(3):
+                    _cid.data.x = cx + shifts.data[i]
+                    _cid.data.y = cy + shifts.data[j]
+                    _cid.data.z = cz + shifts.data[k]
+
+                    # see if the cell exists
+                    ierr = PyDict_Contains( cells, _cid )
+                
+                    if ierr == 1:
+                        cell  = <Cell>PyDict_GetItem(cells, _cid)
+                        cell_indices = <UIntArray>PyList_GetItem(cell.lindices, pa_index)
+                        num_indices = cell_indices.length
+
+                        # add the potential neighbors
+                        for local_index in range(num_indices):
+                            nbrs.append( cell_indices.data[local_index] )
+
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
@@ -1023,13 +1174,6 @@ cdef class LinkedListNNPS(NNPS):
         # defaults
         self.ncells_per_dim = IntArray(3)
         self.ncells_tot = 0
-
-        # cell shifts. Indicates the shifting value for cell indices
-        # in each co-ordinate direction.
-        self.cell_shifts = IntArray(3)
-        self.cell_shifts.data[0] = -1
-        self.cell_shifts.data[1] = 0
-        self.cell_shifts.data[2] = 1
 
         # compute the intial box sort for all local particles
         self.update()
@@ -1433,75 +1577,3 @@ cdef class LinkedListNNPS(NNPS):
 
                                 # get the 'next' particle in this cell
                                 _next = next.data[_next]
-
-    cpdef get_nearest_particles_filtered(
-        self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs):
-        """Filter the nearest neighbors from a list of potential neighbors
-        
-        For the LinkedListNNPS, the nearest neighbors for a given
-        particle, using the cell iteration (which is faster) is
-        obtained in the following way:
-
-        (a) For each cell (cell_index), we first get the indices for
-        the destination particle array within that cell using
-        'nnps.get_particles_in_cell(cell_index, ...)
-        
-        (b) The list of potential neighbors from the source array,
-        with respect to this cell is then sought using
-        'nnps.get_particles_in_neighboring_cells(cell_index, ...)'
-
-        (c) Now we iterate over each destination particle (obtained
-        from step (a) above) and filter the neighbors based on a
-        gather and scatter approach using
-        'nnps.get_nearest_particles_filtered(...)'
-
-        """
-        # src and dst particle arrays
-        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
-        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
-        
-        # Source data arrays
-        cdef DoubleArray s_x = src.x
-        cdef DoubleArray s_y = src.y
-        cdef DoubleArray s_z = src.z
-        cdef DoubleArray s_h = src.h
-        cdef UIntArray s_gid = src.gid
-
-        # Destination data arrays
-        cdef DoubleArray d_x = dst.x
-        cdef DoubleArray d_y = dst.y
-        cdef DoubleArray d_z = dst.z
-        cdef DoubleArray d_h = dst.h
-        cdef UIntArray d_gid = dst.gid
-
-        # cell size and radius_scale 
-        cdef double cell_size = self.cell_size
-        cdef double radius_scale = self.radius_scale
-
-        # locals
-        cdef cPoint xi, xj
-        cdef double hi, hj, xij
-        cdef int npotential_nbrs = potential_nbrs.length
-        cdef int indexj, j
-        cdef int nnbrs
-
-        # gather search radius for particle 'i'
-        xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx],  d_z.data[d_idx])
-        hi = radius_scale * d_h.data[d_idx]
-
-        # reset the nbr array length
-        nbrs.reset()
-
-        # search for true neighbors
-        for indexj in range( npotential_nbrs ):
-            j = potential_nbrs.data[indexj]
-            
-            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-            hj = radius_scale * s_h.data[j]
-            
-            xij = cPoint_distance(xi, xj)
-
-            # select neighbor
-            if ( (xij < hi) or (xij < hj) ):
-                nbrs.append( j )
