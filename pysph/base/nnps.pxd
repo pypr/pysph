@@ -144,16 +144,15 @@ cdef class LinkedListNNPS(NNPS):
     # refresh head and next arrays
     cpdef _refresh(self)
 
-    # get neighbors for a cell
-    cpdef get_cell_neighbors(
+    # return the indices for the particles in neighboring cells
+    cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs)
 
-    # filter the potential neighbors for a particle given the cell
-    # neighbors
-    cpdef get_nearest_particles_by_cell(
+    # filter and return the true nearest neighbors for a particle
+    cpdef get_nearest_particles_filtered(
         self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
         UIntArray nbrs)
 
-    # get the indices for a given cell
-    cpdef get_cell_indices(
+    # return the indices of the particles within a cell
+    cpdef get_particles_in_cell(
         self, int cell_index, int pa_index, UIntArray indices)

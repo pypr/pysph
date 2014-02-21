@@ -756,13 +756,17 @@ cdef class BoxSortNNPS(NNPS):
         self.update()
 
     cpdef update(self):
-        """Update the local data after a parallel update.
+        """Update the local data after particles have moved.
 
-        We want the NNPS to be independent of the ParallelManager
-        which is solely responsible for distributing particles across
-        available processors. We assume therefore that after a
-        parallel update, each processor has all the local particle
-        information it needs.
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
 
         """
         cdef dict cells = self.cells
@@ -1026,7 +1030,8 @@ cdef class LinkedListNNPS(NNPS):
         self.ncells_per_dim = IntArray(3)
         self.ncells_tot = 0
 
-        # cell shifts
+        # cell shifts. Indicates the shifting value for cell indices
+        # in each co-ordinate direction.
         self.cell_shifts = IntArray(3)
         self.cell_shifts.data[0] = -1
         self.cell_shifts.data[1] = 0
@@ -1036,13 +1041,17 @@ cdef class LinkedListNNPS(NNPS):
         self.update()
 
     cpdef update(self):
-        """Update the local data after a parallel update.
+        """Update the local data after particles have moved.
 
-        We want the NNPS to be independent of the ParallelManager
-        which is solely responsible for distributing particles across
-        available processors. We assume therefore that after a
-        parallel update, each processor has all the local particle
-        information it needs.
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
 
         """
         cdef int i, num_particles
@@ -1203,15 +1212,6 @@ cdef class LinkedListNNPS(NNPS):
         cdef int ncx, ncy, ncz, _ncells
         cdef UIntArray head, next
 
-        # adjust xmin and xmax in each co-ordinate direction for periodicity
-        # if domain.periodic_in_x: xmin.data[0] = xmin.data[0] - 0.1*cell_size
-        # if domain.periodic_in_y: xmin.data[1] = xmin.data[1] - 0.1*cell_size
-        # if domain.periodic_in_z: xmin.data[2] = xmin.data[2] - 0.1*cell_size
-
-        # if domain.periodic_in_x: xmax.data[0] = xmax.data[0] + 0.1*cell_size
-        # if domain.periodic_in_y: xmax.data[1] = xmax.data[1] + 0.1*cell_size
-        # if domain.periodic_in_z: xmax.data[2] = xmax.data[2] + 0.1*cell_size
-
         # calculate the number of cells.
         ncx = <int>ceil( cell_size1*(xmax.data[0] - xmin.data[0]) )
         ncy = <int>ceil( cell_size1*(xmax.data[1] - xmin.data[1]) )
@@ -1247,9 +1247,9 @@ cdef class LinkedListNNPS(NNPS):
             for j in range(np):
                 next.data[j] = UINT_MAX
 
-    cpdef get_cell_indices(
+    cpdef get_particles_in_cell(
         self, int cell_index, int pa_index, UIntArray indices):
-        """Return the indices for this cell"""
+        """Return the indices for the particles within this cell"""
         cdef UIntArray head = self.heads[ pa_index ]
         cdef UIntArray next = self.nexts[ pa_index ]
         
@@ -1390,9 +1390,9 @@ cdef class LinkedListNNPS(NNPS):
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs
 
-    cpdef get_cell_neighbors(
+    cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs):
-        """Get all potential neighbors from src w.r.t. a cell
+        """Return indices for particles in neighboring cells.
 
         Parameters:
         -----------
@@ -1460,11 +1460,29 @@ cdef class LinkedListNNPS(NNPS):
         # update the _length for nbrs to indicate the number of neighbors
         nbrs._length = nnbrs
 
-    cpdef get_nearest_particles_by_cell(
+    cpdef get_nearest_particles_filtered(
         self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
         UIntArray nbrs):
-        """Filter the nearest neighbors from a list of potential neighbors"""
+        """Filter the nearest neighbors from a list of potential neighbors
+        
+        For the LinkedListNNPS, the nearest neighbors for a given
+        particle, using the cell iteration (which is faster) is
+        obtained in the following way:
 
+        (a) For each cell (cell_index), we first get the indices for
+        the destination particle array within that cell using
+        'nnps.get_particles_in_cell(cell_index, ...)
+        
+        (b) The list of potential neighbors from the source array,
+        with respect to this cell is then sought using
+        'nnps.get_particles_in_neighboring_cells(cell_index, ...)'
+
+        (c) Now we iterate over each destination particle (obtained
+        from step (a) above) and filter the neighbors based on a
+        gather and scatter approach using
+        'nnps.get_nearest_particles_filtered(...)'
+
+        """
         # src and dst particle arrays
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
         cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]

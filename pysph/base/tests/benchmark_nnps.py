@@ -64,12 +64,12 @@ for numPoints in _numPoints:
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(ncells_tot):
-        nnps_llist.get_cell_indices(i, 0, cell_indices)     # indices in this cell
-        nnps_llist.get_cell_neighbors(i, 0, potential_nbrs) # potential neighbors
+        nnps_llist.get_particles_in_cell(i, 0, cell_indices)     # indices in this cell
+        nnps_llist.get_particles_in_neighboring_cells(i, 0, potential_nbrs) # potential neighbors
 
         # get the indices for each particle
         for particle_index in range( cell_indices._length ):
-            nnps_llist.get_nearest_particles_by_cell(
+            nnps_llist.get_nearest_particles_filtered(
                 0, 0, particle_index, potential_nbrs, nbrs)
         
     ll_neighbor_times_cell.append( time() - t1 )
@@ -141,12 +141,12 @@ for numPoints in _numPoints:
     nbrs = UIntArray(1000)
     t1 = time()
     for i in range(ncells_tot):
-        nnps_llist.get_cell_indices(i, 0, cell_indices)     # indices in this cell
-        nnps_llist.get_cell_neighbors(i, 0, potential_nbrs) # potential neighbors
+        nnps_llist.get_particles_in_cell(i, 0, cell_indices)     # indices in this cell
+        nnps_llist.get_particles_in_neighboring_cells(i, 0, potential_nbrs) # potential neighbors
 
         # get the indices for each particle
         for particle_index in range( cell_indices._length ):
-            nnps_llist.get_nearest_particles_by_cell(
+            nnps_llist.get_nearest_particles_filtered(
                 0, 0, particle_index, potential_nbrs, nbrs)
         
     ll_neighbor_times_cell.append( time() - t1 )
