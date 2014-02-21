@@ -37,7 +37,7 @@ cdef int Ghost = ParticleTAGS.Ghost
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int flatten(cIntPoint cid, IntArray ncells, int dim):
+cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
     """Return a flattened index for a cell
 
     The flattening is determined using the row-order indexing commonly
@@ -45,23 +45,23 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells, int dim):
     based on alternate orderings.
 
     """
-    cdef int ncx = ncells.data[0]
-    cdef int ncy = ncells.data[1]
+    cdef int ncx = ncells_per_dim.data[0]
+    cdef int ncy = ncells_per_dim.data[1]
 
     return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
 
-def py_flatten(IntPoint cid, IntArray ncells, int dim):
+def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
     cdef cIntPoint _cid = cid.data
-    cdef int flattened_index = flatten( _cid, ncells, dim )
+    cdef int flattened_index = flatten( _cid, ncells_per_dim, dim )
     return flattened_index
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline cIntPoint unflatten(int cell_index, IntArray ncells, int dim):
+cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim, int dim):
     """Un-flatten a linear cell index"""
-    cdef int ncx = ncells.data[0]
-    cdef int ncy = ncells.data[1]
+    cdef int ncx = ncells_per_dim.data[0]
+    cdef int ncy = ncells_per_dim.data[1]
 
     cdef cIntPoint cid
     cdef int ix=0, iy=0, iz=0, tmp=0
@@ -84,9 +84,9 @@ cdef inline cIntPoint unflatten(int cell_index, IntArray ncells, int dim):
     cid = cIntPoint_new( ix, iy, iz )
     return cid
 
-def py_unflatten(int cell_index, IntArray ncells, int dim):
+def py_unflatten(int cell_index, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
-    cdef cIntPoint _cid = unflatten( cell_index, ncells, dim )
+    cdef cIntPoint _cid = unflatten( cell_index, ncells_per_dim, dim )
     cdef IntPoint cid = IntPoint_from_cIntPoint(_cid)
     return cid
 
@@ -1023,7 +1023,7 @@ cdef class LinkedListNNPS(NNPS):
         self.xmax = DoubleArray(3)
 
         # defaults
-        self.ncells = IntArray(3)
+        self.ncells_per_dim = IntArray(3)
         self.ncells_tot = 0
 
         # cell shifts
@@ -1096,7 +1096,7 @@ cdef class LinkedListNNPS(NNPS):
 
         cdef DoubleArray xmin = self.xmin
         cdef DoubleArray xmax = self.xmax
-        cdef IntArray ncells = self.ncells
+        cdef IntArray ncells_per_dim = self.ncells_per_dim
         cdef int dim = self.dim
 
         # the head and next arrays for this particle array
@@ -1127,7 +1127,7 @@ cdef class LinkedListNNPS(NNPS):
                 z.data[i] - xmin.data[2] )
 
             # flattened cell index
-            _cid = flatten( find_cell_id( pnt, cell_size ), ncells, dim )
+            _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
 
             # insert this particle
             next.data[ i ] = head.data[ _cid ]
@@ -1218,9 +1218,9 @@ cdef class LinkedListNNPS(NNPS):
         ncz = <int>ceil( cell_size1*(xmax.data[2] - xmin.data[2]) )
 
         # number of cells along each coordinate direction
-        self.ncells.data[0] = ncx 
-        self.ncells.data[1] = ncy 
-        self.ncells.data[2] = ncz
+        self.ncells_per_dim.data[0] = ncx 
+        self.ncells_per_dim.data[1] = ncy 
+        self.ncells_per_dim.data[2] = ncz
         
         # total number of cells
         _ncells = ncx
@@ -1304,7 +1304,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef UIntArray head = self.heads[ src_index ]
 
         # Number of cells
-        cdef IntArray ncells = self.ncells
+        cdef IntArray ncells_per_dim = self.ncells_per_dim
         cdef int ncells_tot = self.ncells_tot
         cdef int dim = self.dim
 
@@ -1360,7 +1360,7 @@ cdef class LinkedListNNPS(NNPS):
 
                     # Only consider valid cell indices
                     if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
-                        cell_index = flatten( cid, ncells, dim )
+                        cell_index = flatten( cid, ncells_per_dim, dim )
                         if -1 < cell_index < ncells_tot:
                       
                             # get the first particle and begin iteration
@@ -1412,7 +1412,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef UIntArray head = self.heads[ pa_index ]
 
         # Number of cells in each dimension and the total ncells
-        cdef IntArray ncells = self.ncells
+        cdef IntArray ncells_per_dim = self.ncells_per_dim
         cdef int ncells_tot = self.ncells_tot
         cdef int dim = self.dim
 
@@ -1425,11 +1425,9 @@ cdef class LinkedListNNPS(NNPS):
         cdef int nnbrs, ix, iy, iz
 
         # get the un-flattened index for this cell
-        cdef cIntPoint _cid = unflatten( cell_index, ncells, dim )
+        cdef cIntPoint _cid = unflatten( cell_index, ncells_per_dim, dim )
         cdef cIntPoint cid
         cdef int _cell_index
-
-        tmp = flatten(_cid, ncells, dim)
 
         # Begin search through neighboring cells
         nnbrs = 0
@@ -1442,7 +1440,7 @@ cdef class LinkedListNNPS(NNPS):
 
                     # only use a valid cell index
                     if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
-                        _cell_index = flatten( cid, ncells, dim )
+                        _cell_index = flatten( cid, ncells_per_dim, dim )
                         if -1 < _cell_index < ncells_tot:
                       
                             # get the first particle and begin iteration

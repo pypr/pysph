@@ -198,14 +198,14 @@ class LinkedListNNPSTestCase(NNPSTestCase):
         """LinkedListNNPS :: test positivity for cell indices"""
         nps = self.nps
         ncells_tot = nps.ncells_tot
-        ncells = nps.ncells
+        ncells_per_dim = nps.ncells_per_dim
         dim = nps.dim
 
         # cell indices should be positive. We iterate over the
         # flattened indices, get the unflattened version and check
         # that each component remains positive
         for cell_index in range(ncells_tot):
-            cid = nnps.py_unflatten( cell_index, ncells, dim )
+            cid = nnps.py_unflatten( cell_index, ncells_per_dim, dim )
             
             self.assertTrue( cid.x > -1 )
             self.assertTrue( cid.y > -1 )
@@ -215,30 +215,30 @@ def test_flatten_unflatten():
     """Test the flattening and un-flattening functions"""
     # first consider the 2D case where we assume a 4 X 5 grid of cells
     dim = 2
-    ncells = IntArray(3)
-    ncells[0] = 4; ncells[1] = 5; ncells[2] = 0
+    ncells_per_dim = IntArray(3)
+    ncells_per_dim[0] = 4; ncells_per_dim[1] = 5; ncells_per_dim[2] = 0
 
     # valid un-flattened cell indices
     cids = [ [i, j] for i in range(4) for j in range(5) ]
     for _cid in cids:
         cid = IntPoint( _cid[0], _cid[1], 0)
-        flattened = nnps.py_flatten( cid, ncells, dim )
-        unflattened = nnps.py_unflatten( flattened, ncells, dim )
+        flattened = nnps.py_flatten( cid, ncells_per_dim, dim )
+        unflattened = nnps.py_unflatten( flattened, ncells_per_dim, dim )
 
         # the unflattened index should match with cid
         assert( cid == unflattened )
 
     # 3D
     dim = 3
-    ncells = IntArray(3)
-    ncells[0] = 4; ncells[1] = 5; ncells[2] = 2
+    ncells_per_dim = IntArray(3)
+    ncells_per_dim[0] = 4; ncells_per_dim[1] = 5; ncells_per_dim[2] = 2
     
     # valid un-flattened indices
     cids = [ [i, j, k] for i in range(4) for j in range(5) for k in range(2) ]
     for _cid in cids:
         cid = IntPoint( _cid[0], _cid[1], _cid[2])
-        flattened = nnps.py_flatten( cid, ncells, dim )
-        unflattened = nnps.py_unflatten( flattened, ncells, dim )
+        flattened = nnps.py_flatten( cid, ncells_per_dim, dim )
+        unflattened = nnps.py_unflatten( flattened, ncells_per_dim, dim )
 
         # the unflattened index should match with cid
         assert( cid == unflattened )

@@ -131,7 +131,7 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     cdef public DoubleArray xmin         # co-ordinate min values
     cdef public DoubleArray xmax         # co-ordinate max values
-    cdef public IntArray ncells          # number of cells in each direction
+    cdef public IntArray ncells_per_dim  # number of cells in each direction
     cdef IntArray cell_shifts            # cell shifts
     cdef public int ncells_tot           # total number of cells
     cdef public bint fixed_h             # Constant cell sizes
