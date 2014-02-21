@@ -46,10 +46,8 @@ class NNPSTestCase(unittest.TestCase):
     def _create_random(self, numPoints):
         # average particle spacing and volume in the unit cube
         dx = pow( 1.0/numPoints, 1./3. )
-        
-        x1 = random.random( numPoints )
-        y1 = random.random( numPoints )
-        z1 = random.random( numPoints )
+
+        x1, y1, z1 = random.random( (3, numPoints) )
         h1 = numpy.ones_like(x1) * 1.2 * dx
         gid1 = numpy.arange(numPoints).astype(numpy.uint32)
         
@@ -138,46 +136,30 @@ class BoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0)
+        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
         
     def test_neighbors_aa(self):
-        """BoxSortNNPS :: neighbor test src = a, dst = a """
+        """NNPS :: neighbor test src = a, dst = a """
         self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_ab(self):
-        """BoxSortNNPS :: neighbor test src = a, dst = b """
+        """NNPS :: neighbor test src = a, dst = b """
         self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
 
     def test_neighbors_ba(self):
-        """BoxSortNNPS :: neighbor test src = b, dst = a """
+        """NNPS :: neighbor test src = b, dst = a """
         self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_bb(self):
-        """BoxSortNNPS :: neighbor test src = b, dst = b """
+        """NNPS :: neighbor test src = b, dst = b """
         self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
 
-class LinkedListNNPSTestCase(NNPSTestCase):
+class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.LinkedListNNPS(dim=3, particles=self.particles, radius_scale=2.0)
+        self.nps = nnps.LinkedListNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
         
-    def test_neighbors_aa(self):
-        """LinkedListNNPS :: neighbor test src = a, dst = a """
-        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
-
-    def test_neighbors_ab(self):
-        """LinkedListNNPS :: neighbor test src = a, dst = b """
-        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
-
-    def test_neighbors_ba(self):
-        """LinkedListNNPS :: neighbor test src = b, dst = a """
-        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
-
-    def test_neighbors_bb(self):
-        """LinkedListNNPS :: neighbor test src = b, dst = b """
-        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
-
     def test_neighbors_filtered_aa(self):
         """LinkedListNNPS :: neighbor test by cell src = a, dst = a """
         self._test_neighbors_filtered(src_index=0, dst_index=0)
