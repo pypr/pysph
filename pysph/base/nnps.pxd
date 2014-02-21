@@ -9,7 +9,7 @@ from particle_array cimport ParticleArray
 from point cimport *
 
 cdef inline int real_to_int(double val, double step)
-cdef inline cIntPoint find_cell_id(cPoint pnt, double cell_size)
+cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
 
@@ -21,7 +21,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef public ParticleArray pa
     cdef str name
     cdef int np
-    
+
     # get the number of particles
     cdef int get_number_of_particles(self)
 
