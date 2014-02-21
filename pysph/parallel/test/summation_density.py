@@ -11,7 +11,7 @@ from pyzoltan.core.carray import UIntArray
 
 # PySPH imports
 from pysph.base.point import Point
-from pysph.base.nnps import NNPS
+from pysph.base.nnps import BoxSortNNPS
 from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
 from pysph.base.utils import get_particle_array_wcsph
 
@@ -119,7 +119,7 @@ PARTICLES = [PA1, PA2]
 PM = ZoltanParallelManagerGeometric(dim=dim, particles=PARTICLES, comm=comm)
 
 # create the local NNPS object with all the particles
-Nnps = NNPS(dim=dim, particles=PARTICLES)
+Nnps = BoxSortNNPS(dim=dim, particles=PARTICLES)
 Nnps.update()
 
 # only root computes summation density
@@ -142,7 +142,7 @@ particles = [pa1, pa2]
 
 # create the local nnps object and parallel manager
 pm = ZoltanParallelManagerGeometric(dim=dim, comm=comm, particles=particles)
-nnps = NNPS(dim=dim, particles=particles)
+nnps = BoxSortNNPS(dim=dim, particles=particles)
 
 # set the Zoltan parameters (Optional)
 pz = pm.pz
