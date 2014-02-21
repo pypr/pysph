@@ -21,6 +21,9 @@ cdef class NNPSParticleArrayWrapper:
     cdef public ParticleArray pa
     cdef str name
     cdef int np
+    
+    # get the number of particles
+    cdef int get_number_of_particles(self)
 
 # Domain limits for the simulation
 cdef class DomainLimits:
@@ -72,6 +75,8 @@ cdef class NNPS:
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef public bint warn                # Flag to warn when extending lists
+    cdef public bint trace               # Flag for timing and debugging
     cdef public list particles           # list of particle arrays
     cdef public list pa_wrappers         # list of particle array wrappers
     cdef public int narrays              # Number of particle arrays
@@ -84,10 +89,10 @@ cdef class NNPS:
     cdef public DomainLimits domain      # Domain limits for the geometry
     cdef public bint is_periodic         # flag for periodicity
 
-    cdef int dim                         # Dimensionality of the problem
-    cdef public dict cells
+    cdef public int dim                  # Dimensionality of the problem
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel
+    cdef IntArray cell_shifts            # cell shifts
 
     ############################################################################
     # Member functions
@@ -115,3 +120,50 @@ cdef class NNPS:
     # list is of the same type of the local and global ids (uint)
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
+
+    # filter and return the true nearest neighbors for a particle
+    cpdef get_nearest_particles_filtered(
+        self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
+        UIntArray nbrs)
+
+# NNPS using the original gridding algorithm
+cdef class BoxSortNNPS(NNPS):
+    cdef public dict cells               # lookup table for the cells
+
+    ############################################################################
+    # Member functions
+    ############################################################################
+    # return the particle indices contained within a cell
+    cpdef get_particles_in_cell(
+        self, IntPoint cell_index, int pa_index, UIntArray indices)
+
+    # return the indices for the particles in neighboring cells
+    cpdef get_particles_in_neighboring_cells(
+        self, IntPoint cell_index, int pa_index, UIntArray nbrs)
+
+# NNPS using the linked list approach
+cdef class LinkedListNNPS(NNPS):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef public DoubleArray xmin         # co-ordinate min values
+    cdef public DoubleArray xmax         # co-ordinate max values
+    cdef public IntArray ncells_per_dim  # number of cells in each direction
+    cdef public int ncells_tot           # total number of cells
+    cdef public bint fixed_h             # Constant cell sizes
+    cdef public list heads               # Head arrays for the cells
+    cdef public list nexts               # Next arrays for the particles
+
+    ############################################################################
+    # Member functions
+    ############################################################################
+    # refresh head and next arrays
+    cpdef _refresh(self)
+
+    # return the particle indices contained within a cell
+    cpdef get_particles_in_cell(
+        self, int cell_index, int pa_index, UIntArray indices)
+
+    # return the indices for the particles in neighboring cells
+    cpdef get_particles_in_neighboring_cells(
+        self, int cell_index, int pa_index, UIntArray nbrs)

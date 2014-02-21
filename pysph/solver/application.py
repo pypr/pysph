@@ -7,7 +7,7 @@ import sys
 
 # PySPH imports.
 from pysph.base.particle_array import ParticleArray
-from pysph.base.nnps import NNPS
+from pysph.base.nnps import BoxSortNNPS
 from pysph.solver.controller import CommandManager
 import pysph.base.kernels as kernels
 from utils import mkdir, load
@@ -513,8 +513,9 @@ class Application(object):
             kernel = self._solver.kernel
 
             # create the NNPS object
-            nnps = NNPS(dim=solver.dim, particles=self.particles,
-                        radius_scale=kernel.radius_scale, domain=self.domain)
+            nnps = BoxSortNNPS(
+                dim=solver.dim, particles=self.particles,
+                radius_scale=kernel.radius_scale, domain=self.domain)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:

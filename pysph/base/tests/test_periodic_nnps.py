@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from pysph.base.nnps import DomainLimits, NNPS
+from pysph.base.nnps import DomainLimits, BoxSortNNPS
 from pysph.base.utils import get_particle_array
 from pysph.parallel._kernels import CubicSpline, Gaussian
 from pysph.base.point import Point
@@ -56,7 +56,8 @@ assert( domain.is_periodic )
 kernel = Gaussian(dim=2)
 
 # nnps
-nnps = NNPS(dim=2, particles=particles, domain=domain, radius_scale=kernel.radius)
+nnps = BoxSortNNPS(
+    dim=2, particles=particles, domain=domain, radius_scale=kernel.radius)
 
 assert (nnps.is_periodic)
 
@@ -75,7 +76,7 @@ for i in range(frho.size):
 
     # compute density from the fluid
     nnps.get_nearest_particles(src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs._length
+    nnbrs = nbrs.length
 
     sx, sy, sh, sm = fluid.get('x', 'y', 'h', 'm', only_real_particles=False)
 
@@ -90,7 +91,7 @@ for i in range(frho.size):
 
     # compute density from the channel
     nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs._length
+    nnbrs = nbrs.length
 
     sx, sy, sh, sm = channel.get('x', 'y', 'h', 'm', only_real_particles=False)
 

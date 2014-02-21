@@ -158,7 +158,7 @@ cdef class SPHCalc:
             nnps.get_nearest_particles(
                 src_array_index, dst_array_index, d_idx, nbrs)
 
-            for nbr_idx in range(nbrs._length):
+            for nbr_idx in range(nbrs.length):
                 s_idx = <int>nbrs.data[nbr_idx]
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
