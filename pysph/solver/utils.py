@@ -469,7 +469,7 @@ class SPHInterpolate(object):
             xi = Point( dx[i], dy[i], dz[i] )
 
             self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-            nnbrs = nbrs._length
+            nnbrs = nbrs.length
 
             _wij = 0.0; _sum = 0.0
             for indexj in range(nnbrs):
@@ -513,7 +513,7 @@ class SPHInterpolate(object):
             self.nnps.get_nearest_particles(
                 src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
 
-            nnbrs = nbrs._length
+            nnbrs = nbrs.length
             hij = h[i]
 
             _wij = 0.0; _sumx = 0.0; _sumy = 0.0; _sumz = 0.0
