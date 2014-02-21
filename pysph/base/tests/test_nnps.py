@@ -59,8 +59,8 @@ class NNPSTestCase(unittest.TestCase):
 
     def _assert_neighbors(self, nbrs_nnps, nbrs_brute_force):
             # ensure that the lengths of the arrays are the same
-            self.assertEqual( nbrs_nnps._length, nbrs_brute_force.length )
-            nnbrs = nbrs_nnps._length
+            self.assertEqual( nbrs_nnps.length, nbrs_brute_force.length )
+            nnbrs = nbrs_nnps.length
 
             _nbrs1 = nbrs_nnps.get_npy_array()
             _nbrs2 = nbrs_brute_force.get_npy_array()
@@ -110,7 +110,7 @@ class NNPSTestCase(unittest.TestCase):
 
             # now iterate over the particles in this cell and get the
             # neighbors
-            for indexi in range( cell_indices._length ):
+            for indexi in range( cell_indices.length ):
                 particle_index = cell_indices[indexi]
 
                 # NNPS neighbors

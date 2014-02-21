@@ -76,7 +76,7 @@ for i in range(frho.size):
 
     # compute density from the fluid
     nnps.get_nearest_particles(src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs._length
+    nnbrs = nbrs.length
 
     sx, sy, sh, sm = fluid.get('x', 'y', 'h', 'm', only_real_particles=False)
 
@@ -91,7 +91,7 @@ for i in range(frho.size):
 
     # compute density from the channel
     nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs._length
+    nnbrs = nbrs.length
 
     sx, sy, sh, sm = channel.get('x', 'y', 'h', 'm', only_real_particles=False)
 

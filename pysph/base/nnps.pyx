@@ -946,7 +946,10 @@ cdef class BoxSortNNPS(NNPS):
         cdef double hi, hj
         hi = radius_scale * d_h.data[d_idx]
 
-        cdef int ierr, nnbrs = 0
+        cdef int ierr
+
+        # reset the nbr array length. This should avoid a realloc
+        nbrs.reset()
 
         cdef int ix, iy, iz
         for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
@@ -968,18 +971,9 @@ cdef class BoxSortNNPS(NNPS):
 
                             hj = radius_scale * s_h.data[j]
 
+                            # select as neighbor
                             if ( (xij < hi) or (xij < hj) ):
-                                if nnbrs == nbrs.length:
-                                    nbrs.resize( nbrs.length + 50 )
-                                    if self.warn:
-                                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
-
-                                nbrs.data[ nnbrs ] = j
-                                nnbrs = nnbrs + 1
-
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
-
+                                nbrs.append( j )
 
 cdef class LinkedListNNPS(NNPS):
     """Nearest neighbor query class using the linked list method.
@@ -1254,23 +1248,16 @@ cdef class LinkedListNNPS(NNPS):
         cdef UIntArray next = self.nexts[ pa_index ]
         
         cdef ZOLTAN_ID_TYPE _next
-        cdef int num_indices = 0
+
+        # reset the indices length
+        indices.reset()
         
         # get the first particle in this cell
         _next = head.data[ cell_index ]
         while( _next != UINT_MAX ):
-            # resize if necessary
-            if indices.length == num_indices:
-                indices.resize( num_indices + 20 )
-
-            # add to the list of particle indices
-            indices.data[num_indices] = _next
-            num_indices = num_indices + 1
-
+            # add to the list of particle indices and find next
+            indices.append( _next )
             _next = next.data[ _next ]
-        
-        # store the number of indices
-        indices._length = num_indices
 
     ######################################################################
     # Neighbor location routines
@@ -1349,8 +1336,10 @@ cdef class LinkedListNNPS(NNPS):
         # gather search radius
         hi = radius_scale * d_h.data[d_idx]
 
+        # reset the length of the nbr array
+        nbrs.reset()
+
         # Begin search through neighboring cells
-        nnbrs = 0
         for ix in range(3):
             for iy in range(3):
                 for iz in range(3):
@@ -1375,20 +1364,12 @@ cdef class LinkedListNNPS(NNPS):
                                 xij = cPoint_distance( xi, xj )
                                 hj = radius_scale * s_h.data[_next]
 
+                                # select neighbor
                                 if ( (xij < hi) or (xij < hj) ):
-                                    if nnbrs == nbrs.length:
-                                        nbrs.resize( nbrs.length + 50 )
-                                        if self.warn:
-                                            print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
-
-                                    nbrs.data[ nnbrs ] = _next
-                                    nnbrs = nnbrs + 1
+                                    nbrs.append( _next )
 
                                 # get the 'next' particle in this cell
                                 _next = next.data[_next]
-
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
 
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs):
@@ -1429,8 +1410,10 @@ cdef class LinkedListNNPS(NNPS):
         cdef cIntPoint cid
         cdef int _cell_index
 
+        # rest the nbr array length
+        nbrs.reset()
+
         # Begin search through neighboring cells
-        nnbrs = 0
         for ix in range(3):
             for iy in range(3):
                 for iz in range(3):
@@ -1446,19 +1429,10 @@ cdef class LinkedListNNPS(NNPS):
                             # get the first particle and begin iteration
                             _next = head.data[ _cell_index ]
                             while( _next != UINT_MAX ):
-                                if nnbrs == nbrs.length:
-                                    nbrs.resize( nbrs.length + 50 )
-                                    if self.warn:
-                                        print """NNPS:: Extending the potential cell neighbor list to %d"""%(nbrs.length)
-
-                                nbrs.data[ nnbrs ] = _next
-                                nnbrs = nnbrs + 1
+                                nbrs.append( _next )
 
                                 # get the 'next' particle in this cell
                                 _next = next.data[_next]
-
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
 
     cpdef get_nearest_particles_filtered(
         self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
@@ -1508,7 +1482,7 @@ cdef class LinkedListNNPS(NNPS):
         # locals
         cdef cPoint xi, xj
         cdef double hi, hj, xij
-        cdef int npotential_nbrs = potential_nbrs._length
+        cdef int npotential_nbrs = potential_nbrs.length
         cdef int indexj, j
         cdef int nnbrs
 
@@ -1516,8 +1490,10 @@ cdef class LinkedListNNPS(NNPS):
         xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx],  d_z.data[d_idx])
         hi = radius_scale * d_h.data[d_idx]
 
+        # reset the nbr array length
+        nbrs.reset()
+
         # search for true neighbors
-        nnbrs = 0
         for indexj in range( npotential_nbrs ):
             j = potential_nbrs.data[indexj]
             
@@ -1525,15 +1501,7 @@ cdef class LinkedListNNPS(NNPS):
             hj = radius_scale * s_h.data[j]
             
             xij = cPoint_distance(xi, xj)
-       
-            if ( (xij < hi) or (xij < hj) ):
-                if nnbrs == nbrs.length:
-                    nbrs.resize( nbrs.length + 50 )
-                    if self.warn:
-                        print """NNPS:: Extending the neighbor list to %d"""%(nbrs.length)
 
-                nbrs.data[ nnbrs ] = j
-                nnbrs = nnbrs + 1
-                
-        # store the number of neighbors
-        nbrs._length = nnbrs
+            # select neighbor
+            if ( (xij < hi) or (xij < hj) ):
+                nbrs.append( j )

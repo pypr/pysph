@@ -68,7 +68,7 @@ for numPoints in _numPoints:
         nnps_llist.get_particles_in_neighboring_cells(i, 0, potential_nbrs) # potential neighbors
 
         # get the indices for each particle
-        for particle_index in range( cell_indices._length ):
+        for particle_index in range( cell_indices.length ):
             nnps_llist.get_nearest_particles_filtered(
                 0, 0, particle_index, potential_nbrs, nbrs)
         
@@ -145,7 +145,7 @@ for numPoints in _numPoints:
         nnps_llist.get_particles_in_neighboring_cells(i, 0, potential_nbrs) # potential neighbors
 
         # get the indices for each particle
-        for particle_index in range( cell_indices._length ):
+        for particle_index in range( cell_indices.length ):
             nnps_llist.get_nearest_particles_filtered(
                 0, 0, particle_index, potential_nbrs, nbrs)
         
