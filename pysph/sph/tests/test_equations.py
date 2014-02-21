@@ -101,7 +101,7 @@ class TestEquations(TestBase):
         self.assertEqual(eq.no_source, True)
 
     def test_continuity_equation(self):
-        from pysph.sph.wc.basic import ContinuityEquation
+        from pysph.sph.basic_equations import ContinuityEquation
         e = ContinuityEquation(dest='fluid', sources=['fluid'])
         # Call the loop code.
 
@@ -148,7 +148,8 @@ class TestEq2(Equation):
 
 class TestGroup(TestBase):
     def setUp(self):
-        from pysph.sph.wc.basic import SummationDensity, TaitEOS
+        from pysph.sph.basic_equations import SummationDensity
+        from pysph.sph.wc.basic import TaitEOS
         self.group = Group([SummationDensity('f', ['f']), TaitEOS('f', None)])
 
     def test_precomputed(self):

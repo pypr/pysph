@@ -9,11 +9,12 @@ import numpy as np
 
 from pysph.base.utils import get_particle_array_wcsph as gpa
 from pysph.base.kernels import CubicSpline
-from pysph.sph.wc.basic import TaitEOS, ContinuityEquation, MomentumEquation,\
-     XSPHCorrection
+from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
+from pysph.sph.integrator import Integrator, WCSPHStep
 
 dim = 3
 
@@ -97,8 +98,11 @@ app = Application()
 # Create the kernel
 kernel = CubicSpline(dim=3)
 
+# Create the integrator.
+integrator = Integrator(fluid=WCSPHStep(), boundary=WCSPHStep())
+
 # Create a solver.
-solver = Solver(kernel=kernel, dim=dim)
+solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
 
 # Setup default parameters.
 solver.set_time_step(dt)
