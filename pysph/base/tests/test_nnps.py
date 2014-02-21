@@ -57,6 +57,22 @@ class NNPSTestCase(unittest.TestCase):
 
         return pa
 
+    def _assert_neighbors(self, nbrs_nnps, nbrs_brute_force):
+            # ensure that the lengths of the arrays are the same
+            self.assertEqual( nbrs_nnps._length, nbrs_brute_force.length )
+            nnbrs = nbrs_nnps._length
+
+            _nbrs1 = nbrs_nnps.get_npy_array()
+            _nbrs2 = nbrs_brute_force.get_npy_array()
+
+            # sort the neighbors
+            nbrs1 = _nbrs1[:nnbrs]; nbrs1.sort()
+            nbrs2 = _nbrs2; nbrs2.sort()
+            
+            # check each neighbor
+            for i in range(nnbrs):
+                self.assertEqual( nbrs1[i], nbrs2[i] )
+        
     def _test_neighbors_by_particle(
         self, src_index, dst_index, dst_numPoints):
         # nnps and the two neighbor lists
@@ -69,18 +85,8 @@ class NNPSTestCase(unittest.TestCase):
             nps.get_nearest_particles(src_index, dst_index, i, nbrs1)
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
-            # ensure that the lengths of the arrays are the same
-            self.assertEqual( nbrs1._length, nbrs2.length )
-
-            _nbrs1 = nbrs1.get_npy_array()
-            _nbrs2 = nbrs2.get_npy_array()
-
-            nnps_nbrs = _nbrs1[:nbrs1._length]; nnps_nbrs.sort()
-            brut_nbrs = _nbrs2; brut_nbrs.sort()
-
-            # check each neighbor
-            for j in range(nbrs1._length):
-                self.assertEqual( nnps_nbrs[j], brut_nbrs[j] )
+            # ensure that the neighbor lists are the same
+            self._assert_neighbors(nbrs1, nbrs2)
 
     def _test_neighbors_filtered(self, src_index, dst_index):
         # nnps and the two neighbor lists
@@ -116,21 +122,8 @@ class NNPSTestCase(unittest.TestCase):
                 nps.brute_force_neighbors(
                     src_index, dst_index, particle_index, nbrs2)
 
-                # The rest is the same as before. We check for the
-                # neighbor list for the particle 'particle_index'
-                # ensure that the lengths of the arrays are the same
-                self.assertEqual( nbrs1._length, nbrs2.length )
-                
-                _nbrs1 = nbrs1.get_npy_array()
-                _nbrs2 = nbrs2.get_npy_array()
-
-                nnps_nbrs = _nbrs1[:nbrs1._length]; nnps_nbrs.sort()
-                brut_nbrs = _nbrs2; brut_nbrs.sort()
-
-                # check each neighbor
-                for j in range(nbrs1._length):
-                    self.assertEqual( nnps_nbrs[j], brut_nbrs[j] )
-        
+                # check the neighbors
+                self._assert_neighbors(nbrs1, nbrs2)        
 
 class BoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
