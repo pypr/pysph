@@ -20,7 +20,8 @@ class SummationDensityTestCase(unittest.TestCase):
 
     @attr(slow=False, parallel=True)
     def test_summation_density(self):
-        run_parallel_script.run(filename='./summation_density.py', nprocs=4, path=path)
+        run_parallel_script.run(filename='./summation_density.py', nprocs=4,
+                                path=path, timeout=40.0)
 
 if __name__ == '__main__':
     unittest.main()
