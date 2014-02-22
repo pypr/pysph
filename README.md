@@ -54,7 +54,6 @@ Building and linking PyZoltan
 -------------------------------
 
  1. Build Zoltan with the following compile options:
-
  ```
  $ ../configure --with-cflags=-fPIC --enable-mpi -with-mpi-incdir=/usr/include/openmpi-x86_64 --with-mpi-libdir=/usr/lib64/openmpi/lib --prefix=/home/<username>/usr/local/Zoltan --with-mpi-compilers=/usr/lib64/openmpi/bin/
  ```
