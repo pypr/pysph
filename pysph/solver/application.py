@@ -533,6 +533,11 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain)
 
+            elif options.bsort:
+                nnps = BoxSortNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain)
+
             elif options.llist:
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
