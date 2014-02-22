@@ -194,15 +194,13 @@ class Application(object):
         # NNPS options
         nnps_options = OptionGroup(parser, "NNPS", "Nearest Neighbor searching")
 
-        # --box-sort
-        nnps_options.add_option("--box-sort", action="store_true", dest="bsort", 
-                                default=False, 
-                                help=("Use the box-sort algorithm"))
-
-        # --linked-list
-        nnps_options.add_option("--linked-list", action='store_true', dest='llist',
-                                default=False, 
-                                help=("Use the linked-list algorithm"))
+        # --nnps
+        nnps_options.add_option("--nnps", dest="nnps",
+                                choices=['box', 'll'],
+                                default='box',
+                                help="Use one of box-sort ('box') or "\
+                                     "the linked list algorithm ('ll'). "
+                                )
 
         parser.add_option_group( nnps_options )
 
@@ -528,17 +526,12 @@ class Application(object):
             kernel = self._solver.kernel
 
             # create the NNPS object
-            if ( (not options.bsort) and (not options.llist) ):
+            if options.nnps == 'box':
                 nnps = BoxSortNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain)
 
-            elif options.bsort:
-                nnps = BoxSortNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain)
-
-            elif options.llist:
+            elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain)
