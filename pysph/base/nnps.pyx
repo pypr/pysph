@@ -1456,6 +1456,9 @@ cdef class LinkedListNNPS(NNPS):
         cdef DoubleArray d_h = dst.h
         cdef UIntArray d_gid = dst.gid
 
+        # minimum values for the particle distribution
+        cdef DoubleArray xmin = self.xmin
+
         # cell size and radius
         cdef double radius_scale = self.radius_scale
         cdef double cell_size = self.cell_size
@@ -1470,12 +1473,21 @@ cdef class LinkedListNNPS(NNPS):
         cdef unsigned int _next
         cdef int ix, iy, iz
 
-        # get the un-flattened index for the destination particle
-        cdef cPoint xi = cPoint_new(
-            d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx])
+        # get the un-flattened index for the destination particle with
+        # respect to the minimum 
+        cdef cPoint xi = cPoint_new(d_x.data[d_idx] - xmin.data[0], 
+                                    d_y.data[d_idx] - xmin.data[1],
+                                    d_z.data[d_idx] - xmin.data[2])
+
         cdef cIntPoint _cid = find_cell_id( xi, cell_size )
         cdef cIntPoint cid = cIntPoint_new(0, 0, 0)
         cdef int cell_index
+
+        # this is the physica position of the particle that will be
+        # used in pairwise searching
+        xi.x = xi.x + xmin.data[0]
+        xi.y = xi.y + xmin.data[1]
+        xi.z = xi.z + xmin.data[2]
 
         # gather search radius
         hi = radius_scale * d_h.data[d_idx]

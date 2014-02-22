@@ -47,7 +47,8 @@ class NNPSTestCase(unittest.TestCase):
         # average particle spacing and volume in the unit cube
         dx = pow( 1.0/numPoints, 1./3. )
 
-        x1, y1, z1 = random.random( (3, numPoints) )
+        # create random points in the interval [-1, 1]^3
+        x1, y1, z1 = random.random( (3, numPoints) ) * 2.0 - 1.0
         h1 = numpy.ones_like(x1) * 1.2 * dx
         gid1 = numpy.arange(numPoints).astype(numpy.uint32)
         
