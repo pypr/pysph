@@ -1,27 +1,43 @@
 """Benchmark numbers for NNPS"""
 import numpy
-from time import time
 from numpy import random
-import pandas as pd
-
-from pyzoltan.core.carray import UIntArray
 
 from pysph.base.utils import get_particle_array
-from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
+from pysph.base.ext_module import ExtModule
 
 # number of points. Be warned, 1<<20 is about a million particles
 # which can take a while to run. Hash out appropriately for your
 # machine
 _numPoints = [1<<15, 1<<16, 1<<17]#, 1<<18, 1<<19, 1<<20, 1<<21, 1<<22]
 
-def bench_nnps(particle_arrays):
+code = """
+import pandas as pd
+from time import time
+
+from pyzoltan.core.carray cimport UIntArray
+from pysph.base.nnps cimport BoxSortNNPS, LinkedListNNPS
+from pysph.base.nnps cimport Cell
+from pysph.base.particle_array cimport ParticleArray
+from pysph.base.point cimport IntPoint
+
+cpdef bench_nnps(list particle_arrays):
 
     # time containers
     bs_update_times = []; bs_neighbor_times = []
     ll_update_times = []; ll_neighbor_times = []
     ll_neighbor_times_cell = []
     bs_neighbor_times_cell = []
-    np = []
+
+    cdef list np = []
+
+    cdef BoxSortNNPS nnps_boxs
+    cdef LinkedListNNPS nnps_llist
+    cdef ParticleArray pa
+    cdef UIntArray nbrs, cell_indices, potential_nbrs
+    cdef int i, numPoints, ncells_tot, particle_index
+    cdef dict cells
+    cdef IntPoint cell_index
+    cdef Cell cell
 
     for pa in particle_arrays:
         numPoints = pa.get_number_of_particles()
@@ -104,6 +120,11 @@ def bench_nnps(particle_arrays):
     )
     results = pd.DataFrame(data=data, index=np)
     return results
+"""
+
+_ext_mod = ExtModule(code)
+mod = _ext_mod.load()
+bench_nnps = mod.bench_nnps
 
 
 def bench_random_distribution():
