@@ -78,11 +78,12 @@ cpdef bench_nnps(list particle_arrays):
         cell_indices = UIntArray(1000)
         potential_nbrs = UIntArray(1000)
         nbrs = UIntArray(1000)
+        ncells_tot = nnps_boxs.get_number_of_cells()
 
         t1 = time()
-        for cell_index, cell in nnps_boxs.cells.iteritems():
-            nnps_boxs.get_particles_in_cell(cell_index, 0, cell_indices)
-            nnps_boxs.get_particles_in_neighboring_cells(cell_index, 0, potential_nbrs)
+        for i in range(ncells_tot):
+            nnps_boxs.get_particles_in_cell(i, 0, cell_indices)
+            nnps_boxs.get_particles_in_neighboring_cells(i, 0, potential_nbrs)
 
             # get the indices for each particle
             for particle_index in range( cell_indices.length ):
@@ -93,7 +94,7 @@ cpdef bench_nnps(list particle_arrays):
 
         # LinkedList : Cell iteration
 
-        ncells_tot = nnps_llist.ncells_tot
+        ncells_tot = nnps_llist.get_number_of_cells()
         cell_indices = UIntArray(1000)
         potential_nbrs = UIntArray(1000)
         nbrs = UIntArray(1000)

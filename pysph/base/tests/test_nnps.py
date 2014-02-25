@@ -25,7 +25,7 @@ class NNPSTestCase(unittest.TestCase):
     We randomly distribute particles in 3-space and compare the list
     of neighbors using the NNPS algorithms and the brute force
     approach.
-    
+
     """
     def setUp(self):
         """Default set-up used by all the tests
@@ -51,7 +51,7 @@ class NNPSTestCase(unittest.TestCase):
         x1, y1, z1 = random.random( (3, numPoints) ) * 2.0 - 1.0
         h1 = numpy.ones_like(x1) * 1.2 * dx
         gid1 = numpy.arange(numPoints).astype(numpy.uint32)
-        
+
         # first particle array
         pa = get_particle_array(
             x=x1, y=y1, z=z1, h=h1, gid=gid1)
@@ -59,21 +59,21 @@ class NNPSTestCase(unittest.TestCase):
         return pa
 
     def _assert_neighbors(self, nbrs_nnps, nbrs_brute_force):
-            # ensure that the lengths of the arrays are the same
-            self.assertEqual( nbrs_nnps.length, nbrs_brute_force.length )
-            nnbrs = nbrs_nnps.length
+        # ensure that the lengths of the arrays are the same
+        self.assertEqual( nbrs_nnps.length, nbrs_brute_force.length )
+        nnbrs = nbrs_nnps.length
 
-            _nbrs1 = nbrs_nnps.get_npy_array()
-            _nbrs2 = nbrs_brute_force.get_npy_array()
+        _nbrs1 = nbrs_nnps.get_npy_array()
+        _nbrs2 = nbrs_brute_force.get_npy_array()
 
-            # sort the neighbors
-            nbrs1 = _nbrs1[:nnbrs]; nbrs1.sort()
-            nbrs2 = _nbrs2; nbrs2.sort()
-            
-            # check each neighbor
-            for i in range(nnbrs):
-                self.assertEqual( nbrs1[i], nbrs2[i] )
-        
+        # sort the neighbors
+        nbrs1 = _nbrs1[:nnbrs]; nbrs1.sort()
+        nbrs2 = _nbrs2; nbrs2.sort()
+
+        # check each neighbor
+        for i in range(nnbrs):
+            self.assertEqual( nbrs1[i], nbrs2[i] )
+
     def _test_neighbors_by_particle(
         self, src_index, dst_index, dst_numPoints):
         # nnps and the two neighbor lists
@@ -94,7 +94,7 @@ class BoxSortNNPSTestCase(NNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
-        
+
     def test_neighbors_aa(self):
         """NNPS :: neighbor test src = a, dst = a """
         self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
@@ -135,9 +135,10 @@ class BoxSortNNPSTestCase(NNPSTestCase):
         potential_neighbors = UIntArray()
         cell_indices = UIntArray()
 
-        # get the cells dict and iterate over them
-        cells_dict = nps.cells
-        for cell_index, cell in cells_dict.iteritems():
+        # get the neighbors for each particle and compare with brute force
+        ncells_tot = nps.get_number_of_cells()
+        for cell_index in range(ncells_tot):
+
             # get the dst particlces in this cell
             nps.get_particles_in_cell(
                 cell_index, dst_index, cell_indices)
@@ -153,7 +154,7 @@ class BoxSortNNPSTestCase(NNPSTestCase):
 
                 # NNPS neighbors
                 nps.get_nearest_particles_filtered(
-                    src_index, dst_index, particle_index, 
+                    src_index, dst_index, particle_index,
                     potential_neighbors, nbrs1)
 
                 # brute force neighbors
@@ -168,7 +169,7 @@ class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.LinkedListNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
-        
+
     def test_cell_indices(self):
         """LinkedListNNPS :: test positivity for cell indices"""
         nps = self.nps
@@ -181,47 +182,10 @@ class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
         # that each component remains positive
         for cell_index in range(ncells_tot):
             cid = nnps.py_unflatten( cell_index, ncells_per_dim, dim )
-            
+
             self.assertTrue( cid.x > -1 )
             self.assertTrue( cid.y > -1 )
             self.assertTrue( cid.z > -1 )
-
-    def _test_neighbors_filtered(self, src_index, dst_index):
-        # nnps and the two neighbor lists
-        nps = self.nps
-        nbrs1 = UIntArray(); nbrs2 = UIntArray()
-
-        potential_neighbors = UIntArray()
-        cell_indices = UIntArray()
-
-        # get the neighbors for each particle and compare with brute force
-        ncells_tot = nps.ncells_tot
-        for cell_index in range(ncells_tot):
-            
-            # get the dst particlces in this cell
-            nps.get_particles_in_cell(
-                cell_index, dst_index, cell_indices)
-
-            # get the potential neighbors for this cell
-            nps.get_particles_in_neighboring_cells(
-                cell_index, src_index, potential_neighbors)
-
-            # now iterate over the particles in this cell and get the
-            # neighbors
-            for indexi in range( cell_indices.length ):
-                particle_index = cell_indices[indexi]
-
-                # NNPS neighbors
-                nps.get_nearest_particles_filtered(
-                    src_index, dst_index, particle_index, 
-                    potential_neighbors, nbrs1)
-
-                # brute force neighbors
-                nps.brute_force_neighbors(
-                    src_index, dst_index, particle_index, nbrs2)
-
-                # check the neighbors
-                self._assert_neighbors(nbrs1, nbrs2)
 
 def test_flatten_unflatten():
     """Test the flattening and un-flattening functions"""
@@ -244,7 +208,7 @@ def test_flatten_unflatten():
     dim = 3
     ncells_per_dim = IntArray(3)
     ncells_per_dim[0] = 4; ncells_per_dim[1] = 5; ncells_per_dim[2] = 2
-    
+
     # valid un-flattened indices
     cids = [ [i, j, k] for i in range(4) for j in range(5) for k in range(2) ]
     for _cid in cids:
