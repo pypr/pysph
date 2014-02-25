@@ -17,7 +17,7 @@ class PyZoltanTests(unittest.TestCase):
     @attr(slow=True, parallel=True)
     def test_zoltan_partition(self):
         run_parallel_script.run(
-            path=path, filename='3d_partition.py', nprocs=4)
+            path=path, filename='3d_partition.py', nprocs=4, timeout=40.0)
 
     @attr(slow=False, parallel=True)
     def test_zoltan_zcomm(self):
