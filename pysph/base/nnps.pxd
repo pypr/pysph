@@ -93,6 +93,7 @@ cdef class NNPS:
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel
     cdef IntArray cell_shifts            # cell shifts
+    cdef public int n_cells              # number of cells
 
     ############################################################################
     # Member functions
@@ -101,6 +102,8 @@ cdef class NNPS:
     # the current cell data, re-computes the cell size and bins all
     # particles locally.
     cpdef update(self)
+
+    cpdef get_number_of_cells(self)
 
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
@@ -126,20 +129,19 @@ cdef class NNPS:
         self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
         UIntArray nbrs)
 
-# NNPS using the original gridding algorithm
-cdef class BoxSortNNPS(NNPS):
-    cdef public dict cells               # lookup table for the cells
-
-    ############################################################################
-    # Member functions
-    ############################################################################
     # return the particle indices contained within a cell
     cpdef get_particles_in_cell(
-        self, IntPoint cell_index, int pa_index, UIntArray indices)
+        self, int cell_index, int pa_index, UIntArray indices)
 
     # return the indices for the particles in neighboring cells
     cpdef get_particles_in_neighboring_cells(
-        self, IntPoint cell_index, int pa_index, UIntArray nbrs)
+        self, int cell_index, int pa_index, UIntArray nbrs)
+
+# NNPS using the original gridding algorithm
+cdef class BoxSortNNPS(NNPS):
+    cdef public dict cells               # lookup table for the cells
+    cdef list _cell_keys
+
 
 # NNPS using the linked list approach
 cdef class LinkedListNNPS(NNPS):
@@ -159,11 +161,3 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     # refresh head and next arrays
     cpdef _refresh(self)
-
-    # return the particle indices contained within a cell
-    cpdef get_particles_in_cell(
-        self, int cell_index, int pa_index, UIntArray indices)
-
-    # return the indices for the particles in neighboring cells
-    cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs)
