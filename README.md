@@ -1,5 +1,14 @@
-README
--------
+PySPH: a Python-based SPH framework
+-------------------------------------
+
+
+[![Build Status](https://drone.io/bitbucket.org/pysph/pysph/status.png)](https://drone.io/bitbucket.org/pysph/pysph/latest)
+
+
+PySPH is an open source framework for Smoothed Particle Hydrodynamics
+(SPH) simulations.   It is implemented in
+[Python](http://www.python.org) and the performance
+critical parts are implemented in [Cython](http://www.cython.org).
 
 This codebase is the new approach for PySPH that is heavily based on
 code generation. It currently supports Cython and is configured to
@@ -54,6 +63,10 @@ Building and linking PyZoltan
  2. Declare the environment variables `ZOLTAN_INCLUDE` and `ZOLTAN_LIBRARY`
 
  3. Install PySPH. The PyZoltan wrappers will be compiled and available.
+
+If you wish to see a working build/test script please see the continous
+[build script](https://drone.io/bitbucket.org/pysph/pysph/admin) hosted at [drone.io](http://drone.io).
+
 
 Running the examples
 ---------------------

@@ -7,7 +7,7 @@ import sys
 
 # PySPH imports.
 from pysph.base.particle_array import ParticleArray
-from pysph.base.nnps import BoxSortNNPS
+from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
 import pysph.base.kernels as kernels
 from utils import mkdir, load
@@ -190,6 +190,19 @@ class Application(object):
                            help=("Scale dt upon restarting by a numerical constant"))
 
         parser.add_option_group( restart )
+
+        # NNPS options
+        nnps_options = OptionGroup(parser, "NNPS", "Nearest Neighbor searching")
+
+        # --nnps
+        nnps_options.add_option("--nnps", dest="nnps",
+                                choices=['box', 'll'],
+                                default='box',
+                                help="Use one of box-sort ('box') or "\
+                                     "the linked list algorithm ('ll'). "
+                                )
+
+        parser.add_option_group( nnps_options )
 
         # Zoltan Options
         zoltan = OptionGroup(parser, "PyZoltan",
@@ -513,9 +526,15 @@ class Application(object):
             kernel = self._solver.kernel
 
             # create the NNPS object
-            nnps = BoxSortNNPS(
-                dim=solver.dim, particles=self.particles,
-                radius_scale=kernel.radius_scale, domain=self.domain)
+            if options.nnps == 'box':
+                nnps = BoxSortNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain)
+
+            elif options.nnps == 'll':
+                nnps = LinkedListNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
