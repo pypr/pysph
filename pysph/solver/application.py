@@ -171,6 +171,12 @@ class Application(object):
                           help="%-55s"%"The integration method to use:"+
                           ''.join(['%d - %-51s'%(d,s) for d,s in
                                      enumerate(integration_methods)]))
+        # --cell-iteration
+        parser.add_option("--cell-iteration", action="store_true",
+                          dest="cell_iteration",
+                          default=False,
+                          help="Use cell based iteration instead of "\
+                          "particle based iteration")
 
         # --cl
         parser.add_option("--cl", action="store_true", dest="with_cl",
@@ -570,6 +576,9 @@ class Application(object):
 
         # output file name
         solver.set_output_fname(fname)
+
+        # Cell iteration.
+        solver.set_cell_iteration(options.cell_iteration)
 
         # output print frequency
         if options.freq is not None:
