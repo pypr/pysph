@@ -38,6 +38,8 @@ class Solver(object):
 
     - pid -- the processor id if running in parallel
 
+    - cell_iteration :bool: -- should we use cell or particle iteration.
+
     """
 
     def __init__(self, integrator=None, kernel=None,
@@ -118,6 +120,9 @@ class Solver(object):
         # Use adaptive time steps
         self.adaptive_timestep = False
 
+        # Use cell iterations or not.
+        self.cell_iteration = False
+
         # Set all extra keyword arguments
         for attr, value in kwargs.iteritems():
             if hasattr(self, attr):
@@ -144,7 +149,8 @@ class Solver(object):
             self.kernel = kernel
 
         self.sph_eval = SPHEval(particles, equations, None, self.kernel,
-                                self.integrator)
+                                self.integrator,
+                                cell_iteration=self.cell_iteration)
         self.sph_eval.set_nnps(nnps)
 
         # set the parallel manager for the integrator
@@ -175,6 +181,11 @@ class Solver(object):
         """Set if we should use adaptive timesteps or not.
         """
         self.adaptive_timestep = value
+
+    def set_cell_iteration(self, value):
+        """Set if we should use cell_iteration or not.
+        """
+        self.cell_iteration = value
 
     def set_final_time(self, tf):
         """ Set the final time for the simulation """

@@ -77,6 +77,9 @@ cdef class SPHCalc:
         cdef long nbr_idx, NP_SRC, NP_DEST
         cdef int s_idx, d_idx
         cdef UIntArray nbrs = self.nbrs
+        cdef UIntArray particle_indices = UIntArray(1000)
+        cdef UIntArray potential_nbrs = UIntArray(1000)
+        cdef int cell_index, ncells, _index
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
         cdef double[3] DT_ADAPT
@@ -148,6 +151,38 @@ cdef class SPHCalc:
         ${indent(object.get_src_array_setup(source, eq_group), 2)}
         src_array_index = src.index
 
+        % if object.cell_iteration:
+        #######################################################################
+        ## Iterate over cells.
+        #######################################################################
+        ncells = nnps.get_number_of_cells()
+        for cell_index in range(ncells):
+            # Find potential neighbors from nearby cells for this cell.
+            nnps.get_particles_in_neighboring_cells(
+                cell_index, src_array_index, potential_nbrs
+            )
+
+            # Get the indices for each particle in this cell
+            nnps.get_particles_in_cell(
+                cell_index, src_array_index, particle_indices
+            )
+            for _index in range(particle_indices.length):
+                # The destination index.
+                d_idx = particle_indices[_index]
+                # Get the neigbors for this destination index.
+                nnps.get_nearest_particles_filtered(
+                    src_array_index, dst_array_index, d_idx,
+                    potential_nbrs, nbrs
+                )
+
+                # Now iterate over the neighbors.
+                for nbr_idx in range(nbrs.length):
+                    s_idx = <int>nbrs.data[nbr_idx]
+                    ###########################################################
+                    ## Iterate over equations for the same set of neighbors.
+                    ###########################################################
+                    ${indent(eq_group.get_loop_code(object.kernel), 5)}
+        % else:
         #######################################################################
         ## Iterate over destination particles.
         #######################################################################
@@ -164,6 +199,7 @@ cdef class SPHCalc:
                 ## Iterate over the equations for the same set of neighbors.
                 ###############################################################
                 ${indent(eq_group.get_loop_code(object.kernel), 4)}
+        % endif
 
         # Source ${source} done.
         # --------------------------------------

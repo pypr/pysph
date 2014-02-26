@@ -46,13 +46,15 @@ def get_array_names(particle_arrays):
 # `SPHEval` class.
 ###############################################################################
 class SPHEval(object):
-    def __init__(self, particle_arrays, equations, locator, kernel, integrator):
+    def __init__(self, particle_arrays, equations, locator, kernel,
+                 integrator, cell_iteration=False):
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
         self.locator = locator
         self.kernel = kernel
         self.nnps = None
         self.integrator = integrator
+        self.cell_iteration = cell_iteration
 
         all_equations = []
         for group in self.equation_groups:
