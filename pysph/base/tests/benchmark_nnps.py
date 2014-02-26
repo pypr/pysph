@@ -34,9 +34,7 @@ cpdef bench_nnps(list particle_arrays):
     cdef LinkedListNNPS nnps_llist
     cdef ParticleArray pa
     cdef UIntArray nbrs, cell_indices, potential_nbrs
-    cdef int i, numPoints, ncells_tot, particle_index
-    cdef dict cells
-    cdef IntPoint cell_index
+    cdef int i, numPoints, ncells_tot, particle_index, index
     cdef Cell cell
 
     for pa in particle_arrays:
@@ -82,11 +80,12 @@ cpdef bench_nnps(list particle_arrays):
 
         t1 = time()
         for i in range(ncells_tot):
-            nnps_boxs.get_particles_in_cell(i, 0, cell_indices)
             nnps_boxs.get_particles_in_neighboring_cells(i, 0, potential_nbrs)
 
             # get the indices for each particle
-            for particle_index in range( cell_indices.length ):
+            nnps_boxs.get_particles_in_cell(i, 0, cell_indices)
+            for index in range( cell_indices.length ):
+                particle_index = cell_indices[index]
                 nnps_boxs.get_nearest_particles_filtered(
                     0, 0, particle_index, potential_nbrs, nbrs)
 
@@ -101,11 +100,12 @@ cpdef bench_nnps(list particle_arrays):
 
         t1 = time()
         for i in range(ncells_tot):
-            nnps_llist.get_particles_in_cell(i, 0, cell_indices)     # indices in this cell
             nnps_llist.get_particles_in_neighboring_cells(i, 0, potential_nbrs) # potential neighbors
 
             # get the indices for each particle
-            for particle_index in range( cell_indices.length ):
+            nnps_llist.get_particles_in_cell(i, 0, cell_indices)     # indices in this cell
+            for index in range( cell_indices.length ):
+                particle_index = cell_indices[index]
                 nnps_llist.get_nearest_particles_filtered(
                     0, 0, particle_index, potential_nbrs, nbrs)
 
