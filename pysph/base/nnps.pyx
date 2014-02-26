@@ -456,14 +456,61 @@ cdef class NNPS:
         self.cell_shifts.data[1] = 0
         self.cell_shifts.data[2] = 1
 
+        # min and max coordinate values
+        self.xmin = DoubleArray(3)
+        self.xmax = DoubleArray(3)
+
     cpdef update(self):
-        raise NotImplementedError("NNPS :: update called")
+        """Update the local data after particles have moved.
+
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
+
+        """
+        cdef int i, num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        # compute the cell sizes
+        self._compute_cell_size()
+
+        # Periodicity is handled by adjusting particles according to a
+        # given cubic domain box
+        if self.is_periodic and not self.in_parallel:
+            # remove periodic ghost particles from a previous step
+            self.remove_periodic_ghosts()
+
+            # box-wrap current particles for periodicity
+            self.adjust_particles()
+
+            # create new periodic ghosts
+            self.create_periodic_ghosts()
+
+        # compute bounds and refresh the data structure
+        self._compute_bounds()
+        self._refresh()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa_index=i, indices=indices )
 
     cdef _bin(self, int pa_index, UIntArray indices):
         raise NotImplementedError("NNPS :: _bin called")
 
-    cdef _compute_cell_size(self):
-        raise NotImplementedError("NNPS :: _compute_cell_size called")
+    cpdef _refresh(self):
+        raise NotImplementedError("NNPS :: _refresh called")
 
     cpdef get_number_of_cells(self):
         return self.n_cells
@@ -476,6 +523,69 @@ cdef class NNPS:
     cpdef get_particles_in_neighboring_cells(self, int cell_index,
         int pa_index, UIntArray nbrs):
         raise NotImplementedError()
+
+    cdef _compute_cell_size(self):
+        """Compute the cell size for the binning.
+
+        The cell size is chosen as the kernel radius scale times the
+        maximum smoothing length in the local processor. For parallel
+        runs, we would need to communicate the maximum 'h' on all
+        processors to decide on the appropriate binning size.
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray h
+        cdef double cell_size
+        cdef double _hmax, hmax = -1.0
+
+        for pa_wrapper in pa_wrappers:
+            h = pa_wrapper.h
+            h.update_min_max()
+
+            _hmax = h.maximum
+            if _hmax > hmax:
+                hmax = _hmax
+
+        cell_size = self.radius_scale * hmax
+
+        if cell_size < 1e-6:
+            msg = """Cell size too small %g. Perhaps h = 0?
+            Setting cell size to 1"""%(cell_size)
+            print msg
+            cell_size = 1.0
+
+        self.cell_size = cell_size
+
+    cdef _compute_bounds(self):
+        """Compute coordinate bounds for the particles"""
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
+        cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
+        cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
+
+        for pa_wrapper in pa_wrappers:
+            x = pa_wrapper.x
+            y = pa_wrapper.y
+            z = pa_wrapper.z
+
+            # find min and max of variables
+            x.update_min_max()
+            y.update_min_max()
+            z.update_min_max()
+
+            xmax = fmax(x.maximum, xmax)
+            ymax = fmax(y.maximum, ymax)
+            zmax = fmax(z.maximum, zmax)
+
+            xmin = fmin(x.minimum, xmin)
+            ymin = fmin(y.minimum, ymin)
+            zmin = fmin(z.minimum, zmin)
+
+        # store the minimum and maximum of physical coordinates
+        self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
+        self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
 
     ######################################################################
     # Neighbor location routines
@@ -849,51 +959,10 @@ cdef class BoxSortNNPS(NNPS):
         # compute the intial box sort
         self.update()
 
-    cpdef update(self):
-        """Update the local data after particles have moved.
-
-        For parallel runs, we want the NNPS to be independent of the
-        ParallelManager which is solely responsible for distributing
-        particles across available processors. We assume therefore
-        that after a parallel update, each processor has all the local
-        particle information it needs and this operation is carried
-        out locally.
-
-        For serial runs, this method should be called when the
-        particles have moved.
-
-        """
+    cpdef _refresh(self):
+        "Clear the cells dict"
         cdef dict cells = self.cells
-        cdef int i, num_particles
-        cdef ParticleArray pa
-        cdef UIntArray indices
-
-        # clear the cells dict
         PyDict_Clear( cells )
-
-        # compute the cell size
-        self._compute_cell_size()
-
-        # Periodicity is handled by adjusting particles according to a
-        # given cubic domain box
-        if self.is_periodic and not self.in_parallel:
-            # remove periodic ghost particles from a previous step
-            self.remove_periodic_ghosts()
-
-            # adjust current particles for periodicity
-            self.adjust_particles()
-
-            # create new periodic ghosts
-            self.create_periodic_ghosts()
-
-        # indices on which to bin
-        for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
-            # bin the particles
-            self._bin( pa_index=i, indices=indices )
 
     cdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
@@ -949,39 +1018,6 @@ cdef class BoxSortNNPS(NNPS):
 
         self.n_cells = <int>len(cells)
         self._cell_keys = cells.keys()
-
-    cdef _compute_cell_size(self):
-        """Compute the cell size for the binning.
-
-        The cell size is chosen as the kernel radius scale times the
-        maximum smoothing length in the local processor. For parallel
-        runs, we would need to communicate the maximum 'h' on all
-        processors to decide on the appropriate binning size.
-
-        """
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray h
-        cdef double cell_size
-        cdef double _hmax, hmax = -1.0
-
-        for pa_wrapper in pa_wrappers:
-            h = pa_wrapper.h
-            h.update_min_max()
-
-            _hmax = h.maximum
-            if _hmax > hmax:
-                hmax = _hmax
-
-        cell_size = self.radius_scale * hmax
-
-        if cell_size < 1e-6:
-            msg = """Cell size too small %g. Perhaps h = 0?
-            Setting cell size to 1"""%(cell_size)
-            print msg
-            cell_size = 1.0
-
-        self.cell_size = cell_size
 
     ######################################################################
     # Neighbor location routines
@@ -1187,61 +1223,12 @@ cdef class LinkedListNNPS(NNPS):
         # flag for constant smoothing lengths
         self.fixed_h = fixed_h
 
-        # min and max coordinate values
-        self.xmin = DoubleArray(3)
-        self.xmax = DoubleArray(3)
-
         # defaults
         self.ncells_per_dim = IntArray(3)
         self.n_cells = 0
 
         # compute the intial box sort for all local particles
         self.update()
-
-    cpdef update(self):
-        """Update the local data after particles have moved.
-
-        For parallel runs, we want the NNPS to be independent of the
-        ParallelManager which is solely responsible for distributing
-        particles across available processors. We assume therefore
-        that after a parallel update, each processor has all the local
-        particle information it needs and this operation is carried
-        out locally.
-
-        For serial runs, this method should be called when the
-        particles have moved.
-
-        """
-        cdef int i, num_particles
-        cdef ParticleArray pa
-        cdef UIntArray indices
-
-        # compute the cell sizes
-        self._compute_cell_size()
-
-        # refresh the head and next arrays.
-        self._refresh()
-
-        # Periodicity is handled by adjusting particles according to a
-        # given cubic domain box
-        if self.is_periodic and not self.in_parallel:
-            # remove periodic ghost particles from a previous step
-            self.remove_periodic_ghosts()
-
-            # box-wrap current particles for periodicity
-            self.adjust_particles()
-
-            # create new periodic ghosts
-            self.create_periodic_ghosts()
-
-        # indices on which to bin. We bin all local particles
-        for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
-            # bin the particles
-            self._bin( pa_index=i, indices=indices )
 
     cdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
@@ -1299,57 +1286,6 @@ cdef class LinkedListNNPS(NNPS):
             # insert this particle
             next.data[ i ] = head.data[ _cid ]
             head.data[_cid] = i
-
-    cdef _compute_cell_size(self):
-        """Compute the cell size for the binning.
-
-        The cell size is chosen as the kernel radius scale times the
-        maximum smoothing length in the local processor.
-
-        """
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray h, x, y, z
-        cdef double cell_size
-        cdef double hmax = -1.0
-        cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
-        cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
-
-        for pa_wrapper in pa_wrappers:
-            x = pa_wrapper.x
-            y = pa_wrapper.y
-            z = pa_wrapper.z
-            h = pa_wrapper.h
-
-            # find min and max of variables
-            h.update_min_max()
-            x.update_min_max()
-            y.update_min_max()
-            z.update_min_max()
-
-            hmax = fmax(h.maximum, hmax)
-
-            xmax = fmax(x.maximum, xmax)
-            ymax = fmax(y.maximum, ymax)
-            zmax = fmax(z.maximum, zmax)
-
-            xmin = fmin(x.minimum, xmin)
-            ymin = fmin(y.minimum, ymin)
-            zmin = fmin(z.minimum, zmin)
-
-        # store the minimum and maximum of physical coordinates
-        self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
-        self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
-
-        # store the cell size
-        cell_size = self.radius_scale * hmax
-        if cell_size < 1e-6:
-            msg = """Cell size too small %g. Perhaps h = 0?
-            Setting cell size to 1"""%(cell_size)
-            print msg
-            cell_size = 1.0
-
-        self.cell_size = cell_size
 
     cpdef _refresh(self):
         """Refresh the head and next arrays locally"""

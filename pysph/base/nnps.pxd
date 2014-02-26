@@ -90,6 +90,8 @@ cdef class NNPS:
     cdef public bint is_periodic         # flag for periodicity
 
     cdef public int dim                  # Dimensionality of the problem
+    cdef public DoubleArray xmin         # co-ordinate min values
+    cdef public DoubleArray xmax         # co-ordinate max values
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel
     cdef IntArray cell_shifts            # cell shifts
@@ -112,6 +114,9 @@ cdef class NNPS:
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
     cdef _compute_cell_size(self)
+
+    # compute the min and max for the particle coordinates
+    cdef _compute_bounds(self)
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type
@@ -137,6 +142,9 @@ cdef class NNPS:
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs)
 
+    # refresh any data structures needed for binning
+    cpdef _refresh(self)
+
 # NNPS using the original gridding algorithm
 cdef class BoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells
@@ -148,8 +156,6 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public DoubleArray xmin         # co-ordinate min values
-    cdef public DoubleArray xmax         # co-ordinate max values
     cdef public IntArray ncells_per_dim  # number of cells in each direction
     cdef public int ncells_tot           # total number of cells
     cdef public bint fixed_h             # Constant cell sizes
@@ -159,5 +165,3 @@ cdef class LinkedListNNPS(NNPS):
     ############################################################################
     # Member functions
     ############################################################################
-    # refresh head and next arrays
-    cpdef _refresh(self)
