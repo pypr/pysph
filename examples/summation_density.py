@@ -26,6 +26,7 @@ equations = [SummationDensity(dest='fluid', sources=['fluid', 'solid']),
 locator = AllPairLocator()
 integrator = Integrator()
 evaluator = SPHEval(particles, equations, locator, kernel, integrator)
+evaluator.setup()
 evaluator.compute()
 
 print particles[0].rho

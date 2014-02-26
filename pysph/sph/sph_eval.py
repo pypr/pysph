@@ -60,21 +60,14 @@ class SPHEval(object):
         self.all_group = Group(equations=all_equations)
 
         self.groups = [self._make_group(g) for g in self.equation_groups]
-        self._setup()
+        self.ext_mod = None
+        self.calc = None
+        self.sph_compute = None
+        self.integrator = None
 
     ##########################################################################
     # Non-public interface.
     ##########################################################################
-    def _setup(self):
-        code = self.get_code()
-        self.ext_mod = ExtModule(code, verbose=True)
-        mod = self.ext_mod.load()
-        self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
-                                *self.particle_arrays)
-        self.sph_compute = self.calc.compute
-        integrator = mod.Integrator(self.calc, self.integrator.steppers)
-        self.integrator.set_integrator(integrator)
-
     def _make_group(self, group):
         equations = group.equations
         dest_list = []
@@ -194,9 +187,23 @@ class SPHEval(object):
                                object=self, integrator=self.integrator)
 
     def set_nnps(self, nnps):
+        if self.calc is None:
+            self.setup()
         self.nnps = nnps
         self.calc.set_nnps(nnps)
         self.integrator.integrator.set_nnps(nnps)
+
+    def setup(self):
+        """Always call this first.
+        """
+        code = self.get_code()
+        self.ext_mod = ExtModule(code, verbose=True)
+        mod = self.ext_mod.load()
+        self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
+                                *self.particle_arrays)
+        self.sph_compute = self.calc.compute
+        integrator = mod.Integrator(self.calc, self.integrator.steppers)
+        self.integrator.set_integrator(integrator)
 
     def compute(self, t, dt):
         self.sph_compute(t, dt)
