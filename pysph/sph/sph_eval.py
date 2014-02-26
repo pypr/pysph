@@ -63,7 +63,6 @@ class SPHEval(object):
         self.ext_mod = None
         self.calc = None
         self.sph_compute = None
-        self.integrator = None
 
     ##########################################################################
     # Non-public interface.
