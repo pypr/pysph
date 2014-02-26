@@ -164,7 +164,7 @@ cdef class SPHCalc:
 
             # Get the indices for each particle in this cell
             nnps.get_particles_in_cell(
-                cell_index, src_array_index, particle_indices
+                cell_index, dst_array_index, particle_indices
             )
             for _index in range(particle_indices.length):
                 # The destination index.
