@@ -145,6 +145,16 @@ cdef class NNPS:
     # refresh any data structures needed for binning
     cpdef _refresh(self)
 
+    # Functions for Periodicity
+    # remove ghosts from a previous iteration
+    cdef _remove_ghosts(self)
+    
+    # box-wrap particles
+    cdef _box_wrap_periodic(self)
+
+    # create new periodic ghosts
+    cdef _create_ghosts_periodic(self)
+
 # NNPS using the original gridding algorithm
 cdef class BoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells
