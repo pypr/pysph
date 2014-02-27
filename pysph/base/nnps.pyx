@@ -809,8 +809,10 @@ cdef class NNPS:
         cdef list particles = self.particles
         cdef int narrays = self.narrays
 
-        # cell size used to check for periodic ghosts
-        cdef double cell_size = self.cell_size
+        # cell size used to check for periodic ghosts. For summation
+        # density like operations, we need to create two layers of
+        # ghost images.
+        cdef double cell_size = 2 * self.cell_size
 
         # periodic domain values
         cdef double xmin = domain.xmin, xmax = domain.xmax
