@@ -1,114 +1,166 @@
 """Tests for the periodicity algorithms in NNPS"""
 
+# NumPy
 import numpy as np
 
-from pysph.base.nnps import DomainLimits, BoxSortNNPS
+# PySPH imports
+from pysph.base.nnps import DomainLimits, BoxSortNNPS, LinkedListNNPS
 from pysph.base.utils import get_particle_array
-from pysph.parallel._kernels import CubicSpline, Gaussian
 from pysph.base.point import Point
+from pysph.parallel._kernels import Gaussian
 
+# PyZoltan CArrays
 from pyzoltan.core.carray import UIntArray
 
-# create the particle arrays
-L = 1.0; n = 100; dx = L/n; hdx = 1.5
-_x = np.arange(dx/2, L, dx)
-vol = dx*dx
+# Python unit testing framework
+import unittest
 
-# fluid particles
-xx, yy = np.meshgrid(_x, _x)
+class PeriodicChannel2DTestCase(unittest.TestCase):
+    """Test the periodicity algorithms in NNPS.
+    
+    A channel like set-up is used in 2D with fluid particles between
+    parallel flat plates. Periodic boundary conditions are imposed
+    along the 'x' direction and summation density is used to check for
+    the density of the fluid particles.
 
-x = xx.ravel(); y = yy.ravel()
-h = np.ones_like(x) * hdx*dx
-m = np.ones_like(x) * vol
-V = np.zeros_like(x)
+    """
+    def setUp(self):
+        # create the particle arrays
+        L = 1.0; n = 100; dx = L/n; hdx = 1.5
+        _x = np.arange(dx/2, L, dx)
+        self.vol = vol = dx*dx
 
-fluid = get_particle_array(name='fluid', x=x, y=y, h=h, m=m, V=V)
+        # fluid particles
+        xx, yy = np.meshgrid(_x, _x)
 
-# channel particles
-_y = np.arange(L+dx/2, L+dx/2 + 10*dx, dx)
-xx, yy = np.meshgrid(_x, _y)
+        x = xx.ravel(); y = yy.ravel() # particle positions
+        h = np.ones_like(x) * hdx*dx   # smoothing lengths
+        m = np.ones_like(x) * vol      # mass
+        V = np.zeros_like(x)           # volumes
 
-xtop = xx.ravel(); ytop = yy.ravel()
+        fluid = get_particle_array(name='fluid', x=x, y=y, h=h, m=m, V=V)
 
-_y = np.arange(-dx/2, -dx/2-10*dx, -dx)
-xx, yy = np.meshgrid(_x, _y)
+        # channel particles
+        _y = np.arange(L+dx/2, L+dx/2 + 10*dx, dx)
+        xx, yy = np.meshgrid(_x, _y)
 
-xbot = xx.ravel(); ybot = yy.ravel()
+        xtop = xx.ravel(); ytop = yy.ravel()
 
-x = np.concatenate( (xtop, xbot) )
-y = np.concatenate( (ytop, ybot) )
+        _y = np.arange(-dx/2, -dx/2-10*dx, -dx)
+        xx, yy = np.meshgrid(_x, _y)
 
-h = np.ones_like(x) * hdx*dx
-m = np.ones_like(x) * vol
-V = np.zeros_like(x)
+        xbot = xx.ravel(); ybot = yy.ravel()
 
-channel = get_particle_array(name='channel', x=x, y=y, h=h, m=m, V=V)
+        x = np.concatenate( (xtop, xbot) )
+        y = np.concatenate( (ytop, ybot) )
 
-# particles
-particles = [fluid, channel]
+        h = np.ones_like(x) * hdx*dx
+        m = np.ones_like(x) * vol
+        V = np.zeros_like(x)
 
-# domain
-domain = DomainLimits(xmin=0, xmax=L, periodic_in_x=True)
+        channel = get_particle_array(name='channel', x=x, y=y, h=h, m=m, V=V)
 
-assert( domain.is_periodic )
+        # particles and domain
+        self.particles = particles = [fluid, channel]
+        self.domain = domain = DomainLimits(xmin=0, xmax=L, periodic_in_x=True)
+        self.kernel = kernel = Gaussian(dim=2)
 
-# kernel ane nnps
-kernel = Gaussian(dim=2)
+    def _test_periodicity_flags(self):
+        "NNPS :: checking for periodicity flags"
+        nnps = self.nnps
+        domain = self.domain
+        self.assertTrue(nnps.is_periodic)
 
-# nnps
-nnps = BoxSortNNPS(
-    dim=2, particles=particles, domain=domain, radius_scale=kernel.radius)
+        self.assertTrue(domain.periodic_in_x)
+        self.assertTrue( not domain.periodic_in_y )
+        self.assertTrue( not domain.periodic_in_z )
 
-assert (nnps.is_periodic)
+    def _test_summation_density(self):
+        "NNPS :: testing for summation density"
+        fluid, channel = self.particles
+        nnps = self.nnps
+        kernel = self.kernel
 
-# test summation density on the fluid. It should be approximately 1
-fx, fy, fh = fluid.get('x', 'y', 'h', only_real_particles=False)
+        # get the fluid arrays
+        fx, fy, fh, frho, fV, fm = fluid.get(
+            'x', 'y', 'h', 'rho', 'V', 'm', only_real_particles=True)
 
-frho = fluid.rho
-frho[:] = 0.0
+        # initialize the fluid density and volume
+        frho[:] = 0.0
+        fV[:] = 0.0
 
-assert( frho.size == fluid.num_real_particles )
+        # compute density on the fluid
+        nbrs = UIntArray()
+        for i in range( fluid.num_real_particles ):
+            xi = Point( fx[i], fy[i] )
+            hi = fh[i]
 
-nbrs = UIntArray()
-for i in range(frho.size):
-    xi = Point( fx[i], fy[i] )
-    hi = fh[i]
+            # compute density from the fluid from the source arrays
+            nnps.get_nearest_particles(src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
+            nnbrs = nbrs.length
 
-    # compute density from the fluid
-    nnps.get_nearest_particles(src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs.length
+            # the source arrays. First source is also the fluid
+            sx, sy, sh, sm = fluid.get('x', 'y', 'h', 'm', only_real_particles=False)
+            
+            for indexj in range(nnbrs):
+                j = nbrs[indexj]
+                xj = Point( sx[j], sy[j] )
+                hij = 0.5 * (hi + sh[j])
 
-    sx, sy, sh, sm = fluid.get('x', 'y', 'h', 'm', only_real_particles=False)
+                frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
+                fV[i] += kernel.py_function(xi, xj, hij)
 
-    for indexj in range(nnbrs):
-        j = nbrs[indexj]
+            # compute density from the channel
+            nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
+            nnbrs = nbrs.length
 
-        xj = Point( sx[j], sy[j] )
-        hij = 0.5 * (hi + sh[j])
+            sx, sy, sh, sm = channel.get('x', 'y', 'h', 'm', only_real_particles=False)
 
-        frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
-        fluid.V[i] += kernel.py_function(xi, xj, hij)
+            for indexj in range(nnbrs):
+                j = nbrs[indexj]
+                
+                xj = Point( sx[j], sy[j] )
+                hij = 0.5 * (hi + sh[j])
+                
+                frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
+                fV[i] += kernel.py_function(xi, xj, hij)
 
-    # compute density from the channel
-    nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-    nnbrs = nbrs.length
+            # check the number density and density by summation
+            voli = 1./fV[i]
+            self.assertAlmostEqual( voli, self.vol, 6 )
+            self.assertAlmostEqual( frho[i], fm[i]/voli, 6)
 
-    sx, sy, sh, sm = channel.get('x', 'y', 'h', 'm', only_real_particles=False)
+class PeriodicChannel2DBoxSort(PeriodicChannel2DTestCase):
+    def setUp(self):
+        PeriodicChannel2DTestCase.setUp(self)
+        self.nnps = BoxSortNNPS(
+            dim=2, particles=self.particles, 
+            domain=self.domain, 
+            radius_scale=self.kernel.radius)
 
-    for indexj in range(nnbrs):
-        j = nbrs[indexj]
+    def test_periodicity_flags(self):
+        "BoxSortNNPS :: test periodicity flags"
+        self._test_periodicity_flags()
 
-        xj = Point( sx[j], sy[j] )
-        hij = 0.5 * (hi + sh[j])
+    def test_summation_density(self):
+        "BoxSortNNPS :: test summation density"
+        self._test_summation_density()
 
-        frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
-        fluid.V[i] += kernel.py_function(xi, xj, hij)
+class PeriodicChannel2DLinkedList(PeriodicChannel2DTestCase):
+    def setUp(self):
+        PeriodicChannel2DTestCase.setUp(self)
+        self.nnps = LinkedListNNPS(
+            dim=2, particles=self.particles, 
+            domain=self.domain, 
+            radius_scale=self.kernel.radius)
 
-# volume computed by SPH
-vol = 1./fluid.V
-expected_rho = fluid.m/vol
+    def test_periodicity_flags(self):
+        "LinkedListNNPS :: test periodicity flags"
+        self._test_periodicity_flags()
 
-diff = max(abs(expected_rho-frho))
-assert (diff < 1e-14)
+    def test_summation_density(self):
+        "LinkedListNNPS :: test summation density"
+        self._test_summation_density()
 
-print "OK"
+if __name__ == '__main__':
+    unittest.main()
