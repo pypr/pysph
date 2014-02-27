@@ -485,13 +485,13 @@ cdef class NNPS:
         # given cubic domain box
         if self.is_periodic and not self.in_parallel:
             # remove periodic ghost particles from a previous step
-            self.remove_periodic_ghosts()
+            self._remove_ghosts()
 
             # box-wrap current particles for periodicity
-            self.adjust_particles()
+            self._box_wrap_periodic()
 
             # create new periodic ghosts
-            self.create_periodic_ghosts()
+            self._create_ghosts_periodic()
 
         # compute bounds and refresh the data structure
         self._compute_bounds()
@@ -717,7 +717,7 @@ cdef class NNPS:
     ####################################################################
     # Functions for periodicity
     ####################################################################
-    def remove_periodic_ghosts(self):
+    cdef _remove_ghosts(self):
         """Remove all ghost particles from a previous step
 
         While creating periodic neighbors, we create new particles and
@@ -726,10 +726,17 @@ cdef class NNPS:
         this tag are removed.
 
         """
-        for pa in self.particles:
+        cdef list particles = self.particles
+        cdef int narrays = self.narrays
+    
+        cdef int array_index
+        cdef ParticleArray pa
+        
+        for array_index in range( narrays ):
+            pa = <ParticleArray>PyList_GetItem( particles, array_index )
             pa.remove_tagged_particles(Ghost)
 
-    def adjust_particles(self):
+    cdef _box_wrap_periodic(self):
         """Box-wrap particles for periodicity
 
         The periodic domain is a rectangular box defined by minimum
@@ -786,7 +793,7 @@ cdef class NNPS:
                     if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
                     if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
 
-    def create_periodic_ghosts(self):
+    cdef _create_ghosts_periodic(self):
         """Identify boundary particles and create images.
 
         We need to find all particles that are within a specified
@@ -798,6 +805,11 @@ cdef class NNPS:
         
         """
         cdef DomainLimits domain = self.domain
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef list particles = self.particles
+        cdef int narrays = self.narrays
+
+        # cell size used to check for periodic ghosts
         cdef double cell_size = self.cell_size
 
         # periodic domain values
@@ -819,20 +831,24 @@ cdef class NNPS:
         cdef ParticleArray pa
         cdef DoubleArray x, y, z
         cdef double xi, yi, zi
-        cdef int i, np, nghost = 0
+        cdef int array_index, i, np
 
         # temporary indices for particles to be replicated
         cdef LongArray left, right, top, bottom, lt, rt, lb, rb
 
-        for pa_wrapper in self.pa_wrappers:
-            pa = pa_wrapper.pa
+        left = LongArray(); right = LongArray()
+        top = LongArray(); bottom = LongArray()
+        lt = LongArray(); rt = LongArray()
+        lb = LongArray(); rb = LongArray()
+
+        for array_index in range(narrays):
+            pa_wrapper = pa_wrappers[ array_index ]
+            pa = particles[ array_index ]
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
 
-            left = LongArray(); right = LongArray()
-            top = LongArray(); bottom = LongArray()
-
-            lt = LongArray(); rt = LongArray()
-            lb = LongArray(); rb = LongArray()
+            # reset the length of the arrays
+            left.reset(); right.reset(); top.reset(); bottom.reset()
+            lt.reset(); rt.reset(); lb.reset(); rb.reset()
 
             np = x.length
             for i in range(np):
@@ -882,7 +898,7 @@ cdef class NNPS:
                     if ( (yi - ymin) < cell_size ):
                         bottom.append(i)
 
-            # now treat each case separately and count the number of ghosts
+            # now treat each case separately and append to the main array
 
             # left
             copy = pa.extract_particles( left )
@@ -890,15 +906,11 @@ cdef class NNPS:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
-            nghost += copy.get_number_of_particles()
-
             # right
             copy = pa.extract_particles( right )
             copy.x -= xtranslate
             copy.tag[:] = Ghost
             pa.append_parray(copy)
-
-            nghost += copy.get_number_of_particles()
 
             # top
             copy = pa.extract_particles( top )
@@ -906,15 +918,11 @@ cdef class NNPS:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
-            nghost += copy.get_number_of_particles()
-
             # bottom
             copy = pa.extract_particles( bottom )
             copy.y += ytranslate
             copy.tag[:] = Ghost
             pa.append_parray(copy)
-
-            nghost += copy.get_number_of_particles()
 
             # left top
             copy = pa.extract_particles( lt )
@@ -923,16 +931,12 @@ cdef class NNPS:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
-            nghost += copy.get_number_of_particles()
-
             # left bottom
             copy = pa.extract_particles( lb )
             copy.x += xtranslate
             copy.y += ytranslate
             copy.tag[:] = Ghost
             pa.append_parray(copy)
-
-            nghost += copy.get_number_of_particles()
 
             # right top
             copy = pa.extract_particles( rt )
@@ -941,16 +945,12 @@ cdef class NNPS:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
-            nghost += copy.get_number_of_particles()
-
             # right bottom
             copy = pa.extract_particles( rb )
             copy.x -= xtranslate
             copy.y += ytranslate
             copy.tag[:] = Ghost
             pa.append_parray(copy)
-
-            nghost += copy.get_number_of_particles()
 
 cdef class BoxSortNNPS(NNPS):
     """Nearest neighbor query class using the box-sort algorithm.
