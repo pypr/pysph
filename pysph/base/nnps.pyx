@@ -718,72 +718,107 @@ cdef class NNPS:
     # Functions for periodicity
     ####################################################################
     def remove_periodic_ghosts(self):
-        """Remove all particles with the Ghost """
+        """Remove all ghost particles from a previous step
+
+        While creating periodic neighbors, we create new particles and
+        give them the tag utils.ParticleTAGS.Ghost. Before repeating
+        this step in the next iteration, all current particles with
+        this tag are removed.
+
+        """
         for pa in self.particles:
             pa.remove_tagged_particles(Ghost)
 
     def adjust_particles(self):
-        """Adjust particles for periodicity"""
-        cdef DomainLimits domain = self.domain
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray x, y, z
+        """Box-wrap particles for periodicity
 
+        The periodic domain is a rectangular box defined by minimum
+        and maximum values in each coordinate direction. These values
+        are used in turn to define translation values used to box-wrap
+        particles that cross a periodic boundary.
+
+        The periodic domain is specified using the DomainLimits object
+
+        """
+        cdef DomainLimits domain = self.domain
+
+        # minimum and maximum values of the domain
         cdef double xmin = domain.xmin, xmax = domain.xmax
         cdef double ymin = domain.ymin, ymax = domain.ymax,
         cdef double zmin = domain.zmin, zmax = domain.zmax
+
+        # translations along each coordinate direction
         cdef double xtranslate = domain.xtranslate
         cdef double ytranslate = domain.ytranslate
         cdef double ztranslate = domain.ztranslate
 
+        # periodicity flags for NNPS
         cdef bint periodic_in_x = domain.periodic_in_x
         cdef bint periodic_in_y = domain.periodic_in_y
         cdef bint periodic_in_z = domain.periodic_in_z
 
+        # locals
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
         cdef double xi, yi, zi
-
         cdef int i, np
-
+        
+        # iterate over each array and mark for translation
         for pa_wrapper in self.pa_wrappers:
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
-
             np = x.length
+
+            # iterate over particles and box-wrap
             for i in range(np):
 
                 if ( (periodic_in_x and not periodic_in_y) ):
-                    if x.data[i] < xmin : x.data[i] += xtranslate
-                    if x.data[i] > xmax : x.data[i] -= xtranslate
+                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
+                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
 
                 if ( (periodic_in_y and not periodic_in_x) ):
-                    if y.data[i] < ymin : y.data[i] += ytranslate
-                    if y.data[i] > ymax : y.data[i] -= ytranslate
+                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
+                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
 
                 if ( periodic_in_x and periodic_in_y ):
-                    if x.data[i] < xmin : x.data[i] += xtranslate
-                    if x.data[i] > xmax : x.data[i] -= xtranslate
-                    if y.data[i] < ymin : y.data[i] += ytranslate
-                    if y.data[i] > ymax : y.data[i] -= ytranslate
+                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
+                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
+
+                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
+                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
 
     def create_periodic_ghosts(self):
-        """Create new ghost particles"""
-        cdef DomainLimits domain = self.domain
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef ParticleArray pa
-        cdef DoubleArray x, y, z
+        """Identify boundary particles and create images.
 
+        We need to find all particles that are within a specified
+        distance from the boundaries and place image copies on the
+        other side of the boundary. Corner reflections need to be
+        accounted for when using domains with multiple periodicity.
+
+        The periodic domain is specified using the DomainLimits object
+        
+        """
+        cdef DomainLimits domain = self.domain
+        cdef double cell_size = self.cell_size
+
+        # periodic domain values
         cdef double xmin = domain.xmin, xmax = domain.xmax
         cdef double ymin = domain.ymin, ymax = domain.ymax,
         cdef double zmin = domain.zmin, zmax = domain.zmax
+
         cdef double xtranslate = domain.xtranslate
         cdef double ytranslate = domain.ytranslate
         cdef double ztranslate = domain.ztranslate
 
+        # periodicity flags
         cdef bint periodic_in_x = domain.periodic_in_x
         cdef bint periodic_in_y = domain.periodic_in_y
         cdef bint periodic_in_z = domain.periodic_in_z
 
+        # locals
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef DoubleArray x, y, z
         cdef double xi, yi, zi
-        cdef double cell_size = self.cell_size
-
         cdef int i, np, nghost = 0
 
         # temporary indices for particles to be replicated
