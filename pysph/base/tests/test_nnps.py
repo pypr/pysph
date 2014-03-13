@@ -18,6 +18,109 @@ from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
 # Python testing framework
 import unittest
 
+class SimpleNNPSTestCase(unittest.TestCase):
+    """Simplified NNPS test case
+
+    We distribute particles manually and perform sanity checks on NNPS
+
+    """
+    def setUp(self):
+        """Default set-up used by all the tests
+        
+        Particles with the following coordinates (x, y, z) are placed in a box
+
+        0 : -1.5 , 0.25 , 0.5
+        1 : 0.33 , -0.25, 0.25
+        2 : 1.25 , -1.25, 1.25
+        3 : 0.05 , 1.25 , -0.5
+        4 : -0.5 , 0.5  , -1.25
+        5 : -0.75, 0.75 , -1.25
+        6 : -1.25, 0.5  , 0.5
+        7 : 0.5  , 1.5  , -0.5
+        8 : 0.5  , -0.5 , 0.5
+        9 : 0.5  , 1.75 , -0.75
+
+        The cell size is set to 1. Valid cell indices and the
+        particles they contain are given below:
+
+        (-2, 0, 0) : particle 0, 6
+        (0, -1, 0) : particle 1, 8
+        (1, -2, 1) : particle 2
+        (0, 1, -1) : particle 3, 7, 9
+        (-1, 0, -2): particle 4, 5
+
+        """
+        x = numpy.array([
+                -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
+
+        y = numpy.array([
+                0.25, -0.25, -1.25, 1.25, 0.5, 0.75, 0.5, 1.5, -0.5, 1.75])
+
+        z = numpy.array([
+                0.5, 0.25, 1.25, -0.5, -1.25, -1.25, 0.5, -0.5, 0.5, -0.75])
+
+        # using a degenrate (h=0) array will set cell size to 1 for NNPS
+        h = numpy.zeros_like(x)
+        
+        pa = get_particle_array(x=x, y=y, z=z, h=h)
+        
+        self.box_sort_nnps = nnps.BoxSortNNPS(
+            dim=3, particles=[pa,], radius_scale=1.0, warn=False)
+
+        self.ll_nnps = nnps.LinkedListNNPS(
+            dim=3, particles=[pa,], radius_scale=1.0, warn=False)
+
+        # these are the expected cells
+        self.expected_cells = {
+            IntPoint(-2, 0, 0):[0,6], 
+            IntPoint(0, -1, 0):[1,8],
+            IntPoint(1, -2, 1):[2,],
+            IntPoint(0, 1, -1):[3, 7, 9],
+            IntPoint(-1, 0, -2):[4, 5]
+            }
+
+    def test_cell_size(self):
+        "SimpleNNPS :: test cell_size"
+        nnps = self.box_sort_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+        
+        nnps = self.ll_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
+    def test_cells(self):
+        "SimpleNNPS :: test cells"
+        nnps = self.box_sort_nnps
+        cells = self.expected_cells
+
+        # check each cell for it's contents
+        for key in cells:
+            self.assertTrue( nnps.cells.has_key(key) )
+            
+            cell = nnps.cells.get(key)
+
+            cell_indices = list( cell.lindices[0].get_npy_array() )
+            expected_indices = cells.get(key)
+            
+            self.assertTrue( cell_indices == expected_indices )
+
+    def test_n_part_per_cell(self):
+        "SimpleNNPS :: test count_n_part_per_cell "
+        nnps = self.box_sort_nnps
+
+        # call the function to count the number of particles
+        nnps.count_n_part_per_cell()
+        expected_cells = self.expected_cells
+        
+        n_part_per_cell_array = nnps.n_part_per_cell[0]
+        nnps_keys = nnps.cells.keys()
+        n_cells = nnps.n_cells
+        
+        for i in range(n_cells):
+            key = nnps_keys[i]
+
+            self.assertTrue(
+                n_part_per_cell_array[i] == len(expected_cells[key]))
+
 class NNPSTestCase(unittest.TestCase):
     """Standard nearest neighbor queries and comparison with the brute
     force approach.

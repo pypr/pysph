@@ -96,6 +96,7 @@ cdef class NNPS:
     cdef public double radius_scale      # Radius scale for kernel
     cdef IntArray cell_shifts            # cell shifts
     cdef public int n_cells              # number of cells
+    cdef public list n_part_per_cell     # number of particles per cell
 
     ############################################################################
     # Member functions
@@ -154,6 +155,9 @@ cdef class NNPS:
 
     # create new periodic ghosts
     cdef _create_ghosts_periodic(self)
+
+    # count the number of particles in each cell
+    cpdef count_n_part_per_cell(self)
 
 # NNPS using the original gridding algorithm
 cdef class BoxSortNNPS(NNPS):
