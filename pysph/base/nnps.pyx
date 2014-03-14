@@ -460,6 +460,9 @@ cdef class NNPS:
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
 
+        # number of particles per cell
+        self.n_part_per_cell = [IntArray() for pa in particles]
+
     cpdef update(self):
         """Update the local data after particles have moved.
 
@@ -552,7 +555,7 @@ cdef class NNPS:
         if cell_size < 1e-6:
             msg = """Cell size too small %g. Perhaps h = 0?
             Setting cell size to 1"""%(cell_size)
-            print msg
+            if self.warn : print msg
             cell_size = 1.0
 
         self.cell_size = cell_size
@@ -586,6 +589,10 @@ cdef class NNPS:
         # store the minimum and maximum of physical coordinates
         self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
         self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
+
+    cpdef count_n_part_per_cell(self):
+        """Count the number of particles in each cell"""
+        raise NotImplementedError("NNPS :: count_n_part_per_cell called")
 
     ######################################################################
     # Neighbor location routines
@@ -1031,7 +1038,7 @@ cdef class BoxSortNNPS(NNPS):
         cdef Cell cell
         cdef int ierr, narrays = self.narrays
 
-        # now bin the particles
+        # now begin binning the particles
         num_particles = indices.length
         for indexi in range(num_particles):
             i = indices.data[indexi]
@@ -1219,6 +1226,35 @@ cdef class BoxSortNNPS(NNPS):
                             if ( (xij < hi) or (xij < hj) ):
                                 nbrs.append( j )
 
+    cpdef count_n_part_per_cell(self):
+        """Count the number of particles in each cell"""
+        cdef int n_arrays = self.narrays
+        cdef int n_cells = self.n_cells
+        cdef list cell_keys = self._cell_keys
+        cdef dict cells = self.cells
+        cdef list n_part_per_cell = self.n_part_per_cell
+
+        # Locals
+        cdef Cell cell
+        cdef int i, j
+        cdef IntArray n_part_per_cell_indices
+        cdef UIntArray cell_indices
+        cdef IntPoint cell_key
+        
+        # iterate over all cells and count the number of particles
+        for i in range( n_arrays ):
+            n_part_per_cell_indices = <IntArray>PyList_GetItem(n_part_per_cell, i)
+            n_part_per_cell_indices.resize(n_cells)
+
+            for j in range( n_cells ):
+                cell_key = <IntPoint>PyList_GetItem(cell_keys, j)
+                cell = <Cell>PyDict_GetItem(cells, cell_key)
+                cell_indices = <UIntArray>PyList_GetItem(cell.lindices, i)
+                
+                # store the number of particles in this cell
+                n_part_per_cell_indices.data[j] = cell_indices.length
+        
+
 cdef class LinkedListNNPS(NNPS):
     """Nearest neighbor query class using the linked list method.
     """
@@ -1395,6 +1431,37 @@ cdef class LinkedListNNPS(NNPS):
             # add to the list of particle indices and find next
             indices.append( _next )
             _next = next.data[ _next ]
+
+    cpdef count_n_part_per_cell(self):
+        "Count the number of particles in the cell"
+        cdef int narrays = self.narrays
+        cdef int n_cells = self.n_cells
+        cdef list heads = self.heads
+        cdef list nexts = self.nexts
+        cdef list n_part_per_cell = self.n_part_per_cell
+        
+        # Locals
+        cdef unsigned int _next
+        cdef IntArray n_part_per_cell_indices
+        cdef UIntArray head, next
+        cdef int i, j, count
+
+        for i in range(narrays):
+            head = <UIntArray>PyList_GetItem( heads, i )
+            next = <UIntArray>PyList_GetItem( nexts, i )
+
+            n_part_per_cell_indices = <IntArray>PyList_GetItem(
+                n_part_per_cell, i)
+            n_part_per_cell_indices.resize(n_cells)
+
+            for j in range(n_cells):
+                count = 0
+                _next = head.data[ j ]
+                while (_next != UINT_MAX):
+                    count = count + 1
+                    _next = next.data[_next]
+                    
+                n_part_per_cell_indices.data[j] = count
 
     ######################################################################
     # Neighbor location routines
