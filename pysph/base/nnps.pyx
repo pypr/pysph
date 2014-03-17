@@ -232,55 +232,23 @@ cdef inline _get_neighboring_cell_indices(
     cdef int _ix = cid.x, _iy = cid.y, _iz = cid.z
     cdef int i, j, k, count
 
-    # only 14 cells for the symmetric case
-    if symmetric:
-        size = 14
-        
     # resize ix, iy and iz according to cell sizes
     ix.resize(size); iy.resize(size); iz.resize(size)
     
     count = 0
-    if symmetric:
-        # first add 9 cells in the upper plane (k=1)
+    for k in [-1, 0, 1]:
         for j in [-1, 0, 1]:
             for i in [-1, 0, 1]:
                 ix.data[count] = _ix + i
                 iy.data[count] = _iy + j
-                iz.data[count] = _iz + 1 # k=1
+                iz.data[count] = _iz + k
                 
                 count = count + 1
-                
-        # now add 3 cells in along in this plane (k=0, j=1)
-        for i in [-1, 0, 1]:
-            ix.data[count] = _ix + i
-            iy.data[count] = _iy + 1     # j=1
-            iz.data[count] = _iz + 0     # k=0
-
-            count = count + 1
-            
-        # finally add two cells with (k=0, j=0, i=0,1)
-        for i in [0, 1]:
-            ix.data[count] = _ix + i
-            iy.data[count] = _iy + 0     # j=0
-            iz.data[count] = _iz + 0     # k=0
-
-            count = count + 1
-        
-    # asymmetric case is simple
-    else:
-        for k in [-1, 0, 1]:
-            for j in [-1, 0, 1]:
-                for i in [-1, 0, 1]:
-                    ix.data[count] = _ix + i
-                    iy.data[count] = _iy + j
-                    iz.data[count] = _iz + k
-                    
-                    count = count + 1
 
 # Wrapper for testing
 def get_neighboring_cell_indices(
     IntPoint cid, IntArray ix, IntArray iy, IntArray iz, bint symmetric):
-    _get_neighboring_cell_indices(cid.data, ix, iy, iz, symmetric)    
+    _get_neighboring_cell_indices(cid.data, ix, iy, iz, symmetric)
 
 #################################################################
 # NNPS extension classes
@@ -674,7 +642,7 @@ cdef class NNPS:
 
     cpdef get_nearest_particles_filtered(
         self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs):
+        UIntArray nbrs, bint symmetric=False):
         """Filter the nearest neighbors from a list of potential neighbors
 
         For cell based iteration, the nearest neighbors for a given
@@ -723,6 +691,7 @@ cdef class NNPS:
         cdef int npotential_nbrs = potential_nbrs.length
         cdef int indexj, j
         cdef int nnbrs
+        cdef bint is_neighbor_candidate
 
         # gather search radius for particle 'i'
         xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx],  d_z.data[d_idx])
@@ -735,14 +704,25 @@ cdef class NNPS:
         for indexj in range( npotential_nbrs ):
             j = potential_nbrs.data[indexj]
 
-            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-            hj = radius_scale * s_h.data[j]
+            # for symmetric interactions, we only select a neighbor
+            # with a gid strictly greater than the destination
+            # gid.
+            is_neighbor_candidate=True
+            if symmetric:
+                if src_index == dst_index:
+                    if s_gid[j] <= d_gid[d_idx]: 
+                        is_neighbor_candidate=False
 
-            xij = cPoint_distance(xi, xj)
+            # now we do a distance check for the candidate neighbor
+            if is_neighbor_candidate:
+                xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
+                hj = radius_scale * s_h.data[j]
 
-            # select neighbor
-            if ( (xij < hi) or (xij < hj) ):
-                nbrs.append( j )
+                xij = cPoint_distance(xi, xj)
+
+                # select neighbor
+                if ( (xij < hi) or (xij < hj) ):
+                    nbrs.append( j )        
 
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -1211,6 +1191,7 @@ cdef class BoxSortNNPS(NNPS):
             ierr = PyDict_Contains( cells, cid )
 
             if ierr == 1:
+                
                 cell  = <Cell>PyDict_GetItem(cells, cid)
                 cell_indices = <UIntArray>PyList_GetItem(cell.lindices, pa_index)
                 num_indices = cell_indices.length

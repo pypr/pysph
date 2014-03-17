@@ -133,7 +133,7 @@ cdef class NNPS:
     # filter and return the true nearest neighbors for a particle
     cpdef get_nearest_particles_filtered(
         self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs)
+        UIntArray nbrs, bint symmetric=*)
 
     # return the particle indices contained within a cell
     cpdef get_particles_in_cell(

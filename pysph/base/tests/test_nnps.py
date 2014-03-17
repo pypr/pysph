@@ -12,6 +12,8 @@ from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
 
+from pysph.parallel._kernels import CubicSpline
+
 # Carrays from PyZoltan
 from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
 
@@ -153,11 +155,17 @@ class NNPSTestCase(unittest.TestCase):
         # create random points in the interval [-1, 1]^3
         x1, y1, z1 = random.random( (3, numPoints) ) * 2.0 - 1.0
         h1 = numpy.ones_like(x1) * 1.2 * dx
+        m1 = numpy.ones_like(x1) * dx
+
+        rho_nnps = numpy.zeros_like(x1)
+        rho_bforce = numpy.zeros_like(x1)
+
         gid1 = numpy.arange(numPoints).astype(numpy.uint32)
 
         # first particle array
         pa = get_particle_array(
-            x=x1, y=y1, z=z1, h=h1, gid=gid1)
+            x=x1, y=y1, z=z1, h=h1, gid=gid1, m=m1, 
+            rho_nnps=rho_nnps, rho_bforce=rho_bforce)
 
         return pa
 
@@ -267,6 +275,110 @@ class BoxSortNNPSTestCase(NNPSTestCase):
                 # check the neighbors
                 self._assert_neighbors(nbrs1, nbrs2)
 
+    # Summation density tests for symmetric interactions
+    def test_summation_density_symmetric_aa(self):
+        "NNPS :: summation density symmetric test. src = a, dst = a"
+        self._test_summation_density_symmetric(src_index=0, dst_index=0)
+
+    def test_summation_density_symmetric_bb(self):
+        "NNPS :: summation density symmetric test. src = b, dst = b"
+        self._test_summation_density_symmetric(src_index=0, dst_index=0)
+
+    def _test_summation_density_symmetric(self, src_index, dst_index):
+        # nnps and the two neighbor lists
+        nps = self.nps
+        nbrs1 = UIntArray() # NNPS Neighbors
+        nbrs2 = UIntArray() # Brute force neighbors
+
+        potential_neighbors = UIntArray()
+        cell_indices_dst = UIntArray()
+
+        # the source and destination particle arrays
+        src = self.particles[src_index]
+        dst = self.particles[dst_index]
+
+        # kernel for summation
+        k = CubicSpline(dim=3)
+
+        # Iterate cell-wise over particles and check for summation density
+        ncells_tot = nps.get_number_of_cells()
+        for cell_index in range(ncells_tot):
+
+            # get the dst particlces in this cell
+            nps.get_particles_in_cell(
+                cell_index, dst_index, cell_indices_dst)
+
+            # get the potential neighbors for this cell with symmetric
+            # interactions
+            nps.get_particles_in_neighboring_cells(
+                cell_index, src_index, potential_neighbors, symmetric=True)
+
+            # now iterate over dst particle indices within this cell
+            for indexi in range( cell_indices_dst.length ):
+                dst_particle_index = cell_indices_dst[indexi]
+                xi = Point(dst.x[dst_particle_index],
+                           dst.y[dst_particle_index],
+                           dst.z[dst_particle_index])
+
+                # NNPS neighbors
+                nps.get_nearest_particles_filtered(
+                    src_index, dst_index, dst_particle_index,
+                    potential_neighbors, nbrs1, symmetric=True)
+
+                # Brute force neighbors
+                nps.brute_force_neighbors(
+                    src_index, dst_index, dst_particle_index, nbrs2)
+
+                # COMPUTE DENSITY BY SUMMATION USING NNPS NBRS (NBRS1)
+                nnbrs = nbrs1.length
+                for indexj in range(nnbrs):
+                    src_particle_index = nbrs1[indexj]
+                    xj = Point(src.x[src_particle_index],
+                               src.y[src_particle_index],
+                               src.z[src_particle_index])
+            
+                    # kernel term wij
+                    hij = 0.5 * (dst.h[dst_particle_index] + src.h[src_particle_index])
+                    wij = k.py_function(xi, xj, hij)
+                    
+                    # add the contribution to both src and dst
+                    dst.rho_nnps[dst_particle_index] += src.m[src_particle_index]*wij
+                    src.rho_nnps[src_particle_index] += dst.m[dst_particle_index]*wij
+
+                # self contribution if src and dst are the same
+                if dst_index == src_index:
+                    hij = dst.h[dst_particle_index]
+                    wij = k.py_function(xi, xi, hij)
+                    dst.rho_nnps[dst_particle_index] += dst.m[dst_particle_index]*wij
+
+                # COMPUTE DENSITY BY SUMMATION USING BRUTE FORCE NBRS (NBRS2)
+                nnbrs = nbrs2.length
+                for indexj in range(nnbrs):
+                    src_particle_index = nbrs2[indexj]
+                    xj = Point(src.x[src_particle_index],
+                               src.y[src_particle_index],
+                               src.z[src_particle_index])
+
+                    # kernel term wij
+                    hij = 0.5 * (dst.h[dst_particle_index] + src.h[src_particle_index])
+                    wij = k.py_function(xi, xj, hij)
+                    
+                    # add the contribution only to dst
+                    dst.rho_bforce[dst_particle_index] += src.m[src_particle_index]*wij
+
+        # compare summation densities using each aproach
+        self._compare_density(dst_index, src_index)
+
+    def _compare_density(self, dst_index, src_index):
+        dst = self.particles[dst_index]
+        rho_nnps = dst.rho_nnps
+        rho_bforce = dst.rho_bforce
+
+        for i in range(rho_nnps.size):
+            #print 'testing summation density for', dst.gid[i]
+            self.assertAlmostEqual(rho_nnps[i], rho_bforce[i], 12)
+        
+
 class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
@@ -372,33 +484,6 @@ def test_get_bbox():
     assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
 
-def test_get_neighboring_cell_indices():
-    "Test the get_neighboring_cell_indices function"
-    ix = IntArray(); iy = IntArray(); iz = IntArray()
-    cid = IntPoint()
-
-    # get the cell lists for symmetric interactions
-    nnps.get_neighboring_cell_indices(cid, ix, iy, iz, symmetric=True)
-    
-    # 14 cells for a symmetric interaction
-    assert(ix.length == 14)
-
-    # assume 10 cells in each dimension and 3D
-    ncells_per_dim = IntArray(3)
-    ncells_per_dim[0] = 10
-    ncells_per_dim[1] = 10
-    ncells_per_dim[2] = 10
-
-    # the target cell's flattened index
-    target_index = nnps.py_flatten(cid, ncells_per_dim, 3)
-    
-    # test each cell's flattened index and ensure it's greater than or
-    # equal to target index
-    for i in range(14):
-        index = nnps.py_flatten(
-            IntPoint(ix[i], iy[i], iz[i]), ncells_per_dim, 3)
-        
-        assert( index >= target_index )
 
 if __name__ == '__main__':
     unittest.main()
