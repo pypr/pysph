@@ -114,10 +114,12 @@ solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 solver.set_time_step(1e-5)
 solver.set_final_time(0.0075)
 
+symmetric = True
+
 equations = [TaitEOS(dest='fluid', source=None, rho0=ro, c0=co, gamma=7.0),
-             ContinuityEquation(dest='fluid',  source='fluid'),
-             MomentumEquation(dest='fluid', source='fluid', alpha=1.0, beta=1.0),
-             XSPHCorrection(dest='fluid', source='fluid'),
+             ContinuityEquation(dest='fluid',  source='fluid', symmetric=symmetric),
+             MomentumEquation(dest='fluid', source='fluid', alpha=1.0, beta=1.0, symmetric=symmetric),
+             XSPHCorrection(dest='fluid', source='fluid', symmetric=symmetric),
             ]
 
 # Setup the application and solver.  This also generates the particles.

@@ -41,7 +41,7 @@ class MomentumEquation(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs,
-             d_p, d_au, d_av, d_aw, s_m,
+             d_p, d_au, d_av, d_aw, s_m, d_m, s_au, s_av, s_aw,
              s_rho, s_cs, s_p, VIJ=[0.0, 0.0, 0.0],
              XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
              DWIJ=[1.0, 1.0, 1.0], DT_ADAPT=[0.0, 0.0, 0.0]):
@@ -71,6 +71,10 @@ class MomentumEquation(Equation):
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[2]
 
+        if self.symmetric:
+            s_au[s_idx] += d_m[d_idx] * (tmp + piij) *DWIJ[0]
+            s_av[s_idx] += d_m[d_idx] * (tmp + piij) *DWIJ[1]
+            s_aw[s_idx] += d_m[d_idx] * (tmp + piij) *DWIJ[2]
 
     def post_loop(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] +=  self.gx

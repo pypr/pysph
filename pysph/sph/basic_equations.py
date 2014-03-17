@@ -92,10 +92,13 @@ class ContinuityEquation(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
+    def loop(self, d_idx, d_arho, s_idx, s_m, d_m, s_arho,
+             DWIJ=[0.0, 0.0, 0.0],
              VIJ=[0.0, 0.0, 0.0]):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
+        if self.symmetric:
+            s_arho[s_idx] += -d_m[d_idx]*vijdotdwij
 
 
 class MonaghanArtificialViscosity(Equation):
@@ -146,13 +149,23 @@ class XSPHCorrection(Equation):
         d_ay[d_idx] = 0.0
         d_az[d_idx] = 0.0
 
-    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ=1.0, RHOIJ1=1.0,
-             VIJ=[1.0,1,1]):
+    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, d_m, s_ax, s_ay, s_az,
+             WIJ=1.0, RHOIJ1=1.0, VIJ=[1.0,1,1]):
         tmp = -self.eps * s_m[s_idx]*WIJ*RHOIJ1
 
-        d_ax[d_idx] += tmp * VIJ[0]
-        d_ay[d_idx] += tmp * VIJ[1]
-        d_az[d_idx] += tmp * VIJ[2]
+        v1 = tmp * VIJ[0]
+        v2 = tmp * VIJ[1]
+        v3 = tmp * VIJ[2]
+
+        d_ax[d_idx] += v1
+        d_ay[d_idx] += v2
+        d_az[d_idx] += v3
+
+        if self.symmetric:
+            factor = -d_m[d_idx]/s_m[s_idx]
+            s_ax[s_idx] += v1 * factor
+            s_ay[s_idx] += v2 * factor
+            s_az[s_idx] += v3 * factor
 
     def post_loop(self, d_idx, d_ax, d_ay, d_az, d_u, d_v, d_w):
         d_ax[d_idx] += d_u[d_idx]
