@@ -211,9 +211,9 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline _get_cell_list(
+cdef inline _get_neighboring_cell_indices(
     cIntPoint cid, IntArray ix, IntArray iy, IntArray iz, bint symmetric):
-    """Get a list of cell indices to search for neighbors
+    """Get cell indices for neighboring cells
     
     Parameters:
     -----------
@@ -278,9 +278,9 @@ cdef inline _get_cell_list(
                     count = count + 1
 
 # Wrapper for testing
-def get_cell_list(
+def get_neighboring_cell_indices(
     IntPoint cid, IntArray ix, IntArray iy, IntArray iz, bint symmetric):
-    _get_cell_list(cid.data, ix, iy, iz, symmetric)    
+    _get_neighboring_cell_indices(cid.data, ix, iy, iz, symmetric)    
 
 #################################################################
 # NNPS extension classes
@@ -1290,7 +1290,7 @@ cdef class BoxSortNNPS(NNPS):
 
         # get the neighboring cell indices with respect to a symmetric
         # or asymmetric interaction
-        _get_cell_list(
+        _get_neighboring_cell_indices(
             _cid, nbr_ix, nbr_iy, nbr_iz, symmetric)
         nnbr_cells = nbr_ix.length        
 
@@ -1656,7 +1656,7 @@ cdef class LinkedListNNPS(NNPS):
         nbrs.reset()
 
         # get the neibhboring cell indices
-        _get_cell_list(
+        _get_neighboring_cell_indices(
             _cid, nbr_ix, nbr_iy, nbr_iz, symmetric)
         nnbr_cells = nbr_ix.length
 

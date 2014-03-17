@@ -372,13 +372,13 @@ def test_get_bbox():
     assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
 
-def test_get_cells():
-    "Test the get_cell_list function"
+def test_get_neighboring_cell_indices():
+    "Test the get_neighboring_cell_indices function"
     ix = IntArray(); iy = IntArray(); iz = IntArray()
     cid = IntPoint()
 
     # get the cell lists for symmetric interactions
-    nnps.get_cell_list(cid, ix, iy, iz, symmetric=True)
+    nnps.get_neighboring_cell_indices(cid, ix, iy, iz, symmetric=True)
     
     # 14 cells for a symmetric interaction
     assert(ix.length == 14)
