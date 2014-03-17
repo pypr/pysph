@@ -272,8 +272,8 @@ cdef inline _get_cell_list(
             for j in [-1, 0, 1]:
                 for i in [-1, 0, 1]:
                     ix.data[count] = _ix + i
-                    iy.data[count] = _iy + i
-                    iz.data[count] = _iz + i
+                    iy.data[count] = _iy + j
+                    iz.data[count] = _iz + k
                     
                     count = count + 1
 
@@ -528,6 +528,11 @@ cdef class NNPS:
         self.cell_shifts.data[0] = -1
         self.cell_shifts.data[1] = 0
         self.cell_shifts.data[2] = 1
+
+        # initialize arrays for neighboring cells
+        self.nbr_ix = IntArray()
+        self.nbr_iy = IntArray()
+        self.nbr_iz = IntArray()
 
         # min and max coordinate values
         self.xmin = DoubleArray(3)
@@ -1242,6 +1247,11 @@ cdef class BoxSortNNPS(NNPS):
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
         cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
 
+        # neighboring cell indices
+        cdef IntArray nbr_ix = self.nbr_ix
+        cdef IntArray nbr_iy = self.nbr_iy
+        cdef IntArray nbr_iz = self.nbr_iz
+
         # Source data arrays
         cdef DoubleArray s_x = src.x
         cdef DoubleArray s_y = src.y
@@ -1273,34 +1283,43 @@ cdef class BoxSortNNPS(NNPS):
         cdef double hi, hj
         hi = radius_scale * d_h.data[d_idx]
 
-        cdef int ierr
+        cdef int ierr, nnbr_cells, nbr_cell_index
 
         # reset the nbr array length. This should avoid a realloc
         nbrs.reset()
 
+        # get the neighboring cell indices with respect to a symmetric
+        # or asymmetric interaction
+        _get_cell_list(
+            _cid, nbr_ix, nbr_iy, nbr_iz, symmetric)
+        nnbr_cells = nbr_ix.length        
+
         cdef int ix, iy, iz
-        for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
-            for iy in [cid.data.y - 1, cid.data.y, cid.data.y + 1]:
-                for iz in [cid.data.z - 1, cid.data.z, cid.data.z + 1]:
-                    cellid.data.x = ix; cellid.data.y = iy; cellid.data.z = iz
+        for nbr_cell_index in range(nnbr_cells):
+            ix = nbr_ix.data[ nbr_cell_index ]
+            iy = nbr_iy.data[ nbr_cell_index ]
+            iz = nbr_iz.data[ nbr_cell_index ]
 
-                    ierr = PyDict_Contains( cells, cellid )
-                    if ierr == 1:
+            # the neighboring cell index
+            cellid.data.x = ix; cellid.data.y = iy; cellid.data.z = iz
 
-                        cell = <Cell>PyDict_GetItem( cells, cellid )
-                        lindices = <UIntArray>PyList_GetItem( cell.lindices, src_index )
+            ierr = PyDict_Contains( cells, cellid )
+            if ierr == 1:
 
-                        for indexj in range( lindices.length ):
-                            j = lindices.data[indexj]
+                cell = <Cell>PyDict_GetItem( cells, cellid )
+                lindices = <UIntArray>PyList_GetItem( cell.lindices, src_index )
 
-                            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-                            xij = cPoint_distance( xi, xj )
+                for indexj in range( lindices.length ):
+                    j = lindices.data[indexj]
 
-                            hj = radius_scale * s_h.data[j]
+                    xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
+                    xij = cPoint_distance( xi, xj )
 
-                            # select as neighbor
-                            if ( (xij < hi) or (xij < hj) ):
-                                nbrs.append( j )
+                    hj = radius_scale * s_h.data[j]
+
+                    # select as neighbor
+                    if ( (xij < hi) or (xij < hj) ):
+                        nbrs.append( j )
 
     cpdef count_n_part_per_cell(self):
         """Count the number of particles in each cell"""
@@ -1575,8 +1594,11 @@ cdef class LinkedListNNPS(NNPS):
         cdef int n_cells = self.n_cells
         cdef int dim = self.dim
 
-        # cell shifts
+        # cell shifts and neighboring cell indices
         cdef IntArray shifts = self.cell_shifts
+        cdef IntArray nbr_ix = self.nbr_ix
+        cdef IntArray nbr_iy = self.nbr_iy
+        cdef IntArray nbr_iz = self.nbr_iz
 
         # Source data arrays
         cdef DoubleArray s_x = src.x
@@ -1619,6 +1641,8 @@ cdef class LinkedListNNPS(NNPS):
         cdef cIntPoint cid = cIntPoint_new(0, 0, 0)
         cdef int cell_index
 
+        cdef int nbr_cell_index, nnbr_cells
+
         # this is the physica position of the particle that will be
         # used in pairwise searching
         xi.x = xi.x + xmin.data[0]
@@ -1631,37 +1655,40 @@ cdef class LinkedListNNPS(NNPS):
         # reset the length of the nbr array
         nbrs.reset()
 
+        # get the neibhboring cell indices
+        _get_cell_list(
+            _cid, nbr_ix, nbr_iy, nbr_iz, symmetric)
+        nnbr_cells = nbr_ix.length
+
         # Begin search through neighboring cells
-        for ix in range(3):
-            for iy in range(3):
-                for iz in range(3):
-                    cid.x = _cid.x + shifts.data[ix]
-                    cid.y = _cid.y + shifts.data[iy]
-                    cid.z = _cid.z + shifts.data[iz]
+        for nbr_cell_index in range(nnbr_cells):
+            cid.x = nbr_ix.data[ nbr_cell_index ]
+            cid.y = nbr_iy.data[ nbr_cell_index ]
+            cid.z = nbr_iz.data[ nbr_cell_index ]
 
-                    # Only consider valid cell indices
-                    if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
-                        cell_index = flatten( cid, ncells_per_dim, dim )
-                        if -1 < cell_index < n_cells:
+            # Only consider valid cell indices
+            if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
+                cell_index = flatten( cid, ncells_per_dim, dim )
+                if -1 < cell_index < n_cells:
 
-                            # get the first particle and begin iteration
-                            _next = head.data[ cell_index ]
-                            while( _next != UINT_MAX ):
-                                xj = cPoint_new(
-                                    s_x.data[_next],
-                                    s_y.data[_next],
-                                    s_z.data[_next]
-                                    )
+                    # get the first particle and begin iteration
+                    _next = head.data[ cell_index ]
+                    while( _next != UINT_MAX ):
+                        xj = cPoint_new(
+                            s_x.data[_next],
+                            s_y.data[_next],
+                            s_z.data[_next]
+                            )
 
-                                xij = cPoint_distance( xi, xj )
-                                hj = radius_scale * s_h.data[_next]
+                        xij = cPoint_distance( xi, xj )
+                        hj = radius_scale * s_h.data[_next]
 
-                                # select neighbor
-                                if ( (xij < hi) or (xij < hj) ):
-                                    nbrs.append( _next )
+                        # select neighbor
+                        if ( (xij < hi) or (xij < hj) ):
+                            nbrs.append( _next )
 
-                                # get the 'next' particle in this cell
-                                _next = next.data[_next]
+                        # get the 'next' particle in this cell
+                        _next = next.data[_next]
 
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs):

@@ -80,6 +80,7 @@ cdef class NNPS:
     cdef public list particles           # list of particle arrays
     cdef public list pa_wrappers         # list of particle array wrappers
     cdef public int narrays              # Number of particle arrays
+    cdef IntArray nbr_ix, nbr_iy, nbr_iz # indices for neighboring cells
 
     cdef bint in_parallel                # Flag to determine if in parallel
     cdef public object comm              # MPI communicator object
