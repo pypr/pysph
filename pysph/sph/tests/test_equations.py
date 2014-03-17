@@ -107,13 +107,16 @@ class TestEquations(TestBase):
 
         d_arho = [0.0, 0.0, 0.0]
         s_m = [0.0, 0.0]
-        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m)
+        d_m = [0.0, 0.0]
+        s_arho = [0.0]
+        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m, d_m=d_m,
+                   s_arho=s_arho)
         self.assertEqual(d_arho[0], 0.0)
         self.assertEqual(d_arho[1], 0.0)
         # Now call with specific arguments.
         s_m = [1, 1]
-        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
-                   DWIJ=[1,1,1], VIJ=[1,1,1])
+        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m, d_m=d_m,
+                   s_arho=s_arho, DWIJ=[1,1,1], VIJ=[1,1,1])
         self.assertEqual(d_arho[0], 3.0)
         self.assertEqual(d_arho[1], 0.0)
 

@@ -93,8 +93,7 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] = 0.0
 
     def loop(self, d_idx, d_arho, s_idx, s_m, d_m, s_arho,
-             DWIJ=[0.0, 0.0, 0.0],
-             VIJ=[0.0, 0.0, 0.0]):
+             DWIJ=[0.0, 0.0, 0.0], VIJ=[0.0, 0.0, 0.0]):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
         if self.symmetric:
