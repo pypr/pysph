@@ -248,7 +248,7 @@ class BoxSortNNPSTestCase(NNPSTestCase):
 
             # get the potential neighbors for this cell
             nps.get_particles_in_neighboring_cells(
-                cell_index, src_index, potential_neighbors)
+                cell_index, src_index, potential_neighbors, symmetric=False)
 
             # now iterate over the particles in this cell and get the
             # neighbors

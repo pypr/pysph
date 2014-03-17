@@ -142,7 +142,7 @@ cdef class NNPS:
 
     # return the indices for the particles in neighboring cells
     cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs)
+        self, int cell_index, int pa_index, UIntArray nbrs, bint symmetric)
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
