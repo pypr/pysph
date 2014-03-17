@@ -95,7 +95,6 @@ cdef class NNPS:
     cdef public DoubleArray xmax         # co-ordinate max values
     cdef public double cell_size         # Cell size for binning
     cdef public double radius_scale      # Radius scale for kernel
-    cdef IntArray cell_shifts            # cell shifts
     cdef public int n_cells              # number of cells
     cdef public list n_part_per_cell     # number of particles per cell
 

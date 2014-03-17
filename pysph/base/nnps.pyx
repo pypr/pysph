@@ -522,13 +522,6 @@ cdef class NNPS:
         # The total number of cells.
         self.n_cells = 0
 
-        # cell shifts. Indicates the shifting value for cell indices
-        # in each co-ordinate direction.
-        self.cell_shifts = IntArray(3)
-        self.cell_shifts.data[0] = -1
-        self.cell_shifts.data[1] = 0
-        self.cell_shifts.data[2] = 1
-
         # initialize arrays for neighboring cells
         self.nbr_ix = IntArray()
         self.nbr_iy = IntArray()
@@ -1602,8 +1595,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef int n_cells = self.n_cells
         cdef int dim = self.dim
 
-        # cell shifts and neighboring cell indices
-        cdef IntArray shifts = self.cell_shifts
+        # neighboring cell indices
         cdef IntArray nbr_ix = self.nbr_ix
         cdef IntArray nbr_iy = self.nbr_iy
         cdef IntArray nbr_iz = self.nbr_iz
