@@ -113,7 +113,7 @@ equations = [
     # Update velocities and advect
     Group(
         equations=[
-            Advect(dest='fluid', sources=None),
+            Advect(dest='fluid', source=None),
             ])
     ]
 

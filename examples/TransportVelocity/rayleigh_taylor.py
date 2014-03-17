@@ -178,30 +178,41 @@ equations = [
     # Summation density for each phase
     Group(
         equations=[
-            DensitySummation(dest='fluid1', sources=['fluid1','fluid2','solid']),
-            DensitySummation(dest='fluid2', sources=['fluid1','fluid2','solid']),
+            DensitySummation(dest='fluid1', source='fluid1'),
+            DensitySummation(dest='fluid1', source='fluid2'),
+            DensitySummation(dest='fluid1', source='solid'),
+            DensitySummation(dest='fluid2', source='fluid1'),
+            DensitySummation(dest='fluid2', source='fluid2'),
+            DensitySummation(dest='fluid2', source='solid'),
             ]),
 
     # boundary conditions for the solid wall from each phase
     Group(
         equations=[
-            SolidWallBC(dest='solid', sources=['fluid1', 'fluid2'], gy=gy, rho0=rho1, p0=p1),
+            SolidWallBC(dest='solid', source='fluid1', gy=gy, rho0=rho1, p0=p1),
+            SolidWallBC(dest='solid', source='fluid2', gy=gy, rho0=rho1, p0=p1),
             ]),
 
     # acceleration equations for each phase
     Group(
         equations=[
-            StateEquation(dest='fluid1', sources=None, b=1.0, rho0=rho1, p0=p1),
-            StateEquation(dest='fluid2', sources=None, b=1.0, rho0=rho2, p0=p2),
+            StateEquation(dest='fluid1', source=None, b=1.0, rho0=rho1, p0=p1),
+            StateEquation(dest='fluid2', source=None, b=1.0, rho0=rho2, p0=p2),
 
-            BodyForce(dest='fluid1', sources=None, fy=gy),
-            BodyForce(dest='fluid2', sources=None, fy=gy),
+            BodyForce(dest='fluid1', source=None, fy=gy),
+            BodyForce(dest='fluid2', source=None, fy=gy),
 
-            MomentumEquation(dest='fluid1', sources=['fluid1', 'fluid2', 'solid'], nu=nu),
-            MomentumEquation(dest='fluid2', sources=['fluid1', 'fluid2', 'solid'], nu=nu),
+            MomentumEquation(dest='fluid1', source='fluid1', nu=nu),
+            MomentumEquation(dest='fluid1', source='fluid2', nu=nu),
+            MomentumEquation(dest='fluid1', source='solid', nu=nu),
+            MomentumEquation(dest='fluid2', source='fluid1', nu=nu),
+            MomentumEquation(dest='fluid2', source='fluid2', nu=nu),
+            MomentumEquation(dest='fluid2', source='solid', nu=nu),
 
-            ArtificialStress(dest='fluid1', sources=['fluid1','fluid2']),
-            ArtificialStress(dest='fluid2', sources=['fluid1','fluid2'])
+            ArtificialStress(dest='fluid1', source='fluid1'),
+            ArtificialStress(dest='fluid1', source='fluid2'),
+            ArtificialStress(dest='fluid2', source='fluid1'),
+            ArtificialStress(dest='fluid2', source='fluid2')
 
             ]),
     ]

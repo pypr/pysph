@@ -272,14 +272,14 @@ class Equation(object):
     ##########################################################################
     # `object` interface.
     ##########################################################################
-    def __init__(self, dest, sources=None, name=None):
+    def __init__(self, dest, source=None, name=None, symmetric=False):
         self.dest = dest
-        self.sources = sources if sources is not None and len(sources) > 0 \
-                                                                else None
+        self.source = source
         # Does the equation require neighbors or not.
-        self.no_source = self.sources is None
+        self.no_source = self.source is None
         self.name = self.__class__.__name__ if name is None else name
         self.var_name = ''
+        self.symmetric = symmetric
 
 
 ###############################################################################
@@ -299,6 +299,7 @@ class Group(object):
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
         self.update()
+        self._symmetric = all([e.symmetric for e in equations])
 
     ##########################################################################
     # Non-public interface.
@@ -521,3 +522,6 @@ class Group(object):
                                 idx=i)
             lines.append(code)
         return '\n'.join(lines)
+
+    def is_symmetric(self):
+        return self._symmetric

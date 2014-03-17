@@ -144,15 +144,15 @@ equations = [
     Group(
         equations=[
             # p
-            IsothermalEOS(dest='solid', sources=None, rho0=rho0, c0=c0),
+            IsothermalEOS(dest='solid', source=None, rho0=rho0, c0=c0),
 
             # vi,j : requires properties v00, v01, v10, v11
-            VelocityGradient2D(dest='solid', sources=['solid',]),
+            VelocityGradient2D(dest='solid', source='solid'),
 
             # rij : requires properties r00, r01, r02, r11, r12, r22,
             #                           s00, s01, s02, s11, s12, s22
             MonaghanArtificialStress(
-             dest='solid', sources=None, eps=0.3),
+             dest='solid', source=None, eps=0.3),
             ],
         ),
 
@@ -161,23 +161,23 @@ equations = [
         equations=[
 
             # arho
-            ContinuityEquation(dest='solid', sources=['solid',]),
+            ContinuityEquation(dest='solid', source='solid'),
 
             # au, av
             MomentumEquationWithStress2D(
-                dest='solid', sources=['solid',], n=4, wdeltap=wdeltap),
+                dest='solid', source='solid', n=4, wdeltap=wdeltap),
 
             # au, av
             MonaghanArtificialViscosity(
-                dest='solid', sources=['solid',], alpha=1.0, beta=1.0),
+                dest='solid', source='solid', alpha=1.0, beta=1.0),
 
             # a_s00, a_s01, a_s11
             HookesDeviatoricStressRate2D(
-                dest='solid', sources=None, shear_mod=G),
+                dest='solid', source=None, shear_mod=G),
 
             # ax, ay, az
             XSPHCorrection(
-                dest='solid', sources=['solid',], eps=0.5),
+                dest='solid', source='solid', eps=0.5),
 
             ]
 

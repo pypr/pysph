@@ -6,6 +6,7 @@ except ImportError:
 
 from mako.template import Template
 from os.path import dirname, join
+from textwrap import dedent
 
 from pysph.sph.equation import Group
 from pysph.base.ext_module import ExtModule
@@ -70,6 +71,12 @@ class SPHEval(object):
     # Non-public interface.
     ##########################################################################
     def _make_group(self, group):
+        """
+        Groups are organized as {destination: (eqs_with_no_source, sources, all_eqs)}
+        eqs_with_no_source: Group([equations]) all SPH Equations with no source.
+        sources are {source: Group([equations...])}
+        all_eqs is a Group of all equations having this destination.
+        """
         equations = group.equations
         dest_list = []
         for equation in equations:
@@ -89,17 +96,39 @@ class SPHEval(object):
                 if equation.no_source:
                     eqs_with_no_source.append(equation)
                 else:
-                    for src in equation.sources:
-                        sources[src].append(equation)
+                    sources[equation.source].append(equation)
 
             for src in sources:
                 eqs = sources[src]
                 sources[src] = Group(eqs)
+                self._check_mixed_symmetry(eqs)
 
             dests[dest] = (Group(eqs_with_no_source), sources,
                            Group(list(all_eqs)))
 
         return dests
+
+    def _check_mixed_symmetry(self, equations):
+        """Checks if all the given equations are symmetric or asymmetric.
+
+        It is an error to have a system of equations where for a given group
+        if a particular destination/source pair contains  mixed symmetric or
+        asymmetric equations.
+
+        """
+        symm = [e.symmetric for e in equations]
+        n_symmetric = symm.count(True)
+        if n_symmetric != 0 and n_symmetric != len(equations):
+            e = equations[0]
+            names = ['%s, symmetry: %s'%(e.name, e.symmetric)
+                        for e in equations]
+            msg = '''All equations for a given dest/source should be either
+                  symmetric or asymmetric. For dest=%s and source=%s the
+                  equations are inconsistent:
+                      %s
+                 '''%(e.dest, e.source, '\n'.join(names))
+
+            raise RuntimeError(dedent(msg))
 
     ##########################################################################
     # Public interface.

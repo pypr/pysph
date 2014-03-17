@@ -135,23 +135,26 @@ equations = [
     # Equation of state
     Group(equations=[
 
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='fluid', source=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='boundary', source=None, rho0=ro, c0=co, gamma=gamma),
 
             ]),
 
     Group(equations=[
 
             # Continuity equation
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-            ContinuityEquation(dest='boundary', sources=['fluid']),
+            ContinuityEquation(dest='fluid', source='fluid'),
+            ContinuityEquation(dest='fluid', source='boundary'),
+            ContinuityEquation(dest='boundary', source='fluid'),
 
             # Momentum equation
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+            MomentumEquation(dest='fluid', source='fluid',
+                     alpha=alpha, beta=beta, gy=-9.81, c0=co),
+            MomentumEquation(dest='fluid', source='boundary',
                      alpha=alpha, beta=beta, gy=-9.81, c0=co),
 
             # Position step with XSPH
-            XSPHCorrection(dest='fluid', sources=['fluid'])
+            XSPHCorrection(dest='fluid', source='fluid')
             ]),
     ]
 

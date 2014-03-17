@@ -153,8 +153,9 @@ equations = [
     # State equation
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid']),
-            #VolumeSummation(dest='fluid',sources=['fluid', 'solid'],),
+            DensitySummation(dest='fluid', source='fluid'),
+            DensitySummation(dest='fluid', source='solid'),
+            #VolumeSummation(dest='fluid',source='fluid',),
 
             ]),
 
@@ -162,23 +163,19 @@ equations = [
     Group(
         equations=[
 
-            SolidWallBC(dest='solid', sources=['fluid'], gx=fx, rho0=rho0, p0=p0),
-            #SolidWallBC(dest='solid', sources=['fluid',], gx=fx, b=0.0),
+            SolidWallBC(dest='solid', source='fluid', gx=fx, rho0=rho0, p0=p0),
+            #SolidWallBC(dest='solid', source='fluid', gx=fx, b=0.0),
 
             ]),
 
     # accelerations
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
-            BodyForce(dest='fluid', sources=None, fx=fx),
-            MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-            ArtificialStress(dest='fluid', sources=['fluid',])
-
-            # BodyForce(dest='fluid', sources=None, fx=fx),
-            # MomentumEquation(dest='fluid', sources=['fluid', 'solid'], nu=nu),
-            # ContinuityEquation(dest='fluid', sources=['fluid', 'solid']),
-
+            StateEquation(dest='fluid', source=None, b=1.0, rho0=rho0, p0=p0),
+            BodyForce(dest='fluid', source=None, fx=fx),
+            MomentumEquation(dest='fluid', source='fluid', nu=nu),
+            MomentumEquation(dest='fluid', source='solid', nu=nu),
+            ArtificialStress(dest='fluid', source='fluid')
             ]),
     ]
 

@@ -30,26 +30,27 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += d_m[d_idx] * Vj * vijdotdwij
 
 class StateEquation(Equation):
-    def __init__(self, dest, sources=None, p0=1.0, rho0=1.0, b=1.0):
+    def __init__(self, dest, source=None, p0=1.0, rho0=1.0, b=1.0,
+                 symmetric=False):
         self.b=b
         self.p0 = p0
         self.rho0 = rho0
-        super(StateEquation, self).__init__(dest, sources)
+        super(StateEquation, self).__init__(dest, source, symmetric=symmetric)
 
     def loop(self, d_idx, d_p, d_rho):
         d_p[d_idx] = self.p0 * ( d_rho[d_idx]/self.rho0 - self.b )
 
 class SolidWallBC(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0, p0=100.0,
+    def __init__(self, dest, source=None, rho0=1.0, p0=100.0,
                  gx=0.0, gy=0.0, gz=0.0, ax=0.0, ay=0.0, az=0.0,
-                 b=1.0):
+                 b=1.0, symmetric=False):
         self.rho0 = rho0
         self.p0 = p0
         self.b=b
         self.gx = gx; self.ax = ax
         self.gy = gy; self.ay = ay
         self.gz = gz; self.az = az
-        super(SolidWallBC, self).__init__(dest, sources)
+        super(SolidWallBC, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_u, d_v, d_p, d_wij):
         d_u[d_idx] = 0.0
@@ -90,14 +91,15 @@ class SolidWallBC(Equation):
         d_rho[d_idx] = self.rho0 * (d_p[d_idx]/self.p0 + self.b)
 
 class MomentumEquation(Equation):
-    def __init__(self, dest, sources=None, pb=0.0, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
+    def __init__(self, dest, source=None, pb=0.0, nu=0.01, gx=0.0, gy=0.0,
+                 gz=0.0, symmetric=False):
         self.gx = gx
         self.gy = gy
         self.gz = gz
 
         self.nu = nu
         self.pb = pb
-        super(MomentumEquation, self).__init__(dest, sources)
+        super(MomentumEquation, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_au, d_av, d_auhat, d_avhat):
         d_au[d_idx] = 0.0

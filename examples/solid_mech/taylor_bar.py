@@ -68,9 +68,9 @@ def get_plate_particles():
 def get_bar_particles():
     xarr = numpy.arange(-bar_width/2.0, bar_width/2.0 + dx, dx)
     yarr = numpy.arange(4*dx, 0.0254 + 4*dx, dx)
-    
+
     x,y = numpy.meshgrid( xarr, yarr )
-    x, y = x.ravel(), y.ravel()                    
+    x, y = x.ravel(), y.ravel()
 
     print 'Number of bar particles: ', len(x)
 
@@ -91,7 +91,7 @@ def create_particles(**kwargs):
     plate = get_plate_particles()
 
     # add requisite properties
-    
+
     # velocity gradient for the bar
     bar.add_property( {'name':'v00'} )
     bar.add_property( {'name':'v01'} )
@@ -121,7 +121,7 @@ def create_particles(**kwargs):
     bar.add_property( {'name':'s110'} )
     bar.add_property( {'name':'s120'} )
     bar.add_property( {'name':'s220'} )
-    
+
     bar.add_property( {'name':'e0'} )
 
     # artificial stress properties
@@ -177,47 +177,46 @@ equations = [
     Group(
         equations=[
             # p
-            MieGruneisenEOS(dest='bar', sources=None, r0=r0, c0=C, S=S),
-            
+            MieGruneisenEOS(dest='bar', source=None, r0=r0, c0=C, S=S),
+
             # vi,j : requires properties v00, v01, v10, v11
-            VelocityGradient2D(dest='bar', sources=['bar',]),
-            
+            VelocityGradient2D(dest='bar', source='bar'),
+
             # rij : requires properties s00, s01, s11
-            VonMisesPlasticity2D(flow_stress=Yo, dest='bar',
-                                 sources=None),
+            VonMisesPlasticity2D(flow_stress=Yo, dest='bar', source=None),
             ],
         ),
-    
+
     # Acceleration variables are now computed
     Group(
         equations=[
 
             # arho
-            ContinuityEquation(dest='bar', sources=['bar']),
-            
+            ContinuityEquation(dest='bar', source='bar'),
+
             # au, av
             MomentumEquationWithStress2D(
-                dest='bar', sources=['bar'], n=4, wdeltap=wdeltap),
+                dest='bar', source='bar', n=4, wdeltap=wdeltap),
 
             # au, av
             MonaghanArtificialViscosity(
-                dest='bar', sources=['bar'], alpha=0.5, beta=0.5),
+                dest='bar', source='bar', alpha=0.5, beta=0.5),
 
             # au av
             MonaghanBoundaryForce(
-                dest='bar', sources=['plate'], deltap=dx),
+                dest='bar', source='plate', deltap=dx),
 
             # ae
-            EnergyEquationWithStress2D(dest='bar', sources=['bar'],
+            EnergyEquationWithStress2D(dest='bar', source='bar',
                                        alpha=0.5, beta=0.5, eta=0.01),
-                
+
             # a_s00, a_s01, a_s11
             HookesDeviatoricStressRate2D(
-                dest='bar', sources=None, shear_mod=G),
+                dest='bar', source=None, shear_mod=G),
 
             # ax, ay, az
             XSPHCorrection(
-                dest='bar', sources=['bar',], eps=0.5),
+                dest='bar', source='bar', eps=0.5),
 
             ]
 

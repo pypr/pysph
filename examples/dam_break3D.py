@@ -130,23 +130,29 @@ equations = [
     # Equation of state
     Group(equations=[
 
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOS(dest='obstacle', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='fluid', source=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='boundary', source=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='obstacle', source=None, rho0=ro, c0=co, gamma=gamma),
 
             ]),
 
     # Continuity, momentum and xsph equations
     Group(equations=[
 
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle']),
-            ContinuityEquation(dest='boundary', sources=['fluid']),
-            ContinuityEquation(dest='obstacle', sources=['fluid']),
+            ContinuityEquation(dest='fluid', source='fluid'),
+            ContinuityEquation(dest='fluid', source='boundary'),
+            ContinuityEquation(dest='fluid', source='obstacle'),
+            ContinuityEquation(dest='boundary', source='fluid'),
+            ContinuityEquation(dest='obstacle', source='fluid'),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
+            MomentumEquation(dest='fluid', source='fluid',
+                             alpha=alpha, beta=beta, gz=-9.81, c0=co),
+            MomentumEquation(dest='fluid', source='boundary',
+                             alpha=alpha, beta=beta, gz=-9.81, c0=co),
+            MomentumEquation(dest='fluid', source='obstacle',
                              alpha=alpha, beta=beta, gz=-9.81, c0=co),
 
-            XSPHCorrection(dest='fluid', sources=['fluid'])
+            XSPHCorrection(dest='fluid', source='fluid')
 
             ]),
     ]

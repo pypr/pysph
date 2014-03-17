@@ -2,18 +2,18 @@ from pysph.sph.equation import Equation
 from textwrap import dedent
 
 class MonaghanBoundaryForce(Equation):
-    def __init__(self, dest, sources=None, deltap=-1):
+    def __init__(self, dest, source=None, deltap=-1, symmetric=False):
         self.deltap = deltap
-        super(MonaghanBoundaryForce,self).__init__(dest,sources)
+        super(MonaghanBoundaryForce,self).__init__(dest, source, symmetric=symmetric)
 
     def cython_code(self):
         code = dedent("""
         from libc.math cimport fabs
         """)
         return dict(helper=code)
-        
+
     def loop(self, d_idx, s_idx, s_m, s_rho, d_m, d_cs, s_cs, d_h,
-             s_tx, s_ty, s_tz, s_nx, s_ny, s_nz, 
+             s_tx, s_ty, s_tz, s_nx, s_ny, s_nz,
              d_au, d_av, d_aw,
              XIJ=[0.0, 0.0, 0.0]):
 
@@ -35,7 +35,7 @@ class MonaghanBoundaryForce(Equation):
         tang[0] = s_tx[s_idx]
         tang[1] = s_ty[s_idx]
         tang[2] = s_tz[s_idx]
-        
+
         # x and y projections
         x = XIJ[0]*tang[0] + XIJ[1]*tang[1] + XIJ[2]*tang[2]
         y = XIJ[0]*norm[0] + XIJ[1]*norm[1] + XIJ[2]*norm[2]
@@ -61,14 +61,12 @@ class MonaghanBoundaryForce(Equation):
 
             else:
                 nforce = 0.0
-                   
+
             force = (mb/(ma+mb)) * nforce * tforce * beta
         else:
             force = 0.0
-        
+
         # boundary force accelerations
         d_au[d_idx] += force * norm[0]
         d_av[d_idx] += force * norm[1]
         d_aw[d_idx] += force * norm[2]
-        
-            

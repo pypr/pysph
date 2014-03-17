@@ -139,28 +139,28 @@ equations = [
     # Summation density for the fluid phase
     Group(
         equations=[
-            DensitySummation(
-                dest='fluid', sources=['fluid','solid']),
+            DensitySummation(dest='fluid', source='fluid'),
+            DensitySummation(dest='fluid', source='solid'),
             ]),
 
     # boundary conditions for the solid wall
     Group(
         equations=[
             SolidWallBC(
-                dest='solid', sources=['fluid',], gy=gy, rho0=rho0, p0=p0),
+                dest='solid', source='fluid', gy=gy, rho0=rho0, p0=p0),
             ]),
 
     # acceleration equation
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
+            StateEquation(dest='fluid', source=None, b=1.0, rho0=rho0, p0=p0),
 
-            BodyForce(dest='fluid', sources=None, fy=gy),
+            BodyForce(dest='fluid', source=None, fy=gy),
 
-            MomentumEquation(
-                dest='fluid', sources=['fluid', 'solid'], nu=nu),
+            MomentumEquation(dest='fluid', source='fluid', nu=nu),
+            MomentumEquation(dest='fluid', source='solid', nu=nu),
 
-            ArtificialStress(dest='fluid', sources=['fluid',])
+            ArtificialStress(dest='fluid', source='fluid')
 
             ]),
     ]

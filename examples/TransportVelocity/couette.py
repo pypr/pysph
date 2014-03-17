@@ -154,23 +154,25 @@ equations = [
     # Summation density for the fluid phase
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','channel']),
+            DensitySummation(dest='fluid', source='fluid'),
+            DensitySummation(dest='fluid', source='channel'),
             ]),
 
     # boundary conditions for the channel wall
     Group(
         equations=[
-            SolidWallBC(dest='channel', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
+            SolidWallBC(dest='channel', source='fluid', b=1.0, rho0=rho0, p0=p0),
             ]),
 
     # acceleration equation
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
+            StateEquation(dest='fluid', source=None, b=1.0, rho0=rho0, p0=p0),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'channel'], nu=nu),
+            MomentumEquation(dest='fluid', source='fluid', nu=nu),
+            MomentumEquation(dest='fluid', source='channel', nu=nu),
 
-            ArtificialStress(dest='fluid', sources=['fluid',])
+            ArtificialStress(dest='fluid', source='fluid')
 
             ]),
     ]

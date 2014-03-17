@@ -4,15 +4,15 @@
 from pysph.sph.equation import Equation
 
 class TaitEOS(Equation):
-    def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0, gamma=7.0):
+    def __init__(self, dest, source=None,
+                 rho0=1000.0, c0=1.0, gamma=7.0, symmetric=False):
         self.rho0 = rho0
         self.rho01 = 1.0/rho0
         self.c0 = c0
         self.gamma = gamma
         self.gamma1 = 0.5*(gamma - 1.0)
         self.B = rho0*c0*c0/gamma
-        super(TaitEOS, self).__init__(dest, sources)
+        super(TaitEOS, self).__init__(dest, source, symmetric=symmetric)
 
     def loop(self, d_idx, d_rho, d_p, d_cs):
         ratio = d_rho[d_idx] * self.rho01
@@ -22,9 +22,9 @@ class TaitEOS(Equation):
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
 class MomentumEquation(Equation):
-    def __init__(self, dest, sources=None,
+    def __init__(self, dest, source=None,
                  alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
-                 c0=1.0):
+                 c0=1.0, symmetric=False):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
@@ -33,7 +33,7 @@ class MomentumEquation(Equation):
         self.gz = gz
         self.dt_fac = 0.0
         self.c0 = c0
-        super(MomentumEquation, self).__init__(dest, sources)
+        super(MomentumEquation, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0

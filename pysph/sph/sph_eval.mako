@@ -159,7 +159,8 @@ cdef class SPHCalc:
         for cell_index in range(ncells):
             # Find potential neighbors from nearby cells for this cell.
             nnps.get_particles_in_neighboring_cells(
-                cell_index, src_array_index, potential_nbrs
+                cell_index, src_array_index, potential_nbrs,
+                symmetric=${eq_group.is_symmetric()}
             )
 
             # Get the indices for each particle in this cell
@@ -191,7 +192,9 @@ cdef class SPHCalc:
             ## Find and iterate over neighbors.
             ###################################################################
             nnps.get_nearest_particles(
-                src_array_index, dst_array_index, d_idx, nbrs)
+                src_array_index, dst_array_index, d_idx, nbrs,
+                symmetric=${eq_group.is_symmetric()}
+            )
 
             for nbr_idx in range(nbrs.length):
                 s_idx = <int>nbrs.data[nbr_idx]

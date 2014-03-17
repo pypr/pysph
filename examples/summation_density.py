@@ -19,8 +19,10 @@ particles = make_particles()
 
 kernel = CubicSpline(dim=1)
 
-equations = [SummationDensity(dest='fluid', sources=['fluid', 'solid']),
-             TaitEOS(dest='fluid', sources=None),
+equations = [
+             SummationDensity(dest='fluid', source='fluid'),
+             SummationDensity(dest='fluid', source='solid'),
+             TaitEOS(dest='fluid', source=None),
             ]
 
 locator = AllPairLocator()

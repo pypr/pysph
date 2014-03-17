@@ -83,16 +83,16 @@ class TestEquations(TestBase):
         self.assertEqual(eq.name, 'Equation')
         self.assertEqual(eq.no_source, True)
         self.assertEqual(eq.dest, 'fluid')
-        self.assertEqual(eq.sources, None)
+        self.assertEqual(eq.source, None)
         self.assertFalse(hasattr(eq, 'loop'))
         self.assertFalse(hasattr(eq, 'post_loop'))
         self.assertFalse(hasattr(eq, 'initialize'))
 
-        eq = Equation('fluid', sources=['fluid'], name='Test')
+        eq = Equation('fluid', source='fluid', name='Test')
         self.assertEqual(eq.name, 'Test')
         self.assertEqual(eq.no_source, False)
         self.assertEqual(eq.dest, 'fluid')
-        self.assertEqual(eq.sources, ['fluid'])
+        self.assertEqual(eq.source, 'fluid')
 
         class Test(Equation):
             pass
@@ -102,7 +102,7 @@ class TestEquations(TestBase):
 
     def test_continuity_equation(self):
         from pysph.sph.basic_equations import ContinuityEquation
-        e = ContinuityEquation(dest='fluid', sources=['fluid'])
+        e = ContinuityEquation(dest='fluid', source='fluid')
         # Call the loop code.
 
         d_arho = [0.0, 0.0, 0.0]
@@ -150,7 +150,7 @@ class TestGroup(TestBase):
     def setUp(self):
         from pysph.sph.basic_equations import SummationDensity
         from pysph.sph.wc.basic import TaitEOS
-        self.group = Group([SummationDensity('f', ['f']), TaitEOS('f', None)])
+        self.group = Group([SummationDensity('f', 'f'), TaitEOS('f', None)])
 
     def test_precomputed(self):
         g = self.group
@@ -232,6 +232,18 @@ class TestGroup(TestBase):
             ''')
         msg = 'EXPECTED:\n%s\nGOT:\n%s'%(expect, result)
         self.assertEqual(result, expect, msg)
+
+    def test_symmetric(self):
+        self.assertEqual(self.group.is_symmetric(), False)
+        from pysph.sph.basic_equations import SummationDensity
+        from pysph.sph.wc.basic import TaitEOS
+        g = Group([SummationDensity('f', 'f', symmetric=True),
+                   TaitEOS('f', None, symmetric=True)])
+        self.assertEqual(g.is_symmetric(), True)
+        g = Group([SummationDensity('f', 'f', symmetric=False),
+                   TaitEOS('f', None, symmetric=True)])
+        self.assertEqual(g.is_symmetric(), False)
+
 
 if __name__ == '__main__':
     unittest.main()

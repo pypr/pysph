@@ -15,12 +15,12 @@ class SummationDensity(Equation):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class BodyForce(Equation):
-    def __init__(self, dest, sources,
-                 fx=0.0, fy=0.0, fz=0.0):
+    def __init__(self, dest, source,
+                 fx=0.0, fy=0.0, fz=0.0, symmetric=False):
         self.fx = fx
         self.fy = fy
         self.fz = fz
-        super(BodyForce, self).__init__(dest, sources)
+        super(BodyForce, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
@@ -53,13 +53,13 @@ class VelocityGradient2D(Equation):
         d_v10[d_idx] = 0.0
         d_v11[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, s_m, s_rho, 
+    def loop(self, d_idx, s_idx, s_m, s_rho,
              d_v00, d_v01, d_v10, d_v11,
-             DWIJ=[0.0, 0.0, 0.0], 
+             DWIJ=[0.0, 0.0, 0.0],
              VIJ= [0.0, 0.0, 0.0]):
-        
+
         tmp = s_m[s_idx]/s_rho[s_idx]
-        
+
         d_v00[d_idx] += tmp * -VIJ[0] * DWIJ[0]
         d_v01[d_idx] += tmp * -VIJ[0] * DWIJ[1]
 
@@ -72,12 +72,12 @@ class IsothermalEOS(Equation):
     :math:`$p = c_0^2(\rho_0 - rho)$`
 
     """
-    def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0):
+    def __init__(self, dest, source=None,
+                 rho0=1000.0, c0=1.0, symmetric=False):
         self.rho0 = rho0
         self.c0 = c0
         self.c02 = c0 * c0
-        super(IsothermalEOS, self).__init__(dest, sources)
+        super(IsothermalEOS, self).__init__(dest, source, symmetric=symmetric)
 
     def loop(self, d_idx, d_rho, d_p):
         d_p[d_idx] = self.c02 * (d_rho[d_idx] - self.rho0)
@@ -99,11 +99,13 @@ class ContinuityEquation(Equation):
 
 
 class MonaghanArtificialViscosity(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0, eta=0.1):
+    def __init__(self, dest, source=None, alpha=1.0, beta=1.0, eta=0.1,
+                 symmetric=False):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
-        super(MonaghanArtificialViscosity, self).__init__(dest, sources)
+        super(MonaghanArtificialViscosity, self).__init__(dest, source,
+                                                          symmetric=symmetric)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
@@ -135,9 +137,9 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
 
 class XSPHCorrection(Equation):
-    def __init__(self, dest, sources=None, eps=0.5):
+    def __init__(self, dest, source=None, eps=0.5, symmetric=False):
         self.eps = eps
-        super(XSPHCorrection, self).__init__(dest, sources)
+        super(XSPHCorrection, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_ax, d_ay, d_az):
         d_ax[d_idx] = 0.0

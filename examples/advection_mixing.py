@@ -106,9 +106,9 @@ equations = [
     Group(
         equations=[
             MixingVelocityUpdate(
-                dest='fluid', sources=None, T=T),
+                dest='fluid', source=None, T=T),
 
-            Advect(dest='fluid', sources=None)
+            Advect(dest='fluid', source=None)
             ])
 
     ]

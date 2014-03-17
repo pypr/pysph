@@ -4,9 +4,9 @@ from pysph.sph.equation import Equation
 from textwrap import dedent
 
 class MonaghanArtificialStress(Equation):
-    def __init__(self, dest, sources=None, eps=0.3):
+    def __init__(self, dest, source=None, eps=0.3, symmetric=False):
         self.eps = eps
-        super(MonaghanArtificialStress, self).__init__(dest, sources)
+        super(MonaghanArtificialStress, self).__init__(dest, source, symmetric=symmetric)
 
     def cython_code(self):
         code = dedent("""
@@ -58,7 +58,7 @@ class MonaghanArtificialStress(Equation):
         sd.x = d_s00[d_idx] - d_p[d_idx]
         sd.y = d_s11[d_idx] - d_p[d_idx]
         sd.z = d_s22[d_idx] - d_p[d_idx]
-        
+
         ss.x = d_s12[d_idx]
         ss.y = d_s02[d_idx]
         ss.z = d_s01[d_idx]
@@ -75,14 +75,14 @@ class MonaghanArtificialStress(Equation):
 
         if S.z > 0: rd.z = -self.eps * S.z * rhoi21
         else : rd.z = 0
-        
+
         # transform artificial stresses in original frame
         transform2inv(rd, R, Rab)
 
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
         d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
-        
+
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
 
@@ -97,24 +97,24 @@ class MomentumEquationWithStress2D(Equation):
     Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
 
     """
-    def __init__(self, dest, sources=None, wdeltap=-1, n=1):
+    def __init__(self, dest, source=None, wdeltap=-1, n=1, symmetric=False):
         self.wdeltap = wdeltap
         self.n = n
         self.with_correction = True
         if wdeltap < 0:
             self.with_correction = False
-        super(MomentumEquationWithStress2D, self).__init__(dest, sources)
+        super(MomentumEquationWithStress2D, self).__init__(dest, source, symmetric=symmetric)
 
     def cython_code(self):
         code = dedent("""
         from libc.math cimport pow
         """)
         return dict(helper=code)
-        
+
     def initialize(self, d_idx, d_au, d_av):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
-        
+
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p,
              d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
              d_r00, d_r01, d_r11, s_r00, s_r01, s_r11,
@@ -126,7 +126,7 @@ class MomentumEquationWithStress2D(Equation):
 
         rhoa = d_rho[d_idx]
         rhob = s_rho[s_idx]
-        
+
         rhoa21 = 1./(rhoa * rhoa)
         rhob21 = 1./(rhob * rhob)
 
@@ -203,19 +203,19 @@ class HookesDeviatoricStressRate2D(Equation):
                                   )$`
 
     """
-    def __init__(self, dest, sources=None, shear_mod=1.0):
+    def __init__(self, dest, source=None, shear_mod=1.0, symmetric=False):
         self.shear_mod = shear_mod
-        super(HookesDeviatoricStressRate2D, self).__init__(dest, sources)
+        super(HookesDeviatoricStressRate2D, self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_as00, d_as01, d_as11):
         d_as00[d_idx] = 0.0
         d_as01[d_idx] = 0.0
         d_as11[d_idx] = 0.0
-    
+
     def loop(self, d_idx, d_s00, d_s01, d_s11,
              d_v00, d_v01, d_v10, d_v11,
              d_as00, d_as01, d_as11):
-        
+
         v00 = d_v00[d_idx]
         v01 = d_v01[d_idx]
         v10 = d_v10[d_idx]
@@ -236,7 +236,7 @@ class HookesDeviatoricStressRate2D(Equation):
         # rotation tensor is asymmetric
         omega01 = 0.5 * (v01 - v10)
         omega10 = -omega01
-        
+
         tmp = 2.0*self.shear_mod
         trace = 1.0/3.0 * (eps00 + eps11)
 
@@ -246,19 +246,19 @@ class HookesDeviatoricStressRate2D(Equation):
 
         # S_01
         d_as01[d_idx] = tmp*(eps01) + \
-            ( s00*omega10 ) + ( s11*omega01 )        
+            ( s00*omega10 ) + ( s11*omega01 )
 
         # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \
             ( s10*omega10 ) + ( s01*omega10 )
 
 class EnergyEquationWithStress2D(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0,
-                 eta=0.01):
+    def __init__(self, dest, source=None, alpha=1.0, beta=1.0,
+                 eta=0.01, symmetric=False):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
-        super(EnergyEquationWithStress2D,self).__init__(dest, sources)
+        super(EnergyEquationWithStress2D,self).__init__(dest, source, symmetric=symmetric)
 
     def initialize(self, d_idx, d_ae):
         d_ae[d_idx] = 0.0
@@ -302,7 +302,7 @@ class EnergyEquationWithStress2D(Equation):
                   d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
                   d_v00, d_v01, d_v10, d_v11,
                   d_ae):
-        
+
         # particle density
         rhoa = d_rho[d_idx]
 
@@ -318,7 +318,7 @@ class EnergyEquationWithStress2D(Equation):
 
         eps10 = eps01
         eps11 = d_v11[d_idx]
-        
+
         # energy acclerations
         sdoteij = s00a*eps00 +  s01a*eps01 + s10a*eps10 + s11a*eps11
         d_ae[d_idx] += 1./rhoa * sdoteij
