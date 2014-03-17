@@ -595,7 +595,7 @@ cdef class NNPS:
 
     # return the indices for the particles in neighboring cells
     cpdef get_particles_in_neighboring_cells(self, int cell_index,
-        int pa_index, UIntArray nbrs, bint symmetric):
+        int pa_index, UIntArray nbrs, bint symmetric=False):
         raise NotImplementedError()
 
     cdef _compute_cell_size(self):
@@ -669,7 +669,7 @@ cdef class NNPS:
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs, bint symmetric):
+                                size_t d_idx, UIntArray nbrs, bint symmetric=False):
         raise NotImplementedError("NNPS :: get_nearest_particles called")
 
     cpdef get_nearest_particles_filtered(
@@ -1157,7 +1157,7 @@ cdef class BoxSortNNPS(NNPS):
             indices.append( cell_indices.data[i] )
 
     cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs, bint symmetric):
+        self, int cell_index, int pa_index, UIntArray nbrs, bint symmetric=False):
         """Return indices for particles in neighboring cells.
 
         Parameters:
@@ -1220,7 +1220,7 @@ cdef class BoxSortNNPS(NNPS):
                     nbrs.append( cell_indices.data[local_index] )
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs, bint symmetric):
+                                size_t d_idx, UIntArray nbrs, bint symmetric=False):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1563,7 +1563,7 @@ cdef class LinkedListNNPS(NNPS):
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs, bint symmetric):
+                                size_t d_idx, UIntArray nbrs, bint symmetric=False):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1691,7 +1691,7 @@ cdef class LinkedListNNPS(NNPS):
                         _next = next.data[_next]
 
     cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs, bint symmetric):
+        self, int cell_index, int pa_index, UIntArray nbrs, bint symmetric=False):
         """Return indices for particles in neighboring cells.
 
         Parameters:
