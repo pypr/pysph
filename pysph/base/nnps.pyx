@@ -209,6 +209,79 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
     return arange
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline _get_cell_list(
+    cIntPoint cid, IntArray ix, IntArray iy, IntArray iz, bint symmetric):
+    """Get a list of cell indices to search for neighbors
+    
+    Parameters:
+    -----------
+
+    cid : cIntPoint :: in
+        The target cell index
+        
+    ix, iy, iz : IntArray (inout)
+        Valid cell indices to search for neighbors
+
+    symmetric : bint
+        Flag to look for symmetric neighbors
+
+    """
+    cdef int size = 27
+    cdef int _ix = cid.x, _iy = cid.y, _iz = cid.z
+    cdef int i, j, k, count
+
+    # only 14 cells for the symmetric case
+    if symmetric:
+        size = 14
+        
+    # resize ix, iy and iz according to cell sizes
+    ix.resize(size); iy.resize(size); iz.resize(size)
+    
+    count = 0
+    if symmetric:
+        # first add 9 cells in the upper plane (k=1)
+        for j in [-1, 0, 1]:
+            for i in [-1, 0, 1]:
+                ix.data[count] = _ix + i
+                iy.data[count] = _iy + j
+                iz.data[count] = _iz + 1 # k=1
+                
+                count = count + 1
+                
+        # now add 3 cells in along in this plane (k=0, j=1)
+        for i in [-1, 0, 1]:
+            ix.data[count] = _ix + i
+            iy.data[count] = _iy + 1     # j=1
+            iz.data[count] = _iz + 0     # k=0
+
+            count = count + 1
+            
+        # finally add two cells with (k=0, j=0, i=0,1)
+        for i in [0, 1]:
+            ix.data[count] = _ix + i
+            iy.data[count] = _iy + 0     # j=0
+            iz.data[count] = _iz + 0     # k=0
+
+            count = count + 1
+        
+    # asymmetric case is simple
+    else:
+        for k in [-1, 0, 1]:
+            for j in [-1, 0, 1]:
+                for i in [-1, 0, 1]:
+                    ix.data[count] = _ix + i
+                    iy.data[count] = _iy + i
+                    iz.data[count] = _iz + i
+                    
+                    count = count + 1
+
+# Wrapper for testing
+def get_cell_list(
+    IntPoint cid, IntArray ix, IntArray iy, IntArray iz, bint symmetric):
+    _get_cell_list(cid.data, ix, iy, iz, symmetric)    
+
 #################################################################
 # NNPS extension classes
 #################################################################
@@ -598,7 +671,7 @@ cdef class NNPS:
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
+                                size_t d_idx, UIntArray nbrs, bint symmetric):
         raise NotImplementedError("NNPS :: get_nearest_particles called")
 
     cpdef get_nearest_particles_filtered(
@@ -1141,7 +1214,7 @@ cdef class BoxSortNNPS(NNPS):
                             nbrs.append( cell_indices.data[local_index] )
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
+                                size_t d_idx, UIntArray nbrs, bint symmetric):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1158,6 +1231,9 @@ cdef class BoxSortNNPS(NNPS):
 
         nbrs : UIntArray (output)
             Neighbors for the requested particle are stored here.
+            
+        symmetric : bint
+            Flag to return symmetric neighbors
 
         """
         cdef dict cells = self.cells
@@ -1467,7 +1543,7 @@ cdef class LinkedListNNPS(NNPS):
     # Neighbor location routines
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
+                                size_t d_idx, UIntArray nbrs, bint symmetric):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:

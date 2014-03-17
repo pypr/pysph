@@ -186,7 +186,7 @@ class NNPSTestCase(unittest.TestCase):
 
         # get the neighbors and sort the result
         for i in range(dst_numPoints):
-            nps.get_nearest_particles(src_index, dst_index, i, nbrs1)
+            nps.get_nearest_particles(src_index, dst_index, i, nbrs1, symmetric=False)
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
             # ensure that the neighbor lists are the same
@@ -371,6 +371,34 @@ def test_get_bbox():
     assert(abs(boxmax.x - (centroid.x + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
+
+def test_get_cells():
+    "Test the get_cell_list function"
+    ix = IntArray(); iy = IntArray(); iz = IntArray()
+    cid = IntPoint()
+
+    # get the cell lists for symmetric interactions
+    nnps.get_cell_list(cid, ix, iy, iz, symmetric=True)
+    
+    # 14 cells for a symmetric interaction
+    assert(ix.length == 14)
+
+    # assume 10 cells in each dimension and 3D
+    ncells_per_dim = IntArray(3)
+    ncells_per_dim[0] = 10
+    ncells_per_dim[1] = 10
+    ncells_per_dim[2] = 10
+
+    # the target cell's flattened index
+    target_index = nnps.py_flatten(cid, ncells_per_dim, 3)
+    
+    # test each cell's flattened index and ensure it's greater than or
+    # equal to target index
+    for i in range(14):
+        index = nnps.py_flatten(
+            IntPoint(ix[i], iy[i], iz[i]), ncells_per_dim, 3)
+        
+        assert( index >= target_index )
 
 if __name__ == '__main__':
     unittest.main()

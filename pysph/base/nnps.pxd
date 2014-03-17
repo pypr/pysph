@@ -123,7 +123,7 @@ cdef class NNPS:
     # requested particle. The returned list is assumed to be of type
     # unsigned int to follow the type of the local and global ids.
     cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs)
+                                size_t d_idx, UIntArray nbrs, bint symmetric)
 
     # Testing function for brute force neighbor search. The return
     # list is of the same type of the local and global ids (uint)
