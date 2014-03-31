@@ -13,6 +13,7 @@ Contents:
 
    overview.rst
    installation.rst
+   using_pysph.rst
 
 
 Indices and tables

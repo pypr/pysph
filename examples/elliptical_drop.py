@@ -44,11 +44,10 @@ def exact_solution(tf=0.0075, dt=1e-4):
 
 co = 1400.0; ro = 1.0
 hdx = 1.3
-def get_circular_patch(
-    name="fluid", dx=0.025, cl_precision="single", empty=False, **kwargs):
+def get_circular_patch(name="fluid", dx=0.025, empty=False, **kwargs):
 
     if empty:
-        pa = get_particle_array_wcsph(name=name, cl_precision=cl_precision)
+        pa = get_particle_array_wcsph(name=name)
     else:
         x,y = mgrid[-1.05:1.05+1e-4:dx, -1.05:1.05+1e-4:dx]
         x = x.ravel()
@@ -70,7 +69,7 @@ def get_circular_patch(
                 indices.append(i)
 
         pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-                                      cs=cs, name=name, cl_precision=cl_precision)
+                                      cs=cs, name=name)
 
         la = LongArray(len(indices))
         la.set_data(array(indices))
@@ -80,23 +79,9 @@ def get_circular_patch(
         print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
 
     # add requisite variables
-    pa.add_property( {'name': 'arho'} )
-    pa.add_property( {'name': 'au'} )
-    pa.add_property( {'name': 'av'} )
-    pa.add_property( {'name': 'aw'} )
-
-    pa.add_property( {'name': 'ax'} )
-    pa.add_property( {'name': 'ay'} )
-    pa.add_property( {'name': 'az'} )
-
-    pa.add_property( {'name': 'rho0'} )
-    pa.add_property( {'name': 'u0'} )
-    pa.add_property( {'name': 'v0'} )
-    pa.add_property( {'name': 'w0'} )
-
-    pa.add_property( {'name': 'x0'} )
-    pa.add_property( {'name': 'y0'} )
-    pa.add_property( {'name': 'z0'} )
+    for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
+                 'v0', 'w0', 'x0', 'y0', 'z0'):
+        pa.add_property( {'name': name} )
 
     return [pa,]
 
