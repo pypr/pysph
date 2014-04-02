@@ -14,6 +14,8 @@ This codebase is the new approach for PySPH that is heavily based on
 code generation. It currently supports Cython and is configured to
 work in parallel.
 
+The latest documentation for PySPH is available at http://pysph.readthedocs.org
+
 Features
 ---------
 
