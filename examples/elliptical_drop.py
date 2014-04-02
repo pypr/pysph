@@ -44,8 +44,8 @@ def exact_solution(tf=0.0075, dt=1e-4):
 
 co = 1400.0; ro = 1.0
 hdx = 1.3
-def get_circular_patch(name="fluid", dx=0.025, empty=False, **kwargs):
-
+def get_circular_patch(dx=0.025, empty=False, **kwargs):
+    name = 'fluid'
     if empty:
         pa = get_particle_array_wcsph(name=name)
     else:
@@ -107,8 +107,7 @@ equations = [TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
-          particle_factory=get_circular_patch,
-          name='fluid')
+          particle_factory=get_circular_patch)
 
 t1 = time()
 app.run()
