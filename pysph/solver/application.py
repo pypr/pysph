@@ -203,7 +203,7 @@ class Application(object):
         # --nnps
         nnps_options.add_option("--nnps", dest="nnps",
                                 choices=['box', 'll'],
-                                default='box',
+                                default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll'). "
                                 )
