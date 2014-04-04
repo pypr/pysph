@@ -385,6 +385,9 @@ class MayaviViewer(HasTraits):
 
     def _get_controller(self):
         ''' get the controller, also sets the iteration count '''
+        if self.n_files > -1:
+            return None
+
         reconnect = self.host_changed
         if not reconnect:
             try:
