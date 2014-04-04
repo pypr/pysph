@@ -20,6 +20,13 @@ cdef extern from 'math.h':
     double fmax(double, double)
     double fmin(double, double)
 
+IF UNAME_SYSNAME == "Windows":
+    cdef inline double fmin(double x, double y):
+        return x if x < y else y
+    cdef inline double fmax(double x, double y):
+        return x if x > y else y
+
+
 cdef extern from 'limits.h':
     cdef unsigned int UINT_MAX
     cdef int INT_MAX
@@ -735,10 +742,10 @@ cdef class NNPS:
         """
         cdef list particles = self.particles
         cdef int narrays = self.narrays
-    
+
         cdef int array_index
         cdef ParticleArray pa
-        
+
         for array_index in range( narrays ):
             pa = <ParticleArray>PyList_GetItem( particles, array_index )
             pa.remove_tagged_particles(Ghost)
@@ -776,7 +783,7 @@ cdef class NNPS:
         cdef DoubleArray x, y, z
         cdef double xi, yi, zi
         cdef int i, np
-        
+
         # iterate over each array and mark for translation
         for pa_wrapper in self.pa_wrappers:
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
@@ -809,7 +816,7 @@ cdef class NNPS:
         accounted for when using domains with multiple periodicity.
 
         The periodic domain is specified using the DomainLimits object
-        
+
         """
         cdef DomainLimits domain = self.domain
         cdef list pa_wrappers = self.pa_wrappers
@@ -1240,7 +1247,7 @@ cdef class BoxSortNNPS(NNPS):
         cdef IntArray n_part_per_cell_indices
         cdef UIntArray cell_indices
         cdef IntPoint cell_key
-        
+
         # iterate over all cells and count the number of particles
         for i in range( n_arrays ):
             n_part_per_cell_indices = <IntArray>PyList_GetItem(n_part_per_cell, i)
@@ -1250,10 +1257,10 @@ cdef class BoxSortNNPS(NNPS):
                 cell_key = <IntPoint>PyList_GetItem(cell_keys, j)
                 cell = <Cell>PyDict_GetItem(cells, cell_key)
                 cell_indices = <UIntArray>PyList_GetItem(cell.lindices, i)
-                
+
                 # store the number of particles in this cell
                 n_part_per_cell_indices.data[j] = cell_indices.length
-        
+
 
 cdef class LinkedListNNPS(NNPS):
     """Nearest neighbor query class using the linked list method.
@@ -1439,7 +1446,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef list heads = self.heads
         cdef list nexts = self.nexts
         cdef list n_part_per_cell = self.n_part_per_cell
-        
+
         # Locals
         cdef unsigned int _next
         cdef IntArray n_part_per_cell_indices
@@ -1460,7 +1467,7 @@ cdef class LinkedListNNPS(NNPS):
                 while (_next != UINT_MAX):
                     count = count + 1
                     _next = next.data[_next]
-                    
+
                 n_part_per_cell_indices.data[j] = count
 
     ######################################################################
