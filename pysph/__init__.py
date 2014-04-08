@@ -10,7 +10,7 @@ except ImportError:
 # Check for Zoltan
 Has_Zoltan=True
 try:
-    from pyzoltan.core import Zoltan
+    from pyzoltan.core import zoltan
 except ImportError:
     # We switch off parallel mode
     Has_Zoltan=False
