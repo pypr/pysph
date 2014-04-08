@@ -42,37 +42,33 @@ dt_force = 1.0
 tf = 2.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array(name='fluid')
-        channel = get_particle_array(name='channel')
-    else:
-        _x = np.arange( dx/2, Lx, dx )
+def create_particles(**kwargs):
+    _x = np.arange( dx/2, Lx, dx )
+    
+    # create the fluid particles
+    _y = np.arange( dx/2, Ly, dx )
 
-        # create the fluid particles
-        _y = np.arange( dx/2, Ly, dx )
+    x, y = np.meshgrid(_x, _y); fx = x.ravel(); fy = y.ravel()
 
-        x, y = np.meshgrid(_x, _y); fx = x.ravel(); fy = y.ravel()
+    # create the channel particles at the top
+    _y = np.arange(Ly+dx/2, Ly+dx/2+ghost_extent, dx)
+    x, y = np.meshgrid(_x, _y); tx = x.ravel(); ty = y.ravel()
 
-        # create the channel particles at the top
-        _y = np.arange(Ly+dx/2, Ly+dx/2+ghost_extent, dx)
-        x, y = np.meshgrid(_x, _y); tx = x.ravel(); ty = y.ravel()
+    # create the channel particles at the bottom
+    _y = np.arange(-dx/2, -dx/2-ghost_extent, -dx)
+    x, y = np.meshgrid(_x, _y); bx = x.ravel(); by = y.ravel()
 
-        # create the channel particles at the bottom
-        _y = np.arange(-dx/2, -dx/2-ghost_extent, -dx)
-        x, y = np.meshgrid(_x, _y); bx = x.ravel(); by = y.ravel()
+    # concatenate the top and bottom arrays
+    cx = np.concatenate( (tx, bx) )
+    cy = np.concatenate( (ty, by) )
 
-        # concatenate the top and bottom arrays
-        cx = np.concatenate( (tx, bx) )
-        cy = np.concatenate( (ty, by) )
+    # create the arrays
+    channel = get_particle_array(name='channel', x=cx, y=cy)
+    fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
-        # create the arrays
-        channel = get_particle_array(name='channel', x=cx, y=cy)
-        fluid = get_particle_array(name='fluid', x=fx, y=fy)
-
-        print "Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            channel.get_number_of_particles(), dt)
+    print "Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
+        Re, fluid.get_number_of_particles(),
+        channel.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -103,24 +99,23 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property({'name':'vmag'})
 
     # setup the particle properties
-    if not empty:
-        volume = dx * dx
+    volume = dx * dx
+    
+    # mass is set to get the reference density of rho0
+    fluid.m[:] = volume * rho0
+    channel.m[:] = volume * rho0
 
-        # mass is set to get the reference density of rho0
-        fluid.m[:] = volume * rho0
-        channel.m[:] = volume * rho0
+    # volume is set as dx^2
+    fluid.V[:] = 1./volume
+    channel.V[:] = 1./volume
 
-        # volume is set as dx^2
-        fluid.V[:] = 1./volume
-        channel.V[:] = 1./volume
+    # smoothing lengths
+    fluid.h[:] = hdx * dx
+    channel.h[:] = hdx * dx
 
-        # smoothing lengths
-        fluid.h[:] = hdx * dx
-        channel.h[:] = hdx * dx
-
-        # channel velocity on upper portion
-        indices = np.where(channel.y > d)[0]
-        channel.u0[indices] = Vmax
+    # channel velocity on upper portion
+    indices = np.where(channel.y > d)[0]
+    channel.u0[indices] = Vmax
 
     # load balancing props
     fluid.set_lb_props( fluid.properties.keys() )

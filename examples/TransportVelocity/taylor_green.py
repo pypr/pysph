@@ -40,59 +40,56 @@ dt_force = 0.25 * 1.0
 tf = 5.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array(name='fluid')
-    else:
-        # create the particles
-        _x = np.arange( dx/2, L, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
-        h = np.ones_like(x) * dx
+def create_particles(**kwargs):
+    # create the particles
+    _x = np.arange( dx/2, L, dx )
+    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+    h = np.ones_like(x) * dx
 
-        # create the arrays
-        fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
+    # create the arrays
+    fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
 
-        # add the requisite arrays
-        fluid.add_property( {'name': 'color'} )
+    # add the requisite arrays
+    fluid.add_property( {'name': 'color'} )
 
-        print "Taylor green vortex problem :: nfluid = %d, dt = %g"%(
-            fluid.get_number_of_particles(), dt)
+    print "Taylor green vortex problem :: nfluid = %d, dt = %g"%(
+        fluid.get_number_of_particles(), dt)
 
-        # setup the particle properties
-        pi = np.pi; cos = np.cos; sin=np.sin
+    # setup the particle properties
+    pi = np.pi; cos = np.cos; sin=np.sin
 
-        # color
-        fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
+    # color
+    fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
 
-        # velocities
-        fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
-        fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
+    # velocities
+    fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
+    fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-        # add requisite properties to the arrays:
-        # particle volume
-        fluid.add_property( {'name': 'V'} )
+    # add requisite properties to the arrays:
+    # particle volume
+    fluid.add_property( {'name': 'V'} )
 
-        # advection velocities and accelerations
-        fluid.add_property( {'name': 'uhat'} )
-        fluid.add_property( {'name': 'vhat'} )
+    # advection velocities and accelerations
+    fluid.add_property( {'name': 'uhat'} )
+    fluid.add_property( {'name': 'vhat'} )
 
-        fluid.add_property( {'name': 'auhat'} )
-        fluid.add_property( {'name': 'avhat'} )
+    fluid.add_property( {'name': 'auhat'} )
+    fluid.add_property( {'name': 'avhat'} )
 
-        fluid.add_property( {'name': 'au'} )
-        fluid.add_property( {'name': 'av'} )
+    fluid.add_property( {'name': 'au'} )
+    fluid.add_property( {'name': 'av'} )
 
-        fluid.add_property( {'name': 'vmag'} )
+    fluid.add_property( {'name': 'vmag'} )
 
-        # mass is set to get the reference density of each phase
-        fluid.rho[:] = rho0
-        fluid.m[:] = volume * fluid.rho
+    # mass is set to get the reference density of each phase
+    fluid.rho[:] = rho0
+    fluid.m[:] = volume * fluid.rho
+    
+    # volume is set as dx^2
+    fluid.V[:] = 1./volume
 
-        # volume is set as dx^2
-        fluid.V[:] = 1./volume
-
-        # smoothing lengths
-        fluid.h[:] = hdx * dx
+    # smoothing lengths
+    fluid.h[:] = hdx * dx
 
     # load balancing props
     fluid.set_lb_props( fluid.properties.keys() )

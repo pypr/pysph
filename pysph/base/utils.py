@@ -102,7 +102,7 @@ def get_particle_array(cl_precision="double", **props):
                 data[:] = UINT_MAX
 
                 prop_dict[prop] = {'name':prop, 'type':'unsigned int',
-                                   'data':data}
+                                   'data':data, 'default':UINT_MAX}
 
             elif prop in ['tag']:
                 prop_dict[prop] = {'name':prop, 'type':'int'}
@@ -182,3 +182,32 @@ def get_particle_array_wcsph(cl_precision="single", **props):
     pa = ParticleArray(name=name, **prop_dict)
 
     return pa
+
+def get_particles_info(particles):
+    """Return the array information for a list of particles.
+
+    This function returns a dictionary containing the property
+    information for a list of particles. This dict can be used for
+    example to set-up dummy/empty particle arrays.
+
+    """
+    info = {}
+    for parray in particles:
+        info[ parray.name ] = {}
+        for prop_name, prop in parray.properties.iteritems():
+            
+            info[ parray.name ][prop_name] = {
+                'name':prop_name, 'type':prop.get_c_type(),
+                'default':parray.default_values[prop_name],
+                'data':None}
+
+    return info
+
+def create_dummy_particles(info):
+    """Returns a replica (empty) of a list of particles"""
+    particles = []
+    for name, prop_dict in info.iteritems():
+        particles.append( ParticleArray(name=name, **prop_dict) )
+
+    return particles
+
