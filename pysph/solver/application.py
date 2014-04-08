@@ -6,6 +6,7 @@ from os.path import basename, splitext, abspath
 import sys
 
 # PySPH imports.
+from pysph.base import utils
 from pysph.base.particle_array import ParticleArray
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
@@ -375,6 +376,10 @@ class Application(object):
         rank = self.rank
         comm = self.comm
 
+        # particle array info that is used to create dummy particles
+        # on non-root processors
+        particles_info = {}
+
         # Only master creates the particles.
         if rank == 0:
             if options.restart_file is not None:
@@ -399,11 +404,18 @@ class Application(object):
                 solver.t, solver.dt, solver.count  = t, dt, count
 
             else:
-                self.particles = particle_factory(empty=False, *args, **kw)
+                self.particles = particle_factory(*args, **kw)
 
-        # everyone else creates empty containers
-        else:
-            self.particles = particle_factory(empty=True, *args, **kw)
+            # get the array info which will be b'casted to other procs
+            particles_info = utils.get_particles_info(self.particles)
+
+        # Broadcast the particles_info to other processors for parallel runs
+        if self.num_procs > 1:
+            particles_info = self.comm.bcast(particles_info, root=0)
+
+        # now all processors other than root create dummy particle arrays
+        if rank != 0:
+            self.particles = utils.create_dummy_particles(particles_info)
 
         # Instantiate the Parallel Manager here and do an initial LB
         self.pm = None
