@@ -146,66 +146,58 @@ class DamBreak2DGeometry(object):
         return x, y
 
     def create_particles(self, nboundary_layers=2, nfluid_offset=2,
-                         hdx=1.5, empty=False, **kwargs):
-        if empty:
-            fluid = get_particle_array_wcsph(name="fluid")
-            boundary = get_particle_array_wcsph(name="boundary")
+                         hdx=1.5, **kwargs):
+        nfluid = self.nfluid
+        xf, yf = self.get_fluid(nfluid_offset)
+        fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
 
-            particles = [fluid, boundary]
+        fluid.gid[:] = range(fluid.get_number_of_particles())
 
-        else:
+        np = nfluid
 
-            nfluid = self.nfluid
-            xf, yf = self.get_fluid(nfluid_offset)
-            fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
+        xb, yb = self.get_wall(nboundary_layers)
+        boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
 
-            fluid.gid[:] = range(fluid.get_number_of_particles())
+        np += boundary.get_number_of_particles()
 
-            np = nfluid
+        dx, dy, ro = self.dx, self.dy, self.ro
 
-            xb, yb = self.get_wall(nboundary_layers)
-            boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
+        # smoothing length, mass and density
+        fluid.h[:] = numpy.ones_like(xf) * hdx * dx
+        fluid.m[:] = dx * dy * 0.5 * ro
+        fluid.rho[:] = ro
+        fluid.rho0[:] = ro
 
-            np += boundary.get_number_of_particles()
+        boundary.h[:] = numpy.ones_like(xb) * hdx * dx
+        boundary.m[:] = dx * dy * 0.5 * ro
+        boundary.rho[:] = ro
+        boundary.rho0[:] = ro
 
-            dx, dy, ro = self.dx, self.dy, self.ro
+        # create the particles list
+        particles = [fluid, boundary]
 
-            # smoothing length, mass and density
-            fluid.h[:] = numpy.ones_like(xf) * hdx * dx
-            fluid.m[:] = dx * dy * 0.5 * ro
-            fluid.rho[:] = ro
-            fluid.rho0[:] = ro
+        if self.with_obstacle:
+            xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
+            gido = numpy.array( range(xo.size), dtype=numpy.uint32 )
+            
+            obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
+            
+            obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
+            obstacle.m[:] = dx * dy * 0.5 * ro
+            obstacle.rho[:] = ro
+            obstacle.rho0[:] = ro
+            
+            # add the obstacle to the boundary particles
+            boundary.append_parray( obstacle )
 
-            boundary.h[:] = numpy.ones_like(xb) * hdx * dx
-            boundary.m[:] = dx * dy * 0.5 * ro
-            boundary.rho[:] = ro
-            boundary.rho0[:] = ro
+            np += obstacle.get_number_of_particles()
 
-            # create the particles list
-            particles = [fluid, boundary]
+        # set the gid for the boundary particles
+        boundary.gid[:] = range( boundary.get_number_of_particles() )
 
-            if self.with_obstacle:
-                xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
-                gido = numpy.array( range(xo.size), dtype=numpy.uint32 )
-
-                obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
-
-                obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
-                obstacle.m[:] = dx * dy * 0.5 * ro
-                obstacle.rho[:] = ro
-                obstacle.rho0[:] = ro
-
-                # add the obstacle to the boundary particles
-                boundary.append_parray( obstacle )
-
-                np += obstacle.get_number_of_particles()
-
-            # set the gid for the boundary particles
-            boundary.gid[:] = range( boundary.get_number_of_particles() )
-
-            print "2D dam break with %d fluid, %d boundary particles"%(
-                fluid.get_number_of_particles(),
-                boundary.get_number_of_particles())
+        print "2D dam break with %d fluid, %d boundary particles"%(
+            fluid.get_number_of_particles(),
+            boundary.get_number_of_particles())
 
         return particles
 
@@ -243,7 +235,7 @@ class DamBreak3DGeometry(object):
     def get_max_speed(self, g=9.81):
         return numpy.sqrt( 2 * g * self.fluid_column_height )
 
-    def create_particles(self, empty=False, **kwargs):
+    def create_particles(self, **kwargs):
         fluid_column_height=self.fluid_column_height
         fluid_column_width=self.fluid_column_width
         fluid_column_length=self.fluid_column_length
@@ -262,103 +254,96 @@ class DamBreak3DGeometry(object):
         nboundary_layers = self.nboundary_layers
         dx = self.dx
 
-        if empty:
-            fluid = get_particle_array_wcsph(name="fluid")
-            boundary = get_particle_array_wcsph(name="boundary")
-            obstacle = get_particle_array_wcsph(name='obstacle')
+        # get the domain limits
+        ghostlims = nboundary_layers * dx
 
-            particles = [fluid, boundary, obstacle]
-        else:
-            # get the domain limits
-            ghostlims = nboundary_layers * dx
+        xmin, xmax = 0.0 -ghostlims, container_length + ghostlims
+        zmin, zmax = 0.0 - ghostlims, container_height + ghostlims
 
-            xmin, xmax = 0.0 -ghostlims, container_length + ghostlims
-            zmin, zmax = 0.0 - ghostlims, container_height + ghostlims
+        cw2 = 0.5 * container_width
+        ymin, ymax = -cw2 - ghostlims, cw2 + ghostlims
+            
+        # create all particles
+        eps = 0.1 * dx
+        xx, yy, zz = numpy.mgrid[xmin:xmax+eps:dx,
+                                 ymin:ymax+eps:dx,
+                                 zmin:zmax+eps:dx]
 
-            cw2 = 0.5 * container_width
-            ymin, ymax = -cw2 - ghostlims, cw2 + ghostlims
+        x = xx.ravel(); y = yy.ravel(); z = zz.ravel()
 
-            # create all particles
-            eps = 0.1 * dx
-            xx, yy, zz = numpy.mgrid[xmin:xmax+eps:dx,
-                                     ymin:ymax+eps:dx,
-                                     zmin:zmax+eps:dx]
+        # create a dummy particle array from which we'll sort
+        pa = get_particle_array_wcsph(name='block', x=x, y=y, z=z)
 
-            x = xx.ravel(); y = yy.ravel(); z = zz.ravel()
+        # get the individual arrays
+        indices = []
+        findices = []
+        oindices = []
 
-            # create a dummy particle array from which we'll sort
-            pa = get_particle_array_wcsph(name='block', x=x, y=y, z=z)
+        obw2 = 0.5 * obstacle_width
+        obl2 = 0.5 * obstacle_length
+        obh = obstacle_height
+        ocx = obstacle_center_x
+        ocy = obstacle_center_y
 
-            # get the individual arrays
-            indices = []
-            findices = []
-            oindices = []
+        for i in range(x.size):
+            xi = x[i]; yi = y[i]; zi = z[i]
 
-            obw2 = 0.5 * obstacle_width
-            obl2 = 0.5 * obstacle_length
-            obh = obstacle_height
-            ocx = obstacle_center_x
-            ocy = obstacle_center_y
+            # fluid
+            if ( (0 < xi <= fluid_column_length) and \
+                     (-cw2 < yi < cw2) and \
+                     (0 < zi <= fluid_column_height) ):
 
-            for i in range(x.size):
-                xi = x[i]; yi = y[i]; zi = z[i]
+                findices.append(i)
 
-                # fluid
-                if ( (0 < xi <= fluid_column_length) and \
-                         (-cw2 < yi < cw2) and \
-                         (0 < zi <= fluid_column_height) ):
+            # obstacle
+            if ( (ocx-obl2 <= xi <= ocx+obl2) and \
+                     (ocy-obw2 <= yi <= ocy+obw2) and \
+                     (0 < zi <= obh) ):
 
-                    findices.append(i)
+                oindices.append(i)
 
-                # obstacle
-                if ( (ocx-obl2 <= xi <= ocx+obl2) and \
-                         (ocy-obw2 <= yi <= ocy+obw2) and \
-                         (0 < zi <= obh) ):
+        # extract the individual arrays
+        fa = LongArray(len(findices)); fa.set_data(numpy.array(findices))
+        fluid = pa.extract_particles(fa)
+        fluid.set_name('fluid')
 
-                    oindices.append(i)
+        oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
+        obstacle = pa.extract_particles(oa)
+        obstacle.set_name('obstacle')
 
-            # extract the individual arrays
-            fa = LongArray(len(findices)); fa.set_data(numpy.array(findices))
-            fluid = pa.extract_particles(fa)
-            fluid.set_name('fluid')
+        indices = concatenate( (where( y <= -cw2 )[0],
+                                where( y >= cw2 )[0],
+                                where( x >= container_length )[0],
+                                where( x <= 0 )[0],
+                                where( z <= 0 )[0]) )
 
-            oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
-            obstacle = pa.extract_particles(oa)
-            obstacle.set_name('obstacle')
+        # remove duplicates
+        indices = array(list(set(indices)))
 
-            indices = concatenate( (where( y <= -cw2 )[0],
-                                    where( y >= cw2 )[0],
-                                    where( x >= container_length )[0],
-                                    where( x <= 0 )[0],
-                                    where( z <= 0 )[0]) )
+        wa = LongArray(indices.size); wa.set_data(indices)
+        boundary = pa.extract_particles(wa)
+        boundary.set_name('boundary')
 
-            # remove duplicates
-            indices = array(list(set(indices)))
+        # create the particles
+        particles = [fluid, boundary, obstacle]
 
-            wa = LongArray(indices.size); wa.set_data(indices)
-            boundary = pa.extract_particles(wa)
-            boundary.set_name('boundary')
+        # set up particle properties
+        h0 = self.hdx * dx
 
-            # create the particles
-            particles = [fluid, boundary, obstacle]
+        volume = dx**3
+        m0 = self.rho0 * volume
 
-            # set up particle properties
-            h0 = self.hdx * dx
+        for pa in particles:
+            pa.m[:] = m0
+            pa.h[:] = h0
 
-            volume = dx**3
-            m0 = self.rho0 * volume
+            pa.rho[:] = self.rho0
 
-            for pa in particles:
-                pa.m[:] = m0
-                pa.h[:] = h0
+        nf = fluid.num_real_particles
+        nb = boundary.num_real_particles
+        no = obstacle.num_real_particles
 
-                pa.rho[:] = self.rho0
-
-            nf = fluid.num_real_particles
-            nb = boundary.num_real_particles
-            no = obstacle.num_real_particles
-
-            print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
+        print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
 
         # load balancing props for the arrays
         #fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'gid',

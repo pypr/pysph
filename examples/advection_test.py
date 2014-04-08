@@ -42,47 +42,44 @@ a = 0.25; b = 0.75
 nx = 50; dx = 1.0/nx
 hdx = 1.2
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array_wcsph(name='fluid')
-    else:
-        # create the particles
-        _x = np.arange( a, b+1e-3, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
-        h = np.ones_like(x) * dx
+def create_particles(**kwargs):
+    # create the particles
+    _x = np.arange( a, b+1e-3, dx )
+    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+    h = np.ones_like(x) * dx
 
-        cx = cy = 0.5
-        indices = []
-        for i in range(x.size):
-            xi = x[i]; yi = y[i]
-            if ( (xi - cx)**2 + (yi - cy)**2 > 0.25**2 ):
-                indices.append(i)
+    cx = cy = 0.5
+    indices = []
+    for i in range(x.size):
+        xi = x[i]; yi = y[i]
+        if ( (xi - cx)**2 + (yi - cy)**2 > 0.25**2 ):
+            indices.append(i)
 
-        # create the arrays
-        fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
+    # create the arrays
+    fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
 
-        # remove particles outside the circular patch
-        to_remove = LongArray(len(indices)); to_remove.set_data(np.array(indices))
-        fluid.remove_particles(to_remove)
+    # remove particles outside the circular patch
+    to_remove = LongArray(len(indices)); to_remove.set_data(np.array(indices))
+    fluid.remove_particles(to_remove)
 
-        # add the requisite arrays
-        fluid.add_property( {'name': 'color'} )
-        fluid.add_property( {'name': 'ax'} )
-        fluid.add_property( {'name': 'ay'} )
-        fluid.add_property( {'name': 'az'} )
+    # add the requisite arrays
+    fluid.add_property( {'name': 'color'} )
+    fluid.add_property( {'name': 'ax'} )
+    fluid.add_property( {'name': 'ay'} )
+    fluid.add_property( {'name': 'az'} )
 
-        print "Advection test :: nfluid = %d"%(
-            fluid.get_number_of_particles())
+    print "Advection test :: nfluid = %d"%(
+        fluid.get_number_of_particles())
 
-        # setup the particle properties
-        pi = np.pi; cos = np.cos; sin=np.sin
+    # setup the particle properties
+    pi = np.pi; cos = np.cos; sin=np.sin
+    
+    # color
+    fluid.color[:] = cos(2*pi*fluid.x) * cos(2*pi*fluid.y)
+    fluid.u[:] = 1.0; fluid.v[:] = 1.0
 
-        # color
-        fluid.color[:] = cos(2*pi*fluid.x) * cos(2*pi*fluid.y)
-        fluid.u[:] = 1.0; fluid.v[:] = 1.0
-
-        # mass
-        fluid.m[:] = dx**2 * 1.0
+    # mass
+    fluid.m[:] = dx**2 * 1.0
 
     # return the particle list
     return [fluid,]

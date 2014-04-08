@@ -48,50 +48,46 @@ tf = 25
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array(name='fluid')
-        solid = get_particle_array(name='solid')
-    else:
-        # create all the particles
-        _x = np.arange( -ghost_extent - dx/2, Lx + ghost_extent + dx/2, dx )
-        _y = np.arange( -ghost_extent - dx/2, Ly + ghost_extent + dx/2, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
+    # create all the particles
+    _x = np.arange( -ghost_extent - dx/2, Lx + ghost_extent + dx/2, dx )
+    _y = np.arange( -ghost_extent - dx/2, Ly + ghost_extent + dx/2, dx )
+    x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
-        # sort out the fluid and the solid
-        indices = []
-        for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < Lx) ):
-                if ( (y[i] > 0.0)  and (y[i] < Ly) ):
-                    indices.append(i)
-
-        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-
-        # create the arrays
-        solid = get_particle_array(name='solid', x=x, y=y)
-
-        # remove the fluid particles from the solid
-        fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-        solid.remove_particles(to_extract)
-
-        # sort out the two fluid phases
-        indices = []
-        for i in range(fluid.get_number_of_particles()):
-            if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
+    # sort out the fluid and the solid
+    indices = []
+    for i in range(x.size):
+        if ( (x[i] > 0.0) and (x[i] < Lx) ):
+            if ( (y[i] > 0.0)  and (y[i] < Ly) ):
                 indices.append(i)
 
-        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    
+    # create the arrays
+    solid = get_particle_array(name='solid', x=x, y=y)
 
-        fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
-        fluid2 = fluid
-        fluid2.set_name('fluid2')
-        fluid2.remove_particles(to_extract)
+    # remove the fluid particles from the solid
+    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
+    solid.remove_particles(to_extract)
 
-        fluid1.rho[:] = rho1
-        fluid2.rho[:] = rho2
-
-        print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid1.get_number_of_particles() + fluid2.get_number_of_particles(),
-            solid.get_number_of_particles(), dt)
+    # sort out the two fluid phases
+    indices = []
+    for i in range(fluid.get_number_of_particles()):
+        if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
+            indices.append(i)
+            
+    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    
+    fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
+    fluid2 = fluid
+    fluid2.set_name('fluid2')
+    fluid2.remove_particles(to_extract)
+    
+    fluid1.rho[:] = rho1
+    fluid2.rho[:] = rho2
+    
+    print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+        Re, fluid1.get_number_of_particles() + fluid2.get_number_of_particles(),
+        solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -132,22 +128,21 @@ def create_particles(empty=False, **kwargs):
     fluid2.add_property({'name':'vmag'})
 
     # setup the particle properties
-    if not empty:
-        volume = dx * dx
+    volume = dx * dx
 
-        # mass is set to get the reference density of each phase
-        fluid1.m[:] = volume * rho1
-        fluid2.m[:] = volume * rho2
+    # mass is set to get the reference density of each phase
+    fluid1.m[:] = volume * rho1
+    fluid2.m[:] = volume * rho2
 
-        # volume is set as dx^2
-        fluid1.V[:] = 1./volume
-        fluid2.V[:] = 1./volume
-        solid.V[:] = 1./volume
-
-        # smoothing lengths
-        fluid1.h[:] = hdx * dx
-        fluid2.h[:] = hdx * dx
-        solid.h[:] = hdx * dx
+    # volume is set as dx^2
+    fluid1.V[:] = 1./volume
+    fluid2.V[:] = 1./volume
+    solid.V[:] = 1./volume
+    
+    # smoothing lengths
+    fluid1.h[:] = hdx * dx
+    fluid2.h[:] = hdx * dx
+    solid.h[:] = hdx * dx
 
     # load balancing props
     fluid1.set_lb_props( fluid1.properties.keys() )
