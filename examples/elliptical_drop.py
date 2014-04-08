@@ -135,7 +135,4 @@ app.setup(solver=solver, equations=equations,
           particle_factory=get_circular_patch)
 
 # run the solver...
-t1 = time()
 app.run()
-elapsed = time() - t1
-print "750 iterations in %gs, avg = %g s/iteration"%(elapsed, elapsed/750)
