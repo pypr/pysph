@@ -96,8 +96,12 @@ class SPHEval(object):
                 eqs = sources[src]
                 sources[src] = Group(eqs)
 
+            # Sort the all_eqs set; so the order is deterministic.  Without
+            # this a  user may get a recompilation for no obvious reason.
+            all_equations = list(all_eqs)
+            all_equations.sort(key=lambda x:x.__class__.__name__)
             dests[dest] = (Group(eqs_with_no_source), sources,
-                           Group(list(all_eqs)))
+                           Group(all_equations))
 
         return dests
 

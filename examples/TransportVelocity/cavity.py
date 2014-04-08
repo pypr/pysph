@@ -40,34 +40,30 @@ dt_force = 1.0
 tf = 5.0
 dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array(name='fluid')
-        solid = get_particle_array(name='solid')
-    else:
-        # create all the particles
-        _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+def create_particles(**kwargs):
+    # create all the particles
+    _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
+    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
 
-        # sort out the fluid and the solid
-        indices = []
-        for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < L) ):
-                if ( (y[i] > 0.0) and (y[i] < L) ):
-                    indices.append(i)
+    # sort out the fluid and the solid
+    indices = []
+    for i in range(x.size):
+        if ( (x[i] > 0.0) and (x[i] < L) ):
+            if ( (y[i] > 0.0) and (y[i] < L) ):
+                indices.append(i)
 
-        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    
+    # create the arrays
+    solid = get_particle_array(name='solid', x=x, y=y)
 
-        # create the arrays
-        solid = get_particle_array(name='solid', x=x, y=y)
+    # remove the fluid particles from the solid
+    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
+    solid.remove_particles(to_extract)
 
-        # remove the fluid particles from the solid
-        fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-        solid.remove_particles(to_extract)
-
-        print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt)
+    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+        Re, fluid.get_number_of_particles(),
+        solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -96,27 +92,26 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property({'name':'vmag'})
 
     # setup the particle properties
-    if not empty:
-        volume = dx * dx
+    volume = dx * dx
+    
+    # mass is set to get the reference density of rho0
+    fluid.m[:] = volume * rho0
+    solid.m[:] = volume * rho0
+    
+    # volume is set as dx^2
+    fluid.V[:] = 1./volume
+    solid.V[:] = 1./volume
 
-        # mass is set to get the reference density of rho0
-        fluid.m[:] = volume * rho0
-        solid.m[:] = volume * rho0
+    # smoothing lengths
+    fluid.h[:] = hdx * dx
+    solid.h[:] = hdx * dx
 
-        # volume is set as dx^2
-        fluid.V[:] = 1./volume
-        solid.V[:] = 1./volume
-
-        # smoothing lengths
-        fluid.h[:] = hdx * dx
-        solid.h[:] = hdx * dx
-
-        # imposed horizontal velocity on the lid
-        solid.u0[:] = 0.0
-        solid.v0[:] = 0.0
-        for i in range(solid.get_number_of_particles()):
-            if solid.y[i] > L:
-                solid.u0[i] = Umax
+    # imposed horizontal velocity on the lid
+    solid.u0[:] = 0.0
+    solid.v0[:] = 0.0
+    for i in range(solid.get_number_of_particles()):
+        if solid.y[i] > L:
+            solid.u0[i] = Umax
 
     # return the particle list
     fluid.set_lb_props( fluid.properties.keys() )

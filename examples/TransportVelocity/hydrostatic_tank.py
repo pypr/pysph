@@ -44,35 +44,31 @@ dt_force = 0.25 * np.sqrt(h0/abs(gy))
 tf = 5.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array(name='fluid')
-        solid = get_particle_array(name='solid')
-    else:
-        # create all the particles
-        _x = np.arange( -ghost_extent, Lx + ghost_extent, dx )
-        _y = np.arange( -ghost_extent, Ly, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
+def create_particles(**kwargs):
+    # create all the particles
+    _x = np.arange( -ghost_extent, Lx + ghost_extent, dx )
+    _y = np.arange( -ghost_extent, Ly, dx )
+    x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
-        # sort out the fluid and the solid
-        indices = []
-        for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < Lx) ):
-                if ( (y[i] > 0.0) and (y[i] < H) ):
-                    indices.append(i)
+    # sort out the fluid and the solid
+    indices = []
+    for i in range(x.size):
+        if ( (x[i] > 0.0) and (x[i] < Lx) ):
+            if ( (y[i] > 0.0) and (y[i] < H) ):
+                indices.append(i)
 
-        to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
+    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
 
-        # create the arrays
-        solid = get_particle_array(name='solid', x=x, y=y)
+    # create the arrays
+    solid = get_particle_array(name='solid', x=x, y=y)
 
-        # remove the fluid particles from the solid
-        fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-        solid.remove_particles(to_extract)
+    # remove the fluid particles from the solid
+    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
+    solid.remove_particles(to_extract)
 
-        print "Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
-            fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt)
+    print "Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
+        fluid.get_number_of_particles(),
+        solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
     # particle volume
@@ -101,20 +97,19 @@ def create_particles(empty=False, **kwargs):
     fluid.add_property({'name':'vmag'})
 
     # setup the particle properties
-    if not empty:
-        volume = dx * dx
+    volume = dx * dx
+    
+    # mass is set to get the reference density of rho0
+    fluid.m[:] = volume * rho0
+    solid.m[:] = volume * rho0
 
-        # mass is set to get the reference density of rho0
-        fluid.m[:] = volume * rho0
-        solid.m[:] = volume * rho0
+    # volume is set as dx^2
+    fluid.V[:] = 1./volume
+    solid.V[:] = 1./volume
 
-        # volume is set as dx^2
-        fluid.V[:] = 1./volume
-        solid.V[:] = 1./volume
-
-        # smoothing lengths
-        fluid.h[:] = hdx * dx
-        solid.h[:] = hdx * dx
+    # smoothing lengths
+    fluid.h[:] = hdx * dx
+    solid.h[:] = hdx * dx
 
     # return the particle list
     return [fluid, solid]

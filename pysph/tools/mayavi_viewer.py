@@ -5,6 +5,7 @@ communicate with a running solver and displays the particles using
 Mayavi.  It can also display a list of supplied files.
 """
 
+import glob
 import sys
 import math
 import numpy
@@ -384,6 +385,9 @@ class MayaviViewer(HasTraits):
 
     def _get_controller(self):
         ''' get the controller, also sets the iteration count '''
+        if self.n_files > -1:
+            return None
+
         reconnect = self.host_changed
         if not reconnect:
             try:
@@ -614,7 +618,7 @@ def main(args=None):
     for arg in args:
         if '=' not in arg:
             if arg.endswith('.npz'):
-                files.append(arg)
+                files.extend(glob.glob(arg))
                 continue
             else:
                 usage()
@@ -646,4 +650,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-

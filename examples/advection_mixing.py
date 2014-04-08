@@ -44,40 +44,37 @@ L = 1.0; T = 0.1
 nx = 50; dx = L/nx
 hdx = 1.2
 
-def create_particles(empty=False, **kwargs):
-    if empty:
-        fluid = get_particle_array_wcsph(name='fluid')
-    else:
-        # create the particles
-        _x = np.arange( dx/2, L, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
-        h = np.ones_like(x) * dx
+def create_particles(**kwargs):
+    # create the particles
+    _x = np.arange( dx/2, L, dx )
+    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+    h = np.ones_like(x) * dx
 
-        # create the arrays
-        fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
+    # create the arrays
+    fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
 
-        # add the requisite arrays
-        fluid.add_property( {'name': 'color'} )
-        fluid.add_property( {'name': 'ax'} )
-        fluid.add_property( {'name': 'ay'} )
-        fluid.add_property( {'name': 'az'} )
+    # add the requisite arrays
+    fluid.add_property( {'name': 'color'} )
+    fluid.add_property( {'name': 'ax'} )
+    fluid.add_property( {'name': 'ay'} )
+    fluid.add_property( {'name': 'az'} )
+    
+    fluid.add_property( {'name': 'u0'} )
+    fluid.add_property( {'name': 'v0'} )
+    
+    print "Advection mixing problem :: nfluid = %d"%(
+        fluid.get_number_of_particles())
+    
+    # setup the particle properties
+    pi = np.pi; cos = np.cos; sin=np.sin
 
-        fluid.add_property( {'name': 'u0'} )
-        fluid.add_property( {'name': 'v0'} )
+    # color
+    fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
 
-        print "Advection mixing problem :: nfluid = %d"%(
-            fluid.get_number_of_particles())
-
-        # setup the particle properties
-        pi = np.pi; cos = np.cos; sin=np.sin
-
-        # color
-        fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
-
-        # velocities
-        fluid.u0[:] = +sin(pi*x)*sin(pi*x) * sin(2*pi*y)
-        fluid.v0[:] = -sin(pi*y)*sin(pi*y) * sin(2*pi*x)
-
+    # velocities
+    fluid.u0[:] = +sin(pi*x)*sin(pi*x) * sin(2*pi*y)
+    fluid.v0[:] = -sin(pi*y)*sin(pi*y) * sin(2*pi*x)
+    
     # return the particle list
     return [fluid,]
 
@@ -110,7 +107,6 @@ equations = [
 
             Advect(dest='fluid', sources=None)
             ])
-
     ]
 
 # Setup the application and solver.  This also generates the particles.
