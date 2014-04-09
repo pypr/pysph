@@ -39,8 +39,31 @@ Currently, PySPH has numerous examples to solve the viscous, incompressible
 Navier-Stokes equations using the weakly compressible (WCSPH) approach. The
 following formulations are currently implemented:
 
-  - Classical WCSPH (Journal of Hydraulic Research Vol. 48 Extra Issue (2010),
-    pp. 6–27)
+- `Weakly Compressible SPH (WCSPH)`_ for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic Research, 48, pp. 6--27)
 
-  - Transport Velocity Formulation (Journal of Computational Physics Vol 241,
-    May 2013, pp. 292-307)
+.. figure:: ../Images/db3d.png
+   :align: center
+
+   3D dam-break past an obstacle SPHERIC benchmark `Test 2`_
+
+- `Transport Velocity Formulation`_ for incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307).
+
+.. figure:: ../Images/ldc-streamlines.png
+   :align: center
+
+   Streamlines for a driven cavity
+
+- `SPH for elastic dynamics`_ (Gray et al. 2001, CMAME, Vol. 190, pp 6641--6662)
+
+.. figure:: ../Images/rings-collision.png
+   :align: center
+   
+   Collision of two elastic rings.
+
+.. _`Weakly Compressible SPH (WCSPH)`: http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250
+
+.. _`Transport Velocity Formulation`: http://dx.doi.org/10.1016/j.jcp.2013.01.043
+
+.. _`SPH for elastic dynamics`: http://dx.doi.org/10.1016/S0045-7825(01)00254-7
+
+.. _`Test 2`: https://wiki.manchester.ac.uk/spheric/index.php/Test2
