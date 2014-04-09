@@ -4,9 +4,9 @@ Using the PySPH framework
 Overview
 ---------
 
-The PySPH framework provides important functionality to simulate a variety of
-problems using the SPH method.  We demonstrate the PySPH framework using a few
-simple example problems.
+The PySPH framework provides important functionality to simulate a
+variety of problems using the SPH method. We demonstrate the PySPH
+framework using a few simple example problems.
 
 The first example we'll look at is the ``examples/elliptical_drop.py``
 example.  This example simulates the evolution of a 2D circular patch of fluid
