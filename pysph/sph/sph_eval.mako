@@ -6,7 +6,7 @@ ${' '*4*level}${l}
 % endfor
 </%def>
 
-from libc.math cimport pow, sqrt
+from libc.math cimport *
 cimport numpy
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
