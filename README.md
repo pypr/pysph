@@ -30,8 +30,9 @@ Currently, PySPH is capable and has numerous examples to solve the
 viscous, incompressible Navier-Stokes equations using the weakly
 compressible (WCSPH) approach. The features of the implementation are:
 
-  - Classical WCSPH (Journal of Hydraulic Research Vol. 48 Extra Issue (2010), pp. 6–27)
-  - Transport Velocity Formulation (Journal of Computational Physics Vol 241, May 2013, pp. 292-307)
+  - [Weakly Compressible SPH (WCSPH)](http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250) for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic Research, 48, pp. 6--27)
+  - [Transport Velocity Formulation](http://dx.doi.org/10.1016/j.jcp.2013.01.043) for incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307)
+  - [SPH for elastic dynamics](http://dx.doi.org/10.1016/S0045-7825(01)00254-7) (Gray et al. 2001, CMAME, Vol. 190, pp 6641--6662)
 
 Installation
 =============
@@ -75,6 +76,15 @@ Running the examples
 
 You can verify the installation by exploring some examples:
 
+    $ cd examples
+    $ python dam_break3D.py
+
+This runs the 3D dam-break problem which is also a SPHERIC benchmark [Test 2](https://wiki.manchester.ac.uk/spheric/index.php/Test2)
+
+![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/db3d.png)
+
+PySPH is more than a tool for wave-body interactions..
+
     $ cd examples/TransportVelocity
     $ python cavity.py
 
@@ -86,10 +96,8 @@ the streamlines:
 
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/ldc-streamlines.png)
 
-
 If you want to use PySPH for elastic dynamics, you can try some of the
-examples from [Gray et al., Comput. Methods Appl. Mech. Engrg. 190
-(2001), 6641-6662]:
+examples from the directory `examples/solid_mech`
 
     $ cd examples/solid_mech
     $ python rings.py
