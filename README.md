@@ -30,15 +30,9 @@ Currently, PySPH is capable and has numerous examples to solve the
 viscous, incompressible Navier-Stokes equations using the weakly
 compressible (WCSPH) approach. The features of the implementation are:
 
-  - `Weakly Compressible SPH (WCSPH)`_ for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic Research, 48, pp. 6--27)
-  - `Transport Velocity Formulation`_ for incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307)
-  - `SPH for elastic dynamics`_ (Gray et al. 2001, CMAME, Vol. 190, pp 6641--6662)
-
-.. _`Weakly Compressible SPH (WCSPH)`: http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250
-
-.. _`Transport Velocity Formulation`: http://dx.doi.org/10.1016/j.jcp.2013.01.043
-
-.. _`SPH for elastic dynamics`: http://dx.doi.org/10.1016/S0045-7825(01)00254-7
+  - [Weakly Compressible SPH (WCSPH)](http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250) for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic Research, 48, pp. 6--27)
+  - [Transport Velocity Formulation](http://dx.doi.org/10.1016/j.jcp.2013.01.043) for incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307)
+  - [SPH for elastic dynamics](http://dx.doi.org/10.1016/S0045-7825(01)00254-7) (Gray et al. 2001, CMAME, Vol. 190, pp 6641--6662)
 
 Installation
 =============
@@ -85,11 +79,11 @@ You can verify the installation by exploring some examples:
     $ cd examples
     $ python dam_break3D.py
 
-This runs the 3D dam-break problem which is also a SPHERIC benchmark `Test 2`_
+This runs the 3D dam-break problem which is also a SPHERIC benchmark [Test 2](https://wiki.manchester.ac.uk/spheric/index.php/Test2)
 
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/db3d.png)
 
-PySPH is more than a tool for wave-body interactions:
+PySPH is more than a tool for wave-body interactions..
 
     $ cd examples/TransportVelocity
     $ python cavity.py
@@ -115,5 +109,3 @@ Which runs the problem of the collision of two elastic rings:
 The auto-generated code for the example resides in the directory
 `~/.pysph/source`. A note of caution however, it's not for the faint
 hearted.
-
-.. _`Test 2`: https://wiki.manchester.ac.uk/spheric/index.php/Test2
