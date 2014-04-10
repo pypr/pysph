@@ -468,8 +468,8 @@ above, we consider the implementations for the PySPH **TaitEOS** and
 
 Notice that it has only one ``loop`` method and this loop is applied
 for all particles.  Since there are no sources, there is no need for
-to find the neighbors.  There are a few important conventions that are
-to be followed when writing the equations.
+us to find the neighbors. There are a few important conventions that
+are to be followed when writing the equations.
 
     - ``d_*`` indicates a destination array.
 
@@ -589,83 +589,5 @@ It is important to note that if there are additional variables to be stepped
 in addition to these standard ones, you must write your own stepper.
 Currently, only predictor-corrector steppers are supported by the framework.
 Take a look at the ``pysph.sph.integrator`` module for more examples.
-
-
-.. Consider a typical SPH simulation described by the discrete equations:
-
-.. .. math::
-
-..    p_a = B\left( \left(\frac{\rho_a}{\rho_0}\right)^{\gamma} - 1 \right )
- 
-..    \frac{D\rho_a}{Dt} = \sum_{b=1}^{N}m_b\,(\vec{v_b} - \vec{v_a})\cdot\,\nabla_a W_{ab}
-   
-..    \frac{D\vec{v_a}}{Dt} = -\sum_{b=1}^Nm_b\left(\frac{p_a}{\rho_a^2} + \frac{p_b}{\rho_b^2}\right)\nabla W_{ab}
-
-..    \frac{D\vec{x_a}}{Dt} = \vec{v_a}
-
-.. One might expect an algorithm for SPH to proceed along the lines of
-.. the following figure:
-
-.. .. _sph-flowchart:
-.. .. figure:: images/sph-flowchart.png
-..    :align: center
-..    :width: 300
-
-.. --------------------
-.. PySPH Design
-.. --------------------
-
-.. PySPH attempts to abstract out the operations represented in the
-.. flowchart. To do this, PySPH is divided into four modules as shown in
-.. the figure: `pysph_modules`_. The module breakup is implied by the
-.. color scheme used.
-
-.. .. _pysph_modules:
-.. .. figure:: images/pysph-modules.png
-..     :align: center
-..     :width: 500
-
-.. **********
-.. pysph.base
-.. **********
-
-.. The :mod:`base` module defines the data structures to hold particle
-.. information and index the particle positions for fast neighbor queries
-.. and as such, is the building block for the particle framework that is
-.. PySPH. 
-
-.. As seen in the flowchart (`sph-flowchart`_), the *find neighbors*
-.. process is within the inner loop, iterating over each particle. This
-.. module can be thought of as the *base* over which all of the other
-.. functionality of PySPH is built.
-
-.. .. toctree::
-..    :maxdepth: 2
-
-..    base
-
-.. **********
-.. pysph.sph
-.. **********
-
-.. The :mod:`sph` module is where all the SPH functions are defined. It
-.. also defines the **SPHCalc** object which is used to iterate over each
-.. particle (colored gray in the flowchart: `sph-flowchart`_)
-
-.. *************
-.. pysph.solver
-.. *************
-
-.. The :mod:`solver` module is used to drive the simulation via the
-.. **Solver** object and also the important function of integration
-.. (represented as *step variables* in the flowchart:
-.. `sph-flowchart`_). Other functions like computing the new time step
-.. and saving output (not shown in the flowchart) are also under the
-.. ambit of the :mod:`solver` module.
-
-.. .. toctree::
-..    :maxdepth: 2
-
-..    solver_interfaces
 
 
