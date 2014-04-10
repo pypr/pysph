@@ -283,6 +283,10 @@ class Solver(object):
         # set the time for the integrator
         #self.integrator.time = self.t
 
+        # Compute the accelerations once for the predictor corrector
+        # integrator to work correctly at the first time step.
+        self.sph_eval.compute(self.t, dt)
+
         while self.t < self.tf:
             self.t += dt
             self.count += 1
