@@ -1,13 +1,31 @@
-.. _elliptical_drop:
+.. _tutorials:
+
+In the tutorials, we will introduce the PySPH framework in the context
+of the examples provided. Read this if you are a casual user and want
+to use the framework *as is*. If you want to add new functions and
+capabilities to PySPH, you should read :ref:`design_overview`. If you
+are new to PySPH however, we highly recommend that you go through this
+document.
+
+Recall that PySPH is a framework for parallel SPH-like simulations in
+Python. The idea therefore, is to provide a user friendly mechanism to
+set-up problems while leaving the internal details to the
+framework. *All* examples follow the following steps:
+
+.. figure:: ../../Images/pysph-examples-common-steps.png
+   :align: center
+
+The tutorials address each of the steps in this flowchart for problems
+with increasing complexity.
 
 
 Learning the ropes
 ==================
 
 The first example we consider is a "patch" test for SPH formulations
-for incompressible fluids in ``examples/elliptical_drop.py``, which
-simulates the evolution of a 2D circular patch of fluid under the
-influence of an initial velocity field given by:
+for incompressible fluids in ``examples/elliptical_drop.py``. This
+problem simulates the evolution of a 2D circular patch of fluid under
+the influence of an initial velocity field given by:
 
 .. math::
         u &= -100 x \\
@@ -57,7 +75,7 @@ Functions for loading/generating the particles
 
 Next in the code are two functions called ``exact_solution`` and
 ``get_circular_patch``. The former produces an exact solution for
-comparison, the latter looks like
+comparison, the latter looks like:
 
 .. code-block:: python
 
@@ -101,10 +119,13 @@ comparison, the latter looks like
 
         return [pa,]
 
-This function is used to initialize the particles in Python. In PySPH,
-we use a **ParticleArray** as a container for particles of a given
-species. These can be conveniently created from the command line using
-NumPy arrays. For example:
+and is used to initialize the particles in Python. In PySPH, we use a
+**ParticleArray** object as a container for particles of a given
+*species*. You can think of a particle species as any homogenous
+entity in a simulation. For example, in a two-phase air water flow, a
+species could be used to represent each phase. A **ParticleArray** can
+be conveniently created from the command line using NumPy arrays. For
+example
 
 .. code-block:: python
 
@@ -114,7 +135,8 @@ NumPy arrays. For example:
     >>> pa = sph.get_particle_array(x=x, y=y)
 
 would create a **ParticleArray**, representing a uniform distribution
-of particles on a Cartesian lattice in 2D.
+of particles on a Cartesian lattice in 2D using the helper function
+`get_particle_array` in the **base** subpackage.
 
 .. note::
 
@@ -122,13 +144,14 @@ of particles on a Cartesian lattice in 2D.
 
 The **ParticleArray** is highly convenient, supporting methods for
 insertions, deletions and concatenations. In the `get_circular_patch`
-function, we use this convenience to remove a list of particles:
+function, we use this convenience to remove a list of particles that
+fall outside a circular region:
 
 .. code-block:: python
     
     pa.remove_particles(la)
 
-where a list of indices is provided in the form of a **LongArray**
+where, a list of indices is provided in the form of a **LongArray**
 which, as the name suggests, is an array of 64 bit integers.
 
 .. note::
@@ -139,9 +162,9 @@ which, as the name suggests, is an array of 64 bit integers.
 
 .. note::
 
-   PySPH works with multiple **ParticleArrays** for general
-   problems. This is why we actually return a **list** in the last line
-   of the `get_circular_patch` function above. 
+   PySPH works with multiple **ParticleArrays**. This is why we
+   actually return a *list* in the last line of the
+   `get_circular_patch` function above.
 
 Setting up the PySPH framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -168,19 +191,21 @@ objects:
 
 The **Application** makes it easy to pass command line arguments to
 the solver. It is also important for the seamless parallel execution
-of the same example. Take a moment to consider how might we write a
-parallel version of the same example. Naturally, we would need some
-MPI imports. Moreover, the particles need to be created in a
-distributed fashion. All this (and more) is handled through the
-abstraction of the **Application**
+of the same example. To appreciate the role of the **Application**
+consider for a moment how might we write a parallel version of the
+same example. At some point, we would need some MPI imports and the
+particles should be created in a distributed fashion. All this (and
+more) is handled through the abstraction of the **Application** which
+hides all this detail from the user.
 
-What the **Integrator** accomplishes should be obvious. We can see
-that we ask for the "fluid" to be stepped using a **WCSPHStep**
-object. Taking a look at the `get_circular_patch` function once more,
-we notice that the **ParticleArray** representing the circular patch
-was named as `fluid`. So we're essentially asking the PySPH framework
-to step or *integrate* the properties of the **ParticleArray** fluid
-using **WCSPHStep**. Safe to assume that the framework takes the
+Intuitively, in an SPH simulation, the role of the **Integrator**
+should be obvious. In the code, we see that we ask for the "fluid" to
+be stepped using a **WCSPHStep** object. Taking a look at the
+`get_circular_patch` function once more, we notice that the
+**ParticleArray** representing the circular patch was named as
+`fluid`. So we're essentially asking the PySPH framework to step or
+*integrate* the properties of the **ParticleArray** fluid using
+**WCSPHStep**. Safe to assume that the framework takes the
 responsibility to call this integrator at the appropriate time during
 a time-step.
 
@@ -202,9 +227,9 @@ particular problem comes in.
 
 For SPH, this would be the pairwise interactions between particles. In
 PySPH, we provide a specific way to define the sequence of
-interactions for a given application. Essentially, we use a *list* of
-objects to define these interactions. For this problem, the sequence
-of interactions is relatively straightforward:
+interactions which is a *list* of **Equation** objects. For the
+circular patch test, the sequence of interactions is relatively
+straightforward:
 
     - Compute pressure from the EOS:  :math:`p = f(\rho)`
     - Compute the rate of change of density: :math:`\frac{d\rho}{dt}`
@@ -228,15 +253,15 @@ is instantiated with the general syntax:
 
 .. code-block:: python
 
-    Equation(dest='array_name', sources, *args)
+    Equation(dest='array_name', sources, **kwargs)
 
 The `dest` argument specifies the *target* or *destination*
 **ParticleArray** on which this interaction is going to operate
 on. Similarly, the `sources` argument specifies a *list* of
 **ParticleArrays** from which the contributions are sought. For some
 equations like the EOS, it doesn't make sense to define a list of
-sources and a `None` suffices. The specification essentially tells
-PySPH that for one time step of the calculation:
+sources and a `None` suffices. The specification basically tells PySPH
+that for one time step of the calculation:
 
     - Use the Tait's EOS to update the properties of the fluid array
     - Compute :math:`\frac{d\rho}{dt}` for the fluid from the fluid
@@ -255,8 +280,8 @@ now knows what to do with the particles within a time step. More
 importantly, this information is enough to generate code to carry out
 a complete SPH simulation.
 
-Loose ends
-~~~~~~~~~~~
+Running the example
+~~~~~~~~~~~~~~~~~~~
 
 In the last two lines of the example, we use the **Application**
 to run the problem:
@@ -275,9 +300,6 @@ what we want it to do. We pass in the function to create the
 particles, the list of equations defining the problem and the solver
 that will be used to marshal the problem. 
 
-Running the example
-~~~~~~~~~~~~~~~~~~~
-
 Many parameters can be configured via the command line, and these will
 override any parameters setup before the ``app.setup`` call.  For
 example one may do the following to find out the various options::
@@ -286,7 +308,7 @@ example one may do the following to find out the various options::
 
 If we run the example without any arguments it will run until a final
 time of 0.0075 seconds.  We can change this for example to 0.005 by
-the following:
+the following::
 
     $ python elliptical_drop.py --tf=0.005
 
@@ -299,7 +321,7 @@ will not be recompiled.  This is all handled automatically without user
 intervention.
 
 If we wish to run the code in parallel (and have compiled PySPH with Zoltan
-and mpi4py) we can do:
+and mpi4py) we can do::
 
     $ mpirun -np 4 /path/to/python elliptical_drop.py
 
