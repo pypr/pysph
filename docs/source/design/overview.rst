@@ -193,8 +193,8 @@ as
 
 	       for j in nbrs:
 		   # pairwise quantities
-		   xij = fluid.x[i] - fluid.x[j]
-		   yij = fluid.y[i] - fluid.y[j]
+		   xij = dst.x[i] - src.x[j]
+		   yij = dst.y[i] - src.y[j]
 		   ...
 
 		   # kernel interaction terms
@@ -214,8 +214,8 @@ as
 
 	       for j in nbrs:
 		   # pairwise quantities
-		   xij = fluid.x[i] - fluid.x[j]
-		   yij = fluid.y[i] - fluid.y[j]
+		   xij = dst.x[i] - src.x[j]
+		   yij = dst.y[i] - src.y[j]
 		   ...
 
 		   # kernel interaction terms
@@ -239,8 +239,8 @@ as
 
 	       for j in nbrs:
 		   # pairwise quantities
-		   xij = fluid.x[i] - fluid.x[j]
-		   yij = fluid.y[i] - fluid.y[j]
+		   xij = dst.x[i] - src.x[j]
+		   yij = dst.y[i] - src.y[j]
 		   ...
 
 		   # kernel interaction terms
@@ -280,6 +280,14 @@ source-destination pair like so:
    ...
 
    # consider the next destination particle array
+
+.. note::
+
+   The `SPHCalc.compute` method first calls the EOS before calling the
+   main loop to compute the accelerations. This is because the EOS
+   (which updates the pressure) must logically be completed for all
+   particles before the accelerations (which uses the pressure) are
+   computed.
 
 The predictor-corrector integrator for this problem can be defined as
 
