@@ -53,6 +53,9 @@ If you want to use PySPH in parallel, you will need
 [mpi4py](http://mpi4py.scipy.org/) and the
 [Zoltan](http://www.cs.sandia.gov/zoltan/) data management library.
 
+To use the `pysph_viewer` you will need to have
+[Mayavi](http://code.enthought.com/projects/mayavi) installed.
+
 Building and linking PyZoltan
 -------------------------------
 
@@ -74,16 +77,30 @@ If you wish to see a working build/test script please see the continous
 Running the examples
 ---------------------
 
-You can verify the installation by exploring some examples:
+You can verify the installation by exploring some examples.  A fairly quick
+running example (taking about 5-10 minutes) would be the following:
 
     $ cd examples
+    $ python dam_break.py
+
+The solution can be viewed live by running:
+
+    $ pysph_viewer
+
+This requires that Mayavi be installed.  The saved output data can be viewed
+by running:
+
+    $ pysph_viewer dam_break_output/*.npz
+
+A 3D version of the dam-break problem is also available, and may be run as:
+
     $ python dam_break3D.py
 
 This runs the 3D dam-break problem which is also a SPHERIC benchmark [Test 2](https://wiki.manchester.ac.uk/spheric/index.php/Test2)
 
 ![IMAGE](https://bitbucket.org/kunalp/pysph/raw/docs/docs/Images/db3d.png)
 
-PySPH is more than a tool for wave-body interactions..
+PySPH is more than a tool for wave-body interactions:
 
     $ cd examples/TransportVelocity
     $ python cavity.py
