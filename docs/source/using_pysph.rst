@@ -1,400 +1,175 @@
+.. _introduction:
+
 Using the PySPH framework
 ==========================
 
-Overview
----------
+In this document, we describe the fundamental data structures for
+working with particles in PySPH. Take a look at the :ref:`tutorials`
+if you want to try out some of the examples. For the experienced user,
+take a look at :ref:`design_overview` if you want to extend PySPH for
+your application.
+
 
-The PySPH framework provides important functionality to simulate a variety of
-problems using the SPH method.  We demonstrate the PySPH framework using a few
-simple example problems.
+Working With Particles
+-----------------------
 
-The first example we'll look at is the ``examples/elliptical_drop.py``
-example.  This example simulates the evolution of a 2D circular patch of fluid
-under the influence of a velocity field given by,
+As an object oriented framework for particle methods, PySPH provides
+convenient data structures to store and manipulate collections of
+particles. These can be constructed from within Python and are fully
+compatible with NumPy arrays. We begin with a brief description for
+the basic data structures for arrays
 
-.. math::
-        u &= -100 x \\
-        v &= 100 y
+Carrays
+--------
 
-If one looks at the example, the first several lines are imports of various
-modules which we will ignore for now.  There are two additional functions
-called ``exact_solution`` and ``get_circular_patch``.  The former just
-produces an exact solution for comparison.  The latter creates the initial
-distribution of the particles.  The particles are created in the form of what
-are called ``ParticleArray`` objects.  Each particle array has a name.  In
-this case the array is called ``"fluid"``. We will look at the
-``get_circular_patch`` code in  in a short while.  The main code is the
-following::
+The `pyzoltan.core.carray` module provides a typed array data
+structure called **Carray**. These are used throughout PySPH and are
+fundamentally very similar to a NumPy arrays. The following named
+types are supported:
 
-    def exact_solution(...):
-        pass
-    def get_circular_patch(...):
-        pass
+    - **UIntArray**    (32 bit unsigned integers)
+    - **IntArray**     (32 bit signed integers)
+    - **LongArray**    (64 bit signed integers)
+    - **DoubleArray**  (64 bit floating point numbers
 
-    # Create the application.
-    app = Application()
+Some simple commands to work with **Carrays** from the interactive
+shell are given below
 
-    kernel = CubicSpline(dim=2)
+.. code-block:: python
 
-    integrator = Integrator(fluid=WCSPHStep())
+    >>> import numpy
+    >>> from pyzoltan.core.carray import DoubleArray
+    >>> array = DoubleArray(10)                      # array of doubles of length 10
+    >>> array.set_data( numpy.arange(10) )           # set the data from a NumPy array
+    >>> array.get(3)                                 # get the value at a given index
+    >>> array.set(5, -1.0)                           # set the value at an index to a value
 
-    # Create and setup a solver.
-    solver = Solver(kernel=kernel, dim=2, integrator=integrator)
+ParticleArray
+--------------
 
-    # Setup default parameters.
-    solver.set_time_step(1e-5)
-    solver.set_final_time(0.0075)
+In PySPH, a collection of **Carrays** make up what is called a
+**ParticleArray**. This is the main data structure that is used to
+represent particles and can be created from NumPy arrays like so:
 
-    # The equations of motion.
-    equations = [
-        TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
-        ContinuityEquation(dest='fluid',  sources=['fluid',]),
-        MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
-        XSPHCorrection(dest='fluid', sources=['fluid']),
-    ]
+.. code-block:: python
 
-    # Setup the application and solver.  This also generates the particles.
-    app.setup(solver=solver, equations=equations,
-              particle_factory=get_circular_patch,
-              name='fluid')
+   >>> import numpy
+   >>> from pysph.base.utils import get_particle_array      
+   >>> x, y = numpy.mgrid[0:1:0.1, 0:1:0.1]             # create some data
+   >>> x = x.ravel(); y = y.ravel()                     # flatten the arrays
+   >>> pa = get_particle_array(name='array', x=x, y=y)  # create the particle array
 
-    app.run()
+In the above, the helper function `get_particle_array` will
+instantiate and return a **ParticleArray** with properties `x` and `y`
+set from given NumPy arrays. In general, a **ParticleArray** can be
+instantiated with an arbitrary number of properties. Each property is
+stored internally as a **Carray** of the appropriate type. 
 
-The following important classes are used in the above code.
+By default, every **ParticleArray** will have the following properties:
 
- - The ``Application`` class manages the entire simulation including any
-   command line options passed by the user.  The application creates the
-   particles, sets up any parallel communications and runs the solver.
+    - `x, y, z`   : Position coordinates (doubles)
+    - `u, v, w`   : Velocity (doubles)        
+    - `h, m, rho` : Smoothing length, mass and density (doubles)
+    - `au, av, aw`: Accelerations (doubles)
+    - `p`         : Pressure (doubles)
+    - `gid`       : Unique global index (unsigned int)
+    - `pid`       : Processor id (int)
+    - `tag`       : Tag (int)
 
- - The ``Solver`` manages the actual simulation.  It manages the
-   ``Integrator``.
+The role of the particle properties like positions, velocities and
+other variables is clear. 
 
- - The ``Integrator`` specifies how the variables are stepped in time.  For
-   each particle array, we provide an instance of an ``IntegratorStep`` class.
-   In this case we use the pre-defined ``WCSPHStep`` (subclass of
-   ``IntegratorStep``). PySPH supports any predictor-corrector integrator.
-   The ``IntegratorStep`` basically provides three methods:
+PySPH introduces a global identifier for a particle which is required
+to be *unique* for that particle. This is represented with the
+property *gid* which is of type *unsigned int*. This property is
+used in the parallel load balancing algorithm with Zoltan.
 
-     * ``initialize(...)``:  Intialize any variables before the step.
+The property *pid* for a particle is an *integer* that is used to
+identify the processor to which the particle is currently assigned.
 
-     * ``predictor(...)``: Perform the prediction step.
+The property *tag* is an *integer* that is used for any other
+identification. For example, we might want to mark all boundary
+particles with the tag 100. Using the *tag*, we can delete all such
+particles as
 
-     * ``corrector(...)``:  Perform the corrector step.
+.. code-block:: python
 
-   See the ``pysph.sph.integrator`` module to see several examples.
+   >>> pa.remove_tagged_particles(tag=100)
 
- - The most important part of the SPH simulation is the set of equations. This
-   is specified as a list of ``Equation`` objects.  An equation can provide
-   the following methods:
+This gives us a very flexible way to work with particles. Another way
+of deleting/extracting particles is by providing the indices for the
+particles in a **LongArray**:
 
-     * ``initialize(...)``:  Intialize any variables for the step.
+.. code-block:: python
 
-     * ``loop(...)``: Perform a source - destintation computation.
+   >>> indices = numpy.array([1,3,5,7])
+   >>> la = LongArray(indices.size); la.set_data(indices)
+   >>> pa.remove_particles( la )
+   >>> extracted = pa.extract_particles(la, props=['rho', 'x', 'y'])
 
-     * ``post_loop(...)``:  Perform any post-loop calculations.
+**ParticleArrays** can be concatenated:
 
-   The equations are described in greater detail in the next session.
+.. code-block:: python
 
- - As expected, ``kernel`` is the SPH kernel that should be used.  Kernels
-   define ``kernel`` and ``gradient`` functions.
+   >>> pa.append_parray(another_array)
 
-The ``app.setup(...)`` call sets up the application and the application is
-then run.  The simulation completes until the desired final time.  Many
-parameters can be configured via the command line, and these will override any
-parameters setup before the ``app.setup`` call.  For example one may do the
-following to find out the various options::
-
-    $ python elliptical_drop.py -h
-
-If we run the example without any arguments it will run until a final time of
-0.0075 seconds.  We can change this to 0.005 by the following::
-
-    $ python elliptical_drop.py --tf=0.005
-
-When this is run, PySPH will generate Cython code from the equations and
-integrators that have been provided, compiles that code and runs the
-simulation.  This provides a great deal of convenience for the user without
-sacrificing performance.  The generated code is available in
-``~/.pysph/source``.  If the code/equations have not changed, then the code
-will not be recompiled.  This is all handled automatically without user
-intervention.
-
-If we wish to run the code in parallel (and have compiled PySPH with Zoltan
-and mpi4py) we can do::
-
-    $ mpirun -np 4 /path/to/python elliptical_drop.py
-
-This will automatically parallelize the run.  In this example doing this will
-only slow it down as the number of particles is extremely small.
-
-
-Creating particles
--------------------
-
-The SPH particles are managed in a ``ParticleArray`` instance.  For a
-simulation involving a solid and fluid we would create two particle arrays.
-One for the fluid and one for the solid.  The ``Application.setup`` method
-expects a callable function which is called to create the particles.  The
-function should return a list of particle arrays.  When the simulation is run
-in parallel, the processor with rank 0 will have all of the particles and this
-is then distributed evenly across the particles.  The other processors (with
-rank > 0) will require an empty particle array the ``empty`` keyword argument
-is used for this and if it is ``True`` one should create empty arrays with the
-correct names.
+To set a given list of properties to zero:
 
-Each particle array is created by the convenience function
-``get_particle_array_wcsph`` which is available in the ``pysph.base.utils``
-module.  This function sets up the ``ParticleArray``, one can pass a ``name``
-keyword argument to set the name of the ``ParticleArray`` and any number of
-numpy arrays which are set as particle properties.  By default the following
-properties are made available for every particle array created with the
-``get_particle_array_wcsph``: ``x, y, z, u, v, w, h, rho, m, p, cs, ax, ay,
-az, au, av, aw, x0, y0, z0, u0, v0, w0, arho, rho0, div, gid, pid, tag``.
+.. code-block:: python
 
-It is important to name each particle array with a reasonable name.  For
-example in the elliptical drop example we use ``"fluid"``.
+   >>> props = ['au', 'av', 'aw']
+   >>> pa.set_to_zero(props)
 
+Nearest Neighbour Particle Searching
+-------------------------------------
 
-Writing the ``Equations``
---------------------------
+To carry out pairwise interactions for SPH, we need to find the
+nearest neighbours for a given particle within a specified interaction
+radius. The **NNPS** object is responsible for handling these nearest
+neighbour queries for a *list* of particle arrays:
 
-It is important for users to be able to easily write out new SPH equations of
-motion.  PySPH provides a very convenient way to write these equations.  The
-PySPH framework allows the user to write these equations in pure Python.
-These pure Python equations are then used to generate high-performance code
-and then called appropriately to perform the simulations.
+.. code-block:: python
 
-In general an SPH algorithm proceeds as the following pseudo-code
-illustrates::
+   >>> from pysph.base import nnps
+   >>> pa1 = get_particle_array(...)                    # create one particle array
+   >>> pa2 = get_particle_array(...)                    # create another particle array
+   >>> particles = [pa1, pa2]
+   >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
 
-    for destination in particles:
-        for equation in equations:
-            equation.initialize(destination)
+The above will create an **NNPS** object that uses the classical
+*linked-list* algorithm for nearest neighbour searches. The radius of
+interaction is determined by the argument `radius_scale`. The
+book-keeping cells have a length of :math:`\text{radius_scale} \times
+h_{\text{max}}`, where :math:`h_{\text{max}}` is the maximum smoothing
+length of *all* particles assigned to the local processor.
 
-    # This is where bulk of the computation happens.
-    for destination in particles:
-        for source in particle.neighbors:
-            for equation in equations:
-                equation.loop(source, destination)
+Since we allow a list of particle arrays, we need to distinguish
+between *source* and *destination* particle arrays in the neighbor
+queries.
 
-    for destination in particles:
-        for equation in equations:
-            equation.post_loop(destination)
+.. note::
 
-The neighbors of a given particle are identified using a nearest neighbor
-algorithm.  PySPH does this automatically for the user and internally uses a
-link-list based algorithm to identify neighbors.
+   A **destination** particle is a particle belonging to that species
+   for which the neighbors are sought.
 
-In PySPH we follow some simple conventions when writing equations.  Let us
-look at a few equations first.  The equation is instantiated as::
+   A **source** particle is a particle belonging to that species which
+   contributes to a given destination particle.
 
-        TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0)
+With these definitions, we can query for nearest neighbors like so:
 
-Each equation is provided a destination particle array name called ``dest``
-and a list of source particle array names in ``sources``.  If ``sources=None``
-this does not require any sources.  The other parameters are constants for the
-particular equation.  Here is what the TaitEOS equation class looks like::
+.. code-block:: python
 
-    class TaitEOS(Equation):
-        def __init__(self, dest, sources=None,
-                    rho0=1000.0, c0=1.0, gamma=7.0):
-            self.rho0 = rho0
-            self.rho01 = 1.0/rho0
-            self.c0 = c0
-            self.gamma = gamma
-            self.gamma1 = 0.5*(gamma - 1.0)
-            self.B = rho0*c0*c0/gamma
-            super(TaitEOS, self).__init__(dest, sources)
+   >>> nbrs = UIntArray()
+   >>> nps.get_nearest_particles(src_index, dst_index, d_idx, nbrs)
 
-        def loop(self, d_idx, d_rho, d_p, d_cs):
-            ratio = d_rho[d_idx] * self.rho01
-            tmp = pow(ratio, self.gamma)
+where `src_index`, `dst_index` and `d_idx` are integers. This will
+return, for the *d_idx* particle of the *dst_index* particle array
+(species), nearest neighbors from the *src_index* particle array
+(species). 
 
-            d_p[d_idx] = self.B * (tmp - 1.0)
-            d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
+If we want to re-compute the data structure for a new distribution of
+particles, we can call the `NNPS.update` method:
 
-Notice that it has only one ``loop`` method and this loop is applied for all
-particles.  Since there are no sources, there is no need for to find the
-neighbors.  There are a few important conventions that are to be followed when
-writing the equations.
+.. code-block:: python
 
-    - ``d_*`` indicates a destination array.
-
-    - ``s_*`` indicates a source array.
-
-    - ``d_idx`` and ``s_idx`` represent the destination and source index
-      respectively.
-
-    - Each function can take any number of arguments as required, these are
-      automatically supplied internally when the application runs.
-
-Let us look at the Continuity equation as another simple example.  It is
-instantiated as ::
-
-        ContinuityEquation(dest='fluid',  sources=['fluid',])
-
-The class is defined as::
-
-    class ContinuityEquation(Equation):
-        def initialize(self, d_idx, d_arho):
-            d_arho[d_idx] = 0.0
-
-        def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
-                VIJ=[0.0, 0.0, 0.0]):
-            vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
-            d_arho[d_idx] += s_m[s_idx]*vijdotdwij
-
-
-Notice that the ``initialize`` method merely sets the value to zero.  The
-``loop`` method also defines a few new quantities like ``DWIJ``, ``VIJ`` etc.
-The method also prescribes default values to these quantities.  The defaults
-are only set so that they may be declared appropriately in the
-high-performance code that is generated from this Python code. These are
-precomputed quantities and are automatically provided depending on the
-equations needed for a particular source/destination pair.  The following
-precomputed quantites are available:
-
-    - ``HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])``.
-
-    - ``XIJ[0] = d_x[d_idx] - s_x[s_idx]``,
-      ``XIJ[1] = d_y[d_idx] - s_y[s_idx]``,
-      ``XIJ[2] = d_z[d_idx] - s_z[s_idx]``
-
-    - ``R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]``
-
-    - ``RIJ = sqrt(R2IJ)``
-
-    - ``WIJ = KERNEL(XIJ, RIJ, HIJ)``
-
-    - ``WJ = KERNEL(XIJ, RIJ, s_h[s_idx])``
-
-    - ``RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])``
-
-    - ``WI = KERNEL(XIJ, RIJ, d_h[d_idx])``
-
-    - ``RHOIJ1 = 1.0/RHOIJ``
-
-    - ``DWIJ``: ``GRADIENT(XIJ, RIJ, HIJ, DWIJ)``
-    - ``DWI``: ``GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)``
-    - ``DWI``: ``GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)``
-
-    - ``VIJ[0] = d_u[d_idx] - s_u[s_idx]``
-      ``VIJ[1] = d_v[d_idx] - s_v[s_idx]``
-      ``VIJ[2] = d_w[d_idx] - s_w[s_idx]``
-
-    - ``DT_ADAPT``: is an array of three doubles that stores an adaptive
-      time-step, the first element is the CFL based time-step limit, the
-      second is the force-based limit and the third a viscosity based limit.
-      See ``pysph.sph.wc.basic.MomentumEquation`` for an example of how this
-      is used.
-
-In an equation, any undeclared variables are automatically declared to be
-doubles in the high-performance Cython code that is generated.  In addition
-one may declare a temporary variable to be a ``matrix`` or a ``cPoint`` by
-writing::
-
-    mat = declare("matrix((3,3))")
-    point = declare("cPoint")
-
-When the Cython code is generated, this gets translated to::
-
-    cdef double[3][3] mat
-    cdef cPoint point
-
-With this machinery, we are able to write complex equations.
-
-If one wishes to write a new equation, one may simply do as above and
-instantiate the equation in the list of equations.
-
-Grouping equations
-~~~~~~~~~~~~~~~~~~~
-
-Often one wishes to compute a set of equations before running the remainder of
-the equations.  For example, one may wish to run the Tait equation of state
-first for all species of particles before any other computations are started.
-In such a case one can simply group the equations and each group will be
-completed before the next group is computed.  For example the ``dam_break.py``
-example lists the following::
-
-    equations = [
-        # Equation of state
-        Group(equations=[
-                TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-                TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-                ]),
-
-        Group(equations=[
-                # Continuity equation
-                ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-                ContinuityEquation(dest='boundary', sources=['fluid']),
-                # Momentum equation
-                MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                        alpha=alpha, beta=beta, gy=-9.81, c0=co),
-                # Position step with XSPH
-                XSPHCorrection(dest='fluid', sources=['fluid'])
-                ]),
-        ]
-
-In this case, the TaitEOS is computed for all the fluid and boundary particles
-first before the continuity, momentum and other equations are run.  This
-ensures that the pressure and sound speed are correctly set before the other
-equations are run.
-
-
-Writing the ``IntegratorSteps``
---------------------------------
-
-The integrator stepper code is similar to the equations in that they are all
-written in pure Python and Cython code is automatically generated from it.
-The simplest integrator is the Euler integrator which looks like this::
-
-    class EulerStep(IntegratorStep):
-        def initialize(self):
-            pass
-        def predictor(self):
-            pass
-        def corrector(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
-                      d_z, d_rho, d_arho, dt=0.0):
-            d_u[d_idx] += dt*d_au[d_idx]
-            d_v[d_idx] += dt*d_av[d_idx]
-            d_w[d_idx] += dt*d_aw[d_idx]
-
-            d_x[d_idx] += dt*d_u[d_idx]
-            d_y[d_idx] += dt*d_v[d_idx]
-            d_z[d_idx] += dt*d_w[d_idx]
-
-            d_rho[d_idx] += dt*d_arho[d_idx]
-
-As can be seen the general structure is very similar to how equations are
-written in that the functions take an arbitrary number of arguments and are
-set.  The value of ``dt`` is also provided automatically when the methods are
-called.
-
-It is important to note that if there are additional variables to be stepped
-in addition to these standard ones, you must write your own stepper.
-Currently, only predictor-corrector steppers are supported by the framework.
-Take a look at the ``pysph.sph.integrator`` module for more examples.
-
-
-Organization of the ``pysph`` package
---------------------------------------
-
-PySPH is organized into several sub-packages.  These are:
-
-  - ``pysph.base``:  This subpackage defines the ``ParticleArray``, ``CArray``
-    (which are used by the particle arrays), Kernels, the nearest neighbor
-    particle search (NNPS) code, and the Cython code generation utilities.
-
-  - ``pysph.sph``: Contains the various ``Equation``, the ``Integrator``
-    various integration steppers, and the code generation for the SPH looping.
-    ``pysph.sph.wc`` contains the equations for the weakly compressible
-    formulation.  ``pysph.sph.solid_mech`` contains the equations for solid
-    mechanics and ``pysph.sph.misc`` has miscellaneous equations.
-
-  - ``pysph.solver``: Provides the ``Solver``, the ``Application`` and a
-    convenient way to interact with the solver as it is running.
-
-  - ``pysph.parallel``: Provides the parallel functionality.
-
-  - ``pysph.tools``: Provides some useful tools including the ``pysph_viewer``
-    which is based on Mayavi.
+   >>> nps.update()

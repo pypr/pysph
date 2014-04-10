@@ -16,6 +16,14 @@ Installation and getting started
    installation.rst
    using_pysph.rst
 
+Tutorials
+----------
+
+.. toctree::
+   :maxdepth: 1
+
+   tutorial/circular_patch.rst
+
 
 PySPH design
 -------------
