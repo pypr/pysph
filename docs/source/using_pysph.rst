@@ -19,20 +19,21 @@ particles. These can be constructed from within Python and are fully
 compatible with NumPy arrays. We begin with a brief description for
 the basic data structures for arrays
 
-Carrays
---------
+.. py:currentmodule:: pyzoltan.core.carray
 
-The `pyzoltan.core.carray` module provides a typed array data
-structure called **Carray**. These are used throughout PySPH and are
-fundamentally very similar to a NumPy arrays. The following named
-types are supported:
+C-arrays
+---------
 
-    - **UIntArray**    (32 bit unsigned integers)
-    - **IntArray**     (32 bit signed integers)
-    - **LongArray**    (64 bit signed integers)
-    - **DoubleArray**  (64 bit floating point numbers
+The :py:class:`BaseArray` class provides a typed array data structure called
+**BaseArray**. These are used throughout PySPH and are fundamentally very
+similar to NumPy arrays. The following named types are supported:
 
-Some simple commands to work with **Carrays** from the interactive
+    - :py:class:`UIntArray`    (32 bit unsigned integers)
+    - :py:class:`IntArray`     (32 bit signed integers)
+    - :py:class:`LongArray`    (64 bit signed integers)
+    - :py:class:`DoubleArray`  (64 bit floating point numbers
+
+Some simple commands to work with **BaseArrays** from the interactive
 shell are given below
 
 .. code-block:: python
@@ -44,31 +45,35 @@ shell are given below
     >>> array.get(3)                                 # get the value at a given index
     >>> array.set(5, -1.0)                           # set the value at an index to a value
 
+
+.. py:currentmodule:: pysph.base.particle_array
+
 ParticleArray
 --------------
 
-In PySPH, a collection of **Carrays** make up what is called a
-**ParticleArray**. This is the main data structure that is used to
+In PySPH, a collection of **BaseArrays** make up what is called a
+:py:class:`ParticleArray`. This is the main data structure that is used to
 represent particles and can be created from NumPy arrays like so:
 
 .. code-block:: python
 
    >>> import numpy
-   >>> from pysph.base.utils import get_particle_array      
+   >>> from pysph.base.utils import get_particle_array
    >>> x, y = numpy.mgrid[0:1:0.1, 0:1:0.1]             # create some data
    >>> x = x.ravel(); y = y.ravel()                     # flatten the arrays
    >>> pa = get_particle_array(name='array', x=x, y=y)  # create the particle array
 
-In the above, the helper function `get_particle_array` will
-instantiate and return a **ParticleArray** with properties `x` and `y`
-set from given NumPy arrays. In general, a **ParticleArray** can be
-instantiated with an arbitrary number of properties. Each property is
-stored internally as a **Carray** of the appropriate type. 
+In the above, the helper function :py:func:`get_particle_array` will
+instantiate and return a :py:class:`ParticleArray` with properties `x` and `y`
+set from given NumPy arrays. In general, a :py:class:`ParticleArray` can be
+instantiated with an arbitrary number of properties. Each property is stored
+internally as a :py:class:`pyzoltan.core.carray.BaseArray` of the appropriate
+type.
 
 By default, every **ParticleArray** will have the following properties:
 
     - `x, y, z`   : Position coordinates (doubles)
-    - `u, v, w`   : Velocity (doubles)        
+    - `u, v, w`   : Velocity (doubles)
     - `h, m, rho` : Smoothing length, mass and density (doubles)
     - `au, av, aw`: Accelerations (doubles)
     - `p`         : Pressure (doubles)
@@ -77,7 +82,7 @@ By default, every **ParticleArray** will have the following properties:
     - `tag`       : Tag (int)
 
 The role of the particle properties like positions, velocities and
-other variables is clear. 
+other variables is clear.
 
 PySPH introduces a global identifier for a particle which is required
 to be *unique* for that particle. This is represented with the
@@ -107,7 +112,7 @@ particles in a **LongArray**:
    >>> pa.remove_particles( la )
    >>> extracted = pa.extract_particles(la, props=['rho', 'x', 'y'])
 
-**ParticleArrays** can be concatenated:
+:py:class:`ParticleArrays` can be concatenated:
 
 .. code-block:: python
 
@@ -120,13 +125,16 @@ To set a given list of properties to zero:
    >>> props = ['au', 'av', 'aw']
    >>> pa.set_to_zero(props)
 
+
+.. py:currentmodule:: pysph.base.nnps
+
 Nearest Neighbour Particle Searching
 -------------------------------------
 
-To carry out pairwise interactions for SPH, we need to find the
-nearest neighbours for a given particle within a specified interaction
-radius. The **NNPS** object is responsible for handling these nearest
-neighbour queries for a *list* of particle arrays:
+To carry out pairwise interactions for SPH, we need to find the nearest
+neighbours for a given particle within a specified interaction radius. The
+:py:class:`NNPS` object is responsible for handling these nearest neighbour
+queries for a *list* of particle arrays:
 
 .. code-block:: python
 
@@ -136,12 +144,12 @@ neighbour queries for a *list* of particle arrays:
    >>> particles = [pa1, pa2]
    >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
 
-The above will create an **NNPS** object that uses the classical
+The above will create an :py:class:`NNPS` object that uses the classical
 *linked-list* algorithm for nearest neighbour searches. The radius of
-interaction is determined by the argument `radius_scale`. The
-book-keeping cells have a length of :math:`\text{radius_scale} \times
-h_{\text{max}}`, where :math:`h_{\text{max}}` is the maximum smoothing
-length of *all* particles assigned to the local processor.
+interaction is determined by the argument `radius_scale`. The book-keeping
+cells have a length of :math:`\text{radius_scale} \times h_{\text{max}}`,
+where :math:`h_{\text{max}}` is the maximum smoothing length of *all*
+particles assigned to the local processor.
 
 Since we allow a list of particle arrays, we need to distinguish
 between *source* and *destination* particle arrays in the neighbor
@@ -165,10 +173,10 @@ With these definitions, we can query for nearest neighbors like so:
 where `src_index`, `dst_index` and `d_idx` are integers. This will
 return, for the *d_idx* particle of the *dst_index* particle array
 (species), nearest neighbors from the *src_index* particle array
-(species). 
+(species).
 
 If we want to re-compute the data structure for a new distribution of
-particles, we can call the `NNPS.update` method:
+particles, we can call the :py:meth:`NNPS.update` method:
 
 .. code-block:: python
 

@@ -1,5 +1,5 @@
-Integrator related modules
-===========================
+Integrator module
+==================
 
 .. automodule:: pysph.sph.integrator
    :members:
