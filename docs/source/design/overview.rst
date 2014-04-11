@@ -12,7 +12,7 @@ PySPH code generation
 To elucidate some of the internal details of PySPH, we will consider a
 typical SPH problem and proceed to write the code that implements
 it. Thereafter, we will describe auto-generated code that PySPH
-generates. 
+generates.
 
 The dam-break problem
 -------------------------
@@ -37,18 +37,18 @@ Equations
 The discrete equations for this formulation are given as
 
 .. math::
-   :label: eos 
+   :label: eos
 
    p_a = B\left( \left(\frac{\rho_a}{\rho_0}\right)^{\gamma} - 1 \right )
 
 .. math::
    :label: continuity
- 
+
    \frac{d\rho_a}{dt} = \sum_{b=1}^{N}m_b\,(\vec{v_b} - \vec{v_a})\cdot\,\nabla_a W_{ab}
 
 .. math::
    :label: momentum
-   
+
    \frac{d\vec{v_a}}{dt} = -\sum_{b=1}^Nm_b\left(\frac{p_a}{\rho_a^2} + \frac{p_b}{\rho_b^2}\right)\nabla W_{ab}
 
 .. math::
@@ -103,7 +103,7 @@ particle positions:
 
 .. math::
    :label: corrector
-   
+
    \rho^{n + 1} = \rho^n + \Delta t(a_\rho)^{n+\frac{1}{2}} \\
 
    \boldsymbol{v}^{n + 1} = \boldsymbol{v}^n + \Delta t(\boldsymbol{a_v})^{n+\frac{1}{2}} \\
@@ -111,7 +111,7 @@ particle positions:
    \boldsymbol{x}^{n + 1} = \boldsymbol{x}^n + \Delta t(\boldsymbol{u} + \boldsymbol{u}^{\text{XSPH}})^{n+\frac{1}{2}}
 
 .. note::
-   
+
    The acceleration variables are *prefixed* like :math:`a_`. The
    boldface symbols in the above equations indicate vector
    quantities. Thus :math:`a_\boldsymbol{v}` represents :math:`a_u,\,
@@ -121,13 +121,13 @@ particle positions:
 Required arrays and properties
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We will be using two **ParticleArrays**, one for the fluid and another
-for the solid. Recall that for the dynamic boundary conditions, the
-solid is treated like a fluid with the only difference being that the
-velocity (:math:`a_\boldsymbol{v}`) and position accelerations
-(:math:`a_\boldsymbol{x} = \boldsymbol{u} +
-\boldsymbol{u}^{\text{XSPH}}`) are never calculated. The solid
-particles therefore remain fixed for the duration of the simulation.
+We will be using two **ParticleArrays** (see
+:py:class:`pysph.base.particle_array.ParticleArray`), one for the fluid and
+another for the solid. Recall that for the dynamic boundary conditions, the
+solid is treated like a fluid with the only difference being that the velocity
+(:math:`a_\boldsymbol{v}`) and position accelerations (:math:`a_\boldsymbol{x}
+= \boldsymbol{u} + \boldsymbol{u}^{\text{XSPH}}`) are never calculated. The
+solid particles therefore remain fixed for the duration of the simulation.
 
 To carry out the integrations for the particles, we require the
 following variables:
@@ -140,11 +140,10 @@ following variables:
 A non-PySPH implementation
 --------------------------
 
-We first consider the pseudo-code for the non-PySPH implementation. We
-assume we have been given two **ParticleArrays** `fluid` and `solid`
-corresponding to the dam-break problem. We also assume that an
-**NNPS** object `nps` is available and can be used for neighbor
-queries:
+We first consider the pseudo-code for the non-PySPH implementation. We assume
+we have been given two **ParticleArrays** `fluid` and `solid` corresponding to
+the dam-break problem. We also assume that an :py:class:`pysph.base.nnps.NNPS`
+object `nps` is available and can be used for neighbor queries:
 
 .. code-block:: python
 
@@ -303,7 +302,7 @@ The predictor-corrector integrator for this problem can be defined as
            for array in self.particles:
                array.rho0[:] = array.rho[:]
 	       ...
-               array.w0[:] = array.w[:]    
+               array.w0[:] = array.w[:]
 
       def predictor(self, dt):
 	  dtb2 = 0.5 * dt
@@ -358,8 +357,9 @@ Specifying the equations
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Given the particle arrays, we ask for a given set of operations to be
-performed on the particles by passing a *list* of **Equation** objects
-to the **Solver**
+performed on the particles by passing a *list* of **Equation** objects (see
+:doc:`../reference/equations`) to the **Solver** (see
+:py:class:`pysph.solver.solver.Solver`)
 
 .. code-block:: python
 
@@ -388,12 +388,12 @@ to the **Solver**
 	       ]),
        ]
 
-We see that we have used two **Group** objects, segregating two parts
-of the evaluation that are logically dependent. The second group,
-where the accelerations are computed *must* be evaluated after the
-first group where the pressure is updated. Recall we had to do a
-similar seggregation for the `SPHCalc.compute` method in our
-hypothetical implementation:
+We see that we have used two **Group** objects (see
+:py:class:`pysph.sph.equation.Group`), segregating two parts of the evaluation
+that are logically dependent. The second group, where the accelerations are
+computed *must* be evaluated after the first group where the pressure is
+updated. Recall we had to do a similar seggregation for the `SPHCalc.compute`
+method in our hypothetical implementation:
 
 .. code-block:: python
 
@@ -415,9 +415,9 @@ Writing the equations
 
 It is important for users to be able to easily write out new SPH equations of
 motion.  PySPH provides a very convenient way to write these equations.  The
-PySPH framework allows the user to write these equations in pure Python.
-These pure Python equations are then used to generate high-performance code
-and then called appropriately to perform the simulations.
+PySPH framework allows the user to write these equations in pure Python. These
+pure Python equations are then used to generate high-performance code and then
+called appropriately to perform the simulations.
 
 In general an SPH algorithm proceeds as the following pseudo-code
 illustrates::
@@ -440,11 +440,12 @@ The neighbors of a given particle are identified using a nearest neighbor
 algorithm.  PySPH does this automatically for the user and internally uses a
 link-list based algorithm to identify neighbors.
 
-In PySPH we follow some simple conventions when writing equations.
-Let us look at a few equations first. In keeping the analogy with our
-hypothetical implementation and the `SPHCalc.accelerations` method
-above, we consider the implementations for the PySPH **TaitEOS** and
-**ContinuityEquation** objects. The former looks like
+In PySPH we follow some simple conventions when writing equations. Let us look
+at a few equations first. In keeping the analogy with our hypothetical
+implementation and the `SPHCalc.accelerations` method above, we consider the
+implementations for the PySPH :py:class:`pysph.sph.wc.basic.TaitEOS` and
+:py:class:`pysph.sph.basic_equations.ContinuityEquation` objects. The former
+looks like:
 
 .. code-block:: python
 
@@ -481,8 +482,12 @@ are to be followed when writing the equations.
     - Each function can take any number of arguments as required, these are
       automatically supplied internally when the application runs.
 
-Let us look at the Continuity equation as another simple example.  It
-is instantiated as
+    - All the standard math symbols from ``math.h`` are also available.
+
+.. py:currentmodule:: pysph.sph.basic_equations
+
+Let us look at the :py:class:`ContinuityEquation` as another simple example.
+It is instantiated as::
 
 .. code-block:: python
 
@@ -535,8 +540,8 @@ precomputed quantites are available:
     - ``DT_ADAPT``: is an array of three doubles that stores an adaptive
       time-step, the first element is the CFL based time-step limit, the
       second is the force-based limit and the third a viscosity based limit.
-      See ``pysph.sph.wc.basic.MomentumEquation`` for an example of how this
-      is used.
+      See :py:class:`pysph.sph.wc.basic.MomentumEquation` for an example of
+      how this is used.
 
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
@@ -588,6 +593,4 @@ called.
 It is important to note that if there are additional variables to be stepped
 in addition to these standard ones, you must write your own stepper.
 Currently, only predictor-corrector steppers are supported by the framework.
-Take a look at the ``pysph.sph.integrator`` module for more examples.
-
-
+Take a look at the :doc:`../reference/integrator` for more examples.

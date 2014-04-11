@@ -158,20 +158,24 @@ Organization of the ``pysph`` package
 
 PySPH is organized into several sub-packages.  These are:
 
-  - ``pysph.base``:  This subpackage defines the ``ParticleArray``, ``CArray``
-    (which are used by the particle arrays), Kernels, the nearest neighbor
+  - ``pysph.base``:  This subpackage defines the
+    :py:class:`pysph.base.particle_array.ParticleArray`,
+    :py:class:`pysph.base.carray.CArray` (which are used by the particle
+    arrays), the various :doc:`reference/kernels`, the nearest neighbor
     particle search (NNPS) code, and the Cython code generation utilities.
 
-  - ``pysph.sph``: Contains the various ``Equation``, the ``Integrator``
-    various integration steppers, and the code generation for the SPH looping.
-    ``pysph.sph.wc`` contains the equations for the weakly compressible
-    formulation.  ``pysph.sph.solid_mech`` contains the equations for solid
-    mechanics and ``pysph.sph.misc`` has miscellaneous equations.
+  - ``pysph.sph``: Contains the various :doc:`reference/equations`, the
+    :doc:`reference/integrator` and associated integration steppers, and the
+    code generation for the SPH looping. ``pysph.sph.wc`` contains the
+    equations for the weakly compressible formulation.
+    ``pysph.sph.solid_mech`` contains the equations for solid mechanics and
+    ``pysph.sph.misc`` has miscellaneous equations.
 
-  - ``pysph.solver``: Provides the ``Solver``, the ``Application`` and a
-    convenient way to interact with the solver as it is running.
+  - ``pysph.solver``: Provides the :py:class:`pysph.solver.solver.Solver`, the
+    :py:class:`pysph.solver.application.Application` and a convenient way to
+    interact with the solver as it is running.
 
   - ``pysph.parallel``: Provides the parallel functionality.
 
   - ``pysph.tools``: Provides some useful tools including the ``pysph_viewer``
-    which is based on Mayavi.
+    which is based on Mayavi_.
