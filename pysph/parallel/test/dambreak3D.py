@@ -71,24 +71,9 @@ def create_particles(empty=False, **kwargs):
 
     # add requisite variables
     for pa in particles:
-        pa.add_property( {'name': 'arho'} )
-        pa.add_property( {'name': 'au'} )
-        pa.add_property( {'name': 'av'} )
-        pa.add_property( {'name': 'aw'} )
-
-        pa.add_property( {'name': 'ax'} )
-        pa.add_property( {'name': 'ay'} )
-        pa.add_property( {'name': 'az'} )
-
-        pa.add_property( {'name': 'rho0'} )
-
-        pa.add_property( {'name': 'u0'} )
-        pa.add_property( {'name': 'v0'} )
-        pa.add_property( {'name': 'w0'} )
-
-        pa.add_property( {'name': 'x0'} )
-        pa.add_property( {'name': 'y0'} )
-        pa.add_property( {'name': 'z0'} )
+        for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az',
+                     'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0'):
+            pa.add_property(name)
 
     return particles
 

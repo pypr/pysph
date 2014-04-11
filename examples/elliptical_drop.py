@@ -96,7 +96,7 @@ def get_circular_patch(dx=0.025, **kwargs):
     # add requisite variables needed for this formulation
     for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
                  'v0', 'w0', 'x0', 'y0', 'z0'):
-        pa.add_property( {'name': name} )
+        pa.add_property(name)
 
     return [pa,]
 

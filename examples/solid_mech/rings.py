@@ -21,7 +21,7 @@ def get_K(G, nu):
 
 def add_properties(pa, *props):
     for prop in props:
-        pa.add_property( {'name':prop} )
+        pa.add_property(name=prop)
 
 
 # constants

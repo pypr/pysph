@@ -63,10 +63,8 @@ def create_particles(**kwargs):
     fluid.remove_particles(to_remove)
 
     # add the requisite arrays
-    fluid.add_property( {'name': 'color'} )
-    fluid.add_property( {'name': 'ax'} )
-    fluid.add_property( {'name': 'ay'} )
-    fluid.add_property( {'name': 'az'} )
+    for prop in ('color', 'ax', 'ay', 'az'):
+        fluid.add_property(name=prop)
 
     print "Advection test :: nfluid = %d"%(
         fluid.get_number_of_particles())

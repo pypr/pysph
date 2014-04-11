@@ -75,36 +75,28 @@ def create_particles(**kwargs):
 
     # add requisite properties to the arrays:
     # particle volume
-    fluid.add_property( {'name': 'V'} )
-    solid.add_property( {'name': 'V'} )
+    fluid.add_property('V')
+    solid.add_property('V' )
 
     # advection velocities and accelerations
-    fluid.add_property( {'name': 'uhat'} )
-    fluid.add_property( {'name': 'vhat'} )
-
-    fluid.add_property( {'name': 'auhat'} )
-    fluid.add_property( {'name': 'avhat'} )
-
-    fluid.add_property( {'name': 'au'} )
-    fluid.add_property( {'name': 'av'} )
-    fluid.add_property( {'name': 'aw'} )
+    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av', 'aw'):
+        fluid.add_property(name)
 
     # kernel summation correction for the solid
-    solid.add_property( {'name': 'wij'} )
+    solid.add_property('wij')
 
-    # imopsed velocity on the solid
-    solid.add_property( {'name': 'u0'} )
-    solid.add_property( {'name': 'v0'} )
-
-    # reference densities and pressures
-    fluid.add_property( {'name': 'rho0'} )
-    fluid.add_property( {'name': 'p0'} )
-
-    # density acceleration
-    fluid.add_property( {'name':'arho'} )
+    # imposed velocity on the solid
+    solid.add_property('u0')
+    solid.add_property('v0')
 
     # magnitude of velocity
-    fluid.add_property({'name':'vmag'})
+    fluid.add_property('vmag')
+    # density acceleration
+    fluid.add_property('arho')
+
+    # reference densities and pressures
+    fluid.add_property('rho0')
+    fluid.add_property('p0')
 
     # setup the particle properties
     volume = dx * dx

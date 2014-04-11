@@ -112,7 +112,7 @@ cdef class ParticleArray:
     cpdef remove_tagged_particles(self, int tag)
 
     # function to add any property
-    cpdef add_property(self, dict prop_info)
+    cpdef add_property(self, str name, str type=*, default=*, data=*)
     cpdef remove_property(self, str prop_name)
 
     # increase the number of particles by num_particles
