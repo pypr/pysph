@@ -60,14 +60,12 @@ def create_particles(empty=False, **kwargs):
             if ( (y[i] > 0.0)  and (y[i] < Ly) ):
                 indices.append(i)
 
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-    
     # create the arrays
     solid = get_particle_array(name='solid', x=x, y=y)
 
     # remove the fluid particles from the solid
-    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-    solid.remove_particles(to_extract)
+    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+    solid.remove_particles(indices)
 
     # sort out the two fluid phases
     indices = []
@@ -75,12 +73,10 @@ def create_particles(empty=False, **kwargs):
         if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
             indices.append(i)
             
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-    
-    fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
+    fluid1 = fluid.extract_particles(indices); fluid1.set_name('fluid1')
     fluid2 = fluid
     fluid2.set_name('fluid2')
-    fluid2.remove_particles(to_extract)
+    fluid2.remove_particles(indices)
     
     fluid1.rho[:] = rho1
     fluid2.rho[:] = rho2

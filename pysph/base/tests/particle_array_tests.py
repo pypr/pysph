@@ -272,14 +272,13 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.m, [1., 1.]), True)
         self.assertEqual(check_array(p.h, [.1, .1]), True)
 
-        # now try invalid operatios to make sure errors are raised.
+        # now try invalid operations to make sure errors are raised.
         remove_arr.resize(10)
         self.assertRaises(ValueError, p.remove_particles, remove_arr)
 
         # now try to remove a particle with index more that particle
         # length.
-        remove_arr.resize(1)
-        remove_arr[0] = 2
+        remove_arr = [2]
 
         p.remove_particles(remove_arr)
         # make sure no change occurred.

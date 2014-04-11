@@ -85,11 +85,7 @@ def get_circular_patch(dx=0.025, **kwargs):
             
     pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
                                   cs=cs, name=name)
-    
-    la = LongArray(len(indices))
-    la.set_data(array(indices))
-    
-    pa.remove_particles(la)
+    pa.remove_particles(indices)
     
     print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
     

@@ -314,7 +314,7 @@ cdef class ParticleArray:
         else:
             return 0
 
-    cpdef remove_particles(self, BaseArray index_list):
+    cpdef remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
         We repeatedly interchange the values of the last element and values from
@@ -323,7 +323,8 @@ cdef class ParticleArray:
 
         **Parameters**
 
-         - index_list - an array of indices, this array should be a LongArray.
+         - indices - an array of indices, this array can be a list, numpy
+           array or a LongArray.
 
         **Algorithm**::
 
@@ -336,6 +337,14 @@ cdef class ParticleArray:
              array.remove(sorted_indices)
 
         """
+        cdef BaseArray index_list
+        if isinstance(indices, BaseArray):
+            index_list = indices
+        else:
+            indices = numpy.asarray(indices)
+            index_list = LongArray(indices.size)
+            index_list.set_data(indices)
+
         cdef str msg
         cdef numpy.ndarray sorted_indices
         cdef BaseArray prop_array
@@ -940,13 +949,13 @@ cdef class ParticleArray:
             self.is_dirty = True
             self.indices_invalid = True
 
-    cpdef ParticleArray extract_particles(self, LongArray index_array, list
-                                          props=None):
+    cpdef ParticleArray extract_particles(self, indices, list props=None):
         """ Create new particle array for particles with indices in index_array
 
         **Parameters**
 
-            - index_array - indices of particles to be extracted.
+            - indices - indices of particles to be extracted (can be a
+              LongArray or list/numpy array).
             - props - the list of properties to extract, if None all properties
               are extracted.
 
@@ -957,9 +966,16 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
+        cdef BaseArray index_array
+        if isinstance(indices, BaseArray):
+            index_array = indices
+        else:
+            indices = numpy.asarray(indices)
+            index_array = LongArray(indices.size)
+            index_array.set_data(indices)
+
         cdef ParticleArray result_array = ParticleArray()
         cdef list prop_names
-        cdef long* idx_data
         cdef BaseArray dst_prop_array, src_prop_array
         cdef str prop_type, prop
 
@@ -981,9 +997,6 @@ cdef class ParticleArray:
             return result_array
 
         result_array.extend(index_array.length)
-
-        # now copy the values.
-        idx_data = index_array.get_data_ptr()
 
         # copy the required indices for each property.
         for prop in prop_names:

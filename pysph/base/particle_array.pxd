@@ -108,7 +108,7 @@ cdef class ParticleArray:
     cpdef BaseArray get_carray(self, str prop)
 
     cpdef int get_number_of_particles(self)
-    cpdef remove_particles(self, BaseArray index_list)
+    cpdef remove_particles(self, indices)
     cpdef remove_tagged_particles(self, int tag)
 
     # function to add any property
@@ -128,8 +128,7 @@ cdef class ParticleArray:
 
     # create a new particle array with the given particles indices and the
     # properties.
-    cpdef ParticleArray extract_particles(self, LongArray index_array, list
-                                          props=*)
+    cpdef ParticleArray extract_particles(self, indices, list props=*)
 
     # set the tag value for the particles
     cpdef set_tag(self, long tag_value, LongArray indices)

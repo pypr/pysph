@@ -57,14 +57,12 @@ def create_particles(**kwargs):
             if ( (y[i] > 0.0) and (y[i] < H) ):
                 indices.append(i)
 
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-
     # create the arrays
     solid = get_particle_array(name='solid', x=x, y=y)
 
     # remove the fluid particles from the solid
-    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-    solid.remove_particles(to_extract)
+    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+    solid.remove_particles(indices)
 
     print "Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
         fluid.get_number_of_particles(),
