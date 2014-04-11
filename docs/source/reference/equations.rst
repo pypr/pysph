@@ -1,6 +1,8 @@
 SPH equations
 ===============
 
+.. autoclass:: pysph.sph.equation.Equation
+   :members:
 
 .. automodule:: pysph.sph.basic_equations
    :members:
@@ -29,3 +31,10 @@ SPH equations
 .. automodule:: pysph.sph.misc.advection
    :members:
    :undoc-members:
+
+
+Group of equations
+-------------------
+
+.. autoclass:: pysph.sph.equation.Group
+   :members:

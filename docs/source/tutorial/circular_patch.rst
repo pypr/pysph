@@ -63,13 +63,13 @@ various modules:
    from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 .. note::
-    
-    This is common for all examples and it is worth noting the pattern of
-    the PySPH imports. Fundamental SPH constructs like the kernel and
-    particle containers are imported from the **base** subpackage. The
-    framework related objects like the solver and integrator are imported
-    from the **solver** subpackage. Finally, we import from the **sph**
-    subpackage, the physics related part for this problem.
+
+    This is common for all examples and it is worth noting the pattern of the
+    PySPH imports. Fundamental SPH constructs like the kernel and particle
+    containers are imported from the ``base`` subpackage. The framework
+    related objects like the solver and integrator are imported from the
+    ``solver`` subpackage. Finally, we import from the ``sph`` subpackage, the
+    physics related part for this problem.
 
 Functions for loading/generating the particles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -120,13 +120,15 @@ comparison, the latter looks like:
 
        return [pa,]
 
+
+.. py:currentmodule:: pysph.base.particle_array
+
 and is used to initialize the particles in Python. In PySPH, we use a
-**ParticleArray** object as a container for particles of a given
-*species*. You can think of a particle species as any homogenous
-entity in a simulation. For example, in a two-phase air water flow, a
-species could be used to represent each phase. A **ParticleArray** can
-be conveniently created from the command line using NumPy arrays. For
-example
+:py:class:`ParticleArray` object as a container for particles of a given
+*species*. You can think of a particle species as any homogenous entity in a
+simulation. For example, in a two-phase air water flow, a species could be
+used to represent each phase. A :py:class:`ParticleArray` can be conveniently
+created from the command line using NumPy arrays. For example
 
 .. code-block:: python
 
@@ -135,24 +137,26 @@ example
     >>> x = x.ravel(); y = y.ravel()
     >>> pa = sph.get_particle_array(x=x, y=y)
 
-would create a **ParticleArray**, representing a uniform distribution
+would create a :py:class:`ParticleArray`, representing a uniform distribution
 of particles on a Cartesian lattice in 2D using the helper function
-`get_particle_array` in the **base** subpackage.
+:py:func:`get_particle_array` in the **base** subpackage.
 
 .. note::
 
    **ParticleArrays** in PySPH use *flattened* or one-dimensional arrays.
 
-The **ParticleArray** is highly convenient, supporting methods for
+The :py:class:`ParticleArray` is highly convenient, supporting methods for
 insertions, deletions and concatenations. In the `get_circular_patch`
-function, we use this convenience to remove a list of particles that
-fall outside a circular region:
+function, we use this convenience to remove a list of particles that fall
+outside a circular region:
 
 .. code-block:: python
-    
+
    pa.remove_particles(la)
 
-where, a list of indices is provided in the form of a **LongArray**
+.. py:currentmodule:: pyzoltan.core.carray
+
+where, a list of indices is provided in the form of a :py:class:`LongArray`
 which, as the name suggests, is an array of 64 bit integers.
 
 .. note::
@@ -170,9 +174,10 @@ which, as the name suggests, is an array of 64 bit integers.
 Setting up the PySPH framework
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-As we move on, we encounter instantiations of the PySPH framework
-objects. These are the **Application**, **Integrator** and **Solver**
-objects:
+As we move on, we encounter instantiations of the PySPH framework objects.
+These are the :py:class:`pysph.solver.application.Application`,
+:py:class:`pysph.sph.integrator.Integrator` and
+:py:class:`pysph.solver.solver.Solver` objects:
 
 .. code-block:: python
 
@@ -190,31 +195,36 @@ objects:
     solver.set_time_step(1e-5)
     solver.set_final_time(0.0075)
 
-The **Application** makes it easy to pass command line arguments to
-the solver. It is also important for the seamless parallel execution
-of the same example. To appreciate the role of the **Application**
-consider for a moment how might we write a parallel version of the
-same example. At some point, we would need some MPI imports and the
-particles should be created in a distributed fashion. All this (and
-more) is handled through the abstraction of the **Application** which
-hides all this detail from the user.
+.. py:currentmodule:: pysph.solver.application
 
-Intuitively, in an SPH simulation, the role of the **Integrator**
-should be obvious. In the code, we see that we ask for the "fluid" to
-be stepped using a **WCSPHStep** object. Taking a look at the
-`get_circular_patch` function once more, we notice that the
-**ParticleArray** representing the circular patch was named as
-`fluid`. So we're essentially asking the PySPH framework to step or
-*integrate* the properties of the **ParticleArray** fluid using
-**WCSPHStep**. Safe to assume that the framework takes the
-responsibility to call this integrator at the appropriate time during
-a time-step.
+The :py:class:`Application` makes it easy to pass command line arguments to
+the solver. It is also important for the seamless parallel execution of the
+same example. To appreciate the role of the :py:class:`Application` consider
+for a moment how might we write a parallel version of the same example. At
+some point, we would need some MPI imports and the particles should be created
+in a distributed fashion. All this (and more) is handled through the
+abstraction of the :py:class:`Application` which hides all this detail from
+the user.
 
-The **Solver** is the main driver for the problem. It marshals a
-simulation and takes the responsibility (through appropriate calls to
-the integrator) to update the solution to the next time step. It also
-handles input/output and computing global quantities (such as minimum
-time step) in parallel.
+.. py:currentmodule:: pysph.sph.integrator
+
+Intuitively, in an SPH simulation, the role of the :py:class:`Integrator`
+should be obvious. In the code, we see that we ask for the "fluid" to be
+stepped using a :py:class:`WCSPHStep` object. Taking a look at the
+`get_circular_patch` function once more, we notice that the **ParticleArray**
+representing the circular patch was named as `fluid`. So we're essentially
+asking the PySPH framework to step or *integrate* the properties of the
+**ParticleArray** fluid using :py:class:`WCSPHStep`. Safe to assume that the
+framework takes the responsibility to call this integrator at the appropriate
+time during a time-step.
+
+.. py:currentmodule:: pysph.solver.solver
+
+The :py:class:`Solver` is the main driver for the problem. It marshals a
+simulation and takes the responsibility (through appropriate calls to the
+integrator) to update the solution to the next time step. It also handles
+input/output and computing global quantities (such as minimum time step) in
+parallel.
 
 Specifying the interactions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,11 +234,11 @@ At this stage, we have the particles (represented by the fluid
 marshall the simulation. What remains is to define how to actually go
 about updating properties *within* a time step. That is, for each
 particle we must "do something". This is where the *physics* for the
-particular problem comes in. 
+particular problem comes in.
 
-For SPH, this would be the pairwise interactions between particles. In
-PySPH, we provide a specific way to define the sequence of
-interactions which is a *list* of **Equation** objects. For the
+For SPH, this would be the pairwise interactions between particles. In PySPH,
+we provide a specific way to define the sequence of interactions which is a
+*list* of **Equation** objects (see :doc:`../reference/equations`). For the
 circular patch test, the sequence of interactions is relatively
 straightforward:
 
@@ -257,7 +267,9 @@ We request this in PySPH like so:
 
        ]
 
-Each *interaction* is specified through an **Equation** object, which
+.. py:currentmodule:: pysph.sph.equation
+
+Each *interaction* is specified through an :py:class:`Equation` object, which
 is instantiated with the general syntax:
 
 .. code-block:: python
@@ -292,7 +304,9 @@ a complete SPH simulation.
 Running the example
 ~~~~~~~~~~~~~~~~~~~
 
-In the last two lines of the example, we use the **Application**
+.. py:currentmodule:: pysph.solver.application
+
+In the last two lines of the example, we use the :py:class:`Application`
 to run the problem:
 
 .. code-block:: python
@@ -303,10 +317,10 @@ to run the problem:
 
    app.run()
 
-We can see that the `Application.setup` method is where we tell PySPH
-what we want it to do. We pass in the function to create the
-particles, the list of equations defining the problem and the solver
-that will be used to marshal the problem. 
+We can see that the :py:meth:`Application.setup` method is where we tell PySPH
+what we want it to do. We pass in the function to create the particles, the
+list of equations defining the problem and the solver that will be used to
+marshal the problem.
 
 Many parameters can be configured via the command line, and these will
 override any parameters setup before the ``app.setup`` call.  For
