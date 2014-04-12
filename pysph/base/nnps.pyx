@@ -416,10 +416,10 @@ cdef class NNPS:
         -----------
 
         dim : int
-            Dimension (Not sure if this is really needed)
+            Dimension (fixme: Not sure if this is really needed)
 
         particles : list
-            The list of particles we are working on
+            The list of particle arrays we are working on.
 
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
@@ -984,10 +984,10 @@ cdef class BoxSortNNPS(NNPS):
         -----------
 
         dim : int
-            Dimension (Not sure if this is really needed)
+            Number of dimensions.
 
         particles : list
-            The list of particles we are working on
+            The list of particle arrays we are working on.
 
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
@@ -1274,10 +1274,10 @@ cdef class LinkedListNNPS(NNPS):
         -----------
 
         dim : int
-            Dimension (Not sure if this is really needed)
+            Number of dimension.
 
         particles : list
-            The list of particles we are working on
+            The list of particle arrays we are working on
 
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
