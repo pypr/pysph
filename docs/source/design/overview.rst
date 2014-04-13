@@ -1,13 +1,13 @@
 .. _design_overview:
 
+=====================
+PySPH code generation
+=====================
+
 This document is an introduction to the design of PySPH. Read this if
 you want to understand the automatic code generation and possibly
 extend PySPH to solve problems other than those provided in the main
 distribution.
-
-=====================
-PySPH code generation
-=====================
 
 To elucidate some of the internal details of PySPH, we will consider a
 typical SPH problem and proceed to write the code that implements
