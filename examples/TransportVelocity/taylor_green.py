@@ -50,7 +50,7 @@ def create_particles(**kwargs):
     fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
 
     # add the requisite arrays
-    fluid.add_property( {'name': 'color'} )
+    fluid.add_property('color')
 
     print "Taylor green vortex problem :: nfluid = %d, dt = %g"%(
         fluid.get_number_of_particles(), dt)
@@ -67,19 +67,13 @@ def create_particles(**kwargs):
 
     # add requisite properties to the arrays:
     # particle volume
-    fluid.add_property( {'name': 'V'} )
+    fluid.add_property('V')
 
     # advection velocities and accelerations
-    fluid.add_property( {'name': 'uhat'} )
-    fluid.add_property( {'name': 'vhat'} )
+    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av'):
+        fluid.add_property(name)
 
-    fluid.add_property( {'name': 'auhat'} )
-    fluid.add_property( {'name': 'avhat'} )
-
-    fluid.add_property( {'name': 'au'} )
-    fluid.add_property( {'name': 'av'} )
-
-    fluid.add_property( {'name': 'vmag'} )
+    fluid.add_property('vmag')
 
     # mass is set to get the reference density of each phase
     fluid.rho[:] = rho0

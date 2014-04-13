@@ -60,14 +60,12 @@ def create_particles(empty=False, **kwargs):
             if ( (y[i] > 0.0)  and (y[i] < Ly) ):
                 indices.append(i)
 
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-    
     # create the arrays
     solid = get_particle_array(name='solid', x=x, y=y)
 
     # remove the fluid particles from the solid
-    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-    solid.remove_particles(to_extract)
+    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+    solid.remove_particles(indices)
 
     # sort out the two fluid phases
     indices = []
@@ -75,12 +73,10 @@ def create_particles(empty=False, **kwargs):
         if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
             indices.append(i)
             
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-    
-    fluid1 = fluid.extract_particles(to_extract); fluid1.set_name('fluid1')
+    fluid1 = fluid.extract_particles(indices); fluid1.set_name('fluid1')
     fluid2 = fluid
     fluid2.set_name('fluid2')
-    fluid2.remove_particles(to_extract)
+    fluid2.remove_particles(indices)
     
     fluid1.rho[:] = rho1
     fluid2.rho[:] = rho2
@@ -91,41 +87,25 @@ def create_particles(empty=False, **kwargs):
 
     # add requisite properties to the arrays:
     # particle volume
-    fluid1.add_property( {'name': 'V'} )
-    fluid2.add_property( {'name': 'V'} )
-    solid.add_property( {'name': 'V'} )
+    fluid1.add_property('V')
+    fluid2.add_property('V')
+    solid.add_property('V' )
 
     # advection velocities and accelerations
-    fluid1.add_property( {'name': 'uhat'} )
-    fluid1.add_property( {'name': 'vhat'} )
-
-    fluid2.add_property( {'name': 'uhat'} )
-    fluid2.add_property( {'name': 'vhat'} )
-
-    fluid1.add_property( {'name': 'auhat'} )
-    fluid1.add_property( {'name': 'avhat'} )
-
-    fluid2.add_property( {'name': 'auhat'} )
-    fluid2.add_property( {'name': 'avhat'} )
-
-    fluid1.add_property( {'name': 'au'} )
-    fluid1.add_property( {'name': 'av'} )
-    fluid1.add_property( {'name': 'aw'} )
-
-    fluid2.add_property( {'name': 'au'} )
-    fluid2.add_property( {'name': 'av'} )
-    fluid2.add_property( {'name': 'aw'} )
+    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av', 'aw'):
+        fluid1.add_property(name)
+        fluid2.add_property(name)
 
     # kernel summation correction for the solid
-    solid.add_property( {'name': 'wij'} )
+    solid.add_property('wij')
 
-    # imopsed velocity on the solid
-    solid.add_property( {'name': 'u0'} )
-    solid.add_property( {'name': 'v0'} )
+    # imposed velocity on the solid
+    solid.add_property('u0')
+    solid.add_property('v0')
 
     # magnitude of velocity
-    fluid1.add_property({'name':'vmag'})
-    fluid2.add_property({'name':'vmag'})
+    fluid1.add_property('vmag')
+    fluid2.add_property('vmag')
 
     # setup the particle properties
     volume = dx * dx

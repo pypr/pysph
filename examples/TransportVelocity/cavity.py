@@ -52,14 +52,12 @@ def create_particles(**kwargs):
             if ( (y[i] > 0.0) and (y[i] < L) ):
                 indices.append(i)
 
-    to_extract = LongArray(len(indices)); to_extract.set_data(np.array(indices))
-    
     # create the arrays
     solid = get_particle_array(name='solid', x=x, y=y)
 
     # remove the fluid particles from the solid
-    fluid = solid.extract_particles(to_extract); fluid.set_name('fluid')
-    solid.remove_particles(to_extract)
+    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+    solid.remove_particles(indices)
 
     print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
@@ -67,29 +65,23 @@ def create_particles(**kwargs):
 
     # add requisite properties to the arrays:
     # particle volume
-    fluid.add_property( {'name': 'V'} )
-    solid.add_property( {'name': 'V'} )
+
+    fluid.add_property('V')
+    solid.add_property('V' )
 
     # advection velocities and accelerations
-    fluid.add_property( {'name': 'uhat'} )
-    fluid.add_property( {'name': 'vhat'} )
-
-    fluid.add_property( {'name': 'auhat'} )
-    fluid.add_property( {'name': 'avhat'} )
-
-    fluid.add_property( {'name': 'au'} )
-    fluid.add_property( {'name': 'av'} )
-    fluid.add_property( {'name': 'aw'} )
+    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av', 'aw'):
+        fluid.add_property(name)
 
     # kernel summation correction for the solid
-    solid.add_property( {'name': 'wij'} )
+    solid.add_property('wij')
 
-    # imopsed velocity on the solid
-    solid.add_property( {'name': 'u0'} )
-    solid.add_property( {'name': 'v0'} )
+    # imposed velocity on the solid
+    solid.add_property('u0')
+    solid.add_property('v0')
 
     # magnitude of velocity
-    fluid.add_property({'name':'vmag'})
+    fluid.add_property('vmag')
 
     # setup the particle properties
     volume = dx * dx

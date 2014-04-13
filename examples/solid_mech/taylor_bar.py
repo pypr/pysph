@@ -93,61 +93,31 @@ def create_particles(**kwargs):
     # add requisite properties
     
     # velocity gradient for the bar
-    bar.add_property( {'name':'v00'} )
-    bar.add_property( {'name':'v01'} )
-    bar.add_property( {'name':'v10'} )
-    bar.add_property( {'name':'v11'} )
+    for name in ('v00', 'v01', 'v10', 'v11'):
+        bar.add_property(name)
 
     # deviatoric stress components
-    bar.add_property( {'name':'s00'} )
-    bar.add_property( {'name':'s01'} )
-    bar.add_property( {'name':'s02'} )
-    bar.add_property( {'name':'s11'} )
-    bar.add_property( {'name':'s12'} )
-    bar.add_property( {'name':'s22'} )
+    for name in ('s00', 's01', 's02', 's11', 's12', 's22'):
+        bar.add_property(name)
 
     # deviatoric stress accelerations
-    bar.add_property( {'name':'as00'} )
-    bar.add_property( {'name':'as01'} )
-    bar.add_property( {'name':'as02'} )
-    bar.add_property( {'name':'as11'} )
-    bar.add_property( {'name':'as12'} )
-    bar.add_property( {'name':'as22'} )
+    for name in ('as00', 'as01', 'as02', 'as11', 'as12', 'as22'):
+        bar.add_property(name)
 
     # deviatoric stress initial values
-    bar.add_property( {'name':'s000'} )
-    bar.add_property( {'name':'s010'} )
-    bar.add_property( {'name':'s020'} )
-    bar.add_property( {'name':'s110'} )
-    bar.add_property( {'name':'s120'} )
-    bar.add_property( {'name':'s220'} )
-    
-    bar.add_property( {'name':'e0'} )
+    for name in ('s000', 's010', 's020', 's110', 's120', 's220'):
+        bar.add_property(name)
+
+    bar.add_property('e0')
 
     # artificial stress properties
-    bar.add_property( {'name':'r00'} )
-    bar.add_property( {'name':'r01'} )
-    bar.add_property( {'name':'r11'} )
+    for name in ('r00', 'r01', 'r11'):
+        bar.add_property(name)
 
-    # standard acceleration variables
-    bar.add_property( {'name':'arho'} )
-    bar.add_property( {'name':'au'} )
-    bar.add_property( {'name':'av'} )
-    bar.add_property( {'name':'aw'} )
-    bar.add_property( {'name':'ax'} )
-    bar.add_property( {'name':'ay'} )
-    bar.add_property( {'name':'az'} )
-    bar.add_property( {'name':'ae'} )
-
-    # initial values
-    bar.add_property( {'name':'rho0'} )
-    bar.add_property( {'name':'u0'} )
-    bar.add_property( {'name':'v0'} )
-    bar.add_property( {'name':'w0'} )
-    bar.add_property( {'name':'x0'} )
-    bar.add_property( {'name':'y0'} )
-    bar.add_property( {'name':'z0'} )
-    bar.add_property( {'name':'e0'} )
+    # standard acceleration variables and initial values.
+    for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae',
+                 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0'):
+        bar.add_property(name)
 
     return [bar, plate]
 
