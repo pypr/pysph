@@ -1,13 +1,15 @@
 .. _introduction:
 
+==========================
 Using the PySPH framework
 ==========================
 
 In this document, we describe the fundamental data structures for
-working with particles in PySPH. Take a look at the :ref:`tutorials`
-if you want to try out some of the examples. For the experienced user,
-take a look at :ref:`design_overview` if you want to extend PySPH for
-your application.
+working with particles in PySPH. Take a look at :ref:`tutorials` for a
+tutorial introduction to some of the examples. For the experienced
+user, take a look at :ref:`design_overview` for some of the internal
+code-generation details and if you want to extend PySPH for your
+application.
 
 
 Working With Particles
@@ -44,7 +46,8 @@ shell are given below
     >>> array.set_data( numpy.arange(10) )           # set the data from a NumPy array
     >>> array.get(3)                                 # get the value at a given index
     >>> array.set(5, -1.0)                           # set the value at an index to a value
-
+    >>> array[3]                                     # standard indexing
+    >>> array[5] = -1.0                              # standard indexing
 
 .. py:currentmodule:: pysph.base.particle_array
 
@@ -70,7 +73,8 @@ instantiated with an arbitrary number of properties. Each property is stored
 internally as a :py:class:`pyzoltan.core.carray.BaseArray` of the appropriate
 type.
 
-By default, every **ParticleArray** will have the following properties:
+By default, every **ParticleArray** returned using the helper function
+will have the following properties:
 
     - `x, y, z`   : Position coordinates (doubles)
     - `u, v, w`   : Velocity (doubles)
@@ -82,37 +86,39 @@ By default, every **ParticleArray** will have the following properties:
     - `tag`       : Tag (int)
 
 The role of the particle properties like positions, velocities and
-other variables is clear.
+other variables should be clear. These define either the kinematic or
+dynamic properties associated with SPH particles in a simulation.
 
 PySPH introduces a global identifier for a particle which is required
 to be *unique* for that particle. This is represented with the
-property *gid* which is of type *unsigned int*. This property is
+property **gid** which is of type **unsigned int**. This property is
 used in the parallel load balancing algorithm with Zoltan.
 
-The property *pid* for a particle is an *integer* that is used to
+The property **pid** for a particle is an **integer** that is used to
 identify the processor to which the particle is currently assigned.
 
-The property *tag* is an *integer* that is used for any other
+The property **tag** is an **integer** that is used for any other
 identification. For example, we might want to mark all boundary
-particles with the tag 100. Using the *tag*, we can delete all such
-particles as
+particles with the tag 100. Using this property, we can delete all
+such particles as
 
 .. code-block:: python
 
    >>> pa.remove_tagged_particles(tag=100)
 
 This gives us a very flexible way to work with particles. Another way
-of deleting/extracting particles is by providing the indices for the
-particles in a **LongArray**:
+of deleting/extracting particles is by providing the indices (as a
+`list`, `NumPy array` or a :py:class:`LongArray`) of the particles to
+be removed:
 
 .. code-block:: python
 
-   >>> indices = numpy.array([1,3,5,7])
-   >>> la = LongArray(indices.size); la.set_data(indices)
-   >>> pa.remove_particles( la )
+   >>> indices = [1,3,5,7]
+   >>> pa.remove_particles( indices )
    >>> extracted = pa.extract_particles(la, props=['rho', 'x', 'y'])
 
-:py:class:`ParticleArrays` can be concatenated:
+A :py:class:`ParticleArray` can be concatenated with another array to
+result in a larger array:
 
 .. code-block:: python
 
@@ -125,6 +131,8 @@ To set a given list of properties to zero:
    >>> props = ['au', 'av', 'aw']
    >>> pa.set_to_zero(props)
 
+Take a look at :py:class:`ParticleArray` reference documentation for
+some of the other methods and their uses.
 
 .. py:currentmodule:: pysph.base.nnps
 
@@ -181,3 +189,4 @@ particles, we can call the :py:meth:`NNPS.update` method:
 .. code-block:: python
 
    >>> nps.update()
+

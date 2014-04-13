@@ -1,5 +1,9 @@
 .. _tutorials:
 
+==================
+Learning the ropes
+==================
+
 In the tutorials, we will introduce the PySPH framework in the context
 of the examples provided. Read this if you are a casual user and want
 to use the framework *as is*. If you want to add new functions and
@@ -17,10 +21,6 @@ framework. *All* examples follow the following steps:
 
 The tutorials address each of the steps in this flowchart for problems
 with increasing complexity.
-
-
-Learning the ropes
-==================
 
 The first example we consider is a "patch" test for SPH formulations
 for incompressible fluids in ``examples/elliptical_drop.py``. This
