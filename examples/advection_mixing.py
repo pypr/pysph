@@ -54,14 +54,9 @@ def create_particles(**kwargs):
     fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
 
     # add the requisite arrays
-    fluid.add_property( {'name': 'color'} )
-    fluid.add_property( {'name': 'ax'} )
-    fluid.add_property( {'name': 'ay'} )
-    fluid.add_property( {'name': 'az'} )
-    
-    fluid.add_property( {'name': 'u0'} )
-    fluid.add_property( {'name': 'v0'} )
-    
+    for prop in ('color', 'ax', 'ay', 'az', 'u0', 'v0'):
+        fluid.add_property(name=prop)
+
     print "Advection mixing problem :: nfluid = %d"%(
         fluid.get_number_of_particles())
     

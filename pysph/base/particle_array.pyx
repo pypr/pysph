@@ -222,7 +222,7 @@ cdef class ParticleArray:
         props = d['properties']
         self.constants = d['constants']
         for prop in props:
-            self.add_property(props[prop])
+            self.add_property(**props[prop])
         self.num_real_particles = numpy.sum(props['tag']['data']==Local)
 
     ######################################################################
@@ -302,7 +302,7 @@ cdef class ParticleArray:
         for prop in props.keys():
             prop_info = props[prop]
             prop_info['name'] = prop
-            self.add_property(prop_info)
+            self.add_property(**prop_info)
 
         self.align_particles()
 
@@ -314,7 +314,7 @@ cdef class ParticleArray:
         else:
             return 0
 
-    cpdef remove_particles(self, BaseArray index_list):
+    cpdef remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
         We repeatedly interchange the values of the last element and values from
@@ -323,7 +323,8 @@ cdef class ParticleArray:
 
         **Parameters**
 
-         - index_list - an array of indices, this array should be a LongArray.
+         - indices - an array of indices, this array can be a list, numpy
+           array or a LongArray.
 
         **Algorithm**::
 
@@ -336,6 +337,14 @@ cdef class ParticleArray:
              array.remove(sorted_indices)
 
         """
+        cdef BaseArray index_list
+        if isinstance(indices, BaseArray):
+            index_list = indices
+        else:
+            indices = numpy.asarray(indices)
+            index_list = LongArray(indices.size)
+            index_list.set_data(indices)
+
         cdef str msg
         cdef numpy.ndarray sorted_indices
         cdef BaseArray prop_array
@@ -470,9 +479,10 @@ cdef class ParticleArray:
                 nparr_dest[old_num_particles:] = nparr_source
             else:
                 # meaning this property is not there in self.
-                self.add_property({'name':prop_name,
-                        'default':parray.default_values[prop_name],
-                        'type':parray.properties[prop_name].get_c_type()})
+                self.add_property(name=prop_name,
+                                  type=parray.properties[prop_name].get_c_type(),
+                                  default=parray.default_values[prop_name]
+                                  )
                 # now add the values to the end of the created array
                 dest = <BaseArray>PyDict_GetItem(self.properties, prop_name)
                 nparr_dest = dest.get_npy_array()
@@ -647,24 +657,22 @@ cdef class ParticleArray:
         else:
             return None
 
-    cpdef add_property(self, dict prop_info):
-        """ Add a new property based on information in prop_info
+    cpdef add_property(self, str name, str type='double', default=None, data=None):
+        """ Add a new property to the particle array.
 
-        **Params**
+        **Parameters**
 
-            - prop_info - a dict with the following keys:
+            - 'name' - compulsory name of property.
+            - 'type' - specifying the data type of this property.
+            - 'default' - specifying the default value of this property.
+            - 'data' - specifying the data associated with each particle.
 
-                - 'name' - compulsory key
-                - 'type' - specifying the data type of this property.
-                - 'default' - specifying the default value of this property.
-                - 'data' - specifying the data associated with each particle.
-
-                type, default and data are optional keys. They will take the
-                following default values:
-                type - 'double' by default
-                default - 0 by default
-                data - if not present, an array with all values set to default will
-                be used for this property.
+            type, default and data are optional keys. They will take the
+            following default values:
+            type - 'double' by default
+            default - 0 by default
+            data - if not present, an array with all values set to default will
+            be used for this property.
 
         **Notes**
 
@@ -695,27 +703,8 @@ cdef class ParticleArray:
               sure particles are aligned properly.
 
         """
-        cdef str prop_name=None, data_type=None
-        cdef object data=None, default=None
+        cdef str prop_name=name, data_type=type
         cdef bint array_size_proper = False
-        cdef PyObject* temp_obj
-
-        temp_obj = PyDict_GetItemString(prop_info, 'name')
-        if temp_obj != NULL:
-            prop_name = <str>temp_obj
-        temp_obj = PyDict_GetItemString(prop_info, 'type')
-        if temp_obj != NULL:
-            data_type = <str>temp_obj
-        temp_obj = PyDict_GetItemString(prop_info, 'data')
-        if temp_obj != NULL:
-            data = <object>temp_obj
-        temp_obj = PyDict_GetItemString(prop_info, 'default')
-        if temp_obj != NULL:
-            default = <object>temp_obj
-
-        if prop_name is None:
-            logger.error('Cannot add property with no name')
-            raise ValueError
 
         # make sure the size of the supplied array is consistent.
         if (data is None or self.get_number_of_particles() == 0 or
@@ -960,13 +949,13 @@ cdef class ParticleArray:
             self.is_dirty = True
             self.indices_invalid = True
 
-    cpdef ParticleArray extract_particles(self, LongArray index_array, list
-                                          props=None):
+    cpdef ParticleArray extract_particles(self, indices, list props=None):
         """ Create new particle array for particles with indices in index_array
 
         **Parameters**
 
-            - index_array - indices of particles to be extracted.
+            - indices - indices of particles to be extracted (can be a
+              LongArray or list/numpy array).
             - props - the list of properties to extract, if None all properties
               are extracted.
 
@@ -977,9 +966,16 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
+        cdef BaseArray index_array
+        if isinstance(indices, BaseArray):
+            index_array = indices
+        else:
+            indices = numpy.asarray(indices)
+            index_array = LongArray(indices.size)
+            index_array.set_data(indices)
+
         cdef ParticleArray result_array = ParticleArray()
         cdef list prop_names
-        cdef long* idx_data
         cdef BaseArray dst_prop_array, src_prop_array
         cdef str prop_type, prop
 
@@ -991,9 +987,9 @@ cdef class ParticleArray:
         for prop in prop_names:
             prop_type = self.properties[prop].get_c_type()
             prop_default = self.default_values[prop]
-            result_array.add_property({'name':prop,
-                                       'type':prop_type,
-                                       'default':prop_default})
+            result_array.add_property(name=prop,
+                                      type=prop_type,
+                                      default=prop_default)
 
         # now we have the result array setup.
         # resize it
@@ -1001,9 +997,6 @@ cdef class ParticleArray:
             return result_array
 
         result_array.extend(index_array.length)
-
-        # now copy the values.
-        idx_data = index_array.get_data_ptr()
 
         # copy the required indices for each property.
         for prop in prop_names:

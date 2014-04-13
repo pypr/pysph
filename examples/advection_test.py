@@ -59,14 +59,11 @@ def create_particles(**kwargs):
     fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, h=h)
 
     # remove particles outside the circular patch
-    to_remove = LongArray(len(indices)); to_remove.set_data(np.array(indices))
-    fluid.remove_particles(to_remove)
+    fluid.remove_particles(indices)
 
     # add the requisite arrays
-    fluid.add_property( {'name': 'color'} )
-    fluid.add_property( {'name': 'ax'} )
-    fluid.add_property( {'name': 'ay'} )
-    fluid.add_property( {'name': 'az'} )
+    for prop in ('color', 'ax', 'ay', 'az'):
+        fluid.add_property(name=prop)
 
     print "Advection test :: nfluid = %d"%(
         fluid.get_number_of_particles())
