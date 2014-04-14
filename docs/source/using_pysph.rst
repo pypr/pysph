@@ -27,9 +27,10 @@ the basic data structures for arrays
 C-arrays
 ^^^^^^^^^^
 
-The :py:class:`BaseArray` class provides a typed array data structure called
-**BaseArray**. These are used throughout PySPH and are fundamentally very
-similar to NumPy arrays. The following named types are supported:
+The :py:class:`BaseArray` class provides a typed array data structure
+called **CArray**. These are used throughout PySPH and are
+fundamentally very similar to NumPy arrays. The following named types
+are supported:
 
     - :py:class:`UIntArray`    (32 bit unsigned integers)
     - :py:class:`IntArray`     (32 bit signed integers)
@@ -51,6 +52,7 @@ shell are given below
     >>> array[5] = -1.0                              # standard indexing
 
 .. py:currentmodule:: pysph.base.particle_array
+.. py:currentmodule:: pyzoltan.core.carray
 
 ^^^^^^^^^^^^^^
 ParticleArray
@@ -75,8 +77,8 @@ instantiated with an arbitrary number of properties. Each property is stored
 internally as a :py:class:`pyzoltan.core.carray.BaseArray` of the appropriate
 type.
 
-By default, every **ParticleArray** returned using the helper function
-will have the following properties:
+By default, every :py:class:`ParticleArray` returned using the helper
+function will have the following properties:
 
     - `x, y, z`   : Position coordinates (doubles)
     - `u, v, w`   : Velocity (doubles)
@@ -193,9 +195,11 @@ particles, we can call the :py:meth:`NNPS.update` method:
 
    >>> nps.update()
 
-^^^^^^^^^^^^^^^^^
+.. py:currentmodule:: pysph.base.nnps
+
+^^^^^^^^^^^^^^^^^^^^^^
 Periodic domains
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 
 The constructor for the :py:class:`NNPS` accepts an optional argument
 (:py:class:`DomainLimits`) that is used to delimit the maximum
@@ -218,7 +222,7 @@ When the :py:class:`NNPS` object is constructed with this
 :py:class:`DomainLimits`, care is taken to create periodic ghosts for
 particles in the vicinity of the periodic boundaries. These *ghost*
 particles are given a special **tag** defined by
-`pysph.base.utils.ParticleTAGS`:
+:py:class:`ParticleTAGS`
 
 .. code-block:: python
 
@@ -245,14 +249,16 @@ particles are given a special **tag** defined by
    The *Ghost* tag is used for particles that are created to satisfy
    boundary conditions locally.
 
+.. py:currentmodule:: pysph.base.particle_array
+
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Particle aligning
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 In PySPH, the :py:class:`ParticleArray` aligns all particles upon a
-call to the `ParticleArray.align` method. The aligning is done so that
-all particles with the *Local* tag are placed first, followed by
-particles with other tags. 
+call to the :py:meth:`ParticleArray.align_particles` method. The
+aligning is done so that all particles with the *Local* tag are placed
+first, followed by particles with other tags.
 
 There is no preference given to the tags other than the fact that a
 particle with a non-zero tag is placed after *all* particles with a
@@ -263,7 +269,7 @@ particles or particles that we want to do active computation on
 The data attribute `ParticleArray.num_real_particles` returns the
 number of real or *Local* particles. The total number of particles in
 a given :py:class:`ParticleArray` can be obtained by a call to the
-`ParticleArray.get_number_of_particles()` method.
+:py:meth:`ParticleArray.get_number_of_particles` method.
 
 The following is a simple example demonstrating this default behaviour
 of PySPH:
@@ -295,6 +301,9 @@ of PySPH:
 We are now in a position to put all these ideas together and write our
 first SPH application.
 
+.. py:currentmodule:: pysph.base.kernels
+.. py:currentmodule:: pysph.base.nnps
+
 ---------------------------------------
 Putting it together: A simple example
 ---------------------------------------
@@ -319,8 +328,6 @@ estimation for the particle density
 We will use the :py:class:`CubicSpline` kernel, defined in
 `pysph.base.kernels` module. The code to set-up the particle
 distribution is given below
-
-.. py:currentmodule:: pysph.base.kernels
 
 .. code-block:: python
 
@@ -423,7 +430,7 @@ neighboring particles:
        nps.get_nearest_particles(0, 0, i, nbrs)                            # get neighbors
        neighbors = nbrs.get_npy_array()                                    # numpy array of neighbors
 
-       _rho = 0.0
+       rho = 0.0
        for j in neighbors:                                                 # iterate over each neighbor
 
 	   xij = xi - x[j]                                                 # interaction terms
@@ -433,9 +440,9 @@ neighboring particles:
 
 	   wij = k.kernel( [xij, yij, 0.0], rij, hij)                      # kernel interaction
 
-	   _rho += m[j] * wij
+	   rho += m[j] * wij
 
-       pa.rho[i] = _rho                                                    # contribution for this destination
+       pa.rho[i] = rho                                                    # contribution for this destination
 
 The average density computed in this manner can be verified as
 :math:`\rho_{\text{avg}} = 0.99994676895585222`.
