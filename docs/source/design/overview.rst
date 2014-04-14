@@ -420,7 +420,7 @@ pure Python equations are then used to generate high-performance code and then
 called appropriately to perform the simulations.
 
 In general an SPH algorithm proceeds as the following pseudo-code
-illustrates::
+illustrates:
 
     for destination in particles:
         for equation in equations:
