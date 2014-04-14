@@ -1,3 +1,6 @@
+.. _installation:
+
+=================================
 Installation and getting started
 =================================
 
@@ -5,9 +8,13 @@ To install PySPH, you need a working Python environment. We recommend
 `Enthought Canopy`_ if you are new to Python or any other Python distribution
 of your choice.
 
-
-Core dependencies
 ------------------
+Dependencies
+------------------
+
+^^^^^^^^^^^^^^^^^^
+Core dependencies
+^^^^^^^^^^^^^^^^^^
 
 The core dependencies are:
 
@@ -27,8 +34,9 @@ Cython and Mako can be installed from the command line using::
 .. _nose: https://pypi.python.org/pypi/nose
 .. _Mako: https://pypi.python.org/pypi/Mako
 
+^^^^^^^^^^^^^^^^^^^^^^
 Optional dependencies
------------------------
+^^^^^^^^^^^^^^^^^^^^^^
 
 PySPH provides a convenient viewer to view the output of results.  This viewer
 is called ``pysph_viewer`` and requires Mayavi_ to be installed.  Since this
@@ -42,7 +50,7 @@ data management library.
 .. _mpi4py: http://mpi4py.scipy.org/
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
-
+-------------------------------
 Building and linking PyZoltan
 -------------------------------
 
@@ -60,9 +68,13 @@ If you wish to see a working and complete  build/test script please see the
 `continous build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`_
 hosted at `Drone.io <http://drone.io>`_.
 
+-------------------------------
+Building and Installing PySPH
+-------------------------------
 
+^^^^^^^^^^^^^^
 Getting PySPH
---------------
+^^^^^^^^^^^^^^
 
 The best way to currently get PySPH is via git_::
 
@@ -76,10 +88,6 @@ sources.
 
 .. _git: http://git-scm.com/
 
-
-Building and Installing PySPH
--------------------------------
-
 Once you have the dependencies installed you can install PySPH with::
 
     $ python setup.py install
@@ -90,9 +98,9 @@ You could also do::
 
 This is useful if you are tracking the latest version of PySPH via git.
 
-
+^^^^^^^^^^^^^^^^^^^
 Running the tests
-------------------
+^^^^^^^^^^^^^^^^^^^
 
 To test PySPH from the source distribution you can do::
 
@@ -101,7 +109,7 @@ To test PySPH from the source distribution you can do::
 This should run all the tests.
 
 
-
+---------------------
 Running the examples
 ---------------------
 
@@ -153,6 +161,7 @@ Which runs the problem of the collision of two elastic rings:
 The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint hearted.
 
+--------------------------------------
 Organization of the ``pysph`` package
 --------------------------------------
 

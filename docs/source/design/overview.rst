@@ -420,7 +420,9 @@ pure Python equations are then used to generate high-performance code and then
 called appropriately to perform the simulations.
 
 In general an SPH algorithm proceeds as the following pseudo-code
-illustrates::
+illustrates:
+
+.. code-block:: python
 
     for destination in particles:
         for equation in equations:
@@ -487,7 +489,7 @@ are to be followed when writing the equations.
 .. py:currentmodule:: pysph.sph.basic_equations
 
 Let us look at the :py:class:`ContinuityEquation` as another simple example.
-It is instantiated as::
+It is instantiated as:
 
 .. code-block:: python
 
