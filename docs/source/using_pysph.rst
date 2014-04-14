@@ -300,6 +300,7 @@ of PySPH:
 We are now in a position to put all these ideas together and write our
 first SPH application.
 
+.. py:currentmodule:: pyzoltan.core.zoltan
 .. py:currentmodule:: pysph.parallel.parallel_manager
 
 -------------------------------
