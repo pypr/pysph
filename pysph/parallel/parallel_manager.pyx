@@ -506,7 +506,6 @@ cdef class ParallelManager:
         (g) Update the local cell map to accomodate remote particles.
 
         Notes:
-        ------
 
         Although not intended to be a 'parallel' NNPS, the
         ParallelManager can be used for this purpose. I don't think
