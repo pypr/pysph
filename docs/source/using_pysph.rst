@@ -52,7 +52,6 @@ shell are given below
     >>> array[5] = -1.0                              # standard indexing
 
 .. py:currentmodule:: pysph.base.particle_array
-.. py:currentmodule:: pyzoltan.core.carray
 
 ^^^^^^^^^^^^^^
 ParticleArray
@@ -140,9 +139,9 @@ some of the other methods and their uses.
 
 .. py:currentmodule:: pysph.base.nnps
 
--------------------------------------
-Nearest Neighbour Particle Searching
--------------------------------------
+-------------------------------------------
+Nearest Neighbour Particle Searching (NNPS)
+-------------------------------------------
 
 To carry out pairwise interactions for SPH, we need to find the nearest
 neighbours for a given particle within a specified interaction radius. The
@@ -301,6 +300,49 @@ of PySPH:
 We are now in a position to put all these ideas together and write our
 first SPH application.
 
+.. py:currentmodule:: pysph.parallel.parallel_manager
+
+-------------------------------
+Parallel NNPS with PyZoltan
+-------------------------------
+
+PySPH uses the Zoltan_ data management library for dynamic load
+balancing through a Python wrapper :py:class:`PyZoltan`, which
+provides functionality for parallel neighbor queries in a manner
+completely analogous to :py:class:`NNPS`.
+
+Particle data is managed and exchanged in parallel via a derivative of
+the abstract base class :py:class:`ParallelManager` object. Continuing
+with our example, we can instantiate a
+:py:class:`ZoltanParallelManagerGeometric` object as:
+
+.. code-block:: python
+ 
+   >>> ... # create particles
+   >>> from pysph.parallel import ZoltanParallelManagerGeometric
+   >>> pm = ZoltanParallelManagerGeometric(dim, particles, comm, radius_scale, lb_method)
+
+The constructor for the parallel manager is quite similar to the
+:py:class:`NNPS` constructor, with two additional parameters, `comm`
+and `lb_method`. The first is the `MPI communicator` object and the
+latter is the partitioning algorithm requested. The following
+geometric load balancing algorithms are supported:
+
+ - Recursive Coordinate Bisection (RCB_)
+ - Recursive Inertial Bisection (RIB_)
+ - Hilbert Space Filling Curves (HSFC_)
+
+The particle distribution can be updated in parallel by a call to the
+:py:meth:`ParallelManager.update` method. Particles across processor
+boundaries that are needed for neighbor queries are assigned the tag
+*Remote* as shown in the figure:
+
+.. figure:: ../Images/local-remote-particles.png
+   :align: center
+
+   Local and remote particles in the vicinity of a processor boundary
+   (dashed line)
+
 .. py:currentmodule:: pysph.base.kernels
 .. py:currentmodule:: pysph.base.nnps
 
@@ -457,5 +499,11 @@ can be used as a library for managing particles for your application.
 
 If you are interested in the PySPH framework and want to try out some
 eaxmples, check out the tutorials: :ref:`tutorials`.
+
+.. _Zoltan: http://www.cs.sandia.gov/Zoltan/
+
+.. _RCB: http://www.cs.sandia.gov/Zoltan/ug_html/ug_alg_rcb.html
+.. _RIB: http://www.cs.sandia.gov/Zoltan/ug_html/ug_alg_rib.html
+.. _HSFC: http://www.cs.sandia.gov/Zoltan/ug_html/ug_alg_hsfc.html
 
 ..  LocalWords:  DomainLimits maximum
