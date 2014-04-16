@@ -252,6 +252,12 @@ class Integrator(object):
         where "fluid" and "solid" are the names of the particle arrays.
         """
         self.cfl = 0.5
+
+        for array_name, integrator_step in kw.iteritems():
+            if not isinstance(integrator_step, IntegratorStep):
+                msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
+                raise ValueError(msg)
+            
         self.steppers = kw
         self.parallel_manager = None
         # This is set later when the underlying compiled integrator is created
