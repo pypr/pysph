@@ -131,6 +131,10 @@ class Solver(object):
                 msg = 'Unknown keyword arg "%s" passed to constructor'%attr
                 raise TypeError(msg)
 
+        # default time step constants
+        self.final_time = 0.0
+        self.dt = 0.0
+
     def setup(self, particles, equations, nnps, kernel=None):
         """ Setup the solver.
 
