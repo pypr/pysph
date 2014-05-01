@@ -454,7 +454,8 @@ The :py:class:`ZComm` object is instantiated with this information as
 
     zcomm = zoltan_comm.ZComm(comm, tag=tag, nsend=nsend, proclist=proclist)
 
-where a message tag is also chosen for the ensuing data transfer.
+where a message tag is also chosen for the ensuing data transfer. This
+sets up a communication plan which will be used subsequently.
 
 .. note::
 
@@ -492,6 +493,10 @@ allocate the data on the receive side. The output from this example is
     Proc 1, Received [ 0.59492848]
     Proc 2, Received [ 0.46479566]
 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Changing the size of data communicated
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 The :py:class:`ZComm` object was used to send values of type `float64`
 in this example. If the number of objects to be sent and their
 destinations are the same, we can modify the :py:class:`ZComm` to send
@@ -524,4 +529,46 @@ The output with this change is::
     Proc 2, Received [ 171 1177]
     Proc 0, Received [1105 2418 2550]
 
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Reversing the communication plan
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+It is often the case for dynamic applications that objects initially
+shared with remote processors have their values updated on remote
+processors. Subsequently, these updated values are required on the
+originating processor, necessitating them to be communicated back. 
+
+For such scenarios, the communication plan represented by
+:py:class:`ZComm` can be used to *reverse* the communication. That is
+the data that was originally sent will be treated as a receive and
+vice-versa. 
+
+To illustrate the use of this feature, we continue with our
+example. The received data (array of unsigned ints) is modified on the
+remote processor and communicated back using the
+:py:meth:`ZComm.Comm_Do_Reverse` method:
+
+.. code-block:: python
+
+    recvdata[:] = rank
+    print 'Proc %d, sending updated data %s'%(rank, recvdata)
+    updated_recvbuf = zcomm.Comm_Do_Reverse(recvdata, np.uint32)
+    print 'Proc %d, received updated data %s'%(rank, updated_recvbuf)
+
+The output from this when run on 3 processors is::
+
+    $ mpirun  -n 3  python zcomm.py 
+    Proc 0, Sending [1005  331  948  791] to [2 1 1 1]
+    Proc 1, Sending [1403 1456 2030 1236 1149] to [2 2 2 0 2]
+    Proc 0, Received [1236 2701]
+    Proc 0, sending updated data [0 0]
+    Proc 2, Sending [2218 2863 2076 2701] to [1 1 1 0]
+    Proc 1, Received [ 331  948  791 2218 2863 2076]
+    Proc 1, sending updated data [1 1 1 1 1 1]
+    Proc 2, Received [1005 1403 1456 2030 1149]
+    Proc 2, sending updated data [2 2 2 2 2]
+    Proc 1, received updated data [2 2 2 0 2]
+    Proc 0, received updated data [2 1 1 1]
+    Proc 2, received updated data [1 1 1 0]
+    
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
