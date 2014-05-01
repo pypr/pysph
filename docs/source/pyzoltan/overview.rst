@@ -372,4 +372,156 @@ can be used to effect the data transfer.
 Another option is to use the unstructured communication utilities
 offered by Zoltan. This is described next.
 
+------------------------------------------
+Unstructured point to point communication
+------------------------------------------
+
+.. py:currentmodule:: pyzoltan.core.zoltan_comm
+
+In the previous section, we saw how to use the Zoltan library function
+to invert a set of export indices to get corresponding import
+indices. Naturally, with a little bit of work, we can structure the
+requisite communication (`MPI` send and receives) to exchange the
+data. 
+
+This set of operations is fairly common and Zoltan_ (PyZoltan)
+provides a very convenient utility called :py:class:`ZComm` to perform
+such communication. The typical use case for :py:class:`ZComm` is when
+we know the list of local objects to send to remote processors but
+have no information about the objects to be received. An example
+(`pyzoltan/core/tests/zcomm.py`) demonstrating the use of the
+:py:class:`ZComm` object is displayed below:
+
+.. code-block:: python
+
+    import mpi4py.MPI as mpi
+    import numpy as np
+    from numpy import random
+
+    # import the unstructured communication package
+    from pyzoltan.core import zoltan_comm
+    from pyzoltan.core import zoltan
+
+    # MPI comm, rank and size
+    comm = mpi.COMM_WORLD; rank = comm.Get_rank(); size = comm.Get_size()
+
+    # each processor creates some random data
+    numObjectsTotal = 1<<10
+
+    x = random.random(numObjectsTotal)
+    gids = np.array( np.arange(size * numObjectsTotal) )[rank*numObjectsTotal:(rank+1)*numObjectsTotal]
+    gids = gids.astype(np.uint32)
+
+    # arbitrarily assign some objects to be sent to some other processor
+    nsend = np.int32( random.random_integers(low=1, high=10) )
+    object_ids = random.random_integers( low=0, high=numObjectsTotal, size=nsend )
+    proclist = random.random_integers(low=0, high=size-1, size=nsend).astype(np.int32)
+
+    indices = np.where(proclist == rank)[0]
+    proclist[indices] = -1
+
+    # create the ZComm object
+    tag = np.int32(0)
+    zcomm = zoltan_comm.ZComm(comm, tag=tag, nsend=nsend, proclist=proclist)
+
+    # the data to send and receive
+    senddata = x[ object_ids ]
+    recvdata = np.ones( zcomm.nreturn )
+
+    # use zoltan to exchange doubles
+    print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+    zcomm.Comm_Do(senddata, recvdata)
+    print "Proc %d, Received %s"%(rank, recvdata)
+
+In this example, each processor creates some random data of size
+`numObjectsTotal`. Each object is assigned a unique global identifier
+as required by Zoltan. Five objects are chosen randomly to be sent to
+the other processors which are also chosen randomly:
+
+.. code-block:: python
+
+    # arbitrarily assign some objects to be sent to some other processor
+    nsend = np.int32( random.random_integers(low=1, high=10) )
+    object_ids = random.random_integers( low=0, high=numObjectsTotal, size=nsend )
+    proclist = random.random_integers(low=0, high=size-1, size=nsend).astype(np.int32)
+
+    indices = np.where(proclist == rank)[0]
+    proclist[indices] = -1
+
+The :py:class:`ZComm` object is instantiated with this information as
+
+.. code-block:: python
+
+    zcomm = zoltan_comm.ZComm(comm, tag=tag, nsend=nsend, proclist=proclist)
+
+where a message tag is also chosen for the ensuing data transfer.
+
+.. note::
+
+   If a processor chooses to send data to itself (since we pick this
+   randomly), the processor in the `proclist` argument is set to
+   `-1`. This is one way of telling Zoltan to ignore this object.
+
+Upon instantiation, the `ZComm.nreturn` data attribute indicates the
+number of objects to be received by this processor. This can be used
+to allocate a buffer to receive the data:
+
+.. code-block:: python
+
+    # the data to send and receive
+    senddata = x[ object_ids ]
+    recvdata = np.ones( zcomm.nreturn )
+
+Finally, with the receive buffer allocated, the
+:py:meth:`ZComm.Comm_Do` method can be used to exchange the data:
+
+.. code-block:: python
+
+    zcomm.Comm_Do(senddata, recvdata)
+
+Note that the user does not need to explicitly write the `MPI` send
+and receive calls. All that is required from the user is to correctly
+allocate the data on the receive side. The output from this example is
+(it will vary given the use of random numbers)::
+
+    $ mpirun  -n 3  python zcomm.py 
+    Proc 2, Sending [ 0.81440537  0.90121359  0.65025628  0.24728032] to [-1  0  0 -1]
+    Proc 0, Sending [ 0.19186399  0.59492848] to [-1  1]
+    Proc 1, Sending [ 0.05956925  0.39236052  0.46479566] to [-1  0  2]
+    Proc 0, Received [ 0.39236052  0.90121359  0.65025628]
+    Proc 1, Received [ 0.59492848]
+    Proc 2, Received [ 0.46479566]
+
+The :py:class:`ZComm` object was used to send values of type `float64`
+in this example. If the number of objects to be sent and their
+destinations are the same, we can modify the :py:class:`ZComm` to send
+other objects. For example, the same object can be used to exchange
+the global indices (`uint32`) like so:
+
+.. code-block:: python
+
+    senddata = gids[ object_ids ]
+    recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
+    zcomm.set_nbytes(4)
+
+    print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+    zcomm.Comm_Do(senddata, recvdata)
+    print "Proc %d, Received %s"%(rank, recvdata)
+
+.. note::
+
+   The :py:meth:`ZComm.set_nbytes` method is used to indicate the size
+   of the individual objects that is communicated via
+   :py:meth:`ZComm.Comm_Do`
+
+The output with this change is::
+
+    $ mpirun  -n 3  python zcomm.py
+    Proc 1, Sending [1105 1177] to [0 2]
+    Proc 2, Sending [2821 2418 2550] to [1 0 0]
+    Proc 1, Received [ 158 2821]
+    Proc 0, Sending [294 171 553 158 563] to [-1  2 -1  1 -1]
+    Proc 2, Received [ 171 1177]
+    Proc 0, Received [1105 2418 2550]
+
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
