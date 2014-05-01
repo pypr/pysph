@@ -24,7 +24,7 @@ Tutorials
 
    tutorial/circular_patch.rst
 
-
+**************************************
 Extending PySPH and code-generation
 **************************************
 
@@ -33,8 +33,16 @@ Extending PySPH and code-generation
 
    design/overview.rst
 
+**********
+PyZoltan
+**********
 
+.. toctree::
+   :maxdepth: 2
+   
+   pyzoltan/overview
 
+************************
 Reference documentation
 ************************
 
