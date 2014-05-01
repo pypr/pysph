@@ -1,4 +1,25 @@
-"""PyZoltan wrapper"""
+"""Definitions for the Zoltan wrapper
+
+This module defines the main wrapper for the Zoltan library. Users can
+use derived classes of PyZoltan to perform a domain decomposition on
+their data. Currently, the following partitioners are available:
+
+ - ZoltanGeometricPartitioner : Dynamic load balancing using RCB, RIB, HSFC
+
+Zoltan works by calling user defined call back functions that have to
+be registered with Zoltan. These functions query a user defined data
+structure and provide the requisite information for Zoltan to proceed
+with the load balancing. The user defined data structures are defined
+as structs in the accompanying header (.pxd) file. 
+
+The user is responsible to populate this struct appropriately with
+application specific data and register the right query functions with
+Zoltan for the chosen algorithm.
+
+Refer to the Zoltan reference manual for a complete list of available
+query functions, load balancing algorithms and auxiliary functions.
+
+"""
 cimport mpi4py.MPI as mpi
 from mpi4py cimport mpi_c as mpic
 
@@ -47,15 +68,6 @@ cdef _check_error(int ierr):
 
 ###############################################################
 # ZOLTAN QUERY FUNCTIONS FOR GEOMETRIC PARTITIONING
-
-# The data structure to hold information about objects that are to be
-# partitioned using the class of Geometric load balancing algorithms
-# is defined in the struct `CoordinateData` in zoltan.pxd. This struct
-# is populated with object data to be partitioned and passed as a
-# void* to the query functions. 
-
-# Refer to the Zoltan reference manual for a complete list of
-# available query functions.
 ###############################################################
 cdef int get_number_of_objects(void* data, int* ierr):
     """Return the number of local objects on a processor.
@@ -157,18 +169,25 @@ cdef class PyZoltan:
             MPI communicator to be used
 
         obj_weight_dim : str, default "0"
-            Weight dimensions for the object. The default value assumes 
-            all objects have equal weight.            
+            Number of weights accociated with an object. The default value implies
+            all objects have the same weight.
 
         edge_weight_dim : str, default "0"
-            Weight dimensions for the edge. The default value assumes all 
-            edges have equal weight.
+            Number of weights associated with an edge. The default value implies all 
+            edges have the same weight.
 
         debug_level : str, default "0"
-            Zoltan debug level. Values in the range -1 < 0 < 11 are accepted
+            Zoltan debug level. Values in the range [0, 10] are accepted
 
         return_lists : str, default "ALL"
-            Kind of lists to be returned by Zoltan
+            Kind of lists to be returned by Zoltan. Valid values:
+            
+            IMPORT - return only lists for objects to be imported
+            EXPORT - return only lists for objects to be exported
+            ALL    - return both import and export lists
+            PART   - return the processor and partition assignment for
+                     all local objects
+            NONE   - dont return anything
 
         Notes:
         
@@ -266,8 +285,12 @@ cdef class PyZoltan:
     def Zoltan_LB_Balance(self):
         """Call the Zoltan load balancing function.
 
-        After a call to this function, we get the import/export lists
-        required for load balancing.
+        After a call to this function, the import/export lists
+        required for load balancing are available as data attributes. 
+
+        The method returns an integer (1:True, 0:False) indicating
+        whether a change in the assignment of the objects is
+        necessary.
 
         """
         cdef Zoltan_Struct* zz = self._zstruct.zz
