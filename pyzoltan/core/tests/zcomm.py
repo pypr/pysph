@@ -36,9 +36,9 @@ senddata = x[ object_ids ]
 recvdata = np.ones( zcomm.nreturn )
 
 # use zoltan to exchange doubles
-#print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
-#zcomm.Comm_Do(senddata, recvdata)
-#print "Proc %d, Received %s"%(rank, recvdata)
+print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+zcomm.Comm_Do(senddata, recvdata)
+print "Proc %d, Received %s"%(rank, recvdata)
 
 # use zoltan to exchange unsigned ints
 senddata = gids[ object_ids ]
