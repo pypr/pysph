@@ -69,7 +69,7 @@ cdef class PyZoltan:
     ###############################################################
     # after a load balance, copy the Zoltan allocated lists to local
     # numpy arrays. The Zoltan lists are subsequently deallocated
-    cdef _set_Zoltan_lists(
+    cdef _set_zoltan_lists(
         self,
         int numExport,                          # number of objects to export
         ZOLTAN_ID_PTR _exportGlobal,            # global indices of export objects

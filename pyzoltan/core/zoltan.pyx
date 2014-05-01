@@ -328,8 +328,8 @@ cdef class PyZoltan:
         _check_error(ierr)
 
         # Copy the Zoltan allocated lists locally
-        self.reset_Zoltan_lists()
-        self._set_Zoltan_lists(numExport,
+        self.reset_zoltan_lists()
+        self._set_zoltan_lists(numExport,
                                exportGlobal,
                                exportLocal,
                                exportProcs,
@@ -353,7 +353,7 @@ cdef class PyZoltan:
         # return changes to determine if we need to do data movement
         return changes
 
-    def reset_Zoltan_lists(self):
+    def reset_zoltan_lists(self):
         """Reset all Zoltan Import/Export lists"""
         self.exportGlobalids.reset()
         self.exportLocalids.reset()
@@ -432,7 +432,7 @@ cdef class PyZoltan:
     #######################################################################
     # Private interface
     #######################################################################
-    cdef _set_Zoltan_lists(self,
+    cdef _set_zoltan_lists(self,
                            int numExport,
                            ZOLTAN_ID_PTR _exportGlobal,
                            ZOLTAN_ID_PTR _exportLocal,
@@ -611,7 +611,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         self.weights.resize( num_local_objects )
 
         # register the query functions with Zoltan
-        self._Zoltan_register_query_functions()
+        self._zoltan_register_query_functions()
 
     #######################################################################
     # Private interface
@@ -678,7 +678,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
     #######################################################################
     # Private interface
     #######################################################################
-    def _Zoltan_register_query_functions(self):
+    def _zoltan_register_query_functions(self):
         """Register query functions for the Geometric based partitioners
 
         The Geometric based partitioners are the simplest kind of
