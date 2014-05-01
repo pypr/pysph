@@ -68,7 +68,7 @@ cdef class PyZoltan:
     # Member functions
     ###############################################################
     # after a load balance, copy the Zoltan allocated lists to local
-    # numpy arrays. The Zoltan lists are freed after a call to LB_Balance
+    # numpy arrays. The Zoltan lists are subsequently deallocated
     cdef _set_Zoltan_lists(
         self,
         int numExport,                          # number of objects to export
@@ -81,7 +81,10 @@ cdef class PyZoltan:
         int* _importProcs                       # target processors to import
         )
 
-    # Invert the lists after computing remote particles
+    # Invert the export lists. Given a situation where every processor
+    # knows which objects must be exported to remote processors, a
+    # call to invert lists will return a list of objects that must be
+    # imported from remote processors.
     cpdef Zoltan_Invert_Lists(self)
 
 # User defined data for the RCB, RIB and HSFC methods
@@ -110,7 +113,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
     # data array for the global indices
     cdef public UIntArray gid
 
-    # User defined structure to hold the coordinate data for the Zoltan interface
+    # User defined structure to hold the coordinate data for the
+    # Zoltan interface
     cdef CoordinateData _cdata
 
     # number of global and local objects

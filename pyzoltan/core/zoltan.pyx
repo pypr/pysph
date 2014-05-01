@@ -47,6 +47,15 @@ cdef _check_error(int ierr):
 
 ###############################################################
 # ZOLTAN QUERY FUNCTIONS FOR GEOMETRIC PARTITIONING
+
+# The data structure to hold information about objects that are to be
+# partitioned using the class of Geometric load balancing algorithms
+# is defined in the struct `CoordinateData` in zoltan.pxd. This struct
+# is populated with object data to be partitioned and passed as a
+# void* to the query functions. 
+
+# Refer to the Zoltan reference manual for a complete list of
+# available query functions.
 ###############################################################
 cdef int get_number_of_objects(void* data, int* ierr):
     """Return the number of local objects on a processor.
@@ -60,7 +69,7 @@ cdef int get_number_of_objects(void* data, int* ierr):
 cdef void get_obj_list(void* data, int sizeGID, int sizeLID,
                        ZOLTAN_ID_PTR globalID, ZOLTAN_ID_PTR localID,
                        int wgt_dim, float* obj_wts, int* ierr):
-    """Return the local and global ids of the particles.
+    """Return the local and global ids of the objects.
 
     Methods: RCB, RIB, HSFC
 
@@ -114,13 +123,65 @@ cdef void get_geometry_list(void* data, int sizeGID, int sizeLID, int num_obj,
         raise ValueError("Dimension %d invalid for PyZoltan!"%dim)
 
 #########################################################################
-# The actual Zoltan Wrapper
+# Zoltan Wrapper
 #########################################################################
 cdef class PyZoltan:
+    """Base class for the Python wrapper for Zoltan
+
+    All Zoltan partitioners are derived from PyZoltan. This class sets
+    up the basic arrays used (import/export lists) for load balancing,
+    methods to set Zoltan parameters and the actual load balancing
+    method itself. 
+
+    The specific Zoltan interface functions that are exposed through
+    this class are:
+
+     - Zoltan_LB_Balance : The main load balancing routine. 
+         Upon return, a list of indices (local, global) to 
+         be imported and exported are available.
+
+     - Zoltan_Invert_Lists : Invert import/export lists
+         Upon return, a given set of lists is inverted.
+
+     - Zoltan_Set_Param : Set the value of a Zoltan parameter
+    
+    """
     def __init__(self, object comm, str obj_weight_dim="0",
                  str edge_weight_dim="0", debug_level="0",
                  str return_lists="ALL"):
-        """Initialize the Zoltan wrapper."""
+        """Initialize the Zoltan wrapper
+
+        Parameters:
+        
+        comm : MPI communicator
+            MPI communicator to be used
+
+        obj_weight_dim : str, default "0"
+            Weight dimensions for the object. The default value assumes 
+            all objects have equal weight.            
+
+        edge_weight_dim : str, default "0"
+            Weight dimensions for the edge. The default value assumes all 
+            edges have equal weight.
+
+        debug_level : str, default "0"
+            Zoltan debug level. Values in the range -1 < 0 < 11 are accepted
+
+        return_lists : str, default "ALL"
+            Kind of lists to be returned by Zoltan
+
+        Notes:
+        
+        Instantiation of the PyZoltan object initializes the Zoltan
+        library, creates the Zoltan struct ubiquitous in Zoltan calls
+        and also sets up the import/export lists that will be used for
+        the data exchange. It also sets up some reasonable default
+        values. 
+
+        In general though, any parameter can be set using the
+        Zoltan_Set_Param function wrapper
+
+        """
         self.comm = comm
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
@@ -270,7 +331,7 @@ cdef class PyZoltan:
         return changes
 
     def reset_Zoltan_lists(self):
-        """Reset all Zoltan interface lists"""
+        """Reset all Zoltan Import/Export lists"""
         self.exportGlobalids.reset()
         self.exportLocalids.reset()
         self.exportProcs.reset()
@@ -281,50 +342,6 @@ cdef class PyZoltan:
 
         self.numExport = 0
         self.numImport = 0
-
-    cdef _set_Zoltan_lists(self,
-                           int numExport,
-                           ZOLTAN_ID_PTR _exportGlobal,
-                           ZOLTAN_ID_PTR _exportLocal,
-                           int* _exportProcs,
-                           int numImport,
-                           ZOLTAN_ID_PTR _importGlobal,
-                           ZOLTAN_ID_PTR _importLocal,
-                           int* _importProcs):
-        """Get the import/export lists returned by Zoltan."""
-        cdef int i
-
-        cdef UIntArray exportGlobalids = self.exportGlobalids
-        cdef UIntArray exportLocalids = self.exportLocalids
-        cdef IntArray exportProcs = self.exportProcs
-
-        cdef UIntArray importGlobalids = self.importGlobalids
-        cdef UIntArray importLocalids = self.importLocalids
-        cdef IntArray importProcs = self.importProcs
-
-        # set the values for the number of import and export objects
-        self.numImport = numImport; self.numExport = numExport
-
-        # resize the PyZoltan import lists
-        importGlobalids.resize(numImport)
-        importLocalids.resize(numImport)
-        importProcs.resize(numImport)
-
-        # resize the PyZoltan export lists
-        exportGlobalids.resize(numExport)
-        exportLocalids.resize(numExport)
-        exportProcs.resize(numExport)
-
-        # set the Import/Export lists
-        for i in range(numExport):
-            exportGlobalids.data[i] = _exportGlobal[i]
-            exportLocalids.data[i] = _exportLocal[i]
-            exportProcs.data[i] = _exportProcs[i]
-
-        for i in range(numImport):
-            importGlobalids.data[i] = _importGlobal[i]
-            importLocalids.data[i] = _importLocal[i]
-            importProcs.data[i] = _importProcs[i]
 
     cpdef Zoltan_Invert_Lists(self):
         """Invert export lists to get import lists
@@ -389,6 +406,53 @@ cdef class PyZoltan:
 
         _check_error(ierr)
 
+    #######################################################################
+    # Private interface
+    #######################################################################
+    cdef _set_Zoltan_lists(self,
+                           int numExport,
+                           ZOLTAN_ID_PTR _exportGlobal,
+                           ZOLTAN_ID_PTR _exportLocal,
+                           int* _exportProcs,
+                           int numImport,
+                           ZOLTAN_ID_PTR _importGlobal,
+                           ZOLTAN_ID_PTR _importLocal,
+                           int* _importProcs):
+        "Copy the import/export lists returned by Zoltan"
+        cdef int i
+
+        cdef UIntArray exportGlobalids = self.exportGlobalids
+        cdef UIntArray exportLocalids = self.exportLocalids
+        cdef IntArray exportProcs = self.exportProcs
+
+        cdef UIntArray importGlobalids = self.importGlobalids
+        cdef UIntArray importLocalids = self.importLocalids
+        cdef IntArray importProcs = self.importProcs
+
+        # set the values for the number of import and export objects
+        self.numImport = numImport; self.numExport = numExport
+
+        # resize the PyZoltan import lists
+        importGlobalids.resize(numImport)
+        importLocalids.resize(numImport)
+        importProcs.resize(numImport)
+
+        # resize the PyZoltan export lists
+        exportGlobalids.resize(numExport)
+        exportLocalids.resize(numExport)
+        exportProcs.resize(numExport)
+
+        # set the Import/Export lists
+        for i in range(numExport):
+            exportGlobalids.data[i] = _exportGlobal[i]
+            exportLocalids.data[i] = _exportLocal[i]
+            exportProcs.data[i] = _exportProcs[i]
+
+        for i in range(numImport):
+            importGlobalids.data[i] = _importGlobal[i]
+            importLocalids.data[i] = _importLocal[i]
+            importProcs.data[i] = _importProcs[i]
+
     def _update_gid(self, UIntArray gid):
         """Update the unique global indices.
 
@@ -421,6 +485,7 @@ cdef class PyZoltan:
         self.num_local_objects = num_local_objects
 
     def _setup_zoltan_arrays(self):
+        """Import/Export lists used by Zoltan"""
         self.exportGlobalids = UIntArray()
         self.exportLocalids = UIntArray()
         self.exportProcs = IntArray()
@@ -436,6 +501,7 @@ cdef class PyZoltan:
         self.weights = DoubleArray()
 
     def _set_default(self):
+        "Set reasonable default values"
         self.Zoltan_Set_Param("DEBUG_LEVEL", self.debug_level)
 
         self.Zoltan_Set_Param("OBJ_WEIGHT_DIM", self.obj_weight_dim)
@@ -455,7 +521,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
     Use the ZoltanGeometricPartitioner to load balance/partition a set
     of objects defined by their coordinates (x, y & z) and an array of
-    unique global indices.
+    unique global indices. Additionally, each object can also have a
+    weight associated with it.
 
     """
     def __init__(self, int dim, object comm, DoubleArray x, DoubleArray y,
@@ -495,10 +562,15 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
             Parameter used for adding items to a decomposition
 
         """
+        # sanity check
+        if not ( x.length == y.length == z.length ):
+            raise ValueError('Coordinate data (x, y, z) lengths not equal!')
+
         # values needed for defaults
         self.lb_method = lb_method
         self.keep_cuts = keep_cuts
 
+        # Base class initialization
         super(ZoltanGeometricPartitioner, self).__init__(
             comm, obj_weight_dim=obj_weight_dim, return_lists=return_lists)
 
@@ -508,7 +580,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         # set the data arrays
         self.x = x; self.y = y; self.z = z; self.gid = gid
 
-        # initiali number of local objects
+        # number of local objects. This is taken equal to the length
+        # of the data supplied initially
         self.num_local_objects = num_local_objects = x.length
 
         # object weights. If obj_weight_dim == "0" this array should be 0
@@ -517,9 +590,19 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         # register the query functions with Zoltan
         self._Zoltan_register_query_functions()
 
+    #######################################################################
+    # Private interface
+    #######################################################################
     def Zoltan_Box_PP_Assign(self, double xmin, double ymin, double zmin,
                              double xmax, double ymax, double zmax):
-        """Find the processors that intersect with a box"""
+        """Find the processors that intersect with a box
+
+        For Zoltan, given a domain decomposition using a geometric
+        algorithm, we can use Zoltan_Box_PP_Assign to find processors
+        that intersect with a rectilinear box defined by the values
+        xmin, .... zmax
+
+        """
         cdef Zoltan_Struct* zz = self._zstruct.zz
 
         cdef np.ndarray[ndim=1, dtype=np.int32_t] procs = self.procs
@@ -547,7 +630,14 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         return numprocs
 
     def Zoltan_Point_PP_Assign(self, double x, double y, double z):
-        """Find to which processor a given point must be sent to"""
+        """Find to which processor a given point must be sent to
+
+        For Zoltan, given a domain decomposition using a geometric
+        algorithm, we can use Zoltan_Point_PP_Assign to find a
+        processor in the decomposition to which a given point (x, y,
+        z) belongs to
+
+        """
         cdef Zoltan_Struct* zz = self._zstruct.zz
 
         cdef int ierr, proc = -1, part = -1
@@ -566,29 +656,49 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
     # Private interface
     #######################################################################
     def _Zoltan_register_query_functions(self):
-        """Query functions for the Geometric based partitioners."""
+        """Register query functions for the Geometric based partitioners
+
+        The Geometric based partitioners are the simplest kind of
+        dynamic load balancing algorithms provided by Zoltan. These
+        require four callbakcs to be registered, two geometry based
+        and two object base callbakcs respectively:
+
+        Num_Obj_Fn : Returns the number of objects assigned locally
+
+        Obj_List_Fn : Populates Zoltan allocated arrays with local and
+        global indices for objects assigned locally
+
+        Num_Geom_Fn : Returns the number of objects used to represent
+        the geometry of an object (2 for 2D applications, 3 for 3D
+        applications etc)
+
+        Geom_Multi_Fn : Populates Zoltan allocated arrays with
+        geometry information (x, y, z, weights) of the objects
+        assigned locally.
+
+        """
         cdef Zoltan_Struct* zz = self._zstruct.zz
         cdef int err
 
-        # number of objects function
+        # Num_Obj_Fn
         err = czoltan.Zoltan_Set_Num_Obj_Fn(
             zz, &get_number_of_objects, <void*>&self._cdata)
 
         _check_error(err)
 
-        # object list function
+        # Obj_List_Fn
         err = czoltan.Zoltan_Set_Obj_List_Fn(
             zz, &get_obj_list, <void*>&self._cdata)
 
         _check_error(err)
 
-        # geom num geom function
+        # Num_Geom_Fn
         err = czoltan.Zoltan_Set_Num_Geom_Fn(
             zz, &get_num_geom, <void*>&self._cdata)
 
         _check_error(err)
 
-        # geom multi function
+        # Geom_Multi_Fn
         err = czoltan.Zoltan_Set_Geom_Multi_Fn(
             zz, &get_geometry_list, <void*>&self._cdata)
 
@@ -598,9 +708,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         """Set the user defined particle data structure for Zoltan.
 
         This is called just before load balancing to update the user
-        defined particle data structure for Zoltan. The reason this
-        needs to be called is because the particle information keeps
-        changing for each time step.
+        defined data structure (CoordinateData) for Zoltan.
 
         """
         self._cdata.dim = <int>self.dim
