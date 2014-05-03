@@ -236,9 +236,10 @@ cdef class ZComm:
 
         #return recvbuf
 
-    def set_nbytes(self, int nbytes):
+    def set_nbytes(self, int nbytes, object dtype=None):
         "Set the number of bytes for each object"
         self.nbytes = nbytes
+        self.dtype = dtype
 
     def set_tag(self, int tag):
         "Set the message tag for this plan"

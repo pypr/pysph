@@ -43,7 +43,7 @@ print "Proc %d, Received %s"%(rank, recvdata)
 # use zoltan to exchange unsigned ints
 senddata = gids[ object_ids ]
 recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
-zcomm.set_nbytes(recvdata.itemsize)
+zcomm.set_nbytes(recvdata.itemsize, recvdata.dtype)
 
 print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
 zcomm.Comm_Do(senddata, recvdata)
