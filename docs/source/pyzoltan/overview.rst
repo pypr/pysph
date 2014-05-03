@@ -39,7 +39,8 @@ A simple example: Partitioning points
 The following simple example demonstrates the partitioning of a random
 collection of points in the unit cube :math:`[0,1]^3`. The objects to
 be partitioned in this case is therefore the points themselves which
-can be thought of as particles in an SPH simulation.
+can be thought of as particles in an SPH simulation. We begin with
+some imports:
 
 .. code-block:: python
 
@@ -59,99 +60,6 @@ can be thought of as particles in an SPH simulation.
     size = comm.Get_size()
 
     colors = ['r', 'g', 'b', 'y', 'm', 'k', 'c', 'burlywood']
-
-    # CREATE THE PARTICLE DATA LOCALLY ON EACH PROCESSOR
-    numPoints = 1<<12
-
-    x = random.random( numPoints )
-    y = random.random( numPoints )
-    z = random.random( numPoints )
-    gid = np.arange( numPoints*size, dtype=np.uint32 )[rank*numPoints:(rank+1)*numPoints]
-
-    # GATHER THE DISTRIBUTED DATA ON THE ROOT FOR PLOTTING
-    X = np.zeros( size * numPoints )
-    Y = np.zeros( size * numPoints )
-    Z = np.zeros( size * numPoints )
-    GID = np.arange( numPoints*size, dtype=np.uint32 )
-
-    comm.Gather( sendbuf=x, recvbuf=X, root=0 )
-    comm.Gather( sendbuf=y, recvbuf=Y, root=0 )
-    comm.Gather( sendbuf=z, recvbuf=Z, root=0 )
-
-    # ROOT PLOTS THE DATA
-    if rank == 0:
-	fig = plt.figure()
-	s1 = fig.add_subplot(111)
-	s1.axes = Axes3D(fig)
-	for i in range(size):
-	    s1.axes.plot3D( X[i*numPoints:(i+1)*numPoints],
-			    Y[i*numPoints:(i+1)*numPoints],
-			    Z[i*numPoints:(i+1)*numPoints],
-			    c=colors[i], marker='o', linestyle='None',
-			    alpha=0.8)
-
-	s1.axes.set_xlabel( 'X' )
-	s1.axes.set_ylabel( 'Y' )
-	s1.axes.set_zlabel( 'Z' )
-
-	plt.title('Initital Distribution')
-	plt.savefig( 'initial.pdf' )
-
-    # PARTITION THE POINT SET USING PyZoltan
-    xa = DoubleArray(numPoints); xa.set_data(x)
-    ya = DoubleArray(numPoints); ya.set_data(y)
-    za = DoubleArray(numPoints); za.set_data(z)
-    gida = UIntArray(numPoints); gida.set_data(gid)
-
-    # CREATE THE GEOMETRIC LOAD BALANCER
-    pz = zoltan.ZoltanGeometricPartitioner(
-	dim=3, comm=comm, x=xa, y=ya, z=za, gid=gida)
-
-    # CALL THE LOAD BALANCING FUNCTION
-    pz.set_lb_method('RCB') # valid options RCB, RIB, HSFC
-    pz.Zoltan_Set_Param('DEBUG_LEVEL', '1')
-    pz.Zoltan_LB_Balance()
-
-    # get the new assignments
-    my_global_ids = list( gid )
-
-    # REMOVE POINTS TO BE EXPORTED
-    for i in range(pz.numExport):
-	my_global_ids.remove( pz.exportGlobalids[i] )
-
-    # ADD POINTS TO BE IMPORTED
-    for i in range(pz.numImport):
-	my_global_ids.append( pz.importGlobalids[i] )
-
-
-    # GATHER THE NEW DATA ON ROOT
-    new_gids = np.array( my_global_ids, dtype=np.uint32 )
-
-    # gather the new gids on root as a list
-    NEW_GIDS = comm.gather( new_gids, root=0 )
-
-    # PLOT THE NEW ASSIGNMENTS
-    if rank == 0:
-	fig = plt.figure()
-	s1 = fig.add_subplot(111)
-	s1.axes = Axes3D(fig)
-	for i in range(size):
-	    s1.axes.plot3D( X[ NEW_GIDS[i] ],
-			    Y[ NEW_GIDS[i] ],
-			    Z[ NEW_GIDS[i] ],
-			    c=colors[i], marker='o', linestyle='None',
-			    alpha=0.8 )
-
-	s1.axes.set_xlabel( 'X' )
-	s1.axes.set_ylabel( 'Y' )
-	s1.axes.set_zlabel( 'Z' )
-
-	plt.title('Final Distribution')
-	plt.savefig( 'final.pdf' )
-	plt.show()
-
-Although the code seems lengthy, a lot of it is concerned with setting
-up the initial data and plotting on the root node. 
 
 ^^^^^^^^^^^^^^^^^
 Creating the data
@@ -390,7 +298,12 @@ such communication. The typical use case for :py:class:`ZComm` is when
 we know the list of local objects to send to remote processors but
 have no information about the objects to be received. An example
 (`pyzoltan/core/tests/zcomm.py`) demonstrating the use of the
-:py:class:`ZComm` object is displayed below:
+:py:class:`ZComm` object is outlined below.
+
+The example can be run with an arbitrary number of processors. Each
+processor allocates some data locally and randomly picks :math:`5` of
+these objects to be sent to remote processors. The remote processors
+are also picked randomly:
 
 .. code-block:: python
 
@@ -417,8 +330,16 @@ have no information about the objects to be received. An example
     object_ids = random.random_integers( low=0, high=numObjectsTotal, size=nsend )
     proclist = random.random_integers(low=0, high=size-1, size=nsend).astype(np.int32)
 
-    indices = np.where(proclist == rank)[0]
-    proclist[indices] = -1
+    my_indices = np.where(proclist == rank)[0]
+    proclist[my_indices] = (rank+1)%size
+
+This information is sufficient enough to instantiate the
+:py:class:`ZComm` object which will be used as the communication plan
+to exchange this data. Once the communication plan is setup, each
+processor knows of the data it must receive with the `ZComm.nreturn`
+attribute. This is used to allocate receive buffers:
+
+.. code-block:: python
 
     # create the ZComm object
     tag = np.int32(0)
@@ -428,74 +349,32 @@ have no information about the objects to be received. An example
     senddata = x[ object_ids ]
     recvdata = np.ones( zcomm.nreturn )
 
+With the send buffer and the allocated receive buffer, we can perform
+the communication using the :py:meth:`ZComm.Comm_Do` method:
+
+.. code-block:: python
+
     # use zoltan to exchange doubles
     print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
     zcomm.Comm_Do(senddata, recvdata)
     print "Proc %d, Received %s"%(rank, recvdata)
-
-In this example, each processor creates some random data of size
-`numObjectsTotal`. Each object is assigned a unique global identifier
-as required by Zoltan. Five objects are chosen randomly to be sent to
-the other processors which are also chosen randomly:
-
-.. code-block:: python
-
-    # arbitrarily assign some objects to be sent to some other processor
-    nsend = np.int32( random.random_integers(low=1, high=10) )
-    object_ids = random.random_integers( low=0, high=numObjectsTotal, size=nsend )
-    proclist = random.random_integers(low=0, high=size-1, size=nsend).astype(np.int32)
-
-    indices = np.where(proclist == rank)[0]
-    proclist[indices] = -1
-
-The :py:class:`ZComm` object is instantiated with this information as
-
-.. code-block:: python
-
-    zcomm = zoltan_comm.ZComm(comm, tag=tag, nsend=nsend, proclist=proclist)
-
-where a message tag is also chosen for the ensuing data transfer. This
-sets up a communication plan which will be used subsequently.
-
-.. note::
-
-   If a processor chooses to send data to itself (since we pick this
-   randomly), the processor in the `proclist` argument is set to
-   `-1`. This is one way of telling Zoltan to ignore this object.
-
-Upon instantiation, the `ZComm.nreturn` data attribute indicates the
-number of objects to be received by this processor. This can be used
-to allocate a buffer to receive the data:
-
-.. code-block:: python
-
-    # the data to send and receive
-    senddata = x[ object_ids ]
-    recvdata = np.ones( zcomm.nreturn )
-
-Finally, with the receive buffer allocated, the
-:py:meth:`ZComm.Comm_Do` method can be used to exchange the data:
-
-.. code-block:: python
-
-    zcomm.Comm_Do(senddata, recvdata)
 
 Note that the user does not need to explicitly write the `MPI` send
 and receive calls. All that is required from the user is to correctly
 allocate the data on the receive side. The output from this example is
 (it will vary given the use of random numbers)::
 
-    $ mpirun  -n 3  python zcomm.py 
-    Proc 2, Sending [ 0.81440537  0.90121359  0.65025628  0.24728032] to [-1  0  0 -1]
-    Proc 0, Sending [ 0.19186399  0.59492848] to [-1  1]
-    Proc 1, Sending [ 0.05956925  0.39236052  0.46479566] to [-1  0  2]
-    Proc 0, Received [ 0.39236052  0.90121359  0.65025628]
-    Proc 1, Received [ 0.59492848]
-    Proc 2, Received [ 0.46479566]
+    $ mpirun  -n 3 python zcomm.py
+    Proc 2, Sending [ 0.83476393  0.07041833  0.20059537  0.7722934   0.4529769 ] to [0 1 0 0 1]
+    Proc 2, Received [ 0.50391764  0.40028207]
+    Proc 0, Sending [ 0.50391764] to [2]
+    Proc 1, Sending [ 0.29755463  0.40028207  0.69433472] to [0 2 0]
+    Proc 1, Received [ 0.07041833  0.4529769 ]
+    Proc 0, Received [ 0.29755463  0.69433472  0.83476393  0.20059537  0.7722934 ]
 
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Changing the size of data communicated
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Using the plan for similar communication
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The :py:class:`ZComm` object was used to send values of type `float64`
 in this example. If the number of objects to be sent and their
@@ -507,7 +386,7 @@ the global indices (`uint32`) like so:
 
     senddata = gids[ object_ids ]
     recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
-    zcomm.set_nbytes(4)
+    zcomm.set_nbytes(recvdata.itemsize)
 
     print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
     zcomm.Comm_Do(senddata, recvdata)
@@ -522,12 +401,12 @@ the global indices (`uint32`) like so:
 The output with this change is::
 
     $ mpirun  -n 3  python zcomm.py
-    Proc 1, Sending [1105 1177] to [0 2]
-    Proc 2, Sending [2821 2418 2550] to [1 0 0]
-    Proc 1, Received [ 158 2821]
-    Proc 0, Sending [294 171 553 158 563] to [-1  2 -1  1 -1]
-    Proc 2, Received [ 171 1177]
-    Proc 0, Received [1105 2418 2550]
+    Proc 1, Sending [1054 1692 2034] to [0 2 0]
+    Proc 0, Sending [214] to [2]
+    Proc 2, Sending [2720 3034 2511 2412 2975] to [0 1 0 0 1]
+    Proc 2, Received [ 214 1692]
+    Proc 1, Received [3034 2975]
+    Proc 0, Received [1054 2034 2720 2511 2412]
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Reversing the communication plan
@@ -558,17 +437,17 @@ remote processor and communicated back using the
 The output from this when run on 3 processors is::
 
     $ mpirun  -n 3  python zcomm.py 
-    Proc 0, Sending [1005  331  948  791] to [2 1 1 1]
-    Proc 1, Sending [1403 1456 2030 1236 1149] to [2 2 2 0 2]
-    Proc 0, Received [1236 2701]
-    Proc 0, sending updated data [0 0]
-    Proc 2, Sending [2218 2863 2076 2701] to [1 1 1 0]
-    Proc 1, Received [ 331  948  791 2218 2863 2076]
-    Proc 1, sending updated data [1 1 1 1 1 1]
-    Proc 2, Received [1005 1403 1456 2030 1149]
-    Proc 2, sending updated data [2 2 2 2 2]
-    Proc 1, received updated data [2 2 2 0 2]
-    Proc 0, received updated data [2 1 1 1]
-    Proc 2, received updated data [1 1 1 0]
-    
+    Proc 1, Sending [1054 1692 2034] to [0 2 0]
+    Proc 0, Sending [214] to [2]
+    Proc 2, Sending [2720 3034 2511 2412 2975] to [0 1 0 0 1]
+    Proc 2, Received [ 214 1692]
+    Proc 1, Received [3034 2975]
+    Proc 0, Received [1054 2034 2720 2511 2412]
+    Proc 0, sending updated data [0 0 0 0 0]
+    Proc 2, sending updated data [2 2]
+    Proc 1, sending updated data [1 1]
+    Proc 0, received updated data [2]
+    Proc 1, received updated data [0 2 0]
+    Proc 2, received updated data [0 1 0 0 1]
+
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
