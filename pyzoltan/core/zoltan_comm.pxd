@@ -24,5 +24,6 @@ cdef class ZComm:
     # number of objects to be received
     cdef public int nreturn
 
-    # size of each element
+    # size of each element and dtype
     cdef public int nbytes
+    cdef public object dtype

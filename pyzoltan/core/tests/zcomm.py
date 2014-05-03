@@ -20,12 +20,12 @@ gids = np.array( np.arange(size * numObjectsTotal) )[rank*numObjectsTotal:(rank+
 gids = gids.astype(np.uint32)
 
 # arbitrarily assign some objects to be sent to some other processor
-nsend = np.int32( random.random_integers(low=1, high=10) )
+nsend = np.int32( random.random_integers(low=1, high=5) )
 object_ids = random.random_integers( low=0, high=numObjectsTotal, size=nsend )
 proclist = random.random_integers(low=0, high=size-1, size=nsend).astype(np.int32)
 
-indices = np.where(proclist == rank)[0]
-proclist[indices] = -1
+my_indices = np.where(proclist == rank)[0]
+proclist[my_indices] = (rank + 1)%size
 
 # create the ZComm object
 tag = np.int32(0)
@@ -43,8 +43,17 @@ print "Proc %d, Received %s"%(rank, recvdata)
 # use zoltan to exchange unsigned ints
 senddata = gids[ object_ids ]
 recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
-zcomm.set_nbytes(4)
+zcomm.set_nbytes(recvdata.itemsize, recvdata.dtype)
 
 print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
 zcomm.Comm_Do(senddata, recvdata)
 print "Proc %d, Received %s"%(rank, recvdata)
+
+# Test the Comm Reverse function
+# modify the received data
+recvdata[:] = rank
+
+updated_info = np.zeros(zcomm.nsend, dtype=senddata.dtype)
+print 'Proc %d, sending updated data %s'%(rank, recvdata)
+zcomm.Comm_Do_Reverse(recvdata, updated_info)
+print 'Proc %d, received updated data %s'%(rank, updated_info)

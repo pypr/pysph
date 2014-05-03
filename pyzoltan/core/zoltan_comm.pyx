@@ -193,9 +193,53 @@ cdef class ZComm:
 
         _check_error(ierr)
 
-    def set_nbytes(self, int nbytes):
+    def Comm_Do_Reverse(self, np.ndarray _sendbuf, np.ndarray recvbuf):
+        """Perform the reverse of the unstructured communication
+        between processors
+
+        Parameters:
+        
+        _sendbuf : np.ndarray
+            The array of data to be sent by this processor
+
+        Notes:
+        
+        Internally, Zoltan_Comm_Do accepts char* buffers to move the
+        data between processors. The number of objects is determined
+        by the `nbytes` argument. 
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef char* send_data = _sendbuf.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+        # the returned data will be updated. The number of objects to
+        # send for Do_Reverse is therefore equal to nreturn
+        cdef int nsend = self.nreturn
+
+        # sizes pointer is null for equal sized objects
+        cdef int* sizesp = NULL
+
+        #cdef np.ndarray recvbuf = np.zeros( self.nsend, dtype=dtype )
+        cdef char* _recvbuf = recvbuf.data
+
+        # Zoltan interface function
+        ierr = zcomm.Zoltan_Comm_Do_Reverse(
+            _zoltan_comm_obj,
+            tag,
+            send_data,
+            nbytes,
+            sizesp,
+            _recvbuf)
+
+        _check_error(ierr)
+
+        #return recvbuf
+
+    def set_nbytes(self, int nbytes, object dtype=None):
         "Set the number of bytes for each object"
         self.nbytes = nbytes
+        self.dtype = dtype
 
     def set_tag(self, int tag):
         "Set the message tag for this plan"
