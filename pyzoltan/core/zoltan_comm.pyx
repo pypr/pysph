@@ -193,7 +193,7 @@ cdef class ZComm:
 
         _check_error(ierr)
 
-    def Comm_Do_Reverse(self, np.ndarray _sendbuf, dtype):
+    def Comm_Do_Reverse(self, np.ndarray _sendbuf, np.ndarray recvbuf):
         """Perform the reverse of the unstructured communication
         between processors
 
@@ -220,7 +220,7 @@ cdef class ZComm:
         # sizes pointer is null for equal sized objects
         cdef int* sizesp = NULL
 
-        cdef np.ndarray recvbuf = np.zeros( self.nsend, dtype=dtype )
+        #cdef np.ndarray recvbuf = np.zeros( self.nsend, dtype=dtype )
         cdef char* _recvbuf = recvbuf.data
 
         # Zoltan interface function
@@ -234,7 +234,7 @@ cdef class ZComm:
 
         _check_error(ierr)
 
-        return recvbuf
+        #return recvbuf
 
     def set_nbytes(self, int nbytes):
         "Set the number of bytes for each object"

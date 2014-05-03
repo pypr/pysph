@@ -430,9 +430,17 @@ remote processor and communicated back using the
 .. code-block:: python
 
     recvdata[:] = rank
+
+    updated_info = np.zeros(zcomm.nsend, dtype=senddata.dtype)
     print 'Proc %d, sending updated data %s'%(rank, recvdata)
-    updated_recvbuf = zcomm.Comm_Do_Reverse(recvdata, np.uint32)
-    print 'Proc %d, received updated data %s'%(rank, updated_recvbuf)
+    zcomm.Comm_Do_Reverse(recvdata, updated_info)
+    print 'Proc %d, received updated data %s'%(rank, updated_info)
+
+.. note::
+
+   The size of the buffer each processor will receive in the reverse
+   communication phase is equal to the number of objects initially
+   sent. This is available through the `ZComm.send` attribute
 
 The output from this when run on 3 processors is::
 

@@ -52,6 +52,8 @@ print "Proc %d, Received %s"%(rank, recvdata)
 # Test the Comm Reverse function
 # modify the received data
 recvdata[:] = rank
+
+updated_info = np.zeros(zcomm.nsend, dtype=senddata.dtype)
 print 'Proc %d, sending updated data %s'%(rank, recvdata)
-updated_recvbuf = zcomm.Comm_Do_Reverse(recvdata, np.uint32)
-print 'Proc %d, received updated data %s'%(rank, updated_recvbuf)
+zcomm.Comm_Do_Reverse(recvdata, updated_info)
+print 'Proc %d, received updated data %s'%(rank, updated_info)
