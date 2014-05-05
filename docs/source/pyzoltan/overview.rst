@@ -458,4 +458,86 @@ The output from this when run on 3 processors is::
     Proc 1, received updated data [0 2 0]
     Proc 2, received updated data [0 1 0 0 1]
 
+------------------------------------------
+Distributed data directories
+------------------------------------------
+
+.. py:currentmodule:: pyzoltan.core.zoltan_dd
+
+The Zoltan `Distributed Data Directory`_ utility is a convenient way
+for a processor to locate remote data. It is implemented as a parallel
+hash map, keyed on the object identifiers (global indices) and with
+arbitrary user data associated with each entry.
+
+The use of this feature is highly problem dependent since the user
+defined data will necessarily change for different applications. We
+use a simple example demonstrating it's use. Each processor stores
+ownership of the object in the distributed directory *without* any
+user data associated with each entry. 
+
+We begin with the standard set of imports and create some data on each
+processor and assign each object a unique global identifier:
+
+.. code-block:: python
+
+    import numpy
+    import pyzoltan.api as pz
+    import mpi4py.MPI as mpi
+
+    comm = mpi.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
+    # every processor owns some data
+    numObjectsTotal = 5
+    my_indices = numpy.array( range( rank*numObjectsTotal,(rank+1)*numObjectsTotal ), dtype=numpy.uint32 )
+
+    gid = pz.UIntArray(my_indices.size); gid.set_data( my_indices )
+
+Additionally, each processor has an **IntArray** which denotes object
+assignment:
+
+.. code-block:: python
+
+    part_assignment = numpy.array( [rank]*numObjectsTotal, dtype=numpy.int32 )
+    part = pz.IntArray( part_assignment.size ); part.set_data( part_assignment )
+
+This is sufficient data to create the distributed directory:
+
+.. code-block:: python
+
+    # create a zoltan dd and store the object assignments
+    dd = pz.Zoltan_DD(comm)
+
+    # update the dd with the data
+    dd.Zoltan_DD_Update(gid, part)
+
+Note that after instantiation of the :py:class:`Zoltan_DD` object, we
+call the :py:meth:`Zoltan_DD.Zoltan_DD_Update` method to update the
+data associated with this directory. Now, given the shared data
+available with each processor, we can query for object assignments. In
+the example below, each processor queries for the objects with global
+indices `numObjectsTotal + rank` and `numObjectsTotal - rank`:
+
+.. code-block:: python
+
+    # now we can query the dd
+    owner_data = pz.IntArray()   # output array for the object data assignment
+    owner_parts = pz.IntArray()  # output array for the object assignment
+
+    # every processor requests for information about some data
+    query_gids = pz.UIntArray(2); query_gids.set_data( numpy.array([numObjectsTotal+rank,
+								    numObjectsTotal-rank], dtype=numpy.uint32) )
+
+    # use Zoltan_DD_Find to query the data
+    dd.Zoltan_DD_Find(query_gids, owner_parts, owner_data)
+
+The result from this quey with :math:`3` processors is shown below::
+
+    $ mpirun  -n 3 python zoltan_dd.py 
+    Processor 0, query_gids = [5 5], owner_parts = [1 1], owner_data = [1 1]
+    Processor 1, query_gids = [6 4], owner_parts = [1 0], owner_data = [1 0]
+    Processor 2, query_gids = [7 3], owner_parts = [1 0], owner_data = [1 0]
+
+.. _`Distributed Data Directory`: http://www.cs.sandia.gov/Zoltan/ug_html/ug_util_dd.html
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
