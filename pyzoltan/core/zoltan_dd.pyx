@@ -60,13 +60,13 @@ cdef class Zoltan_DD:
         -----------
 
         gid : UIntArray (in)
-            Global indices for which to search for
+            Global indices for requested data
 
         part : IntArray (out)
             Partition/Processor to which the entry belongs
 
         own : IntArray (out)
-            Ownership of the hash entry
+            Partition/Processor to which the associated data belongs.
 
         lid, data : None (not used)
 
