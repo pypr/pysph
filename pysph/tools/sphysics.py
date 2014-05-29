@@ -80,7 +80,6 @@ def sphysics2pysph(partfile, indat='INDAT', dim=3, vtk=True):
         name='boundary', x=x[:nb], y=y[:nb], z=z[:nb], u=u[:nb],
         v=v[:nb], w=w[:nb], rho=rho[:nb], p=p[:nb], m=m[:nb],
         h=h[:nb])
-    solid.tag[:] = 1
 
     # PySPH arrays
     arrays = [fluid, solid]
