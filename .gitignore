@@ -16,5 +16,3 @@ build/
 dist/
 *.out
 *_output
-examples/SPHysics/INDAT
-examples/SPHysics/IPART
