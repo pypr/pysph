@@ -111,3 +111,73 @@ class Results(object):
             _fname = self.fname + '_%s_%s'%(array_name, fileno)
 
             self._write_vtk_snapshot(mesh, dirname, _fname)
+
+class PySPH2VTK(object):
+    """Convert PySPH array data to Paraview legible VTK data"""
+    def __init__(self, arrays, dirname='.', fileno=None):
+        self.arrays = arrays
+        self.dirname = dirname
+        self.fileno=fileno
+
+        array_dict = {}
+        for array in arrays:
+            array_dict[ array.name ] = array
+
+        self.array_dict = array_dict
+            
+    def _write_vtk_snapshot(self, mesh, directory, _fname):
+        fname = path.join(directory, _fname)
+        write_data( mesh, fname )
+
+    def write_vtk(self, array_name, props):
+        # ceck if it is possible
+        if not TVTK:
+            raise RuntimeError('Cannot generate VTK output!')
+
+        # check if the array is legal
+        if array_name not in self.array_dict.keys():
+            raise RuntimeError('Array %s not defined'%array_name)
+
+        # create a list of props
+        if type(props) != list:
+            props = [ props ]
+
+        # create an output folder for the vtk files
+        dirname = path.join(self.dirname, 'vtk')
+        utils.mkdir(dirname)
+
+        array = self.array_dict[array_name]
+        num_particles = array.num_real_particles
+
+        # save the points
+        points = np.zeros( shape=(num_particles,3) )
+        points[:, 0] = array.z
+        points[:, 1] = array.y
+        points[:, 2] = array.x
+
+        mesh = tvtk.PolyData(points=points)
+
+        # add the scalar props
+        for prop in props:
+            if prop == 'vmag':
+                u, v, w = array.get('u','v','w')
+                numpy_array = np.sqrt(u**2 + v**2 + w**2)
+            else:
+                numpy_array = array.get(prop)
+
+            vtkarray = array2vtk(numpy_array)
+            vtkarray.SetName(prop)
+
+            # add the array as point data
+            mesh.point_data.add_array(vtkarray)
+
+        # set the last prop as the active scalar
+        mesh.point_data.set_active_scalars(props[-1])
+
+        # spit it out
+        if self.fileno is None:
+            _fname = '%s'%(array_name)
+        else:
+            _fname = '%s_%03d'%(array_name, self.fileno)
+
+        self._write_vtk_snapshot(mesh, dirname, _fname)
