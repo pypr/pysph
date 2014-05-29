@@ -25,6 +25,9 @@ class Results(object):
         self.fname = fname
         self.endswith = endswith
 
+        # the starting file number
+        self.start = 0
+
         if ( (dirname is not None) and (fname is not None) ):
             self.load()
 
@@ -39,6 +42,10 @@ class Results(object):
             self.dirname, self.fname, self.endswith)
 
         self.nfiles = len(files)
+
+    def reload(self):
+        self.start = self.nfiles
+        self.load()
 
     def get_ke_history(self, array_name):
         nfiles = self.nfiles
@@ -74,7 +81,7 @@ class Results(object):
         utils.mkdir(dirname)
 
         nfiles = self.nfiles
-        for i in range(nfiles):
+        for i in range(self.start, nfiles):
             f = self.files[i]
             data = utils.load(f)
 
