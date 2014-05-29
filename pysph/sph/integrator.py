@@ -251,8 +251,6 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
-        self.cfl = 0.5
-
         for array_name, integrator_step in kw.iteritems():
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
@@ -264,9 +262,8 @@ class Integrator(object):
         # by the SPHEval.
         self.integrator = None
 
-    def compute_time_step(self, dt):
+    def compute_time_step(self, dt, cfl):
         calc = self.integrator.sph_calc
-        cfl = self.cfl
         dt_cfl = calc.dt_cfl
         hmin = 1.0
 

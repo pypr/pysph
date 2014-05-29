@@ -42,8 +42,9 @@ class Solver(object):
 
     """
 
-    def __init__(self, integrator=None, kernel=None,
-                 dim=2, tdamp=0.0, **kwargs):
+    def __init__(self, dim=2, integrator=None, kernel=None,
+                 tdamp=0.0, tf=1.0, dt=1e-3, 
+                 adaptive_timestep=False, cfl=0.3, **kwargs):
         """Constructor
 
         Any additional keyword args are used to set the values of any
@@ -52,7 +53,26 @@ class Solver(object):
         Parameters
         -----------
 
-        integrator_type : The integrator to use.
+        dim : int
+            Problem dimensionality
+
+        integrator_type : integrator.Integrator
+            The integrator to use
+
+        kernel : base.kernels.Kernel
+            SPH kernel to use
+
+        tdamp : double
+            Initial solution damping time
+
+        tf, dt : double
+            Final time and suggested initial time-step
+
+        adaptive_timestep : bint
+            Flag to use adaptive time-steps
+
+        cfl : double
+            CFL number for adaptive time stepping
 
         """
 
@@ -117,8 +137,9 @@ class Solver(object):
         # solution damping to avoid impulsive starts
         self.tdamp = tdamp
 
-        # Use adaptive time steps
-        self.adaptive_timestep = False
+        # Use adaptive time steps and cfl number
+        self.adaptive_timestep = adaptive_timestep
+        self.cfl = cfl
 
         # Use cell iterations or not.
         self.cell_iteration = False
@@ -132,8 +153,8 @@ class Solver(object):
                 raise TypeError(msg)
 
         # default time step constants
-        self.final_time = 0.0
-        self.dt = 0.0
+        self.tf = tf
+        self.dt = dt
 
     def setup(self, particles, equations, nnps, kernel=None):
         """ Setup the solver.
@@ -185,6 +206,10 @@ class Solver(object):
         """Set if we should use adaptive timesteps or not.
         """
         self.adaptive_timestep = value
+
+    def set_cfl(self, value):
+        'Set the CFL number for adaptive time stepping'
+        self.cfl = value
 
     def set_cell_iteration(self, value):
         """Set if we should use cell_iteration or not.
@@ -306,7 +331,8 @@ class Solver(object):
             self.integrator.integrate(self.t, dt, self.count)
 
             if self.adaptive_timestep:
-                self.dt = dt = self.integrator.compute_time_step(self.dt)
+                self.dt = dt = self.integrator.compute_time_step(
+                    self.dt, self.cfl)
 
             # update the time for all arrays
             self.update_particle_time()
