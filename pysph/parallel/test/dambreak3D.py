@@ -8,6 +8,8 @@ SPHYSICS Case 5
 import numpy as np
 
 from pysph.base.utils import get_particle_array_wcsph as gpa
+
+from pysph.sph.equation import Group
 from pysph.base.kernels import CubicSpline
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
@@ -28,6 +30,7 @@ gamma = 7.0
 alpha = 0.1
 beta = 0.0
 B = co*co*ro/gamma
+eps = 0.5
 
 def create_particles(empty=False, **kwargs):
     ns = 13987
@@ -35,37 +38,33 @@ def create_particles(empty=False, **kwargs):
     #h0 = 0.9 * np.sqrt(3 * dx**2)
     h0 = hdx * dx
 
-    if empty:
-        fluid = gpa(name='fluid')
-        solid = gpa(name='boundary')
-    else:
-        import os
-        path = os.path.dirname(os.path.abspath(__file__))
+    import os
+    path = os.path.dirname(os.path.abspath(__file__))
 
-        ipart = os.path.join(path, 'IPART.txt.gz')
-        ipart = np.loadtxt(ipart)
+    ipart = os.path.join(path, 'IPART.txt.gz')
+    ipart = np.loadtxt(ipart)
 
-        x = ipart[:, 0]; y = ipart[:, 1]; z = ipart[:, 2]
-        u = ipart[:, 3]; v = ipart[:, 4]; w = ipart[:, 5]
-        rho = ipart[:, 6]; p = ipart[:, 7]; m = ipart[:, 8]
+    x = ipart[:, 0]; y = ipart[:, 1]; z = ipart[:, 2]
+    u = ipart[:, 3]; v = ipart[:, 4]; w = ipart[:, 5]
+    rho = ipart[:, 6]; p = ipart[:, 7]; m = ipart[:, 8]
 
-        # the fluid particles
-        xf = x[ns:]; yf = y[ns:]; zf = z[ns:]
-        rhof = rho[ns:]; pf = p[ns:]; mf = m[ns:]
+    # the fluid particles
+    xf = x[ns:]; yf = y[ns:]; zf = z[ns:]
+    rhof = rho[ns:]; pf = p[ns:]; mf = m[ns:]
 
-        hf = np.ones_like(xf) * h0
+    hf = np.ones_like(xf) * h0
 
-        fluid = gpa(name='fluid', x=xf, y=yf, z=zf,
-                    rho=rhof, p=pf, m=mf, h=hf)
+    fluid = gpa(name='fluid', x=xf, y=yf, z=zf,
+                rho=rhof, p=pf, m=mf, h=hf)
 
-        # the solid particles
-        xs = x[:ns]; ys = y[:ns]; zs = z[:ns]
-        rhos = rho[:ns]; ps = p[:ns]; ms = m[:ns]
+    # the solid particles
+    xs = x[:ns]; ys = y[:ns]; zs = z[:ns]
+    rhos = rho[:ns]; ps = p[:ns]; ms = m[:ns]
 
-        hs = np.ones_like(xs) * h0
+    hs = np.ones_like(xs) * h0
 
-        solid = gpa(name='boundary', x=xs, y=ys, z=zs,
-                    rho=rhos, p=ps, m=ms, h=hs)
+    solid = gpa(name='boundary', x=xs, y=ys, z=zs,
+                rho=rhos, p=ps, m=ms, h=hs)
 
     particles = [fluid, solid]
 
@@ -97,20 +96,24 @@ solver.set_final_time(tf)
 equations = [
 
     # Equation of state
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-    TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+    Group(equations=[
 
-    # Continuity equation
-    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-    ContinuityEquation(dest='boundary', sources=['fluid']),
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
+            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-    # Momentum equation
-    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gz=-9.81),
+            ]),
 
-    # Position step with XSPH
-    XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.5)
+    # Continuity Momentum and XSPH equations
+    Group(equations=[
+               ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+               ContinuityEquation(dest='boundary', sources=['fluid']),
+               
+               MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+                                alpha=alpha, beta=beta, gz=-9.81),
 
+               # Position step with XSPH
+               XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
+               ])
     ]
 
 # Setup the application and solver.  This also generates the particles.

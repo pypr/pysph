@@ -12,6 +12,7 @@ way.
 """
 import numpy
 
+from pysph.sph.equation import Group
 from pysph.base.kernels import CubicSpline, Gaussian
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
@@ -62,21 +63,26 @@ solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
 equations = [
 
     # Equation of state
-    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-    TaitEOS(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+    Group(equations=[
 
-    # Continuity equation
-    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-    ContinuityEquation(dest='boundary', sources=['fluid']),
+            TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+            TaitEOS(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
 
-    # Momentum equation
-    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gz=-9.81),
+            ]),
 
-    # Position step with XSPH
-    XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
+    # Continuity Momentum and XSPH equations
+    Group(equations=[
+               ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+               ContinuityEquation(dest='boundary', sources=['fluid']),
+               
+               MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+                                alpha=alpha, beta=beta, gz=-9.81),
 
+               # Position step with XSPH
+               XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
+               ])
     ]
+    
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
