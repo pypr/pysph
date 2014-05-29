@@ -134,6 +134,11 @@ class Application(object):
                           dest="adaptive_timestep", default=None,
                           help="Do not use adaptive time stepping.")
 
+        # --cfl
+        parser.add_option("--cfl", action="store", dest="cfl", type='float',
+                          default=0.3,
+                          help="CFL number for adaptive time steps")
+
         # -q/--quiet.
         parser.add_option("-q", "--quiet", action="store_true",
                          dest="quiet", default=False,
@@ -610,6 +615,9 @@ class Application(object):
         # Set the adaptive timestep
         if options.adaptive_timestep is not None:
             solver.set_adaptive_timestep(options.adaptive_timestep)
+
+            # set solver cfl number
+            solver.set_cfl(options.cfl)
 
         # default kernel
         # if options.kernel is not None:
