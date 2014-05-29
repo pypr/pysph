@@ -30,7 +30,7 @@ dt = 1e-5
 tf = 2.0
 
 # physical constants for the run loaded from SPHysics INDAT
-indat = numpy.loadtxt('INDAT')
+indat = numpy.loadtxt('INDAT.gz')
 H = float( indat[10] )
 B = float( indat[11] )
 gamma = float( indat[12] )
@@ -41,7 +41,7 @@ beta = 0.0
 c0 = numpy.sqrt( B*gamma/rho0 )
 
 # particle factory function
-def create_particles(ipart='IPART', indat='INDAT', **kwargs):
+def create_particles(ipart='IPART.gz', indat='INDAT.gz', **kwargs):
      return sphysics2pysph(ipart, indat, vtk=False)
 
 # Create the application.
