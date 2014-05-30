@@ -489,7 +489,7 @@ class Application(object):
                 pm.set_zoltan_rcb_lock_directions()
 
             if options.zoltan_rcb_reuse:
-                pm.set_zoltan.rcb_reuse()
+                pm.set_zoltan_rcb_reuse()
                 
             if options.zoltan_rcb_rectilinear:
                 pm.set_zoltan_rcb_rectilinear_blocks()
