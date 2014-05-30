@@ -13,7 +13,7 @@ import os
 import os.path
 
 from traits.api import (HasTraits, Instance, on_trait_change,
-        List, Str, Int, Range, Float, Bool, Password, Property)
+        List, Str, Int, Range, Float, Bool, Button, Password, Property)
 from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
     TitleEditor, HGroup)
 from mayavi.core.api import PipelineBase
@@ -49,6 +49,27 @@ def set_arrays(dataset, particle_array):
         dataset.data.point_data.add_array(va)
     dataset._update_data()
 
+def glob_files(fname):
+    """Glob for all similar files given one of them.
+
+    This assumes that the files are of the form *_[0-9]*.*.
+    """
+    fbase = fname[:fname.rfind('_')+1]
+    ext = fname[fname.rfind('.'):]
+    return glob.glob("%s*%s"%(fbase, ext))
+
+def sort_file_list(files):
+    """Given a list of input files, sort them in serial order, in-place.
+    """
+    def _sort_func(x, y):
+        """Sort the files correctly."""
+        def _process(arg):
+            a = os.path.splitext(arg)[0]
+            return int(a[a.rfind('_')+1:])
+        return cmp(_process(x), _process(y))
+
+    files.sort(_sort_func)
+    return files
 
 ##############################################################################
 # `ParticleArrayHelper` class.
@@ -198,6 +219,9 @@ class MayaviViewer(HasTraits):
     particle_arrays = List(Instance(ParticleArrayHelper), [])
     pa_names = List(Str, [])
 
+    # The default scalar to load up when running the viewer.
+    scalar = Str("rho")
+
     scene = Instance(MlabSceneModel, ())
 
     ########################################
@@ -213,6 +237,7 @@ class MayaviViewer(HasTraits):
     # Traits to view saved solver output.
     files = List(Str, [])
     current_file = Str('', desc='the file being viewed currently')
+    update_files = Button('Refresh')
     file_count = Range(low='_low', high='n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
@@ -261,6 +286,7 @@ class MayaviViewer(HasTraits):
                           Item(name='file_count'),
                           HGroup(Item(name='play'),
                                  Item(name='loop'),
+                                 Item(name='update_files', show_label=False),
                                 ),
                           label='Saved Data',
                           defined_when='n_files>-1',
@@ -555,6 +581,17 @@ class MayaviViewer(HasTraits):
         self.file_count = pc
         self._play_count = pc
 
+    def _scalar_changed(self, value):
+        for pa in self.particle_arrays:
+            pa.scalar = value
+
+    def _update_files_fired(self):
+        fc = self.file_count
+        files = glob_files(self.files[fc])
+        sort_file_list(files)
+        self.files = files
+        self.file_count = fc
+
 ######################################################################
 def usage():
     print """Usage:
@@ -631,14 +668,7 @@ def main(args=None):
             val = arg
         kw[key] = val
 
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
-
-    files.sort(_sort_func)
+    sort_file_list(files)
     # This hack to set n_files first is a dirty hack to work around issues with
     # setting up the UI but setting the files only after the UI is activated.
     # If we set the particle arrays before the scene is activated, the arrays
