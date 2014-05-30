@@ -74,6 +74,9 @@ cdef class ParallelManager:
     cdef public int rank
     cdef public int size
 
+    cdef public np.ndarray dt_sendbuf    # array for global reduction
+    cdef public np.ndarray dt_recvbuf    # for time step calculation
+
     cdef public int lb_freq              # load balancing frequency
     cdef public int lb_count             # counter for current lb step
 
