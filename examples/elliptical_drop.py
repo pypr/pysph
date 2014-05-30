@@ -104,11 +104,8 @@ kernel = CubicSpline(dim=2)
 integrator = Integrator(fluid=WCSPHStep())
 
 # Construct the solver
-solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-# Setup default parameters for the solver
-solver.set_time_step(1e-5)
-solver.set_final_time(0.0075)
+solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                dt=1e-5, tf=0.0075)
 
 # Define the SPH equations used to solve this problem
 equations = [

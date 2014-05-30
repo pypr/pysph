@@ -1,3 +1,8 @@
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
+
 import numpy
 from particle_array import ParticleArray
 
@@ -191,7 +196,7 @@ def get_particles_info(particles):
     example to set-up dummy/empty particle arrays.
 
     """
-    info = {}
+    info = OrderedDict()
     for parray in particles:
         info[ parray.name ] = {}
         for prop_name, prop in parray.properties.iteritems():

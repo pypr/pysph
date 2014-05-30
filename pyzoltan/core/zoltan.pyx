@@ -674,10 +674,73 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         _check_error(ierr)
 
         return proc
+    
+    # Load balancing options
+    def set_rcb_lock_directions(self, str flag):
+        """Flag to fix the directions of the RCB cuts
+
+        Legal values are:
+        
+        0 : don't fix directions (default when using RCB)
+        1 : fix directions
+
+        Notes:
+        
+        This option is only valid for the RCB based geometric
+        partitioner. Setting this option to True (1) will mean the
+        direction of the cuts used at the beginning is re-used for the
+        duration of the simulation.
+
+        """
+        self._check_lb_method('RCB')        
+        self.Zoltan_Set_Param("RCB_LOCK_DIRECTIONS", flag)
+
+    def set_rcb_reuse(self, str flag):
+        """Flag to use the previous cut direction as a guess
+
+        Legal values are:
+
+        0 : don't reuse
+        1 : reuse
+
+        """
+        self._check_lb_method('RCB')
+        self.Zoltan_Set_Param('RCB_REUSE', flag)
+
+    def set_rcb_rectilinear_blocks(self, str flag):
+        """Flag controlling the shape of the RCB regions
+        
+        This option will avoid any unwanted projections of the
+        different partitions at the cost of a slight imbalance.
+
+        """
+        self._check_lb_method('RCB')
+        self.Zoltan_Set_Param('RCB_RECTILINEAR_BLOCKS', flag)
+
+    def set_rcb_directions(self, str flag):
+        """Flag to group the cuts along a given direction
+
+        Legal values (refer to the Zoltan User Guide):
+        
+        '0' = don't order cuts; 
+        '1' = xyz 
+        '2' = xzy 
+        '3' = yzx 
+        '4' = yxz 
+        '5' = zxy 
+        '6' = zyx
+
+        """
+        self._check_lb_method('RCB')
+        self.Zoltan_Set_Param('RCB_SET_DIRECTIONS', flag)
 
     #######################################################################
     # Private interface
     #######################################################################
+    def _check_lb_method(self, str expected):
+        if not self.lb_method == expected:
+            raise ValueError('Invalid LB_METHOD %s'%(self.lb_method))
+
     def _zoltan_register_query_functions(self):
         """Register query functions for the Geometric based partitioners
 

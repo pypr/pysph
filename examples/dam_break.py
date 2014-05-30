@@ -124,10 +124,8 @@ integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep())
 
 # Create a solver.
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
-# Setup default parameters.
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
+                dt=dt, tf=tf, adaptive_timestep=True)
 
 # create the equations
 equations = [
