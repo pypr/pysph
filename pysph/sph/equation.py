@@ -294,7 +294,27 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations):
+    def __init__(self, equations, real=True):
+        """Constructor.
+
+        Parameters
+        -----------
+
+        - equations: list: a list of equation objects.
+
+        - real: bool: specifies if only non-remote/non-ghost particles should
+                      be operated on.
+
+        Note that when running simulations in parallel, one should typically
+        run the summation density over all particles (both local and remote)
+        in each processor.  This is because we must update the
+        pressure/density of the remote neighbors in the current processor.
+        Otherwise the results can be incorrect with the remote particles
+        having an older density.  This is also the case for the TaitEOS.  In
+        these cases the group that computes the equation should set real to
+        False.
+        """
+        self.real = real
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()

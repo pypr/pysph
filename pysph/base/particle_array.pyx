@@ -306,13 +306,16 @@ cdef class ParticleArray:
 
         self.align_particles()
 
-    cpdef int get_number_of_particles(self):
+    cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
-        if len(self.properties.values()) > 0:
-            prop0 = self.properties.values()[0]
-            return prop0.length
+        if real:
+            return self.num_real_particles
         else:
-            return 0
+            if len(self.properties.values()) > 0:
+                prop0 = self.properties.values()[0]
+                return prop0.length
+            else:
+                return 0
 
     cpdef remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
