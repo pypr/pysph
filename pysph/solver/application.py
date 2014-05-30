@@ -228,6 +228,26 @@ class Application(object):
                           dest="zoltan_lb_method", default="RCB",
                           help=("""Choose the Zoltan load balancnig method"""))
 
+        # --rcb-lock
+        zoltan.add_option("--rcb-lock", action="store_true", dest="zoltan_rcb_lock_directions",
+                          default=False,
+                          help=("Lock the directions of the RCB cuts"))
+
+        # rcb--reuse
+        zoltan.add_option("--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
+                          default=False,
+                          help=("Reuse previous RCB cuts"))
+
+        # rcb-rectilinear
+        zoltan.add_option("--rcb-rectilinear", action="store_true", dest='zoltan_rcb_rectilinear',
+                          default=False,
+                          help=("Produce nice rectilinear blocks without projections"))
+
+        # rcb-set-direction
+        zoltan.add_option("--rcb-set-direction", action='store', dest="zoltan_rcb_set_direction",
+                          default=0, type="int",
+                          help=("Set the order of the RCB cuts"))
+
         zoltan.add_option("--zoltan-weights", action="store_false",
                           dest="zoltan_weights", default=True,
                           help=("""Switch between using weights for input to Zoltan.
@@ -461,6 +481,21 @@ class Application(object):
                 update_cell_sizes=options.update_cell_sizes,
                 radius_scale=radius_scale,
                 )
+
+            ### ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
+            
+            # RCB lock directions
+            if options.zoltan_rcb_lock_directions:
+                pm.set_zoltan_rcb_lock_directions()
+
+            if options.zoltan_rcb_reuse:
+                pm.set_zoltan_rcb_reuse()
+                
+            if options.zoltan_rcb_rectilinear:
+                pm.set_zoltan_rcb_rectilinear_blocks()
+
+            if options.zoltan_rcb_set_direction > 0:
+                pm.set_zoltan_rcb_directions( str(options.zoltan_rcb_set_direction) )
 
             # set zoltan options
             pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)

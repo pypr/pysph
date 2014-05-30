@@ -1254,6 +1254,34 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
             keep_cuts=keep_cuts,
             lb_method=lb_method)
 
+    def set_zoltan_rcb_lock_directions(self):
+        """Set the Zoltan flag to fix the directions of the RCB cuts"""
+        self.pz.set_rcb_lock_directions('1')
+
+    def set_zoltan_rcb_reuse(self):
+        """Use previous cuts as guesses for the current RCB cut"""
+        self.pz.set_rcb_reuse('1')
+
+    def set_zoltan_rcb_rectilinear_blocks(self):
+        """Flag to control the shape of the RCB regions """
+        self.pz.set_rcb_rectilinear_blocks('1')
+
+    def set_zoltan_rcb_directions(self, value):
+        """Option to group the cuts along a given direction
+        
+        Legal values (refer to the Zoltan User Guide):
+        
+        '0' = don't order cuts; 
+        '1' = xyz 
+        '2' = xzy 
+        '3' = yzx 
+        '4' = yxz 
+        '5' = zxy 
+        '6' = zyx
+
+        """
+        self.pz.set_rcb_directions(value)
+
     def set_data(self):
         """Set the user defined particle data structure for Zoltan.
 
