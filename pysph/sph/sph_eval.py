@@ -78,6 +78,7 @@ class SPHEval(object):
                 dest_list.append(dest)
 
         dests = OrderedDict()
+        dests.real = group.real
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
@@ -155,12 +156,12 @@ class SPHEval(object):
         src.update(dest)
         return group.get_array_declarations(src)
 
-    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources):
+    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources, real):
         src, dest_arrays = eqs_with_no_source.get_array_names()
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        lines = ['NP_DEST = self.%s.size()'%dest_name]
+        lines = ['NP_DEST = self.%s.size(real=%s)'%(dest_name, real)]
         lines += ['%s = dst.%s.data'%(n, n[2:])
                  for n in dest_arrays]
         return '\n'.join(lines)
