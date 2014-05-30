@@ -68,13 +68,13 @@ equations = [
             TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
             TaitEOS(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
 
-            ]),
+            ], real=False),
 
     # Continuity Momentum and XSPH equations
     Group(equations=[
                ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
                ContinuityEquation(dest='boundary', sources=['fluid']),
-               
+
                MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
                                 alpha=alpha, beta=beta, gz=-9.81),
 
@@ -82,7 +82,7 @@ equations = [
                XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
                ])
     ]
-    
+
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,

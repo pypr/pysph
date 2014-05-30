@@ -107,7 +107,7 @@ cdef class ParticleArray:
 
     cpdef BaseArray get_carray(self, str prop)
 
-    cpdef int get_number_of_particles(self)
+    cpdef int get_number_of_particles(self, bint real=*)
     cpdef remove_particles(self, indices)
     cpdef remove_tagged_particles(self, int tag)
 

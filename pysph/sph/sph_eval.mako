@@ -34,8 +34,8 @@ cdef class ParticleArrayWrapper:
 
         self.name = pa.name
 
-    cpdef long size(self):
-        return self.array.get_number_of_particles()
+    cpdef long size(self, bint real=False):
+        return self.array.get_number_of_particles(real)
 
 
 # #############################################################################
@@ -118,7 +118,7 @@ cdef class SPHCalc:
         #######################################################################
 
         dst = self.${dest}
-        ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources), 2)}
+        ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 2)}
         dst_array_index = dst.index
 
         #######################################################################
@@ -254,8 +254,8 @@ cdef class Integrator:
         if self.parallel_manager:
             self.parallel_manager.update()
         self.nnps.update()
+
         # compute accelerations
-        # XXX: Implement initialize for all equations.
         self.sph_calc.compute(t, dt)
 
         self.corrector()
@@ -272,7 +272,8 @@ cdef class Integrator:
         # ---------------------------------------------------------------------
         # Destination ${dest}.
         dst = self.${dest}
-        NP_DEST = dst.size()
+        # Only iterate over real particles.
+        NP_DEST = dst.size(real=True)
         ${indent(integrator.get_array_setup(dest, method), 2)}
         for d_idx in range(NP_DEST):
             ${indent(integrator.get_stepper_loop(dest, method), 3)}
