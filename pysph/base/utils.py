@@ -4,16 +4,18 @@ except ImportError:
     from ordereddict import OrderedDict
 
 import numpy
-from particle_array import ParticleArray
+from particle_array import ParticleArray, \
+    get_local_tag, get_remote_tag, get_ghost_tag
 
 from pyzoltan.core.carray import LongArray
 
 UINT_MAX = (1<<32) - 1
 
+# Internal tags used in PySPH (defined in particle_array.pxd)
 class ParticleTAGS:
-    Local = 0
-    Remote = 1
-    Ghost = 2
+    Local = get_local_tag()
+    Remote = get_remote_tag()
+    Ghost = get_ghost_tag()
 
 def arange_long(start, stop=-1):
     """ Creates a LongArray working same as builtin range with upto 2 arguments
