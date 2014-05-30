@@ -413,7 +413,7 @@ cdef class ParallelManager:
         self.lb_freq = 1
 
         # array for global reduction of time steps
-        self.dt_sendbuf = np.ones( self.size, dtype=np.float64 )
+        self.dt_sendbuf = np.array( [1.0], dtype=np.float64 )
 
     def update_time_steps(self, double local_dt):
         """Peform a reduction to compute the globally stable time steps"""
@@ -423,10 +423,10 @@ cdef class ParallelManager:
         comm = self.comm
 
         # set the local time step and peform the global reduction
-        dt_sendbuf[self.rank] = local_dt
+        dt_sendbuf[0] = local_dt
         comm.Allreduce( sendbuf=dt_sendbuf, recvbuf=dt_recvbuf, op=mpi.MIN )
         
-        return dt_recvbuf[self.rank]
+        return dt_recvbuf[0]
 
     cpdef compute_cell_size(self):
         """Compute the cell size for the binning.
