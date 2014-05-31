@@ -14,7 +14,7 @@ import numpy
 
 from pysph.sph.equation import Group
 from pysph.base.kernels import CubicSpline, Gaussian
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 
 from pysph.solver.solver import Solver
@@ -66,7 +66,7 @@ equations = [
     Group(equations=[
 
             TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-            TaitEOS(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+            TaitEOSHGCorrection(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
 
             ], real=False),
 
@@ -76,7 +76,8 @@ equations = [
                ContinuityEquation(dest='boundary', sources=['fluid']),
 
                MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                                alpha=alpha, beta=beta, gz=-9.81),
+                                alpha=alpha, beta=beta, gz=-9.81,
+                                tensile_correction=True),
 
                # Position step with XSPH
                XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
