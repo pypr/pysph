@@ -143,23 +143,6 @@ class MomentumEquation(Equation):
         # gradient and correction terms
         tmp = (tmpi + tmpj) + (Ri + Rj)*fij
 
-        # tensile instability correction
-        if self.tensile_instability_correction:
-            fab = WIJ/self.kfactor
-            fab = pow( fab, 4.0 )
-
-            if pi > 0:
-                Ra = 0.005 * pi*rhoi21
-            else:
-                Ra = 0.2 * fabs(pi)*rhoi21
-
-            if pj > 0:
-                Rb = 0.005 * pj*rhoj21
-            else:
-                Rb = 0.2 * fabs(pj)*rhoj21
-
-            tmp = tmp + (Ra + Rb)*fab                
-
         d_au[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[0]
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[2]

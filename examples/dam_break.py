@@ -95,7 +95,7 @@ dt = 1e-4
 tf = 2.5
 
 #h = 0.0156
-h = 0.0390
+h = 0.039
 hdx = 1.5
 #h = 0.01
 dx = dy = h/hdx
@@ -120,7 +120,6 @@ app = Application()
 
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
-kfactor = get_correction(kernel=kernel,h0=h)
 
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep())
