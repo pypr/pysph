@@ -317,8 +317,6 @@ class Solver(object):
         self.sph_eval.compute(self.t, dt)
 
         while self.t < self.tf:
-            self.t += dt
-            self.count += 1
 
             # perform any pre step functions
             for func in self.pre_step_functions:
@@ -327,19 +325,32 @@ class Solver(object):
             logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
                                                            self.rank))
             # perform the integration and update the time.
-            #print self.count, self.t
+            #print 'Solver Iteration', self.count, dt
             self.integrator.integrate(self.t, dt, self.count)
-
-            if self.adaptive_timestep:
-                self.dt = dt = self.integrator.compute_time_step(
-                    self.dt, self.cfl)
-
-            # update the time for all arrays
-            self.update_particle_time()
 
             # perform any post step functions
             for func in self.post_step_functions:
                 func.eval(self)
+
+            # update time and iteration counters if successfully
+            # integrated
+            self.t += dt
+            self.count += 1
+
+            # update the time for all arrays
+            self.update_particle_time()
+
+            # compute the new time step across all processors
+            if self.adaptive_timestep:
+                # locally stable time step
+                dt = self.integrator.compute_time_step(
+                    self.dt, self.cfl)
+                
+                # globally stable time step
+                if self.in_parallel:
+                    dt = self.pm.update_time_steps(dt)
+
+                self.dt = dt
 
             # dump output
             if self.count % self.pfreq == 0:
@@ -347,12 +358,14 @@ class Solver(object):
                 if self.comm:
                     self.comm.barrier()
 
+            # update progress bar
             bar.update(self.t)
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)
-
+                    
+        # close the progress bar
         bar.finish()
 
         # final output save

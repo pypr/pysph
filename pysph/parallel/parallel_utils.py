@@ -6,11 +6,6 @@ from pysph.base.particle_array import ParticleArray
 
 UINT_MAX = get_zoltan_id_type_max()
 
-class ParticleTAGS:
-    Local = 0           # Particles local to this processor
-    Remote = 1          # Remote particles for computations
-    Ghost = 2           # Ghost particles for periodicity
-
 def invert_export_lists(comm, exportProcs, recv_count):
     """Invert a given set of export indices.
 
