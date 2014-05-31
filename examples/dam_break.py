@@ -92,11 +92,11 @@ container_width  = 4.0
 nboundary_layers=2
 
 dt = 1e-4
-tf = 1.0
+tf = 2.5
 
 #h = 0.0156
 h = 0.0390
-hdx = 1.3
+hdx = 1.5
 #h = 0.01
 dx = dy = h/hdx
 ro = 1000.0
@@ -105,20 +105,22 @@ gamma = 7.0
 alpha = 0.5
 beta = 0.0
 B = co*co*ro/gamma
+p0 = 1000.0
 
 geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
     fluid_column_height=fluid_column_height,
     fluid_column_width=fluid_column_width, dx=dx, dy=dy,
-    nboundary_layers=nboundary_layers, ro=ro, co=co,
-    with_obstacle=False)
-
+    nboundary_layers=1, ro=ro, co=co,
+    with_obstacle=False,
+    beta=2.0, nfluid_offset=1, hdx=hdx)
 
 # Create the application.
 app = Application()
 
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
+kfactor = get_correction(kernel=kernel,h0=h)
 
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep())
@@ -135,7 +137,6 @@ equations = [
 
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
             TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-
             ], real=False),
 
     Group(equations=[
@@ -156,6 +157,6 @@ equations = [
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
-          particle_factory=geom.create_particles, hdx=hdx)
+          particle_factory=geom.create_particles)
 
 app.run()

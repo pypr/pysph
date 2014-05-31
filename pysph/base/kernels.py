@@ -4,6 +4,10 @@ from math import pi, sqrt, exp
 M_1_PI = 1.0/pi
 M_2_SQRTPI = 2.0/sqrt(pi)
 
+def get_correction(kernel, h0):
+    rij = kernel.deltap * h0
+    return kernel.kernel(rij=rij, h=h0)
+
 ###############################################################################
 # `CubicSpline` class.
 ###############################################################################
@@ -11,7 +15,7 @@ class CubicSpline(object):
     def __init__(self, dim=1):
         self.radius_scale = 2.0
         self.dim = dim
-        
+
     def get_deltap(self):
         return 2./3
 
