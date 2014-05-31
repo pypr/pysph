@@ -29,6 +29,14 @@ try:
 except ImportError:
     Have_MPI = False
 
+compiler = 'gcc'
+#compiler = 'intel'
+if compiler == 'intel':
+    extra_compile_args = ['-O3']
+else:
+    extra_compile_args = []
+
+
 mpi_inc_dirs = []
 mpi_compile_args = []
 mpi_link_args = []
@@ -50,7 +58,6 @@ def get_zoltan_directory(varname):
 
 if Have_MPI:
     mpic = 'mpicc'
-    compiler = 'gcc'
     if compiler == 'intel':
         link_args = commands.getoutput(mpic + ' -cc=icc -link_info')
         link_args = link_args[3:]
@@ -82,27 +89,32 @@ cmdclass = {'build_ext': build_ext}
 ext_modules = [
     Extension( name="pyzoltan.core.carray",
                sources=["pyzoltan/core/carray.pyx"],
-               include_dirs = include_dirs),
+               include_dirs = include_dirs,
+               extra_compile_args=extra_compile_args),
 
     Extension( name="pysph.base.particle_array",
-               sources=["pysph/base/particle_array.pyx"]),
+               sources=["pysph/base/particle_array.pyx"],
+               extra_compile_args=extra_compile_args),
 
     Extension( name="pysph.base.point",
-               sources=["pysph/base/point.pyx"]),
+               sources=["pysph/base/point.pyx"],
+               extra_compile_args=extra_compile_args),
 
     Extension( name="pysph.base.nnps",
-               sources=["pysph/base/nnps.pyx"]),
+               sources=["pysph/base/nnps.pyx"],
+               extra_compile_args=extra_compile_args),
 
     # kernels used for tests
     Extension( name="pysph.parallel._kernels",
                sources=["pysph/parallel/_kernels.pyx"],
                include_dirs = include_dirs,
-               ),
+               extra_compile_args=extra_compile_args),
 
     # Eigen decomposition code
     Extension( name="pysph.sph.solid_mech.linalg",
                sources=["pysph/sph/solid_mech/linalg.pyx"],
                include_dirs=include_dirs,
+               extra_compile_args=extra_compile_args,
                ),
     ]
 
@@ -118,7 +130,7 @@ if Have_MPI:
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args),
+                   extra_compile_args=mpi_compile_args+extra_compile_args),
 
         Extension( name="pyzoltan.core.zoltan_dd",
                    sources=["pyzoltan/core/zoltan_dd.pyx"],
@@ -126,7 +138,7 @@ if Have_MPI:
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args),
+                   extra_compile_args=mpi_compile_args+extra_compile_args),
 
         Extension( name="pyzoltan.core.zoltan_comm",
                    sources=["pyzoltan/core/zoltan_comm.pyx"],
@@ -134,7 +146,7 @@ if Have_MPI:
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args),
+                   extra_compile_args=mpi_compile_args+extra_compile_args),
         ]
 
     parallel_modules = [
@@ -145,7 +157,7 @@ if Have_MPI:
                    library_dirs = zoltan_library_dirs,
                    libraries = ['zoltan', 'mpi'],
                    extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args),
+                   extra_compile_args=mpi_compile_args+extra_compile_args),
         ]
 
     ext_modules += zoltan_modules + parallel_modules
