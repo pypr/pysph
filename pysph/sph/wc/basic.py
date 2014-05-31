@@ -57,7 +57,7 @@ class TaitEOSHGCorrection(Equation):
 class MomentumEquation(Equation):
     def __init__(self, dest, sources=None,
                  alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
-                 c0=1.0):
+                 c0=1.0, tensile_correction=False):
         self.alpha = alpha
         self.beta = beta
         self.eta = eta
@@ -66,6 +66,9 @@ class MomentumEquation(Equation):
         self.gz = gz
         self.dt_fac = 0.0
         self.c0 = c0
+
+        self.tensile_correction = tensile_correction
+        
         super(MomentumEquation, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
@@ -77,7 +80,8 @@ class MomentumEquation(Equation):
              d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ=[0.0, 0.0, 0.0],
              XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
-             DWIJ=[1.0, 1.0, 1.0], DT_ADAPT=[0.0, 0.0, 0.0]):
+             DWIJ=[1.0, 1.0, 1.0], DT_ADAPT=[0.0, 0.0, 0.0],
+             WIJ=0.0, WDP=0.0):
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
 
@@ -98,7 +102,32 @@ class MomentumEquation(Equation):
             _dt_fac = abs( HIJ * vijdotxij/R2IJ ) + self.c0
             DT_ADAPT[0] = max(_dt_fac, DT_ADAPT[0])
 
-        tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
+        tmpi = d_p[d_idx]*rhoi21
+        tmpj = s_p[s_idx]*rhoj21
+
+        fij = WIJ/WDP
+        Ri = 0.0; Rj = 0.0
+
+        #tmp = d_p[d_idx] * rhoi21 + s_p[s_idx] * rhoj21
+        #tmp = tmpi + tmpj
+
+        # tensile instability correction
+        if self.tensile_correction:
+            fij = fij*fij
+            fij = fij*fij
+
+            if d_p[d_idx] > 0 : 
+                Ri = 0.01 * tmpi
+            else:
+                Ri = 0.2*abs( tmpi )
+
+            if s_p[s_idx] > 0:
+                Rj = 0.01 * tmpj
+            else:
+                Rj = 0.2 * abs( tmpj )
+
+        # gradient and correction terms
+        tmp = (tmpi + tmpj) + (Ri + Rj)*fij
 
         d_au[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[0]
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]

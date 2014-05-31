@@ -144,7 +144,8 @@ equations = [
             ContinuityEquation(dest='obstacle', sources=['fluid']),
 
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
-                             alpha=alpha, beta=beta, gz=-9.81, c0=co),
+                             alpha=alpha, beta=beta, gz=-9.81, c0=co,
+                             tensile_correction=True),
 
             XSPHCorrection(dest='fluid', sources=['fluid'])
 

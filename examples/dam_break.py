@@ -146,7 +146,8 @@ equations = [
 
             # Momentum equation
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gy=-9.81, c0=co),
+                             alpha=alpha, beta=beta, gy=-9.81, c0=co,
+                             tensile_correction=True),
 
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])

@@ -76,7 +76,8 @@ equations = [
                ContinuityEquation(dest='boundary', sources=['fluid']),
 
                MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                                alpha=alpha, beta=beta, gz=-9.81),
+                                alpha=alpha, beta=beta, gz=-9.81,
+                                tensile_correction=True),
 
                # Position step with XSPH
                XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)

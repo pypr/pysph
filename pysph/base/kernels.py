@@ -11,6 +11,9 @@ class CubicSpline(object):
     def __init__(self, dim=1):
         self.radius_scale = 2.0
         self.dim = dim
+        
+    def get_deltap(self):
+        return 2./3
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
@@ -79,6 +82,9 @@ class WendlandQuintic(object):
             raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
         self.dim = dim
 
+    def get_deltap(self):
+        return 0.5
+
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0/h
         q = rij*h1
@@ -140,6 +146,9 @@ class Gaussian(object):
         self.radius_scale = 3.0
         self.dim = dim
 
+    def get_deltap(self):
+        return sqrt(0.5)
+
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
         q = rij*h1
@@ -187,6 +196,10 @@ class QuinticSpline(object):
         if dim != 2:
             raise NotImplementedError('Quintic spline currently only supports 2D kernels.')
         self.dim = dim
+
+    # this is incorrect for the moment and needs to be calculated
+    def get_deltap(self):
+        return 1.0
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
