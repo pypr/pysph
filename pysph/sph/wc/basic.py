@@ -21,6 +21,39 @@ class TaitEOS(Equation):
         d_p[d_idx] = self.B * (tmp - 1.0)
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
+class TaitEOSHGCorrection(Equation):
+    """Tait Equation of state with Hughes and Graham Correction
+    
+    The correction is described in "Comparison of incompressible and
+    weakly-compressible SPH models for free-surface water flows",
+    Journal of Hydraullic Research, 2010, 48
+
+    The correction is to be applied on boundary particles and imposes
+    a minimum value of the density (rho0) which is set upon
+    instantiation. This correction avoids particle sticking behaviour
+    at walls.
+
+    """
+    def __init__(self, dest, sources=None,
+                 rho0=1000.0, c0=1.0, gamma=7.0):
+        self.rho0 = rho0
+        self.rho01 = 1.0/rho0
+        self.c0 = c0
+        self.gamma = gamma
+        self.gamma1 = 0.5*(gamma - 1.0)
+        self.B = rho0*c0*c0/gamma
+        super(TaitEOSHGCorrection, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_rho, d_p, d_cs):
+        if d_rho[d_idx] < self.rho0:
+            d_rho[d_idx] = self.rho0
+
+        ratio = d_rho[d_idx] * self.rho01
+        tmp = pow(ratio, self.gamma)
+                
+        d_p[d_idx] = self.B * (tmp - 1.0)
+        d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
+
 class MomentumEquation(Equation):
     def __init__(self, dest, sources=None,
                  alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
