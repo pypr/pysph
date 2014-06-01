@@ -100,7 +100,7 @@ class Application(object):
         parser.add_option("-v", "--loglevel", action="store",
                           type="string",
                           dest="loglevel",
-                          default='warning',
+                          default='info',
                           help="Log-level to use for log messages. " +
                                valid_vals)
         # --logfile
@@ -386,7 +386,7 @@ class Application(object):
             lfn = os.path.join(self.path,filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
             logging.basicConfig(level=loglevel, format=format,
-                                filename=lfn, filemode='w')
+                                filename=lfn, filemode='a')
         if stream:
             logger.addHandler(logging.StreamHandler())
 

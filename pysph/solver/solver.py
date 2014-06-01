@@ -182,7 +182,7 @@ class Solver(object):
 
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)
-        logger.info("Solver setup complete.")
+        logger.debug("Solver setup complete.")
 
     def add_print_properties(self, props):
         """ Add a list of properties to print """
@@ -331,8 +331,10 @@ class Solver(object):
                 func.eval(self)
 
             if self.rank == 0:
-	       logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
-                                                              self.rank))
+                logger.debug(
+                    "Iteration=%d, time=%f, timestep=%f" % \
+                        (self.count, self.t, dt)
+                )
             # perform the integration and update the time.
             #print 'Solver Iteration', self.count, dt
             self.integrator.integrate(self.t, dt, self.count)
