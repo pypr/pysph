@@ -5,7 +5,7 @@ import threading, thread
 from pysph.base.particle_array import ParticleArray
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 class DummyComm(object):
     ''' A dummy MPI.Comm implementation as placeholder for for serial runs '''
@@ -207,12 +207,14 @@ class CommandManager(object):
     def __init__(self, solver, comm=None):
         if comm is not None:
             self.comm = comm
+            self.rank = comm.Get_rank()
         else:
             try:
                 self.comm = solver.particles.cell_manager.parallel_controller.comm
             except AttributeError:
                 self.comm = DummyComm()
-        logger.info('CommandManager: using comm: %s'%self.comm)
+            self.rank = 0
+        logger.debug('CommandManager: using comm: %s'%self.comm)
         self.solver = solver
         self.interfaces = []
         self.func_dict = {}
@@ -236,7 +238,7 @@ class CommandManager(object):
         instance passed to it
         The new created thread is set to daemon mode and returned
         '''
-        logger.info('adding_interface: %s'%callable)
+        logger.debug('adding_interface: %s'%callable)
         control = Controller(self, block)
         thr = threading.Thread(target=callable, args=(control,))
         thr.daemon = True
@@ -255,7 +257,8 @@ class CommandManager(object):
         self.sync_commands()
         with self.qlock:
             self.run_queued_commands()
-        logger.info('control handler: count=%d'%solver.count)
+        if self.rank == 0:
+            logger.debug('control handler: count=%d'%solver.count)
 
         for interval in self.func_dict:
             if solver.count%interval == 0:
@@ -292,14 +295,14 @@ class CommandManager(object):
 
     def run_command(self, cmd, args=[], kwargs={}):
         res =  self.dispatch_dict[cmd](self, *args, **kwargs)
-        logger.info('controller: running_command: %s %s %s %s'%(
+        logger.debug('controller: running_command: %s %s %s %s'%(
                                                 cmd, args, kwargs, res))
         return res
 
     def pause_on_next(self):
         ''' pause and wait for command on the next control interval '''
         if self.comm.Get_size() > 1:
-            logger.info('pause/continue noy yet supported in parallel runs')
+            logger.debug('pause/continue not yet supported in parallel runs')
             return False
         with self.plock:
             self.pause.add(threading.current_thread().ident)
@@ -313,7 +316,7 @@ class CommandManager(object):
     def cont(self):
         ''' continue after a pause command '''
         if self.comm.Get_size() > 1:
-            logger.info('pause/continue noy yet supported in parallel runs')
+            logger.debug('pause/continue noy yet supported in parallel runs')
             return
         with self.plock:
             self.pause.remove(threading.current_thread().ident)
@@ -422,7 +425,7 @@ class CommandManager(object):
                     raise RuntimeError('Invalid dispatch on method: %s with '
                                        'non-existant property: %s '%(meth,prop))
             if block or meth=='get' or meth in self.active_methods:
-                logger.info('controller: immediate dispatch(): %s %s %s'%(
+                logger.debug('controller: immediate dispatch(): %s %s %s'%(
                             meth, args, kwargs))
                 return self.dispatch_dict[meth](self, *args, **kwargs)
             else:
@@ -433,9 +436,8 @@ class CommandManager(object):
                     self.queue_lock_map[lock_id] = lock
                     self.queue_dict[lock_id] = (meth, args, kwargs)
                     self.queue.append(lock_id)
-                logger.info('controller: dispatch(%d): %s %s %s'%(
+                logger.debug('controller: dispatch(%d): %s %s %s'%(
                             lock_id, meth, args, kwargs))
                 return str(lock_id)
         else:
             raise RuntimeError('Invalid dispatch on method: '+meth)
-

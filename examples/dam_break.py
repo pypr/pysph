@@ -78,7 +78,7 @@ from db_geometry import DamBreak2DGeometry
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -92,11 +92,11 @@ container_width  = 4.0
 nboundary_layers=2
 
 dt = 1e-4
-tf = 1.0
+tf = 2.5
 
 #h = 0.0156
-h = 0.0390
-hdx = 1.3
+h = 0.039
+hdx = 1.5
 #h = 0.01
 dx = dy = h/hdx
 ro = 1000.0
@@ -105,14 +105,15 @@ gamma = 7.0
 alpha = 0.5
 beta = 0.0
 B = co*co*ro/gamma
+p0 = 1000.0
 
 geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
     fluid_column_height=fluid_column_height,
     fluid_column_width=fluid_column_width, dx=dx, dy=dy,
-    nboundary_layers=nboundary_layers, ro=ro, co=co,
-    with_obstacle=False)
-
+    nboundary_layers=1, ro=ro, co=co,
+    with_obstacle=False,
+    beta=2.0, nfluid_offset=1, hdx=hdx)
 
 # Create the application.
 app = Application()
@@ -134,8 +135,7 @@ equations = [
     Group(equations=[
 
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-
+            TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
             ], real=False),
 
     Group(equations=[
@@ -146,7 +146,8 @@ equations = [
 
             # Momentum equation
             MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                     alpha=alpha, beta=beta, gy=-9.81, c0=co),
+                             alpha=alpha, beta=beta, gy=-9.81, c0=co,
+                             tensile_correction=True),
 
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])
@@ -155,6 +156,6 @@ equations = [
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
-          particle_factory=geom.create_particles, hdx=hdx)
+          particle_factory=geom.create_particles)
 
 app.run()

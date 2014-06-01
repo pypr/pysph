@@ -196,6 +196,11 @@ def precomputed_symbols():
                 code="WIJ = KERNEL(XIJ, RIJ, HIJ)",
                 WIJ=0.0)
 
+    # wdeltap for tensile instability correction
+    c.WDP = BasicCodeBlock(
+                code="WDP = KERNEL(XIJ, DELTAP*HIJ, HIJ)",
+                WDP=0.0)
+
     c.WI = BasicCodeBlock(
                 code="WI = KERNEL(XIJ, RIJ, d_h[d_idx])",
                 WI=0.0)
@@ -382,6 +387,8 @@ class Group(object):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
             g_func = 'self.kernel.gradient'
+            deltap = 'self.kernel.get_deltap()'
+            code = code.replace('DELTAP', deltap)
             return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
         else:
             return code
