@@ -5,7 +5,7 @@ import threading, thread
 from pysph.base.particle_array import ParticleArray
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 class DummyComm(object):
     ''' A dummy MPI.Comm implementation as placeholder for for serial runs '''
@@ -207,11 +207,13 @@ class CommandManager(object):
     def __init__(self, solver, comm=None):
         if comm is not None:
             self.comm = comm
+            self.rank = comm.Get_rank()
         else:
             try:
                 self.comm = solver.particles.cell_manager.parallel_controller.comm
             except AttributeError:
                 self.comm = DummyComm()
+            self.rank = 0
         logger.info('CommandManager: using comm: %s'%self.comm)
         self.solver = solver
         self.interfaces = []
@@ -255,7 +257,8 @@ class CommandManager(object):
         self.sync_commands()
         with self.qlock:
             self.run_queued_commands()
-        logger.info('control handler: count=%d'%solver.count)
+        if self.rank == 0:
+            logger.info('control handler: count=%d'%solver.count)
 
         for interval in self.func_dict:
             if solver.count%interval == 0:
@@ -438,4 +441,3 @@ class CommandManager(object):
                 return str(lock_id)
         else:
             raise RuntimeError('Invalid dispatch on method: '+meth)
-

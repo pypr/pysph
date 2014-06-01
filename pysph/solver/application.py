@@ -4,13 +4,12 @@ import logging
 from optparse import OptionParser, OptionGroup, Option
 from os.path import basename, splitext, abspath
 import sys
+import time
 
 # PySPH imports.
 from pysph.base import utils
-from pysph.base.particle_array import ParticleArray
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
-import pysph.base.kernels as kernels
 from utils import mkdir, load
 
 # conditional parallel imports
@@ -26,6 +25,8 @@ def list_option_callback(option, opt, value, parser):
     val = value.split(',')
     val.extend( parser.rargs )
     setattr( parser.values, option.dest, val )
+
+logger = logging.getLogger(__name__)
 
 ##############################################################################
 # `Application` class.
@@ -143,6 +144,11 @@ class Application(object):
         parser.add_option("-q", "--quiet", action="store_true",
                          dest="quiet", default=False,
                          help="Do not print any progress information.")
+
+        # --disable-output
+        parser.add_option("--disable-output", action="store_true",
+                         dest="disable_output", default=False,
+                         help="Do not dump any output files.")
 
         # -o/ --fname
         parser.add_option("-o", "--fname", action="store",
@@ -370,7 +376,6 @@ class Application(object):
                     stderr
         """
         # logging setup
-        self.logger = logger = logging.getLogger()
         logger.setLevel(loglevel)
 
         # Setup the log file.
@@ -379,9 +384,9 @@ class Application(object):
 
         if len(filename) > 0:
             lfn = os.path.join(self.path,filename)
-            if self.num_procs > 1:
-                logging.basicConfig(level=loglevel, filename=lfn,
-                                    filemode='w')
+            format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
+            logging.basicConfig(level=loglevel, format=format,
+                                filename=lfn, filemode='w')
         if stream:
             logger.addHandler(logging.StreamHandler())
 
@@ -483,14 +488,14 @@ class Application(object):
                 )
 
             ### ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
-            
+
             # RCB lock directions
             if options.zoltan_rcb_lock_directions:
                 pm.set_zoltan_rcb_lock_directions()
 
             if options.zoltan_rcb_reuse:
                 pm.set_zoltan_rcb_reuse()
-                
+
             if options.zoltan_rcb_rectilinear:
                 pm.set_zoltan_rcb_rectilinear_blocks()
 
@@ -566,6 +571,7 @@ class Application(object):
             solver need to be set before calling this method
 
         """
+        start_time = time.time()
         self._solver = solver
         solver_opts = solver.get_options(self.opt_parse)
         if solver_opts is not None:
@@ -629,6 +635,9 @@ class Application(object):
         # output file name
         solver.set_output_fname(fname)
 
+        # disable_output
+        solver.set_disable_output(options.disable_output)
+
         # Cell iteration.
         solver.set_cell_iteration(options.cell_iteration)
 
@@ -653,19 +662,6 @@ class Application(object):
 
             # set solver cfl number
             solver.set_cfl(options.cfl)
-
-        # default kernel
-        # if options.kernel is not None:
-        #     solver.kernel = getattr(kernels,
-        #                         kernel_names[options.kernel])(dim=solver.dim)
-
-        # if options.resume is not None:
-        #     solver.particles = self.particles # needed to be able to load particles
-        #     r = solver.load_output(options.resume)
-        #     if r is not None:
-        #         print 'available files for resume:'
-        #         print r
-        #         sys.exit(0)
 
         if options.integration is not None:
             # FIXME, this is bogus
@@ -716,15 +712,31 @@ class Application(object):
 
                 self.command_manager.add_interface(interface.start)
 
-                self.logger.info('started multiprocessing interface on %s'%(
-                        interface.address,))
+                logger.info('started multiprocessing interface on %s'%(
+                             interface.address,))
+        end_time = time.time()
+        self._message("Setup took: %.5f secs"%(end_time - start_time))
 
     def run(self):
         """Run the application.
         """
+        start_time = time.time()
         self._solver.solve(not self.options.quiet)
+        end_time = time.time()
+        self._message("Run took: %.5f secs"%(end_time - start_time))
 
     def dump_code(self, file):
         """Dump the generated code to given file.
         """
         file.write(self._solver.sph_eval.ext_mod.code)
+
+    def _message(self, msg):
+        if self.options.quiet:
+            return
+        if self.num_procs == 1:
+            logger.info(msg)
+            print msg
+        elif (self.num_procs > 1 and self.rank in (0,1)):
+            s = "Rank %d: %s"%(self.rank, msg)
+            logger.info(s)
+            print s

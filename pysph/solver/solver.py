@@ -11,7 +11,7 @@ from pysph.sph.sph_eval import SPHEval
 from utils import FloatPBar, savez, load
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
 
 class Solver(object):
     """ Base class for all PySPH Solvers
@@ -43,7 +43,7 @@ class Solver(object):
     """
 
     def __init__(self, dim=2, integrator=None, kernel=None,
-                 tdamp=0.0, tf=1.0, dt=1e-3, 
+                 tdamp=0.0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3, **kwargs):
         """Constructor
 
@@ -101,6 +101,8 @@ class Solver(object):
 
         # default output printing frequency
         self.pfreq = 100
+
+        self.disable_output = False
 
         # the process id for parallel runs
         self.pid = None
@@ -180,6 +182,7 @@ class Solver(object):
 
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)
+        logger.info("Solver setup complete.")
 
     def add_print_properties(self, props):
         """ Add a list of properties to print """
@@ -227,6 +230,11 @@ class Solver(object):
     def set_print_freq(self, n):
         """ Set the output print frequency """
         self.pfreq = n
+
+    def set_disable_output(self, value):
+        """Disable file output.
+        """
+        self.disable_output = value
 
     def set_arrays_to_print(self, array_names=None):
         """Only print the arrays with the given names.
@@ -322,8 +330,9 @@ class Solver(object):
             for func in self.pre_step_functions:
                 func.eval(self)
 
-            logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
-                                                           self.rank))
+            if self.rank == 0:
+	       logger.info("Time %f, time step %f, rank  %d"%(self.t, dt,
+                                                              self.rank))
             # perform the integration and update the time.
             #print 'Solver Iteration', self.count, dt
             self.integrator.integrate(self.t, dt, self.count)
@@ -345,7 +354,7 @@ class Solver(object):
                 # locally stable time step
                 dt = self.integrator.compute_time_step(
                     self.dt, self.cfl)
-                
+
                 # globally stable time step
                 if self.in_parallel:
                     dt = self.pm.update_time_steps(dt)
@@ -364,7 +373,7 @@ class Solver(object):
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)
-                    
+
         # close the progress bar
         bar.finish()
 
@@ -413,6 +422,9 @@ class Solver(object):
         array['x']
 
         """
+        if self.disable_output:
+            return
+
         fname = self.fname + '_'
         props = {"arrays":{}, "solver_data":{}}
 
