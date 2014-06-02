@@ -12,6 +12,8 @@ import inspect
 from pysph.sph.equation import get_array_names
 from pysph.base.cython_generator import CythonGenerator
 
+from numpy import sqrt
+
 ###############################################################################
 # `IntegratorStep` class
 ###############################################################################
@@ -262,25 +264,66 @@ class Integrator(object):
         # by the SPHEval.
         self.integrator = None
 
-    def compute_time_step(self, dt, cfl):
+    def set_fixed_h(self, fixed_h):
+        # compute h_minimum once for constant smoothing lengths
+        if fixed_h:
+            self.compute_h_minimum()
+
+        self.fixed_h=fixed_h
+
+    def compute_h_minimum(self):
         calc = self.integrator.sph_calc
-        dt_cfl = calc.dt_cfl
+
         hmin = 1.0
-
-        # if the dt_cfl is not defined, return default dt
-        if dt_cfl <= 0.0:
-            return dt
-
-        # iterate over particles and find the stable time step
         for pa in calc.particle_arrays:
             h = pa.get_carray('h')
             h.update_min_max()
-
+            
             if h.minimum < hmin:
                 hmin = h.minimum
 
-        # return the courant limited time step
-        return cfl * hmin/dt_cfl
+        self.h_minimum = hmin
+
+    def compute_time_step(self, dt, cfl):
+        calc = self.integrator.sph_calc
+
+        # different time step controls
+        dt_cfl_factor = calc.dt_cfl
+        dt_visc_factor = calc.dt_viscous
+
+        # force factor is acceleration squared
+        dt_force_factor = sqrt(calc.dt_force)
+
+        # iterate over particles and find hmin if using vatialbe h
+        if not self.fixed_h:
+            self.compute_h_minimum()
+
+        hmin = self.h_minimum
+
+        # default time steps set to some large value
+        dt_cfl = dt_force = dt_viscous = 1e20
+
+        # stable time step based on courant condition
+        if dt_cfl_factor > 0:
+            dt_cfl = hmin/dt_cfl_factor
+
+        # stable time step based on force criterion
+        if dt_force_factor > 0:
+            dt_force = sqrt( hmin/dt_force_factor )
+
+        # stable time step based on viscous condition
+        if dt_visc_factor > 0:
+            dt_viscous = hmin/dt_visc_factor
+
+        # minimum of all three
+        dt_min = min( dt_cfl, dt_force, dt_viscous )
+
+        # return the computed time steps. If dt factors aren't
+        # defined, the default dt is returned
+        if dt_min <= 0.0:
+            return dt
+        else:
+            return cfl*dt_min
 
     def get_stepper_code(self):
         classes = {}

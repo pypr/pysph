@@ -55,9 +55,9 @@ kernel = CubicSpline(dim=3)
 integrator = Integrator(
     fluid=WCSPHStep(),boundary=WCSPHStep())
 
-# Create a solver.
+# Create a solver. damping time is taken as 0.1% of the final time
 solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
-                adaptive_timestep=True, tf=tf, dt=dt)
+                adaptive_timestep=True, tf=tf, dt=dt, tdamp=tf/1000)
 
 # create the equations
 equations = [

@@ -124,9 +124,10 @@ kernel = WendlandQuintic(dim=2)
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep())
 
-# Create a solver.
+# Create a solver. Damping time is taken as 0.1% of the final time
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=True)
+                dt=dt, tf=tf, adaptive_timestep=True, tdamp=tf/1000.0,
+                fixed_h=True)
 
 # create the equations
 equations = [
