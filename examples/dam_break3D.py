@@ -118,11 +118,8 @@ integrator = Integrator(fluid=WCSPHStep(),
                         obstacle=WCSPHStep())
 
 # Create a solver.
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
-
-# Setup default parameters.
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+solver = Solver(kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt, 
+                adaptive_timestep=True, tdamp=tf/1000.0)
 
 # create the equations
 equations = [

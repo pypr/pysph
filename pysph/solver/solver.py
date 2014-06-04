@@ -43,8 +43,9 @@ class Solver(object):
     """
 
     def __init__(self, dim=2, integrator=None, kernel=None,
-                 tdamp=0.0, tf=1.0, dt=1e-3,
-                 adaptive_timestep=False, cfl=0.3, **kwargs):
+                 tdamp=0.001, tf=1.0, dt=1e-3,
+                 adaptive_timestep=False, cfl=0.3,
+                 fixed_h=False, **kwargs):
         """Constructor
 
         Any additional keyword args are used to set the values of any
@@ -63,7 +64,7 @@ class Solver(object):
             SPH kernel to use
 
         tdamp : double
-            Initial solution damping time
+            Time upto which damping of the initial solution is required
 
         tf, dt : double
             Final time and suggested initial time-step
@@ -73,6 +74,9 @@ class Solver(object):
 
         cfl : double
             CFL number for adaptive time stepping
+
+        fixed_h : bint
+            Flag for constant smoothing lengths
 
         """
 
@@ -158,7 +162,10 @@ class Solver(object):
         self.tf = tf
         self.dt = dt
 
-    def setup(self, particles, equations, nnps, kernel=None):
+        # flag for constant smoothing lengths
+        self.fixed_h = fixed_h
+
+    def setup(self, particles, equations, nnps, kernel=None, fixed_h=False):
         """ Setup the solver.
 
         The solver's processor id is set if the in_parallel flag is set
@@ -182,6 +189,11 @@ class Solver(object):
 
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)
+
+        # set integrator option for constant smoothing length
+        self.fixed_h = fixed_h
+        self.integrator.set_fixed_h( fixed_h )
+
         logger.debug("Solver setup complete.")
 
     def add_print_properties(self, props):
@@ -319,6 +331,9 @@ class Solver(object):
 
         # set the time for the integrator
         #self.integrator.time = self.t
+        
+        # initial solution damping time
+        tdamp = self.tdamp
 
         # Compute the accelerations once for the predictor corrector
         # integrator to work correctly at the first time step.
@@ -336,7 +351,7 @@ class Solver(object):
                         (self.count, self.t, dt)
                 )
             # perform the integration and update the time.
-            #print 'Solver Iteration', self.count, dt
+            #print 'Solver Iteration', self.count, dt, self.t, tdamp
             self.integrator.integrate(self.t, dt, self.count)
 
             # perform any post step functions
@@ -356,6 +371,10 @@ class Solver(object):
                 # locally stable time step
                 dt = self.integrator.compute_time_step(
                     self.dt, self.cfl)
+
+                # damp the initial solution
+                if self.t < tdamp:
+                    dt *= 0.5 * (numpy.sin(numpy.pi*(-0.5+self.t/tdamp)) + 1.0)
 
                 # globally stable time step
                 if self.in_parallel:
