@@ -97,6 +97,39 @@ class ContinuityEquation(Equation):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
+class ContinuityEquationFerrariDissipation(Equation):
+    r"""Density rate equation with dissipative terms:
+
+    :math:`$\frac{d\rho_a}{dt} = \sum_b m_b \left(
+    \boldsymbol{v}_{ab}\cdot \nabla_a W_{ab} + \eta_{ab} \cdot
+    \nabla_{a} W_{ab} (\frac{c_{ab}}{\rho_b}(\rho_b - \rho_a)) \right)$`
+
+    """
+    def initialize(self, d_idx, d_arho):
+        d_arho[d_idx] = 0.0
+
+    def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho, 
+             DWIJ=[0.0, 0.0, 0.0], VIJ=[0.0, 0.0, 0.0], RIJ=0.0,
+             XIJ=[0.0, 0.0, 0.0]):
+
+        vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
+
+        etadotdwij = 0.0
+        if RIJ > 1e-14:
+            # celerity (sound speed)
+            cij =  max( d_cs[d_idx], s_cs[s_idx] )
+
+            # eta \cdot \nabla W
+            etadotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+            etadotdwij = etadotdwij/RIJ
+
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+
+        # standard term with dissipative penalization
+        d_arho[d_idx] += s_m[s_idx] * (vijdotdwij + \
+                                           etadotdwij*cij*(rhoj-rhoi)/rhoj)
+
 
 class MonaghanArtificialViscosity(Equation):
     def __init__(self, dest, sources=None, alpha=1.0, beta=1.0, eta=0.1):
