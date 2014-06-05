@@ -376,9 +376,13 @@ class Solver(object):
                 if self.t < tdamp:
                     dt *= 0.5 * (numpy.sin(numpy.pi*(-0.5+self.t/tdamp)) + 1.0)
 
-                # globally stable time step
+                # set the globally stable time step
                 if self.in_parallel:
                     dt = self.pm.update_time_steps(dt)
+
+                # adjust dt to land on final time
+                if self.t + dt > self.tf:
+                    dt = self.tf - self.t
 
                 self.dt = dt
 
