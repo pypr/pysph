@@ -27,6 +27,7 @@ from pysph.solver.solver import Solver
 from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
+from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
@@ -103,24 +104,32 @@ app = Application()
 kernel = CubicSpline(dim=2)
 integrator = Integrator(fluid=WCSPHStep())
 
-# Construct the solver
+# Construct the solver.
+dt = 1e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                dt=1e-5, tf=0.0075)
+                dt=dt, tf=tf, adaptive_timestep=True,
+                cfl=0.1, tdamp=tf/1000.0)
 
 # Define the SPH equations used to solve this problem
 equations = [
-    # Equation of state: p = f(rho)
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
     
-    # Density rate: drho/dt
-    ContinuityEquation(dest='fluid',  sources=['fluid',]),
+    # Equation of state: p = f(rho)
+    Group(equations=[
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
+            ], real=False ),
 
-    # Acceleration: du,v/dt
-    MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+    Group( equations=[
+    
+            # Density rate: drho/dt
+            ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-    # XSPH velocity correction
-    XSPHCorrection(dest='fluid', sources=['fluid']),
+            # Acceleration: du,v/dt
+            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=0.0),
 
+            # XSPH velocity correction
+            XSPHCorrection(dest='fluid', sources=['fluid']),
+
+            ]),
     ]
 
 # Setup the application and solver.
