@@ -220,6 +220,11 @@ class Application(object):
                                      "the linked list algorithm ('ll'). "
                                 )
 
+        # --fixed-h
+        nnps_options.add_option("--fixed-h", dest="fixed_h",
+                                action="store_true", default=False,
+                                help="Option for fixed smoothing lengths")
+
         parser.add_option_group( nnps_options )
 
         # Zoltan Options
@@ -586,6 +591,9 @@ class Application(object):
         # setup the solver using any options
         self._solver.setup_solver(options.__dict__)
 
+        # fixed smoothing lengths
+        fixed_h = solver.fixed_h or options.fixed_h
+
         if nnps is None:
             kernel = self._solver.kernel
 
@@ -598,7 +606,8 @@ class Application(object):
             elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain)
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
@@ -669,7 +678,7 @@ class Application(object):
             pass
 
         # setup the solver. This is where the code is compiled
-        solver.setup(particles=self.particles, equations=equations, nnps=nnps)
+        solver.setup(particles=self.particles, equations=equations, nnps=nnps, fixed_h=fixed_h)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)

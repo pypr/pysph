@@ -111,10 +111,10 @@ class MomentumEquation(Equation):
             piij = piij*RHOIJ1
 
         # compute the CFL time step factor
-        _dt_fac = 0.0
+        _dt_cfl = 0.0
         if R2IJ > 1e-12:
-            _dt_fac = abs( HIJ * vijdotxij/R2IJ ) + self.c0
-            DT_ADAPT[0] = max(_dt_fac, DT_ADAPT[0])
+            _dt_cfl = abs( HIJ * vijdotxij/R2IJ ) + self.c0
+            DT_ADAPT[0] = max(_dt_cfl, DT_ADAPT[0])
 
         tmpi = d_p[d_idx]*rhoi21
         tmpj = s_p[s_idx]*rhoj21
@@ -147,7 +147,15 @@ class MomentumEquation(Equation):
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw):
+    def post_loop(self, d_idx, d_au, d_av, d_aw, DT_ADAPT=[0.0, 0.0, 0.0]):
         d_au[d_idx] +=  self.gx
         d_av[d_idx] +=  self.gy
         d_aw[d_idx] +=  self.gz
+        
+        acc2 = ( d_au[d_idx]*d_au[d_idx] + \
+                    d_av[d_idx]*d_av[d_idx] + \
+                    d_aw[d_idx]*d_aw[d_idx] )
+
+        # store the square of the max acceleration
+        DT_ADAPT[1] = max( acc2, DT_ADAPT[1] )
+                    
