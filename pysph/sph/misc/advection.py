@@ -20,7 +20,6 @@ class MixingVelocityUpdate(Equation):
 
     def cython_code(self):
         code = dedent("""
-        from libc.math cimport sin, cos
         from libc.math cimport M_PI as pi
         """)
         return dict(helper=code)

@@ -68,10 +68,11 @@ class Undefined(object):
     pass
 
 class CythonGenerator(object):
-    def __init__(self):
+    def __init__(self, known_types=None):
         self.code = ''
         # Methods to not wrap.
         self.ignore_methods = ['cython_code']
+        self.known_types = known_types if known_types is not None else {}
 
     def parse(self, obj):
         cls = obj.__class__
@@ -164,13 +165,20 @@ class CythonGenerator(object):
         if args and args[0] == 'self':
             args = args[1:]
         defaults = argspec.defaults if argspec.defaults is not None else []
+
+        # The call_args dict is filled up with the defaults to detect
+        # the appropriate type of the arguments.
         call_args = {}
+
         for i in range(1, len(defaults)+1):
             call_args[args[-i]] = defaults[-i]
 
         # Set the rest to Undefined
         for i in range(len(args) - len(defaults)):
             call_args[args[i]] = Undefined
+
+        # Make sure any predefined quantities are suitably typed.
+        call_args.update(self.known_types)
 
         new_args = ['self']
         for arg in args:

@@ -11,7 +11,7 @@ class SummationDensity(Equation):
     def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_rho, s_idx, s_m, WIJ=0.0):
+    def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class BodyForce(Equation):
@@ -53,13 +53,12 @@ class VelocityGradient2D(Equation):
         d_v10[d_idx] = 0.0
         d_v11[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, s_m, s_rho, 
+    def loop(self, d_idx, s_idx, s_m, s_rho,
              d_v00, d_v01, d_v10, d_v11,
-             DWIJ=[0.0, 0.0, 0.0], 
-             VIJ= [0.0, 0.0, 0.0]):
-        
+             DWIJ, VIJ):
+
         tmp = s_m[s_idx]/s_rho[s_idx]
-        
+
         d_v00[d_idx] += tmp * -VIJ[0] * DWIJ[0]
         d_v01[d_idx] += tmp * -VIJ[0] * DWIJ[1]
 
@@ -92,8 +91,7 @@ class ContinuityEquation(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
-             VIJ=[0.0, 0.0, 0.0]):
+    def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ, VIJ):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
@@ -110,11 +108,8 @@ class MonaghanArtificialViscosity(Equation):
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_rho, d_cs,
-             d_au, d_av, d_aw, s_m,
-             s_rho, s_cs, VIJ=[0.0, 0.0, 0.0],
-             XIJ=[0.0, 0.0, 0.0], HIJ=1.0, R2IJ=1.0, RHOIJ1=1.0,
-             DWIJ=[1.0, 1.0, 1.0], DT_ADAPT=[0.0, 0.0, 0.0]):
+    def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, DWIJ, DT_ADAPT):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
@@ -144,8 +139,7 @@ class XSPHCorrection(Equation):
         d_ay[d_idx] = 0.0
         d_az[d_idx] = 0.0
 
-    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ=1.0, RHOIJ1=1.0,
-             VIJ=[1.0,1,1]):
+    def loop(self, s_idx, d_idx, s_m, d_ax, d_ay, d_az, WIJ, RHOIJ1, VIJ):
         tmp = -self.eps * s_m[s_idx]*WIJ*RHOIJ1
 
         d_ax[d_idx] += tmp * VIJ[0]

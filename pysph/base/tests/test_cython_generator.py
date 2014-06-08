@@ -25,6 +25,10 @@ class EqWithReturn(BasicEq):
     def func(self, d_idx=0, d_x=[0.0, 0.0]):
         return d_x[d_idx]
 
+class EqWithKnownTypes:
+    def some_func(self, d_idx, d_p, WIJ, DWIJ):
+        d_p[d_idx] = WIJ*DWIJ[0]
+
 class EqWithMatrix:
     def func(self, d_idx, d_x=[0.0, 0.0]):
         mat = declare('matrix((2,2))')
@@ -151,6 +155,20 @@ class TestCythonCodeGenerator(TestBase):
                 mat[0][0] = d_x[d_idx]
                 cdef double vec[3]
                 vec[0] = d_x[d_idx]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_method_with_known_types(self):
+        cg = CythonGenerator(known_types={'WIJ':0.0, 'DWIJ':[0.0, 0.0, 0.0]})
+        cg.parse(EqWithKnownTypes())
+        expect = dedent("""
+        cdef class EqWithKnownTypes:
+            def __init__(self, object obj):
+                for key in obj.__dict__:
+                    setattr(self, key, getattr(obj, key))
+
+            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
+                d_p[d_idx] = WIJ*DWIJ[0]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 

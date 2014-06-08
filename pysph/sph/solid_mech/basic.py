@@ -58,7 +58,7 @@ class MonaghanArtificialStress(Equation):
         sd.x = d_s00[d_idx] - d_p[d_idx]
         sd.y = d_s11[d_idx] - d_p[d_idx]
         sd.z = d_s22[d_idx] - d_p[d_idx]
-        
+
         ss.x = d_s12[d_idx]
         ss.y = d_s02[d_idx]
         ss.z = d_s01[d_idx]
@@ -75,14 +75,14 @@ class MonaghanArtificialStress(Equation):
 
         if S.z > 0: rd.z = -self.eps * S.z * rhoi21
         else : rd.z = 0
-        
+
         # transform artificial stresses in original frame
         transform2inv(rd, R, Rab)
 
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
         d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
-        
+
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
 
@@ -110,23 +110,22 @@ class MomentumEquationWithStress2D(Equation):
         from libc.math cimport pow
         """)
         return dict(helper=code)
-        
+
     def initialize(self, d_idx, d_au, d_av):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
-        
+
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p,
              d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
              d_r00, d_r01, d_r11, s_r00, s_r01, s_r11,
-             d_au, d_av,
-             WIJ=0.0, DWIJ=[0.0, 0.0, 0.0]):
+             d_au, d_av, WIJ, DWIJ):
 
         pa = d_p[d_idx]
         pb = s_p[s_idx]
 
         rhoa = d_rho[d_idx]
         rhob = s_rho[s_idx]
-        
+
         rhoa21 = 1./(rhoa * rhoa)
         rhob21 = 1./(rhob * rhob)
 
@@ -211,11 +210,11 @@ class HookesDeviatoricStressRate2D(Equation):
         d_as00[d_idx] = 0.0
         d_as01[d_idx] = 0.0
         d_as11[d_idx] = 0.0
-    
+
     def loop(self, d_idx, d_s00, d_s01, d_s11,
              d_v00, d_v01, d_v10, d_v11,
              d_as00, d_as01, d_as11):
-        
+
         v00 = d_v00[d_idx]
         v01 = d_v01[d_idx]
         v10 = d_v10[d_idx]
@@ -236,7 +235,7 @@ class HookesDeviatoricStressRate2D(Equation):
         # rotation tensor is asymmetric
         omega01 = 0.5 * (v01 - v10)
         omega10 = -omega01
-        
+
         tmp = 2.0*self.shear_mod
         trace = 1.0/3.0 * (eps00 + eps11)
 
@@ -246,7 +245,7 @@ class HookesDeviatoricStressRate2D(Equation):
 
         # S_01
         d_as01[d_idx] = tmp*(eps01) + \
-            ( s00*omega10 ) + ( s11*omega01 )        
+            ( s00*omega10 ) + ( s11*omega01 )
 
         # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \
@@ -264,9 +263,7 @@ class EnergyEquationWithStress2D(Equation):
         d_ae[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_p, s_p,
-             d_cs, s_cs, d_ae,
-             XIJ=[0.0, 0.0, 0.0], VIJ=[0.0, 0.0, 0.0],
-             DWIJ=[0.0, 0.0, 0.0], HIJ=0.0, R2IJ=0.0, RHOIJ1=0.0):
+             d_cs, s_cs, d_ae, XIJ, VIJ, DWIJ, HIJ, R2IJ, RHOIJ1):
 
         rhoa = d_rho[d_idx]
         ca = d_cs[d_idx]
@@ -302,7 +299,7 @@ class EnergyEquationWithStress2D(Equation):
                   d_s00, d_s01, d_s11, s_s00, s_s01, s_s11,
                   d_v00, d_v01, d_v10, d_v11,
                   d_ae):
-        
+
         # particle density
         rhoa = d_rho[d_idx]
 
@@ -318,7 +315,7 @@ class EnergyEquationWithStress2D(Equation):
 
         eps10 = eps01
         eps11 = d_v11[d_idx]
-        
+
         # energy acclerations
         sdoteij = s00a*eps00 +  s01a*eps01 + s10a*eps10 + s11a*eps11
         d_ae[d_idx] += 1./rhoa * sdoteij
