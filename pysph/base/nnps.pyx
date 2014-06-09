@@ -42,6 +42,9 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
 
+cdef inline double norm2(double x, double y, double z):
+    return x*x + y*y + z*z   
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
@@ -65,6 +68,7 @@ def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
+@cython.cdivision(True)
 cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim, int dim):
     """Un-flatten a linear cell index"""
     cdef int ncx = ncells_per_dim.data[0]
@@ -97,6 +101,7 @@ def py_unflatten(int cell_index, IntArray ncells_per_dim, int dim):
     cdef IntPoint cid = IntPoint_from_cIntPoint(_cid)
     return cid
 
+@cython.cdivision(True)
 cdef inline int real_to_int(double real_val, double step):
     """ Return the bin index to which the given position belongs.
 
@@ -723,8 +728,6 @@ cdef class NNPS:
             if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
-        return nbrs
-
     def set_in_parallel(self, bint in_parallel):
         self.in_parallel = in_parallel
 
@@ -1198,11 +1201,12 @@ cdef class BoxSortNNPS(NNPS):
         cdef IntPoint cid = IntPoint_from_cIntPoint( _cid )
         cdef IntPoint cellid = IntPoint(0, 0, 0)
 
-        cdef cPoint xj
-        cdef double xij
+        cdef double xij2
 
-        cdef double hi, hj
-        hi = radius_scale * d_h.data[d_idx]
+        cdef double hi2, hj2
+
+        hi2 = radius_scale * d_h.data[d_idx]
+        hi2 *= hi2
 
         cdef int ierr
 
@@ -1224,13 +1228,15 @@ cdef class BoxSortNNPS(NNPS):
                         for indexj in range( lindices.length ):
                             j = lindices.data[indexj]
 
-                            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-                            xij = cPoint_distance( xi, xj )
+                            xij2 = norm2( s_x.data[j]-xi.x,
+                                          s_y.data[j]-xi.y,
+                                          s_z.data[j]-xi.z )
 
-                            hj = radius_scale * s_h.data[j]
+                            hj2 = radius_scale * s_h.data[j]
+                            hj2 *= hj2
 
-                            # select as neighbor
-                            if ( (xij < hi) or (xij < hj) ):
+                            # select neighbor
+                            if ( (xij2 < hi2) or (xij2 < hj2) ):
                                 nbrs.append( j )
 
     cpdef count_n_part_per_cell(self):
@@ -1342,7 +1348,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef size_t num_particles, indexi, i
 
         # point and flattened index
-        cdef cPoint pnt
+        cdef cPoint pnt = cPoint_new(0, 0, 0)
         cdef int _cid
 
         # flattened cell index
@@ -1355,10 +1361,9 @@ cdef class LinkedListNNPS(NNPS):
 
             # the flattened index is considered relative to the
             # minimum along each co-ordinate direction
-            pnt = cPoint_new(
-                x.data[i] - xmin.data[0],
-                y.data[i] - xmin.data[1],
-                z.data[i] - xmin.data[2] )
+            pnt.x = x.data[i] - xmin.data[0]
+            pnt.y = y.data[i] - xmin.data[1]
+            pnt.z = z.data[i] - xmin.data[2]
 
             # flattened cell index
             _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
@@ -1533,9 +1538,8 @@ cdef class LinkedListNNPS(NNPS):
         # locals
         cdef UIntArray lindices
         cdef size_t indexj
-        cdef cPoint xj
-        cdef double xij
-        cdef double hi, hj
+        cdef double xij2
+        cdef double hi2, hj2
         cdef int ierr, nnbrs
         cdef unsigned int _next
         cdef int ix, iy, iz
@@ -1557,7 +1561,8 @@ cdef class LinkedListNNPS(NNPS):
         xi.z = xi.z + xmin.data[2]
 
         # gather search radius
-        hi = radius_scale * d_h.data[d_idx]
+        hi2 = radius_scale * d_h.data[d_idx]
+        hi2 *= hi2
 
         # reset the length of the nbr array
         nbrs.reset()
@@ -1578,17 +1583,15 @@ cdef class LinkedListNNPS(NNPS):
                             # get the first particle and begin iteration
                             _next = head.data[ cell_index ]
                             while( _next != UINT_MAX ):
-                                xj = cPoint_new(
-                                    s_x.data[_next],
-                                    s_y.data[_next],
-                                    s_z.data[_next]
-                                    )
+                                hj2 = radius_scale * s_h.data[_next]
+                                hj2 *= hj2
 
-                                xij = cPoint_distance( xi, xj )
-                                hj = radius_scale * s_h.data[_next]
+                                xij2 = norm2( s_x.data[_next]-xi.x,
+                                              s_y.data[_next]-xi.y,
+                                              s_z.data[_next]-xi.z )
 
                                 # select neighbor
-                                if ( (xij < hi) or (xij < hj) ):
+                                if ( (xij2 < hi2) or (xij2 < hj2) ):
                                     nbrs.append( _next )
 
                                 # get the 'next' particle in this cell
