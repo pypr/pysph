@@ -269,6 +269,15 @@ def sort_precomputed(precomputed):
     return result
 
 
+def get_predefined_types(precomp):
+    """Return a dictionary that can be used by a CythonGenerator for
+    the precomputed symbols.
+    """
+    result = {'DT_ADAPT':[0.0, 0.0, 0.0]}
+    for sym, value in precomp.iteritems():
+        result[sym] = value.context[sym]
+    return result
+
 ##############################################################################
 # `Equation` class.
 ##############################################################################
@@ -526,7 +535,8 @@ class Group(object):
             classes[cls] += 1
             eqs[cls] = equation
         wrappers = []
-        code_gen = CythonGenerator()
+        predefined = get_predefined_types(self.pre_comp)
+        code_gen = CythonGenerator(known_types=predefined)
         for cls in sorted(classes.keys()):
             code_gen.parse(eqs[cls])
             wrappers.append(code_gen.get_code())
