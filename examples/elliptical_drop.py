@@ -27,6 +27,7 @@ from pysph.solver.solver import Solver
 from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
+from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
@@ -94,6 +95,9 @@ def get_circular_patch(dx=0.025, **kwargs):
                  'v0', 'w0', 'x0', 'y0', 'z0'):
         pa.add_property(name)
 
+    # set the output property arrays
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'p', 'pid', 'tag', 'gid'] )
+
     return [pa,]
 
 # Create the application.
@@ -107,20 +111,27 @@ integrator = Integrator(fluid=WCSPHStep())
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=1e-5, tf=0.0075)
 
+# select True if you want to dump out remote particle properties in
+# parallel runs. This can be over-ridden with the --output-remote
+# command line option
+solver.set_output_only_real(True)
+
 # Define the SPH equations used to solve this problem
 equations = [
+
     # Equation of state: p = f(rho)
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
-    
-    # Density rate: drho/dt
-    ContinuityEquation(dest='fluid',  sources=['fluid',]),
+    Group(equations=[
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0)
+            ], real=False),
 
-    # Acceleration: du,v/dt
-    MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+    # Density rate, Acceleration and XSPH corrections
+    Group(equations=[
+            ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-    # XSPH velocity correction
-    XSPHCorrection(dest='fluid', sources=['fluid']),
-
+            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+            
+            XSPHCorrection(dest='fluid', sources=['fluid'])
+            ], real=True),
     ]
 
 # Setup the application and solver.
