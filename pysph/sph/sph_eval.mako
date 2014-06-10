@@ -255,8 +255,17 @@ cdef class Integrator:
         self.dt = dt
         self.initialize()
         
-        # In EPEC mode, an Evaluate is called before Predict
-        if self.mode == 2: 
+        # In EPEC mode, an Evaluate is called before Predict. Since
+        # the particles have moved since the last corrector step, the
+        # NNPS data structures need to be updated as well.
+        if self.mode == 2:
+
+            # update NNPS since particles have moved
+            if self.parallel_manager:
+                self.parallel_manager.update()
+            self.nnps.update() 
+
+            # Evaluate
             self.sph_calc.compute(t, dt)
 
         # Predict
@@ -265,7 +274,7 @@ cdef class Integrator:
         # update the local time counter
         t = t + 0.5 * dt
 
-        # Update NNPS since particles have moved
+        # update NNPS since particles have moved
         if self.parallel_manager:
             self.parallel_manager.update()
         self.nnps.update()
