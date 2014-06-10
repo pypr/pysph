@@ -27,6 +27,7 @@ from pysph.solver.solver import Solver
 from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
+from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
@@ -117,18 +118,20 @@ solver.set_output_only_real(True)
 
 # Define the SPH equations used to solve this problem
 equations = [
+
     # Equation of state: p = f(rho)
-    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
-    
-    # Density rate: drho/dt
-    ContinuityEquation(dest='fluid',  sources=['fluid',]),
+    Group(equations=[
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0)
+            ], real=False),
 
-    # Acceleration: du,v/dt
-    MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+    # Density rate, Acceleration and XSPH corrections
+    Group(equations=[
+            ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-    # XSPH velocity correction
-    XSPHCorrection(dest='fluid', sources=['fluid']),
-
+            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+            
+            XSPHCorrection(dest='fluid', sources=['fluid'])
+            ], real=True),
     ]
 
 # Setup the application and solver.
