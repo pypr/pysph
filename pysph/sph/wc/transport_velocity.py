@@ -8,7 +8,7 @@ class DensitySummation(Equation):
         d_V[d_idx] = 0.0
         d_rho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_V, d_rho, d_m, WIJ=1.0):
+    def loop(self, d_idx, d_V, d_rho, d_m, WIJ):
         d_V[d_idx] += WIJ
         d_rho[d_idx] += d_m[d_idx]*WIJ
 
@@ -16,15 +16,14 @@ class VolumeSummation(Equation):
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0
 
-    def loop(self, d_idx, d_V, WIJ=1.0):
+    def loop(self, d_idx, d_V, WIJ):
         d_V[d_idx] += WIJ
 
 class ContinuityEquation(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_arho, d_m, s_V, VIJ=[0, 0, 0],
-             DWIJ=[0, 0, 0]):
+    def loop(self, d_idx, s_idx, d_arho, d_m, s_V, VIJ, DWIJ):
         Vj = 1./s_V[s_idx]
         vijdotdwij = VIJ[0] * DWIJ[0] + VIJ[1] * DWIJ[1] + VIJ[2] * DWIJ[2]
         d_arho[d_idx] += d_m[d_idx] * Vj * vijdotdwij
@@ -58,7 +57,7 @@ class SolidWallBC(Equation):
         d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_u, d_v, d_p, d_wij, s_u, s_v, s_p, s_rho,
-             WIJ=1.0, XIJ=[1,1,1]):
+             WIJ, XIJ):
         # smooth velocities at the ghost points
         d_u[d_idx] += s_u[s_idx]*WIJ
         d_v[d_idx] += s_v[s_idx]*WIJ
@@ -108,7 +107,7 @@ class MomentumEquation(Equation):
     def loop(self, d_idx, s_idx, d_rho, d_p, d_u, d_v, d_V, d_au, d_av,
              d_auhat, d_avhat, d_m, d_uhat, d_vhat,
              s_rho, s_p, s_u, s_v, s_uhat, s_vhat, s_V,
-             R2IJ=1.0, HIJ=1.0, DWIJ=[0, 0, 0], VIJ=[0, 0, 0], XIJ=[0, 0, 0]):
+             R2IJ, HIJ, DWIJ, VIJ, XIJ):
         # averaged pressure
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
         pi = d_p[d_idx]; pj = s_p[s_idx]
@@ -145,7 +144,7 @@ class ArtificialStress(Equation):
 
     def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_V, d_uhat, d_vhat,
              d_au, d_av, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
-             DWIJ=[0, 0, 0]):
+             DWIJ):
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
 
         ui = d_u[d_idx]; uhati = d_uhat[d_idx]
