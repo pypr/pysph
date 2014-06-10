@@ -4,18 +4,16 @@ import mpi4py.MPI as mpi
 
 import numpy
 from numpy import random
-from numpy import savez, load
 
 # Carray from PyZoltan
 from pyzoltan.core.carray import UIntArray
 
 # PySPH imports
-from pysph.base.point import Point
 from pysph.base.nnps import BoxSortNNPS
 from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
 from pysph.base.utils import get_particle_array_wcsph
 
-from pysph.parallel._kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, get_compiled_kernel
 
 """Utility to compute summation density"""
 def sd_evaluate(nnps, pm, mass, src_index, dst_index):
@@ -28,7 +26,7 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
     sx, sy, sz, sh, srho = src.get('x', 'y', 'z', 'h', 'rho', only_real_particles=False)
 
     neighbors = UIntArray()
-    cubic = CubicSpline(dim=dim)
+    cubic = get_compiled_kernel(CubicSpline(dim=dim))
 
     # compute density for each destination particle
     num_particles = dst.num_real_particles
@@ -38,7 +36,6 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
 
     for i in range(num_particles):
 
-        xi = Point( dx[i], dy[i], dz[i] )
         hi = dh[i]
 
         nnps.get_nearest_particles(
@@ -50,8 +47,7 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
         for indexj in range(nnbrs):
             j = neighbors[indexj]
 
-            xj = Point(sx[j], sy[j], sz[j])
-            wij = cubic.py_function(xi, xj, hi)
+            wij = cubic.kernel(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hi)
 
             rho_sum = rho_sum + mass *  wij
 

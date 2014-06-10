@@ -1,0 +1,47 @@
+from libc.math cimport *
+import numpy as np
+
+cdef class KernelWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public object kern
+    cdef public double[:] xij, grad
+    cdef public double radius_scale
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.xij = np.zeros(3, dtype=float)
+        self.grad = np.zeros(3, dtype=float)
+        self.radius_scale = kern.radius_scale
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double[:] xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.py_kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double[:] xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double[:] grad = self.grad
+        self.kern.py_gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
+
+<?py
+from pysph.base.cython_generator import CythonGenerator
+from pysph.base.kernels import (CubicSpline, WendlandQuintic, Gaussian,
+    QuinticSpline)
+
+g = CythonGenerator()
+for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
+    k = cls()
+    g.parse(k)
+    out.write('\n' + '#'*75)
+    out.write(g.get_code())
+?>

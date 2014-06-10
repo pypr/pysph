@@ -1,59 +1,9 @@
-import numpy
-from mako.template import Template
+import numpy as np
 from scipy.integrate import quad
-from textwrap import dedent
 from unittest import TestCase, main
 
-from pysph.base.cython_generator import CythonGenerator
-from pysph.base.kernels import CubicSpline
-from pysph.base.ext_module import ExtModule
+from pysph.base.kernels import CubicSpline, get_compiled_kernel
 
-def generate_kernel_code(kernel_factory):
-    """Given a factory function to create a kernel, this generates
-    some simple wrapper code so the kernel itself can be easily tested
-    from Python.
-    """
-    template = dedent("""\
-    from libc.math cimport sqrt
-
-    ${kernel_code}
-
-    cdef ${kernel_name} g_kernel
-
-    cpdef set_kernel(kernel):
-        global g_kernel
-        g_kernel = ${kernel_name}(**kernel.__dict__)
-
-    cpdef kernel(xi, yi, zi, xj, yj, zj, h):
-        cdef double[3] xij
-        xij[0] = xi-xj
-        xij[1] = yi-yj
-        xij[2] = zi-zj
-        rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
-        return g_kernel.kernel(xij, rij, h)
-
-    cpdef gradient(xi, yi, zi, xj, yj, zj, h):
-        cdef double[3] result
-        cdef double[3] xij
-        xij[0] = xi-xj
-        xij[1] = yi-yj
-        xij[2] = zi-zj
-        rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
-        g_kernel.gradient(xij, rij, h, result)
-        return result[0], result[1], result[2]
-    """)
-    kernel = kernel_factory()
-    kernel_name = kernel.__class__.__name__
-    cg = CythonGenerator()
-    cg.parse(kernel)
-    lines = []
-    if hasattr(kernel, 'cython_code'):
-        lines.append(kernel.cython_code().get('helper'))
-    lines.append(cg.get_code())
-    kernel_code = '\n'.join(lines)
-    code = Template(template).render(kernel_code=kernel_code,
-                                     kernel_name=kernel_name)
-    return code
 
 ###############################################################################
 # `TestKernelBase` class.
@@ -64,12 +14,9 @@ class TestKernelBase(TestCase):
     kernel_factory = None
     @classmethod
     def setUpClass(cls):
-        code = generate_kernel_code(cls.kernel_factory)
-        cls.ext_mod = ExtModule(code)
-        cls.mod = cls.ext_mod.load()
-        cls.mod.set_kernel(cls.kernel_factory())
-        cls.kernel = cls.mod.kernel
-        cls.gradient = cls.mod.gradient
+        cls.wrapper = get_compiled_kernel(cls.kernel_factory())
+        cls.kernel = cls.wrapper.kernel
+        cls.gradient = cls.wrapper.gradient
 
     def setUp(self):
         self.kernel = self.__class__.kernel
@@ -97,23 +44,23 @@ class TestKernelBase(TestCase):
         def func(x, y):
             fac = pow(x-x0, m)*pow(y-y0, n)
             return fac*self.kernel(x, y, 0.0, x0, y0, 0.0, 0.15)
-        vfunc = numpy.vectorize(func)
+        vfunc = np.vectorize(func)
         nx, ny = 101, 101
         vol = 1.0/(nx-1)*1.0/(ny-1)
-        x, y = numpy.mgrid[0:1:nx*1j, 0:1:nx*1j]
-        result = numpy.sum(vfunc(x, y))*vol
+        x, y = np.mgrid[0:1:nx*1j, 0:1:nx*1j]
+        result = np.sum(vfunc(x, y))*vol
         return result
 
     def check_gradient_moment_2d(self, m, n):
         x0, y0, z0 = 0.5, 0.5, 0.0
         def func(x, y):
             fac = pow(x-x0, m)*pow(y-y0, n)
-            return fac*numpy.asarray(self.gradient(x, y, 0.0, x0, y0, 0.0, 0.15))
-        vfunc = numpy.vectorize(func, otypes=[numpy.ndarray])
+            return fac*np.asarray(self.gradient(x, y, 0.0, x0, y0, 0.0, 0.15))
+        vfunc = np.vectorize(func, otypes=[np.ndarray])
         nx, ny = 101, 101
         vol = 1.0/(nx-1)*1.0/(ny-1)
-        x, y = numpy.mgrid[0:1:nx*1j, 0:1:nx*1j]
-        result = numpy.sum(vfunc(x, y))*vol
+        x, y = np.mgrid[0:1:nx*1j, 0:1:nx*1j]
+        result = np.sum(vfunc(x, y))*vol
         return result
 
     def check_kernel_moment_3d(self, l, m, n):
@@ -121,23 +68,23 @@ class TestKernelBase(TestCase):
         def func(x, y, z):
             fac = pow(x-x0, l)*pow(y-y0, m)*pow(z-z0, n)
             return fac*self.kernel(x, y, z, x0, y0, z0, 0.15)
-        vfunc = numpy.vectorize(func)
+        vfunc = np.vectorize(func)
         nx, ny, nz = 51, 51, 51
         vol = 1.0/(nx-1)*1.0/(ny-1)*1.0/(nz-1)
-        x, y, z = numpy.mgrid[0:1:nx*1j, 0:1:ny*1j, 0:1:nz*1j]
-        result = numpy.sum(vfunc(x, y, z))*vol
+        x, y, z = np.mgrid[0:1:nx*1j, 0:1:ny*1j, 0:1:nz*1j]
+        result = np.sum(vfunc(x, y, z))*vol
         return result
 
     def check_gradient_moment_3d(self, l, m, n):
         x0, y0, z0 = 0.5, 0.5, 0.5
         def func(x, y, z):
             fac = pow(x-x0, l)*pow(y-y0, m)*pow(z-z0, n)
-            return fac*numpy.asarray(self.gradient(x, y, z, x0, y0, z0, 0.15))
-        vfunc = numpy.vectorize(func, otypes=[numpy.ndarray])
+            return fac*np.asarray(self.gradient(x, y, z, x0, y0, z0, 0.15))
+        vfunc = np.vectorize(func, otypes=[np.ndarray])
         nx, ny, nz = 51, 51, 51
         vol = 1.0/(nx-1)*1.0/(ny-1)*1.0/(nz-1)
-        x, y, z = numpy.mgrid[0:1:nx*1j, 0:1:ny*1j, 0:1:nz*1j]
-        result = numpy.sum(vfunc(x, y, z))*vol
+        x, y, z = np.mgrid[0:1:nx*1j, 0:1:ny*1j, 0:1:nz*1j]
+        result = np.sum(vfunc(x, y, z))*vol
         return result
 
 ###############################################################################
@@ -201,7 +148,7 @@ class TestCubicSpline2D(TestKernelBase):
 
     def test_simple(self):
         k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 10./(7*numpy.pi)
+        expect = 10./(7*np.pi)
         self.assertAlmostEqual(k, expect,
                                msg='Kernel value %s != %s (expected)'%(k, expect))
         k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
@@ -255,7 +202,7 @@ class TestCubicSpline3D(TestKernelBase):
 
     def test_simple(self):
         k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 1./numpy.pi
+        expect = 1./np.pi
         self.assertAlmostEqual(k, expect,
                                msg='Kernel value %s != %s (expected)'%(k, expect))
         k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
