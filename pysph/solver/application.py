@@ -166,8 +166,8 @@ class Application(object):
                          help="Dump detailed output.")
 
         # --output-remote
-        parser.add_option("--output-remote", action="store_true",
-                          dest="output_remote", default=None,
+        parser.add_option("--output-dump-remote", action="store_true",
+                          dest="output_dump_remote", default=False,
                           help="Save Remote particles in parallel")
         # --directory
         parser.add_option("--directory", action="store",
@@ -663,7 +663,7 @@ class Application(object):
             solver.set_output_printing_level(options.detailed_output)
 
         # solver output behaviour in parallel
-        if options.output_remote is not None:
+        if options.output_dump_remote:
             solver.set_output_only_real( False )
 
         # output directory
