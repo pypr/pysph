@@ -202,6 +202,10 @@ class DamBreak2DGeometry(object):
         # set the gid for the boundary particles
         boundary.gid[:] = range( boundary.get_number_of_particles() )
 
+        # boundary particles can do with a reduced list of properties
+        # to be saved to disk since they are fixed
+        boundary.set_output_arrays( ['x', 'y', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
+
         print "2D dam break with %d fluid, %d boundary particles"%(
             fluid.get_number_of_particles(),
             boundary.get_number_of_particles())
@@ -361,5 +365,10 @@ class DamBreak3DGeometry(object):
         #obstacle.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
         boundary.set_lb_props( boundary.properties.keys() )
         obstacle.set_lb_props( obstacle.properties.keys() )
+
+        # boundary and obstacle particles can do with a reduced list of properties
+        # to be saved to disk since they are fixed
+        boundary.set_output_arrays( ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
+        obstacle.set_output_arrays( ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
 
         return particles
