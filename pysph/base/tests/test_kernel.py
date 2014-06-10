@@ -22,7 +22,7 @@ def generate_kernel_code(kernel_factory):
 
     cpdef set_kernel(kernel):
         global g_kernel
-        g_kernel = ${kernel_name}(kernel)
+        g_kernel = ${kernel_name}(**kernel.__dict__)
 
     cpdef kernel(xi, yi, zi, xj, yj, zj, h):
         cdef double[3] xij

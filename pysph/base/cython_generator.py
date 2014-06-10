@@ -26,9 +26,9 @@ cdef class ${class_name}:
     %for name, type in public_vars.iteritems():
     cdef public ${type} ${name}
     %endfor
-    def __init__(self, object obj):
-        for key in obj.__dict__:
-            setattr(self, key, getattr(obj, key))
+    def __init__(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
 
 %for defn, body in methods:
     ${defn}
@@ -74,6 +74,8 @@ class CythonGenerator(object):
         self.ignore_methods = ['cython_code']
         self.known_types = known_types if known_types is not None else {}
 
+    ##### Public protocol #####################################################
+
     def parse(self, obj):
         cls = obj.__class__
         name = cls.__name__
@@ -82,6 +84,38 @@ class CythonGenerator(object):
         helper = CythonClassHelper(name=name, public_vars=public_vars,
                                    methods=methods)
         self.code = helper.generate()
+
+    def get_code(self):
+        return self.code
+
+    def detect_type(self, name, value):
+        """Given the variable name and value, detect its type.
+        """
+        if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+            return 'double*'
+        if name in ['s_idx', 'd_idx']:
+            return 'long'
+        if value is Undefined:
+            raise CodeGenerationError('Unknown type, for %s'%name)
+
+        if isinstance(value, bool):
+            return 'int'
+        elif isinstance(value, int):
+            return 'long'
+        elif isinstance(value, str):
+            return 'str'
+        elif isinstance(value, float):
+            return 'double'
+        elif isinstance(value, (list, tuple)):
+            if all_numeric(value):
+                # We don't deal with integer lists for now.
+                return 'double*'
+            else:
+                return 'list' if isinstance(value, list) else 'tuple'
+        else:
+            return 'object'
+
+    ###### Private protocol ###################################################
 
     def _get_public_vars(self, obj):
         # For now get it all from the dict.
@@ -191,33 +225,3 @@ class CythonGenerator(object):
         defn = 'cdef inline {ret} {name}({arg_def}):'\
                     .format(ret=ret, name=name, arg_def=arg_def)
         return defn
-
-    def get_code(self):
-        return self.code
-
-    def detect_type(self, name, value):
-        """Given the variable name and value, detect its type.
-        """
-        if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
-            return 'double*'
-        if name in ['s_idx', 'd_idx']:
-            return 'long'
-        if value is Undefined:
-            raise CodeGenerationError('Unknown type, for %s'%name)
-
-        if isinstance(value, bool):
-            return 'int'
-        elif isinstance(value, int):
-            return 'long'
-        elif isinstance(value, str):
-            return 'str'
-        elif isinstance(value, float):
-            return 'double'
-        elif isinstance(value, (list, tuple)):
-            if all_numeric(value):
-                # We don't deal with integer lists for now.
-                return 'double*'
-            else:
-                return 'list' if isinstance(value, list) else 'tuple'
-        else:
-            return 'object'
