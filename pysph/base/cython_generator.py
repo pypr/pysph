@@ -115,6 +115,13 @@ class CythonGenerator(object):
         else:
             return 'object'
 
+    def ctype_to_python(self, type_str):
+        """Given a c-style type declaration obtained from the `detect_type`
+        method, return a Python friendly type declaration.
+        """
+        return type_str.replace('*', '[:]')
+
+
     ###### Private protocol ###################################################
 
     def _get_public_vars(self, obj):
@@ -136,8 +143,11 @@ class CythonGenerator(object):
 
                 sourcelines = inspect.getsourcelines(meth)[0]
                 defn, lines = get_func_definition(sourcelines)
-                defn = self._get_method_spec(meth, lines)
-                body = self._get_method_body(meth, lines)
+                m_name, returns, args = self._analyze_method(meth, lines)
+                c_defn = self._get_c_method_spec(m_name, returns, args)
+                c_body = self._get_method_body(meth, lines)
+                methods.append((c_defn, c_body))
+                defn, body = self._get_py_method_spec(m_name, returns, args)
                 methods.append((defn, body))
         return methods
 
@@ -190,10 +200,15 @@ class CythonGenerator(object):
         code = ''.join(declare) + cython_body
         return code
 
-    def _get_method_spec(self, meth, lines):
+    def _analyze_method(self, meth, lines):
+        """Returns information about the method.
+
+        Specifically it returns the method name, if it has a return value,
+        and a list of [(arg_name, value),...].
+        """
         name = meth.__name__
         body = ''.join(lines)
-        dedented_body = dedent(body)
+        returns = has_return(dedent(body))
         argspec = inspect.getargspec(meth)
         args = argspec.args
         if args and args[0] == 'self':
@@ -214,14 +229,58 @@ class CythonGenerator(object):
         # Make sure any predefined quantities are suitably typed.
         call_args.update(self.known_types)
 
-        new_args = ['self']
+        new_args = [('self', None)]
         for arg in args:
             value = call_args[arg]
-            type = self.detect_type(arg, value)
-	    new_args.append('{type} {arg}'.format(type=type, arg=arg))
+            new_args.append((arg, value))
 
-        ret = 'double' if has_return(dedented_body) else 'void'
-        arg_def = ', '.join(new_args)
-        defn = 'cdef inline {ret} {name}({arg_def}):'\
-                    .format(ret=ret, name=name, arg_def=arg_def)
-        return defn
+        return name, returns, new_args
+
+    def _get_c_method_spec(self, name, returns, args):
+        """Returns a C definition for the method.
+        """
+        c_args = []
+        if args and args[0][0] == 'self':
+            args = args[1:]
+            c_args.append('self')
+
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
+
+        c_ret = 'double' if returns else 'void'
+        c_arg_def = ', '.join(c_args)
+        cdefn = 'cdef inline {ret} {name}({arg_def}):'\
+                     .format(ret=c_ret, name=name, arg_def=c_arg_def)
+
+        return cdefn
+
+    def _get_py_method_spec(self, name, returns, args):
+        """Returns a Python friendly definition for the method along with the
+        wrapper function.
+        """
+        py_args = []
+        if args and args[0][0] == 'self':
+            args = args[1:]
+            py_args.append('self')
+
+        call_sig = []
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            py_type = self.ctype_to_python(c_type)
+            py_args.append('{type} {arg}'.format(type=py_type, arg=arg))
+            if c_type.endswith('*'):
+                call_sig.append('&{arg}[0]'.format(arg=arg))
+            else:
+                call_sig.append('{arg}'.format(arg=arg))
+
+        py_ret = ' double' if returns else ''
+        py_arg_def = ', '.join(py_args)
+        pydefn = 'cpdef{ret} py_{name}({arg_def}):'\
+                     .format(ret=py_ret, name=name, arg_def=py_arg_def)
+        call = ', '.join(call_sig)
+        py_ret = 'return ' if returns else ''
+        body = ' '*8 + '{ret}self.{name}({call})'\
+                    .format(name=name, call=call, ret=py_ret)
+
+        return pydefn, body

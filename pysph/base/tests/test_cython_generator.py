@@ -121,6 +121,9 @@ class TestCythonCodeGenerator(TestBase):
                 cdef double tmp
                 tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
+
+            cpdef py_func(self, long d_idx, double[:] d_x):
+                self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
@@ -138,6 +141,9 @@ class TestCythonCodeGenerator(TestBase):
 
             cdef inline double func(self, long d_idx, double* d_x):
                 return d_x[d_idx]
+
+            cpdef double py_func(self, long d_idx, double[:] d_x):
+                return self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
@@ -155,6 +161,9 @@ class TestCythonCodeGenerator(TestBase):
                 mat[0][0] = d_x[d_idx]
                 cdef double vec[3]
                 vec[0] = d_x[d_idx]
+
+            cpdef py_func(self, long d_idx, double[:] d_x):
+                self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
