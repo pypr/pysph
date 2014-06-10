@@ -134,6 +134,9 @@ class Solver(object):
         # flag to print all arrays
         self.detailed_output = False
 
+        # flag to save Remote arrays
+        self.output_only_real = True
+
         # output filename
         self.fname = self.__class__.__name__
 
@@ -274,6 +277,10 @@ class Solver(object):
     def set_output_printing_level(self, detailed_output):
         """ Set the output printing level """
         self.detailed_output = detailed_output
+
+    def set_output_only_real(self, output_only_real):
+        """ Set the flag to save out only real particles """
+        self.output_only_real=output_only_real
 
     def set_output_directory(self, path):
         """ Set the output directory """
@@ -447,56 +454,50 @@ class Solver(object):
             return
 
         fname = self.fname + '_'
-        props = {"arrays":{}, "solver_data":{}}
+        output_data = {"arrays":{}, "solver_data":{}}
 
         _fname = os.path.join(self.output_directory,
                               fname  + str(self.count) +'.npz')
 
-        # save the cell partitions
-        #if self.in_parallel:
-        #    self.pm.save_partition(self.output_directory, self.count)
-
-        if self.detailed_output:
-            for array in self.particles:
-                props["arrays"][array.name]=array.get_property_arrays(all=True)
-        else:
-            for array in self.particles:
-                props["arrays"][array.name]=array.get_property_arrays(all=False)
-
+        # Array data
+        for array in self.particles:
+            output_data["arrays"][array.name] = array.get_property_arrays(
+                all=self.detailed_output, only_real=self.output_only_real)
+        
         # Add the solver data
-        props["solver_data"]["dt"] = dt
-        props["solver_data"]["t"] = self.t
-        props["solver_data"]["count"] = self.count
+        output_data["solver_data"]["dt"] = dt
+        output_data["solver_data"]["t"] = self.t
+        output_data["solver_data"]["count"] = self.count
 
+        # Gather particle data on root
         if self.parallel_output_mode == "collected" and self.in_parallel:
-
             comm = self.comm
 
-            arrays = props["arrays"]
+            arrays = output_data["arrays"]
             array_names = arrays.keys()
 
             # gather the data from all processors
             collected_data = comm.gather(arrays, root=0)
 
             if self.rank == 0:
-                props["arrays"] = {}
+                output_data["arrays"] = {}
                 size = comm.Get_size()
 
                 # concatenate the arrays
                 for array_name in array_names:
-                    props["arrays"][array_name] = {}
+                    output_data["arrays"][array_name] = {}
 
                     _props = collected_data[0][array_name].keys()
                     for prop in _props:
                         data = [collected_data[pid][array_name][prop]
                                         for pid in range(size)]
                         prop_arr = numpy.concatenate(data)
-                        props["arrays"][array_name][prop] = prop_arr
+                        output_data["arrays"][array_name][prop] = prop_arr
 
-                savez(_fname, version=1, **props)
+                savez(_fname, version=1, **output_data)
 
         else:
-            savez(_fname, version=1, **props)
+            savez(_fname, version=1, **output_data)
 
     def load_output(self, count):
         """ Load particle data from dumped output file.
