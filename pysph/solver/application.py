@@ -165,10 +165,10 @@ class Application(object):
                          dest="detailed_output", default=None,
                          help="Dump detailed output.")
 
-        # --output-only-real
-        parser.add_option("--output-only-real", action="store_true",
-                          dest="output_only_real", default=None,
-                          help="Save only Local (real) particles in parallel")
+        # --output-remote
+        parser.add_option("--output-remote", action="store_true",
+                          dest="output_remote", default=None,
+                          help="Save Remote particles in parallel")
         # --directory
         parser.add_option("--directory", action="store",
                          dest="output_dir", default=self.fname+'_output',
@@ -663,8 +663,8 @@ class Application(object):
             solver.set_output_printing_level(options.detailed_output)
 
         # solver output behaviour in parallel
-        if options.output_only_real is not None:
-            solver.set_output_only_real( options.output_only_real )
+        if options.output_remote is not None:
+            solver.set_output_only_real( False )
 
         # output directory
         solver.set_output_directory(abspath(options.output_dir))

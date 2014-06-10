@@ -95,7 +95,7 @@ def get_circular_patch(dx=0.025, **kwargs):
         pa.add_property(name)
 
     # set the output property arrays
-    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'p', 'pid'] )
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'p', 'pid', 'tag', 'gid'] )
 
     return [pa,]
 
@@ -111,8 +111,9 @@ solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=1e-5, tf=0.0075)
 
 # select True if you want to dump out remote particle properties in
-# parallel runs
-solver.set_output_only_real(False)
+# parallel runs. This can be over-ridden with the --output-remote
+# command line option
+solver.set_output_only_real(True)
 
 # Define the SPH equations used to solve this problem
 equations = [

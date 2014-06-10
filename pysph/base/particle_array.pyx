@@ -231,7 +231,7 @@ cdef class ParticleArray:
     ######################################################################
     # `Public` interface
     ######################################################################
-    def set_output_arrays(self, list props, bint extend=True):
+    def set_output_arrays(self, list props):
         """Set the list of output arrays for this ParticleArray
 
         Parameters:
@@ -239,22 +239,11 @@ cdef class ParticleArray:
         props : list
             The list of property arrays
 
-        extend : bint
-            Flag to extend the current list            
-        
         In PySPH, the solver obtains the list of property arrays to
         output by calling the `ParticleArray.get_property_arrays`
         method. If detailed output is not requested, the
         `output_property_arrays` attribute is used to determine the
         arrays that will be written to file
-
-        Notes:
-        
-        The extend flag is used to determine whether the current list
-        of properties is to be extended. This is useful when for
-        example we want to set a reduced list of arrays to be printed
-        for certain arrays. In that case, the `props` list is taken as
-        the list itself.
 
         """
         # first check if the arrays are valid and raise a warning
@@ -263,12 +252,26 @@ cdef class ParticleArray:
                 msg = "ParticleArray does not have property %s for output"%prop
                 raise ValueError(msg)
 
-        # add to an existing list by selecting unique elements
-        if extend:
-            self.output_property_arrays.extend( props )
-            self.output_property_arrays = list( set(self.output_property_arrays) )
-        else:
-            self.output_property_arrays = props
+        self.output_property_arrays = props
+
+    def add_output_arrays(self, list props):
+        """Append props to the existing list of output arrays
+
+        Parameters:
+        
+        props : list
+            The additional list of property arrays to save
+
+        """
+        # first check if the arrays are valid and raise a warning
+        for prop in props:
+            if not self.properties.has_key(prop):
+                msg = "ParticleArray does not have property %s for output"%prop
+                raise ValueError(msg)
+
+        # add to the existing list
+        self.output_property_arrays.extend(props)
+        self.output_property_arrays = list( set(self.output_property_arrays) )
 
     def get_property_arrays(self, all=True, only_real=True):
         """Return a dictionary of arrays held by the `ParticleArray` container 

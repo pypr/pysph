@@ -266,7 +266,7 @@ class Solver(object):
 
     def set_output_only_real(self, output_only_real):
         """ Set the flag to save out only real particles """
-        self.output_only_real=output_only_real
+        self.output_only_real = output_only_real
 
     def set_output_directory(self, path):
         """ Set the output directory """
