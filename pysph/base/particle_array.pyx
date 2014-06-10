@@ -248,9 +248,7 @@ cdef class ParticleArray:
         """
         # first check if the arrays are valid and raise a warning
         for prop in props:
-            if not self.properties.has_key(prop):
-                msg = "ParticleArray does not have property %s for output"%prop
-                raise ValueError(msg)
+            self._check_property(prop)
 
         self.output_property_arrays = props
 
@@ -265,9 +263,7 @@ cdef class ParticleArray:
         """
         # first check if the arrays are valid and raise a warning
         for prop in props:
-            if not self.properties.has_key(prop):
-                msg = "ParticleArray does not have property %s for output"%prop
-                raise ValueError(msg)
+            self._check_property(prop)
 
         # add to the existing list
         self.output_property_arrays.extend(props)
