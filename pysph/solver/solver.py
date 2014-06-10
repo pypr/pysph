@@ -123,14 +123,6 @@ class Solver(object):
         # the default parallel output mode
         self.parallel_output_mode = "collected"
 
-        # default particle properties to print
-        self.print_properties = ['x','u','m','h','p','e','rho',]
-        if self.dim > 1:
-            self.print_properties.extend(['y','v'])
-
-        if self.dim > 2:
-            self.print_properties.extend(['z','w'])
-
         # flag to print all arrays
         self.detailed_output = False
 
@@ -198,12 +190,6 @@ class Solver(object):
         self.integrator.set_fixed_h( fixed_h )
 
         logger.debug("Solver setup complete.")
-
-    def add_print_properties(self, props):
-        """ Add a list of properties to print """
-        for prop in props:
-            if not prop in self.print_properties:
-                self.print_properties.append(prop)
 
     def append_particle_arrrays(self, arrays):
         """ Append the particle arrays to the existing particle arrays
@@ -329,7 +315,7 @@ class Solver(object):
             show = show_progress
         bar = FloatPBar(self.t, self.tf, show=show)
 
-        self.dump_output(dt, *self.print_properties)
+        self.dump_output()
         if self.comm:
             self.comm.barrier() # everybody waits for this to complete
 
@@ -391,7 +377,7 @@ class Solver(object):
 
             # dump output
             if self.count % self.pfreq == 0:
-                self.dump_output(dt, *self.print_properties)
+                self.dump_output()
                 if self.comm:
                     self.comm.barrier()
 
@@ -406,48 +392,45 @@ class Solver(object):
         bar.finish()
 
         # final output save
-        self.dump_output(dt, *self.print_properties)
+        self.dump_output()
 
     def update_particle_time(self):
         for array in self.particles:
             array.set_time(self.t)
 
-    def dump_output(self, dt, *print_properties):
-        """ Print output based on level of detail required
+    def dump_output(self):
+        """Dump the simulation results to file
 
-        The default detail level (low) is the integrator's calc's update
-        property for each named particle array.
+        The arrays used for printing are determined by the particle
+        array's `output_property_arrays` data attribute. For debugging
+        it is sometimes nice to have all the arrays (including
+        accelerations) saved. This can be chosen from using the
+        command line option `--detailed-output`
 
-        The higher detail level dumps all particle array properties.
+        Output data Format:
 
-        Format:
-        -------
+        A single file named as: <fname>_<rank>_<iteration_count>.npz
 
-        A single file named as: <fname>_<rank>_<count>.npz
+        The data is saved as a Python dictionary with two keys:
 
-        The output file contains the following fields:
+        `solver_data` : Solver meta data like time, dt and iteration number
 
-        solver_data : Solver related data like time step, time and
-        iteration count. These are used to resume a simulation.
+        `arrays` : A dictionary keyed on particle array names and with
+                   particle properties as value.
 
-        arrays : A dictionary keyed on particle array names and with
-        particle properties as value.
+         Example:
+         
+         You can load the data output by PySPH like so:
 
-        version : The version number for this format of file
-        output. The current version number is 1
+         >>> from pysph.solver.utils import load
+         >>> data = load('output_directory/filename_x_xxx.npz')
+         >>> solver_data = data['solver_data']
+         >>> arrays = data['arrays']
+         >>> fluid = arrays['fluid']
+         >>> ...
 
-        Example:
-        --------
-
-        data = load('foo.npz')
-
-        version = data['version']
-
-        dt = data['solver_data']['dt']
-        t = data['solver_data']['t']
-
-        array = data['arrays'][array_name].astype(object)
-        array['x']
+         In the above example, it is assumed that the output file
+         contained an array named fluid. 
 
         """
         if self.disable_output:
@@ -465,7 +448,7 @@ class Solver(object):
                 all=self.detailed_output, only_real=self.output_only_real)
         
         # Add the solver data
-        output_data["solver_data"]["dt"] = dt
+        output_data["solver_data"]["dt"] = self.dt
         output_data["solver_data"]["t"] = self.t
         output_data["solver_data"]["count"] = self.count
 
