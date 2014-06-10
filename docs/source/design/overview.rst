@@ -497,16 +497,13 @@ It is instantiated as:
        def initialize(self, d_idx, d_arho):
 	   d_arho[d_idx] = 0.0
 
-       def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ=[0.0, 0.0, 0.0],
-		VIJ=[0.0, 0.0, 0.0]):
+       def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ, VIJ):
 	   vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
 	   d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
 Notice that the ``initialize`` method merely sets the value to zero.  The
 ``loop`` method also defines a few new quantities like ``DWIJ``, ``VIJ`` etc.
-The method also prescribes default values to these quantities.  The defaults
-are only set so that they may be declared appropriately in the
-high-performance code that is generated from this Python code. These are
+The method also prescribes default values to these quantities.  These are
 precomputed quantities and are automatically provided depending on the
 equations needed for a particular source/destination pair.  The following
 precomputed quantites are available:

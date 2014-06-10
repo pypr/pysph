@@ -107,7 +107,8 @@ class TestEquations(TestBase):
 
         d_arho = [0.0, 0.0, 0.0]
         s_m = [0.0, 0.0]
-        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m)
+        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
+                   DWIJ=[0,0,0], VIJ=[0,0,0])
         self.assertEqual(d_arho[0], 0.0)
         self.assertEqual(d_arho[1], 0.0)
         # Now call with specific arguments.
