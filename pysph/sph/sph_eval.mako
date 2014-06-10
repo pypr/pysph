@@ -228,6 +228,9 @@ cdef class Integrator:
     cdef public object parallel_manager
     cdef public NNPS nnps
     cdef public double dt
+
+    cdef int mode
+
     ${indent(integrator.get_stepper_defs(), 1)}
 
     def __init__(self, calc, steppers):
@@ -236,6 +239,9 @@ cdef class Integrator:
         self.${name} = calc.${name}
         % endfor
         ${indent(integrator.get_stepper_init(), 2)}
+
+    def set_predictor_corrector_mode(self, int mode):
+        self.mode = mode
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -248,16 +254,35 @@ cdef class Integrator:
         """
         self.dt = dt
         self.initialize()
+        
+        # In EPEC mode, an Evaluate is called before Predict. Since
+        # the particles have moved since the last corrector step, the
+        # NNPS data structures need to be updated as well.
+        if self.mode == 2:
+
+            # update NNPS since particles have moved
+            if self.parallel_manager:
+                self.parallel_manager.update()
+            self.nnps.update() 
+
+            # Evaluate
+            self.sph_calc.compute(t, dt)
+
+        # Predict
         self.predictor()
 
-        # Update NNPS since particles have moved
+        # update the local time counter
+        t = t + 0.5 * dt
+
+        # update NNPS since particles have moved
         if self.parallel_manager:
             self.parallel_manager.update()
         self.nnps.update()
 
-        # compute accelerations
+        # Evaluate
         self.sph_calc.compute(t, dt)
 
+        # Correct
         self.corrector()
 
     % for method in ('initialize', 'predictor', 'corrector'):

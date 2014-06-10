@@ -19,7 +19,7 @@ from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import Integrator, WCSPHStep
+from pysph.sph.integrator import Integrator, WCSPHStep, PredictorCorrectorMode
 
 from pysph.tools.sphysics import sphysics2pysph
 
@@ -51,9 +51,13 @@ app = Application()
 # Specify the kernel
 kernel = CubicSpline(dim=3)
 
-# Setup the integrator
+# Setup the integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
 integrator = Integrator(
-    fluid=WCSPHStep(),boundary=WCSPHStep())
+    fluid=WCSPHStep(),boundary=WCSPHStep(), mode=PredictorCorrectorMode.EPEC)
 
 # Create a solver. damping time is taken as 0.1% of the final time
 solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
