@@ -110,12 +110,6 @@ ext_modules = [
                include_dirs=include_dirs,
                extra_compile_args=extra_compile_args),
 
-    # kernels used for tests
-    Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"],
-               include_dirs = include_dirs,
-               extra_compile_args=extra_compile_args),
-
     # Eigen decomposition code
     Extension( name="pysph.sph.solid_mech.linalg",
                sources=["pysph/sph/solid_mech/linalg.pyx"],
