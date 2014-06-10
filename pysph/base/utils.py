@@ -121,6 +121,11 @@ def get_particle_array(cl_precision="double", **props):
     # create the particle array
     pa = ParticleArray(name=name, **prop_dict)
 
+    # default property arrays to save out. Any reasonable SPH particle
+    # should define these
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
+                           'pid', 'gid', 'tag'] )
+
     return pa
 
 def get_particle_array_wcsph(cl_precision="single", **props):
@@ -187,6 +192,10 @@ def get_particle_array_wcsph(cl_precision="single", **props):
 
     # create the particle array
     pa = ParticleArray(name=name, **prop_dict)
+
+    # default property arrays to save out. 
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
+                           'pid', 'gid', 'tag', 'p'] )
 
     return pa
 

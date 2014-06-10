@@ -38,6 +38,9 @@ cdef class ParticleArray:
     cdef public dict properties
     cdef public list property_arrays
 
+    # list of output property arrays
+    cdef public list output_property_arrays
+
     # dictionary to hold the constants for all the particles
     cdef public dict constants
 
