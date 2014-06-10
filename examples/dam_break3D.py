@@ -81,7 +81,7 @@ from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, WCSPHStep
+from pysph.sph.integrator import Integrator, WCSPHStep, PredictorCorrectorMode
 
 dim = 3
 
@@ -112,7 +112,11 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=dim)
 
-# Create the integrator.
+# Setup the integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep(),
                         obstacle=WCSPHStep())

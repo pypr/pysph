@@ -24,7 +24,7 @@ from pyzoltan.core.carray import LongArray
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import WCSPHStep, Integrator
+from pysph.sph.integrator import WCSPHStep, Integrator, PredictorCorrectorMode
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -103,9 +103,16 @@ def get_circular_patch(dx=0.025, **kwargs):
 # Create the application.
 app = Application()
 
-# Set the SPH kernel and integrator
+# Set the SPH kernel
 kernel = CubicSpline(dim=2)
-integrator = Integrator(fluid=WCSPHStep())
+
+# Create the Integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
+integrator = Integrator(
+    fluid=WCSPHStep(), mode=PredictorCorrectorMode.PEC)
 
 # Construct the solver
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
