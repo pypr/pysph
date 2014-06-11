@@ -14,48 +14,6 @@ from pysph.base.cython_generator import CythonGenerator
 
 from numpy import sqrt
 
-class PredictorCorrectorMode:
-    """Styles for the predictor corrector integrators
-
-    Predictor corrector integrators can have two modes of
-    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`. 
-
-    In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
-    using:
-    
-    y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
-    
-    F(y^{n+\frac{1}{2}}) --> Evaluate
-
-    y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
-
-    In the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the system
-    is advanced using:
-    
-    F(y^n) --> Evaluate
-    
-    y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
-
-    F(y^{n+\frac{1}{2}}) --> Evaluate
-
-    y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
-
-    Notes:
-    
-    The Evaluate stage of the integrator forces a function
-    evaluation. Therefore, the PEC mode is much faster but relies on
-    old accelertions for the Prediction stage.
-
-    In the EPEC mode, the final corrector can be modified to
-
-    y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)
-
-    This would require additional storage for the accelerations.
-
-    """
-    PEC = 1
-    EPEC = 2
-
 ###############################################################################
 # `IntegratorStep` class
 ###############################################################################
@@ -322,8 +280,46 @@ class AdamiVerletStep(IntegratorStep):
 # `Integrator` class
 ###############################################################################
 class Integrator(object):
+    """Generic class for Predictor Corrector integrators in PySPH
 
-    def __init__(self, mode=PredictorCorrectorMode.PEC, **kw):
+    Predictor corrector integrators can have two modes of
+    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`. 
+
+    In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
+    using:
+    
+    y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
+    
+    F(y^{n+\frac{1}{2}}) --> Evaluate
+
+    y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
+
+    In the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the system
+    is advanced using:
+    
+    F(y^n) --> Evaluate
+    
+    y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
+
+    F(y^{n+\frac{1}{2}}) --> Evaluate
+
+    y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
+
+    Notes:
+    
+    The Evaluate stage of the integrator forces a function
+    evaluation. Therefore, the PEC mode is much faster but relies on
+    old accelertions for the Prediction stage.
+
+    In the EPEC mode, the final corrector can be modified to
+
+    y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)
+
+    This would require additional storage for the accelerations.
+
+    """
+
+    def __init__(self, epec=False, **kw):
         """Pass fluid names and suitable `IntegratorStep` instances.
 
         For example::
@@ -332,7 +328,7 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
-        self.mode = mode
+        self.epec = epec
 
         for array_name, integrator_step in kw.iteritems():
             if not isinstance(integrator_step, IntegratorStep):
@@ -476,4 +472,4 @@ class Integrator(object):
 
     def set_integrator(self, integrator):
         self.integrator = integrator
-        self.integrator.set_predictor_corrector_mode(self.mode)
+        self.integrator.set_predictor_corrector_mode(self.epec)

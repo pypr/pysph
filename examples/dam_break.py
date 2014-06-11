@@ -83,7 +83,7 @@ from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, WCSPHStep, PredictorCorrectorMode
+from pysph.sph.integrator import Integrator, WCSPHStep
 
 dim = 2
 fluid_column_height = 2.0
@@ -129,7 +129,7 @@ kernel = WendlandQuintic(dim=2)
 # evaluation per iteration.
 integrator = Integrator(
     fluid=WCSPHStep(), boundary=WCSPHStep(),
-    mode=PredictorCorrectorMode.EPEC)
+    epec=True)
 
 # Create a solver. Damping time is taken as 0.1% of the final time
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,

@@ -24,7 +24,7 @@ from pyzoltan.core.carray import LongArray
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import WCSPHStep, Integrator, PredictorCorrectorMode
+from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -113,10 +113,10 @@ kernel = CubicSpline(dim=2)
 # (EPEC). The default faster mode is PEC which requies one less force
 # evaluation per iteration.
 integrator = Integrator(
-    fluid=WCSPHStep(), mode=PredictorCorrectorMode.PEC)
+    fluid=WCSPHStep(), epec=True)
 
 # Construct the solver.
-dt = 1e-6; tf = 0.0075
+dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True,
                 cfl=0.1, tdamp=tf/1000.0)
