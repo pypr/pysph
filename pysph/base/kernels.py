@@ -11,10 +11,10 @@ def get_compiled_kernel(kernel):
     """Given a kernel, return a high performance wrapper kernel.
     """
     import c_kernels
-    from .c_kernels import KernelWrapper
     cls = getattr(c_kernels, kernel.__class__.__name__)
+    wrapper = getattr(c_kernels, kernel.__class__.__name__ + 'Wrapper')
     kern = cls(**kernel.__dict__)
-    return KernelWrapper(kern)
+    return wrapper(kern)
 
 ###############################################################################
 # `CubicSpline` class.

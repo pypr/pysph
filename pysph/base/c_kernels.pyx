@@ -1,38 +1,6 @@
 from libc.math cimport *
 import numpy as np
 
-cdef class KernelWrapper:
-    """Reasonably high-performance convenience wrapper for Kernels.
-    """
-
-    cdef public object kern
-    cdef public double[:] xij, grad
-    cdef public double radius_scale
-
-    def __init__(self, kern):
-        self.kern = kern
-        self.xij = np.zeros(3, dtype=float)
-        self.grad = np.zeros(3, dtype=float)
-        self.radius_scale = kern.radius_scale
-
-    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
-        cdef double[:] xij = self.xij
-        xij[0] = xi-xj
-        xij[1] = yi-yj
-        xij[2] = zi-zj
-        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
-        return self.kern.py_kernel(xij, rij, h)
-
-    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
-        cdef double[:] xij = self.xij
-        xij[0] = xi-xj
-        xij[1] = yi-yj
-        xij[2] = zi-zj
-        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
-        cdef double[:] grad = self.grad
-        self.kern.py_gradient(xij, rij, h, grad)
-        return grad[0], grad[1], grad[2]
-
 
 ###########################################################################
 cdef class CubicSpline:
@@ -117,6 +85,36 @@ cdef class CubicSpline:
         return self.kernel(&xij[0], rij, h)
 
 
+cdef class CubicSplineWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public CubicSpline kern
+    cdef double[3] xij, grad
+    cdef public double radius_scale
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.radius_scale = kern.radius_scale
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double* grad = self.grad
+        self.kern.gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
+
 ###########################################################################
 cdef class WendlandQuintic:
     cdef public long dim
@@ -196,6 +194,36 @@ cdef class WendlandQuintic:
         return self.kernel(&xij[0], rij, h)
 
 
+cdef class WendlandQuinticWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public WendlandQuintic kern
+    cdef double[3] xij, grad
+    cdef public double radius_scale
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.radius_scale = kern.radius_scale
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double* grad = self.grad
+        self.kern.gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
+
 ###########################################################################
 cdef class Gaussian:
     cdef public long dim
@@ -260,6 +288,36 @@ cdef class Gaussian:
     cpdef double py_kernel(self, double[:] xij, double rij, double h):
         return self.kernel(&xij[0], rij, h)
 
+
+cdef class GaussianWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public Gaussian kern
+    cdef double[3] xij, grad
+    cdef public double radius_scale
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.radius_scale = kern.radius_scale
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double* grad = self.grad
+        self.kern.gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
 
 ###########################################################################
 cdef class QuinticSpline:
@@ -346,4 +404,34 @@ cdef class QuinticSpline:
     cpdef double py_kernel(self, double[:] xij, double rij, double h):
         return self.kernel(&xij[0], rij, h)
 
+
+cdef class QuinticSplineWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public QuinticSpline kern
+    cdef double[3] xij, grad
+    cdef public double radius_scale
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.radius_scale = kern.radius_scale
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double* grad = self.grad
+        self.kern.gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
 
