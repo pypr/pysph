@@ -280,30 +280,34 @@ class AdamiVerletStep(IntegratorStep):
 # `Integrator` class
 ###############################################################################
 class Integrator(object):
-    """Generic class for Predictor Corrector integrators in PySPH
+    r"""Generic class for Predictor Corrector integrators in PySPH
 
     Predictor corrector integrators can have two modes of
     operation. Consider the ODE system `\frac{dy}{dt} = F(y)`. 
 
     In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
     using:
-    
-    y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
-    
-    F(y^{n+\frac{1}{2}}) --> Evaluate
 
-    y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
-
-    In the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the system
-    is advanced using:
+    .. math::
     
-    F(y^n) --> Evaluate
+        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
     
-    y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
+        F(y^{n+\frac{1}{2}}) --> Evaluate
 
-    F(y^{n+\frac{1}{2}}) --> Evaluate
+        y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
 
-    y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
+    While, in the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the
+    system is advanced using:
+
+    .. math::
+    
+        F(y^n) --> Evaluate
+    
+        y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
+
+        F(y^{n+\frac{1}{2}}) --> Evaluate
+
+        y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
 
     Notes:
     
@@ -311,9 +315,9 @@ class Integrator(object):
     evaluation. Therefore, the PEC mode is much faster but relies on
     old accelertions for the Prediction stage.
 
-    In the EPEC mode, the final corrector can be modified to
+    In the EPEC mode, the final corrector can be modified to:
 
-    y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)
+    :math:`$y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)$`
 
     This would require additional storage for the accelerations.
 
