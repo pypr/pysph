@@ -77,8 +77,9 @@ from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
+    UpdateSmoothingLengthFerrari, ContinuityEquationDeltaSPH
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -102,7 +103,7 @@ dx = dy = h/hdx
 ro = 1000.0
 co = 10.0 * numpy.sqrt(2*9.81*fluid_column_height)
 gamma = 7.0
-alpha = 0.5
+alpha = 0.1
 beta = 0.0
 B = co*co*ro/gamma
 p0 = 1000.0
@@ -121,13 +122,19 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
-integrator = Integrator(fluid=WCSPHStep(),
-                        boundary=WCSPHStep())
+# Create the Integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
+integrator = Integrator(
+    fluid=WCSPHStep(), boundary=WCSPHStep(),
+    epec=True)
 
 # Create a solver. Damping time is taken as 0.1% of the final time
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True, tdamp=tf/1000.0,
-                fixed_h=True)
+                fixed_h=False)
 
 # create the equations
 equations = [
@@ -141,8 +148,9 @@ equations = [
 
     Group(equations=[
 
-            # Continuity equation
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+            # Continuity equation with dissipative corrections for fluid on fluid
+            ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
+            ContinuityEquation(dest='fluid', sources=['boundary']),
             ContinuityEquation(dest='boundary', sources=['fluid']),
 
             # Momentum equation
@@ -152,7 +160,13 @@ equations = [
 
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])
+
             ]),
+
+    # smoothing length update
+    Group( equations=[
+            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, hdx=1.2, dim=2)
+            ], real=True ),
     ]
 
 # Setup the application and solver.  This also generates the particles.

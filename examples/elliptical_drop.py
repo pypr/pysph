@@ -28,8 +28,9 @@ from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.basic_equations import XSPHCorrection
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari, \
+    ContinuityEquationDeltaSPH
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """Exact solution for the locus of the circular patch."""
@@ -96,20 +97,29 @@ def get_circular_patch(dx=0.025, **kwargs):
         pa.add_property(name)
 
     # set the output property arrays
-    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'p', 'pid', 'tag', 'gid'] )
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'h', 'p', 'pid', 'tag', 'gid'] )
 
     return [pa,]
 
 # Create the application.
 app = Application()
 
-# Set the SPH kernel and integrator
+# Set the SPH kernel
 kernel = CubicSpline(dim=2)
-integrator = Integrator(fluid=WCSPHStep())
 
-# Construct the solver
+# Create the Integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
+integrator = Integrator(
+    fluid=WCSPHStep(), epec=True)
+
+# Construct the solver.
+dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                dt=1e-5, tf=0.0075)
+                dt=dt, tf=tf, adaptive_timestep=True,
+                cfl=0.1, tdamp=tf/1000.0)
 
 # select True if you want to dump out remote particle properties in
 # parallel runs. This can be over-ridden with the --output-remote
@@ -118,20 +128,34 @@ solver.set_output_only_real(True)
 
 # Define the SPH equations used to solve this problem
 equations = [
-
+    
     # Equation of state: p = f(rho)
     Group(equations=[
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0)
-            ], real=False),
+            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
+            ], real=False ),
 
-    # Density rate, Acceleration and XSPH corrections
-    Group(equations=[
-            ContinuityEquation(dest='fluid',  sources=['fluid',]),
+    # Block for the accelerations
+    Group( equations=[
+    
+            # Density rate: drho/dt with dissipative penalization
+            ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',],
+                                       delta=0.1, c0=co),
 
-            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+            # Acceleration: du,v/dt
+            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=0.0),
+
+            # XSPH velocity correction
+            XSPHCorrection(dest='fluid', sources=['fluid']),
+
+            ]),
+
+    # Update smoothing lengths at the end
+    Group( equations=[
             
-            XSPHCorrection(dest='fluid', sources=['fluid'])
-            ], real=True),
+            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=1.2),
+            ], real=True ),
+            
+
     ]
 
 # Setup the application and solver.

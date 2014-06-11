@@ -15,6 +15,11 @@ class SummationDensity(Equation):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class BodyForce(Equation):
+    r"""Add a body force to the particles:
+
+    :math:`$\boldsymbol{f} = f_x, f_y, f_z$`
+    
+    """
     def __init__(self, dest, sources,
                  fx=0.0, fy=0.0, fz=0.0):
         self.fx = fx
@@ -95,12 +100,11 @@ class ContinuityEquation(Equation):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
-
 class MonaghanArtificialViscosity(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0, eta=0.1):
+    """Classical Monaghan style artificial viscosity"""
+    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
         self.alpha = alpha
         self.beta = beta
-        self.eta = eta
         super(MonaghanArtificialViscosity, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
@@ -109,7 +113,7 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
-             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, DWIJ, DT_ADAPT):
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ, DT_ADAPT):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
@@ -120,7 +124,7 @@ class MonaghanArtificialViscosity(Equation):
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij)/(R2IJ + EPS)
 
             piij = -self.alpha*cij*muij + self.beta*muij*muij
             piij = piij*RHOIJ1
@@ -130,6 +134,12 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
 
 class XSPHCorrection(Equation):
+    """Position stepping with XSPH correction
+    
+    This equation must be used to advect the particles. XSPH can be
+    turned off by setting the parameter :math:`$\eps = 0$`.
+
+    """
     def __init__(self, dest, sources=None, eps=0.5):
         self.eps = eps
         super(XSPHCorrection, self).__init__(dest, sources)
