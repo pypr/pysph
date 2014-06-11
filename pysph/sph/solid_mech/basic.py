@@ -15,7 +15,7 @@ class MonaghanArtificialStress(Equation):
         from pysph.sph.solid_mech.linalg cimport transform2inv
         from pysph.base.point cimport cPoint
         """)
-        return dict(helper=code)
+        return code
 
     def loop(self, d_idx, d_rho, d_p,
              d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,

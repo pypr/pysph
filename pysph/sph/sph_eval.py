@@ -22,12 +22,11 @@ def group_equations(equations):
         return equations
 
 ###############################################################################
-def get_code(obj, key):
+def get_code(obj):
     if hasattr(obj, '_cython_code_'):
         code = obj._cython_code_()
         doc = '# From %s'%obj.__class__.__name__
-        src = code.get(key, '')
-        return [doc, src] if len(src) > 0 else []
+        return [doc, code] if len(code) > 0 else []
     return []
 
 ###############################################################################
@@ -110,11 +109,11 @@ class SPHEval(object):
     ##########################################################################
     def get_helpers(self):
         helpers = []
-        helpers.extend(get_code(self.kernel, 'helper'))
+        helpers.extend(get_code(self.kernel))
 
         # get helpers from the Equations
         for equation in self.all_group.equations:
-            helpers.extend(get_code(equation, 'helper'))
+            helpers.extend(get_code(equation))
 
         # Kernel wrappers.
         cg = CythonGenerator()

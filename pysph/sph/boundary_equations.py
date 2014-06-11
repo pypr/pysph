@@ -86,7 +86,7 @@ cdef double wendland_quintic(double rij, double h):
 
     return val
         """)
-        return dict(helper=code)
+        return code
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_au, d_av, d_aw, RIJ, R2IJ, XIJ):
 
