@@ -77,8 +77,8 @@ from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
+from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection, ContinuityEquationWithDissipation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, UpdateSmoothingLengthFerrari
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -133,7 +133,7 @@ integrator = Integrator(
 # Create a solver. Damping time is taken as 0.1% of the final time
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True, tdamp=tf/1000.0,
-                fixed_h=True)
+                fixed_h=False)
 
 # create the equations
 equations = [
@@ -148,7 +148,9 @@ equations = [
     Group(equations=[
 
             # Continuity equation
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+            #ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+            ContinuityEquationWithDissipation(dest='fluid', sources=['fluid', 'boundary'],
+                                              c0=co, delta=0.1),
             ContinuityEquation(dest='boundary', sources=['fluid']),
 
             # Momentum equation
@@ -159,6 +161,11 @@ equations = [
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])
             ]),
+
+    # smoothing length update
+    Group( equations=[
+            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, hdx=1.2, dim=2)
+            ], real=True ),
     ]
 
 # Setup the application and solver.  This also generates the particles.

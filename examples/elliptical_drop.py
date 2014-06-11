@@ -28,8 +28,8 @@ from pysph.sph.integrator import WCSPHStep, Integrator, PredictorCorrectorMode
 
 # PySPH sph imports
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection, ContinuityEquationWithDissipation
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquationWithDissipation
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """Exact solution for the locus of the circular patch."""
@@ -96,7 +96,7 @@ def get_circular_patch(dx=0.025, **kwargs):
         pa.add_property(name)
 
     # set the output property arrays
-    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'p', 'pid', 'tag', 'gid'] )
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'h', 'p', 'pid', 'tag', 'gid'] )
 
     return [pa,]
 
@@ -133,6 +133,7 @@ equations = [
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
             ], real=False ),
 
+    # Block for the accelerations
     Group( equations=[
     
             # Density rate: drho/dt with dissipative penalization
@@ -146,6 +147,14 @@ equations = [
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
             ]),
+
+    # Update smoothing lengths at the end
+    Group( equations=[
+            
+            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=1.2),
+            ], real=True ),
+            
+
     ]
 
 # Setup the application and solver.

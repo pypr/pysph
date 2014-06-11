@@ -56,6 +56,42 @@ class TaitEOSHGCorrection(Equation):
         d_p[d_idx] = self.B * (tmp - 1.0)
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
+class UpdateSmoothingLengthFerrari(Equation):
+    """Update the particle smoothing lengths using:
+
+    `math: h_a = hdx \left(\frac{m_a}{\rho_a}\right)^{\frac{1}{d}}`,
+    where hdx is a scaling factor and d is the nuber of
+    dimensions. This is adapted from eqn (11) in Ferrari et al's
+    paper.
+
+    Ideally, the kernel scaling factor should be determined from the
+    kernel used based on a linear stability analysis. The default
+    value of (hdx=1) reduces to the formulation suggested by Ferrari
+    et al. who used a Cubic Spline kernel.
+
+   Typically, a change in the smoothing length should mean the
+   neighbors are re-computed which in PySPH means the NNPS must be
+   updated. This equation should therefore be placed as the last
+   equation so that after the final corrector stage, the smoothing
+   lengths are updated and the new NNPS data structure is computed.
+
+   Note however that since this is to be used with incompressible flow
+   equations, the density variations are small and hence the smoothing
+   lengths should also not vary too much.
+
+    """
+    def __init__(self, dest, dim, hdx=1.0, sources=None):
+        self.dim1 = 1./dim
+        self.hdx = hdx
+        
+        super(UpdateSmoothingLengthFerrari, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_rho, d_h, d_m):
+        # naive estimate of particle volume
+        Vj = d_m[d_idx]/d_rho[d_idx]
+
+        d_h[d_idx] = self.hdx * pow(Vj, self.dim1)
+
 class MomentumEquation(Equation):
     def __init__(self, dest, sources=None,
                  alpha=1.0, beta=1.0, gx=0.0, gy=0.0, gz=0.0,
