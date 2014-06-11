@@ -56,6 +56,49 @@ class TaitEOSHGCorrection(Equation):
         d_p[d_idx] = self.B * (tmp - 1.0)
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
 
+class ContinuityEquationWithDissipation(Equation):
+    r"""Density rate equation with dissipative terms:
+
+    :math:`$\frac{d\rho_a}{dt} = \sum_b \rho_a \frac{m_b}{\rho_b}
+    \left( \boldsymbol{v}_{ab}\cdot \nabla_a W_{ab} + \delta \eta_{ab}
+    \cdot \nabla_{a} W_{ab} (h_{ab}\frac{c_{ab}}{\rho_a}(\rho_b -
+    \rho_a)) \right)$`
+
+    The description for this equation can be found in 'delta-SPH model
+    for simulating violent impact flows', 2011, CMAME, 200, pp
+    1526--1542
+
+    """
+    def __init__(self, dest, sources, c0, delta=0.1):
+        self.c0 = c0
+        self.delta = delta
+        super(ContinuityEquationWithDissipation, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_arho):
+        d_arho[d_idx] = 0.0
+
+    def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho, 
+             DWIJ, VIJ, XIJ, RIJ, HIJ, EPS):
+
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        Vj = s_m[s_idx]/rhoj
+
+        # v_{ij} \cdot \nabla W
+        vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
+
+        # eta_{ij} \cdot \nabla W
+        etadotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+        etadotdwij /= (RIJ + EPS)
+
+        # celerity (sound speed)
+        #cij =  max( d_cs[d_idx], s_cs[s_idx] )
+        cij = self.c0
+        psi_ij = self.delta * HIJ * cij * (rhoj - rhoi)
+
+        # standard term with dissipative penalization eqn (5a)
+        d_arho[d_idx] += rhoi*vijdotdwij*Vj + psi_ij*etadotdwij*Vj
+
 class UpdateSmoothingLengthFerrari(Equation):
     """Update the particle smoothing lengths using:
 

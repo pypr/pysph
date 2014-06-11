@@ -77,8 +77,9 @@ from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection, ContinuityEquationWithDissipation
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, UpdateSmoothingLengthFerrari
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
+    UpdateSmoothingLengthFerrari, ContinuityEquationWithDissipation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -147,10 +148,9 @@ equations = [
 
     Group(equations=[
 
-            # Continuity equation
-            #ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-            ContinuityEquationWithDissipation(dest='fluid', sources=['fluid', 'boundary'],
-                                              c0=co, delta=0.1),
+            # Continuity equation with dissipative corrections for fluid on fluid
+            ContinuityEquationWithDissipation(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
+            ContinuityEquation(dest='fluid', sources=['boundary']),
             ContinuityEquation(dest='boundary', sources=['fluid']),
 
             # Momentum equation
@@ -160,6 +160,7 @@ equations = [
 
             # Position step with XSPH
             XSPHCorrection(dest='fluid', sources=['fluid'])
+
             ]),
 
     # smoothing length update

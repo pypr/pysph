@@ -28,8 +28,9 @@ from pysph.sph.integrator import WCSPHStep, Integrator, PredictorCorrectorMode
 
 # PySPH sph imports
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquationWithDissipation
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari
+from pysph.sph.basic_equations import XSPHCorrection
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari, \
+    ContinuityEquationWithDissipation
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """Exact solution for the locus of the circular patch."""
