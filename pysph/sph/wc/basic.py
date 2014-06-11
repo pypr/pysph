@@ -174,7 +174,76 @@ class MomentumEquation(Equation):
         # store the square of the max acceleration
         DT_ADAPT[1] = max( acc2, DT_ADAPT[1] )
 
-class ContinuityEquationWithDissipation(Equation):
+class MomentumEquationDeltaSPH(Equation):
+    r"""Momentum equation defined in JOSEPHINE and the delta-SPH model
+    
+    The paper references for the momentum equations are:
+
+    - 'delta-SPH model for simulating violent impact flows', CMAME,
+       200, pp 1526--1542 (REF1) and
+
+    - 'JOSEPHINE': A parallel SPH code for free-surface flows,
+       Computer Physics Communications, 2012, 183, pp 1468--1480 (REF2)
+
+      Artificial viscosity is used in the Momentum equation and is
+      controlled by the parameter :math:`$\alpha$`. The form of the
+      artificial viscosity is similar, although not identical to the
+      Monaghan-style artificial viscosity.
+
+    """
+    def __init__(
+        self, dest, sources=None, alpha=1.0, 
+        gx=0.0, gy=0.0, gz=0.0, rho0=1000.0, c0=1.0):
+
+        self.alpha = alpha
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+
+        self.c0 = c0
+        self.rho0 = rho0
+
+        super(MomentumEquationDeltaSPH, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_rho, d_cs, d_p, d_au, d_av, d_aw, s_m,
+             s_rho, s_cs, s_p, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, WIJ, DWIJ):
+
+        # src paricle volume mj/rhoj
+        Vj = s_m[s_idx]/s_rho[s_idx]
+
+        pi = d_p[d_idx]
+        pj = s_p[s_idx]
+
+        # viscous contribution second part of eqn (5b) in REF1
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        piij = self.alpha * HIJ * self.c0 * self.rho0 * vijdotxij/(R2IJ + EPS)
+
+        # gradient and viscous terms eqn 5b in REF1
+        tmp = -Vj/d_rho[d_idx] * (pi + pj) + pij * Vj/d_rho[d_idx]
+
+        # accelerations
+        d_au[d_idx] += tmp * DWIJ[0]
+        d_av[d_idx] += tmp * DWIJ[1]
+        d_aw[d_idx] += tmp * DWIJ[2]
+
+    def post_loop(self, d_idx, d_au, d_av, d_aw, DT_ADAPT):
+        d_au[d_idx] +=  self.gx
+        d_av[d_idx] +=  self.gy
+        d_aw[d_idx] +=  self.gz
+
+        acc2 = ( d_au[d_idx]*d_au[d_idx] + \
+                    d_av[d_idx]*d_av[d_idx] + \
+                    d_aw[d_idx]*d_aw[d_idx] )
+
+        # store the square of the max acceleration
+        DT_ADAPT[1] = max( acc2, DT_ADAPT[1] )
+
+class ContinuityEquationDeltaSPH(Equation):
     r"""Density rate equation with dissipative terms:
 
     :math:`$\frac{d\rho_a}{dt} = \sum_b \rho_a \frac{m_b}{\rho_b}
@@ -190,7 +259,7 @@ class ContinuityEquationWithDissipation(Equation):
     def __init__(self, dest, sources, c0, delta=0.1):
         self.c0 = c0
         self.delta = delta
-        super(ContinuityEquationWithDissipation, self).__init__(dest, sources)
+        super(ContinuityEquationDeltaSPH, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0

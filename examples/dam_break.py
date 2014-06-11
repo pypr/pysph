@@ -79,7 +79,7 @@ from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
 from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
-    UpdateSmoothingLengthFerrari, ContinuityEquationWithDissipation
+    UpdateSmoothingLengthFerrari, ContinuityEquationDeltaSPH
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -149,7 +149,7 @@ equations = [
     Group(equations=[
 
             # Continuity equation with dissipative corrections for fluid on fluid
-            ContinuityEquationWithDissipation(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
+            ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
             ContinuityEquation(dest='fluid', sources=['boundary']),
             ContinuityEquation(dest='boundary', sources=['fluid']),
 

@@ -30,7 +30,7 @@ from pysph.sph.integrator import WCSPHStep, Integrator
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import XSPHCorrection
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari, \
-    ContinuityEquationWithDissipation
+    ContinuityEquationDeltaSPH
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """Exact solution for the locus of the circular patch."""
@@ -138,8 +138,8 @@ equations = [
     Group( equations=[
     
             # Density rate: drho/dt with dissipative penalization
-            ContinuityEquationWithDissipation(dest='fluid',  sources=['fluid',],
-                                                 delta=0.1, c0=co),
+            ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',],
+                                       delta=0.1, c0=co),
 
             # Acceleration: du,v/dt
             MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=0.0),
