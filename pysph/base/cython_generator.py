@@ -9,6 +9,7 @@ import inspect
 import logging
 from mako.template import Template
 from textwrap import dedent
+import types
 
 from ast_utils import get_assigned, has_return
 
@@ -90,13 +91,13 @@ class CythonGenerator(object):
     ##### Public protocol #####################################################
 
     def parse(self, obj):
-        cls = obj.__class__
-        name = cls.__name__
-        public_vars = self._get_public_vars(obj)
-        methods = self._get_methods(cls)
-        helper = CythonClassHelper(name=name, public_vars=public_vars,
-                                   methods=methods)
-        self.code = helper.generate()
+        obj_type = type(obj)
+        if obj_type is types.FunctionType:
+            self._parse_function(obj)
+        elif hasattr(obj, '__class__'):
+            self._parse_instance(obj)
+        else:
+            raise TypeError('Unsupport type to wrap: %s'%obj_type)
 
     def get_code(self):
         return self.code
@@ -136,6 +137,23 @@ class CythonGenerator(object):
 
 
     ###### Private protocol ###################################################
+
+    def _parse_instance(self, obj):
+        cls = obj.__class__
+        name = cls.__name__
+        public_vars = self._get_public_vars(obj)
+        methods = self._get_methods(cls)
+        helper = CythonClassHelper(name=name, public_vars=public_vars,
+                                   methods=methods)
+        self.code = helper.generate()
+
+    def _parse_function(self, obj):
+        sourcelines = inspect.getsourcelines(obj)[0]
+        defn, lines = get_func_definition(sourcelines)
+        m_name, returns, args = self._analyze_method(obj, lines)
+        c_defn = self._get_c_method_spec(m_name, returns, args)
+        c_body = self._get_method_body(obj, lines, indent=' '*4)
+        self.code = '{defn}\n{body}'.format(defn=c_defn, body=c_body)
 
     def _get_public_vars(self, obj):
         # For now get it all from the dict.
@@ -202,7 +220,7 @@ class CythonGenerator(object):
         else:
             return '', line
 
-    def _get_method_body(self, meth, lines):
+    def _get_method_body(self, meth, lines, indent=' '*8):
         args = set(inspect.getargspec(meth).args)
         src = [self._process_body_line(line) for line in lines]
         declared = [x[0] for x in src if len(x[0]) > 0]
@@ -211,7 +229,7 @@ class CythonGenerator(object):
         dedented_body = dedent(body)
         symbols = get_assigned(dedented_body)
         undefined = symbols - set(declared) - args
-        declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
+        declare = [indent +'cdef double %s\n'%x for x in undefined]
         code = ''.join(declare) + cython_body
         return code
 
@@ -226,8 +244,10 @@ class CythonGenerator(object):
         returns = has_return(dedent(body))
         argspec = inspect.getargspec(meth)
         args = argspec.args
+        is_method = False
         if args and args[0] == 'self':
             args = args[1:]
+            is_method = True
         defaults = argspec.defaults if argspec.defaults is not None else []
 
         # The call_args dict is filled up with the defaults to detect
@@ -244,7 +264,7 @@ class CythonGenerator(object):
         # Make sure any predefined quantities are suitably typed.
         call_args.update(self.known_types)
 
-        new_args = [('self', None)]
+        new_args = [('self', None)] if is_method else []
         for arg in args:
             value = call_args[arg]
             new_args.append((arg, value))
