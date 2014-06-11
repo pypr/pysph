@@ -125,8 +125,8 @@ class SolidMechStep(IntegratorStep):
     def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                   d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_e0, d_ae,
-                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, 
-                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
+                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
                   d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
                   dt=0.0):
         dtb2 = 0.5*dt
@@ -154,7 +154,7 @@ class SolidMechStep(IntegratorStep):
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                   d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_ae, d_e0,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220, 
+                  d_s000, d_s010, d_s020, d_s110, d_s120, d_s220,
                   d_as00, d_as01, d_as02, d_as11, d_as12, d_as22,
                   dt=0.0):
 
@@ -257,7 +257,7 @@ class Integrator(object):
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
                 raise ValueError(msg)
-            
+
         self.steppers = kw
         self.parallel_manager = None
         # This is set later when the underlying compiled integrator is created
@@ -278,7 +278,7 @@ class Integrator(object):
         for pa in calc.particle_arrays:
             h = pa.get_carray('h')
             h.update_min_max()
-            
+
             if h.minimum < hmin:
                 hmin = h.minimum
 
@@ -351,7 +351,7 @@ class Integrator(object):
         lines = []
         for dest, stepper in self.steppers.iteritems():
             cls_name = stepper.__class__.__name__
-            code = 'self.{name} = {cls}(steppers["{dest}"])'\
+            code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
                         .format(name=dest+'_stepper', cls=cls_name,
                                 dest=dest)
             lines.append(code)

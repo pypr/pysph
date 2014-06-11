@@ -172,12 +172,15 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithKnownTypes())
         expect = dedent("""
         cdef class EqWithKnownTypes:
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
                 d_p[d_idx] = WIJ*DWIJ[0]
+
+            cpdef py_some_func(self, long d_idx, double[:] d_p, double WIJ, double[:] DWIJ):
+                self.some_func(d_idx, &d_p[0], WIJ, &DWIJ[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
