@@ -7,7 +7,7 @@ import numpy as np
 from pysph.base.nnps import DomainLimits, BoxSortNNPS, LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.point import Point
-from pysph.parallel._kernels import Gaussian
+from pysph.base.kernels import Gaussian, get_compiled_kernel
 
 # PyZoltan CArrays
 from pyzoltan.core.carray import UIntArray
@@ -17,7 +17,7 @@ import unittest
 
 class PeriodicChannel2DTestCase(unittest.TestCase):
     """Test the periodicity algorithms in NNPS.
-    
+
     A channel like set-up is used in 2D with fluid particles between
     parallel flat plates. Periodic boundary conditions are imposed
     along the 'x' direction and summation density is used to check for
@@ -63,7 +63,7 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
         # particles and domain
         self.particles = particles = [fluid, channel]
         self.domain = domain = DomainLimits(xmin=0, xmax=L, periodic_in_x=True)
-        self.kernel = kernel = Gaussian(dim=2)
+        self.kernel = get_compiled_kernel(Gaussian(dim=2))
 
     def _test_periodicity_flags(self):
         "NNPS :: checking for periodicity flags"
@@ -92,7 +92,6 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
         # compute density on the fluid
         nbrs = UIntArray()
         for i in range( fluid.num_real_particles ):
-            xi = Point( fx[i], fy[i] )
             hi = fh[i]
 
             # compute density from the fluid from the source arrays
@@ -101,14 +100,14 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
 
             # the source arrays. First source is also the fluid
             sx, sy, sh, sm = fluid.get('x', 'y', 'h', 'm', only_real_particles=False)
-            
+
             for indexj in range(nnbrs):
                 j = nbrs[indexj]
                 xj = Point( sx[j], sy[j] )
                 hij = 0.5 * (hi + sh[j])
 
-                frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
-                fV[i] += kernel.py_function(xi, xj, hij)
+                frho[i] += sm[j] * kernel.kernel(fx[i], fy[i], 0.0, sx[j], sy[j], 0.0, hij)
+                fV[i] += kernel.kernel(fx[i], fy[i], 0.0, sx[j], sy[j], 0.0, hij)
 
             # compute density from the channel
             nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
@@ -118,12 +117,11 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
 
             for indexj in range(nnbrs):
                 j = nbrs[indexj]
-                
-                xj = Point( sx[j], sy[j] )
+
                 hij = 0.5 * (hi + sh[j])
-                
-                frho[i] += sm[j] * kernel.py_function(xi, xj, hij)
-                fV[i] += kernel.py_function(xi, xj, hij)
+
+                frho[i] += sm[j] * kernel.kernel(fx[i], fy[i], 0.0, sx[j], sy[j], 0.0, hij)
+                fV[i] += kernel.kernel(fx[i], fy[i], 0.0, sx[j], sy[j], 0.0, hij)
 
             # check the number density and density by summation
             voli = 1./fV[i]
@@ -134,9 +132,9 @@ class PeriodicChannel2DBoxSort(PeriodicChannel2DTestCase):
     def setUp(self):
         PeriodicChannel2DTestCase.setUp(self)
         self.nnps = BoxSortNNPS(
-            dim=2, particles=self.particles, 
-            domain=self.domain, 
-            radius_scale=self.kernel.radius)
+            dim=2, particles=self.particles,
+            domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
 
     def test_periodicity_flags(self):
         "BoxSortNNPS :: test periodicity flags"
@@ -150,9 +148,9 @@ class PeriodicChannel2DLinkedList(PeriodicChannel2DTestCase):
     def setUp(self):
         PeriodicChannel2DTestCase.setUp(self)
         self.nnps = LinkedListNNPS(
-            dim=2, particles=self.particles, 
-            domain=self.domain, 
-            radius_scale=self.kernel.radius)
+            dim=2, particles=self.particles,
+            domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
 
     def test_periodicity_flags(self):
         "LinkedListNNPS :: test periodicity flags"

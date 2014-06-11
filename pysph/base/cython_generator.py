@@ -26,9 +26,9 @@ cdef class ${class_name}:
     %for name, type in public_vars.iteritems():
     cdef public ${type} ${name}
     %endfor
-    def __init__(self, object obj):
-        for key in obj.__dict__:
-            setattr(self, key, getattr(obj, key))
+    def __init__(self, **kwargs):
+        for key, value in kwargs.iteritems():
+            setattr(self, key, value)
 
 %for defn, body in methods:
     ${defn}
@@ -68,11 +68,26 @@ class Undefined(object):
     pass
 
 class CythonGenerator(object):
-    def __init__(self, known_types=None):
+    def __init__(self, known_types=None, python_methods=False):
+        """
+        Parameters
+        -----------
+
+        - known_types: dict: provides default types for known arguments.
+
+        - python_methods: bool: generate python wrapper functions.
+
+             specifies if convenient Python friendly wrappers are to be
+             generated in addition to the low-level c wrappers.
+        """
+
         self.code = ''
+        self.python_methods = python_methods
         # Methods to not wrap.
         self.ignore_methods = ['cython_code']
         self.known_types = known_types if known_types is not None else {}
+
+    ##### Public protocol #####################################################
 
     def parse(self, obj):
         cls = obj.__class__
@@ -82,6 +97,45 @@ class CythonGenerator(object):
         helper = CythonClassHelper(name=name, public_vars=public_vars,
                                    methods=methods)
         self.code = helper.generate()
+
+    def get_code(self):
+        return self.code
+
+    def detect_type(self, name, value):
+        """Given the variable name and value, detect its type.
+        """
+        if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+            return 'double*'
+        if name in ['s_idx', 'd_idx']:
+            return 'long'
+        if value is Undefined:
+            raise CodeGenerationError('Unknown type, for %s'%name)
+
+        if isinstance(value, bool):
+            return 'int'
+        elif isinstance(value, int):
+            return 'long'
+        elif isinstance(value, str):
+            return 'str'
+        elif isinstance(value, float):
+            return 'double'
+        elif isinstance(value, (list, tuple)):
+            if all_numeric(value):
+                # We don't deal with integer lists for now.
+                return 'double*'
+            else:
+                return 'list' if isinstance(value, list) else 'tuple'
+        else:
+            return 'object'
+
+    def ctype_to_python(self, type_str):
+        """Given a c-style type declaration obtained from the `detect_type`
+        method, return a Python friendly type declaration.
+        """
+        return type_str.replace('*', '[:]')
+
+
+    ###### Private protocol ###################################################
 
     def _get_public_vars(self, obj):
         # For now get it all from the dict.
@@ -102,9 +156,14 @@ class CythonGenerator(object):
 
                 sourcelines = inspect.getsourcelines(meth)[0]
                 defn, lines = get_func_definition(sourcelines)
-                defn = self._get_method_spec(meth, lines)
-                body = self._get_method_body(meth, lines)
-                methods.append((defn, body))
+                m_name, returns, args = self._analyze_method(meth, lines)
+                c_defn = self._get_c_method_spec(m_name, returns, args)
+                c_body = self._get_method_body(meth, lines)
+                methods.append((c_defn, c_body))
+                if self.python_methods:
+                    defn, body = self._get_py_method_spec(m_name, returns,
+                                                          args)
+                    methods.append((defn, body))
         return methods
 
     def _handle_declare_statement(self, name, declare):
@@ -156,10 +215,15 @@ class CythonGenerator(object):
         code = ''.join(declare) + cython_body
         return code
 
-    def _get_method_spec(self, meth, lines):
+    def _analyze_method(self, meth, lines):
+        """Returns information about the method.
+
+        Specifically it returns the method name, if it has a return value,
+        and a list of [(arg_name, value),...].
+        """
         name = meth.__name__
         body = ''.join(lines)
-        dedented_body = dedent(body)
+        returns = has_return(dedent(body))
         argspec = inspect.getargspec(meth)
         args = argspec.args
         if args and args[0] == 'self':
@@ -180,44 +244,58 @@ class CythonGenerator(object):
         # Make sure any predefined quantities are suitably typed.
         call_args.update(self.known_types)
 
-        new_args = ['self']
+        new_args = [('self', None)]
         for arg in args:
             value = call_args[arg]
-            type = self.detect_type(arg, value)
-	    new_args.append('{type} {arg}'.format(type=type, arg=arg))
+            new_args.append((arg, value))
 
-        ret = 'double' if has_return(dedented_body) else 'void'
-        arg_def = ', '.join(new_args)
-        defn = 'cdef inline {ret} {name}({arg_def}):'\
-                    .format(ret=ret, name=name, arg_def=arg_def)
-        return defn
+        return name, returns, new_args
 
-    def get_code(self):
-        return self.code
-
-    def detect_type(self, name, value):
-        """Given the variable name and value, detect its type.
+    def _get_c_method_spec(self, name, returns, args):
+        """Returns a C definition for the method.
         """
-        if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
-            return 'double*'
-        if name in ['s_idx', 'd_idx']:
-            return 'long'
-        if value is Undefined:
-            raise CodeGenerationError('Unknown type, for %s'%name)
+        c_args = []
+        if args and args[0][0] == 'self':
+            args = args[1:]
+            c_args.append('self')
 
-        if isinstance(value, bool):
-            return 'int'
-        elif isinstance(value, int):
-            return 'long'
-        elif isinstance(value, str):
-            return 'str'
-        elif isinstance(value, float):
-            return 'double'
-        elif isinstance(value, (list, tuple)):
-            if all_numeric(value):
-                # We don't deal with integer lists for now.
-                return 'double*'
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
+
+        c_ret = 'double' if returns else 'void'
+        c_arg_def = ', '.join(c_args)
+        cdefn = 'cdef inline {ret} {name}({arg_def}):'\
+                     .format(ret=c_ret, name=name, arg_def=c_arg_def)
+
+        return cdefn
+
+    def _get_py_method_spec(self, name, returns, args):
+        """Returns a Python friendly definition for the method along with the
+        wrapper function.
+        """
+        py_args = []
+        if args and args[0][0] == 'self':
+            args = args[1:]
+            py_args.append('self')
+
+        call_sig = []
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            py_type = self.ctype_to_python(c_type)
+            py_args.append('{type} {arg}'.format(type=py_type, arg=arg))
+            if c_type.endswith('*'):
+                call_sig.append('&{arg}[0]'.format(arg=arg))
             else:
-                return 'list' if isinstance(value, list) else 'tuple'
-        else:
-            return 'object'
+                call_sig.append('{arg}'.format(arg=arg))
+
+        py_ret = ' double' if returns else ''
+        py_arg_def = ', '.join(py_args)
+        pydefn = 'cpdef{ret} py_{name}({arg_def}):'\
+                     .format(ret=py_ret, name=name, arg_def=py_arg_def)
+        call = ', '.join(call_sig)
+        py_ret = 'return ' if returns else ''
+        body = ' '*8 + '{ret}self.{name}({call})'\
+                    .format(name=name, call=call, ret=py_ret)
+
+        return pydefn, body

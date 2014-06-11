@@ -427,9 +427,8 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
 
 # SPH interpolation of data
 from pyzoltan.core.carray import UIntArray
-from pysph.parallel._kernels import Gaussian
+from pysph.base.kernels import Gaussian, get_compiled_kernel
 from pysph.base.nnps import NNPS
-from pysph.base.point import Point
 class SPHInterpolate(object):
     """Class to perform SPH interpolation
 
@@ -440,10 +439,11 @@ class SPHInterpolate(object):
     def __init__(self, dim, dst, src, kernel=None):
         self.dst = dst; self.src = src
         if kernel is None:
-            self.kernel = Gaussian(dim)
+            self.kernel = get_compiled_kernel(Gaussian(dim))
 
         # create the neighbor locator object
-        self.nnps = nnps = NNPS(dim=dim, particles=[dst, src], radius_scale=self.kernel.radius)
+        self.nnps = nnps = NNPS(dim=dim, particles=[dst, src],
+                                radius_scale=self.kernel.radius_scale)
         nnps.update()
 
     def interpolate(self, arr):
@@ -466,19 +466,16 @@ class SPHInterpolate(object):
         kernel = self.kernel
 
         for i in range(np):
-            xi = Point( dx[i], dy[i], dz[i] )
-
             self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
             nnbrs = nbrs.length
 
             _wij = 0.0; _sum = 0.0
             for indexj in range(nnbrs):
                 j  = nbrs[indexj]
-                xj = Point( sx[j], sy[j], sz[j] )
 
                 hij = 0.5 * (sh[j] + dh[i])
 
-                wij = kernel.py_function(xi, xj, hij)
+                wij = kernel.kernel(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
                 _wij += wij
                 _sum += arr[j] * wij
 
@@ -500,32 +497,34 @@ class SPHInterpolate(object):
         nbrs = UIntArray()
 
         # data arrays
-        src = dst = self.dst
-        x, y, z, h, r, m = dst.get('x', 'y', 'z', 'h', 'rho', 'm')
-        f = dst.get(arr)
+        # source arrays
+        src = self.src
+        sx, sy, sz, sh, srho, sm = src.get('x', 'y', 'z', 'h', 'rho', 'm', only_real_particles=False)
+
+        # dest arrays
+        dst = self.dst
+        dx, dy, dz, dh = dst.x, dst.y, dst.z, dst.h
 
         # kernel
         kernel = self.kernel
 
         for i in range(np):
-            xi = Point( x[i], y[i], z[i] )
-
-            self.nnps.get_nearest_particles(
-                src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
-
+            self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
             nnbrs = nbrs.length
-            hij = h[i]
 
             _wij = 0.0; _sumx = 0.0; _sumy = 0.0; _sumz = 0.0
             for indexj in range(nnbrs):
                 j  = nbrs[indexj]
-                xj = Point( sx[j], sy[j], sz[j] )
 
-                rhoj = rho[j]; mj = m[j]
-                fji = f[j] - f[i]
+                hij = 0.5 * (sh[j] + dh[i])
 
-                # kenrel gradient
-                dwij = kernel.py_gradient(xi, xj, hij)
+                wij = kernel.kernel(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
+
+                rhoj = srho[j]; mj = sm[j]
+                fji = arr[j] - arr[i]
+
+                # kernel gradient
+                dwij = kernel.gradient(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
 
                 _wij += wij
                 tmp = 1./rhoj * fji * mj
