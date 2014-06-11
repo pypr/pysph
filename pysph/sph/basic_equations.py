@@ -15,6 +15,11 @@ class SummationDensity(Equation):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class BodyForce(Equation):
+    r"""Add a body force to the particles:
+
+    :math:`$\boldsymbol{f} = f_x, f_y, f_z$`
+    
+    """
     def __init__(self, dest, sources,
                  fx=0.0, fy=0.0, fz=0.0):
         self.fx = fx
@@ -96,6 +101,7 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
 class MonaghanArtificialViscosity(Equation):
+    """Classical Monaghan style artificial viscosity"""
     def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
         self.alpha = alpha
         self.beta = beta
@@ -128,6 +134,12 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
 
 class XSPHCorrection(Equation):
+    """Position stepping with XSPH correction
+    
+    This equation must be used to advect the particles. XSPH can be
+    turned off by setting the parameter :math:`$\eps = 0$`.
+
+    """
     def __init__(self, dest, sources=None, eps=0.5):
         self.eps = eps
         super(XSPHCorrection, self).__init__(dest, sources)
