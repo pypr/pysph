@@ -38,7 +38,7 @@ from pysph.base.cython_generator import CythonGenerator
 from pysph.base.kernels import (CubicSpline, WendlandQuintic, Gaussian,
     QuinticSpline)
 
-g = CythonGenerator()
+g = CythonGenerator(python_methods=True)
 for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
     k = cls()
     g.parse(k)

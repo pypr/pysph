@@ -68,8 +68,21 @@ class Undefined(object):
     pass
 
 class CythonGenerator(object):
-    def __init__(self, known_types=None):
+    def __init__(self, known_types=None, python_methods=False):
+        """
+        Parameters
+        -----------
+
+        - known_types: dict: provides default types for known arguments.
+
+        - python_methods: bool: generate python wrapper functions.
+
+             specifies if convenient Python friendly wrappers are to be
+             generated in addition to the low-level c wrappers.
+        """
+
         self.code = ''
+        self.python_methods = python_methods
         # Methods to not wrap.
         self.ignore_methods = ['cython_code']
         self.known_types = known_types if known_types is not None else {}
@@ -147,8 +160,10 @@ class CythonGenerator(object):
                 c_defn = self._get_c_method_spec(m_name, returns, args)
                 c_body = self._get_method_body(meth, lines)
                 methods.append((c_defn, c_body))
-                defn, body = self._get_py_method_spec(m_name, returns, args)
-                methods.append((defn, body))
+                if self.python_methods:
+                    defn, body = self._get_py_method_spec(m_name, returns,
+                                                          args)
+                    methods.append((defn, body))
         return methods
 
     def _handle_declare_statement(self, name, declare):

@@ -121,14 +121,31 @@ class TestCythonCodeGenerator(TestBase):
                 cdef double tmp
                 tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_python_methods(self):
+        cg = CythonGenerator(python_methods=True)
+        cg.parse(EqWithMethod())
+        expect = dedent("""
+        cdef class EqWithMethod:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef double tmp
+                tmp = abs(self.rho*self.c)*sin(pi*self.c)
+                d_x[d_idx] = d_x[d_idx]*tmp
 
             cpdef py_func(self, long d_idx, double[:] d_x):
                 self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
-    def test_method_with_return(self):
-        cg = CythonGenerator()
         cg.parse(EqWithReturn())
         expect = dedent("""
         cdef class EqWithReturn:
@@ -147,6 +164,23 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
+    def test_method_with_return(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithReturn())
+        expect = dedent("""
+        cdef class EqWithReturn:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline double func(self, long d_idx, double* d_x):
+                return d_x[d_idx]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
     def test_method_with_matrix(self):
         cg = CythonGenerator()
         cg.parse(EqWithMatrix())
@@ -161,9 +195,6 @@ class TestCythonCodeGenerator(TestBase):
                 mat[0][0] = d_x[d_idx]
                 cdef double vec[3]
                 vec[0] = d_x[d_idx]
-
-            cpdef py_func(self, long d_idx, double[:] d_x):
-                self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
@@ -178,9 +209,6 @@ class TestCythonCodeGenerator(TestBase):
 
             cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
                 d_p[d_idx] = WIJ*DWIJ[0]
-
-            cpdef py_some_func(self, long d_idx, double[:] d_p, double WIJ, double[:] DWIJ):
-                self.some_func(d_idx, &d_p[0], WIJ, &DWIJ[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
