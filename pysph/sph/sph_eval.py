@@ -23,8 +23,8 @@ def group_equations(equations):
 
 ###############################################################################
 def get_code(obj, key):
-    if hasattr(obj, 'cython_code'):
-        code = obj.cython_code()
+    if hasattr(obj, '_cython_code_'):
+        code = obj._cython_code_()
         doc = '# From %s'%obj.__class__.__name__
         src = code.get(key, '')
         return [doc, src] if len(src) > 0 else []

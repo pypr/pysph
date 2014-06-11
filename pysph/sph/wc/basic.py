@@ -13,7 +13,7 @@ class TaitEOS(Equation):
     The reference speed of sound, c0, is to be taken approximately as
     10 times the maximum expected velocity in the system. The particle
     sound speed is given by the usual expression:
-    
+
     :math:`$c_a = \sqrt{\frac{\partial p}{\partial \rho}}$`
 
     """
@@ -70,7 +70,7 @@ class TaitEOSHGCorrection(Equation):
 
 class MomentumEquation(Equation):
     r"""Classic Monaghan style Momentum equation with artificial viscosity
-    
+
     The standard reference for this is Monaghan's 1992 paper 'Smoothed
     Particle Hydrodynamics'
 
@@ -95,13 +95,6 @@ class MomentumEquation(Equation):
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def cython_code(self):
-        code = dedent("""
-        from libc.math cimport pow, fabs
-        """)
-
-        return dict(helper=code)
-
     def loop(self, d_idx, s_idx, d_rho, d_cs,
              d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ,
@@ -110,9 +103,6 @@ class MomentumEquation(Equation):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
-
-        pi = d_p[d_idx]
-        pj = s_p[s_idx]
 
         vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 
@@ -176,7 +166,7 @@ class MomentumEquation(Equation):
 
 class MomentumEquationDeltaSPH(Equation):
     r"""Momentum equation defined in JOSEPHINE and the delta-SPH model
-    
+
     The paper references for the momentum equations are:
 
     - 'delta-SPH model for simulating violent impact flows', CMAME,
@@ -192,7 +182,7 @@ class MomentumEquationDeltaSPH(Equation):
 
     """
     def __init__(
-        self, dest, sources=None, alpha=1.0, 
+        self, dest, sources=None, alpha=1.0,
         gx=0.0, gy=0.0, gz=0.0, rho0=1000.0, c0=1.0):
 
         self.alpha = alpha
@@ -264,7 +254,7 @@ class ContinuityEquationDeltaSPH(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho, 
+    def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho,
              DWIJ, VIJ, XIJ, RIJ, HIJ, EPS):
 
         rhoi = d_rho[d_idx]
@@ -288,7 +278,7 @@ class ContinuityEquationDeltaSPH(Equation):
 
 class UpdateSmoothingLengthFerrari(Equation):
     r"""Update the particle smoothing lengths using:
-    
+
     :math: `$h_a = hdx \left(\frac{m_a}{\rho_a}\right)^{\frac{1}{d}}$`,
     where hdx is a scaling factor and d is the nuber of
     dimensions. This is adapted from eqn (11) in Ferrari et al's
@@ -304,7 +294,7 @@ class UpdateSmoothingLengthFerrari(Equation):
     updated. This equation should therefore be placed as the last
     equation so that after the final corrector stage, the smoothing
     lengths are updated and the new NNPS data structure is computed.
-    
+
     Note however that since this is to be used with incompressible flow
     equations, the density variations are small and hence the smoothing
     lengths should also not vary too much.
@@ -313,7 +303,7 @@ class UpdateSmoothingLengthFerrari(Equation):
     def __init__(self, dest, dim, hdx=1.0, sources=None):
         self.dim1 = 1./dim
         self.hdx = hdx
-        
+
         super(UpdateSmoothingLengthFerrari, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_h, d_m):

@@ -6,12 +6,6 @@ class MonaghanBoundaryForce(Equation):
         self.deltap = deltap
         super(MonaghanBoundaryForce,self).__init__(dest,sources)
 
-    def cython_code(self):
-        code = dedent("""
-        from libc.math cimport fabs
-        """)
-        return dict(helper=code)
-
     def loop(self, d_idx, s_idx, s_m, s_rho, d_m, d_cs, s_cs, d_h,
              s_tx, s_ty, s_tz, s_nx, s_ny, s_nz,
              d_au, d_av, d_aw, XIJ):
@@ -81,7 +75,7 @@ class MonaghanKajtarBoundaryForce(Equation):
 
         super(MonaghanKajtarBoundaryForce,self).__init__(dest,sources)
 
-    def cython_code(self):
+    def _cython_code_(self):
         code = dedent("""
 cdef double wendland_quintic(double rij, double h):
     cdef double q = rij/h

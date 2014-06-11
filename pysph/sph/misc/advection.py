@@ -1,6 +1,5 @@
 """Functions for advection"""
 
-from textwrap import dedent
 from pysph.sph.equation import Equation
 from numpy import cos, pi
 
@@ -17,9 +16,3 @@ class MixingVelocityUpdate(Equation):
     def loop(self, d_idx, d_u, d_v, d_u0, d_v0, t=0.1):
         d_u[d_idx] = cos(pi*t/self.T) * d_u0[d_idx]
         d_v[d_idx] = -cos(pi*t/self.T) * d_v0[d_idx]
-
-    def cython_code(self):
-        code = dedent("""
-        from libc.math cimport M_PI as pi
-        """)
-        return dict(helper=code)

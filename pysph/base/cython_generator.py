@@ -85,7 +85,7 @@ class CythonGenerator(object):
         self.code = ''
         self.python_methods = python_methods
         # Methods to not wrap.
-        self.ignore_methods = ['cython_code']
+        self.ignore_methods = ['_cython_code_']
         self.known_types = known_types if known_types is not None else {}
 
     ##### Public protocol #####################################################
