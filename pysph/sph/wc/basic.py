@@ -58,16 +58,14 @@ class TaitEOSHGCorrection(Equation):
 
 class MomentumEquation(Equation):
     def __init__(self, dest, sources=None,
-                 alpha=1.0, beta=1.0, eta=0.1, gx=0.0, gy=0.0, gz=0.0,
+                 alpha=1.0, beta=1.0, gx=0.0, gy=0.0, gz=0.0,
                  c0=1.0, tensile_correction=False):
 
         self.alpha = alpha
         self.beta = beta
-        self.eta = eta
         self.gx = gx
         self.gy = gy
         self.gz = gz
-        self.dt_fac = 0.0
         self.c0 = c0
 
         self.tensile_correction = tensile_correction
@@ -89,7 +87,7 @@ class MomentumEquation(Equation):
     def loop(self, d_idx, s_idx, d_rho, d_cs,
              d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ,
-             XIJ, HIJ, R2IJ, RHOIJ1,
+             XIJ, HIJ, R2IJ, RHOIJ1, EPS,
              DWIJ, DT_ADAPT, WIJ, WDP):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
@@ -104,7 +102,7 @@ class MomentumEquation(Equation):
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij)/(R2IJ + EPS)
 
             piij = -self.alpha*cij*muij + self.beta*muij*muij
             piij = piij*RHOIJ1

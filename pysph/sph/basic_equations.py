@@ -117,7 +117,7 @@ class ContinuityEquationWithDissipation(Equation):
         d_arho[d_idx] = 0.0
 
     def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho, 
-             DWIJ, VIJ, XIJ, RIJ, HIJ):
+             DWIJ, VIJ, XIJ, RIJ, HIJ, EPS):
 
         rhoi = d_rho[d_idx]
         rhoj = s_rho[s_idx]
@@ -128,7 +128,7 @@ class ContinuityEquationWithDissipation(Equation):
 
         # eta_{ij} \cdot \nabla W
         etadotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
-        etadotdwij /= (RIJ + 0.01*HIJ*HIJ)
+        etadotdwij /= (RIJ + EPS)
 
         # celerity (sound speed)
         #cij =  max( d_cs[d_idx], s_cs[s_idx] )
@@ -139,10 +139,9 @@ class ContinuityEquationWithDissipation(Equation):
         d_arho[d_idx] += rhoi*vijdotdwij*Vj + psi_ij*etadotdwij*Vj
 
 class MonaghanArtificialViscosity(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0, eta=0.1):
+    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
         self.alpha = alpha
         self.beta = beta
-        self.eta = eta
         super(MonaghanArtificialViscosity, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
@@ -151,7 +150,7 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
-             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, DWIJ, DT_ADAPT):
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ, DT_ADAPT):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
@@ -162,7 +161,7 @@ class MonaghanArtificialViscosity(Equation):
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij)/(R2IJ + EPS)
 
             piij = -self.alpha*cij*muij + self.beta*muij*muij
             piij = piij*RHOIJ1
