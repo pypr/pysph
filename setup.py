@@ -105,9 +105,9 @@ ext_modules = [
                extra_compile_args=extra_compile_args),
 
     # kernels used for tests
-    Extension( name="pysph.parallel._kernels",
-               sources=["pysph/parallel/_kernels.pyx"],
-               include_dirs = include_dirs,
+    Extension( name="pysph.base.c_kernels",
+               sources=["pysph/base/c_kernels.pyx"],
+               include_dirs=include_dirs,
                extra_compile_args=extra_compile_args),
 
     # Eigen decomposition code
@@ -163,10 +163,11 @@ if Have_MPI:
     ext_modules += zoltan_modules + parallel_modules
 
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
-    generator = path.join( path.abspath('.'), 'pyzoltan/core/generator.py' )
-    d = {'__file__': generator }
-    execfile(generator, d)
-    d['main'](None)
+    for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
+        generator = path.join( path.abspath('.'), path.join(pth, 'generator.py'))
+        d = {'__file__': generator }
+        execfile(generator, d)
+        d['main'](None)
 
 
 setup(name='PySPH',

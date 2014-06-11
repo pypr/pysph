@@ -79,9 +79,9 @@ class TestMiscUtils(TestBase):
         expect = dedent("""
         cdef class A:
             cdef public double x
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             def f(self, x):
                 x += 1
@@ -99,9 +99,9 @@ class TestCythonCodeGenerator(TestBase):
             cdef public double c
             cdef public list _hidden
             cdef public double rho
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
@@ -113,14 +113,54 @@ class TestCythonCodeGenerator(TestBase):
             cdef public double c
             cdef public list _hidden
             cdef public double rho
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double tmp
                 tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_python_methods(self):
+        cg = CythonGenerator(python_methods=True)
+        cg.parse(EqWithMethod())
+        expect = dedent("""
+        cdef class EqWithMethod:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef double tmp
+                tmp = abs(self.rho*self.c)*sin(pi*self.c)
+                d_x[d_idx] = d_x[d_idx]*tmp
+
+            cpdef py_func(self, long d_idx, double[:] d_x):
+                self.func(d_idx, &d_x[0])
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+        cg.parse(EqWithReturn())
+        expect = dedent("""
+        cdef class EqWithReturn:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline double func(self, long d_idx, double* d_x):
+                return d_x[d_idx]
+
+            cpdef double py_func(self, long d_idx, double[:] d_x):
+                return self.func(d_idx, &d_x[0])
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
@@ -132,9 +172,9 @@ class TestCythonCodeGenerator(TestBase):
             cdef public double c
             cdef public list _hidden
             cdef public double rho
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             cdef inline double func(self, long d_idx, double* d_x):
                 return d_x[d_idx]
@@ -146,9 +186,9 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithMatrix())
         expect = dedent("""
         cdef class EqWithMatrix:
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double mat[2][2]
@@ -163,9 +203,9 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithKnownTypes())
         expect = dedent("""
         cdef class EqWithKnownTypes:
-            def __init__(self, object obj):
-                for key in obj.__dict__:
-                    setattr(self, key, getattr(obj, key))
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
 
             cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
                 d_p[d_idx] = WIJ*DWIJ[0]

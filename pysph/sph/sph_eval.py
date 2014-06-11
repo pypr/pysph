@@ -143,7 +143,7 @@ class SPHEval(object):
         return 'cdef public %s kernel'%(self.kernel.__class__.__name__)
 
     def get_kernel_init(self):
-        return 'self.kernel = %s(kernel)'%(self.kernel.__class__.__name__)
+        return 'self.kernel = %s(**kernel.__dict__)'%(self.kernel.__class__.__name__)
 
     def get_variable_declarations(self):
         group = self.all_group

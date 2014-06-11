@@ -553,7 +553,7 @@ class Group(object):
     def get_equation_init(self):
         lines = []
         for i, equation in enumerate(self.equations):
-            code = 'self.{name} = {cls}(equations[{idx}])'\
+            code = 'self.{name} = {cls}(**equations[{idx}].__dict__)'\
                         .format(name=equation.var_name, cls=equation.name,
                                 idx=i)
             lines.append(code)
