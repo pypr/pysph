@@ -33,6 +33,7 @@ class IntegratorStep(object):
 # `EulerStep` class
 ###############################################################################
 class EulerStep(IntegratorStep):
+    """Fast but inaccurate integrator. Use this for testing"""
     def initialize(self):
         pass
     def predictor(self):
@@ -53,6 +54,18 @@ class EulerStep(IntegratorStep):
 # `WCSPHStep` class
 ###############################################################################
 class WCSPHStep(IntegratorStep):
+    """Standard Predictor Corrector integrator for the WCSPH formulation
+    
+    Use this integrator for WCSPH formulations. In the predictor step,
+    the particles are advanced to `t + dt/2`. The particles are then
+    advanced with the new force computed at this position.
+
+    This integrator can be used in PEC or EPEC mode.
+
+    The same integrator can be used for other problems. Like for
+    example solid mechanics (see SolidMechStep)
+
+    """
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho):
         d_x0[d_idx] = d_x[d_idx]
@@ -99,6 +112,7 @@ class WCSPHStep(IntegratorStep):
 # `SolidMechStep` class
 ###############################################################################
 class SolidMechStep(IntegratorStep):
+    """Predictor corrector Integrator for solid mechanics problems"""
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho,
                    d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
@@ -182,69 +196,134 @@ class SolidMechStep(IntegratorStep):
 # `TransportVelocityStep` class
 ###############################################################################
 class TransportVelocityStep(IntegratorStep):
+    """Integrator defined in 'A transport velocity formulation for
+    smoothed particle hydrodynamics', 2013, JCP, 241, pp 292--307
+
+    For a predictor-corrector style of integrator, this integrator
+    should operate only in PEC mode.
+    
+    """
     def initialize(self):
         pass
 
     def predictor(self, d_idx, d_u, d_v, d_au, d_av, d_uhat, d_auhat, d_vhat,
                   d_avhat, d_x, d_y, dt=0.0):
         dtb2 = 0.5*dt
+
+        # velocity update eqn (14)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
+
+        # advection velocity update eqn (15)
         d_uhat[d_idx] = d_u[d_idx] + dtb2*d_auhat[d_idx]
         d_vhat[d_idx] = d_v[d_idx] + dtb2*d_avhat[d_idx]
 
+        # position update eqn (16)
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
 
     def corrector(self, d_idx, d_u, d_v, d_au, d_av, d_vmag, dt=0.0):
         dtb2 = 0.5*dt
-        # Update velocities avoiding impulsive starts
+
+        # corrector update eqn (17)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
 
         # magnitude of velocity squared
         d_vmag[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
-
 
 ###############################################################################
 # `AdamiVerletStep` class
 ###############################################################################
 class AdamiVerletStep(IntegratorStep):
+    """Verlet time integration described in `A generalized wall
+    boundary condition for smoothed particle hydrodynamics` 2012, JCP,
+    231, pp 7057--7075
+
+    This integrator can operate in either PEC mode or in EPEC mode as
+    described in the paper.
+
+    """
     def initialize(self):
         pass
 
     def predictor(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, dt=0.0):
         dtb2 = 0.5*dt
+
+        # velocity predictor eqn (14)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
 
+        # position predictor eqn (15)
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
-
 
     def corrector(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, d_rho, d_arho,
                   d_vmag, dt=0.0):
         dtb2 = 0.5*dt
+
+        # velocity corrector eqn (18)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
 
-        # udpate positions
+        # position corrector eqn (17)
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
 
-        # update densities
+        # density corrector eqn (16)
         d_rho[d_idx] += dt * d_arho[d_idx]
 
         # magnitude of velocity squared
         d_vmag[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
 
-
 ###############################################################################
 # `Integrator` class
 ###############################################################################
 class Integrator(object):
+    r"""Generic class for Predictor Corrector integrators in PySPH
 
-    def __init__(self, **kw):
+    Predictor corrector integrators can have two modes of
+    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`. 
+
+    In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
+    using:
+
+    .. math::
+    
+        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
+    
+        F(y^{n+\frac{1}{2}}) --> Evaluate
+
+        y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
+
+    While, in the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the
+    system is advanced using:
+
+    .. math::
+    
+        F(y^n) --> Evaluate
+    
+        y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
+
+        F(y^{n+\frac{1}{2}}) --> Evaluate
+
+        y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
+
+    Notes:
+    
+    The Evaluate stage of the integrator forces a function
+    evaluation. Therefore, the PEC mode is much faster but relies on
+    old accelertions for the Prediction stage.
+
+    In the EPEC mode, the final corrector can be modified to:
+
+    :math:`$y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)$`
+
+    This would require additional storage for the accelerations.
+
+    """
+
+    def __init__(self, epec=False, **kw):
         """Pass fluid names and suitable `IntegratorStep` instances.
 
         For example::
@@ -253,6 +332,8 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
+        self.epec = epec
+
         for array_name, integrator_step in kw.iteritems():
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
@@ -395,3 +476,4 @@ class Integrator(object):
 
     def set_integrator(self, integrator):
         self.integrator = integrator
+        self.integrator.set_predictor_corrector_mode(self.epec)

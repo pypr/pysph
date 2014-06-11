@@ -162,6 +162,8 @@ def precomputed_symbols():
     """
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
+    
+    c.EPS = BasicCodeBlock(code="EPS = 0.01*HIJ*HIJ", EPS=0.0)
 
     c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])",
                              RHOIJ=0.0)

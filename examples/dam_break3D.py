@@ -112,10 +112,15 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=dim)
 
-# Create the integrator.
+# Setup the integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
 integrator = Integrator(fluid=WCSPHStep(),
                         boundary=WCSPHStep(),
-                        obstacle=WCSPHStep())
+                        obstacle=WCSPHStep(),
+                        epec=True)
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt, 

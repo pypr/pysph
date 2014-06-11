@@ -51,9 +51,13 @@ app = Application()
 # Specify the kernel
 kernel = CubicSpline(dim=3)
 
-# Setup the integrator
+# Setup the integrator. Currently, PySPH supports Predictor Corrector
+# style integrators which can be operated in two modes
+# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
+# (EPEC). The default faster mode is PEC which requies one less force
+# evaluation per iteration.
 integrator = Integrator(
-    fluid=WCSPHStep(),boundary=WCSPHStep())
+    fluid=WCSPHStep(),boundary=WCSPHStep(), epec=True)
 
 # Create a solver. damping time is taken as 0.1% of the final time
 solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
