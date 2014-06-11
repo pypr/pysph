@@ -224,7 +224,7 @@ class MomentumEquationDeltaSPH(Equation):
         piij = self.alpha * HIJ * self.c0 * self.rho0 * vijdotxij/(R2IJ + EPS)
 
         # gradient and viscous terms eqn 5b in REF1
-        tmp = -Vj/d_rho[d_idx] * (pi + pj) + pij * Vj/d_rho[d_idx]
+        tmp = -Vj/d_rho[d_idx] * (pi + pj) + piij * Vj/d_rho[d_idx]
 
         # accelerations
         d_au[d_idx] += tmp * DWIJ[0]
