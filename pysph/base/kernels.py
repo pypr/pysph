@@ -1,4 +1,3 @@
-from textwrap import dedent
 from math import pi, sqrt, exp
 
 M_1_PI = 1.0/pi
@@ -7,6 +6,15 @@ M_2_SQRTPI = 2.0/sqrt(pi)
 def get_correction(kernel, h0):
     rij = kernel.deltap * h0
     return kernel.kernel(rij=rij, h=h0)
+
+def get_compiled_kernel(kernel):
+    """Given a kernel, return a high performance wrapper kernel.
+    """
+    import c_kernels
+    cls = getattr(c_kernels, kernel.__class__.__name__)
+    wrapper = getattr(c_kernels, kernel.__class__.__name__ + 'Wrapper')
+    kern = cls(**kernel.__dict__)
+    return wrapper(kern)
 
 ###############################################################################
 # `CubicSpline` class.
@@ -72,12 +80,6 @@ class CubicSpline(object):
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
 
-    def cython_code(self):
-        code = dedent('''
-        from libc.math cimport M_1_PI
-        ''')
-        return dict(helper=code)
-
 
 class WendlandQuintic(object):
     def __init__(self, dim=2):
@@ -139,11 +141,6 @@ class WendlandQuintic(object):
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
 
-    def cython_code(self):
-        code = dedent('''
-        from libc.math cimport M_1_PI
-        ''')
-        return dict(helper=code)
 
 class Gaussian(object):
     def __init__(self, dim=2):
@@ -188,11 +185,6 @@ class Gaussian(object):
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
 
-    def cython_code(self):
-        code = dedent('''
-        from libc.math cimport exp, M_2_SQRTPI
-        ''')
-        return dict(helper=code)
 
 class QuinticSpline(object):
     def __init__(self, dim=2):
@@ -260,9 +252,3 @@ class QuinticSpline(object):
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
-
-    def cython_code(self):
-        code = dedent('''
-        from libc.math cimport M_1_PI
-        ''')
-        return dict(helper=code)
