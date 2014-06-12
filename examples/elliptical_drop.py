@@ -18,7 +18,7 @@ from time import time
 
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_wcsph
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import CubicSpline, Gaussian
 from pyzoltan.core.carray import LongArray
 
 # PySPH solver and integrator
@@ -28,9 +28,9 @@ from pysph.sph.integrator import WCSPHStep, Integrator
 
 # PySPH sph imports
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import XSPHCorrection
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
 from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari, \
-    ContinuityEquationDeltaSPH
+    ContinuityEquationDeltaSPH, MomentumEquationDeltaSPH
 
 def exact_solution(tf=0.0075, dt=1e-4):
     """Exact solution for the locus of the circular patch."""
@@ -104,8 +104,10 @@ def get_circular_patch(dx=0.025, **kwargs):
 # Create the application.
 app = Application()
 
-# Set the SPH kernel
-kernel = CubicSpline(dim=2)
+# Set the SPH kernel. The spline based kernels are much more efficient
+#(but less accurate) than the Gaussian
+kernel = CubicSpline(dim=2) 
+#kernel = Gaussian(dim=2)
 
 # Create the Integrator. Currently, PySPH supports Predictor Corrector
 # style integrators which can be operated in two modes
@@ -119,7 +121,7 @@ integrator = Integrator(
 dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True,
-                cfl=0.1, tdamp=tf/1000.0)
+                cfl=0.05, tdamp=tf/1000.0)
 
 # select True if you want to dump out remote particle properties in
 # parallel runs. This can be over-ridden with the --output-remote
@@ -134,25 +136,27 @@ equations = [
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
             ], real=False ),
 
-    # Block for the accelerations
+    # Block for the accelerations. Choose between either the Delta-SPH
+    # formulation or the standard Monaghan 1994 formulation
     Group( equations=[
     
             # Density rate: drho/dt with dissipative penalization
-            ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',],
-                                       delta=0.1, c0=co),
+            #ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',], delta=0.1, c0=co),
+            ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
             # Acceleration: du,v/dt
-            MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=0.0),
+            #MomentumEquationDeltaSPH(dest='fluid', sources=['fluid'], alpha=0.2, rho0=ro, c0=co),
+            MomentumEquation(dest='fluid', sources=['fluid'], alpha=0.2, beta=0.0),
 
             # XSPH velocity correction
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
             ]),
 
-    # Update smoothing lengths at the end
+    # Update smoothing lengths at the end.
     Group( equations=[
             
-            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=1.2),
+            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=hdx),
             ], real=True ),
             
 
