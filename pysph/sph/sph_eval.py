@@ -23,11 +23,22 @@ def group_equations(equations):
 
 ###############################################################################
 def get_code(obj):
+    """This function looks at the object and gets any additional code to
+    wrap from either the `_cython_code_` method or the `_get_helpers_` method.
+    """
+    result = []
     if hasattr(obj, '_cython_code_'):
         code = obj._cython_code_()
         doc = '# From %s'%obj.__class__.__name__
-        return [doc, code] if len(code) > 0 else []
-    return []
+        result.extend([doc, code] if len(code) > 0 else [])
+    if hasattr(obj, '_get_helpers_'):
+        cg = CythonGenerator()
+        doc = '# From %s'%obj.__class__.__name__
+        result.append(doc)
+        for helper in obj._get_helpers_():
+            cg.parse(helper)
+            result.append(cg.get_code())
+    return result
 
 ###############################################################################
 def get_array_names(particle_arrays):

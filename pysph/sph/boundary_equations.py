@@ -1,5 +1,13 @@
 from pysph.sph.equation import Equation
-from textwrap import dedent
+
+def wendland_quintic(rij=1.0, h=1.0):
+    q = rij/h
+    q1 = 2.0 - q
+    if q < 2.0:
+        val = (1 + 2.5*q + 2*q*q)*q1*q1*q1*q1*q1
+
+    return val
+
 
 class MonaghanBoundaryForce(Equation):
     def __init__(self, dest, sources=None, deltap=-1):
@@ -75,18 +83,8 @@ class MonaghanKajtarBoundaryForce(Equation):
 
         super(MonaghanKajtarBoundaryForce,self).__init__(dest,sources)
 
-    def _cython_code_(self):
-        code = dedent("""
-cdef double wendland_quintic(double rij, double h):
-    cdef double q = rij/h
-    cdef double q1 = 2.0 - q
-    cdef double val = 0.0
-    if q < 2.0:
-        val = (1 + 2.5*q + 2*q*q)*q1*q1*q1*q1*q1
-
-    return val
-        """)
-        return code
+    def _get_helpers_(self):
+        return [wendland_quintic]
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_au, d_av, d_aw, RIJ, R2IJ, XIJ):
 
