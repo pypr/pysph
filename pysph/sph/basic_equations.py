@@ -43,7 +43,7 @@ class VelocityGradient2D(Equation):
     The expression for the velocity gradient is:
 
     :math:`\frac{\partial v^i}{\partial x^j} = \sum_{b}\frac{m_b}{\rho_b}(v_b
-    - v_a)\frac{\partial W_{ab}}{\partial x_a^j}$`
+    - v_a)\frac{\partial W_{ab}}{\partial x_a^j}`
 
     The tensor properties are stored in the variables v_ij where 'i'
     refers to the velocity component and 'j' refers to the spatial
@@ -137,7 +137,7 @@ class XSPHCorrection(Equation):
     """Position stepping with XSPH correction
     
     This equation must be used to advect the particles. XSPH can be
-    turned off by setting the parameter :math:`$\eps = 0`.
+    turned off by setting the parameter :math:`\eps = 0`.
 
     """
     def __init__(self, dest, sources=None, eps=0.5):
