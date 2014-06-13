@@ -22,13 +22,23 @@ def group_equations(equations):
         return equations
 
 ###############################################################################
-def get_code(obj, key):
-    if hasattr(obj, 'cython_code'):
-        code = obj.cython_code()
+def get_code(obj):
+    """This function looks at the object and gets any additional code to
+    wrap from either the `_cython_code_` method or the `_get_helpers_` method.
+    """
+    result = []
+    if hasattr(obj, '_cython_code_'):
+        code = obj._cython_code_()
         doc = '# From %s'%obj.__class__.__name__
-        src = code.get(key, '')
-        return [doc, src] if len(src) > 0 else []
-    return []
+        result.extend([doc, code] if len(code) > 0 else [])
+    if hasattr(obj, '_get_helpers_'):
+        cg = CythonGenerator()
+        doc = '# From %s'%obj.__class__.__name__
+        result.append(doc)
+        for helper in obj._get_helpers_():
+            cg.parse(helper)
+            result.append(cg.get_code())
+    return result
 
 ###############################################################################
 def get_array_names(particle_arrays):
@@ -46,11 +56,10 @@ def get_array_names(particle_arrays):
 # `SPHEval` class.
 ###############################################################################
 class SPHEval(object):
-    def __init__(self, particle_arrays, equations, locator, kernel,
+    def __init__(self, particle_arrays, equations, kernel,
                  integrator, cell_iteration=False):
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
-        self.locator = locator
         self.kernel = kernel
         self.nnps = None
         self.integrator = integrator
@@ -111,14 +120,11 @@ class SPHEval(object):
     ##########################################################################
     def get_helpers(self):
         helpers = []
-        helpers.extend(get_code(self.kernel, 'helper'))
-
-        if self.locator is not None:
-            helpers.extend(get_code(self.locator, 'helper'))
+        helpers.extend(get_code(self.kernel))
 
         # get helpers from the Equations
         for equation in self.all_group.equations:
-            helpers.extend(get_code(equation, 'helper'))
+            helpers.extend(get_code(equation))
 
         # Kernel wrappers.
         cg = CythonGenerator()
@@ -173,24 +179,16 @@ class SPHEval(object):
                  for n in src_arrays]
         return '\n'.join(lines)
 
-    def get_locator_code(self, src_name, dest_name):
-        locator_name = self.locator.__class__.__name__
-        return 'locator = %s(self.%s, self.%s)'%(locator_name, src_name, dest_name)
-
     def get_code(self):
         helpers = self.get_helpers()
         array_names =  get_array_names(self.particle_arrays)
         parrays = [pa.name for pa in self.particle_arrays]
         pa_names = ', '.join(parrays)
-        if self.locator is None:
-            locator = ''
-        else:
-            locator = '\n'.join(get_code(self.locator, 'code'))
         path = join(dirname(__file__), 'sph_eval.mako')
         template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names,
-                               pa_names=pa_names, locator=locator,
-                               object=self, integrator=self.integrator)
+                               pa_names=pa_names, object=self,
+                               integrator=self.integrator)
 
     def set_nnps(self, nnps):
         if self.calc is None:

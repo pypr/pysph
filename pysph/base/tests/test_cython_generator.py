@@ -36,6 +36,14 @@ class EqWithMatrix:
         vec = declare('matrix((3,))')
         vec[0] = d_x[d_idx]
 
+def func_with_return(d_idx, d_x, x=0.0):
+    x += 1
+    return d_x[d_idx] + x
+
+def simple_func(d_idx, d_x, x=0.0):
+    d_x[d_idx] += x
+
+
 class TestBase(unittest.TestCase):
     def assert_code_equal(self, result, expect):
         expect = expect.strip()
@@ -164,6 +172,18 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
+        cg.parse(func_with_return)
+        expect = dedent("""
+        cdef inline double func_with_return(long d_idx, double* d_x, double x):
+            x += 1
+            return d_x[d_idx] + x
+
+        cpdef double py_func_with_return(long d_idx, double[:] d_x, double x):
+            return func_with_return(d_idx, &d_x[0], x)
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+
     def test_method_with_return(self):
         cg = CythonGenerator()
         cg.parse(EqWithReturn())
@@ -209,6 +229,23 @@ class TestCythonCodeGenerator(TestBase):
 
             cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
                 d_p[d_idx] = WIJ*DWIJ[0]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_wrap_function(self):
+        cg = CythonGenerator()
+        cg.parse(func_with_return)
+        expect = dedent("""
+        cdef inline double func_with_return(long d_idx, double* d_x, double x):
+            x += 1
+            return d_x[d_idx] + x
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+        cg.parse(simple_func)
+        expect = dedent("""
+        cdef inline void simple_func(long d_idx, double* d_x, double x):
+            d_x[d_idx] += x
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 

@@ -8,14 +8,14 @@ class MonaghanArtificialStress(Equation):
         self.eps = eps
         super(MonaghanArtificialStress, self).__init__(dest, sources)
 
-    def cython_code(self):
+    def _cython_code_(self):
         code = dedent("""
         cimport cython
         from pysph.sph.solid_mech.linalg cimport get_eigenvalvec
         from pysph.sph.solid_mech.linalg cimport transform2inv
         from pysph.base.point cimport cPoint
         """)
-        return dict(helper=code)
+        return code
 
     def loop(self, d_idx, d_rho, d_p,
              d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
@@ -104,12 +104,6 @@ class MomentumEquationWithStress2D(Equation):
         if wdeltap < 0:
             self.with_correction = False
         super(MomentumEquationWithStress2D, self).__init__(dest, sources)
-
-    def cython_code(self):
-        code = dedent("""
-        from libc.math cimport pow
-        """)
-        return dict(helper=code)
 
     def initialize(self, d_idx, d_au, d_av):
         d_au[d_idx] = 0.0
