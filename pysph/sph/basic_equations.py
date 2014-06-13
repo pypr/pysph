@@ -5,7 +5,7 @@ from pysph.sph.equation import Equation
 class SummationDensity(Equation):
     r"""Good old Summation density:
 
-    :math:`\rho_a = \sum_b m_b W_{ab}$`
+    :math:`\rho_a = \sum_b m_b W_{ab}`
 
     """
     def initialize(self, d_idx, d_rho):
@@ -17,7 +17,7 @@ class SummationDensity(Equation):
 class BodyForce(Equation):
     r"""Add a body force to the particles:
 
-    :math:`\boldsymbol{f} = f_x, f_y, f_z$`
+    :math:`\boldsymbol{f} = f_x, f_y, f_z`
     
     """
     def __init__(self, dest, sources,
@@ -49,7 +49,7 @@ class VelocityGradient2D(Equation):
     refers to the velocity component and 'j' refers to the spatial
     component. Thus v_21 is
 
-    :math:`\frac{\partial w}{\partial y}$`
+    :math:`\frac{\partial w}{\partial y}`
 
     """
     def initialize(self, d_idx, d_v00, d_v01, d_v10, d_v11):
@@ -73,7 +73,7 @@ class VelocityGradient2D(Equation):
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
-    :math:`p = c_0^2(\rho_0 - rho)$`
+    :math:`p = c_0^2(\rho_0 - rho)`
 
     """
     def __init__(self, dest, sources=None,
@@ -90,7 +90,7 @@ class ContinuityEquation(Equation):
     r"""Density rate:
 
     :math:`\frac{d\rho_a}{dt} = \sum_b m_b \boldsymbol{v}_{ab}\cdot
-    \nabla_a W_{ab} $`
+    \nabla_a W_{ab} `
 
     """
     def initialize(self, d_idx, d_arho):
@@ -137,7 +137,7 @@ class XSPHCorrection(Equation):
     """Position stepping with XSPH correction
     
     This equation must be used to advect the particles. XSPH can be
-    turned off by setting the parameter :math:`$\eps = 0$`.
+    turned off by setting the parameter :math:`$\eps = 0`.
 
     """
     def __init__(self, dest, sources=None, eps=0.5):
