@@ -7,6 +7,7 @@ ${' '*4*level}${l}
 </%def>
 
 from libc.math cimport *
+from libc.math cimport M_PI as pi
 cimport numpy
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
@@ -255,7 +256,7 @@ cdef class Integrator:
         """
         self.dt = dt
         self.initialize()
-        
+
         # In EPEC mode, an Evaluate is called before Predict. Since
         # the particles have moved since the last corrector step, the
         # NNPS data structures need to be updated as well.
@@ -264,7 +265,7 @@ cdef class Integrator:
             # update NNPS since particles have moved
             if self.parallel_manager:
                 self.parallel_manager.update()
-            self.nnps.update() 
+            self.nnps.update()
 
             # Evaluate
             self.sph_calc.compute(t, dt)

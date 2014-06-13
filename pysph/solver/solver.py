@@ -177,7 +177,7 @@ class Solver(object):
         if kernel is not None:
             self.kernel = kernel
 
-        self.sph_eval = SPHEval(particles, equations, None, self.kernel,
+        self.sph_eval = SPHEval(particles, equations, self.kernel,
                                 self.integrator,
                                 cell_iteration=self.cell_iteration)
         self.sph_eval.set_nnps(nnps)
@@ -324,7 +324,7 @@ class Solver(object):
 
         # set the time for the integrator
         #self.integrator.time = self.t
-        
+
         # initial solution damping time
         tdamp = self.tdamp
 
@@ -423,7 +423,7 @@ class Solver(object):
                    particle properties as value.
 
          Example:
-         
+
          You can load the data output by PySPH like so:
 
          >>> from pysph.solver.utils import load
@@ -434,7 +434,7 @@ class Solver(object):
          >>> ...
 
          In the above example, it is assumed that the output file
-         contained an array named fluid. 
+         contained an array named fluid.
 
         """
         if self.disable_output:
@@ -450,7 +450,7 @@ class Solver(object):
         for array in self.particles:
             output_data["arrays"][array.name] = array.get_property_arrays(
                 all=self.detailed_output, only_real=self.output_only_real)
-        
+
         # Add the solver data
         output_data["solver_data"]["dt"] = self.dt
         output_data["solver_data"]["t"] = self.t

@@ -9,6 +9,7 @@ import inspect
 import logging
 from mako.template import Template
 from textwrap import dedent
+import types
 
 from ast_utils import get_assigned, has_return
 
@@ -84,22 +85,16 @@ class CythonGenerator(object):
         self.code = ''
         self.python_methods = python_methods
         # Methods to not wrap.
-        self.ignore_methods = ['cython_code']
+        self.ignore_methods = ['_cython_code_']
         self.known_types = known_types if known_types is not None else {}
 
     ##### Public protocol #####################################################
 
-    def parse(self, obj):
-        cls = obj.__class__
-        name = cls.__name__
-        public_vars = self._get_public_vars(obj)
-        methods = self._get_methods(cls)
-        helper = CythonClassHelper(name=name, public_vars=public_vars,
-                                   methods=methods)
-        self.code = helper.generate()
-
-    def get_code(self):
-        return self.code
+    def ctype_to_python(self, type_str):
+        """Given a c-style type declaration obtained from the `detect_type`
+        method, return a Python friendly type declaration.
+        """
+        return type_str.replace('*', '[:]')
 
     def detect_type(self, name, value):
         """Given the variable name and value, detect its type.
@@ -128,92 +123,19 @@ class CythonGenerator(object):
         else:
             return 'object'
 
-    def ctype_to_python(self, type_str):
-        """Given a c-style type declaration obtained from the `detect_type`
-        method, return a Python friendly type declaration.
-        """
-        return type_str.replace('*', '[:]')
+    def get_code(self):
+        return self.code
 
+    def parse(self, obj):
+        obj_type = type(obj)
+        if obj_type is types.FunctionType:
+            self._parse_function(obj)
+        elif hasattr(obj, '__class__'):
+            self._parse_instance(obj)
+        else:
+            raise TypeError('Unsupport type to wrap: %s'%obj_type)
 
     ###### Private protocol ###################################################
-
-    def _get_public_vars(self, obj):
-        # For now get it all from the dict.
-        data = obj.__dict__
-        vars = dict((name, self.detect_type(name, data[name]))
-                        for name in sorted(data.keys()))
-        return vars
-
-    def _get_methods(self, cls):
-        methods = []
-        for name in dir(cls):
-            if name.startswith('_'):
-                continue
-            meth = getattr(cls, name)
-            if callable(meth):
-                if name in self.ignore_methods:
-                    continue
-
-                sourcelines = inspect.getsourcelines(meth)[0]
-                defn, lines = get_func_definition(sourcelines)
-                m_name, returns, args = self._analyze_method(meth, lines)
-                c_defn = self._get_c_method_spec(m_name, returns, args)
-                c_body = self._get_method_body(meth, lines)
-                methods.append((c_defn, c_body))
-                if self.python_methods:
-                    defn, body = self._get_py_method_spec(m_name, returns,
-                                                          args)
-                    methods.append((defn, body))
-        return methods
-
-    def _handle_declare_statement(self, name, declare):
-        def matrix(size):
-            sz = ''.join(['[%d]'%n for n in size])
-            return sz
-
-        # Remove the "declare('" and the trailing "')".
-        code = declare[9:-2]
-        if code.startswith('matrix'):
-            sz = matrix(eval(code[7:-1]))
-            defn = 'cdef double %s%s'%(name, sz)
-            return defn
-        elif code.startswith('cPoint'):
-            defn = 'cdef cPoint %s'%name
-            return defn
-        else:
-            raise RuntimeError('Unknown declaration %s'%declare)
-
-    def _process_body_line(self, line):
-        """Returns the name defined and the processed line itself.
-
-        This hack primarily lets us declare variables from Python and inject
-        them into Cython code.
-        """
-        if '=' in line:
-            words = [x.strip() for x in line.split('=')]
-            if words[1].startswith('declare'):
-                name = words[0]
-                declare = words[1]
-                defn = self._handle_declare_statement(name, declare)
-                indent = line[:line.index(name)]
-                return name, indent + defn + '\n'
-            else:
-                return '', line
-        else:
-            return '', line
-
-    def _get_method_body(self, meth, lines):
-        args = set(inspect.getargspec(meth).args)
-        src = [self._process_body_line(line) for line in lines]
-        declared = [x[0] for x in src if len(x[0]) > 0]
-        cython_body = ''.join([x[1] for x in src])
-        body = ''.join(lines)
-        dedented_body = dedent(body)
-        symbols = get_assigned(dedented_body)
-        undefined = symbols - set(declared) - args
-        declare = [' '*8 +'cdef double %s\n'%x for x in undefined]
-        code = ''.join(declare) + cython_body
-        return code
 
     def _analyze_method(self, meth, lines):
         """Returns information about the method.
@@ -226,8 +148,10 @@ class CythonGenerator(object):
         returns = has_return(dedent(body))
         argspec = inspect.getargspec(meth)
         args = argspec.args
+        is_method = False
         if args and args[0] == 'self':
             args = args[1:]
+            is_method = True
         defaults = argspec.defaults if argspec.defaults is not None else []
 
         # The call_args dict is filled up with the defaults to detect
@@ -244,7 +168,7 @@ class CythonGenerator(object):
         # Make sure any predefined quantities are suitably typed.
         call_args.update(self.known_types)
 
-        new_args = [('self', None)]
+        new_args = [('self', None)] if is_method else []
         for arg in args:
             value = call_args[arg]
             new_args.append((arg, value))
@@ -270,12 +194,65 @@ class CythonGenerator(object):
 
         return cdefn
 
-    def _get_py_method_spec(self, name, returns, args):
+    def _get_methods(self, cls):
+        methods = []
+        for name in dir(cls):
+            if name.startswith('_'):
+                continue
+            meth = getattr(cls, name)
+            if callable(meth):
+                if name in self.ignore_methods:
+                    continue
+
+                c_code, py_code = self._get_method_wrapper(meth, indent=' '*8)
+                methods.append(c_code)
+                if self.python_methods:
+                    methods.append(py_code)
+
+        return methods
+
+    def _get_method_body(self, meth, lines, indent=' '*8):
+        args = set(inspect.getargspec(meth).args)
+        src = [self._process_body_line(line) for line in lines]
+        declared = [x[0] for x in src if len(x[0]) > 0]
+        cython_body = ''.join([x[1] for x in src])
+        body = ''.join(lines)
+        dedented_body = dedent(body)
+        symbols = get_assigned(dedented_body)
+        undefined = symbols - set(declared) - args
+        declare = [indent +'cdef double %s\n'%x for x in undefined]
+        code = ''.join(declare) + cython_body
+        return code
+
+    def _get_method_wrapper(self, meth, indent=' '*8):
+        sourcelines = inspect.getsourcelines(meth)[0]
+        defn, lines = get_func_definition(sourcelines)
+        m_name, returns, args = self._analyze_method(meth, lines)
+        c_defn = self._get_c_method_spec(m_name, returns, args)
+        c_body = self._get_method_body(meth, lines, indent=indent)
+        self.code = '{defn}\n{body}'.format(defn=c_defn, body=c_body)
+        if self.python_methods:
+            defn, body = self._get_py_method_spec(m_name, returns, args,
+                                                  indent=indent)
+        else:
+            defn, body = None, None
+        return (c_defn, c_body), (defn, body)
+
+    def _get_public_vars(self, obj):
+        # For now get it all from the dict.
+        data = obj.__dict__
+        vars = dict((name, self.detect_type(name, data[name]))
+                        for name in sorted(data.keys()))
+        return vars
+
+    def _get_py_method_spec(self, name, returns, args, indent=' '*8):
         """Returns a Python friendly definition for the method along with the
         wrapper function.
         """
         py_args = []
+        is_method = False
         if args and args[0][0] == 'self':
+            is_method = True
             args = args[1:]
             py_args.append('self')
 
@@ -295,7 +272,61 @@ class CythonGenerator(object):
                      .format(ret=py_ret, name=name, arg_def=py_arg_def)
         call = ', '.join(call_sig)
         py_ret = 'return ' if returns else ''
-        body = ' '*8 + '{ret}self.{name}({call})'\
-                    .format(name=name, call=call, ret=py_ret)
+        py_self = 'self.' if is_method else ''
+        body = indent + '{ret}{self}{name}({call})'\
+                    .format(name=name, call=call, ret=py_ret, self=py_self)
 
         return pydefn, body
+
+    def _handle_declare_statement(self, name, declare):
+        def matrix(size):
+            sz = ''.join(['[%d]'%n for n in size])
+            return sz
+
+        # Remove the "declare('" and the trailing "')".
+        code = declare[9:-2]
+        if code.startswith('matrix'):
+            sz = matrix(eval(code[7:-1]))
+            defn = 'cdef double %s%s'%(name, sz)
+            return defn
+        elif code.startswith('cPoint'):
+            defn = 'cdef cPoint %s'%name
+            return defn
+        else:
+            raise RuntimeError('Unknown declaration %s'%declare)
+
+    def _parse_function(self, obj):
+        c_code, py_code = self._get_method_wrapper(obj, indent=' '*4)
+        code = '{defn}\n{body}'.format(defn=c_code[0], body=c_code[1])
+        if self.python_methods:
+            code += '\n'
+            code += '{defn}\n{body}'.format(defn=py_code[0], body=py_code[1])
+        self.code = code
+
+    def _parse_instance(self, obj):
+        cls = obj.__class__
+        name = cls.__name__
+        public_vars = self._get_public_vars(obj)
+        methods = self._get_methods(cls)
+        helper = CythonClassHelper(name=name, public_vars=public_vars,
+                                   methods=methods)
+        self.code = helper.generate()
+
+    def _process_body_line(self, line):
+        """Returns the name defined and the processed line itself.
+
+        This hack primarily lets us declare variables from Python and inject
+        them into Cython code.
+        """
+        if '=' in line:
+            words = [x.strip() for x in line.split('=')]
+            if words[1].startswith('declare'):
+                name = words[0]
+                declare = words[1]
+                defn = self._handle_declare_statement(name, declare)
+                indent = line[:line.index(name)]
+                return name, indent + defn + '\n'
+            else:
+                return '', line
+        else:
+            return '', line
