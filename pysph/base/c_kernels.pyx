@@ -35,7 +35,7 @@ cdef class CubicSpline:
             fac = 2./3 * h1
 
         # compute the gradient
-        if (rij > 1e-8):
+        if (rij > 1e-12):
             if (q >= 2.0):
                 val = 0.0
             elif ( q >= 1.0 ):
