@@ -6,6 +6,7 @@ import numpy as np
 cdef class CubicSpline:
     cdef public long dim
     cdef public double radius_scale
+    cdef public double fac
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
@@ -25,16 +26,13 @@ cdef class CubicSpline:
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
-        elif self.dim == 2:
-            fac = 10*M_1_PI/7.0 * h1 * h1
-
-        else:
-            fac = 2./3 * h1
-
-        # compute the gradient
+        # compute the gradient.
         if (rij > 1e-12):
             if (q >= 2.0):
                 val = 0.0
@@ -61,14 +59,11 @@ cdef class CubicSpline:
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1
-
-        elif self.dim == 2:
-            fac = 10*M_1_PI/7.0 * h1 * h1
-
-        else:
-            fac = 2./3 * h1
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         if ( q >= 2.0 ):
             val = 0.0
@@ -92,10 +87,12 @@ cdef class CubicSplineWrapper:
     cdef public CubicSpline kern
     cdef double[3] xij, grad
     cdef public double radius_scale
+    cdef public double fac
 
     def __init__(self, kern):
         self.kern = kern
         self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
 
     cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
         cdef double* xij = self.xij
@@ -119,6 +116,7 @@ cdef class CubicSplineWrapper:
 cdef class WendlandQuintic:
     cdef public long dim
     cdef public double radius_scale
+    cdef public double fac
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
@@ -137,15 +135,10 @@ cdef class WendlandQuintic:
         cdef double fac
         h1 = 1./h
         q = rij*h1
-
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
-
-        elif self.dim == 2:
-            fac = 7.0*M_1_PI/4.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        
+        fac = self.fac * h1 * h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient
         if (rij > 1e-12):
@@ -172,15 +165,10 @@ cdef class WendlandQuintic:
         cdef double val
         h1 = 1.0/h
         q = rij*h1
-
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
-
-        elif self.dim == 2:
-            fac = 7.0*M_1_PI/4.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        
+        fac = self.fac * h1 * h1
+        if self.dim > 2:
+            fac *= h1
 
         if ( q >= 2.0 ):
             val = 0.0
@@ -201,10 +189,12 @@ cdef class WendlandQuinticWrapper:
     cdef public WendlandQuintic kern
     cdef double[3] xij, grad
     cdef public double radius_scale
+    cdef public double fac
 
     def __init__(self, kern):
         self.kern = kern
         self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
 
     cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
         cdef double* xij = self.xij
@@ -328,6 +318,7 @@ cdef class GaussianWrapper:
 cdef class QuinticSpline:
     cdef public long dim
     cdef public double radius_scale
+    cdef public double fac
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
@@ -347,11 +338,7 @@ cdef class QuinticSpline:
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 2:
-            fac = M_1_PI * 7./478.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        fac = self.fac * h1 * h1
 
         # compute the gradient
         if (rij > 1e-12):
@@ -386,11 +373,7 @@ cdef class QuinticSpline:
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 2:
-            fac = M_1_PI * 7./478.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        fac = self.fac * h1 * h1
 
         if ( q > 3.0 ):
             val = 0.0
@@ -417,10 +400,12 @@ cdef class QuinticSplineWrapper:
     cdef public QuinticSpline kern
     cdef double[3] xij, grad
     cdef public double radius_scale
+    cdef public double fac
 
     def __init__(self, kern):
         self.kern = kern
         self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
 
     cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
         cdef double* xij = self.xij

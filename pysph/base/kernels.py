@@ -1,7 +1,6 @@
 from math import pi, sqrt, exp
 
 M_1_PI = 1.0/pi
-M_1_SQRTPI = 1./sqrt(pi)
 M_2_SQRTPI = 2.0/sqrt(pi)
 
 def get_correction(kernel, h0):
@@ -25,6 +24,13 @@ class CubicSpline(object):
         self.radius_scale = 2.0
         self.dim = dim
 
+        if dim == 3:
+            self.fac = M_1_PI
+        elif dim == 2:
+            self.fac = 10*M_1_PI/7.0
+        else:
+            self.fac = 2.0/3.0
+
     def get_deltap(self):
         return 2./3
 
@@ -32,14 +38,11 @@ class CubicSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1
-
-        elif self.dim == 2:
-            fac = 10*M_1_PI/7.0 * h1 * h1
-
-        else:
-            fac = 2./3 * h1
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         if ( q >= 2.0 ):
             val = 0.0
@@ -56,14 +59,11 @@ class CubicSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1
-
-        elif self.dim == 2:
-            fac = 10*M_1_PI/7.0 * h1 * h1
-
-        else:
-            fac = 2./3 * h1
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient.
         if (rij > 1e-12):
@@ -89,70 +89,61 @@ class WendlandQuintic(object):
             raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
         self.dim = dim
 
+        if dim == 3:
+            self.fac = M_1_PI * 21.0/16.0
+        if dim == 2:
+            self.fac = 7.0 * M_1_PI/4.0
+
     def get_deltap(self):
         return 0.5
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0/h
         q = rij*h1
+        
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
-
-        elif self.dim == 2:
-            fac = 7.0*M_1_PI/4.0 * h1 * h1
-
-        else:
-            fac = 0.0
-
-        if ( q >= 2.0 ):
-            val = 0.0
-
-        else:
+        val = 0.0
+        if ( q <= 2.0 ):
             val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2*q + 1)
 
         return val * fac
 
-
     def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1./h
         q = rij*h1
-
-        if self.dim == 3:
-            fac = M_1_PI * h1 * h1 * h1 * 21.0/16.0
-
-        elif self.dim == 2:
-            fac = 7.0*M_1_PI/4.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient
-        if (rij > 1e-12):
-            if (q >= 2.0):
-                val = 0.0
-            else:
+        val = 0.0
+        if ( q <= 2.0 ):
+            if (rij > 1e-12):
                 val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
-
-        else:
-            val = 0.0
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
 
-
 class Gaussian(object):
     def __init__(self, dim=2):
         self.radius_scale = 3.0
         self.dim = dim
 
-        self.fac = M_1_SQRTPI
+        self.fac = 0.5*M_2_SQRTPI
         if dim > 1:
-            self.fac *= M_1_SQRTPI
+            self.fac *= 0.5*M_2_SQRTPI
         if dim > 2:
-            self.fac *= M_1_SQRTPI
+            self.fac *= 0.5*M_2_SQRTPI
 
     def get_deltap(self):
         return 2.2360679774997898
@@ -201,6 +192,8 @@ class QuinticSpline(object):
             raise NotImplementedError('Quintic spline currently only supports 2D kernels.')
         self.dim = dim
 
+        self.fac = M_1_PI * 7.0/478.0
+
     # this is incorrect for the moment and needs to be calculated
     def get_deltap(self):
         return 1.0
@@ -209,11 +202,11 @@ class QuinticSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 2:
-            fac = M_1_PI * 7./478.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         if ( q > 3.0 ):
             val = 0.0
@@ -233,11 +226,11 @@ class QuinticSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        if self.dim == 2:
-            fac = M_1_PI * 7./478.0 * h1 * h1
-
-        else:
-            fac = 0.0
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient
         if (rij > 1e-12):
