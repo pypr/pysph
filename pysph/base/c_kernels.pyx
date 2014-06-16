@@ -228,12 +228,13 @@ cdef class WendlandQuinticWrapper:
 cdef class Gaussian:
     cdef public long dim
     cdef public double radius_scale
+    cdef public double fac
     def __init__(self, **kwargs):
         for key, value in kwargs.iteritems():
             setattr(self, key, value)
 
     cdef inline double get_deltap(self):
-        return sqrt(0.5)
+        return 2.2360679774997898
 
     cpdef double py_get_deltap(self):
         return self.get_deltap()
@@ -247,17 +248,17 @@ cdef class Gaussian:
         h1 = 1./h
         q = rij*h1
 
-        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient
-        if (rij > 1e-12):
-            if (q >= 3.0):
-                val = 0.0
-            else:
+        val = 0.0
+        if (q <= 3.0):
+            if (rij > 1e-12):
                 val = -2 * q * exp(-q*q) * h1/rij
-
-        else:
-            val = 0.0
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
@@ -275,15 +276,17 @@ cdef class Gaussian:
         h1 = 1./h
         q = rij*h1
 
-        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
-        if ( q >= 3.0 ):
-            val = 0.0
+        val = 0.0
+        if ( q <= 3.0 ):
+            val = exp(-q*q) * fac
 
-        else:
-            val = exp(-q*q)
-
-        return val * fac
+        return val
 
     cpdef double py_kernel(self, double[:] xij, double rij, double h):
         return self.kernel(&xij[0], rij, h)
@@ -296,10 +299,12 @@ cdef class GaussianWrapper:
     cdef public Gaussian kern
     cdef double[3] xij, grad
     cdef public double radius_scale
+    cdef public double fac
 
     def __init__(self, kern):
         self.kern = kern
         self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
 
     cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
         cdef double* xij = self.xij

@@ -1,6 +1,7 @@
 from math import pi, sqrt, exp
 
 M_1_PI = 1.0/pi
+M_1_SQRTPI = 1./sqrt(pi)
 M_2_SQRTPI = 2.0/sqrt(pi)
 
 def get_correction(kernel, h0):
@@ -147,44 +148,51 @@ class Gaussian(object):
         self.radius_scale = 3.0
         self.dim = dim
 
+        self.fac = M_1_SQRTPI
+        if dim > 1:
+            self.fac *= M_1_SQRTPI
+        if dim > 2:
+            self.fac *= M_1_SQRTPI
+
     def get_deltap(self):
-        return sqrt(0.5)
+        return 2.2360679774997898
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
         q = rij*h1
 
-        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
-        if ( q >= 3.0 ):
-            val = 0.0
+        val = 0.0
+        if ( q <= 3.0 ):
+            val = exp(-q*q) * fac
 
-        else:
-            val = exp(-q*q)
-
-        return val * fac
+        return val
 
     def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0., 0, 0]):
         h1 = 1./h
         q = rij*h1
 
-        fac = (0.5 * M_2_SQRTPI * h1)**self.dim
+        fac = self.fac * h1
+        if self.dim > 1:
+            fac *= h1
+        if self.dim > 2:
+            fac *= h1
 
         # compute the gradient
-        if (rij > 1e-12):
-            if (q >= 3.0):
-                val = 0.0
-            else:
+        val = 0.0
+        if (q <= 3.0):
+            if (rij > 1e-12):
                 val = -2 * q * exp(-q*q) * h1/rij
-
-        else:
-            val = 0.0
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
-
 
 class QuinticSpline(object):
     def __init__(self, dim=2):
