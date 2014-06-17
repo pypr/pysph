@@ -268,12 +268,13 @@ class MomentumEquationArtificialStress(Equation):
          - \boldsymbol{v})
 
     """
-    def initialize(self, d_idx, d_au, d_av):
+    def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_V, d_uhat, d_vhat,
-             d_au, d_av, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
+             d_au, d_av, d_aw, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
              DWIJ):
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
 
@@ -298,10 +299,16 @@ class MomentumEquationArtificialStress(Equation):
         # contraction of stress tensor with kernel gradient
         Ax = 0.5 * (Axxi + Axxj) * DWIJ[0] + 0.5 * (Axyi + Axyj) * DWIJ[1]
         Ay = 0.5 * (Ayxi + Ayxj) * DWIJ[0] + 0.5 * (Ayyi + Ayyj) * DWIJ[1]
+        
+        # THIS NEEDS TO BE WORKED OUT AND IMPLEMENTED
+        Az = 0.0
 
         # accelerations 2nd part of Eq. (8)
-        d_au[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * Ax
-        d_av[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * Ay
+        tmp = 1./d_m[d_idx] * (Vi2 + Vj2)
+
+        d_au[d_idx] += tmp * Ax
+        d_av[d_idx] += tmp * Ay
+        d_aw[d_idx] += tmp * Az
 
 class SolidWallNoSlipBC(Equation):
     """Solid wall boundary condition described in REF1
@@ -364,33 +371,33 @@ class SolidWallNoSlipBC(Equation):
              d_u, d_v, d_w, d_uf, d_vf, d_wf,
              s_u0, s_v0, s_w0, 
              d_au, d_av, d_aw,
-             DWIJ, R2IJ, EPS, XIJ, VIJ):
+             DWIJ, R2IJ, EPS, XIJ):
 
-        # smooth velocities at the ghost points Eq. (23). u0, v0, w0
-        # are assumed to be the prescribed wall velocities.
+        # Extrapolated velocities at the ghost points using Eq. (23),
+        # u0, v0, w0 are the prescribed wall velocities.
         ug = 2*s_u0[s_idx] - d_uf[d_idx]
         vg = 2*s_v0[s_idx] - d_vf[d_idx]
         wg = 2*s_w0[s_idx] - d_wf[d_idx]
         
-        # averaged shear viscosity Eq. (6)
+        # averaged shear viscosity Eq. (6). There is no real averaging
+        # here as the dummy particle is assigned the same viscosity as
+        # the fluid particle.
         etaij = self.nu * d_rho[d_idx]
 
         # particle volumes
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
-        # inverse mass for destination particle
-        mi1 = 1.0/d_m[d_idx]
-
         # scalar part of the kernel gradient
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
             
-        # viscous contribution (third term) from Eq. (8)
-        tmp = mi1 * (Vi2 + Vj2) * (etaij * Fij/(R2IJ + EPS))
+        # viscous contribution (third term) from Eq. (8), with VIJ
+        # defined appropriately using the ghost values
+        tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * (etaij * Fij/(R2IJ + EPS))
 
-        d_au[d_idx] += tmp * VIJ[0]
-        d_av[d_idx] += tmp * VIJ[1]
-        d_aw[d_idx] += tmp * VIJ[2]
+        d_au[d_idx] += tmp * (d_u[d_idx] - ug)
+        d_av[d_idx] += tmp * (d_v[d_idx] - vg)
+        d_aw[d_idx] += tmp * (d_w[d_idx] - wg)
 
 class SolidWallPressureBC(Equation):
     """Solid wall pressure boundary condition described in REF1
