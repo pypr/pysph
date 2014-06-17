@@ -54,6 +54,39 @@ class VolumeSummation(Equation):
     def loop(self, d_idx, d_V, WIJ):
         d_V[d_idx] += WIJ
 
+class ShepardFilteredVelocity(Equation):
+    """Shepard filtered smooth velocity Eq. (22) in REF2:
+    
+    .. math::
+
+        \tlide{\boldsymbol{v}}_a = \frac{1}{V_a}\sum_b
+        \boldsymbol{v}_b W_{ab},
+
+    where :math:`V` is the particle volume computed through either
+    `VolumeSummation` or `DensitySummation`.
+
+    Notes:
+
+    The destination particle array for this equation should define the
+    *filtered* velocity variables :math:`uf, vf, wf`.
+
+    """
+    def initialize(self, d_idx, d_uf, d_vf, d_wf):
+        d_uf[d_idx] = 0.0
+        d_vf[d_idx] = 0.0
+        d_wf[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_uf, d_vf, d_wf,
+             s_u, s_v, s_w, d_V, WIJ):
+
+        # particle volume
+        Vi = 1./d_V[d_idx]
+        
+        # sum in Eq. (22)
+        d_uf[d_idx] += Vi * s_u[s_idx] * WIJ
+        d_vf[d_idx] += Vi * s_v[s_idx] * WIJ
+        d_wf[d_idx] += Vi * s_w[s_idx] * WIJ
+
 class ContinuityEquation(Equation):
     """Conservation of mass equation Eq (6) in REF1
 
