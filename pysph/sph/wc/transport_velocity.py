@@ -99,10 +99,10 @@ class ContinuityEquation(Equation):
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_arho, d_m, s_V, VIJ, DWIJ):
-        Vj = 1./s_V[s_idx]
-        vijdotdwij = VIJ[0] * DWIJ[0] + VIJ[1] * DWIJ[1] + VIJ[2] * DWIJ[2]
-        d_arho[d_idx] += d_m[d_idx] * Vj * vijdotdwij
+    def loop(self, d_idx, s_idx, d_arho, s_m, d_rho, s_rho, VIJ, DWIJ):
+        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
+
+        d_arho[d_idx] += d_rho[d_idx] * s_m[s_idx]/s_rho[s_idx] * vijdotdwij
 
 class StateEquation(Equation):
     """Generalized weakly compressible EOS:
