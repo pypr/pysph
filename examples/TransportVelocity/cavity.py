@@ -123,7 +123,8 @@ def create_particles(**kwargs):
 app = Application()
 
 # Create the kernel
-kernel = QuinticSpline(dim=2)
+#kernel = QuinticSpline(dim=2)
+kernel = CubicSpline(dim=2)
 
 integrator = Integrator(
     fluid=TransportVelocityStep(), epec=False)
@@ -160,7 +161,7 @@ equations = [
     # been updated and can be used in the integration equations.
     Group(
         equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the

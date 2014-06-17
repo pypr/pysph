@@ -13,8 +13,11 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import DensitySummation,\
-    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
+from pysph.sph.wc.transport_velocity import (DensitySummation,
+    ShepardFilteredVelocity, StateEquation,
+    MomentumEquationPressureGradient, MomentumEquationViscosity,
+    MomentumEquationArtificialStress,
+    SolidWallPressureBC, SolidWallNoSlipBC)
 
 # numpy
 import numpy as np
@@ -76,15 +79,20 @@ def create_particles(**kwargs):
     channel.add_property('V' )
 
     # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av', 'aw'):
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
         fluid.add_property(name)
 
     # kernel summation correction for the channel
     channel.add_property('wij')
 
     # imposed velocity on the channel
-    channel.add_property('u0')
-    channel.add_property('v0')
+    channel.add_property('u0'); channel.u0[:] = 0.
+    channel.add_property('v0'); channel.v0[:] = 0.
+    channel.add_property('w0'); channel.w0[:] = 0.
+
+    # Shepard filtered velocities for the fluid
+    for name in ['uf', 'vf', 'wf']:
+        fluid.add_property(name)
 
     # magnitude of velocity
     fluid.add_property('vmag')
@@ -137,28 +145,57 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # Summation density for the fluid phase
+    # Summation density along with volume summation for the fluid
+    # phase. This is done for all local and remote particles. At the
+    # end of this group, the fluid phase has the correct density
+    # taking into consideration the fluid and solid
+    # particles. 
     Group(
         equations=[
             DensitySummation(dest='fluid', sources=['fluid','channel']),
-            ]),
+            ], real=False),
 
-    # boundary conditions for the channel wall
+    # Once the fluid density is computed, we can use the EOS to set
+    # the fluid pressure. Additionally, the shepard filtered velocity
+    # for the fluid phase is determined.
     Group(
         equations=[
-            SolidWallBC(dest='channel', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
-            ]),
+            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ], real=False),
 
-    # acceleration equation
+    # Once the pressure for the fluid phase has been updated, we can
+    # extrapolate the pressure to the ghost particles. After this
+    # group, the fluid density, pressure and the boundary pressure has
+    # been updated and can be used in the integration equations.
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
+            SolidWallPressureBC(dest='channel', sources=['fluid'], 
+                                b=1.0, rho0=rho0, p0=p0),
+            ], real=False),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'channel'], nu=nu),
+    # The main accelerations block. The acceleration arrays for the
+    # fluid phase are upadted in this stage for all local particles.
+    Group(
+        equations=[
+            # Pressure gradient terms
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid', 'channel'], pb=p0),
+            
+            # fluid viscosity
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+            
+            # No-slip boundary condition. This is effectively a
+            # viscous interaction of the fluid with the ghost
+            # particles.
+            SolidWallNoSlipBC(
+                dest='fluid', sources=['channel'], nu=nu),
+            
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-            ArtificialStress(dest='fluid', sources=['fluid',])
-
-            ]),
+            ], real=True),
     ]
 
 # Setup the application and solver.  This also generates the particles.

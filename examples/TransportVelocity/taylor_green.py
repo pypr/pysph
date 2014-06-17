@@ -14,7 +14,9 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 # the eqations
 from pysph.sph.equation import Group
 from pysph.sph.wc.transport_velocity import DensitySummation,\
-    StateEquation, MomentumEquation, ArtificialStress
+    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
+    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
+    ShepardFilteredVelocity
 
 # numpy
 import numpy as np
@@ -70,7 +72,11 @@ def create_particles(**kwargs):
     fluid.add_property('V')
 
     # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av'):
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
+        fluid.add_property(name)
+
+    # Shepard filtered velocities for the fluid
+    for name in ['uf', 'vf', 'wf']:
         fluid.add_property(name)
 
     fluid.add_property('vmag')
@@ -114,21 +120,42 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # density summation
+    # Summation density along with volume summation for the fluid
+    # phase. This is done for all local and remote particles. At the
+    # end of this group, the fluid phase has the correct density
+    # taking into consideration the fluid and solid
+    # particles. 
     Group(
         equations=[
             DensitySummation(dest='fluid', sources=['fluid']),
-            ]),
+            ], real=False),
 
+    # Once the fluid density is computed, we can use the EOS to set
+    # the fluid pressure. Additionally, the shepard filtered velocity
+    # for the fluid phase is determined.
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ], real=False),
 
-            MomentumEquation(dest='fluid', sources=['fluid'], nu=nu, pb=p0),
+    # The main accelerations block. The acceleration arrays for the
+    # fluid phase are upadted in this stage for all local particles.
+    Group(
+        equations=[
+            # Pressure gradient terms
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid'], pb=p0),
+            
+            # fluid viscosity
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+            
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-            ArtificialStress(dest='fluid', sources=['fluid']),
+            ], real=True),
 
-            ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.

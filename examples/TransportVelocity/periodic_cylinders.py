@@ -170,7 +170,8 @@ equations = [
     # been updated and can be used in the integration equations.
     Group(
         equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx, b=1.0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], 
+                                gx=fx, b=1.0, rho0=rho0, p0=p0),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the
