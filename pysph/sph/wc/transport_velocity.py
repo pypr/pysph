@@ -207,7 +207,28 @@ class SolidWallBC(Equation):
 
 class MomentumEquation(Equation):
     """Momentum equation for the Transport Velocity formulation
-    Eq. (8) in REF2
+    Eq. (8) in REF2:
+
+    .. math::
+
+        \frac{d \boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
+        V_b^2)\left[-\bar{p}_{ab}\nabla_a W_{ab} +
+        \bar{\eta}_{ab}\hat{r}_{ab}\cdot \nabla_a W_{ab}
+        \frac{\boldsymbol{v}_{ab}}{|\boldsymbol{r}_{ab}|}\right]
+
+    Notes:
+
+    The artificial stress terms are not included in this equation. The
+    contribution from this term is handled explicitly by the
+    `ArtificialStress` equation.
+
+    The Transport velocity formulation differentiates between the
+    fluid velocity :math:`v` and the advection velocity
+    :math:`\tilde{v}`. The latter is corrected by the contribution
+    from the background pressure and is only used to correctly update
+    the particle positions. In PySPH, we differentiate between the two
+    by defining two sets of velocity variables :math:`u, v, w` and
+    :math:`uhat, vhat, what`
 
     """
     def __init__(self, dest, sources=None, pb=0.0, nu=0.01, gx=0.0, gy=0.0, gz=0.0):
@@ -229,14 +250,15 @@ class MomentumEquation(Equation):
              d_auhat, d_avhat, d_m, d_uhat, d_vhat,
              s_rho, s_p, s_u, s_v, s_uhat, s_vhat, s_V,
              R2IJ, HIJ, DWIJ, VIJ, XIJ):
-        # averaged pressure
+
+        # averaged pressure Eq. (7)
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
         pi = d_p[d_idx]; pj = s_p[s_idx]
 
         pij = rhoj * pi + rhoi * pj
         pij /= (rhoj + rhoi)
 
-        # averaged shear viscosity
+        # averaged shear viscosity Eq. (6)
         etai = self.nu * rhoi
         etaj = self.nu * rhoj
 
@@ -249,16 +271,32 @@ class MomentumEquation(Equation):
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
-        # accelerations
+        # accelerations 1st and 3rd terms in Eq. (8)
         d_au[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * (-pij*DWIJ[0] + etaij*Fij/(R2IJ + 0.01 * HIJ * HIJ)*VIJ[0])
         d_av[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * (-pij*DWIJ[1] + etaij*Fij/(R2IJ + 0.01 * HIJ * HIJ)*VIJ[1])
 
-        # contribution due to the background pressure
+        # contribution due to the background pressure Eq. (13)
         d_auhat[d_idx] += -self.pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[0]
         d_avhat[d_idx] += -self.pb/d_m[d_idx] * (Vi2 + Vj2) * DWIJ[1]
 
 
 class ArtificialStress(Equation):
+    """Artificial stress contribution to the Momentum Equation
+
+    .. math::
+
+        \frac{d\boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
+        V_b^2)\left[ \frac{1}{2}(\boldsymbol{A}_a +
+        \boldsymbol{A}_b) : \nabla_a W_{ab}\right]
+
+     where the artificial stress terms are given by:
+
+     .. math::
+
+         \boldsymbol{A} = \rho \boldsymbol{v} (\tilde{\boldsymbol{v}}
+         - \boldsymbol{v})
+
+    """
     def initialize(self, d_idx, d_au, d_av):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
@@ -268,12 +306,14 @@ class ArtificialStress(Equation):
              DWIJ):
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
 
+        # physical and advection velocities
         ui = d_u[d_idx]; uhati = d_uhat[d_idx]
         vi = d_v[d_idx]; vhati = d_vhat[d_idx]
 
         uj = s_u[s_idx]; uhatj = s_uhat[s_idx]
         vj = s_v[s_idx]; vhatj = s_vhat[s_idx]
 
+        # particle volumes
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
@@ -284,9 +324,10 @@ class ArtificialStress(Equation):
         Axxj = rhoj*uj*(uhatj - uj); Axyj = rhoj*uj*(vhatj - vj)
         Ayxj = rhoj*vj*(uhatj - uj); Ayyj = rhoj*vj*(vhatj - vj)
 
+        # contraction of stress tensor with kernel gradient
         Ax = 0.5 * (Axxi + Axxj) * DWIJ[0] + 0.5 * (Axyi + Axyj) * DWIJ[1]
         Ay = 0.5 * (Ayxi + Ayxj) * DWIJ[0] + 0.5 * (Ayyi + Ayyj) * DWIJ[1]
 
-        # accelerations
+        # accelerations 2nd part of Eq. (8)
         d_au[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * Ax
         d_av[d_idx] += 1.0/d_m[d_idx] * (Vi2 + Vj2) * Ay
