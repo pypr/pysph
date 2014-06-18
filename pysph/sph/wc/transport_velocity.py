@@ -38,9 +38,9 @@ class DensitySummation(Equation):
         d_V[d_idx] = 0.0
         d_rho[d_idx] = 0.0
 
-    def loop(self, d_idx, d_V, d_rho, d_m, WIJ):
+    def loop(self, d_idx, s_idx, d_V, d_rho, s_m, WIJ):
         d_V[d_idx] += WIJ
-        d_rho[d_idx] += d_m[d_idx]*WIJ
+        d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class VolumeSummation(Equation):
     """Number density for volume computation.
@@ -367,7 +367,7 @@ class SolidWallNoSlipBC(Equation):
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_m, d_rho, d_V, s_V,
+    def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, d_V, s_V,
              d_u, d_v, d_w, d_uf, d_vf, d_wf,
              s_u0, s_v0, s_w0, 
              d_au, d_av, d_aw,
@@ -379,10 +379,11 @@ class SolidWallNoSlipBC(Equation):
         vg = 2*s_v0[s_idx] - d_vf[d_idx]
         wg = 2*s_w0[s_idx] - d_wf[d_idx]
         
-        # averaged shear viscosity Eq. (6). There is no real averaging
-        # here as the dummy particle is assigned the same viscosity as
-        # the fluid particle.
-        etaij = self.nu * d_rho[d_idx]
+        # averaged shear viscosity Eq. (6).
+        etai = self.nu * d_rho[d_idx]
+        etaj = self.nu * s_rho[s_idx]
+
+        etaij = 2 * (etai * etaj)/(etai + etaj)
 
         # particle volumes
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
@@ -460,7 +461,7 @@ class SolidWallPressureBC(Equation):
             (self.gy-self.ay)*XIJ[1] + \
             (self.gz-self.az)*XIJ[2]
 
-        d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx] * gdotxij * WIJ
+        d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx]*gdotxij*WIJ
 
         # denominator of Eq. (27)
         d_wij[d_idx] += WIJ
