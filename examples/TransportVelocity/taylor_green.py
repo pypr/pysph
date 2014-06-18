@@ -5,7 +5,7 @@ from pyzoltan.core.carray import LongArray
 
 # PySPH imports
 from pysph.base.nnps import DomainLimits
-from pysph.base.utils import get_particle_array
+from pysph.base.utils import get_particle_array_tvf_fluid
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
@@ -49,7 +49,7 @@ def create_particles(**kwargs):
     h = np.ones_like(x) * dx
 
     # create the arrays
-    fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
+    fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
 
     # add the requisite arrays
     fluid.add_property('color')
@@ -67,20 +67,6 @@ def create_particles(**kwargs):
     fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
     fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-    # add requisite properties to the arrays:
-    # particle volume
-    fluid.add_property('V')
-
-    # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
-        fluid.add_property(name)
-
-    # Shepard filtered velocities for the fluid
-    for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
-
-    fluid.add_property('vmag')
-
     # mass is set to get the reference density of each phase
     fluid.rho[:] = rho0
     fluid.m[:] = volume * fluid.rho
@@ -90,9 +76,6 @@ def create_particles(**kwargs):
 
     # smoothing lengths
     fluid.h[:] = hdx * dx
-
-    # load balancing props
-    fluid.set_lb_props( fluid.properties.keys() )
 
     # return the particle list
     return [fluid,]
@@ -105,9 +88,10 @@ domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = QuinticSpline(dim=2)
+#kernel = QuinticSpline(dim=2)
 #kernel = WendlandQuintic(dim=2)
 #kernel = Gaussian(dim=2)
+kernel = CubicSpline(dim=2)
 
 integrator = Integrator(fluid=TransportVelocityStep())
 
