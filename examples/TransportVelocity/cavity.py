@@ -119,7 +119,7 @@ def create_particles(**kwargs):
 
     # set the output arrays
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag', 'rho', 'p',
-                              'V', 'm'] )
+                              'V', 'm', 'h'] )
     solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
             
     return [fluid, solid]
