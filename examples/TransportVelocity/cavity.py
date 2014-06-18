@@ -87,6 +87,11 @@ def create_particles(**kwargs):
     solid.add_property('v0'); solid.v0[:] = 0.
     solid.add_property('w0'); solid.w0[:] = 0.
 
+    # imposed accelerations on the solid
+    solid.add_property('ax')
+    solid.add_property('ay')
+    solid.add_property('az')
+
     # magnitude of velocity
     fluid.add_property('vmag')
 

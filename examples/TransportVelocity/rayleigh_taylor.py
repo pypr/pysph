@@ -106,6 +106,11 @@ def create_particles(empty=False, **kwargs):
     solid.add_property('v0'); solid.v0[:] = 0.
     solid.add_property('w0'); solid.w0[:] = 0.
 
+    # imposed accelerations on the solid
+    solid.add_property('ax')
+    solid.add_property('ay')
+    solid.add_property('az')
+
     # Shepard filtered velocities for the fluid
     for name in ['uf', 'vf', 'wf']:
         fluid1.add_property(name)

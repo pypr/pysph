@@ -438,14 +438,13 @@ class SolidWallPressureBC(Equation):
     
     """
     def __init__(self, dest, sources=None, rho0=1.0, p0=100.0,
-                 gx=0.0, gy=0.0, gz=0.0, ax=0.0, ay=0.0, az=0.0,
-                 b=1.0):
+                 gx=0.0, gy=0.0, gz=0.0, b=1.0):
         self.rho0 = rho0
         self.p0 = p0
         self.b=b
-        self.gx = gx; self.ax = ax
-        self.gy = gy; self.ay = ay
-        self.gz = gz; self.az = az
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
 
         super(SolidWallPressureBC, self).__init__(dest, sources)
 
@@ -454,12 +453,14 @@ class SolidWallPressureBC(Equation):
         d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_p, s_p, d_wij, s_rho,
-             WIJ, XIJ):
+             d_ax, d_ay, d_az, WIJ, XIJ):
 
-        # numerator of Eq. (27)
-        gdotxij = (self.gx-self.ax)*XIJ[0] + \
-            (self.gy-self.ay)*XIJ[1] + \
-            (self.gz-self.az)*XIJ[2]
+        # numerator of Eq. (27) ax, ay and az are the prescribed wall
+        # accelerations which must be defined for the wall boundary
+        # particle
+        gdotxij = (self.gx - d_ax[d_idx])*XIJ[0] + \
+            (self.gy - d_ay[d_idx])*XIJ[1] + \
+            (self.gz - d_az[d_idx])*XIJ[2]
 
         d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx]*gdotxij*WIJ
 

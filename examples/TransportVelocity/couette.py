@@ -90,6 +90,10 @@ def create_particles(**kwargs):
     channel.add_property('v0'); channel.v0[:] = 0.
     channel.add_property('w0'); channel.w0[:] = 0.
 
+    channel.add_property('ax')
+    channel.add_property('ay')
+    channel.add_property('az')
+
     # Shepard filtered velocities for the fluid
     for name in ['uf', 'vf', 'wf']:
         fluid.add_property(name)
