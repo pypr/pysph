@@ -13,10 +13,12 @@ cdef class {cls}Wrapper:
     cdef public {cls} kern
     cdef double[3] xij, grad
     cdef public double radius_scale
+    cdef public double fac
 
     def __init__(self, kern):
         self.kern = kern
         self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
 
     cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
         cdef double* xij = self.xij
