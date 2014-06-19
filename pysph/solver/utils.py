@@ -341,7 +341,6 @@ def load(fname):
 
         for array_name in arrays:
             array = get_particle_array(name=array_name,
-                                       cl_precision="single",
                                        **arrays[array_name])
             ret["arrays"][array_name] = array
 
