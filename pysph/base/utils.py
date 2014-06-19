@@ -36,14 +36,11 @@ def arange_long(start, stop=-1):
 
 
 def get_particle_array(
-    cl_precision="double", additional_props=None, **props):
+    additional_props=None, **props):
     """ Create and return a particle array with default properties
 
     Parameters
     ----------
-
-    cl_precision : {'single', 'double'}
-        Precision to use in OpenCL (default: 'double').
 
     props : dict
         A dictionary of properties requested.
@@ -135,7 +132,7 @@ def get_particle_array(
 
     return pa
 
-def get_particle_array_wcsph(cl_precision="single", **props):
+def get_particle_array_wcsph(**props):
     """Return a particle array for the WCSPH formulation"""
 
     # handle the name separately
