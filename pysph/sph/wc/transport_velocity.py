@@ -79,13 +79,13 @@ class ShepardFilteredVelocity(Equation):
     def loop(self, d_idx, s_idx, d_uf, d_vf, d_wf,
              s_u, s_v, s_w, d_V, WIJ):
 
-        # particle volume
-        Vi = 1./d_V[d_idx]
+        # normalized kernel WIJ
+        wij = 1./d_V[d_idx] * WIJ
         
         # sum in Eq. (22)
-        d_uf[d_idx] += Vi * s_u[s_idx] * WIJ
-        d_vf[d_idx] += Vi * s_v[s_idx] * WIJ
-        d_wf[d_idx] += Vi * s_w[s_idx] * WIJ
+        d_uf[d_idx] += s_u[s_idx] * wij
+        d_vf[d_idx] += s_v[s_idx] * wij
+        d_wf[d_idx] += s_w[s_idx] * wij
 
 class ContinuityEquation(Equation):
     """Conservation of mass equation Eq (6) in REF1
@@ -300,7 +300,7 @@ class MomentumEquationArtificialStress(Equation):
         Ax = 0.5 * (Axxi + Axxj) * DWIJ[0] + 0.5 * (Axyi + Axyj) * DWIJ[1]
         Ay = 0.5 * (Ayxi + Ayxj) * DWIJ[0] + 0.5 * (Ayyi + Ayyj) * DWIJ[1]
         
-        # THIS NEEDS TO BE WORKED OUT AND IMPLEMENTED
+        # FIXME: THIS NEEDS TO BE WORKED OUT AND IMPLEMENTED FOR 3D
         Az = 0.0
 
         # accelerations 2nd part of Eq. (8)
