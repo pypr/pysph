@@ -35,14 +35,12 @@ def arange_long(start, stop=-1):
         return arange
 
 
-def get_particle_array(cl_precision="double", **props):
+def get_particle_array(
+    additional_props=None, **props):
     """ Create and return a particle array with default properties
 
     Parameters
     ----------
-
-    cl_precision : {'single', 'double'}
-        Precision to use in OpenCL (default: 'double').
 
     props : dict
         A dictionary of properties requested.
@@ -94,8 +92,14 @@ def get_particle_array(cl_precision="double", **props):
                                'type':'double',
                                'name':prop}
 
+    # default properties for an SPH particle
     default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
                      'au', 'av', 'aw', 'gid', 'pid', 'tag']
+
+    # add any additional props
+    if additional_props:
+        default_props.extend( additional_props )
+        default_props = list( set(default_props) )
 
     # Add the default props
     for prop in default_props:
@@ -128,7 +132,7 @@ def get_particle_array(cl_precision="double", **props):
 
     return pa
 
-def get_particle_array_wcsph(cl_precision="single", **props):
+def get_particle_array_wcsph(**props):
     """Return a particle array for the WCSPH formulation"""
 
     # handle the name separately
@@ -198,6 +202,19 @@ def get_particle_array_wcsph(cl_precision="single", **props):
                            'pid', 'gid', 'tag', 'p'] )
 
     return pa
+
+def get_particle_array_tvf_fluid(**props):
+    "Get the fluid array for the transport velocity formulation"
+    tv_props = ['uf', 'vf', 'wf','uhat', 'vhat', 'what',
+                'auhat', 'avhat', 'awhat', 'vmag', 'V']
+
+    return get_particle_array(additional_props=tv_props, **props)
+
+def get_particle_array_tvf_solid(**props):
+    "Get the solid array for the transport velocity formulation"
+    tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az']
+
+    return get_particle_array(additional_props=tv_props, **props)
 
 def get_particles_info(particles):
     """Return the array information for a list of particles.
