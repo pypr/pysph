@@ -12,8 +12,10 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import DensitySummation,\
-    StateEquation, SolidWallBC, MomentumEquation, ArtificialStress
+from pysph.sph.wc.transport_velocity import SummationDensity,\
+    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
+    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
+    ShepardFilteredVelocity
 
 # numpy
 import numpy as np
@@ -64,21 +66,31 @@ def create_particles(**kwargs):
         solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
-    # particle volume
 
+    # particle volume for fluid and solid
     fluid.add_property('V')
     solid.add_property('V' )
 
+    # Shepard filtered velocities for the fluid
+    for name in ['uf', 'vf', 'wf']:
+        fluid.add_property(name)
+
     # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av', 'aw'):
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
         fluid.add_property(name)
 
     # kernel summation correction for the solid
     solid.add_property('wij')
 
-    # imposed velocity on the solid
-    solid.add_property('u0')
-    solid.add_property('v0')
+    # imposed or prescribed boundary velocity for the solid
+    solid.add_property('u0'); solid.u0[:] = 0.
+    solid.add_property('v0'); solid.v0[:] = 0.
+    solid.add_property('w0'); solid.w0[:] = 0.
+
+    # imposed accelerations on the solid
+    solid.add_property('ax')
+    solid.add_property('ay')
+    solid.add_property('az')
 
     # magnitude of velocity
     fluid.add_property('vmag')
@@ -105,54 +117,80 @@ def create_particles(**kwargs):
         if solid.y[i] > L:
             solid.u0[i] = Umax
 
-    # return the particle list
-    fluid.set_lb_props( fluid.properties.keys() )
-    solid.set_lb_props( solid.properties.keys() )
-
+    # set the output arrays
+    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag', 'rho', 'p',
+                              'V', 'm', 'h'] )
+    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+            
     return [fluid, solid]
 
 # Create the application.
 app = Application()
 
 # Create the kernel
-kernel = QuinticSpline(dim=2)
+#kernel = QuinticSpline(dim=2)
+kernel = CubicSpline(dim=2)
 
-integrator = Integrator(fluid=TransportVelocityStep())
+integrator = Integrator(
+    fluid=TransportVelocityStep(), epec=False)
+
 # Create a solver.
-solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-# Setup default parameters.
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                tf=tf, dt=dt, adaptive_timestep=False)
 
 equations = [
 
-    # Summation density for the fluid phase
+    # Summation density along with volume summation for the fluid
+    # phase. This is done for all local and remote particles. At the
+    # end of this group, the fluid phase has the correct density
+    # taking into consideration the fluid and solid
+    # particles. 
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid'],)
+            SummationDensity(dest='fluid', sources=['fluid','solid']),
+            ], real=False),
 
-            ]),
 
-    # boundary conditions for the solid wall
+    # Once the fluid density is computed, we can use the EOS to set
+    # the fluid pressure. Additionally, the shepard filtered velocity
+    # for the fluid phase is determined.
     Group(
         equations=[
+            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ], real=False),
 
-            SolidWallBC(dest='solid', sources=['fluid',], b=1.0, rho0=rho0, p0=p0),
-
-            ]),
-
-    # acceleration equation
+    # Once the pressure for the fluid phase has been updated, we can
+    # extrapolate the pressure to the ghost particles. After this
+    # group, the fluid density, pressure and the boundary pressure has
+    # been updated and can be used in the integration equations.
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, b=1.0, rho0=rho0, p0=p0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
+            ], real=False),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'solid'],
-                             nu=nu, pb=p0),
+    # The main accelerations block. The acceleration arrays for the
+    # fluid phase are upadted in this stage for all local particles.
+    Group(
+        equations=[
+            # Pressure gradient terms
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid', 'solid'], pb=p0),
+            
+            # fluid viscosity
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+            
+            # No-slip boundary condition. This is effectively a
+            # viscous interaction of the fluid with the ghost
+            # particles.
+            SolidWallNoSlipBC(
+                dest='fluid', sources=['solid'], nu=nu),
+            
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-            ArtificialStress(dest='fluid', sources=['fluid',]),
-
-            ]),
+            ], real=True),
     ]
 
 # Setup the application and solver.  This also generates the particles.
