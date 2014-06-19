@@ -12,7 +12,7 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import DensitySummation,\
+from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
     ShepardFilteredVelocity
@@ -147,7 +147,7 @@ equations = [
     # particles. 
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid']),
+            SummationDensity(dest='fluid', sources=['fluid','solid']),
             ], real=False),
 
 

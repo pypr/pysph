@@ -13,7 +13,7 @@ The references are
 
 from pysph.sph.equation import Equation
 
-class DensitySummation(Equation):
+class SummationDensity(Equation):
     """Summation density with volume summation
 
     In addition to the standard summation density, the number density
@@ -45,7 +45,7 @@ class DensitySummation(Equation):
 class VolumeSummation(Equation):
     """Number density for volume computation.
 
-    See `DensitySummation`
+    See `SummationDensity`
 
     """
     def initialize(self, d_idx, d_V):
@@ -63,7 +63,7 @@ class ShepardFilteredVelocity(Equation):
         \boldsymbol{v}_b W_{ab},
 
     where :math:`V` is the particle volume computed through either
-    `VolumeSummation` or `DensitySummation`.
+    `VolumeSummation` or `SummationDensity`.
 
     Notes:
 

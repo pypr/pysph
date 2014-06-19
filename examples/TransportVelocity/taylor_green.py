@@ -13,7 +13,7 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import DensitySummation,\
+from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
     ShepardFilteredVelocity
@@ -111,7 +111,7 @@ equations = [
     # particles. 
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid']),
+            SummationDensity(dest='fluid', sources=['fluid']),
             ], real=False),
 
     # Once the fluid density is computed, we can use the EOS to set
