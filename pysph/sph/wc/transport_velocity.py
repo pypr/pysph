@@ -54,6 +54,11 @@ class VolumeSummation(Equation):
     def loop(self, d_idx, d_V, WIJ):
         d_V[d_idx] += WIJ
 
+class VolumeFromMassDensity(Equation):
+    """Set the inverse volume using mass density"""
+    def loop(self, d_idx, d_V, d_rho, d_m):
+        d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
+
 class ShepardFilteredVelocity(Equation):
     """Shepard filtered smooth velocity Eq. (22) in REF2:
     
@@ -250,6 +255,41 @@ class MomentumEquationViscosity(Equation):
         d_au[d_idx] += tmp * VIJ[0]
         d_av[d_idx] += tmp * VIJ[1]
         d_aw[d_idx] += tmp * VIJ[2]
+
+class MomentumEquationArtificialViscosity(Equation):
+    """Artificial viscosity for the Momentum equation Eq. (11) in REF1
+
+    .. math::
+
+        \frac{d \boldsymbol{v}_a}{dt} = -\sum_b m_b \alpha h_{ab}
+        c_{ab} \frac{\boldsymbol{v}_{ab}\cdot
+        \boldsymbol{r}_{ab}}{\rho_{ab}\left(|r_{ab}|^2 + \epsilon
+        \right)}\nabla_a W_{ab}
+
+    """
+    def __init__(self, dest, sources=None, alpha=0.1, c0=1.0):
+        self.alpha = alpha
+        self.c0 = c0
+        super(MomentumEquationArtificialViscosity, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_m, d_au, d_av, d_aw,
+             RHOIJ, R2IJ, EPS, DWIJ, VIJ, XIJ, HIJ):
+
+        # v_{ab} \cdot r_{ab}
+        vijdotrij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] * VIJ[2]*XIJ[2]
+
+        # scalar part of the accelerations Eq. (11)
+        tmp = -s_m[s_idx] * self.alpha * HIJ * self.c0/RHOIJ
+        tmp *= vijdotrij/(R2IJ + EPS)
+
+        d_au[d_idx] += tmp * DWIJ[0]
+        d_av[d_idx] += tmp * DWIJ[1]
+        d_aw[d_idx] += tmp * DWIJ[2]
 
 class MomentumEquationArtificialStress(Equation):
     """Artificial stress contribution to the Momentum Equation
