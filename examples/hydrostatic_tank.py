@@ -208,7 +208,11 @@ equations1 = [
             ]),
     ]
 
-# Formulation for REF2
+# Formulation for REF2. Note that for this formulation to work, the
+# boundary particles need to have a spacing different from the fluid
+# particles (usually determined by a factor beta). In the current
+# implementation, the value is taken as 1.0 which will mostly be
+# ineffective.
 equations2 = [
     # For the multi-phase formulation, we require an estimate of the
     # particle volume. This can be either defined from the particle
@@ -231,9 +235,11 @@ equations2 = [
             # no-penetration condition is to be satisfied with this
             # equation. The subsequent equations therefore do not have
             # solid as the source. Note the difference between the
-            # ghost-fluid formulations
+            # ghost-fluid formulations. K should be 0.01*co**2
+            # according to REF2. We take it much smaller here on
+            # account of the multiple layers of boundary particles
             MonaghanKajtarBoundaryForce(dest='fluid', sources=['solid'],
-                                        K=1.0, beta=1.0, h=hdx*dx),
+                                        K=0.02, beta=1.0, h=hdx*dx),
 
             # Continuity equation 
             ContinuityEquation(dest='fluid', sources=['fluid',]),
@@ -296,7 +302,7 @@ equations3 = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations3,
+app.setup(solver=solver, equations=equations1,
           particle_factory=create_particles)
 
 app.run()
