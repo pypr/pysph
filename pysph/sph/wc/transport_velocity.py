@@ -12,6 +12,10 @@ The references are
 """
 
 from pysph.sph.equation import Equation
+from math import sin, cos, pi
+
+# constants
+M_PI = pi
 
 class SummationDensity(Equation):
     """Summation density with volume summation
@@ -155,14 +159,19 @@ class MomentumEquationPressureGradient(Equation):
     fluid and boundary particles.
 
     This function also computes the contribution to the background
-    pressure.
+    pressure and accelerations due to a body force or gravity.
+
+    The body forces are damped according to Eq. (13) in REF1 to avoid
+    instantaneous accelerations. By default, damping is neglected.
 
     """
-    def __init__(self, dest, sources=None, pb=0.0, gx=0., gy=0., gz=0.):
+    def __init__(self, dest, sources=None, pb=0.0, gx=0., gy=0., gz=0.,
+                 tdamp=0.0):
         self.pb = 0.0
         self.gx = gx
         self.gy = gy
         self.gz = gz
+        self.tdamp = tdamp
         super(MomentumEquationPressureGradient, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw, d_auhat, d_avhat, d_awhat):
@@ -206,11 +215,15 @@ class MomentumEquationPressureGradient(Equation):
         d_avhat[d_idx] += tmp * DWIJ[1]
         d_awhat[d_idx] += tmp * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw):
-        # acceleration due to gravity or external body force
-        d_au[d_idx] += self.gx
-        d_av[d_idx] += self.gy
-        d_aw[d_idx] += self.gz
+    def post_loop(self, d_idx, d_au, d_av, d_aw, t=0.0):
+        # damped accelerations due to body or external force
+        damping_factor = 1.0
+        if t <= self.tdamp:
+            damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
+            
+        d_au[d_idx] += self.gx * damping_factor
+        d_av[d_idx] += self.gy * damping_factor
+        d_aw[d_idx] += self.gz * damping_factor
 
 class MomentumEquationViscosity(Equation):
     """Momentum equation for the Transport Velocity formulation
@@ -278,18 +291,22 @@ class MomentumEquationArtificialViscosity(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, s_m, d_au, d_av, d_aw,
-             RHOIJ, R2IJ, EPS, DWIJ, VIJ, XIJ, HIJ):
+             RHOIJ1, R2IJ, EPS, DWIJ, VIJ, XIJ, HIJ):
 
         # v_{ab} \cdot r_{ab}
-        vijdotrij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] * VIJ[2]*XIJ[2]
+        vijdotrij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 
         # scalar part of the accelerations Eq. (11)
-        tmp = -s_m[s_idx] * self.alpha * HIJ * self.c0/RHOIJ
-        tmp *= vijdotrij/(R2IJ + EPS)
+        piij = 0.0
+        if vijdotrij < 0:
+            muij = (HIJ * vijdotrij)/(R2IJ + EPS)
 
-        d_au[d_idx] += tmp * DWIJ[0]
-        d_av[d_idx] += tmp * DWIJ[1]
-        d_aw[d_idx] += tmp * DWIJ[2]
+            piij = -self.alpha*self.c0*muij
+            piij = s_m[s_idx] * piij*RHOIJ1
+
+        d_au[d_idx] += -piij * DWIJ[0]
+        d_av[d_idx] += -piij * DWIJ[1]
+        d_aw[d_idx] += -piij * DWIJ[2]
 
 class MomentumEquationArtificialStress(Equation):
     """Artificial stress contribution to the Momentum Equation
