@@ -280,18 +280,34 @@ class AdamiVerletStep(IntegratorStep):
 # `RigidBodyStep` class
 ###############################################################################        
 class RigidBodyStep(IntegratorStep):
-    def predictor(self):
-        pass
+    """Simple rigid-body motion
+
+    At each stage of the integrator, the prescribed velocity and
+    accelerations are incremented by dt/2.
+    
+    """
+    def predictor(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
+                  d_z, dt=0.0):
+        dtb2 = 0.5*dt
+        d_u0[d_idx] += dtb2*d_ax[d_idx]
+        d_v0[d_idx] += dtb2*d_ay[d_idx]
+        d_w0[d_idx] += dtb2*d_az[d_idx]
+
+        d_x[d_idx] += dtb2*d_u0[d_idx]
+        d_y[d_idx] += dtb2*d_v0[d_idx]
+        d_z[d_idx] += dtb2*d_w0[d_idx]
+        
     def corrector(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
                   d_z, dt=0.0):
-        d_u0[d_idx] += dt*d_ax[d_idx]
-        d_v0[d_idx] += dt*d_ay[d_idx]
-        d_w0[d_idx] += dt*d_az[d_idx]
+        dtb2 = 0.5*dt
+        d_u0[d_idx] += dtb2*d_ax[d_idx]
+        d_v0[d_idx] += dtb2*d_ay[d_idx]
+        d_w0[d_idx] += dtb2*d_az[d_idx]
 
 
-        d_x[d_idx] += dt*d_u0[d_idx]
-        d_y[d_idx] += dt*d_v0[d_idx]
-        d_z[d_idx] += dt*d_w0[d_idx]
+        d_x[d_idx] += dtb2*d_u0[d_idx]
+        d_y[d_idx] += dtb2*d_v0[d_idx]
+        d_z[d_idx] += dtb2*d_w0[d_idx]
 
 ###############################################################################
 # `GasDFluidStep` class

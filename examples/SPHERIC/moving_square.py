@@ -15,7 +15,6 @@ from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrato
 
 # the eqations
 from pysph.sph.equation import Group, Equation
-from pysph.sph.basic_equations import RigidBodyConstantAcceleration
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
@@ -198,7 +197,7 @@ class SPHERICBenchmarkAcceleration(Equation):
     This equation must be instantiated with no sources
 
     """
-    def loop(self, d_idx, d_ax, t):
+    def loop(self, d_idx, d_ax, t=0.0):
         a = 2.8209512
         b = 0.525652151
         c = 0.14142151
