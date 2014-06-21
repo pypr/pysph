@@ -7,25 +7,26 @@ from the `sph_eval` module.
 """
 
 import inspect
+from numpy import sqrt
+from textwrap import dedent
 
 # Local imports.
 from pysph.sph.equation import get_array_names
-from pysph.base.cython_generator import CythonGenerator
+from pysph.base.cython_generator import CythonGenerator, get_func_definition
 
-from numpy import sqrt
 
 ###############################################################################
 # `IntegratorStep` class
 ###############################################################################
 class IntegratorStep(object):
-    """Subclass this and implement the methods ``predictor`` and ``corrector``.
+    """Subclass this and implement the methods ``stage1`` and ``stage2``.
     Use the same conventions as the equations.
     """
     def initialize(self):
         pass
-    def predictor(self):
+    def stage1(self):
         pass
-    def corrector(self):
+    def stage2(self):
         pass
 
 
@@ -36,9 +37,7 @@ class EulerStep(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
     def initialize(self):
         pass
-    def predictor(self):
-        pass
-    def corrector(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
                   d_z, d_rho, d_arho, dt=0.0):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
@@ -55,7 +54,7 @@ class EulerStep(IntegratorStep):
 ###############################################################################
 class WCSPHStep(IntegratorStep):
     """Standard Predictor Corrector integrator for the WCSPH formulation
-    
+
     Use this integrator for WCSPH formulations. In the predictor step,
     the particles are advanced to `t + dt/2`. The particles are then
     advanced with the new force computed at this position.
@@ -78,7 +77,7 @@ class WCSPHStep(IntegratorStep):
 
         d_rho0[d_idx] = d_rho[d_idx]
 
-    def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                    d_aw, d_ax, d_ay, d_az, d_arho, dt=0.0):
         dtb2 = 0.5*dt
@@ -93,7 +92,7 @@ class WCSPHStep(IntegratorStep):
         # Update densities and smoothing lengths from the accelerations
         d_rho[d_idx] = d_rho0[d_idx] + dtb2 * d_arho[d_idx]
 
-    def corrector(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                    d_aw, d_ax, d_ay, d_az, d_arho, dt=0.0):
 
@@ -136,7 +135,7 @@ class SolidMechStep(IntegratorStep):
         d_s120[d_idx] = d_s12[d_idx]
         d_s220[d_idx] = d_s22[d_idx]
 
-    def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                   d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_e0, d_ae,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
@@ -164,7 +163,7 @@ class SolidMechStep(IntegratorStep):
         d_s12[d_idx] = d_s120[d_idx] + dtb2 * d_as12[d_idx]
         d_s22[d_idx] = d_s220[d_idx] + dtb2 * d_as22[d_idx]
 
-    def corrector(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, d_au, d_av,
                   d_aw, d_ax, d_ay, d_az, d_arho, d_e, d_ae, d_e0,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
@@ -201,12 +200,12 @@ class TransportVelocityStep(IntegratorStep):
 
     For a predictor-corrector style of integrator, this integrator
     should operate only in PEC mode.
-    
+
     """
     def initialize(self):
         pass
 
-    def predictor(self, d_idx, d_u, d_v, d_au, d_av, d_uhat, d_auhat, d_vhat,
+    def stage1(self, d_idx, d_u, d_v, d_au, d_av, d_uhat, d_auhat, d_vhat,
                   d_avhat, d_x, d_y, dt=0.0):
         dtb2 = 0.5*dt
 
@@ -222,7 +221,7 @@ class TransportVelocityStep(IntegratorStep):
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
 
-    def corrector(self, d_idx, d_u, d_v, d_au, d_av, d_vmag, dt=0.0):
+    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_vmag, dt=0.0):
         dtb2 = 0.5*dt
 
         # corrector update eqn (17)
@@ -247,7 +246,7 @@ class AdamiVerletStep(IntegratorStep):
     def initialize(self):
         pass
 
-    def predictor(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, dt=0.0):
+    def stage1(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, dt=0.0):
         dtb2 = 0.5*dt
 
         # velocity predictor eqn (14)
@@ -258,7 +257,7 @@ class AdamiVerletStep(IntegratorStep):
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
 
-    def corrector(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, d_rho, d_arho,
+    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, d_rho, d_arho,
                   d_vmag, dt=0.0):
         dtb2 = 0.5*dt
 
@@ -293,7 +292,7 @@ class GasDFluidStep(IntegratorStep):
 
         d_e0[d_idx] = d_e[d_idx]
 
-    def predictor(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e0, d_e, d_au, d_av,
                   d_aw, d_ae, dt=0.0):
         dtb2 = 0.5*dt
@@ -309,7 +308,7 @@ class GasDFluidStep(IntegratorStep):
         # update thermal energy
         d_e[d_idx] = d_e0[d_idx] + dtb2 * d_ae[d_idx]
 
-    def corrector(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
+    def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                    d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e0, d_e, d_au, d_av,
                    d_aw, d_ae, dt=0.0):
 
@@ -331,15 +330,15 @@ class Integrator(object):
     r"""Generic class for Predictor Corrector integrators in PySPH
 
     Predictor corrector integrators can have two modes of
-    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`. 
+    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`.
 
     In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
     using:
 
     .. math::
-    
+
         y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
-    
+
         F(y^{n+\frac{1}{2}}) --> Evaluate
 
         y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
@@ -348,9 +347,9 @@ class Integrator(object):
     system is advanced using:
 
     .. math::
-    
+
         F(y^n) --> Evaluate
-    
+
         y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
 
         F(y^{n+\frac{1}{2}}) --> Evaluate
@@ -358,7 +357,7 @@ class Integrator(object):
         y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
 
     Notes:
-    
+
     The Evaluate stage of the integrator forces a function
     evaluation. Therefore, the PEC mode is much faster but relies on
     old accelertions for the Prediction stage.
@@ -371,7 +370,7 @@ class Integrator(object):
 
     """
 
-    def __init__(self, epec=False, **kw):
+    def __init__(self, **kw):
         """Pass fluid names and suitable `IntegratorStep` instances.
 
         For example::
@@ -380,8 +379,6 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
-        self.epec = epec
-
         for array_name, integrator_step in kw.iteritems():
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
@@ -393,6 +390,9 @@ class Integrator(object):
         # by the SPHEval.
         self.integrator = None
 
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
     def set_fixed_h(self, fixed_h):
         # compute h_minimum once for constant smoothing lengths
         if fixed_h:
@@ -454,6 +454,60 @@ class Integrator(object):
         else:
             return cfl*dt_min
 
+    def one_timestep(self, t, dt):
+        """User written function that actually does one timestep.
+
+        This function is used in the high-performance Cython implementation.
+        The assumptions one may make are the following:
+
+            - t and dt are passed.
+
+            - the following methods are available:
+
+                - self.initialize()
+
+                - self.stage1(), self.stage2() etc. depending on the number of
+                  stages available.
+
+                - self.compute_accelerations(t, dt)
+                - self.do_post_stage(stage_dt, stage_count_from_1)
+
+        Please see any of the concrete implementations of the Integrator class
+        to study.
+
+        """
+        raise NotImplementedError()
+
+    def set_parallel_manager(self, pm):
+        self.integrator.set_parallel_manager(pm)
+
+    def set_integrator(self, integrator):
+        self.integrator = integrator
+
+    def set_post_stage_callback(self, callback):
+        """This callback is called when the particles are moved, i.e
+        one stage of the integration is done.
+
+        This callback is passed the current time value, the timestep and the
+        stage.
+
+        The current time value is  t + stage_dt, for example this would be
+        0.5*dt for a two stage predictor corrector integrator.
+
+        """
+        self.integrator.set_post_stage_callback(callback)
+
+    def step(self, time, dt):
+        """This function is called by the solver.
+
+        To implement the integration step please override the
+        ``one_timestep`` method.
+        """
+        self.integrator.step(time, dt)
+
+    ##########################################################################
+    # Mako interface.
+    ##########################################################################
     def get_stepper_code(self):
         classes = {}
         for dest, stepper in self.steppers.iteritems():
@@ -516,12 +570,73 @@ class Integrator(object):
                 .format(obj=dest+'_stepper', method=method, args=call_args)
         return c
 
-    def integrate(self, time, dt, count):
-        self.integrator.integrate(time, dt, count)
+    def get_stepper_method_wrapper_names(self):
+        """Returns the names of the methods we should wrap.  For a 2 stage
+        method this will return ('initialize', 'stage1', 'stage2')
+        """
+        methods = set(['initialize'])
+        for stepper in self.steppers.values():
+            stages = [x for x in dir(stepper) if x.startswith('stage')]
+            methods.update(stages)
+        return list(sorted(methods))
 
-    def set_parallel_manager(self, pm):
-        self.integrator.set_parallel_manager(pm)
+    def get_timestep_code(self):
+        sourcelines = inspect.getsourcelines(self.one_timestep)[0]
+        defn, lines = get_func_definition(sourcelines)
+	return dedent(''.join(lines))
 
-    def set_integrator(self, integrator):
-        self.integrator = integrator
-        self.integrator.set_predictor_corrector_mode(self.epec)
+
+###############################################################################
+# `EulerIntegrator` class
+###############################################################################
+class EulerIntegrator(Integrator):
+    def one_timestep(self, t, dt):
+        self.initialize()
+        self.compute_accelerations()
+        self.stage1()
+        self.do_post_stage(dt, 1)
+
+
+###############################################################################
+# `PECIntegrator` class
+###############################################################################
+class PECIntegrator(Integrator):
+    def one_timestep(self, t, dt):
+        self.initialize()
+
+        # Predict
+        self.stage1()
+
+        # Call any post-stage functions.
+        self.do_post_stage(0.5*dt, 1)
+
+        self.compute_accelerations()
+
+        # Correct
+        self.stage2()
+
+        # Call any post-stage functions.
+        self.do_post_stage(dt, 2)
+
+###############################################################################
+# `EPECIntegrator` class
+###############################################################################
+class EPECIntegrator(Integrator):
+    def one_timestep(self, t, dt):
+        self.initialize()
+
+        self.compute_accelerations()
+
+        # Predict
+        self.stage1()
+
+        # Call any post-stage functions.
+        self.do_post_stage(0.5*dt, 1)
+
+        self.compute_accelerations()
+
+        # Correct
+        self.stage2()
+
+        # Call any post-stage functions.
+        self.do_post_stage(dt, 2)

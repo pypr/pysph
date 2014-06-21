@@ -24,7 +24,7 @@ from pyzoltan.core.carray import LongArray
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import WCSPHStep, Integrator
+from pysph.sph.integrator import WCSPHStep, PECIntegrator
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -72,25 +72,25 @@ def get_circular_patch(dx=0.025, **kwargs):
     m = ones_like(x)*dx*dx
     h = ones_like(x)*hdx*dx
     rho = ones_like(x) * ro
-    
+
     p = ones_like(x) * 1./7.0 * co**2
     cs = ones_like(x) * co
-    
+
     u = -100*x
     v = 100*y
-    
+
     # remove particles outside the circle
     indices = []
     for i in range(len(x)):
         if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
             indices.append(i)
-            
+
     pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
                                   cs=cs, name=name)
     pa.remove_particles(indices)
-    
+
     print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
-    
+
     # add requisite variables needed for this formulation
     for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
                  'v0', 'w0', 'x0', 'y0', 'z0'):
@@ -106,7 +106,7 @@ app = Application()
 
 # Set the SPH kernel. The spline based kernels are much more efficient
 #(but less accurate) than the Gaussian
-kernel = CubicSpline(dim=2) 
+kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
 # Create the Integrator. Currently, PySPH supports Predictor Corrector
@@ -114,8 +114,8 @@ kernel = CubicSpline(dim=2)
 # Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
 # (EPEC). The default faster mode is PEC which requies one less force
 # evaluation per iteration.
-integrator = Integrator(
-    fluid=WCSPHStep(), epec=True)
+integrator = PECIntegrator(
+    fluid=WCSPHStep())
 
 # Construct the solver.
 dt = 5e-6; tf = 0.0075
@@ -130,7 +130,7 @@ solver.set_output_only_real(True)
 
 # Define the SPH equations used to solve this problem
 equations = [
-    
+
     # Equation of state: p = f(rho)
     Group(equations=[
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
@@ -139,7 +139,7 @@ equations = [
     # Block for the accelerations. Choose between either the Delta-SPH
     # formulation or the standard Monaghan 1994 formulation
     Group( equations=[
-    
+
             # Density rate: drho/dt with dissipative penalization
             #ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',], delta=0.1, c0=co),
             ContinuityEquation(dest='fluid',  sources=['fluid',]),
@@ -155,10 +155,10 @@ equations = [
 
     # Update smoothing lengths at the end.
     Group( equations=[
-            
+
             UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=hdx),
             ], real=True ),
-            
+
 
     ]
 

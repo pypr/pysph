@@ -345,7 +345,7 @@ class Solver(object):
                 )
             # perform the integration and update the time.
             #print 'Solver Iteration', self.count, dt, self.t, tdamp
-            self.integrator.integrate(self.t, dt, self.count)
+            self.integrator.step(self.t, dt)
 
             # perform any post step functions
             for func in self.post_step_functions:
@@ -386,7 +386,7 @@ class Solver(object):
             if self.t + dt > self.tf:
                 dt = self.tf - self.t
                 self.dt = dt
-                
+
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)
