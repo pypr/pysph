@@ -1,149 +1,142 @@
-"""Poiseuille flow using the transport velocity formulation of Adami et.al."""
+"""Lid driven cavity using the Transport Velocity formulation"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
 
 # PySPH imports
-from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
+from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import (SummationDensity,
-    ShepardFilteredVelocity, StateEquation,
-    MomentumEquationPressureGradient, MomentumEquationViscosity,
-    MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+from pysph.sph.wc.transport_velocity import SummationDensity,\
+    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
+    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
+    ShepardFilteredVelocity
 
 # numpy
 import numpy as np
 
 # domain and reference values
-Re = 0.0125
-d = 0.5; Ly = 2*d; Lx = 0.4*Ly
-rho0 = 1.0; nu = 1.0
-Vmax = nu*Re/(2*d)
-c0 = 10*Vmax; p0 = c0*c0*rho0
+L = 1.0; Umax = 1.0
+c0 = 10 * Umax; rho0 = 1.0
+p0 = c0*c0*rho0
 
-# The body force is adjusted to give the Required Reynold's number
-# based on the steady state maximum velocity Vmax:
-# Vmax = fx/(2*nu)*(d^2) at the centerline
-fx = Vmax * 2*nu/(d**2)
+# Reynolds number and kinematic viscosity
+Re = 100; nu = Umax * L/Re
 
 # Numerical setup
-dx = 0.025
+nx = 50; dx = L/nx
 ghost_extent = 5 * dx
 hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Vmax )
+dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * np.sqrt(h0/fx)
+dt_force = 1.0
 
-tf = 2.0
+tf = 5.0
 dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
-    _x = np.arange( dx/2, Lx, dx )
-    
-    # create the fluid particles
-    _y = np.arange( dx/2, Ly, dx )
-    
-    x, y = np.meshgrid(_x, _y); fx = x.ravel(); fy = y.ravel()
+    # create all the particles
+    _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
+    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
 
-    # create the channel particles at the top
-    _y = np.arange(Ly+dx/2, Ly+dx/2+ghost_extent, dx)
-    x, y = np.meshgrid(_x, _y); tx = x.ravel(); ty = y.ravel()
-
-    # create the channel particles at the bottom
-    _y = np.arange(-dx/2, -dx/2-ghost_extent, -dx)
-    x, y = np.meshgrid(_x, _y); bx = x.ravel(); by = y.ravel()
-
-    # concatenate the top and bottom arrays
-    cx = np.concatenate( (tx, bx) )
-    cy = np.concatenate( (ty, by) )
+    # sort out the fluid and the solid
+    indices = []
+    for i in range(x.size):
+        if ( (x[i] > 0.0) and (x[i] < L) ):
+            if ( (y[i] > 0.0) and (y[i] < L) ):
+                indices.append(i)
 
     # create the arrays
-    channel = get_particle_array(name='channel', x=cx, y=cy)
-    fluid = get_particle_array(name='fluid', x=fx, y=fy)
+    solid = get_particle_array(name='solid', x=x, y=y)
 
-    print "Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
+    # remove the fluid particles from the solid
+    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+    solid.remove_particles(indices)
+
+    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
-        channel.get_number_of_particles(), dt)
+        solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
-    # particle volume
+
+    # particle volume for fluid and solid
     fluid.add_property('V')
-    channel.add_property('V' )
-
-    # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
-        fluid.add_property(name)
-
-    # kernel summation correction for the channel
-    channel.add_property('wij')
-
-    # imposed velocity on the channel
-    channel.add_property('u0'); channel.u0[:] = 0.
-    channel.add_property('v0'); channel.v0[:] = 0.
-    channel.add_property('w0'); channel.w0[:] = 0.
-
-    # imposed accelerations on the solid
-    channel.add_property('ax')
-    channel.add_property('ay')
-    channel.add_property('az')
+    solid.add_property('V' )
 
     # Shepard filtered velocities for the fluid
     for name in ['uf', 'vf', 'wf']:
         fluid.add_property(name)
 
+    # advection velocities and accelerations
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
+        fluid.add_property(name)
+
+    # kernel summation correction for the solid
+    solid.add_property('wij')
+
+    # imposed or prescribed boundary velocity for the solid
+    solid.add_property('u0'); solid.u0[:] = 0.
+    solid.add_property('v0'); solid.v0[:] = 0.
+    solid.add_property('w0'); solid.w0[:] = 0.
+
+    # imposed accelerations on the solid
+    solid.add_property('ax')
+    solid.add_property('ay')
+    solid.add_property('az')
+
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
-
+    
     # mass is set to get the reference density of rho0
     fluid.m[:] = volume * rho0
-    channel.m[:] = volume * rho0
-
+    solid.m[:] = volume * rho0
+    
     # volume is set as dx^2
     fluid.V[:] = 1./volume
-    channel.V[:] = 1./volume
+    solid.V[:] = 1./volume
 
     # smoothing lengths
     fluid.h[:] = hdx * dx
-    channel.h[:] = hdx * dx
+    solid.h[:] = hdx * dx
 
-    # load balancing props
-    fluid.set_lb_props( fluid.properties.keys() )
-    channel.set_lb_props( channel.properties.keys() )
+    # imposed horizontal velocity on the lid
+    solid.u0[:] = 0.0
+    solid.v0[:] = 0.0
+    for i in range(solid.get_number_of_particles()):
+        if solid.y[i] > L:
+            solid.u0[i] = Umax
 
-    # return the particle list
-    return [fluid, channel]
-
-# domain for periodicity
-domain = DomainLimits(xmin=0, xmax=Lx, periodic_in_x=True)
+    # set the output arrays
+    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
+                              'V', 'm', 'h'] )
+    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+            
+    return [fluid, solid]
 
 # Create the application.
-app = Application(domain=domain)
+app = Application()
 
 # Create the kernel
-kernel = Gaussian(dim=2)
+#kernel = QuinticSpline(dim=2)
+kernel = CubicSpline(dim=2)
 
-integrator = Integrator(fluid=TransportVelocityStep())
+integrator = Integrator(
+    fluid=TransportVelocityStep(), epec=False)
 
 # Create a solver.
-solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-# Setup default parameters.
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                tf=tf, dt=dt, adaptive_timestep=False)
 
 equations = [
 
@@ -154,8 +147,9 @@ equations = [
     # particles. 
     Group(
         equations=[
-            SummationDensity(dest='fluid', sources=['fluid','channel']),
+            SummationDensity(dest='fluid', sources=['fluid','solid']),
             ], real=False),
+
 
     # Once the fluid density is computed, we can use the EOS to set
     # the fluid pressure. Additionally, the shepard filtered velocity
@@ -172,8 +166,7 @@ equations = [
     # been updated and can be used in the integration equations.
     Group(
         equations=[
-            SolidWallPressureBC(dest='channel', sources=['fluid'], 
-                                b=1.0, gx=fx, p0=p0, rho0=rho0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the
@@ -182,7 +175,7 @@ equations = [
         equations=[
             # Pressure gradient terms
             MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'channel'], pb=p0, gx=fx),
+                dest='fluid', sources=['fluid', 'solid'], pb=p0),
             
             # fluid viscosity
             MomentumEquationViscosity(
@@ -192,13 +185,12 @@ equations = [
             # viscous interaction of the fluid with the ghost
             # particles.
             SolidWallNoSlipBC(
-                dest='fluid', sources=['channel'], nu=nu),
+                dest='fluid', sources=['solid'], nu=nu),
             
             # Artificial stress for the fluid phase
             MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
             ], real=True),
-
     ]
 
 # Setup the application and solver.  This also generates the particles.

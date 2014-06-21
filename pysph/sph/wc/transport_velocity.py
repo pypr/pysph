@@ -18,7 +18,7 @@ from math import sin, cos, pi
 M_PI = pi
 
 class SummationDensity(Equation):
-    """Summation density with volume summation
+    r"""Summation density with volume summation
 
     In addition to the standard summation density, the number density
     for the particle is also computed. The number density is important
@@ -32,7 +32,7 @@ class SummationDensity(Equation):
 
     .. math::
 
-        \mathcal{V}_a = \frac{1}{\sum_b W_{ab}}
+              \mathcal{V}_a = \frac{1}{\sum_b W_{ab}}
 
     For this equation, the destination particle array must define the
     variable `V` for particle volume.
@@ -64,11 +64,11 @@ class VolumeFromMassDensity(Equation):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
 
 class ShepardFilteredVelocity(Equation):
-    """Shepard filtered smooth velocity Eq. (22) in REF2:
+    r"""Shepard filtered smooth velocity Eq. (22) in REF2:
     
     .. math::
 
-        \tlide{\boldsymbol{v}}_a = \frac{1}{V_a}\sum_b
+        \tilde{\boldsymbol{v}}_a = \frac{1}{V_a}\sum_b
         \boldsymbol{v}_b W_{ab},
 
     where :math:`V` is the particle volume computed through either
@@ -97,7 +97,7 @@ class ShepardFilteredVelocity(Equation):
         d_wf[d_idx] += s_w[s_idx] * wij
 
 class ContinuityEquation(Equation):
-    """Conservation of mass equation Eq (6) in REF1
+    r"""Conservation of mass equation Eq (6) in REF1
 
     .. math::
 
@@ -114,20 +114,20 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += d_rho[d_idx] * s_m[s_idx]/s_rho[s_idx] * vijdotdwij
 
 class StateEquation(Equation):
-    """Generalized weakly compressible EOS:
+    r"""Generalized weakly compressible EOS:
 
     .. math::
 
         p_a = p_0\left[ \left(\frac{\rho}{\rho_0}\right)^\gamma - b
         \right] + \mathcal{X}
 
-     Notes:
-     
+Notes:
+ 
      This is the generalized Tait's equation of state and the
      suggested values in REF2 are :math:`\mathcal{X} = 0`,
      :math:`\gamma=1` and :math:`b = 1`
 
-     The reference pressure :math:`p_0` is calculated from the
+The reference pressure :math:`p_0` is calculated from the
      artificial sound speed and reference density:
      
      .. math::
@@ -145,7 +145,7 @@ class StateEquation(Equation):
         d_p[d_idx] = self.p0 * ( d_rho[d_idx]/self.rho0 - self.b )
 
 class MomentumEquationPressureGradient(Equation):
-    """Momentum equation for the Transport Velocity formulation
+    r"""Momentum equation for the Transport Velocity formulation
     Eq. (8) in REF2:
 
     .. math::
@@ -218,7 +218,7 @@ class MomentumEquationPressureGradient(Equation):
     def post_loop(self, d_idx, d_au, d_av, d_aw, t=0.0):
         # damped accelerations due to body or external force
         damping_factor = 1.0
-        if t <= self.tdamp:
+        if t < self.tdamp:
             damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
             
         d_au[d_idx] += self.gx * damping_factor
@@ -226,14 +226,14 @@ class MomentumEquationPressureGradient(Equation):
         d_aw[d_idx] += self.gz * damping_factor
 
 class MomentumEquationViscosity(Equation):
-    """Momentum equation for the Transport Velocity formulation
+    r"""Momentum equation for the Transport Velocity formulation
     Eq. (8) in REF2:
 
     .. math::
 
-        \frac{d \boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
-        V_b^2)\left[ \bar{\eta}_{ab}\hat{r}_{ab}\cdot \nabla_a W_{ab}
-        \frac{\boldsymbol{v}_{ab}}{|\boldsymbol{r}_{ab}|}\right]
+           \frac{d \boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
+           V_b^2)\left[ \bar{\eta}_{ab}\hat{r}_{ab}\cdot \nabla_a W_{ab}
+           \frac{\boldsymbol{v}_{ab}}{|\boldsymbol{r}_{ab}|}\right]
 
     """
     def __init__(self, dest, sources=None, nu=0.01):
@@ -270,7 +270,7 @@ class MomentumEquationViscosity(Equation):
         d_aw[d_idx] += tmp * VIJ[2]
 
 class MomentumEquationArtificialViscosity(Equation):
-    """Artificial viscosity for the Momentum equation Eq. (11) in REF1
+    r"""Artificial viscosity for the Momentum equation Eq. (11) in REF1
 
     .. math::
 
@@ -309,19 +309,19 @@ class MomentumEquationArtificialViscosity(Equation):
         d_aw[d_idx] += -piij * DWIJ[2]
 
 class MomentumEquationArtificialStress(Equation):
-    """Artificial stress contribution to the Momentum Equation
+    r"""Artificial stress contribution to the Momentum Equation
 
     .. math::
 
-        \frac{d\boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
-        V_b^2)\left[ \frac{1}{2}(\boldsymbol{A}_a +
-        \boldsymbol{A}_b) : \nabla_a W_{ab}\right]
+          \frac{d\boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
+          V_b^2)\left[ \frac{1}{2}(\boldsymbol{A}_a +
+          \boldsymbol{A}_b) : \nabla_a W_{ab}\right]
 
-     where the artificial stress terms are given by:
+where the artificial stress terms are given by:
 
-     .. math::
+    .. math::
 
-         \boldsymbol{A} = \rho \boldsymbol{v} (\tilde{\boldsymbol{v}}
+           \boldsymbol{A} = \rho \boldsymbol{v} (\tilde{\boldsymbol{v}}
          - \boldsymbol{v})
 
     """
@@ -368,7 +368,7 @@ class MomentumEquationArtificialStress(Equation):
         d_aw[d_idx] += tmp * Az
 
 class SolidWallNoSlipBC(Equation):
-    """Solid wall boundary condition described in REF1
+    r"""Solid wall boundary condition described in REF1
     
     This boundary condition is to be used with fixed ghost particles
     in SPH simulations and is formulated for the general case of
@@ -458,7 +458,7 @@ class SolidWallNoSlipBC(Equation):
         d_aw[d_idx] += tmp * (d_w[d_idx] - wg)
 
 class SolidWallPressureBC(Equation):
-    """Solid wall pressure boundary condition described in REF1
+    r"""Solid wall pressure boundary condition described in REF1
     Eq. (27)
     
     This boundary condition is to be used with fixed ghost particles
