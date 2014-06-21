@@ -6,7 +6,7 @@ from textwrap import dedent
 class MonaghanArtificialStress(Equation):
     r"""
     Artificial stress to remove the tension instability is added to 
-    the momentum equation as described in `SPH elastic dynamics` by J.P.Gray 
+    the momentum equation as described in "SPH elastic dynamics" by J.P.Gray 
     and J.J. Moaghan and R.P. Swift, Computer Methods in Applied Mechanical 
     Engineering. vol 190 (2001) pp 6641 - 6662
     """
