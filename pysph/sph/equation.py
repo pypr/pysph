@@ -162,7 +162,7 @@ def precomputed_symbols():
     """
     c = Context()
     c.HIJ = BasicCodeBlock(code="HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])", HIJ=0.0)
-    
+
     c.EPS = BasicCodeBlock(code="EPS = 0.01*HIJ*HIJ", EPS=0.0)
 
     c.RHOIJ = BasicCodeBlock(code="RHOIJ = 0.5*(d_rho[d_idx] + s_rho[s_idx])",
@@ -279,6 +279,22 @@ def get_predefined_types(precomp):
     for sym, value in precomp.iteritems():
         result[sym] = value.context[sym]
     return result
+
+
+def get_arrays_used_in_equation(equation):
+    """Return two sets, the source and destination arrays used by the equation.
+    """
+    src_arrays = set()
+    dest_arrays = set()
+    for meth_name in ('initialize', 'loop', 'post_loop'):
+        meth = getattr(equation, meth_name, None)
+        if meth is not None:
+            args = inspect.getargspec(meth).args
+            s, d = get_array_names(args)
+            src_arrays.update(s)
+            dest_arrays.update(d)
+    return src_arrays, dest_arrays
+
 
 ##############################################################################
 # `Equation` class.
@@ -460,13 +476,9 @@ class Group(object):
         src_arrays = set()
         dest_arrays = set()
         for equation in self.equations:
-            for meth_name in ('initialize', 'loop', 'post_loop'):
-                meth = getattr(equation, meth_name, None)
-                if meth is not None:
-                    args = inspect.getargspec(meth).args
-                    s, d = get_array_names(args)
-                    src_arrays.update(s)
-                    dest_arrays.update(d)
+            s, d = get_arrays_used_in_equation(equation)
+            src_arrays.update(s)
+            dest_arrays.update(d)
 
         for cb in self.precomputed.values():
             src_arrays.update(cb.src_arrays)
