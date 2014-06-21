@@ -1,5 +1,8 @@
 """Lid driven cavity using the Transport Velocity formulation"""
 
+# math
+from math import exp
+
 # NumPy
 import numpy as np
 
@@ -11,7 +14,7 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator
 
 # the eqations
-from pysph.sph.equation import Group
+from pysph.sph.equation import Group, Equation
 from pysph.sph.basic_equations import RigidBodyConstantAcceleration
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
@@ -173,18 +176,53 @@ integrator = Integrator(
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 tf=tf, dt=dt, adaptive_timestep=False)
 
+class SPHERICBenchmarkAcceleration(Equation):
+    r"""Equation to set the acceleration for the moving square
+    benchmark problem.
+
+    We use scipy.optimize to fit the Gaussian:
+
+    .. math::
+    
+        a \exp( -\frac{(t-b)^2}{2c^2} ) + d
+
+    to the SPHERIC Motion.dat file. The values for the parameters are
+
+    a = 2.8209512
+    b = 0.525652151
+    c = 0.14142151
+    d = -2.55580905e-08
+
+    Notes:
+
+    This equation must be instantiated with no sources
+
+    """
+    def loop(self, d_idx, d_ax, t):
+        a = 2.8209512
+        b = 0.525652151
+        c = 0.14142151
+        d = -2.55580905e-08
+        
+        # compute the acceleration
+        acc = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
+
+        d_ax[d_idx] = acc
+
 equations = [
+
+    # set the acceleration for the obstacle using the special function
+    # mimicing the accelerations provided in the test.
+    Group(
+        equations=[
+            SPHERICBenchmarkAcceleration(dest='obstacle', sources=None),
+            ], real=False),
 
     # Summation density along with volume summation for the fluid
     # phase. This is done for all local and remote particles. At the
     # end of this group, the fluid phase has the correct density
     # taking into consideration the fluid and solid
     # particles. 
-    Group(
-        equations=[
-            RigidBodyConstantAcceleration(dest='obstacle', acc=1.0),
-            
-            ], real=False),
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
