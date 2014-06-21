@@ -221,7 +221,7 @@ class TransportVelocityStep(IntegratorStep):
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
 
-    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_vmag, dt=0.0):
+    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_vmag2, dt=0.0):
         dtb2 = 0.5*dt
 
         # corrector update eqn (17)
@@ -229,7 +229,7 @@ class TransportVelocityStep(IntegratorStep):
         d_v[d_idx] += dtb2*d_av[d_idx]
 
         # magnitude of velocity squared
-        d_vmag[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
+        d_vmag2[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
 
 ###############################################################################
 # `AdamiVerletStep` class
@@ -258,7 +258,7 @@ class AdamiVerletStep(IntegratorStep):
         d_y[d_idx] += dtb2*d_v[d_idx]
 
     def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, d_rho, d_arho,
-                  d_vmag, dt=0.0):
+               d_vmag2, dt=0.0):
         dtb2 = 0.5*dt
 
         # velocity corrector eqn (18)
@@ -273,7 +273,7 @@ class AdamiVerletStep(IntegratorStep):
         d_rho[d_idx] += dt * d_arho[d_idx]
 
         # magnitude of velocity squared
-        d_vmag[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
+        d_vmag2[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
 
 ###############################################################################
 # `GasDFluidStep` class

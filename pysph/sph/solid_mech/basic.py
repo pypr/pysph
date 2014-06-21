@@ -4,6 +4,12 @@ from pysph.sph.equation import Equation
 from textwrap import dedent
 
 class MonaghanArtificialStress(Equation):
+    r"""
+    Artificial stress to remove the tension instability is added to 
+    the momentum equation as described in "SPH elastic dynamics" by J.P.Gray 
+    and J.J. Moaghan and R.P. Swift, Computer Methods in Applied Mechanical 
+    Engineering. vol 190 (2001) pp 6641 - 6662
+    """
     def __init__(self, dest, sources=None, eps=0.3):
         self.eps = eps
         super(MonaghanArtificialStress, self).__init__(dest, sources)
@@ -20,7 +26,7 @@ class MonaghanArtificialStress(Equation):
     def loop(self, d_idx, d_rho, d_p,
              d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
              d_r00, d_r01, d_r02, d_r11, d_r12, d_r22):
-        """Compute the stress terms
+        r"""Compute the stress terms
 
         Parameters:
         -----------
@@ -86,15 +92,13 @@ class MonaghanArtificialStress(Equation):
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
 
-    :math:`$
-    \frac{D\vec{v_a}^i}{Dt} = \sum_b
-    m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} +
-    \frac{\sigma_b^{ij}}{\rho_b^2} \right)\nabla_a\,W_{ab}$`
+     :math:`\frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} 
+     +\frac{\sigma_b^{ij}}{\rho_b^2} \right)\nabla_a\,W_{ab}`
 
     Artificial stress to remove the tension instability is added to
-    the momentum equation as described in `SPH elastic dynamics` by
+    the momentum equation as described in "SPH elastic dynamics" by
     J.P. Gray and J.J. Moaghan and R.P. Swift, Computer Methods in
-    Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
+     Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
 
     """
     def __init__(self, dest, sources=None, wdeltap=-1, n=1):
@@ -175,25 +179,25 @@ class MomentumEquationWithStress2D(Equation):
 class HookesDeviatoricStressRate2D(Equation):
     r""" Compute the RHS for the rate of change of stress equation (2D)
 
-    .. raw:: latex
-
-      \[
-      \frac{dS^{ij}}{dt} = 2\mu\left(\eps^{ij} -
-      \frac{1}{3}\delta^{ij}\eps^{ij}\right) + S^{ik}\Omega^{jk} +
-      \Omega^{ik}S^{kj}
-      \]
+    .. math:: 
+      
+           \left[	
+           \frac{dS^{ij}}{dt} = 2\mu\left(\epsilon^{ij} -
+           \frac{1}{3}\delta^{ij}\epsilon^{ij}\right) + S^{ik}\Omega^{jk} +
+           \Omega^{ik}S^{kj}
+           \right]
 
     where,
 
-    :math:`$\eps^{ij} = \frac{1}{2}\left( \frac{\partialv^i}{\partialx^j} +
-                                  \frac{\partialv^j}{\partialx^i} \right
-                                  )$`
+    .. math:: \epsilon^{ij} = \frac{1}{2}\left( 
+           \frac{\partial v^i}{\partial x^j} +
+           {\partial v^j}{\partial x^i}\right)
 
     and
 
-    :math:`$\Omega^{ij} = \frac{1}{2}\left( \frac{\partialv^i}{\partialx^j} -
-                                  \frac{\partialv^j}{\partialx^i} \right
-                                  )$`
+    .. math:: \Omega^{ij} = \frac{1}{2}\left( 
+       	   \frac{\partial v^i}{\partial x^j} - 
+           {\partial v^j}{\partial x^i} \right)
 
     """
     def __init__(self, dest, sources=None, shear_mod=1.0):

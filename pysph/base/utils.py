@@ -206,9 +206,13 @@ def get_particle_array_wcsph(**props):
 def get_particle_array_tvf_fluid(**props):
     "Get the fluid array for the transport velocity formulation"
     tv_props = ['uf', 'vf', 'wf','uhat', 'vhat', 'what',
-                'auhat', 'avhat', 'awhat', 'vmag', 'V']
+                'auhat', 'avhat', 'awhat', 'vmag2', 'V']
 
-    return get_particle_array(additional_props=tv_props, **props)
+    pa = get_particle_array(additional_props=tv_props, **props)
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
+                           'm', 'au', 'av', 'aw', 'V', 'vmag2'] )
+
+    return pa
 
 def get_particle_array_tvf_solid(**props):
     "Get the solid array for the transport velocity formulation"

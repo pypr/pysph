@@ -1,9 +1,10 @@
-"""Lid driven cavity using the Transport Velocity formulation"""
+"""Incompressible flow past a periodic array of cylinders"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
 
 # PySPH imports
+from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
@@ -12,46 +13,52 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import SummationDensity,\
-    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
-    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    ShepardFilteredVelocity
+from pysph.sph.wc.transport_velocity import (SummationDensity,
+    ShepardFilteredVelocity, StateEquation,
+    MomentumEquationPressureGradient, MomentumEquationViscosity,
+    MomentumEquationArtificialStress,
+    SolidWallPressureBC, SolidWallNoSlipBC)
 
 # numpy
 import numpy as np
 
 # domain and reference values
-L = 1.0; Umax = 1.0
-c0 = 10 * Umax; rho0 = 1.0
+L = 0.12; Umax = 1.2e-4
+a = 0.02; H = 4*a
+fx = 2.5e-4
+c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * L/Re
+nu = 0.1/rho0; Re = a*Umax/nu
 
 # Numerical setup
-nx = 50; dx = L/nx
-ghost_extent = 5 * dx
-hdx = 1.2
+nx = 144; dx = L/nx
+ghost_extent = 5 * 1.5 * dx
+hdx = 1.05
 
 # adaptive time steps
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
+dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 5.0
-dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+tf = 20.0
+dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
     # create all the particles
-    _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
-    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+    _x = np.arange( dx/2, L, dx )
+    _y = np.arange( -ghost_extent, H+ghost_extent, dx )
+    x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
     # sort out the fluid and the solid
     indices = []
+    cx = 0.5 * L; cy = 0.5 * H
     for i in range(x.size):
-        if ( (x[i] > 0.0) and (x[i] < L) ):
-            if ( (y[i] > 0.0) and (y[i] < L) ):
+        xi = x[i]; yi = y[i]
+        if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
+            if ( (yi > 0) and (yi < H) ):
                 indices.append(i)
 
     # create the arrays
@@ -61,13 +68,13 @@ def create_particles(**kwargs):
     fluid = solid.extract_particles(indices); fluid.set_name('fluid')
     solid.remove_particles(indices)
 
-    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+    print "Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
         solid.get_number_of_particles(), dt)
 
     # add requisite properties to the arrays:
 
-    # particle volume for fluid and solid
+    # volume from number density for fluid and solid
     fluid.add_property('V')
     solid.add_property('V' )
 
@@ -75,8 +82,8 @@ def create_particles(**kwargs):
     for name in ['uf', 'vf', 'wf']:
         fluid.add_property(name)
 
-    # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
+    # advection velocities and accelerations for the fluid
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat'):
         fluid.add_property(name)
 
     # kernel summation correction for the solid
@@ -93,7 +100,7 @@ def create_particles(**kwargs):
     solid.add_property('az')
 
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
@@ -101,42 +108,45 @@ def create_particles(**kwargs):
     # mass is set to get the reference density of rho0
     fluid.m[:] = volume * rho0
     solid.m[:] = volume * rho0
-    
-    # volume is set as dx^2
+
+    # initial particle density
+    fluid.rho[:] = rho0
+    solid.rho[:] = rho0
+
+    # volume is set as dx^2. V is the number density form of the
+    # particle volume and will be computed in the equations for the
+    # fluid phase. The initial values are used for the solid phase
     fluid.V[:] = 1./volume
     solid.V[:] = 1./volume
 
-    # smoothing lengths
+    # particle smoothing lengths
     fluid.h[:] = hdx * dx
     solid.h[:] = hdx * dx
 
-    # imposed horizontal velocity on the lid
-    solid.u0[:] = 0.0
-    solid.v0[:] = 0.0
-    for i in range(solid.get_number_of_particles()):
-        if solid.y[i] > L:
-            solid.u0[i] = Umax
-
-    # set the output arrays
-    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag', 'rho', 'p',
-                              'V', 'm', 'h'] )
-    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
-            
+    # return the particle list
     return [fluid, solid]
 
+# domain for periodicity
+domain = DomainLimits(
+    xmin=0, xmax=L, periodic_in_x=True)
+
 # Create the application.
-app = Application()
+app = Application(domain=domain)
 
 # Create the kernel
-#kernel = QuinticSpline(dim=2)
-kernel = CubicSpline(dim=2)
+#kernel = Gaussian(dim=2)
+kernel = QuinticSpline(dim=2)
 
+# The predictor corrector integrator for the TV formulation. As per
+# the paper, the integrator is defined for PEC mode with only one
+# function evaluation per time step.
 integrator = Integrator(
     fluid=TransportVelocityStep(), epec=False)
 
-# Create a solver.
-solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                tf=tf, dt=dt, adaptive_timestep=False)
+# Create a solver. Damping time is taken as 0.1% of the final time
+solver = Solver(
+    kernel=kernel, dim=2, integrator=integrator,
+    adaptive_timestep=False, tf=tf, dt=dt, tdamp=tf/1000.0)
 
 equations = [
 
@@ -149,7 +159,6 @@ equations = [
         equations=[
             SummationDensity(dest='fluid', sources=['fluid','solid']),
             ], real=False),
-
 
     # Once the fluid density is computed, we can use the EOS to set
     # the fluid pressure. Additionally, the shepard filtered velocity
@@ -166,7 +175,8 @@ equations = [
     # been updated and can be used in the integration equations.
     Group(
         equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], 
+                                gx=fx, b=1.0, rho0=rho0, p0=p0),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the
@@ -175,7 +185,7 @@ equations = [
         equations=[
             # Pressure gradient terms
             MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'solid'], pb=p0),
+                dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
             
             # fluid viscosity
             MomentumEquationViscosity(
