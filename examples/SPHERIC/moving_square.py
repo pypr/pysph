@@ -1,8 +1,5 @@
 """Lid driven cavity using the Transport Velocity formulation"""
 
-# PyZoltan imports
-from pyzoltan.core.carray import LongArray
-
 # PySPH imports
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
