@@ -71,8 +71,9 @@ def check_equation_array_properties(equation, particle_arrays):
 
     errors = defaultdict(set)
     _check_array(p_arrays[equation.dest], eq_dest, errors)
-    for src in equation.sources:
-        _check_array(p_arrays[src], eq_src, errors)
+    if equation.sources is not None:
+        for src in equation.sources:
+            _check_array(p_arrays[src], eq_src, errors)
 
     if len(errors) > 0:
         msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
@@ -94,13 +95,14 @@ class SPHEval(object):
         self.nnps = None
         self.integrator = integrator
         self.cell_iteration = cell_iteration
-        for equation in equations:
-            check_equation_array_properties(equation, particle_arrays)
 
         all_equations = []
         for group in self.equation_groups:
             all_equations.extend(group.equations)
         self.all_group = Group(equations=all_equations)
+
+        for equation in all_equations:
+            check_equation_array_properties(equation, particle_arrays)
 
         self.groups = [self._make_group(g) for g in self.equation_groups]
         self.ext_mod = None
