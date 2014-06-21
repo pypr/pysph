@@ -7,7 +7,7 @@ except ImportError:
 from mako.template import Template
 from os.path import dirname, join
 
-from pysph.sph.equation import Group
+from pysph.sph.equation import Group, get_arrays_used_in_equation
 from pysph.base.ext_module import ExtModule
 from pysph.base.cython_generator import CythonGenerator
 
@@ -52,6 +52,37 @@ def get_array_names(particle_arrays):
     array_names = ', '.join(sorted(props))
     return array_names
 
+
+def check_equation_array_properties(equation, particle_arrays):
+    """Given an equation and the particle arrays, check if the particle arrays
+    have the necessary properties.
+    """
+    p_arrays = {x.name:x for x in particle_arrays}
+    _src, _dest = get_arrays_used_in_equation(equation)
+    eq_src = set([x[2:] for x in _src])
+    eq_dest = set([x[2:] for x in _dest])
+
+    def _check_array(array, eq_props, errors):
+        """Updates the `errors` with any errors.
+        """
+        props = set(array.properties.keys())
+        if not eq_props < props:
+            errors[array.name].update(eq_props - props)
+
+    errors = defaultdict(set)
+    _check_array(p_arrays[equation.dest], eq_dest, errors)
+    if equation.sources is not None:
+        for src in equation.sources:
+            _check_array(p_arrays[src], eq_src, errors)
+
+    if len(errors) > 0:
+        msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
+        for name, missing in errors.iteritems():
+            msg += "Array '%s' missing properties %s.\n"%(name, missing)
+        print msg
+        raise RuntimeError(msg)
+
+
 ###############################################################################
 # `SPHEval` class.
 ###############################################################################
@@ -69,6 +100,9 @@ class SPHEval(object):
         for group in self.equation_groups:
             all_equations.extend(group.equations)
         self.all_group = Group(equations=all_equations)
+
+        for equation in all_equations:
+            check_equation_array_properties(equation, particle_arrays)
 
         self.groups = [self._make_group(g) for g in self.equation_groups]
         self.ext_mod = None
@@ -88,6 +122,7 @@ class SPHEval(object):
 
         dests = OrderedDict()
         dests.real = group.real
+        dests.update_nnps = group.update_nnps
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
