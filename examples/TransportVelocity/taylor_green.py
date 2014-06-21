@@ -5,7 +5,7 @@ from pyzoltan.core.carray import LongArray
 
 # PySPH imports
 from pysph.base.nnps import DomainLimits
-from pysph.base.utils import get_particle_array
+from pysph.base.utils import get_particle_array_tvf_fluid
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
@@ -13,8 +13,10 @@ from pysph.sph.integrator import TransportVelocityStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import DensitySummation,\
-    StateEquation, MomentumEquation, ArtificialStress
+from pysph.sph.wc.transport_velocity import SummationDensity,\
+    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
+    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
+    ShepardFilteredVelocity
 
 # numpy
 import numpy as np
@@ -47,7 +49,7 @@ def create_particles(**kwargs):
     h = np.ones_like(x) * dx
 
     # create the arrays
-    fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
+    fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
 
     # add the requisite arrays
     fluid.add_property('color')
@@ -65,16 +67,6 @@ def create_particles(**kwargs):
     fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
     fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-    # add requisite properties to the arrays:
-    # particle volume
-    fluid.add_property('V')
-
-    # advection velocities and accelerations
-    for name in ('uhat', 'vhat', 'auhat', 'avhat', 'au', 'av'):
-        fluid.add_property(name)
-
-    fluid.add_property('vmag')
-
     # mass is set to get the reference density of each phase
     fluid.rho[:] = rho0
     fluid.m[:] = volume * fluid.rho
@@ -84,9 +76,6 @@ def create_particles(**kwargs):
 
     # smoothing lengths
     fluid.h[:] = hdx * dx
-
-    # load balancing props
-    fluid.set_lb_props( fluid.properties.keys() )
 
     # return the particle list
     return [fluid,]
@@ -99,9 +88,10 @@ domain = DomainLimits(xmin=0, xmax=L, ymin=0, ymax=L,
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = QuinticSpline(dim=2)
+#kernel = QuinticSpline(dim=2)
 #kernel = WendlandQuintic(dim=2)
 #kernel = Gaussian(dim=2)
+kernel = CubicSpline(dim=2)
 
 integrator = Integrator(fluid=TransportVelocityStep())
 
@@ -114,21 +104,42 @@ solver.set_final_time(tf)
 
 equations = [
 
-    # density summation
+    # Summation density along with volume summation for the fluid
+    # phase. This is done for all local and remote particles. At the
+    # end of this group, the fluid phase has the correct density
+    # taking into consideration the fluid and solid
+    # particles. 
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid']),
-            ]),
+            SummationDensity(dest='fluid', sources=['fluid']),
+            ], real=False),
 
+    # Once the fluid density is computed, we can use the EOS to set
+    # the fluid pressure. Additionally, the shepard filtered velocity
+    # for the fluid phase is determined.
     Group(
         equations=[
-            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ], real=False),
 
-            MomentumEquation(dest='fluid', sources=['fluid'], nu=nu, pb=p0),
+    # The main accelerations block. The acceleration arrays for the
+    # fluid phase are upadted in this stage for all local particles.
+    Group(
+        equations=[
+            # Pressure gradient terms
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid'], pb=p0),
+            
+            # fluid viscosity
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+            
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-            ArtificialStress(dest='fluid', sources=['fluid']),
+            ], real=True),
 
-            ]),
     ]
 
 # Setup the application and solver.  This also generates the particles.

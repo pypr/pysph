@@ -3,6 +3,7 @@ from pysph.sph.equation import Equation
 def wendland_quintic(rij=1.0, h=1.0):
     q = rij/h
     q1 = 2.0 - q
+    val = 0.0
     if q < 2.0:
         val = (1 + 2.5*q + 2*q*q)*q1*q1*q1*q1*q1
 

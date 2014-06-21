@@ -341,7 +341,6 @@ def load(fname):
 
         for array_name in arrays:
             array = get_particle_array(name=array_name,
-                                       cl_precision="single",
                                        **arrays[array_name])
             ret["arrays"][array_name] = array
 
@@ -428,7 +427,7 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
 # SPH interpolation of data
 from pyzoltan.core.carray import UIntArray
 from pysph.base.kernels import Gaussian, get_compiled_kernel
-from pysph.base.nnps import NNPS
+from pysph.base.nnps import LinkedListNNPS as NNPS
 class SPHInterpolate(object):
     """Class to perform SPH interpolation
 

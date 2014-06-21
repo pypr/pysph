@@ -35,14 +35,12 @@ def arange_long(start, stop=-1):
         return arange
 
 
-def get_particle_array(cl_precision="double", **props):
+def get_particle_array(
+    additional_props=None, **props):
     """ Create and return a particle array with default properties
 
     Parameters
     ----------
-
-    cl_precision : {'single', 'double'}
-        Precision to use in OpenCL (default: 'double').
 
     props : dict
         A dictionary of properties requested.
@@ -94,8 +92,14 @@ def get_particle_array(cl_precision="double", **props):
                                'type':'double',
                                'name':prop}
 
+    # default properties for an SPH particle
     default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
                      'au', 'av', 'aw', 'gid', 'pid', 'tag']
+
+    # add any additional props
+    if additional_props:
+        default_props.extend( additional_props )
+        default_props = list( set(default_props) )
 
     # Add the default props
     for prop in default_props:
@@ -128,7 +132,7 @@ def get_particle_array(cl_precision="double", **props):
 
     return pa
 
-def get_particle_array_wcsph(cl_precision="single", **props):
+def get_particle_array_wcsph(**props):
     """Return a particle array for the WCSPH formulation"""
 
     # handle the name separately
@@ -196,6 +200,33 @@ def get_particle_array_wcsph(cl_precision="single", **props):
     # default property arrays to save out. 
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
                            'pid', 'gid', 'tag', 'p'] )
+
+    return pa
+
+def get_particle_array_tvf_fluid(**props):
+    "Get the fluid array for the transport velocity formulation"
+    tv_props = ['uf', 'vf', 'wf','uhat', 'vhat', 'what',
+                'auhat', 'avhat', 'awhat', 'vmag', 'V']
+
+    return get_particle_array(additional_props=tv_props, **props)
+
+def get_particle_array_tvf_solid(**props):
+    "Get the solid array for the transport velocity formulation"
+    tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az']
+
+    return get_particle_array(additional_props=tv_props, **props)
+
+def get_particle_array_gasd(**props):
+    "Get the particle array with requisite properties for gas-dynamics"
+    required_props = [
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
+        'au', 'av', 'aw', 'arho', 'ae', 'am', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
+        'rho0', 'e0', 'div', 'grhox', 'grhoy', 'grhoz']
+
+    pa = get_particle_array( additional_props=required_props, **props )
+    
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
+                           'au', 'av', 'ae', 'pid', 'gid', 'tag'] )
 
     return pa
 

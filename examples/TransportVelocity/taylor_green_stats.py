@@ -14,7 +14,8 @@ def velocity(b, t, x, y):
     return factor * u, factor * v
 
 class TaylorGreenResults(pprocess.Results):
-    def __init__(self, dirname=None, fname=None, endswith=".npz",
+    def __init__(self, dirname='taylor_green_output', 
+                 fname='taylor_green', endswith=".npz",
                  U=1, Re=100):
         super(TaylorGreenResults, self).__init__(dirname, fname, endswith)
 
@@ -46,8 +47,3 @@ class TaylorGreenResults(pprocess.Results):
 
         self.decay = decay
         self.linf = linf
-
-
-
-
-
