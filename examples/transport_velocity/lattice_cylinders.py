@@ -9,7 +9,8 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, Integrator
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import TransportVelocityStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -67,11 +68,11 @@ def create_particles(**kwargs):
     # remove the fluid particles from the solid
     fluid = solid.extract_particles(indices); fluid.set_name('fluid')
     solid.remove_particles(indices)
-    
+
     print "Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
         solid.get_number_of_particles(), dt)
-    
+
     # add requisite properties to the arrays:
     # particle volume
     fluid.add_property('V')
@@ -136,10 +137,10 @@ app = Application(domain=domain)
 # Create the kernel
 kernel = Gaussian(dim=2)
 
-integrator = Integrator(fluid=TransportVelocityStep(), epec=False)
+integrator = PECIntegrator(fluid=TransportVelocityStep())
 
 # Create a solver.
-solver = Solver(kernel=kernel, dim=2, integrator=integrator, 
+solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf)
 
 equations = [
@@ -148,7 +149,7 @@ equations = [
     # phase. This is done for all local and remote particles. At the
     # end of this group, the fluid phase has the correct density
     # taking into consideration the fluid and solid
-    # particles. 
+    # particles.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid','solid']),
@@ -180,17 +181,17 @@ equations = [
             # Pressure gradient terms
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
-            
+
             # fluid viscosity
             MomentumEquationViscosity(
                 dest='fluid', sources=['fluid'], nu=nu),
-            
+
             # No-slip boundary condition. This is effectively a
             # viscous interaction of the fluid with the ghost
             # particles.
             SolidWallNoSlipBC(
                 dest='fluid', sources=['solid'], nu=nu),
-            
+
             # Artificial stress for the fluid phase
             MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 

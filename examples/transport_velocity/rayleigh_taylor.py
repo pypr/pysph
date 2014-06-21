@@ -8,7 +8,8 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, Integrator
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import TransportVelocityStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -74,15 +75,15 @@ def create_particles(empty=False, **kwargs):
     for i in range(fluid.get_number_of_particles()):
         if fluid.y[i] > 1 - 0.15*np.sin(2*np.pi*fluid.x[i]):
             indices.append(i)
-            
+
     fluid1 = fluid.extract_particles(indices); fluid1.set_name('fluid1')
     fluid2 = fluid
     fluid2.set_name('fluid2')
     fluid2.remove_particles(indices)
-    
+
     fluid1.rho[:] = rho1
     fluid2.rho[:] = rho2
-    
+
     print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid1.get_number_of_particles() + fluid2.get_number_of_particles(),
         solid.get_number_of_particles(), dt)
@@ -131,7 +132,7 @@ def create_particles(empty=False, **kwargs):
     fluid1.V[:] = 1./volume
     fluid2.V[:] = 1./volume
     solid.V[:] = 1./volume
-    
+
     # smoothing lengths
     fluid1.h[:] = hdx * dx
     fluid2.h[:] = hdx * dx
@@ -151,8 +152,8 @@ app = Application()
 # Create the kernel
 kernel = Gaussian(dim=2)
 
-integrator = Integrator(fluid1=TransportVelocityStep(),
-                        fluid2=TransportVelocityStep())
+integrator = PECIntegrator(fluid1=TransportVelocityStep(),
+                           fluid2=TransportVelocityStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)
@@ -201,13 +202,13 @@ equations = [
                 dest='fluid1', sources=['fluid1', 'fluid2', 'solid'], pb=p1, gy=gy),
             MomentumEquationPressureGradient(
                 dest='fluid2', sources=['fluid1', 'fluid2', 'solid'], pb=p2, gy=gy),
-            
+
             # fluid viscosity
             MomentumEquationViscosity(
                 dest='fluid1', sources=['fluid1', 'fluid2'], nu=nu),
             MomentumEquationViscosity(
                 dest='fluid2', sources=['fluid1', 'fluid2'], nu=nu),
-            
+
             # No-slip boundary condition. This is effectively a
             # viscous interaction of the fluid with the ghost
             # particles.
@@ -216,7 +217,7 @@ equations = [
 
             SolidWallNoSlipBC(
                 dest='fluid2', sources=['solid'], nu=nu),
-            
+
             # Artificial stress for the fluid phase
             MomentumEquationArtificialStress(dest='fluid1', sources=['fluid1', 'fluid2']),
             MomentumEquationArtificialStress(dest='fluid2', sources=['fluid1', 'fluid2']),

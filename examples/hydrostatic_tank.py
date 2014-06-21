@@ -21,7 +21,7 @@ Of these, the first and third are ghost particle methods while the
 second is the classical Monaghan style, repulsive particle approach.
 
 For the fluid dynamics, we use the multi-phase formulation presented
-in REF1. 
+in REF1.
 
 """
 # NumPy
@@ -35,7 +35,8 @@ from pysph.base.utils import get_particle_array_wcsph as gpa
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import Integrator, WCSPHStep
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import WCSPHStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -94,7 +95,7 @@ def create_particles(**kwargs):
         if ( (x[i] > 0.0) and (x[i] < Lx) ):
             if ( (y[i] > 0.0) and (y[i] < H) ):
                 indices.append(i)
-                
+
     # create the arrays
     solid = gpa(name='solid', x=x, y=y)
 
@@ -115,7 +116,7 @@ def create_particles(**kwargs):
         solid.get_number_of_particles(), dt)
 
     ###### ADD PARTICLE PROPS FOR MULTI-PHASE SPH ######
-    
+
     # particle volume
     fluid.add_property('V')
     solid.add_property('V' )
@@ -130,10 +131,10 @@ def create_particles(**kwargs):
     ##### INITIALIZE PARTICLE PROPS #####
     fluid.rho[:] = rho0
     solid.rho[:] = rho0
-    
+
     fluid.rho0[:] = rho0
     solid.rho0[:] = rho0
-    
+
     # mass is set to get the reference density of rho0
     volume = dx * dx
 
@@ -158,7 +159,7 @@ app = Application()
 #kernel = Gaussian(dim=2)
 kernel = QuinticSpline(dim=2)
 
-integrator = Integrator(fluid=WCSPHStep())
+integrator = PECIntegrator(fluid=WCSPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
@@ -183,14 +184,14 @@ equations1 = [
     # The boundary conditions are imposed by extrapolating the fluid
     # pressure, taking into considering the bounday acceleration
     Group(equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, gy=gy, 
+            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, gy=gy,
                                 rho0=rho0, p0=p0),
             ], ),
 
     # Main acceleration block
     Group(equations=[
 
-            # Continuity equation 
+            # Continuity equation
             ContinuityEquation(dest='fluid', sources=['fluid','solid']),
 
             # Pressure gradient with acceleration damping.
@@ -241,7 +242,7 @@ equations2 = [
             MonaghanKajtarBoundaryForce(dest='fluid', sources=['solid'],
                                         K=0.02, beta=1.0, h=hdx*dx),
 
-            # Continuity equation 
+            # Continuity equation
             ContinuityEquation(dest='fluid', sources=['fluid',]),
 
             # Pressure gradient with acceleration damping.
@@ -282,7 +283,7 @@ equations3 = [
     # fluid phase
     Group(equations=[
 
-            # Continuity equation 
+            # Continuity equation
             ContinuityEquation(dest='fluid', sources=['fluid','solid']),
             ContinuityEquation(dest='solid', sources=['fluid']),
 

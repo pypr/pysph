@@ -28,7 +28,8 @@ from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import EulerStep, Integrator
+from pysph.sph.integrator import EulerIntegrator
+from pysph.sph.integrator_step import EulerStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -59,7 +60,7 @@ def create_particles(**kwargs):
 
     print "Advection mixing problem :: nfluid = %d"%(
         fluid.get_number_of_particles())
-    
+
     # setup the particle properties
     pi = np.pi; cos = np.cos; sin=np.sin
 
@@ -69,7 +70,7 @@ def create_particles(**kwargs):
     # velocities
     fluid.u0[:] = +sin(pi*x)*sin(pi*x) * sin(2*pi*y)
     fluid.v0[:] = -sin(pi*y)*sin(pi*y) * sin(2*pi*x)
-    
+
     # return the particle list
     return [fluid,]
 
@@ -83,7 +84,7 @@ app = Application(domain=domain)
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
-integrator = Integrator(fluid=EulerStep())
+integrator = EulerIntegrator(fluid=EulerStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)

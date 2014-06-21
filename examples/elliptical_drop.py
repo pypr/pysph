@@ -24,7 +24,8 @@ from pyzoltan.core.carray import LongArray
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import WCSPHStep, PECIntegrator
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import WCSPHStep
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -109,13 +110,11 @@ app = Application()
 kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
-# Create the Integrator. Currently, PySPH supports Predictor Corrector
-# style integrators which can be operated in two modes
-# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
-# (EPEC). The default faster mode is PEC which requies one less force
-# evaluation per iteration.
-integrator = PECIntegrator(
-    fluid=WCSPHStep())
+# Create the Integrator. Currently, PySPH supports multi-step  style
+# integrators.  Predict-Correct-Evaluate (PEC) and
+# Evaluate-Predict-Evaluate-Correct (EPEC) are available. The default faster
+# mode is PEC  which requies one less force  evaluation per iteration.
+integrator = PECIntegrator(fluid=WCSPHStep())
 
 # Construct the solver.
 dt = 5e-6; tf = 0.0075
