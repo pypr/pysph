@@ -326,7 +326,7 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True):
+    def __init__(self, equations, real=True, update_nnps=False):
         """Constructor.
 
         Parameters
@@ -336,6 +336,9 @@ class Group(object):
 
         - real: bool: specifies if only non-remote/non-ghost particles should
                       be operated on.
+
+        - update_nnps: bool: specifies if the neighbors should be re-computed 
+                       locally after this group
 
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
@@ -347,6 +350,7 @@ class Group(object):
         False.
         """
         self.real = real
+        self.update_nnps = update_nnps
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
