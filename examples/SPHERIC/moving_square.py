@@ -8,12 +8,12 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator,
+from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator
 
 # the eqations
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import RigidBodyConstantAcceleration
-from pysph.sph.wc.transport_velocity import DensitySummation,\
+from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
     ShepardFilteredVelocity
@@ -186,7 +186,7 @@ equations = [
             ], real=False),
     Group(
         equations=[
-            DensitySummation(dest='fluid', sources=['fluid','solid','obstacle']),
+            SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
             ], real=False),
 
 
