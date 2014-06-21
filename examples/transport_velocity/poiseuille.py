@@ -1,4 +1,4 @@
-"""Couette flow using the transport velocity formulation of Adami et.al."""
+"""Poiseuille flow using the transport velocity formulation of Adami et.al."""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray
@@ -26,13 +26,16 @@ import numpy as np
 Re = 0.0125
 d = 0.5; Ly = 2*d; Lx = 0.4*Ly
 rho0 = 1.0; nu = 1.0
-
-# upper wall velocity based on the Reynolds number and channel width
 Vmax = nu*Re/(2*d)
 c0 = 10*Vmax; p0 = c0*c0*rho0
 
+# The body force is adjusted to give the Required Reynold's number
+# based on the steady state maximum velocity Vmax:
+# Vmax = fx/(2*nu)*(d^2) at the centerline
+fx = Vmax * 2*nu/(d**2)
+
 # Numerical setup
-dx = 0.05
+dx = 0.025
 ghost_extent = 5 * dx
 hdx = 1.2
 
@@ -40,17 +43,17 @@ hdx = 1.2
 h0 = hdx * dx
 dt_cfl = 0.25 * h0/( c0 + Vmax )
 dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
+dt_force = 0.25 * np.sqrt(h0/fx)
 
 tf = 2.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
     _x = np.arange( dx/2, Lx, dx )
     
     # create the fluid particles
     _y = np.arange( dx/2, Ly, dx )
-
+    
     x, y = np.meshgrid(_x, _y); fx = x.ravel(); fy = y.ravel()
 
     # create the channel particles at the top
@@ -69,7 +72,7 @@ def create_particles(**kwargs):
     channel = get_particle_array(name='channel', x=cx, y=cy)
     fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
-    print "Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
+    print "Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
         channel.get_number_of_particles(), dt)
 
@@ -90,6 +93,7 @@ def create_particles(**kwargs):
     channel.add_property('v0'); channel.v0[:] = 0.
     channel.add_property('w0'); channel.w0[:] = 0.
 
+    # imposed accelerations on the solid
     channel.add_property('ax')
     channel.add_property('ay')
     channel.add_property('az')
@@ -99,11 +103,11 @@ def create_particles(**kwargs):
         fluid.add_property(name)
 
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
-    
+
     # mass is set to get the reference density of rho0
     fluid.m[:] = volume * rho0
     channel.m[:] = volume * rho0
@@ -115,10 +119,6 @@ def create_particles(**kwargs):
     # smoothing lengths
     fluid.h[:] = hdx * dx
     channel.h[:] = hdx * dx
-
-    # channel velocity on upper portion
-    indices = np.where(channel.y > d)[0]
-    channel.u0[indices] = Vmax
 
     # load balancing props
     fluid.set_lb_props( fluid.properties.keys() )
@@ -135,8 +135,6 @@ app = Application(domain=domain)
 
 # Create the kernel
 kernel = Gaussian(dim=2)
-
-print domain, kernel
 
 integrator = Integrator(fluid=TransportVelocityStep())
 
@@ -175,7 +173,7 @@ equations = [
     Group(
         equations=[
             SolidWallPressureBC(dest='channel', sources=['fluid'], 
-                                b=1.0, rho0=rho0, p0=p0),
+                                b=1.0, gx=fx, p0=p0, rho0=rho0),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the
@@ -184,7 +182,7 @@ equations = [
         equations=[
             # Pressure gradient terms
             MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'channel'], pb=p0),
+                dest='fluid', sources=['fluid', 'channel'], pb=p0, gx=fx),
             
             # fluid viscosity
             MomentumEquationViscosity(
@@ -200,6 +198,7 @@ equations = [
             MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
             ], real=True),
+
     ]
 
 # Setup the application and solver.  This also generates the particles.
