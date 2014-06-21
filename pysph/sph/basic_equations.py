@@ -47,9 +47,7 @@ class VelocityGradient2D(Equation):
 
     The tensor properties are stored in the variables v_ij where 'i'
     refers to the velocity component and 'j' refers to the spatial
-    component. Thus v_21 is
-
-    :math:`\frac{\partial w}{\partial y}`
+    component. Thus v_21 is :math:`\frac{\partial w}{\partial y}`
 
     """
     def initialize(self, d_idx, d_v00, d_v01, d_v10, d_v11):
@@ -90,7 +88,7 @@ class ContinuityEquation(Equation):
     r"""Density rate:
 
     :math:`\frac{d\rho_a}{dt} = \sum_b m_b \boldsymbol{v}_{ab}\cdot
-    \nabla_a W_{ab} `
+    \nabla_a W_{ab}`
 
     """
     def initialize(self, d_idx, d_arho):
@@ -137,7 +135,7 @@ class XSPHCorrection(Equation):
     """Position stepping with XSPH correction
     
     This equation must be used to advect the particles. XSPH can be
-    turned off by setting the parameter :math:`\epsilon = 0`.
+    turned off by setting the parameter ``eps`` = 0`.
 
     """
     def __init__(self, dest, sources=None, eps=0.5):

@@ -71,8 +71,8 @@ class TaitEOSHGCorrection(Equation):
 class MomentumEquation(Equation):
     r"""Classic Monaghan style Momentum equation with artificial viscosity
 
-    The standard reference for this is Monaghan's 1992 paper 'Smoothed
-    Particle Hydrodynamics'
+    The standard reference for this is Monaghan's 1992 paper "Smoothed
+    Particle Hydrodynamics"
 
     """
     def __init__(self, dest, sources=None,
@@ -176,7 +176,7 @@ class MomentumEquationDeltaSPH(Equation):
        Computer Physics Communications, 2012, 183, pp 1468--1480 (REF2)
 
       Artificial viscosity is used in the Momentum equation and is
-      controlled by the parameter :math:`$\alpha$`. The form of the
+      controlled by the parameter :math:`\alpha`. The form of the
       artificial viscosity is similar, although not identical to the
       Monaghan-style artificial viscosity.
 
@@ -244,7 +244,7 @@ class ContinuityEquationDeltaSPH(Equation):
     The description for this equation can be found in 'delta-SPH model
     for simulating violent impact flows', 2011, CMAME, 200, pp
     1526--1542
-
+	
     """
     def __init__(self, dest, sources, c0, delta=0.1):
         self.c0 = c0
