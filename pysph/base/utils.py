@@ -216,6 +216,20 @@ def get_particle_array_tvf_solid(**props):
 
     return get_particle_array(additional_props=tv_props, **props)
 
+def get_particle_array_gasd(**props):
+    "Get the particle array with requisite properties for gas-dynamics"
+    required_props = [
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
+        'au', 'av', 'aw', 'arho', 'ae', 'am', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
+        'rho0', 'e0', 'div', 'grhox', 'grhoy', 'grhoz']
+
+    pa = get_particle_array( additional_props=required_props, **props )
+    
+    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
+                           'au', 'av', 'ae', 'pid', 'gid', 'tag'] )
+
+    return pa
+
 def get_particles_info(particles):
     """Return the array information for a list of particles.
 
