@@ -88,6 +88,7 @@ class SPHEval(object):
 
         dests = OrderedDict()
         dests.real = group.real
+        dests.update_nnps = group.update_nnps
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
