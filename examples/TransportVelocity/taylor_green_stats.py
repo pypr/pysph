@@ -36,7 +36,7 @@ class TaylorGreenResults(pprocess.Results):
             data = utils.load(files[i])
 
             pa = data['arrays'][array]
-            vmag = np.sqrt( pa.vmag )
+            vmag = np.sqrt( pa.vmag2 )
 
             t = data['solver_data']['t']
             decay[i] = vmag.max()

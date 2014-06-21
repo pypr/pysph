@@ -93,7 +93,7 @@ def create_particles(**kwargs):
     solid.add_property('az')
 
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
@@ -118,7 +118,7 @@ def create_particles(**kwargs):
             solid.u0[i] = Umax
 
     # set the output arrays
-    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag', 'rho', 'p',
+    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
                               'V', 'm', 'h'] )
     solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
             

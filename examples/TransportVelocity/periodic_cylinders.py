@@ -100,7 +100,7 @@ def create_particles(**kwargs):
     solid.add_property('az')
 
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
