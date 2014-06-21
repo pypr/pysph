@@ -5,7 +5,10 @@ from textwrap import dedent
 
 class MonaghanArtificialStress(Equation):
     r"""
-    Artificial stress to remove the tension instability is added to the momentum equation as described in `SPH elastic dynamics` by J.P.Gray and J.J. Moaghan and R.P. Swift, Computer Methods in Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
+    Artificial stress to remove the tension instability is added to 
+    the momentum equation as described in `SPH elastic dynamics` by J.P.Gray 
+    and J.J. Moaghan and R.P. Swift, Computer Methods in Applied Mechanical 
+    Engineering. vol 190 (2001) pp 6641 - 6662
     """
     def __init__(self, dest, sources=None, eps=0.3):
         self.eps = eps
@@ -89,7 +92,8 @@ class MonaghanArtificialStress(Equation):
 class MomentumEquationWithStress2D(Equation):
     r""" Evaluate the momentum equation:
 
-    :math:`\frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} + \frac{\sigma_b^{ij}}{\rho_b^2} \right)\nabla_a\,W_{ab}`
+    :math:`\frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} 
+           + \frac{\sigma_b^{ij}}{\rho_b^2} \right)\nabla_a\,W_{ab}`
 
     Artificial stress to remove the tension instability is added to
     the momentum equation as described in `SPH elastic dynamics` by
@@ -185,11 +189,15 @@ class HookesDeviatoricStressRate2D(Equation):
 
     where,
 
-    :math:`\epsilon^{ij} = \frac{1}{2}\left( \frac{\partial v^i}{\partial x^j} +{\partial v^j}{\partial x^i}\right)`
+    :math:`\epsilon^{ij} = \frac{1}{2}\left( 
+           \frac{\partial v^i}{\partial x^j} +
+           {\partial v^j}{\partial x^i}\right)`
 
     and
 
-    :math:`\Omega^{ij} = \frac{1}{2}\left( \frac{\partial v^i}{\partial x^j} - {\partial v^j}{\partial x^i} \right)`
+    :math:`\Omega^{ij} = \frac{1}{2}\left( 
+       	   \frac{\partial v^i}{\partial x^j} - 
+           {\partial v^j}{\partial x^i} \right)`
 
     """
     def __init__(self, dest, sources=None, shear_mod=1.0):

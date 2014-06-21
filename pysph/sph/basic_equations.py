@@ -137,7 +137,7 @@ class XSPHCorrection(Equation):
     """Position stepping with XSPH correction
     
     This equation must be used to advect the particles. XSPH can be
-    turned off by setting the parameter :math:`\eps = 0`.
+    turned off by setting the parameter :math:`\epsilon = 0`.
 
     """
     def __init__(self, dest, sources=None, eps=0.5):
