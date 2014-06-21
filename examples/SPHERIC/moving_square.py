@@ -1,38 +1,21 @@
 """Lid driven cavity using the Transport Velocity formulation"""
 
+# NumPy
+import numpy as np
+
 # PySPH imports
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, Integrator,IntegratorStep
+from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator,
 
 # the eqations
-from pysph.sph.equation import Group
+from pysph.sph.equation import Group, Equation
 from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
     ShepardFilteredVelocity
-
-# numpy
-import numpy as np
-
-from pysph.sph.equation import Equation
-class BoxStep(IntegratorStep):
-    def initialize(self):
-        pass
-    def predictor(self):
-        pass
-    def corrector(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
-                  d_z, dt=0.0):
-        d_u0[d_idx] += dt*d_ax[d_idx]
-        d_v0[d_idx] += dt*d_ay[d_idx]
-        d_w0[d_idx] += dt*d_az[d_idx]
-
-
-        d_x[d_idx] += dt*d_u0[d_idx]
-        d_y[d_idx] += dt*d_v0[d_idx]
-        d_z[d_idx] += dt*d_w0[d_idx]
 		
 class MoveBox(Equation):
     def __init__(self,dest,sources=None,ap =1.0):
@@ -193,7 +176,8 @@ app = Application()
 kernel = CubicSpline(dim=2)
 
 integrator = Integrator(
-    fluid=TransportVelocityStep(),obstacle=BoxStep(), epec=False)
+    fluid=TransportVelocityStep(),
+    obstacle=RigidBodyStep(), epec=False)
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
@@ -213,7 +197,6 @@ equations = [
             ], real=False),
     Group(
         equations=[
-           # MoveBox(dest='obstacle',ap=0.0),
             DensitySummation(dest='fluid', sources=['fluid','solid','obstacle']),
             ], real=False),
 
