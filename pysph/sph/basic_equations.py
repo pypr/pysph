@@ -13,6 +13,16 @@ class SummationDensity(Equation):
 
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
+        
+class RigidBodyConstantAcceleration(Equation):
+    def __init__(self,dest,sources=None, acc =1.0):
+        self.acc= acc
+        super(RigidBodyConstantAcceleration,self).__init__(dest,sources)
+    def loop(self, d_idx, d_ax,d_u,d_u0):
+        if d_u0[d_idx]<1.0:
+            d_ax[d_idx] =  self.acc
+        else :
+            d_ax[d_idx] = 0
 
 class BodyForce(Equation):
     r"""Add a body force to the particles:

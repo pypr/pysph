@@ -11,24 +11,13 @@ from pysph.solver.application import Application
 from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator,
 
 # the eqations
-from pysph.sph.equation import Group, Equation
+from pysph.sph.equation import Group
+from pysph.sph.basic_equations import RigidBodyConstantAcceleration
 from pysph.sph.wc.transport_velocity import DensitySummation,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
     ShepardFilteredVelocity
 		
-class MoveBox(Equation):
-    def __init__(self,dest,sources=None,ap =1.0):
-        self.ap= ap
-        self.solver = solver
-        super(MoveBox,self).__init__(dest,sources)
-    def loop(self, d_idx, d_ax,d_u,d_u0):
-        if d_u0[d_idx]<1.0:
-            d_ax[d_idx] =  self.ap
-        else :
-            d_ax[d_idx] = 0
-
-
 # domain and reference values
 L = 10.0; Umax = 1.0
 c0 = 20 * Umax; rho0 = 1.0
@@ -192,7 +181,7 @@ equations = [
     # particles. 
     Group(
         equations=[
-            MoveBox(dest='obstacle',ap=1.0),
+            RigidBodyConstantAcceleration(dest='obstacle', acc=1.0),
             
             ], real=False),
     Group(
