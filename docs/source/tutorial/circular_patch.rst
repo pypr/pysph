@@ -56,7 +56,7 @@ various modules:
    # PySPH solver and integrator
    from pysph.solver.application import Application
    from pysph.solver.solver import Solver
-   from pysph.sph.integrator import WCSPHStep, Integrator
+   from pysph.sph.integrator import PECIntegrator
 
    # PySPH sph imports
    from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
@@ -176,7 +176,7 @@ Setting up the PySPH framework
 
 As we move on, we encounter instantiations of the PySPH framework objects.
 These are the :py:class:`pysph.solver.application.Application`,
-:py:class:`pysph.sph.integrator.Integrator` and
+:py:class:`pysph.sph.integrator.PECIntegrator` and
 :py:class:`pysph.solver.solver.Solver` objects:
 
 .. code-block:: python
@@ -186,7 +186,7 @@ These are the :py:class:`pysph.solver.application.Application`,
 
     kernel = CubicSpline(dim=2)
 
-    integrator = Integrator(fluid=WCSPHStep())
+    integrator = PECIntegrator(fluid=WCSPHStep())
 
     # Create and setup a solver.
     solver = Solver(kernel=kernel, dim=2, integrator=integrator)
@@ -208,7 +208,7 @@ the user.
 
 .. py:currentmodule:: pysph.sph.integrator
 
-Intuitively, in an SPH simulation, the role of the :py:class:`Integrator`
+Intuitively, in an SPH simulation, the role of the :py:class:`PECIntegrator`
 should be obvious. In the code, we see that we ask for the "fluid" to be
 stepped using a :py:class:`WCSPHStep` object. Taking a look at the
 `get_circular_patch` function once more, we notice that the **ParticleArray**

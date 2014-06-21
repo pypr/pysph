@@ -327,47 +327,8 @@ class GasDFluidStep(IntegratorStep):
 # `Integrator` class
 ###############################################################################
 class Integrator(object):
-    r"""Generic class for Predictor Corrector integrators in PySPH
-
-    Predictor corrector integrators can have two modes of
-    operation. Consider the ODE system `\frac{dy}{dt} = F(y)`.
-
-    In the Predict-Evaluate-Correct (PEC) mode, the system is advanced
-    using:
-
-    .. math::
-
-        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
-
-        F(y^{n+\frac{1}{2}}) --> Evaluate
-
-        y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
-
-    While, in the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the
-    system is advanced using:
-
-    .. math::
-
-        F(y^n) --> Evaluate
-
-        y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
-
-        F(y^{n+\frac{1}{2}}) --> Evaluate
-
-        y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
-
-    Notes:
-
-    The Evaluate stage of the integrator forces a function
-    evaluation. Therefore, the PEC mode is much faster but relies on
-    old accelertions for the Prediction stage.
-
-    In the EPEC mode, the final corrector can be modified to:
-
-    :math:`$y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)$`
-
-    This would require additional storage for the accelerations.
-
+    r"""Generic class for multi-step integrators in PySPH for a system of
+    ODES of the form :math:`\frac{dy}{dt} = F(y)`.
     """
 
     def __init__(self, **kw):
@@ -473,10 +434,25 @@ class Integrator(object):
                 - self.do_post_stage(stage_dt, stage_count_from_1)
 
         Please see any of the concrete implementations of the Integrator class
-        to study.
+        to study.  By default the Integrator implements a
+        predict-evaluate-correct method, the same as PECIntegrator.
 
         """
-        raise NotImplementedError()
+        self.initialize()
+
+        # Predict
+        self.stage1()
+
+        # Call any post-stage functions.
+        self.do_post_stage(0.5*dt, 1)
+
+        self.compute_accelerations()
+
+        # Correct
+        self.stage2()
+
+        # Call any post-stage functions.
+        self.do_post_stage(dt, 2)
 
     def set_parallel_manager(self, pm):
         self.integrator.set_parallel_manager(pm)
@@ -601,6 +577,18 @@ class EulerIntegrator(Integrator):
 # `PECIntegrator` class
 ###############################################################################
 class PECIntegrator(Integrator):
+    r"""
+    In the Predict-Evaluate-Correct (PEC) mode, the system is advanced using:
+
+    .. math::
+
+        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
+
+        F(y^{n+\frac{1}{2}}) --> Evaluate
+
+        y^{n + 1} = y^n + \Delta t F(y^{n+\frac{1}{2}})
+
+    """
     def one_timestep(self, t, dt):
         self.initialize()
 
@@ -622,6 +610,36 @@ class PECIntegrator(Integrator):
 # `EPECIntegrator` class
 ###############################################################################
 class EPECIntegrator(Integrator):
+    r"""
+    Predictor corrector integrators can have two modes of
+    operation.
+
+    In the Evaluate-Predict-Evaluate-Correct (EPEC) mode, the
+    system is advanced using:
+
+    .. math::
+
+        F(y^n) --> Evaluate
+
+        y^{n+\frac{1}{2}} = y^n + F(y^n) --> Predict
+
+        F(y^{n+\frac{1}{2}}) --> Evaluate
+
+        y^{n+1} = y^n + \Delta t F(y^{n+\frac{1}{2}}) --> Correct
+
+    Notes:
+
+    The Evaluate stage of the integrator forces a function
+    evaluation. Therefore, the PEC mode is much faster but relies on
+    old accelertions for the Prediction stage.
+
+    In the EPEC mode, the final corrector can be modified to:
+
+    :math:`y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)`
+
+    This would require additional storage for the accelerations.
+
+    """
     def one_timestep(self, t, dt):
         self.initialize()
 
