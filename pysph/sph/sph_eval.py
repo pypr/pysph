@@ -7,7 +7,7 @@ except ImportError:
 from mako.template import Template
 from os.path import dirname, join
 
-from pysph.sph.equation import Group
+from pysph.sph.equation import Group, get_arrays_used_in_equation
 from pysph.base.ext_module import ExtModule
 from pysph.base.cython_generator import CythonGenerator
 
@@ -52,6 +52,36 @@ def get_array_names(particle_arrays):
     array_names = ', '.join(sorted(props))
     return array_names
 
+
+def check_equation_array_properties(equation, particle_arrays):
+    """Given an equation and the particle arrays, check if the particle arrays
+    have the necessary properties.
+    """
+    p_arrays = {x.name:x for x in particle_arrays}
+    _src, _dest = get_arrays_used_in_equation(equation)
+    eq_src = set([x[2:] for x in _src])
+    eq_dest = set([x[2:] for x in _dest])
+
+    def _check_array(array, eq_props, errors):
+        """Updates the `errors` with any errors.
+        """
+        props = set(array.properties.keys())
+        if not eq_props < props:
+            errors[array.name].update(eq_props - props)
+
+    errors = defaultdict(set)
+    _check_array(p_arrays[equation.dest], eq_dest, errors)
+    for src in equation.sources:
+        _check_array(p_arrays[src], eq_src, errors)
+
+    if len(errors) > 0:
+        msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
+        for name, missing in errors.iteritems():
+            msg += "Array '%s' missing properties %s.\n"%(name, missing)
+        print msg
+        raise RuntimeError(msg)
+
+
 ###############################################################################
 # `SPHEval` class.
 ###############################################################################
@@ -64,6 +94,8 @@ class SPHEval(object):
         self.nnps = None
         self.integrator = integrator
         self.cell_iteration = cell_iteration
+        for equation in equations:
+            check_equation_array_properties(equation, particle_arrays)
 
         all_equations = []
         for group in self.equation_groups:
