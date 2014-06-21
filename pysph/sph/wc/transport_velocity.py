@@ -218,7 +218,7 @@ class MomentumEquationPressureGradient(Equation):
     def post_loop(self, d_idx, d_au, d_av, d_aw, t=0.0):
         # damped accelerations due to body or external force
         damping_factor = 1.0
-        if t <= self.tdamp:
+        if t < self.tdamp:
             damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
             
         d_au[d_idx] += self.gx * damping_factor

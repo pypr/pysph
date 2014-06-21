@@ -117,8 +117,8 @@ def create_particles(empty=False, **kwargs):
         fluid2.add_property(name)
 
     # magnitude of velocity
-    fluid1.add_property('vmag')
-    fluid2.add_property('vmag')
+    fluid1.add_property('vmag2')
+    fluid2.add_property('vmag2')
 
     # setup the particle properties
     volume = dx * dx
