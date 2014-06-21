@@ -356,6 +356,15 @@ class Solver(object):
             self.t += dt
             self.count += 1
 
+            # dump output
+            if self.count % self.pfreq == 0:
+                self.dump_output()
+                if self.comm:
+                    self.comm.barrier()
+
+            # update progress bar
+            bar.update(self.t)
+
             # update the time for all arrays
             self.update_particle_time()
 
@@ -373,21 +382,11 @@ class Solver(object):
                 if self.in_parallel:
                     dt = self.pm.update_time_steps(dt)
 
-                # adjust dt to land on final time
-                if self.t + dt > self.tf:
-                    dt = self.tf - self.t
-
+            # adjust dt to land on final time
+            if self.t + dt > self.tf:
+                dt = self.tf - self.t
                 self.dt = dt
-
-            # dump output
-            if self.count % self.pfreq == 0:
-                self.dump_output()
-                if self.comm:
-                    self.comm.barrier()
-
-            # update progress bar
-            bar.update(self.t)
-
+                
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)

@@ -109,8 +109,7 @@ cdef class ParticleArray:
     # `object` interface
     ######################################################################
     def __cinit__(self, str name='', default_particle_tag=Local,
-                  cl_precision = 'double', constants={},
-                  *args, **props):
+                  constants={}, *args, **props):
         """ Constructor
 
         Parameters
@@ -118,9 +117,6 @@ cdef class ParticleArray:
 
         name : str
             name of this particle array.
-
-        cl_precision : {'single', 'double'}
-            Set the precision to use for OpenCL.
 
         props : dict
             dictionary of properties for every particle in this array
@@ -138,20 +134,6 @@ cdef class ParticleArray:
         self.name = name
         self.is_dirty = True
         self.indices_invalid = True
-
-        self.cl_precision = cl_precision
-
-        self.queue = object()
-        self.device = object()
-        self.context = object()
-
-        self.pa_buf_host = object()
-        self.pa_tag_host = object()
-        self.pa_buf_device = object()
-        self.pa_tag_device = object()
-
-        self.cl_properties = {}
-        self.cl_setup_done=False
 
         # static particle arrays
         self.is_static = False
