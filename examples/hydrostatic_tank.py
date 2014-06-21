@@ -196,7 +196,7 @@ equations1 = [
             # Pressure gradient with acceleration damping.
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                tdamp=1.0),
+                tdamp=1.0, use_damping=True),
 
             # artificial viscosity for stability
             MomentumEquationArtificialViscosity(
