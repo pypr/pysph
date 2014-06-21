@@ -7,14 +7,14 @@ from textwrap import dedent
 class TaitEOS(Equation):
     r"""Tait equation of state for water like fluids:
 
-    :math:`$p_a = \frac{c_{0}^2\rho_0}{\gamma}\left(
-    \left(\frac{\rho_a}{\rho_0}\right)^{\gamma} -1\right)$`
+    :math:`p_a = \frac{c_{0}^2\rho_0}{\gamma}\left(
+    \left(\frac{\rho_a}{\rho_0}\right)^{\gamma} -1\right)`
 
     The reference speed of sound, c0, is to be taken approximately as
     10 times the maximum expected velocity in the system. The particle
     sound speed is given by the usual expression:
 
-    :math:`$c_a = \sqrt{\frac{\partial p}{\partial \rho}}$`
+    :math:`c_a = \sqrt{\frac{\partial p}{\partial \rho}}`
 
     """
     def __init__(self, dest, sources=None,
@@ -71,8 +71,8 @@ class TaitEOSHGCorrection(Equation):
 class MomentumEquation(Equation):
     r"""Classic Monaghan style Momentum equation with artificial viscosity
 
-    The standard reference for this is Monaghan's 1992 paper 'Smoothed
-    Particle Hydrodynamics'
+    The standard reference for this is Monaghan's 1992 paper "Smoothed
+    Particle Hydrodynamics"
 
     """
     def __init__(self, dest, sources=None,
@@ -176,7 +176,7 @@ class MomentumEquationDeltaSPH(Equation):
        Computer Physics Communications, 2012, 183, pp 1468--1480 (REF2)
 
       Artificial viscosity is used in the Momentum equation and is
-      controlled by the parameter :math:`$\alpha$`. The form of the
+      controlled by the parameter :math:`\alpha`. The form of the
       artificial viscosity is similar, although not identical to the
       Monaghan-style artificial viscosity.
 
@@ -236,15 +236,15 @@ class MomentumEquationDeltaSPH(Equation):
 class ContinuityEquationDeltaSPH(Equation):
     r"""Density rate equation with dissipative terms:
 
-    :math:`$\frac{d\rho_a}{dt} = \sum_b \rho_a \frac{m_b}{\rho_b}
+    :math:`\frac{d\rho_a}{dt} = \sum_b \rho_a \frac{m_b}{\rho_b}
     \left( \boldsymbol{v}_{ab}\cdot \nabla_a W_{ab} + \delta \eta_{ab}
     \cdot \nabla_{a} W_{ab} (h_{ab}\frac{c_{ab}}{\rho_a}(\rho_b -
-    \rho_a)) \right)$`
+    \rho_a)) \right)`
 
     The description for this equation can be found in 'delta-SPH model
     for simulating violent impact flows', 2011, CMAME, 200, pp
     1526--1542
-
+	
     """
     def __init__(self, dest, sources, c0, delta=0.1):
         self.c0 = c0
@@ -279,7 +279,8 @@ class ContinuityEquationDeltaSPH(Equation):
 class UpdateSmoothingLengthFerrari(Equation):
     r"""Update the particle smoothing lengths using:
 
-    :math: `$h_a = hdx \left(\frac{m_a}{\rho_a}\right)^{\frac{1}{d}}$`,
+    :math:`h_a = hdx \left(\frac{m_a}{\rho_a}\right)^{\frac{1}{d}}`
+
     where hdx is a scaling factor and d is the nuber of
     dimensions. This is adapted from eqn (11) in Ferrari et al's
     paper.
