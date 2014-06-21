@@ -1,0 +1,240 @@
+"""Lid driven cavity using the Transport Velocity formulation"""
+
+# NumPy
+import numpy as np
+
+# PySPH imports
+from pysph.base.utils import get_particle_array
+from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
+from pysph.solver.solver import Solver
+from pysph.solver.application import Application
+from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator
+
+# the eqations
+from pysph.sph.equation import Group
+from pysph.sph.basic_equations import RigidBodyConstantAcceleration
+from pysph.sph.wc.transport_velocity import SummationDensity,\
+    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
+    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
+    ShepardFilteredVelocity
+		
+# domain and reference values
+L = 10.0; Umax = 1.0
+c0 = 20 * Umax; rho0 = 1.0
+p0 = c0*c0*rho0
+
+# Reynolds number and kinematic viscosity
+Re = 100; nu = Umax * L/Re
+
+# Numerical setup
+nx = 50; dx = 0.20* L/nx
+ghost_extent = 5 * dx
+hdx = 1.2
+
+# adaptive time steps
+h0 = hdx * dx
+dt_cfl = 0.25 * h0/( c0 + Umax )
+dt_viscous = 0.125 * h0**2/nu
+dt_force = 1.0
+
+tf = 8.0
+dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+
+def create_particles(**kwargs):
+    # create all the particles
+    _x = np.arange( -ghost_extent - dx/2, 10.0 + ghost_extent + dx/2, dx )
+    _y = np.arange( -ghost_extent - dx/2, 5.0 + ghost_extent + dx/2, dx )
+    _x1 = np.arange( -ghost_extent - dx, 10.0 + ghost_extent + dx, dx )
+    _y1 = np.arange( -ghost_extent - dx, 5.0 + ghost_extent + dx, dx )
+   # x = np.append(_x,_x1) ; y = np.append(_y,_y1)
+    x, y = np.meshgrid(_x, _y);x1, y1= np.meshgrid(_x1, _y1); 
+    x = x.ravel(); y = y.ravel();x1 = x1.ravel();y1 = y1.ravel()
+   # x=np.append(x,x1);y=np.append(y,y1)
+    # sort out the fluid and the solid
+    indices = []
+    for i in range(x.size):
+        if ( (x[i] > 0.0) and (x[i] < 10.0) ):
+            if ( (y[i] > 0.0) and (y[i] < 5.0) ):
+                if not ( (x[i] > 1.0) and (x[i] < 2.0) and  (y[i] > 2.0) and (y[i] < 3.0) ):
+                        indices.append(i)
+    indices2 = []
+    for i in range(x.size):
+        if ( (x[i] > 1.0) and (x[i] < 2.0) ):
+            if ( (y[i] > 2.0) and (y[i] < 3.0) ):
+                indices2.append(i)
+    # create the arrays
+#    xs = []; ys[]
+#    for i in range(x.size):
+#        for j in range(indices.size):
+#            for k in range(indices.size):
+                
+        
+    solid = get_particle_array(name='solid', x=x, y=y)
+    
+    # remove the fluid particles from the solid
+    obstacle = solid.extract_particles(indices2); obstacle.set_name('obstacle')
+    fluid = solid.extract_particles(indices);     fluid.set_name('fluid')
+    
+    solid.remove_particles(indices2)
+    solid.remove_particles(indices)
+    
+    
+
+    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
+        Re, fluid.get_number_of_particles(),
+        solid.get_number_of_particles(),
+        obstacle.get_number_of_particles(), dt)
+
+    # add requisite properties to the arrays:
+
+    # particle volume for fluid and solid
+    fluid.add_property('V')
+    solid.add_property('V' )
+    obstacle.add_property('V' )
+
+    # Shepard filtered velocities for the fluid
+    for name in ['uf', 'vf', 'wf']:
+        fluid.add_property(name)
+
+    # advection velocities and accelerations
+    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
+        fluid.add_property(name)
+
+    # kernel summation correction for the solid
+    solid.add_property('wij')
+    obstacle.add_property('wij')
+
+    # imposed or prescribed boundary velocity for the solid
+    solid.add_property('u0'); solid.u0[:] = 0.
+    solid.add_property('v0'); solid.v0[:] = 0.
+    solid.add_property('w0'); solid.w0[:] = 0.
+    obstacle.add_property('u0'); obstacle.u0[:] = 0.
+    obstacle.add_property('v0'); obstacle.v0[:] = 0.
+    obstacle.add_property('w0'); obstacle.w0[:] = 0.
+
+    # imposed accelerations on the solid
+    solid.add_property('ax')
+    solid.add_property('ay')
+    solid.add_property('az')
+    obstacle.add_property('ax')
+    obstacle.add_property('ay')
+    obstacle.add_property('az')
+    # magnitude of velocity
+    fluid.add_property('vmag')
+
+    # setup the particle properties
+    volume = dx * dx
+    
+    # mass is set to get the reference density of rho0
+    fluid.m[:] = volume * rho0
+    solid.m[:] = volume * rho0
+    obstacle.m[:] = volume * rho0
+    
+    # volume is set as dx^2
+    fluid.V[:] = 1./volume
+    solid.V[:] = 1./volume
+    obstacle.V[:] = 1./volume
+    # smoothing lengths
+    fluid.h[:] = hdx * dx
+    solid.h[:] = hdx * dx
+    obstacle.h[:] = hdx * dx
+
+    # imposed horizontal velocity on the lid
+    solid.u0[:] = 0.0
+    solid.v0[:] = 0.0
+    obstacle.u0[:] = 0.0
+    obstacle.v0[:] = 0.0
+#    for i in range(solid.get_number_of_particles()):
+#        if solid.y[i] > L:
+#            solid.u0[i] = Umax
+
+    # set the output arrays
+    fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag', 'rho', 'p',
+                              'V', 'm', 'h'] )
+    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+    obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+            
+    particles = [fluid, obstacle, solid]
+    return particles
+
+# Create the application.
+app = Application()
+
+# Create the kernel
+#kernel = QuinticSpline(dim=2)
+kernel = CubicSpline(dim=2)
+
+integrator = Integrator(
+    fluid=TransportVelocityStep(),
+    obstacle=RigidBodyStep(), epec=False)
+
+# Create a solver.
+solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                tf=tf, dt=dt, adaptive_timestep=False)
+
+equations = [
+
+    # Summation density along with volume summation for the fluid
+    # phase. This is done for all local and remote particles. At the
+    # end of this group, the fluid phase has the correct density
+    # taking into consideration the fluid and solid
+    # particles. 
+    Group(
+        equations=[
+            RigidBodyConstantAcceleration(dest='obstacle', acc=1.0),
+            
+            ], real=False),
+    Group(
+        equations=[
+            SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
+            ], real=False),
+
+
+    # Once the fluid density is computed, we can use the EOS to set
+    # the fluid pressure. Additionally, the shepard filtered velocity
+    # for the fluid phase is determined.
+    Group(
+        equations=[
+            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ], real=False),
+
+    # Once the pressure for the fluid phase has been updated, we can
+    # extrapolate the pressure to the ghost particles. After this
+    # group, the fluid density, pressure and the boundary pressure has
+    # been updated and can be used in the integration equations.
+    Group(
+        equations=[
+            SolidWallPressureBC(dest='obstacle', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
+            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
+            ], real=False),
+
+    # The main accelerations block. The acceleration arrays for the
+    # fluid phase are upadted in this stage for all local particles.
+    Group(
+        equations=[
+            # Pressure gradient terms
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid', 'solid','obstacle'], pb=p0),
+            
+            # fluid viscosity
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+            
+            # No-slip boundary condition. This is effectively a
+            # viscous interaction of the fluid with the ghost
+            # particles.
+            SolidWallNoSlipBC(
+                dest='fluid', sources=['solid','obstacle'], nu=nu),
+            
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+
+            ], real=True),
+    ]
+
+# Setup the application and solver.  This also generates the particles.
+app.setup(solver=solver, equations=equations,
+            particle_factory=create_particles)
+
+app.run()

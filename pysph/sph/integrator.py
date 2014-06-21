@@ -277,6 +277,23 @@ class AdamiVerletStep(IntegratorStep):
         d_vmag2[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
 
 ###############################################################################
+# `RigidBodyStep` class
+###############################################################################        
+class RigidBodyStep(IntegratorStep):
+    def predictor(self):
+        pass
+    def corrector(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
+                  d_z, dt=0.0):
+        d_u0[d_idx] += dt*d_ax[d_idx]
+        d_v0[d_idx] += dt*d_ay[d_idx]
+        d_w0[d_idx] += dt*d_az[d_idx]
+
+
+        d_x[d_idx] += dt*d_u0[d_idx]
+        d_y[d_idx] += dt*d_v0[d_idx]
+        d_z[d_idx] += dt*d_w0[d_idx]
+
+###############################################################################
 # `GasDFluidStep` class
 ###############################################################################
 class GasDFluidStep(IntegratorStep):
