@@ -110,48 +110,43 @@ class SPHEval(object):
         self.sph_compute = None
 
     ##########################################################################
-    # Non-public interface.
-    ##########################################################################
-    def _make_group(self, group):
-        equations = group.equations
-        dest_list = []
-        for equation in equations:
-            dest = equation.dest
-            if dest not in dest_list:
-                dest_list.append(dest)
-
-        dests = OrderedDict()
-        dests.real = group.real
-        dests.update_nnps = group.update_nnps
-        for dest in dest_list:
-            sources = defaultdict(list)
-            eqs_with_no_source = [] # For equations that have no source.
-            all_eqs = set()
-            for equation in equations:
-                if equation.dest != dest:
-                    continue
-                all_eqs.add(equation)
-                if equation.no_source:
-                    eqs_with_no_source.append(equation)
-                else:
-                    for src in equation.sources:
-                        sources[src].append(equation)
-
-            for src in sources:
-                eqs = sources[src]
-                sources[src] = Group(eqs)
-
-            # Sort the all_eqs set; so the order is deterministic.  Without
-            # this a  user may get a recompilation for no obvious reason.
-            all_equations = list(all_eqs)
-            all_equations.sort(key=lambda x:x.__class__.__name__)
-            dests[dest] = (Group(eqs_with_no_source), sources,
-                           Group(all_equations))
-
-        return dests
-
-    ##########################################################################
     # Public interface.
+    ##########################################################################
+    def compute(self, t, dt):
+        self.sph_compute(t, dt)
+
+    def get_code(self):
+        helpers = self.get_helpers()
+        array_names =  get_array_names(self.particle_arrays)
+        parrays = [pa.name for pa in self.particle_arrays]
+        pa_names = ', '.join(parrays)
+        path = join(dirname(__file__), 'sph_eval.mako')
+        template = Template(filename=path)
+        return template.render(helpers=helpers, array_names=array_names,
+                               pa_names=pa_names, object=self,
+                               integrator=self.integrator)
+
+    def set_nnps(self, nnps):
+        if self.calc is None:
+            self.setup()
+        self.nnps = nnps
+        self.calc.set_nnps(nnps)
+        self.integrator.integrator.set_nnps(nnps)
+
+    def setup(self):
+        """Always call this first.
+        """
+        code = self.get_code()
+        self.ext_mod = ExtModule(code, verbose=True)
+        mod = self.ext_mod.load()
+        self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
+                                *self.particle_arrays)
+        self.sph_compute = self.calc.compute
+        integrator = mod.Integrator(self.calc, self.integrator.steppers)
+        self.integrator.set_integrator(integrator)
+
+    ##########################################################################
+    # Mako interface.
     ##########################################################################
     def get_helpers(self):
         helpers = []
@@ -214,35 +209,43 @@ class SPHEval(object):
                  for n in src_arrays]
         return '\n'.join(lines)
 
-    def get_code(self):
-        helpers = self.get_helpers()
-        array_names =  get_array_names(self.particle_arrays)
-        parrays = [pa.name for pa in self.particle_arrays]
-        pa_names = ', '.join(parrays)
-        path = join(dirname(__file__), 'sph_eval.mako')
-        template = Template(filename=path)
-        return template.render(helpers=helpers, array_names=array_names,
-                               pa_names=pa_names, object=self,
-                               integrator=self.integrator)
+    ##########################################################################
+    # Non-public interface.
+    ##########################################################################
+    def _make_group(self, group):
+        equations = group.equations
+        dest_list = []
+        for equation in equations:
+            dest = equation.dest
+            if dest not in dest_list:
+                dest_list.append(dest)
 
-    def set_nnps(self, nnps):
-        if self.calc is None:
-            self.setup()
-        self.nnps = nnps
-        self.calc.set_nnps(nnps)
-        self.integrator.integrator.set_nnps(nnps)
+        dests = OrderedDict()
+        dests.real = group.real
+        dests.update_nnps = group.update_nnps
+        for dest in dest_list:
+            sources = defaultdict(list)
+            eqs_with_no_source = [] # For equations that have no source.
+            all_eqs = set()
+            for equation in equations:
+                if equation.dest != dest:
+                    continue
+                all_eqs.add(equation)
+                if equation.no_source:
+                    eqs_with_no_source.append(equation)
+                else:
+                    for src in equation.sources:
+                        sources[src].append(equation)
 
-    def setup(self):
-        """Always call this first.
-        """
-        code = self.get_code()
-        self.ext_mod = ExtModule(code, verbose=True)
-        mod = self.ext_mod.load()
-        self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
-                                *self.particle_arrays)
-        self.sph_compute = self.calc.compute
-        integrator = mod.Integrator(self.calc, self.integrator.steppers)
-        self.integrator.set_integrator(integrator)
+            for src in sources:
+                eqs = sources[src]
+                sources[src] = Group(eqs)
 
-    def compute(self, t, dt):
-        self.sph_compute(t, dt)
+            # Sort the all_eqs set; so the order is deterministic.  Without
+            # this a  user may get a recompilation for no obvious reason.
+            all_equations = list(all_eqs)
+            all_equations.sort(key=lambda x:x.__class__.__name__)
+            dests[dest] = (Group(eqs_with_no_source), sources,
+                           Group(all_equations))
+
+        return dests

@@ -103,6 +103,9 @@ class Solver(object):
         self.pre_step_functions = []
         self.post_step_functions = []
 
+        # List of functions to be called after each stage of the integrator.
+        self.post_stage_callbacks = []
+
         # default output printing frequency
         self.pfreq = 100
 
@@ -160,6 +163,9 @@ class Solver(object):
         # flag for constant smoothing lengths
         self.fixed_h = fixed_h
 
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
     def setup(self, particles, equations, nnps, kernel=None, fixed_h=False):
         """ Setup the solver.
 
@@ -185,11 +191,22 @@ class Solver(object):
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)
 
+        # Set the post_stage_callback.
+        self.integrator.set_post_stage_callback(self._post_stage_callback)
+
         # set integrator option for constant smoothing length
         self.fixed_h = fixed_h
         self.integrator.set_fixed_h( fixed_h )
 
         logger.debug("Solver setup complete.")
+
+    def add_post_stage_callback(self, callback):
+        """These callbacks are called after each integrator stage.
+
+        The callbacks are passed (current_time, dt, stage).  See the the
+        `Integrator.one_timestep` methods for examples of how this is called.
+        """
+        self.post_stage_callbacks.append(callback)
 
     def append_particle_arrrays(self, arrays):
         """ Append the particle arrays to the existing particle arrays
@@ -295,6 +312,9 @@ class Solver(object):
         self.execute_commands = callable
         self.command_interval = command_interval
 
+    def set_parallel_manager(self, pm):
+        self.pm = pm
+
     def solve(self, show_progress=True):
         """ Solve the system
 
@@ -319,12 +339,6 @@ class Solver(object):
         if self.comm:
             self.comm.barrier() # everybody waits for this to complete
 
-        # the parallel manager
-        pm = self.pm
-
-        # set the time for the integrator
-        #self.integrator.time = self.t
-
         # initial solution damping time
         tdamp = self.tdamp
 
@@ -345,7 +359,7 @@ class Solver(object):
                 )
             # perform the integration and update the time.
             #print 'Solver Iteration', self.count, dt, self.t, tdamp
-            self.integrator.integrate(self.t, dt, self.count)
+            self.integrator.step(self.t, dt)
 
             # perform any post step functions
             for func in self.post_step_functions:
@@ -386,7 +400,7 @@ class Solver(object):
             if self.t + dt > self.tf:
                 dt = self.tf - self.t
                 self.dt = dt
-                
+
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
                     self.execute_commands(self)
@@ -532,9 +546,6 @@ class Solver(object):
         self.t = float(data["solver_data"]['t'])
         self.count = int(data["solver_data"]['count'])
 
-    def set_parallel_manager(self, pm):
-        self.pm = pm
-
     def get_options(self, opt_parser):
         """ Implement this to add additional options for the application """
         pass
@@ -554,5 +565,12 @@ class Solver(object):
             of existence of any key)
         """
         pass
+
+    ##########################################################################
+    # Non-public interface.
+    ##########################################################################
+    def _post_stage_callback(self, time, dt, stage):
+        for callback in self.post_stage_callbacks:
+            callback(time, dt, stage)
 
 ############################################################################
