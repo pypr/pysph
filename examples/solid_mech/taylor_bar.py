@@ -7,7 +7,8 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, SolidMechStep
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import SolidMechStep
 
 # basic sph equations
 from pysph.sph.basic_equations import ContinuityEquation, \
@@ -68,9 +69,9 @@ def get_plate_particles():
 def get_bar_particles():
     xarr = numpy.arange(-bar_width/2.0, bar_width/2.0 + dx, dx)
     yarr = numpy.arange(4*dx, 0.0254 + 4*dx, dx)
-    
+
     x,y = numpy.meshgrid( xarr, yarr )
-    x, y = x.ravel(), y.ravel()                    
+    x, y = x.ravel(), y.ravel()
 
     print 'Number of bar particles: ', len(x)
 
@@ -91,7 +92,7 @@ def create_particles(**kwargs):
     plate = get_plate_particles()
 
     # add requisite properties
-    
+
     # velocity gradient for the bar
     for name in ('v00', 'v01', 'v10', 'v11'):
         bar.add_property(name)
@@ -129,7 +130,7 @@ kernel = WendlandQuintic(dim=2)
 wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
 # integrator
-integrator = Integrator(bar=SolidMechStep())
+integrator = PECIntegrator(bar=SolidMechStep())
 
 # Create a solver
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)
@@ -148,23 +149,23 @@ equations = [
         equations=[
             # p
             MieGruneisenEOS(dest='bar', sources=None, r0=r0, c0=C, S=S),
-            
+
             # vi,j : requires properties v00, v01, v10, v11
             VelocityGradient2D(dest='bar', sources=['bar',]),
-            
+
             # rij : requires properties s00, s01, s11
             VonMisesPlasticity2D(flow_stress=Yo, dest='bar',
                                  sources=None),
             ],
         ),
-    
+
     # Acceleration variables are now computed
     Group(
         equations=[
 
             # arho
             ContinuityEquation(dest='bar', sources=['bar']),
-            
+
             # au, av
             MomentumEquationWithStress2D(
                 dest='bar', sources=['bar'], n=4, wdeltap=wdeltap),
@@ -180,7 +181,7 @@ equations = [
             # ae
             EnergyEquationWithStress2D(dest='bar', sources=['bar'],
                                        alpha=0.5, beta=0.5, eta=0.01),
-                
+
             # a_s00, a_s01, a_s11
             HookesDeviatoricStressRate2D(
                 dest='bar', sources=None, shear_mod=G),

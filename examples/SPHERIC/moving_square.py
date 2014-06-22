@@ -11,7 +11,9 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, RigidBodyStep, Integrator
+
+from pysph.sph.integrator_step import RigidBodyStep, TransportVelocityStep
+from pysph.sph.integrator import Integrator
 
 # the eqations
 from pysph.sph.equation import Group, Equation
@@ -167,9 +169,8 @@ app = Application()
 #kernel = QuinticSpline(dim=2)
 kernel = CubicSpline(dim=2)
 
-integrator = Integrator(
-    fluid=TransportVelocityStep(),
-    obstacle=RigidBodyStep(), epec=False)
+integrator = Integrator(fluid=TransportVelocityStep(),
+                        obstacle=RigidBodyStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
