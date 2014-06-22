@@ -304,7 +304,7 @@ The predictor-corrector integrator for this problem can be defined as
 	       ...
                array.w0[:] = array.w[:]
 
-      def predictor(self, dt):
+      def stage1(self, dt):
 	  dtb2 = 0.5 * dt
 	  for array in self.particles:
 	      array.rho = array.rho0[:] + dtb2*array.arho[:]
@@ -314,7 +314,7 @@ The predictor-corrector integrator for this problem can be defined as
               ...
 	      array.z = array.z0[:] + dtb2*array.az[:]
 
-      def corrector(self, dt):
+      def stage2(self, dt):
 	  for array in self.particles:
 	      array.rho = array.rho0[:] + dt*array.arho[:]
 
@@ -325,10 +325,10 @@ The predictor-corrector integrator for this problem can be defined as
 
       def integrate(self, dt):
           self.initialize()
-	  self.predictor(dt)   # predictor step
+	  self.stage1(dt)   # predictor step
           self.nps.update()    # update NNPS structure
           self.calc.compute()  # compute the accelerations
-          self.corrector(dt)   # corrector step
+          self.stage2(dt)   # corrector step
 
 The `Integrator.integrate` method is responsible for updating the
 solution the next time level. Before the predictor stage, the
@@ -570,9 +570,7 @@ The simplest integrator is the Euler integrator which looks like this::
     class EulerStep(IntegratorStep):
         def initialize(self):
             pass
-        def predictor(self):
-            pass
-        def corrector(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
+        def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
                       d_z, d_rho, d_arho, dt=0.0):
             d_u[d_idx] += dt*d_au[d_idx]
             d_v[d_idx] += dt*d_av[d_idx]

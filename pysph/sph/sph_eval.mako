@@ -215,12 +215,12 @@ cdef class SPHCalc:
         % endif
         # Destination ${dest} done.
         # ---------------------------------------------------------------------
-        
+
         #######################################################################
         ## Update NNPS locally if needed
         #######################################################################
         % if group.update_nnps:
-        # Updating NNPS
+        # Updating NNPS.
         nnps.update()
         % endif
 
@@ -237,22 +237,18 @@ cdef class Integrator:
     cdef public SPHCalc sph_calc
     cdef public object parallel_manager
     cdef public NNPS nnps
-    cdef public double dt
-
-    # PEC or EPEC mode
-    cdef bint epec
+    cdef public double dt, t, orig_t
+    cdef object _post_stage_callback
 
     ${indent(integrator.get_stepper_defs(), 1)}
 
     def __init__(self, calc, steppers):
         self.sph_calc = calc
+        self._post_stage_callback = None
         % for name in pa_names.split():
         self.${name} = calc.${name}
         % endfor
         ${indent(integrator.get_stepper_init(), 2)}
-
-    def set_predictor_corrector_mode(self, bint epec):
-        self.epec = epec
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -260,43 +256,47 @@ cdef class Integrator:
     def set_parallel_manager(self, object pm):
         self.parallel_manager = pm
 
-    cpdef integrate(self, double t, double dt, int count):
-        """Main step routine.
-        """
-        self.dt = dt
-        self.initialize()
+    def set_post_stage_callback(self, object callback):
+        self._post_stage_callback = callback
 
-        # In EPEC mode, an Evaluate is called before Predict. Since
-        # the particles have moved since the last corrector step, the
-        # NNPS data structures need to be updated as well.
-        if self.epec:
-
-            # update NNPS since particles have moved
-            if self.parallel_manager:
-                self.parallel_manager.update()
-            self.nnps.update()
-
-            # Evaluate
-            self.sph_calc.compute(t, dt)
-
-        # Predict
-        self.predictor()
-
-        # update the local time counter
-        t = t + 0.5 * dt
-
+    cpdef compute_accelerations(self):
         # update NNPS since particles have moved
         if self.parallel_manager:
             self.parallel_manager.update()
         self.nnps.update()
 
         # Evaluate
-        self.sph_calc.compute(t, dt)
+        self.sph_calc.compute(self.t, self.dt)
 
-        # Correct
-        self.corrector()
+    cpdef do_post_stage(self, double stage_dt, int stage):
+        """This is called after every stage of the integrator.
 
-    % for method in ('initialize', 'predictor', 'corrector'):
+        Internally, this calls any post_stage_callback function that has
+        been given to take suitable action.
+
+        Parameters
+        ----------
+
+         - stage_dt : double: the timestep taken at this stage.
+
+         - stage : int: the stage completed (starting from 1).
+        """
+        self.t = self.orig_t + stage_dt
+        if self._post_stage_callback is not None:
+            self._post_stage_callback(self.t, self.dt, stage)
+
+    cpdef step(self, double t, double dt):
+        """Main step routine.
+        """
+        self.orig_t = t
+        self.t = t
+        self.dt = dt
+        self.one_timestep(t, dt)
+
+    cdef one_timestep(self, double t, double dt):
+        ${indent(integrator.get_timestep_code(), 2)}
+
+    % for method in integrator.get_stepper_method_wrapper_names():
     cdef ${method}(self):
         cdef long NP_DEST
         cdef long d_idx

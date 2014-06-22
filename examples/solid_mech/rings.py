@@ -13,7 +13,8 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, WendlandQuintic
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, SolidMechStep
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import SolidMechStep
 
 def get_K(G, nu):
     ''' Get the bulk modulus from shear modulus and Poisson ratio '''
@@ -51,10 +52,10 @@ def create_particles(**kwargs):
     keep = numpy.flatnonzero((ri*ri<=d) * (d<ro*ro))
     x = x[keep]
     y = y[keep]
-        
+
     x = numpy.concatenate([x-spacing,x+spacing])
     y = numpy.concatenate([y,y])
-    
+
     print 'Ellastic Collision with %d particles'%(x.size)
     print "Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu)
 
@@ -71,7 +72,7 @@ def create_particles(**kwargs):
     # u is set later
     v = z
     u_f = 0.059
-    
+
     p *= 0
     h *= 1
 
@@ -122,7 +123,7 @@ kernel = CubicSpline(dim=2)
 wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
 # integrator
-integrator = Integrator(solid=SolidMechStep())
+integrator = PECIntegrator(solid=SolidMechStep())
 
 # Create a solver
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)
