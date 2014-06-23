@@ -43,7 +43,7 @@ cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
 
 cdef inline double norm2(double x, double y, double z):
-    return x*x + y*y + z*z   
+    return x*x + y*y + z*z
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -1396,6 +1396,11 @@ cdef class LinkedListNNPS(NNPS):
         ncy = <int>ceil( cell_size1*(xmax.data[1] - xmin.data[1]) )
         ncz = <int>ceil( cell_size1*(xmax.data[2] - xmin.data[2]) )
 
+        if ncx < 0 or ncy < 0 or ncz < 0:
+            msg = 'LinkedListNNPS: Number of cells is negative '\
+                   '(%s, %s, %s).'%(ncx, ncy, ncz)
+            raise RuntimeError(msg)
+
         # number of cells along each coordinate direction
         self.ncells_per_dim.data[0] = ncx
         self.ncells_per_dim.data[1] = ncy
@@ -1406,6 +1411,11 @@ cdef class LinkedListNNPS(NNPS):
         if dim == 2: _ncells = ncx * ncy
         if dim == 3: _ncells = ncx * ncy * ncz
         self.n_cells = <int>_ncells
+
+        if _ncells < 0 or _ncells > 2**28:
+            # unsigned ints are 4 bytes, which means 2**28 cells requires 1GB.
+            msg = "ERROR: LinkedListNNPS requires too many cells (%s)."%_ncells
+            raise RuntimeError(msg)
 
         # initialize the head and next arrays
         for i in range(narrays):
