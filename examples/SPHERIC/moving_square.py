@@ -15,6 +15,8 @@ from pysph.solver.application import Application
 from pysph.sph.integrator_step import RigidBodyStep, TransportVelocityStep
 from pysph.sph.integrator import Integrator
 
+from pysph.tools import uniform_distribution
+
 # the eqations
 from pysph.sph.equation import Group, Equation
 from pysph.sph.wc.transport_velocity import SummationDensity,\
@@ -23,16 +25,18 @@ from pysph.sph.wc.transport_velocity import SummationDensity,\
     ShepardFilteredVelocity
 		
 # domain and reference values
-L = 10.0; Umax = 1.0
+Lx = 10.0; Ly = 5.0
+Umax = 1.0
 c0 = 25.0 * Umax; rho0 = 1.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * L/Re
+Re = 100; nu = Umax * Lx/Re
 
 # Numerical setup
-nx = 50; dx = 0.20* L/nx
-ghost_extent = 5 * dx
+nx = 50; dx = 0.20* Lx/nx
+nghost_layers = 4
+ghost_extent = nghost_layers * dx
 hdx = 1.2
 
 # adaptive time steps
@@ -44,54 +48,33 @@ dt_force = 1.0
 tf = 8.0
 dt = 0.8 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(**kwargs):
-    # create all the particles
-    _x = np.arange( -ghost_extent - dx/2, 10.0 + ghost_extent + dx/2, dx )
-    _y = np.arange( -ghost_extent - dx/2, 5.0 + ghost_extent + dx/2, dx )
-    _x1 = np.arange( -ghost_extent - dx, 10.0 + ghost_extent + dx, dx )
-    _y1 = np.arange( -ghost_extent - dx, 5.0 + ghost_extent + dx, dx )
-   # x = np.append(_x,_x1) ; y = np.append(_y,_y1)
-    x, y = np.meshgrid(_x, _y);x1, y1= np.meshgrid(_x1, _y1); 
-    x = x.ravel(); y = y.ravel();x1 = x1.ravel();y1 = y1.ravel()
-   # x=np.append(x,x1);y=np.append(y,y1)
-    # sort out the fluid and the solid
+# The SPH kernel to use
+kernel = QuinticSpline(dim=2)
+#kernel = CubicSpline(dim=2)
+
+def _get_interior(x, y):
     indices = []
     for i in range(x.size):
-        if ( (x[i] > 0.0) and (x[i] < 10.0) ):
-            if ( (y[i] > 0.0) and (y[i] < 5.0) ):
-                if not ( (x[i] > 1.0) and (x[i] < 2.0) and  (y[i] > 2.0) and (y[i] < 3.0) ):
-                        indices.append(i)
-    indices2 = []
-    for i in range(x.size):
-        if ( (x[i] > 1.0) and (x[i] < 2.0) ):
-            if ( (y[i] > 2.0) and (y[i] < 3.0) ):
-                indices2.append(i)
-    # create the arrays
-#    xs = []; ys[]
-#    for i in range(x.size):
-#        for j in range(indices.size):
-#            for k in range(indices.size):
+        if ( (x[i] > 0.0) and (x[i] < Lx) ):
+            if ( (y[i] > 0.0) and (y[i] < Ly) ):
+                indices.append(i)
                 
-        
-    solid = get_particle_array(name='solid', x=x, y=y)
-    
-    # remove the fluid particles from the solid
-    obstacle = solid.extract_particles(indices2); obstacle.set_name('obstacle')
-    fluid = solid.extract_particles(indices);     fluid.set_name('fluid')
-    
-    solid.remove_particles(indices2)
-    solid.remove_particles(indices)
-    
-    
+    return indices
 
-    print "SPHERIC benchmark 6 :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
-        Re, fluid.get_number_of_particles(),
-        solid.get_number_of_particles(),
-        obstacle.get_number_of_particles(), dt)
+def _get_obstacle(x, y):
+    indices = []
+    for i in range(x.size):
+        if ( (1.0 <= x[i] <= 2.0) and (2.0 <= y[i] <= 3.0) ):
+            indices.append(i)
+            
+    return indices
 
-    # add requisite properties to the arrays:
+def _setup_particle_properties(particles, volume):
+    fluid, solid, obstacle = particles
 
-    # particle volume for fluid and solid
+    #### ADD PROPS FOR THE PARTICLES ###
+
+    # volume from number density
     fluid.add_property('V')
     solid.add_property('V' )
     obstacle.add_property('V' )
@@ -100,11 +83,11 @@ def create_particles(**kwargs):
     for name in ['uf', 'vf', 'wf']:
         fluid.add_property(name)
 
-    # advection velocities and accelerations
+    # advection velocities and accelerations for fluid
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
         fluid.add_property(name)
 
-    # kernel summation correction for the solid
+    # kernel summation correction for solids
     solid.add_property('wij')
     obstacle.add_property('wij')
 
@@ -112,6 +95,7 @@ def create_particles(**kwargs):
     solid.add_property('u0'); solid.u0[:] = 0.
     solid.add_property('v0'); solid.v0[:] = 0.
     solid.add_property('w0'); solid.w0[:] = 0.
+
     obstacle.add_property('u0'); obstacle.u0[:] = 0.
     obstacle.add_property('v0'); obstacle.v0[:] = 0.
     obstacle.add_property('w0'); obstacle.w0[:] = 0.
@@ -120,16 +104,16 @@ def create_particles(**kwargs):
     solid.add_property('ax')
     solid.add_property('ay')
     solid.add_property('az')
+
     obstacle.add_property('ax')
     obstacle.add_property('ay')
     obstacle.add_property('az')
 
-    # magnitude of velocity
+    # magnitude of velocity squared
     fluid.add_property('vmag2')
 
-    # setup the particle properties
-    volume = dx * dx
-    
+    #### SETUP PARTICLE PROPERTIES ###
+
     # mass is set to get the reference density of rho0
     fluid.m[:] = volume * rho0
     solid.m[:] = volume * rho0
@@ -139,35 +123,67 @@ def create_particles(**kwargs):
     fluid.V[:] = 1./volume
     solid.V[:] = 1./volume
     obstacle.V[:] = 1./volume
+
     # smoothing lengths
     fluid.h[:] = hdx * dx
     solid.h[:] = hdx * dx
     obstacle.h[:] = hdx * dx
 
-    # imposed horizontal velocity on the lid
-    solid.u0[:] = 0.0
-    solid.v0[:] = 0.0
-    obstacle.u0[:] = 0.0
-    obstacle.v0[:] = 0.0
-#    for i in range(solid.get_number_of_particles()):
-#        if solid.y[i] > L:
-#            solid.u0[i] = Umax
-
     # set the output arrays
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
                               'V', 'm', 'h'] )
+
     solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
     obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
             
-    particles = [fluid, obstacle, solid]
+    particles = [fluid, solid, obstacle]
+    return particles    
+
+def create_particles(hcp=False, **kwargs):
+    "Initial distribution using Hexagonal close packing of particles"
+    # create all particles
+    global dx
+    if hcp:
+        x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution.uniform_distribution_hcp2D(
+            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent, 
+            ymin=-ghost_extent, ymax=Ly+ghost_extent)
+    else:
+        x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution.uniform_distribution_cubic2D(
+            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent, 
+            ymin=-ghost_extent, ymax=Ly+ghost_extent)
+
+    x = x.ravel(); y = y.ravel()
+    
+    # create the basic particle array
+    solid = get_particle_array(name='solid', x=x, y=y)
+    
+    # now sort out the interior from all particles
+    indices = _get_interior(solid.x, solid.y)
+    fluid = solid.extract_particles( indices )
+    fluid.set_name('fluid')
+
+    solid.remove_particles( indices )
+
+    # sort out the obstacle from the interior
+    indices = _get_obstacle(fluid.x, fluid.y)
+    obstacle = fluid.extract_particles( indices )
+    obstacle.set_name('obstacle')
+
+    fluid.remove_particles(indices)
+
+    print "SPHERIC benchmark 6 :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
+        Re, fluid.get_number_of_particles(),
+        solid.get_number_of_particles(),
+        obstacle.get_number_of_particles(), dt)
+
+    # setup requisite particle properties and initial conditions
+    volume = dx * dy
+    particles = _setup_particle_properties([fluid, solid, obstacle], volume=volume)
+
     return particles
 
 # Create the application.
 app = Application()
-
-# Create the kernel
-kernel = QuinticSpline(dim=2)
-#kernel = CubicSpline(dim=2)
 
 integrator = Integrator(fluid=TransportVelocityStep(),
                         obstacle=RigidBodyStep())
@@ -272,6 +288,6 @@ equations = [
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,
-            particle_factory=create_particles)
+          particle_factory=create_particles)
 
 app.run()
