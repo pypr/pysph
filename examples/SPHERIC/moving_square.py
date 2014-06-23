@@ -24,7 +24,7 @@ from pysph.sph.wc.transport_velocity import SummationDensity,\
 		
 # domain and reference values
 L = 10.0; Umax = 1.0
-c0 = 20 * Umax; rho0 = 1.0
+c0 = 25.0 * Umax; rho0 = 1.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
@@ -42,7 +42,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 8.0
-dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.8 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
     # create all the particles
@@ -84,7 +84,7 @@ def create_particles(**kwargs):
     
     
 
-    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
+    print "SPHERIC benchmark 6 :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
         solid.get_number_of_particles(),
         obstacle.get_number_of_particles(), dt)
@@ -166,8 +166,8 @@ def create_particles(**kwargs):
 app = Application()
 
 # Create the kernel
-#kernel = QuinticSpline(dim=2)
-kernel = CubicSpline(dim=2)
+kernel = QuinticSpline(dim=2)
+#kernel = CubicSpline(dim=2)
 
 integrator = Integrator(fluid=TransportVelocityStep(),
                         obstacle=RigidBodyStep())
@@ -204,10 +204,8 @@ class SPHERICBenchmarkAcceleration(Equation):
         c = 0.14142151
         d = -2.55580905e-08
         
-        # compute the acceleration
-        acc = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
-
-        d_ax[d_idx] = acc
+        # compute the acceleration and set it for the destination
+        d_ax[d_idx] = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
 
 equations = [
 
