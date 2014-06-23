@@ -9,7 +9,8 @@ from pysph.base.utils import get_particle_array_tvf_fluid
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import TransportVelocityStep, Integrator
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import TransportVelocityStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -70,7 +71,7 @@ def create_particles(**kwargs):
     # mass is set to get the reference density of each phase
     fluid.rho[:] = rho0
     fluid.m[:] = volume * fluid.rho
-    
+
     # volume is set as dx^2
     fluid.V[:] = 1./volume
 
@@ -93,7 +94,7 @@ app = Application(domain=domain)
 #kernel = Gaussian(dim=2)
 kernel = CubicSpline(dim=2)
 
-integrator = Integrator(fluid=TransportVelocityStep())
+integrator = PECIntegrator(fluid=TransportVelocityStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)
@@ -108,7 +109,7 @@ equations = [
     # phase. This is done for all local and remote particles. At the
     # end of this group, the fluid phase has the correct density
     # taking into consideration the fluid and solid
-    # particles. 
+    # particles.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid']),
@@ -130,11 +131,11 @@ equations = [
             # Pressure gradient terms
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid'], pb=p0),
-            
+
             # fluid viscosity
             MomentumEquationViscosity(
                 dest='fluid', sources=['fluid'], nu=nu),
-            
+
             # Artificial stress for the fluid phase
             MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 

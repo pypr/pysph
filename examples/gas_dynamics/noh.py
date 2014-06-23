@@ -6,12 +6,12 @@ import numpy
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_gasd as gpa
 from pysph.base.kernels import CubicSpline, Gaussian
-from pyzoltan.core.carray import LongArray
 
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, GasDFluidStep
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import GasDFluidStep
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -72,7 +72,7 @@ def create_particles(**kwargs):
         v[i] = vr*sin(theta)
 
     fluid = gpa(name='fluid', x=x,y=y,m=m,rho=rho, h=h,u=u,v=v,p=p,e=e)
-    
+
     print "Noh's problem with %d particles"%(fluid.get_number_of_particles())
 
     return [fluid,]
@@ -81,10 +81,10 @@ def create_particles(**kwargs):
 app = Application()
 
 # Set the SPH kernel
-kernel = Gaussian(dim=2) 
+kernel = Gaussian(dim=2)
 
 # Create the Integrator.
-integrator = Integrator(fluid=GasDFluidStep(), epec=False)
+integrator = PECIntegrator(fluid=GasDFluidStep())
 
 # Create the soliver
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
@@ -92,7 +92,7 @@ solver = Solver(kernel=kernel, dim=2, integrator=integrator,
 
 # Define the SPH equations
 equations = [
-    
+
     # Scale smoothing length. Since the particle smoothing lengths are
     # updated, we need to re-compute the neighbors
     Group(
@@ -102,7 +102,7 @@ equations = [
         ),
 
     # Given the new smoothing lengths and (possibly) new neighbors, we
-    # compute the pilot density. 
+    # compute the pilot density.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid',]),
@@ -119,10 +119,10 @@ equations = [
                 dest='fluid', sources=None, k=kernel_factor, dim=dim),
             ], update_nnps=True
         ),
-    
+
     # Now that we have the correct smoothing length, we need to
     # evaluate the density which will be used in the
-    # accelerations. 
+    # accelerations.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid',]),
@@ -146,7 +146,7 @@ equations = [
             ], update_nnps=False
         ),
     ]
-        
+
 # Setup the application and solver.
 app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)

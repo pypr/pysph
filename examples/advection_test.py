@@ -17,16 +17,14 @@ particle. This should remain constant through the simulation.
 
 """
 
-# PyZoltan imports
-from pyzoltan.core.carray import LongArray
-
 # PySPH imports
 from pysph.base.nnps import DomainLimits
 from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import EulerStep, Integrator
+from pysph.sph.integrator import EulerIntegrator
+from pysph.sph.integrator_step import EulerStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -70,7 +68,7 @@ def create_particles(**kwargs):
 
     # setup the particle properties
     pi = np.pi; cos = np.cos; sin=np.sin
-    
+
     # color
     fluid.color[:] = cos(2*pi*fluid.x) * cos(2*pi*fluid.y)
     fluid.u[:] = 1.0; fluid.v[:] = 1.0
@@ -92,7 +90,7 @@ app = Application(domain=domain)
 kernel = WendlandQuintic(dim=2)
 
 # Create the integrator.
-integrator = Integrator(fluid=EulerStep())
+integrator = EulerIntegrator(fluid=EulerStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator)
