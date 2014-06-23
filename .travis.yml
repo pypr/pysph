@@ -1,0 +1,25 @@
+language: python
+
+python:
+    - 2.7
+
+env:
+    - ZOLTAN_DIR=~/zoltan
+    - ZOLTAN_INCLUDE=$ZOLTAN_DIR/include
+    - ZOLTAN_LIBRARY=$ZOLTAN_DIR/lib
+
+before-install:
+    # System dependencies via apt.
+    - sudo apt-get update
+    - sudo apt-get install python-scipy python-mako python-mpi4py python-matplotlib libopenmpi-dev python-nose
+    # Build zoltan.
+    - ./build_zoltan.sh $ZOLTAN_DIR
+
+install:
+    - pip install cython
+    # Build pysph.
+    - python setup.py develop
+
+# Run the tests.
+script:
+    - nosetests -A"slow==False"
