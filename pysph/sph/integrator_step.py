@@ -319,30 +319,45 @@ class RigidBodyStep(IntegratorStep):
     """Simple rigid-body motion
 
     At each stage of the integrator, the prescribed velocity and
-    accelerations are incremented by dt/2.
+    accelerations are incremented by dt/2. 
+
+    Note that the time centered velocity is used for updating the
+    particle positions. This ensures exact motion for a constant
+    acceleration.
     
     """
     def stage1(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
                   d_z, dt=0.0):
 
         dtb2 = 0.5*dt
+
+        uold = d_u0[d_idx]
+        vold = d_v0[d_idx]
+        wold = d_w0[d_idx]
+
         d_u0[d_idx] += dtb2*d_ax[d_idx]
         d_v0[d_idx] += dtb2*d_ay[d_idx]
         d_w0[d_idx] += dtb2*d_az[d_idx]
 
-        d_x[d_idx] += dtb2*d_u0[d_idx]
-        d_y[d_idx] += dtb2*d_v0[d_idx]
-        d_z[d_idx] += dtb2*d_w0[d_idx]
+        # positions are updated based on the time centered velocity
+        d_x[d_idx] += dtb2 * 0.5 * (d_u0[d_idx] + uold)
+        d_y[d_idx] += dtb2 * 0.5 * (d_v0[d_idx] + vold)
+        d_z[d_idx] += dtb2 * 0.5 * (d_w0[d_idx] + wold)
         
     def stage2(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
                d_z, dt=0.0):
 
         dtb2 = 0.5*dt
+
+        uold = d_u0[d_idx]
+        vold = d_v0[d_idx]
+        wold = d_w0[d_idx]
+
         d_u0[d_idx] += dtb2*d_ax[d_idx]
         d_v0[d_idx] += dtb2*d_ay[d_idx]
         d_w0[d_idx] += dtb2*d_az[d_idx]
 
-
-        d_x[d_idx] += dtb2*d_u0[d_idx]
-        d_y[d_idx] += dtb2*d_v0[d_idx]
-        d_z[d_idx] += dtb2*d_w0[d_idx]
+        # positions are updated based on the time centered velocity
+        d_x[d_idx] += dtb2 * 0.5 * (d_u0[d_idx] + uold)
+        d_y[d_idx] += dtb2 * 0.5 * (d_v0[d_idx] + vold)
+        d_z[d_idx] += dtb2 * 0.5 * (d_w0[d_idx] + wold)
