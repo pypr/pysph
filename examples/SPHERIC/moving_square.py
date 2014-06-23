@@ -125,9 +125,9 @@ def _setup_particle_properties(particles, volume):
     obstacle.V[:] = 1./volume
 
     # smoothing lengths
-    fluid.h[:] = hdx * dx
-    solid.h[:] = hdx * dx
-    obstacle.h[:] = hdx * dx
+    fluid.h[:] = h0
+    solid.h[:] = h0
+    obstacle.h[:] = h0
 
     # set the output arrays
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
@@ -177,7 +177,9 @@ def create_particles(hcp=False, **kwargs):
         obstacle.get_number_of_particles(), dt)
 
     # setup requisite particle properties and initial conditions
-    volume = dx * dy
+    wij_sum = uniform_distribution.get_number_density(dx, dy, kernel, h0)
+    volume = 1./wij_sum
+
     particles = _setup_particle_properties([fluid, solid, obstacle], volume=volume)
 
     return particles
@@ -287,7 +289,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=create_particles)
+#app.setup(solver=solver, equations=equations,
+#          particle_factory=create_particles)
 
-app.run()
+#app.run()

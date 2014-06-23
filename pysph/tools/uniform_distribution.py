@@ -58,3 +58,37 @@ def uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax, nrows=None):
     print 'Offset: ymin, ymax = ', y.min()-ymin, ymax-y.max()
 
     return x, y, dx, dy, xmin, xmax, ymin, ymax
+
+def get_number_density(dx, dy, kernel, h0):
+
+    # create a dummy particle distribution with the reference spacings
+    dxb2 = 0.5 * dx
+    dyb2 = 0.5 * dy
+
+    xstart = 0.25 * dx
+    ystart = dyb2
+
+    # create the points
+    x, y = numpy.mgrid[xstart:1.0:dx,
+                       ystart:1.0:dy]
+
+    # each alternate row is shifted by dxb2
+    x[:,::2] += dxb2
+
+    # the target point
+    nrows, ncols = x.shape
+    x0, y0 = x[nrows/2, ncols/2], y[nrows/2, ncols/2]
+
+    x = x.ravel(); y = y.ravel()
+
+    # now do a kernel sum
+    wij_sum = 0.0
+    for i in range(x.size):
+        xij = x0 - x[i]
+        yij = y0 - y[i]
+        zij = 0.0
+        
+        rij = numpy.sqrt( xij**2 + yij**2 + zij**2 )
+        wij_sum += kernel.kernel( [xij, yij, zij], rij, h0 )
+                
+    return wij_sum

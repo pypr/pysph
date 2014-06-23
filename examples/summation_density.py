@@ -17,10 +17,10 @@ This tutorial illustrates the following:
 # PySPH imports
 from pyzoltan.core.carray import UIntArray
 from pysph.base import utils
-from pysph.base.kernels import CubicSpline, Gaussian
+from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline
 from pysph.base.nnps import DomainLimits, LinkedListNNPS
 from pysph.tools.uniform_distribution import uniform_distribution_cubic2D, \
-    uniform_distribution_hcp2D
+    uniform_distribution_hcp2D, get_number_density
 
 # NumPy
 import numpy
@@ -30,6 +30,7 @@ from time import time
 
 # particle spacings
 dx = 0.01; dxb2 = 0.5 * dx
+h0 = 1.3*dx
 
 # Uniform lattice distribution of particles
 x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_cubic2D(
@@ -39,15 +40,22 @@ x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_cubic2D(
 #x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_hcp2D(
 #    dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, adjust=True)
 
+# SPH kernel
+k = CubicSpline(dim=2)
+#k = Gaussian(dim=2)
+#k = QuinticSpline(dim=2)
+
 # for the hexagonal particle spacing, dx*dy is only an approximate
 # expression for the particle volume. As far as the summation density
 # test is concerned, the value will be uniform but not equal to 1. To
 # reproduce a density profile of 1, we need to estimate the kernel sum
 # or number density of the distribution based on the kernel
-volume = dx*dy
+wij_sum_estimate = get_number_density(dx, dy, k, h0)
+volume = 1./wij_sum_estimate
+print dx*dy, volume
 
 x = x.ravel(); y = y.ravel()
-h = numpy.ones_like(x) * 1.3*dx
+h = numpy.ones_like(x) * h0
 m = numpy.ones_like(x) * volume
 wij = numpy.zeros_like(x)
 
@@ -58,10 +66,6 @@ pa = utils.get_particle_array(x=x,y=y,h=h,m=m,wij=wij)
 domain = DomainLimits(
     xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
     periodic_in_x=True, periodic_in_y=True)
-
-# SPH kernel
-#k = CubicSpline(dim=2)
-k = Gaussian(dim=2)
 
 # NNPS object for nearest neighbor queries
 nps = LinkedListNNPS(dim=2, particles=[pa,], radius_scale=k.radius_scale, domain=domain)
