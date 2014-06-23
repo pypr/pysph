@@ -1,0 +1,34 @@
+language: python
+
+python:
+    - 2.7
+
+# This doesn't work yet on shippable but we keep it here in case it does.
+virtualenv:
+    system_site_packages: true
+
+env:
+    - ZOLTAN_DIR=$HOME/zoltan ZOLTAN_INCLUDE=$ZOLTAN_DIR/include ZOLTAN_LIBRARY=$ZOLTAN_DIR/lib
+
+before_install:
+    # System dependencies via apt.
+    - sudo apt-get install build-essential python-dev libopenmpi-dev
+    # Again, the following are not useful without system_site_packages support.
+    - sudo apt-get install python-numpy python-mako python-mpi4py python-nose
+    # Build zoltan.
+    - ./build_zoltan.sh $ZOLTAN_DIR
+
+install:
+    # These are needed because system_site_packages doesn't work.
+    - pip install numpy
+    - pip install cython
+    - pip install mako nose
+    # Build pysph.
+    - make clean
+    - python setup.py develop
+
+before_script:
+    - mkdir -p shippable/testresults
+
+script:
+    - nosetests -A"slow==False" --with-xunit --xunit-file=shippable/testresults/nosetests.xml
