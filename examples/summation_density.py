@@ -20,7 +20,7 @@ from pysph.base import utils
 from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline
 from pysph.base.nnps import DomainLimits, LinkedListNNPS
 from pysph.tools.uniform_distribution import uniform_distribution_cubic2D, \
-    uniform_distribution_hcp2D, get_number_density
+    uniform_distribution_hcp2D, get_number_density_hcp
 
 # NumPy
 import numpy
@@ -33,12 +33,12 @@ dx = 0.01; dxb2 = 0.5 * dx
 h0 = 1.3*dx
 
 # Uniform lattice distribution of particles
-x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_cubic2D(
-    dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0)
+#x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_cubic2D(
+#    dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0)
 
 # Uniform hexagonal close packing arrangement of particles
-#x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_hcp2D(
-#    dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, adjust=True)
+x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_hcp2D(
+    dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, adjust=True)
 
 # SPH kernel
 k = CubicSpline(dim=2)
@@ -50,9 +50,9 @@ k = CubicSpline(dim=2)
 # test is concerned, the value will be uniform but not equal to 1. To
 # reproduce a density profile of 1, we need to estimate the kernel sum
 # or number density of the distribution based on the kernel
-wij_sum_estimate = get_number_density(dx, dy, k, h0)
+wij_sum_estimate = get_number_density_hcp(dx, dy, k, h0)
 volume = 1./wij_sum_estimate
-print dx*dy, volume
+print 'Volume estimates :: dx^2 = %g, Number density = %g'%(dx*dy, volume)
 
 x = x.ravel(); y = y.ravel()
 h = numpy.ones_like(x) * h0

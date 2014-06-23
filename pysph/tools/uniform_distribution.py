@@ -59,7 +59,7 @@ def uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax, nrows=None):
 
     return x, y, dx, dy, xmin, xmax, ymin, ymax
 
-def get_number_density(dx, dy, kernel, h0):
+def get_number_density_hcp(dx, dy, kernel, h0):
 
     # create a dummy particle distribution with the reference spacings
     dxb2 = 0.5 * dx

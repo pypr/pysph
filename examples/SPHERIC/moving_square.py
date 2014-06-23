@@ -177,8 +177,12 @@ def create_particles(hcp=False, **kwargs):
         obstacle.get_number_of_particles(), dt)
 
     # setup requisite particle properties and initial conditions
-    wij_sum = uniform_distribution.get_number_density(dx, dy, kernel, h0)
-    volume = 1./wij_sum
+
+    if hcp:
+        wij_sum = uniform_distribution.get_number_density_hcp(dx, dy, kernel, h0)
+        volume = 1./wij_sum
+    else:
+        volume = dx*dy
 
     particles = _setup_particle_properties([fluid, solid, obstacle], volume=volume)
 
@@ -289,7 +293,7 @@ equations = [
     ]
 
 # Setup the application and solver.  This also generates the particles.
-#app.setup(solver=solver, equations=equations,
-#          particle_factory=create_particles)
+app.setup(solver=solver, equations=equations,
+          particle_factory=create_particles)
 
-#app.run()
+app.run()
