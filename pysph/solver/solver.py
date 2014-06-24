@@ -45,6 +45,7 @@ class Solver(object):
     def __init__(self, dim=2, integrator=None, kernel=None,
                  tdamp=0.001, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
+                 toutput = [],
                  fixed_h=False, **kwargs):
         """Constructor
 
@@ -74,6 +75,9 @@ class Solver(object):
 
         cfl : double
             CFL number for adaptive time stepping
+
+        toutput : list
+            Optional list of output times to force output
 
         fixed_h : bint
             Flag for constant smoothing lengths
@@ -144,6 +148,10 @@ class Solver(object):
         # Use adaptive time steps and cfl number
         self.adaptive_timestep = adaptive_timestep
         self.cfl = cfl
+
+        # list of output times
+        self.toutput = toutput
+        self.force_output = False
 
         # Use cell iterations or not.
         self.cell_iteration = False
@@ -289,6 +297,10 @@ class Solver(object):
         """ Set the output directory """
         self.output_directory = path
 
+    def set_toutput(self, toutput):
+        """ Set a list of output times """
+        self.toutput = toutput
+
     def set_parallel_output_mode(self, mode="collected"):
         """Set the default solver dump mode in parallel.
 
@@ -346,6 +358,9 @@ class Solver(object):
         # integrator to work correctly at the first time step.
         self.sph_eval.compute(self.t, dt)
 
+        # solution output times
+        toutput = numpy.array( self.toutput )
+
         while self.t < self.tf:
 
             # perform any pre step functions
@@ -370,11 +385,25 @@ class Solver(object):
             self.t += dt
             self.count += 1
 
-            # dump output
+            # dump output if the iteration number is a multiple of the
+            # printing frequency
             if self.count % self.pfreq == 0:
                 self.dump_output()
                 if self.comm:
                     self.comm.barrier()
+
+            # dump output if forced
+            if self.force_output:
+                self.dump_output()
+                if self.comm:
+                    self.comm.barrier()
+
+                self.force_output = False
+
+                if self.rank == 0:
+                    msg = 'Writing output at time %g, iteration %d, dt = %g'%(
+                        self.t, self.count, self.dt)
+                    logger.info(msg)
 
             # update progress bar
             bar.update(self.t)
@@ -400,6 +429,16 @@ class Solver(object):
             if self.t + dt > self.tf:
                 dt = self.tf - self.t
                 self.dt = dt
+
+            # adjust dt to land on specified output time
+            tdiff = toutput - self.t
+            condition = (tdiff > 0) & (tdiff < dt)
+            if numpy.any( condition ):
+                output_time = toutput[ numpy.where(condition) ]
+                dt = output_time - self.t
+                self.dt = dt
+
+                self.force_output = True
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
