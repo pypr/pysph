@@ -124,7 +124,7 @@ dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True,
                 cfl=0.05, tdamp=tf/1000.0,
-                toutput=[0.0033, 0.0052])
+                output_at_times=[0.0033, 0.0052])
 
 # select True if you want to dump out remote particle properties in
 # parallel runs. This can be over-ridden with the --output-remote

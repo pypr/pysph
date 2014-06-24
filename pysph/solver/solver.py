@@ -45,7 +45,7 @@ class Solver(object):
     def __init__(self, dim=2, integrator=None, kernel=None,
                  tdamp=0.001, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
-                 toutput = [],
+                 output_at_times = [],
                  fixed_h=False, **kwargs):
         """Constructor
 
@@ -76,7 +76,7 @@ class Solver(object):
         cfl : double
             CFL number for adaptive time stepping
 
-        toutput : list
+        output_at_times : list
             Optional list of output times to force output
 
         fixed_h : bint
@@ -150,7 +150,7 @@ class Solver(object):
         self.cfl = cfl
 
         # list of output times
-        self.toutput = toutput
+        self.output_at_times = output_at_times
         self.force_output = False
 
         # Use cell iterations or not.
@@ -297,9 +297,9 @@ class Solver(object):
         """ Set the output directory """
         self.output_directory = path
 
-    def set_toutput(self, toutput):
+    def set_output_at_times(self, output_at_times):
         """ Set a list of output times """
-        self.toutput = toutput
+        self.output_at_times = output_at_times
 
     def set_parallel_output_mode(self, mode="collected"):
         """Set the default solver dump mode in parallel.
@@ -362,7 +362,7 @@ class Solver(object):
         self.sph_eval.compute(self.t, dt)
 
         # solution output times
-        toutput = numpy.array( self.toutput )
+        output_at_times = numpy.array( self.output_at_times )
 
         while self.t < self.tf:
 
@@ -432,10 +432,10 @@ class Solver(object):
                 self.dt = dt
 
             # adjust dt to land on specified output time
-            tdiff = toutput - self.t
+            tdiff = output_at_times - self.t
             condition = (tdiff > 0) & (tdiff < dt)
             if numpy.any( condition ):
-                output_time = toutput[ numpy.where(condition) ]
+                output_time = output_at_times[ numpy.where(condition) ]
                 dt = output_time - self.t
                 self.dt = dt
 
