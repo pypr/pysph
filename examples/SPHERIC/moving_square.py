@@ -30,8 +30,12 @@ Umax = 1.0
 c0 = 25.0 * Umax; rho0 = 1.0
 p0 = c0*c0*rho0
 
+# obstacle dimensions
+obstacle_width = 1.0
+obstacle_height = 1.0
+
 # Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * Lx/Re
+Re = 100; nu = Umax * obstacle_width/Re
 
 # Numerical setup
 nx = 50; dx = 0.20* Lx/nx
@@ -196,7 +200,8 @@ integrator = Integrator(fluid=TransportVelocityStep(),
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                tf=tf, dt=dt, adaptive_timestep=False)
+                tf=tf, dt=dt, adaptive_timestep=False,
+                toutput=[1.0, 3.0, 5.0, 7.0])
 
 class SPHERICBenchmarkAcceleration(Equation):
     r"""Equation to set the acceleration for the moving square
