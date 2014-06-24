@@ -1,5 +1,8 @@
 import numpy as np
-from scipy.integrate import quad
+try:
+    from scipy.integrate import quad
+except ImportError:
+    quad = None
 from unittest import TestCase, main
 
 from pysph.base.kernels import CubicSpline, get_compiled_kernel
@@ -25,18 +28,31 @@ class TestKernelBase(TestCase):
     def check_kernel_moment_1d(self, a, b, h, m, xj=0.0):
         func = self.kernel
         if m == 0:
-            return quad(func, a, b, args=(0, 0, xj, 0, 0, h))[0]
+            f = lambda x: func(x, 0, 0, xj, 0, 0, h)
         else:
             f = lambda x: pow(x, m)*func(x, 0, 0, xj, 0, 0, h)
-            return quad(f, a, b)[0]
+        if quad is None:
+            kern_f = np.vectorize(f)
+            nx = 201
+            x = np.linspace(a, b, nx)
+            result = np.sum(kern_f(x))*(b-a)/(nx-1)
+        else:
+            result = quad(f, a, b)[0]
+
+        return result
 
     def check_grad_moment_1d(self, a, b, h, m, xj=0.0):
         func = self.gradient
         if m == 0:
             f = lambda x: func(x, 0, 0, xj, 0, 0, h)[0]
-            return quad(f, a, b)[0]
         else:
             f = lambda x: pow(x-xj, m)*func(x, 0, 0, xj, 0, 0, h)[0]
+        if quad is None:
+            kern_f = np.vectorize(f)
+            nx = 201
+            x = np.linspace(a, b, nx)
+            return np.sum(kern_f(x))*(b-a)/(nx-1)
+        else:
             return quad(f, a, b)[0]
 
     def check_kernel_moment_2d(self, m, n):
