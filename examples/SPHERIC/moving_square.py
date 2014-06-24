@@ -17,7 +17,7 @@ from pysph.sph.integrator import Integrator
 
 from pysph.tools import uniform_distribution
 
-# the eqations
+# SPH equations for this problem
 from pysph.sph.equation import Group, Equation
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
