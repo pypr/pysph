@@ -62,28 +62,26 @@ To use the `pysph_viewer` you will need to have
 Building and linking PyZoltan
 -------------------------------
 
- 1. We've provided a simple Zoltan build script in the repository.  This can
- be used as so:
+1. We've provided a simple Zoltan build script in the repository.  This can
+be used as so:
 
- ```
- $ ./build_zoltan.sh  INSTALL_PREFIX
- ```
- where the `INSTALL_PREFIX` is where the library and includes will be
- installed.  You may edit and tweak the build to suit your installation.
- However, this script  what we use to build Zoltan on our continuous
- integration servers on drone and shippable.
+    $ ./build_zoltan.sh  INSTALL_PREFIX
 
- 2. Declare the environment variables `ZOLTAN_INCLUDE` and `ZOLTAN_LIBRARY`.
- If you used the above script, this would be:
+where the `INSTALL_PREFIX` is where the library and includes will be
+installed.  You may edit and tweak the build to suit your installation.
+However, this script  what we use to build Zoltan on our continuous
+integration servers on drone and shippable.
 
- ```
- $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
- $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
- ```
+2. Declare the environment variables `ZOLTAN_INCLUDE` and `ZOLTAN_LIBRARY`. If
+you used the above script, this would be:
 
- 3. Install PySPH. The PyZoltan wrappers will be compiled and available.
+    $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
+    $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
 
-If you wish to see a working build/test script please see the our
+3. Install PySPH. The PyZoltan wrappers will be compiled and available.
+
+
+If you wish to see a working build/test script please see our
 [shippable.yml](https://bitbucket.org/pysph/pysph/src/master/shippable.yml).
 Or you could see the [build script](https://drone.io/bitbucket.org/pysph/pysph/admin)
 hosted at [drone.io](http://drone.io).
