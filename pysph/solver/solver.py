@@ -327,6 +327,10 @@ class Solver(object):
     def set_parallel_manager(self, pm):
         self.pm = pm
 
+    def barrier(self):
+        if self.comm:
+            self.comm.barrier()
+
     def solve(self, show_progress=True):
         """ Solve the system
 
@@ -348,8 +352,7 @@ class Solver(object):
         bar = FloatPBar(self.t, self.tf, show=show)
 
         self.dump_output()
-        if self.comm:
-            self.comm.barrier() # everybody waits for this to complete
+        self.barrier() # everybody waits for this to complete
 
         # initial solution damping time
         tdamp = self.tdamp
@@ -389,14 +392,12 @@ class Solver(object):
             # printing frequency
             if self.count % self.pfreq == 0:
                 self.dump_output()
-                if self.comm:
-                    self.comm.barrier()
+                self.barrier()
 
             # dump output if forced
             if self.force_output:
                 self.dump_output()
-                if self.comm:
-                    self.comm.barrier()
+                self.barrier()
 
                 self.force_output = False
 
