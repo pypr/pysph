@@ -351,6 +351,7 @@ class Solver(object):
             show = show_progress
         bar = FloatPBar(self.t, self.tf, show=show)
 
+        # Initial solution
         self.dump_output()
         self.barrier() # everybody waits for this to complete
 
@@ -401,11 +402,6 @@ class Solver(object):
 
                 self.force_output = False
 
-                if self.rank == 0:
-                    msg = 'Writing output at time %g, iteration %d, dt = %g'%(
-                        self.t, self.count, self.dt)
-                    logger.info(msg)
-
             # update progress bar
             bar.update(self.t)
 
@@ -414,6 +410,7 @@ class Solver(object):
 
             # compute the new time step across all processors
             if self.adaptive_timestep:
+
                 # locally stable time step
                 dt = self.integrator.compute_time_step(
                     self.dt, self.cfl)
@@ -429,17 +426,20 @@ class Solver(object):
             # adjust dt to land on final time
             if self.t + dt > self.tf:
                 dt = self.tf - self.t
-                self.dt = dt
 
-            # adjust dt to land on specified output time
-            tdiff = output_at_times - self.t
-            condition = (tdiff > 0) & (tdiff < dt)
-            if numpy.any( condition ):
-                output_time = output_at_times[ numpy.where(condition) ]
-                dt = output_time - self.t
-                self.dt = dt
+            # adjust dt to land on specific output times
+            if output_at_times.size > 0:
+                tdiff = output_at_times - self.t
+                condition = (tdiff > 0) & (tdiff < dt)
 
-                self.force_output = True
+                if numpy.any( condition ):
+                    output_time = output_at_times[ numpy.where(condition) ]
+                    dt = float( output_time - self.t )
+
+                    self.force_output = True
+
+            # set the adjusted time-step for the solver
+            self.dt = dt
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
@@ -498,6 +498,11 @@ class Solver(object):
 
         _fname = os.path.join(self.output_directory,
                               fname  + str(self.count) +'.npz')
+
+        if self.rank == 0:
+            msg = 'Writing output at time %g, iteration %d, dt = %g'%(
+                self.t, self.count, self.dt)
+            logger.info(msg)
 
         # Array data
         for array in self.particles:
