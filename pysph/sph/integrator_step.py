@@ -326,38 +326,41 @@ class RigidBodyStep(IntegratorStep):
     acceleration.
     
     """
-    def stage1(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
-                  d_z, dt=0.0):
+    def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+                   d_u, d_v, d_w, d_u0, d_v0, d_w0):
 
-        dtb2 = 0.5*dt
+        d_u0[d_idx] = d_u[d_idx]
+        d_v0[d_idx] = d_v[d_idx]
+        d_w0[d_idx] = d_w[d_idx]
 
-        uold = d_u0[d_idx]
-        vold = d_v0[d_idx]
-        wold = d_w0[d_idx]
-
-        d_u0[d_idx] += dtb2*d_ax[d_idx]
-        d_v0[d_idx] += dtb2*d_ay[d_idx]
-        d_w0[d_idx] += dtb2*d_az[d_idx]
-
-        # positions are updated based on the time centered velocity
-        d_x[d_idx] += dtb2 * 0.5 * (d_u0[d_idx] + uold)
-        d_y[d_idx] += dtb2 * 0.5 * (d_v0[d_idx] + vold)
-        d_z[d_idx] += dtb2 * 0.5 * (d_w0[d_idx] + wold)
+        d_x0[d_idx] = d_x[d_idx]
+        d_y0[d_idx] = d_y[d_idx]
+        d_z0[d_idx] = d_z[d_idx]
         
-    def stage2(self, d_idx, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, d_x, d_y,
-               d_z, dt=0.0):
+    def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, 
+               dt=0.0):
 
         dtb2 = 0.5*dt
 
-        uold = d_u0[d_idx]
-        vold = d_v0[d_idx]
-        wold = d_w0[d_idx]
-
-        d_u0[d_idx] += dtb2*d_ax[d_idx]
-        d_v0[d_idx] += dtb2*d_ay[d_idx]
-        d_w0[d_idx] += dtb2*d_az[d_idx]
+        d_u[d_idx] += dtb2 * d_ax[d_idx]
+        d_v[d_idx] += dtb2 * d_ay[d_idx]
+        d_w[d_idx] += dtb2 * d_az[d_idx]
 
         # positions are updated based on the time centered velocity
-        d_x[d_idx] += dtb2 * 0.5 * (d_u0[d_idx] + uold)
-        d_y[d_idx] += dtb2 * 0.5 * (d_v0[d_idx] + vold)
-        d_z[d_idx] += dtb2 * 0.5 * (d_w0[d_idx] + wold)
+        d_x[d_idx] += dtb2 * 0.5 * (d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] += dtb2 * 0.5 * (d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] += dtb2 * 0.5 * (d_w[d_idx] + d_w0[d_idx])        
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
+               dt=0.0):
+
+        d_u[d_idx] = d_u0[d_idx] + dt * d_ax[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dt * d_ay[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dt * d_az[d_idx]
+
+        # positions are updated based on the time centered velocity
+        d_x[d_idx] = d_x0[d_idx] + dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] = d_y0[d_idx] + dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] = d_z0[d_idx] + dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])
