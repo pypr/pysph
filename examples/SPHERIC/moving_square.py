@@ -95,7 +95,8 @@ def _setup_particle_properties(particles, volume):
     solid.add_property('wij')
     obstacle.add_property('wij')
 
-    # imposed or prescribed boundary velocity for the solid
+    # initial velocities needed for the solid for rigid-body
+    # integration
     solid.add_property('u0'); solid.u0[:] = 0.
     solid.add_property('v0'); solid.v0[:] = 0.
     solid.add_property('w0'); solid.w0[:] = 0.
