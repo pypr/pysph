@@ -344,6 +344,7 @@ class Solver(object):
 
         """
         dt = self.dt
+        old_dt = self.dt
 
         if self.in_parallel:
             show = False
@@ -402,6 +403,10 @@ class Solver(object):
 
                 self.force_output = False
 
+                # re-set the time-step to the old time step before it
+                # was adjusted
+                dt = old_dt
+
             # update progress bar
             bar.update(self.t)
 
@@ -434,8 +439,13 @@ class Solver(object):
 
                 if numpy.any( condition ):
                     output_time = output_at_times[ numpy.where(condition) ]
-                    dt = float( output_time - self.t )
 
+                    # save the old time-step and compute the new
+                    # time-step to fall on the specified output time
+                    # instant
+                    old_dt = dt
+                    dt = float( output_time - self.t )
+                    
                     self.force_output = True
 
             # set the adjusted time-step for the solver
