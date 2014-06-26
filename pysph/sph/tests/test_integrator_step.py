@@ -4,7 +4,7 @@ import numpy
 import unittest
 
 from pysph.base.utils import get_particle_array as gpa
-from pysph.sph.integrator_step import RigidBodyStep
+from pysph.sph.integrator_step import OneStageRigidBodyStep, TwoStageRigidBodyStep
 
 class RigidBodyMotionTestCase(unittest.TestCase):
     """Tests for linear motion.
@@ -25,8 +25,7 @@ class RigidBodyMotionTestCase(unittest.TestCase):
         # create the particle array
         self.pa = pa = gpa(additional_props, name='square', x=x, y=y)
         
-        # create the integrator stepper class we want to test
-        self.stepper = stepper = RigidBodyStep()
+        self._set_stepper()
 
     def _integrate(self, final_time, dt, epec=False):
         """Integrate"""
@@ -34,6 +33,7 @@ class RigidBodyMotionTestCase(unittest.TestCase):
         stepper = self.stepper
 
         current_time = 0.0
+        iteration = 0
 
         while( current_time < final_time ):
 
@@ -67,24 +67,29 @@ class RigidBodyMotionTestCase(unittest.TestCase):
                     pa.u, pa.v, pa.w, pa.u0, pa.v0, pa.w0, 
                     pa.ax, pa.ay, pa.az, dt)
 
-            # update time
+            # update time and iteration
             current_time = current_time + 0.5 * dt
+            iteration += 1
 
 class ConstantAccelerationTestCase(RigidBodyMotionTestCase):
+    """ Constnat linear acceleration """
     def _update_accelerations(self, time):
         " Constant accelerations "
         self.pa.ax[0] = 1.0
         self.pa.ay[0] = 1.0
         self.pa.az[0] = 1.0
 
-    def test_motion_pec(self):
-        """ Test motion for constant acceleration using PEC integration"""
+    def _set_stepper(self):
+        # create the integrator stepper class we want to test
+        self.stepper = TwoStageRigidBodyStep()
+
+    def _test_motion(self, final_time=1.0, dt=1e-2, epec=True):
+        """ Test motion for constant acceleration """
         
         # we simulate a two-stage integration with constant
         # acceleration ax = 1. Initial velocities are zero so we can
         # compare with the elementry formulae: S = 1/2 * a * t * t etc...
-        final_time = 1.0
-        self._integrate( final_time=final_time, dt=0.1 )
+        self._integrate( final_time, dt, epec )
 
         # get the particle arrays to test
         x, y, z, u, v, w = self.pa.get('x', 'y', 'z', 'u', 'v', 'w')
@@ -98,6 +103,14 @@ class ConstantAccelerationTestCase(RigidBodyMotionTestCase):
         self.assertAlmostEqual( u[0], 1.0, 14 )
         self.assertAlmostEqual( v[0], 1.0, 14 )
         self.assertAlmostEqual( w[0], 1.0, 14 )
+
+    def test_one_stage(self):
+        self.stepper = OneStageRigidBodyStep()
+        self._test_motion()
+
+    def test_two_stage(self):
+        self.stepper = TwoStageRigidBodyStep()
+        self._test_motion()
 
 if __name__ == '__main__':
     unittest.main()

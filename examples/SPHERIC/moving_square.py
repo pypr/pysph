@@ -12,7 +12,7 @@ from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSp
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 
-from pysph.sph.integrator_step import RigidBodyStep, TransportVelocityStep
+from pysph.sph.integrator_step import TwoStageRigidBodyStep, TransportVelocityStep
 from pysph.sph.integrator import Integrator
 
 from pysph.tools import uniform_distribution
@@ -95,17 +95,17 @@ def _setup_particle_properties(particles, volume):
     solid.add_property('wij')
     obstacle.add_property('wij')
 
-    # initial velocities needed for the solid for rigid-body
-    # integration
-    solid.add_property('u0'); solid.u0[:] = 0.
-    solid.add_property('v0'); solid.v0[:] = 0.
-    solid.add_property('w0'); solid.w0[:] = 0.
-
+    # initial velocities and positions needed for the obstacle for
+    # rigid-body integration
     obstacle.add_property('u0'); obstacle.u0[:] = 0.
     obstacle.add_property('v0'); obstacle.v0[:] = 0.
     obstacle.add_property('w0'); obstacle.w0[:] = 0.
 
-    # imposed accelerations on the solid
+    obstacle.add_property('x0')
+    obstacle.add_property('y0')
+    obstacle.add_property('z0')
+
+    # imposed accelerations on the solid and obstacle
     solid.add_property('ax')
     solid.add_property('ay')
     solid.add_property('az')
@@ -138,7 +138,7 @@ def _setup_particle_properties(particles, volume):
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
                               'V', 'm', 'h'] )
 
-    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+    solid.set_output_arrays( ['x', 'y', 'rho', 'p'] )
     obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
             
     particles = [fluid, solid, obstacle]
@@ -197,12 +197,12 @@ def create_particles(hcp=False, **kwargs):
 app = Application()
 
 integrator = Integrator(fluid=TransportVelocityStep(),
-                        obstacle=RigidBodyStep())
+                        obstacle=TwoStageRigidBodyStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 tf=tf, dt=dt, adaptive_timestep=False,
-                toutput=[1.0, 3.0, 5.0, 7.0])
+                output_at_times=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0])
 
 class SPHERICBenchmarkAcceleration(Equation):
     r"""Equation to set the acceleration for the moving square
