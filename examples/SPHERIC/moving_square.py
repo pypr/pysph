@@ -1,4 +1,4 @@
-"""Lid driven cavity using the Transport Velocity formulation"""
+"""SPHERIC benchmark case 6 (https://wiki.manchester.ac.uk/spheric/index.php/Test6)"""
 
 # math
 from math import exp
