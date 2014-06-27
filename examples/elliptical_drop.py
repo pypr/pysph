@@ -116,11 +116,15 @@ kernel = CubicSpline(dim=2)
 # mode is PEC  which requies one less force  evaluation per iteration.
 integrator = PECIntegrator(fluid=WCSPHStep())
 
-# Construct the solver.
+# Construct the solver. tdamp determines the time until which smaller
+# time-steps are used when using adaptive time-steps. Use the tdamp
+# list to specify instants of time at which the output solution is
+# required.
 dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True,
-                cfl=0.05, tdamp=tf/1000.0)
+                cfl=0.05, tdamp=tf/1000.0,
+                output_at_times=[0.0033, 0.0052])
 
 # select True if you want to dump out remote particle properties in
 # parallel runs. This can be over-ridden with the --output-remote

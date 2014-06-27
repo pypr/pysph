@@ -57,7 +57,8 @@ def check_equation_array_properties(equation, particle_arrays):
     """Given an equation and the particle arrays, check if the particle arrays
     have the necessary properties.
     """
-    p_arrays = {x.name:x for x in particle_arrays}
+    #p_arrays = {x.name:x for x in particle_arrays}
+    p_arrays = dict((x.name, x) for x in particle_arrays)
     _src, _dest = get_arrays_used_in_equation(equation)
     eq_src = set([x[2:] for x in _src])
     eq_dest = set([x[2:] for x in _dest])

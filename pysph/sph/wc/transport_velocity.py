@@ -426,15 +426,15 @@ class SolidWallNoSlipBC(Equation):
 
     def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, d_V, s_V,
              d_u, d_v, d_w, d_uf, d_vf, d_wf,
-             s_u0, s_v0, s_w0, 
+             s_u, s_v, s_w, 
              d_au, d_av, d_aw,
              DWIJ, R2IJ, EPS, XIJ):
 
         # Extrapolated velocities at the ghost points using Eq. (23),
-        # u0, v0, w0 are the prescribed wall velocities.
-        ug = 2*s_u0[s_idx] - d_uf[d_idx]
-        vg = 2*s_v0[s_idx] - d_vf[d_idx]
-        wg = 2*s_w0[s_idx] - d_wf[d_idx]
+        # s_u, s_v, s_w are the prescribed wall velocities.
+        ug = 2*s_u[s_idx] - d_uf[d_idx]
+        vg = 2*s_v[s_idx] - d_vf[d_idx]
+        wg = 2*s_w[s_idx] - d_wf[d_idx]
         
         # averaged shear viscosity Eq. (6).
         etai = self.nu * d_rho[d_idx]
