@@ -221,6 +221,7 @@ cdef class SPHCalc:
         #######################################################################
         % if group.update_nnps:
         # Updating NNPS.
+        nnps.compute_cell_size()
         nnps.update()
         % endif
 
