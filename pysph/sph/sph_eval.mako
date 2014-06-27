@@ -27,6 +27,9 @@ cdef class ParticleArrayWrapper:
 
     def __init__(self, pa, index):
         self.index = index
+        self.set_array(pa)
+
+    cpdef set_array(self, pa):
         self.array = pa
         props = set(pa.properties.keys())
         props = props.union(['tag', 'pid', 'gid'])
@@ -62,6 +65,11 @@ cdef class SPHCalc:
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
+
+    def update_particle_arrays(self, particle_arrays):
+        for pa in particle_arrays:
+            name = pa.name
+            getattr(self, name).set_array(pa)
 
     cdef initialize_dt_adapt(self, double* DT_ADAPT):
         self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
@@ -231,6 +239,7 @@ cdef class SPHCalc:
         self.set_dt_adapt(DT_ADAPT)
 
 
+% if integrator is not None:
 # #############################################################################
 cdef class Integrator:
     cdef public ParticleArrayWrapper ${pa_names}
@@ -315,3 +324,4 @@ cdef class Integrator:
             ${indent(integrator.get_stepper_loop(dest, method), 3)}
         % endfor
     % endfor
+% endif
