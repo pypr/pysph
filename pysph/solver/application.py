@@ -613,6 +613,12 @@ class Application(object):
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h)
 
+        # once the NNPS has been set-up, we set the default Solver
+        # post-stage callback to the DomainManager.setup_domain
+        # method. This method is responsible to computing the new cell
+        # size and doing any periodicity checks if needed.
+        solver.add_post_stage_callback( nnps.domain.setup_domain )
+
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
             nnps.set_in_parallel(True)

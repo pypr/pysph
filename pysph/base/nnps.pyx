@@ -290,6 +290,9 @@ cdef class DomainManager:
         # default value for the cell size
         self.cell_size = 1.0
 
+        # default DomainManager in_parallel is set to False
+        self.in_parallel = False
+
     def _check_limits(self, dim, xmin, xmax, ymin, ymax, zmin, zmax):
         """Sanity check on the limits"""
         if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
@@ -302,9 +305,40 @@ cdef class DomainManager:
     def set_cell_size(self, cell_size):
         self.cell_size = cell_size
 
+    def set_in_parallel(self, bint in_parallel):
+        self.in_parallel = in_parallel
+
+    def set_radius_scale(self, double radius_scale):
+        self.radius_scale = radius_scale
+
     ####################################################################
     # Functions for periodicity
     ####################################################################
+    def setup_domain(self, *args, **kwargs):
+        """General method that is called before NNPS can bin particles.
+
+        This method is responsible for the computation of cell sizes
+        and creation of any ghost particles for periodic or wall
+        boundary conditions.
+
+        """
+        # compute the cell sizes
+        self._compute_cell_size()
+
+        # Periodicity is handled by adjusting particles according to a
+        # given cubic domain box. In parallel, it is expected that the
+        # appropriate parallel NNPS is responsible for the creation of
+        # ghost particles.
+        if self.is_periodic and not self.in_parallel:
+            # remove periodic ghost particles from a previous step
+            self._remove_ghosts()
+
+            # box-wrap current particles for periodicity
+            self._box_wrap_periodic()
+
+            # create new periodic ghosts
+            self._create_ghosts_periodic()
+
     cdef _remove_ghosts(self):
         """Remove all ghost particles from a previous step
 
@@ -538,6 +572,42 @@ cdef class DomainManager:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
+    cdef _compute_cell_size(self):
+        """Compute the cell size for the binning.
+
+        The cell size is chosen as the kernel radius scale times the
+        maximum smoothing length in the local processor. For parallel
+        runs, we would need to communicate the maximum 'h' on all
+        processors to decide on the appropriate binning size.
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray h
+        cdef double cell_size
+        cdef double _hmax, hmax = -1.0
+
+        for pa_wrapper in pa_wrappers:
+            h = pa_wrapper.h
+            h.update_min_max()
+
+            _hmax = h.maximum
+            if _hmax > hmax:
+                hmax = _hmax
+
+        cell_size = self.radius_scale * hmax
+
+        if cell_size < 1e-6:
+            msg = """Cell size too small %g. Perhaps h = 0?
+            Setting cell size to 1"""%(cell_size)
+            if self.warn : print msg
+            cell_size = 1.0
+
+        self.cell_size = cell_size
+
+        # set the cell size for the DomainManager
+        self.set_cell_size(cell_size)
+
 cdef class Cell:
     """Basic indexing structure for the box-sort NNPS.
 
@@ -690,7 +760,6 @@ cdef class NNPS:
             Flag to warn when extending particle lists
 
         """
-        self.in_parallel = False
         # store the list of particles and number of arrays
         self.particles = particles
         self.narrays = len( particles )
@@ -708,6 +777,9 @@ cdef class NNPS:
 
         # set the particle array wrappers for the domain manager
         self.domain.set_pa_wrappers(self.pa_wrappers)
+        
+        # set the radius scale to determine the cell size
+        self.domain.set_radius_scale(self.radius_scale)
 
         # periodicity
         self.is_periodic = self.domain.is_periodic
@@ -752,20 +824,8 @@ cdef class NNPS:
         
         cdef DomainManager domain = self.domain
 
-        # compute the cell sizes
-        self._compute_cell_size()
-
-        # Periodicity is handled by adjusting particles according to a
-        # given cubic domain box
-        if self.is_periodic and not self.in_parallel:
-            # remove periodic ghost particles from a previous step
-            domain._remove_ghosts()
-
-            # box-wrap current particles for periodicity
-            domain._box_wrap_periodic()
-
-            # create new periodic ghosts
-            domain._create_ghosts_periodic()
+        # use cell sizes computed by the domain.
+        self.cell_size = domain.cell_size
 
         # compute bounds and refresh the data structure
         self._compute_bounds()
@@ -797,42 +857,6 @@ cdef class NNPS:
     cpdef get_particles_in_neighboring_cells(self, int cell_index,
         int pa_index, UIntArray nbrs):
         raise NotImplementedError()
-
-    cdef _compute_cell_size(self):
-        """Compute the cell size for the binning.
-
-        The cell size is chosen as the kernel radius scale times the
-        maximum smoothing length in the local processor. For parallel
-        runs, we would need to communicate the maximum 'h' on all
-        processors to decide on the appropriate binning size.
-
-        """
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray h
-        cdef double cell_size
-        cdef double _hmax, hmax = -1.0
-
-        for pa_wrapper in pa_wrappers:
-            h = pa_wrapper.h
-            h.update_min_max()
-
-            _hmax = h.maximum
-            if _hmax > hmax:
-                hmax = _hmax
-
-        cell_size = self.radius_scale * hmax
-
-        if cell_size < 1e-6:
-            msg = """Cell size too small %g. Perhaps h = 0?
-            Setting cell size to 1"""%(cell_size)
-            if self.warn : print msg
-            cell_size = 1.0
-
-        self.cell_size = cell_size
-
-        # set the cell size for the DomainManager
-        self.domain.set_cell_size(cell_size)
 
     cdef _compute_bounds(self):
         """Compute coordinate bounds for the particles"""
@@ -867,6 +891,9 @@ cdef class NNPS:
     cpdef count_n_part_per_cell(self):
         """Count the number of particles in each cell"""
         raise NotImplementedError("NNPS :: count_n_part_per_cell called")
+
+    def set_in_parallel(self, bint in_parallel):
+        self.domain.in_parallel = in_parallel
 
     ######################################################################
     # Neighbor location routines
@@ -990,9 +1017,6 @@ cdef class NNPS:
             if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
-    def set_in_parallel(self, bint in_parallel):
-        self.in_parallel = in_parallel
-
 cdef class BoxSortNNPS(NNPS):
     """Nearest neighbor query class using the box-sort algorithm.
 
@@ -1025,14 +1049,11 @@ cdef class BoxSortNNPS(NNPS):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain, warn)
 
-        # default not in parallel
-
-        self.in_parallel = False
-
         # initialize the cells dict
         self.cells = {}
 
         # compute the intial box sort
+        self.domain.setup_domain()
         self.update()
 
     cpdef _refresh(self):
@@ -1335,7 +1356,10 @@ cdef class LinkedListNNPS(NNPS):
         self.ncells_per_dim = IntArray(3)
         self.n_cells = 0
 
-        # compute the intial box sort for all local particles
+        # compute the intial box sort for all local particles. The
+        # DomainManager.setup_domain method is called to compute the
+        # cell size.
+        self.domain.setup_domain()
         self.update()
 
     cdef _bin(self, int pa_index, UIntArray indices):
