@@ -89,11 +89,6 @@ def create_particles(**kwargs):
     # kernel summation correction for the channel
     channel.add_property('wij')
 
-    # imposed velocity on the channel
-    channel.add_property('u0'); channel.u0[:] = 0.
-    channel.add_property('v0'); channel.v0[:] = 0.
-    channel.add_property('w0'); channel.w0[:] = 0.
-
     # imposed accelerations on the solid
     channel.add_property('ax')
     channel.add_property('ay')

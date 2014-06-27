@@ -83,11 +83,6 @@ def create_particles(**kwargs):
     # kernel summation correction for the solid
     solid.add_property('wij')
 
-    # imposed or prescribed boundary velocity for the solid
-    solid.add_property('u0'); solid.u0[:] = 0.
-    solid.add_property('v0'); solid.v0[:] = 0.
-    solid.add_property('w0'); solid.w0[:] = 0.
-
     # imposed accelerations on the solid
     solid.add_property('ax')
     solid.add_property('ay')
@@ -112,16 +107,17 @@ def create_particles(**kwargs):
     solid.h[:] = hdx * dx
 
     # imposed horizontal velocity on the lid
-    solid.u0[:] = 0.0
-    solid.v0[:] = 0.0
+    solid.u[:] = 0.0
+    solid.v[:] = 0.0
     for i in range(solid.get_number_of_particles()):
         if solid.y[i] > L:
-            solid.u0[i] = Umax
+            solid.u[i] = Umax
 
     # set the output arrays
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
                               'V', 'm', 'h'] )
-    solid.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+
+    solid.set_output_arrays( ['x', 'y', 'u', 'rho', 'p'] )
 
     return [fluid, solid]
 

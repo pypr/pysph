@@ -90,11 +90,6 @@ def create_particles(**kwargs):
     # kernel summation correction for the solid
     solid.add_property('wij')
 
-    # imposed or prescribed boundary velocity for the solid
-    solid.add_property('u0'); solid.u0[:] = 0.
-    solid.add_property('v0'); solid.v0[:] = 0.
-    solid.add_property('w0'); solid.w0[:] = 0.
-
     # imposed accelerations on the solid
     solid.add_property('ax')
     solid.add_property('ay')

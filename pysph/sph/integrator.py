@@ -15,7 +15,6 @@ from pysph.sph.equation import get_array_names
 from pysph.base.cython_generator import CythonGenerator, get_func_definition
 from .integrator_step import IntegratorStep
 
-
 ###############################################################################
 # `Integrator` class
 ###############################################################################
