@@ -4,7 +4,7 @@
 import numpy as np
 
 # PySPH imports
-from pysph.base.nnps import DomainLimits, BoxSortNNPS, LinkedListNNPS
+from pysph.base.nnps import DomainManager, BoxSortNNPS, LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.point import Point
 from pysph.base.kernels import Gaussian, get_compiled_kernel
@@ -62,7 +62,7 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
 
         # particles and domain
         self.particles = particles = [fluid, channel]
-        self.domain = domain = DomainLimits(xmin=0, xmax=L, periodic_in_x=True)
+        self.domain = domain = DomainManager(xmin=0, xmax=L, periodic_in_x=True)
         self.kernel = get_compiled_kernel(Gaussian(dim=2))
 
     def _test_periodicity_flags(self):

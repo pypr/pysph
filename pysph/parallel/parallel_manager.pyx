@@ -16,7 +16,7 @@ from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core import zoltan_utils
 
 # PySPH imports
-from pysph.base.nnps cimport DomainLimits, Cell, find_cell_id, arange_uint
+from pysph.base.nnps cimport DomainManager, Cell, find_cell_id, arange_uint
 from pysph.base.utils import ParticleTAGS
 from pysph.solver.utils import savez
 
@@ -330,7 +330,7 @@ cdef class ParallelManager:
         ghost_layers : int, default (2)
             Optional factor for computing bounding boxes for cells.
 
-        domain : DomainLimits, default (None)
+        domain : DomainManager, default (None)
             Optional limits for the domain
 
         """
@@ -1032,7 +1032,7 @@ cdef class ZoltanParallelManager(ParallelManager):
         ghost_layers : int, default (2)
             Optional factor for computing bounding boxes for cells.
 
-        domain : DomainLimits, default (None)
+        domain : DomainManager, default (None)
             Optional limits for the domain
 
         """

@@ -4,7 +4,7 @@
 from pyzoltan.core.carray import LongArray
 
 # PySPH imports
-from pysph.base.nnps import DomainLimits
+from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
@@ -123,7 +123,7 @@ def create_particles(**kwargs):
     return [fluid, solid]
 
 # domain for periodicity
-domain = DomainLimits(
+domain = DomainManager(
     xmin=0, xmax=L, ymin=0, ymax=H, periodic_in_x=True,periodic_in_y=True)
 
 # Create the application.
