@@ -243,6 +243,10 @@ cdef class NNPSParticleArrayWrapper:
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
 
+    def remove_tagged_particles(self, int tag):
+        cdef ParticleArray pa = self.pa
+        pa.remove_tagged_particles(tag)
+
 cdef class DomainManager:
     """This class determines the limits of the solution domain.
 
@@ -279,10 +283,260 @@ cdef class DomainManager:
         # store the dimension
         self.dim = dim
 
+        # empty list of particle array wrappers for now
+        self.pa_wrappers = []
+        self.narrays = 0
+        
+        # default value for the cell size
+        self.cell_size = 1.0
+
     def _check_limits(self, dim, xmin, xmax, ymin, ymax, zmin, zmax):
         """Sanity check on the limits"""
         if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
             raise ValueError("Invalid domain limits!")
+
+    def set_pa_wrappers(self, wrappers):
+        self.pa_wrappers = wrappers
+        self.narrays = len(wrappers)
+
+    def set_cell_size(self, cell_size):
+        self.cell_size = cell_size
+
+    ####################################################################
+    # Functions for periodicity
+    ####################################################################
+    cdef _remove_ghosts(self):
+        """Remove all ghost particles from a previous step
+
+        While creating periodic neighbors, we create new particles and
+        give them the tag utils.ParticleTAGS.Ghost. Before repeating
+        this step in the next iteration, all current particles with
+        this tag are removed.
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef int narrays = self.narrays
+
+        cdef int array_index
+        cdef NNPSParticleArrayWrapper pa_wrapper
+
+        for array_index in range( narrays ):
+            pa_wrapper = <NNPSParticleArrayWrapper>PyList_GetItem( pa_wrappers, array_index )
+            pa_wrapper.remove_tagged_particles(Ghost)
+
+    cdef _box_wrap_periodic(self):
+        """Box-wrap particles for periodicity
+
+        The periodic domain is a rectangular box defined by minimum
+        and maximum values in each coordinate direction. These values
+        are used in turn to define translation values used to box-wrap
+        particles that cross a periodic boundary.
+
+        The periodic domain is specified using the DomainManager object
+
+        """
+        # minimum and maximum values of the domain
+        cdef double xmin = self.xmin, xmax = self.xmax
+        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double zmin = self.zmin, zmax = self.zmax
+
+        # translations along each coordinate direction
+        cdef double xtranslate = self.xtranslate
+        cdef double ytranslate = self.ytranslate
+        cdef double ztranslate = self.ztranslate
+
+        # periodicity flags for NNPS
+        cdef bint periodic_in_x = self.periodic_in_x
+        cdef bint periodic_in_y = self.periodic_in_y
+        cdef bint periodic_in_z = self.periodic_in_z
+
+        # locals
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
+        cdef double xi, yi, zi
+        cdef int i, np
+
+        # iterate over each array and mark for translation
+        for pa_wrapper in self.pa_wrappers:
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+            np = x.length
+
+            # iterate over particles and box-wrap
+            for i in range(np):
+
+                if ( (periodic_in_x and not periodic_in_y) ):
+                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
+                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
+
+                if ( (periodic_in_y and not periodic_in_x) ):
+                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
+                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
+
+                if ( periodic_in_x and periodic_in_y ):
+                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
+                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
+
+                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
+                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
+
+    cdef _create_ghosts_periodic(self):
+        """Identify boundary particles and create images.
+
+        We need to find all particles that are within a specified
+        distance from the boundaries and place image copies on the
+        other side of the boundary. Corner reflections need to be
+        accounted for when using domains with multiple periodicity.
+
+        The periodic domain is specified using the DomainManager object
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef int narrays = self.narrays
+
+        # cell size used to check for periodic ghosts. For summation
+        # density like operations, we need to create two layers of
+        # ghost images.
+        cdef double cell_size = 2.0 * self.cell_size
+
+        # periodic domain values
+        cdef double xmin = self.xmin, xmax = self.xmax
+        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double zmin = self.zmin, zmax = self.zmax
+
+        cdef double xtranslate = self.xtranslate
+        cdef double ytranslate = self.ytranslate
+        cdef double ztranslate = self.ztranslate
+
+        # periodicity flags
+        cdef bint periodic_in_x = self.periodic_in_x
+        cdef bint periodic_in_y = self.periodic_in_y
+        cdef bint periodic_in_z = self.periodic_in_z
+
+        # locals
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef DoubleArray x, y, z
+        cdef double xi, yi, zi
+        cdef int array_index, i, np
+
+        # temporary indices for particles to be replicated
+        cdef LongArray left, right, top, bottom, lt, rt, lb, rb
+
+        left = LongArray(); right = LongArray()
+        top = LongArray(); bottom = LongArray()
+        lt = LongArray(); rt = LongArray()
+        lb = LongArray(); rb = LongArray()
+
+        for array_index in range(narrays):
+            pa_wrapper = pa_wrappers[ array_index ]
+            pa = pa_wrapper.pa
+            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
+
+            # reset the length of the arrays
+            left.reset(); right.reset(); top.reset(); bottom.reset()
+            lt.reset(); rt.reset(); lb.reset(); rb.reset()
+
+            np = x.length
+            for i in range(np):
+                xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
+
+                # X-Periodic
+                if periodic_in_x and not periodic_in_y:
+                    if ( (xi - xmin) <= cell_size ): left.append(i)
+                    if ( (xmax - xi) <= cell_size ): right.append(i)
+
+                # Y-Periodic
+                if periodic_in_y and not periodic_in_x:
+                    if ( (yi - ymin) <= cell_size ): bottom.append(i)
+                    if ( (ymax - yi) <= cell_size ): top.append(i)
+
+                # X&Y-Periodic
+                if periodic_in_x and periodic_in_y:
+                    # particle near the left end
+                    if ( (xi - xmin) <= cell_size ):
+                        left.append(i)
+
+                        # left bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            lb.append(i)
+
+                        # left top corner
+                        if ( (ymax - yi) < cell_size ):
+                            lt.append( i )
+
+                    # particle near the right
+                    if ( (xmax - xi) <= cell_size ):
+                        right.append(i)
+
+                        # right bottom corner
+                        if ( (yi - ymin) <= cell_size ):
+                            rb.append(i)
+
+                        # right top corner
+                        if ( (ymax - yi) < cell_size ):
+                            rt.append( i )
+
+                    # particle near the top
+                    if ( (ymax - yi) < cell_size ):
+                        top.append(i)
+
+                    # particle near the bottom
+                    if ( (yi - ymin) < cell_size ):
+                        bottom.append(i)
+
+            # now treat each case separately and append to the main array
+
+            # left
+            copy = pa.extract_particles( left )
+            copy.x += xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # right
+            copy = pa.extract_particles( right )
+            copy.x -= xtranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # top
+            copy = pa.extract_particles( top )
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # bottom
+            copy = pa.extract_particles( bottom )
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # left top
+            copy = pa.extract_particles( lt )
+            copy.x += xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # left bottom
+            copy = pa.extract_particles( lb )
+            copy.x += xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # right top
+            copy = pa.extract_particles( rt )
+            copy.x -= xtranslate
+            copy.y -= ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
+
+            # right bottom
+            copy = pa.extract_particles( rb )
+            copy.x -= xtranslate
+            copy.y += ytranslate
+            copy.tag[:] = Ghost
+            pa.append_parray(copy)
 
 cdef class Cell:
     """Basic indexing structure for the box-sort NNPS.
@@ -452,6 +706,9 @@ cdef class NNPS:
         if domain is None:
             self.domain = DomainManager(dim)
 
+        # set the particle array wrappers for the domain manager
+        self.domain.set_pa_wrappers(self.pa_wrappers)
+
         # periodicity
         self.is_periodic = self.domain.is_periodic
 
@@ -492,6 +749,8 @@ cdef class NNPS:
         cdef int i, num_particles
         cdef ParticleArray pa
         cdef UIntArray indices
+        
+        cdef DomainManager domain = self.domain
 
         # compute the cell sizes
         self._compute_cell_size()
@@ -500,13 +759,13 @@ cdef class NNPS:
         # given cubic domain box
         if self.is_periodic and not self.in_parallel:
             # remove periodic ghost particles from a previous step
-            self._remove_ghosts()
+            domain._remove_ghosts()
 
             # box-wrap current particles for periodicity
-            self._box_wrap_periodic()
+            domain._box_wrap_periodic()
 
             # create new periodic ghosts
-            self._create_ghosts_periodic()
+            domain._create_ghosts_periodic()
 
         # compute bounds and refresh the data structure
         self._compute_bounds()
@@ -571,6 +830,9 @@ cdef class NNPS:
             cell_size = 1.0
 
         self.cell_size = cell_size
+
+        # set the cell size for the DomainManager
+        self.domain.set_cell_size(cell_size)
 
     cdef _compute_bounds(self):
         """Compute coordinate bounds for the particles"""
@@ -730,246 +992,6 @@ cdef class NNPS:
 
     def set_in_parallel(self, bint in_parallel):
         self.in_parallel = in_parallel
-
-    ####################################################################
-    # Functions for periodicity
-    ####################################################################
-    cdef _remove_ghosts(self):
-        """Remove all ghost particles from a previous step
-
-        While creating periodic neighbors, we create new particles and
-        give them the tag utils.ParticleTAGS.Ghost. Before repeating
-        this step in the next iteration, all current particles with
-        this tag are removed.
-
-        """
-        cdef list particles = self.particles
-        cdef int narrays = self.narrays
-
-        cdef int array_index
-        cdef ParticleArray pa
-
-        for array_index in range( narrays ):
-            pa = <ParticleArray>PyList_GetItem( particles, array_index )
-            pa.remove_tagged_particles(Ghost)
-
-    cdef _box_wrap_periodic(self):
-        """Box-wrap particles for periodicity
-
-        The periodic domain is a rectangular box defined by minimum
-        and maximum values in each coordinate direction. These values
-        are used in turn to define translation values used to box-wrap
-        particles that cross a periodic boundary.
-
-        The periodic domain is specified using the DomainManager object
-
-        """
-        cdef DomainManager domain = self.domain
-
-        # minimum and maximum values of the domain
-        cdef double xmin = domain.xmin, xmax = domain.xmax
-        cdef double ymin = domain.ymin, ymax = domain.ymax,
-        cdef double zmin = domain.zmin, zmax = domain.zmax
-
-        # translations along each coordinate direction
-        cdef double xtranslate = domain.xtranslate
-        cdef double ytranslate = domain.ytranslate
-        cdef double ztranslate = domain.ztranslate
-
-        # periodicity flags for NNPS
-        cdef bint periodic_in_x = domain.periodic_in_x
-        cdef bint periodic_in_y = domain.periodic_in_y
-        cdef bint periodic_in_z = domain.periodic_in_z
-
-        # locals
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray x, y, z
-        cdef double xi, yi, zi
-        cdef int i, np
-
-        # iterate over each array and mark for translation
-        for pa_wrapper in self.pa_wrappers:
-            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
-            np = x.length
-
-            # iterate over particles and box-wrap
-            for i in range(np):
-
-                if ( (periodic_in_x and not periodic_in_y) ):
-                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
-                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
-
-                if ( (periodic_in_y and not periodic_in_x) ):
-                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
-                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
-
-                if ( periodic_in_x and periodic_in_y ):
-                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
-                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
-
-                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
-                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
-
-    cdef _create_ghosts_periodic(self):
-        """Identify boundary particles and create images.
-
-        We need to find all particles that are within a specified
-        distance from the boundaries and place image copies on the
-        other side of the boundary. Corner reflections need to be
-        accounted for when using domains with multiple periodicity.
-
-        The periodic domain is specified using the DomainManager object
-
-        """
-        cdef DomainManager domain = self.domain
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef list particles = self.particles
-        cdef int narrays = self.narrays
-
-        # cell size used to check for periodic ghosts. For summation
-        # density like operations, we need to create two layers of
-        # ghost images.
-        cdef double cell_size = 2 * self.cell_size
-
-        # periodic domain values
-        cdef double xmin = domain.xmin, xmax = domain.xmax
-        cdef double ymin = domain.ymin, ymax = domain.ymax,
-        cdef double zmin = domain.zmin, zmax = domain.zmax
-
-        cdef double xtranslate = domain.xtranslate
-        cdef double ytranslate = domain.ytranslate
-        cdef double ztranslate = domain.ztranslate
-
-        # periodicity flags
-        cdef bint periodic_in_x = domain.periodic_in_x
-        cdef bint periodic_in_y = domain.periodic_in_y
-        cdef bint periodic_in_z = domain.periodic_in_z
-
-        # locals
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef ParticleArray pa
-        cdef DoubleArray x, y, z
-        cdef double xi, yi, zi
-        cdef int array_index, i, np
-
-        # temporary indices for particles to be replicated
-        cdef LongArray left, right, top, bottom, lt, rt, lb, rb
-
-        left = LongArray(); right = LongArray()
-        top = LongArray(); bottom = LongArray()
-        lt = LongArray(); rt = LongArray()
-        lb = LongArray(); rb = LongArray()
-
-        for array_index in range(narrays):
-            pa_wrapper = pa_wrappers[ array_index ]
-            pa = particles[ array_index ]
-            x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
-
-            # reset the length of the arrays
-            left.reset(); right.reset(); top.reset(); bottom.reset()
-            lt.reset(); rt.reset(); lb.reset(); rb.reset()
-
-            np = x.length
-            for i in range(np):
-                xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
-
-                # X-Periodic
-                if periodic_in_x and not periodic_in_y:
-                    if ( (xi - xmin) <= cell_size ): left.append(i)
-                    if ( (xmax - xi) <= cell_size ): right.append(i)
-
-                # Y-Periodic
-                if periodic_in_y and not periodic_in_x:
-                    if ( (yi - ymin) <= cell_size ): bottom.append(i)
-                    if ( (ymax - yi) <= cell_size ): top.append(i)
-
-                # X&Y-Periodic
-                if periodic_in_x and periodic_in_y:
-                    # particle near the left end
-                    if ( (xi - xmin) <= cell_size ):
-                        left.append(i)
-
-                        # left bottom corner
-                        if ( (yi - ymin) <= cell_size ):
-                            lb.append(i)
-
-                        # left top corner
-                        if ( (ymax - yi) < cell_size ):
-                            lt.append( i )
-
-                    # particle near the right
-                    if ( (xmax - xi) <= cell_size ):
-                        right.append(i)
-
-                        # right bottom corner
-                        if ( (yi - ymin) <= cell_size ):
-                            rb.append(i)
-
-                        # right top corner
-                        if ( (ymax - yi) < cell_size ):
-                            rt.append( i )
-
-                    # particle near the top
-                    if ( (ymax - yi) < cell_size ):
-                        top.append(i)
-
-                    # particle near the bottom
-                    if ( (yi - ymin) < cell_size ):
-                        bottom.append(i)
-
-            # now treat each case separately and append to the main array
-
-            # left
-            copy = pa.extract_particles( left )
-            copy.x += xtranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # right
-            copy = pa.extract_particles( right )
-            copy.x -= xtranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # top
-            copy = pa.extract_particles( top )
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # bottom
-            copy = pa.extract_particles( bottom )
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # left top
-            copy = pa.extract_particles( lt )
-            copy.x += xtranslate
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # left bottom
-            copy = pa.extract_particles( lb )
-            copy.x += xtranslate
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # right top
-            copy = pa.extract_particles( rt )
-            copy.x -= xtranslate
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
-
-            # right bottom
-            copy = pa.extract_particles( rb )
-            copy.x -= xtranslate
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
 
 cdef class BoxSortNNPS(NNPS):
     """Nearest neighbor query class using the box-sort algorithm.

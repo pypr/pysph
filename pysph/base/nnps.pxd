@@ -39,6 +39,22 @@ cdef class DomainManager:
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
 
+    cdef public list pa_wrappers        # NNPS particle array wrappers
+    cdef public int narrays             # number of arrays
+    cdef public double cell_size        # distance to create ghosts
+
+    ############################################################################
+    # Functions for Periodicity
+    ############################################################################
+    # remove ghost particles from a previous iteration
+    cdef _remove_ghosts(self)
+    
+    # box-wrap particles within the physical domain
+    cdef _box_wrap_periodic(self)
+
+    # create new ghosts
+    cdef _create_ghosts_periodic(self)
+
 # Cell to hold particle indices
 cdef class Cell:
     ############################################################################
@@ -145,16 +161,6 @@ cdef class NNPS:
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
-
-    # Functions for Periodicity
-    # remove ghosts from a previous iteration
-    cdef _remove_ghosts(self)
-    
-    # box-wrap particles
-    cdef _box_wrap_periodic(self)
-
-    # create new periodic ghosts
-    cdef _create_ghosts_periodic(self)
 
     # count the number of particles in each cell
     cpdef count_n_part_per_cell(self)
