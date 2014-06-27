@@ -601,9 +601,6 @@ cdef class DomainManager:
         cell_size = self.radius_scale * hmax
 
         if cell_size < 1e-6:
-            msg = """Cell size too small %g. Perhaps h = 0?
-            Setting cell size to 1"""%(cell_size)
-            if self.warn : print msg
             cell_size = 1.0
 
         self.cell_size = cell_size
