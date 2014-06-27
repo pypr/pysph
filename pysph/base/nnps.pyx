@@ -243,7 +243,7 @@ cdef class NNPSParticleArrayWrapper:
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
 
-cdef class DomainLimits:
+cdef class DomainManager:
     """This class determines the limits of the solution domain.
 
     We expect all simulations to have well defined domain limits
@@ -429,7 +429,7 @@ cdef class NNPS:
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
 
-        domain : DomainLimits, default (None)
+        domain : DomainManager, default (None)
             Optional limits for the domain
 
         warn : bint
@@ -450,7 +450,7 @@ cdef class NNPS:
 
         self.domain = domain
         if domain is None:
-            self.domain = DomainLimits(dim)
+            self.domain = DomainManager(dim)
 
         # periodicity
         self.is_periodic = self.domain.is_periodic
@@ -761,10 +761,10 @@ cdef class NNPS:
         are used in turn to define translation values used to box-wrap
         particles that cross a periodic boundary.
 
-        The periodic domain is specified using the DomainLimits object
+        The periodic domain is specified using the DomainManager object
 
         """
-        cdef DomainLimits domain = self.domain
+        cdef DomainManager domain = self.domain
 
         # minimum and maximum values of the domain
         cdef double xmin = domain.xmin, xmax = domain.xmax
@@ -818,10 +818,10 @@ cdef class NNPS:
         other side of the boundary. Corner reflections need to be
         accounted for when using domains with multiple periodicity.
 
-        The periodic domain is specified using the DomainLimits object
+        The periodic domain is specified using the DomainManager object
 
         """
-        cdef DomainLimits domain = self.domain
+        cdef DomainManager domain = self.domain
         cdef list pa_wrappers = self.pa_wrappers
         cdef list particles = self.particles
         cdef int narrays = self.narrays
@@ -995,7 +995,7 @@ cdef class BoxSortNNPS(NNPS):
         radius_scale : double, default (2)
             Optional kernel radius scale. Defaults to 2
 
-        domain : DomainLimits, default (None)
+        domain : DomainManager, default (None)
             Optional limits for the domain
 
         """
@@ -1291,7 +1291,7 @@ cdef class LinkedListNNPS(NNPS):
         ghost_layers : int
             Optional number of layers to share in parallel
 
-        domain : DomainLimits, default (None)
+        domain : DomainManager, default (None)
             Optional limits for the domain
 
         fixed_h : bint
@@ -1374,7 +1374,7 @@ cdef class LinkedListNNPS(NNPS):
 
     cpdef _refresh(self):
         """Refresh the head and next arrays locally"""
-        cdef DomainLimits domain = self.domain
+        cdef DomainManager domain = self.domain
         cdef int narrays = self.narrays
         cdef DoubleArray xmin = self.xmin
         cdef DoubleArray xmax = self.xmax

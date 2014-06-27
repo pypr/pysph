@@ -26,7 +26,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef int get_number_of_particles(self)
 
 # Domain limits for the simulation
-cdef class DomainLimits:
+cdef class DomainManager:
     cdef public double xmin, xmax
     cdef public double ymin, ymax
     cdef public double zmin, zmax
@@ -86,7 +86,7 @@ cdef class NNPS:
     cdef public int rank                 # MPI rank
     cdef public int size                 # MPI size
 
-    cdef public DomainLimits domain      # Domain limits for the geometry
+    cdef public DomainManager domain     # Domain manager
     cdef public bint is_periodic         # flag for periodicity
 
     cdef public int dim                  # Dimensionality of the problem

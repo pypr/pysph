@@ -9,7 +9,7 @@ numerical result.
 This tutorial illustrates the following:
 
    - Creating particles : ParticleArray
-   - Setting up a periodic domain : DomainLimits
+   - Setting up a periodic domain : DomainManager
    - Nearest Neighbor Particle Searching : NNPS
 
 """
@@ -18,7 +18,7 @@ This tutorial illustrates the following:
 from pyzoltan.core.carray import UIntArray
 from pysph.base import utils
 from pysph.base.kernels import CubicSpline
-from pysph.base.nnps import DomainLimits, LinkedListNNPS
+from pysph.base.nnps import DomainManager, LinkedListNNPS
 
 # NumPy
 import numpy
@@ -38,7 +38,7 @@ m = numpy.ones_like(x) * dx*dx
 pa = utils.get_particle_array(x=x,y=y,h=h,m=m)
 
 # the simulation domain used to request periodicity
-domain = DomainLimits(
+domain = DomainManager(
     xmin=0., xmax=1., ymin=0., ymax=1.,periodic_in_x=True, periodic_in_y=True)
 
 # NNPS object for nearest neighbor queries
