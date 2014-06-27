@@ -45,6 +45,7 @@ class Solver(object):
     def __init__(self, dim=2, integrator=None, kernel=None,
                  tdamp=0.001, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
+                 output_at_times = [],
                  fixed_h=False, **kwargs):
         """Constructor
 
@@ -74,6 +75,9 @@ class Solver(object):
 
         cfl : double
             CFL number for adaptive time stepping
+
+        output_at_times : list
+            Optional list of output times to force output
 
         fixed_h : bint
             Flag for constant smoothing lengths
@@ -144,6 +148,10 @@ class Solver(object):
         # Use adaptive time steps and cfl number
         self.adaptive_timestep = adaptive_timestep
         self.cfl = cfl
+
+        # list of output times
+        self.output_at_times = output_at_times
+        self.force_output = False
 
         # Use cell iterations or not.
         self.cell_iteration = False
@@ -289,6 +297,10 @@ class Solver(object):
         """ Set the output directory """
         self.output_directory = path
 
+    def set_output_at_times(self, output_at_times):
+        """ Set a list of output times """
+        self.output_at_times = output_at_times
+
     def set_parallel_output_mode(self, mode="collected"):
         """Set the default solver dump mode in parallel.
 
@@ -315,6 +327,10 @@ class Solver(object):
     def set_parallel_manager(self, pm):
         self.pm = pm
 
+    def barrier(self):
+        if self.comm:
+            self.comm.barrier()
+
     def solve(self, show_progress=True):
         """ Solve the system
 
@@ -328,6 +344,7 @@ class Solver(object):
 
         """
         dt = self.dt
+        old_dt = self.dt
 
         if self.in_parallel:
             show = False
@@ -335,9 +352,9 @@ class Solver(object):
             show = show_progress
         bar = FloatPBar(self.t, self.tf, show=show)
 
+        # Initial solution
         self.dump_output()
-        if self.comm:
-            self.comm.barrier() # everybody waits for this to complete
+        self.barrier() # everybody waits for this to complete
 
         # initial solution damping time
         tdamp = self.tdamp
@@ -345,6 +362,9 @@ class Solver(object):
         # Compute the accelerations once for the predictor corrector
         # integrator to work correctly at the first time step.
         self.sph_eval.compute(self.t, dt)
+
+        # solution output times
+        output_at_times = numpy.array( self.output_at_times )
 
         while self.t < self.tf:
 
@@ -370,11 +390,22 @@ class Solver(object):
             self.t += dt
             self.count += 1
 
-            # dump output
+            # dump output if the iteration number is a multiple of the
+            # printing frequency
             if self.count % self.pfreq == 0:
                 self.dump_output()
-                if self.comm:
-                    self.comm.barrier()
+                self.barrier()
+
+            # dump output if forced
+            if self.force_output:
+                self.dump_output()
+                self.barrier()
+
+                self.force_output = False
+
+                # re-set the time-step to the old time step before it
+                # was adjusted
+                dt = old_dt
 
             # update progress bar
             bar.update(self.t)
@@ -384,6 +415,7 @@ class Solver(object):
 
             # compute the new time step across all processors
             if self.adaptive_timestep:
+
                 # locally stable time step
                 dt = self.integrator.compute_time_step(
                     self.dt, self.cfl)
@@ -399,7 +431,25 @@ class Solver(object):
             # adjust dt to land on final time
             if self.t + dt > self.tf:
                 dt = self.tf - self.t
-                self.dt = dt
+
+            # adjust dt to land on specific output times
+            if output_at_times.size > 0:
+                tdiff = output_at_times - self.t
+                condition = (tdiff > 0) & (tdiff < dt)
+
+                if numpy.any( condition ):
+                    output_time = output_at_times[ numpy.where(condition) ]
+
+                    # save the old time-step and compute the new
+                    # time-step to fall on the specified output time
+                    # instant
+                    old_dt = dt
+                    dt = float( output_time - self.t )
+                    
+                    self.force_output = True
+
+            # set the adjusted time-step for the solver
+            self.dt = dt
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
@@ -458,6 +508,11 @@ class Solver(object):
 
         _fname = os.path.join(self.output_directory,
                               fname  + str(self.count) +'.npz')
+
+        if self.rank == 0:
+            msg = 'Writing output at time %g, iteration %d, dt = %g'%(
+                self.t, self.count, self.dt)
+            logger.info(msg)
 
         # Array data
         for array in self.particles:

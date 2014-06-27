@@ -86,10 +86,6 @@ def create_particles(**kwargs):
     # kernel summation correction for the channel
     channel.add_property('wij')
 
-    # imposed velocity on the channel
-    channel.add_property('u0'); channel.u0[:] = 0.
-    channel.add_property('v0'); channel.v0[:] = 0.
-    channel.add_property('w0'); channel.w0[:] = 0.
 
     channel.add_property('ax')
     channel.add_property('ay')
@@ -119,7 +115,7 @@ def create_particles(**kwargs):
 
     # channel velocity on upper portion
     indices = np.where(channel.y > d)[0]
-    channel.u0[indices] = Vmax
+    channel.u[indices] = Vmax
 
     # load balancing props
     fluid.set_lb_props( fluid.properties.keys() )

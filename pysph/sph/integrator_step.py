@@ -311,3 +311,91 @@ class GasDFluidStep(IntegratorStep):
 
         # Update densities and smoothing lengths from the accelerations
         d_e[d_idx] = d_e0[d_idx] + dt * d_ae[d_idx]
+
+###############################################################################
+# `TwoStageRigidBodyStep` class
+###############################################################################        
+class TwoStageRigidBodyStep(IntegratorStep):
+    """Simple rigid-body motion
+
+    At each stage of the integrator, the prescribed velocity and
+    accelerations are incremented by dt/2. 
+
+    Note that the time centered velocity is used for updating the
+    particle positions. This ensures exact motion for a constant
+    acceleration.
+    
+    """
+    def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+                   d_u, d_v, d_w, d_u0, d_v0, d_w0):
+
+        d_u0[d_idx] = d_u[d_idx]
+        d_v0[d_idx] = d_v[d_idx]
+        d_w0[d_idx] = d_w[d_idx]
+
+        d_x0[d_idx] = d_x[d_idx]
+        d_y0[d_idx] = d_y[d_idx]
+        d_z0[d_idx] = d_z[d_idx]
+        
+    def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, 
+               dt=0.0):
+
+        dtb2 = 0.5*dt
+
+        d_u[d_idx] = d_u0[d_idx] + dtb2 * d_ax[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dtb2 * d_ay[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dtb2 * d_az[d_idx]
+
+        # positions are updated based on the time centered velocity
+        d_x[d_idx] = d_x0[d_idx] + dtb2 * 0.5 * (d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] = d_y0[d_idx] + dtb2 * 0.5 * (d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] = d_z0[d_idx] + dtb2 * 0.5 * (d_w[d_idx] + d_w0[d_idx])
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
+               dt=0.0):
+
+        d_u[d_idx] = d_u0[d_idx] + dt * d_ax[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dt * d_ay[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dt * d_az[d_idx]
+
+        # positions are updated based on the time centered velocity
+        d_x[d_idx] = d_x0[d_idx] + dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] = d_y0[d_idx] + dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] = d_z0[d_idx] + dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])
+
+###############################################################################
+# `OneStageRigidBodyStep` class
+###############################################################################        
+class OneStageRigidBodyStep(IntegratorStep):
+    """Simple one stage rigid-body motion """
+    def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+                   d_u, d_v, d_w, d_u0, d_v0, d_w0):
+
+        d_u0[d_idx] = d_u[d_idx]
+        d_v0[d_idx] = d_v[d_idx]
+        d_w0[d_idx] = d_w[d_idx]
+
+        d_x0[d_idx] = d_x[d_idx]
+        d_y0[d_idx] = d_y[d_idx]
+        d_z0[d_idx] = d_z[d_idx]
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, 
+               dt=0.0):
+        pass
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
+               dt=0.0):
+
+        # update velocities
+        d_u[d_idx] += dt * d_ax[d_idx]
+        d_v[d_idx] += dt * d_ay[d_idx]
+        d_w[d_idx] += dt * d_az[d_idx]
+
+        # upadte positions using time-centered velocity
+        d_x[d_idx] += dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
+        d_y[d_idx] += dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
+        d_z[d_idx] += dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])

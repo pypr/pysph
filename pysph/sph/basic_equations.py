@@ -13,7 +13,7 @@ class SummationDensity(Equation):
 
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
-
+        
 class BodyForce(Equation):
     r"""Add a body force to the particles:
 
