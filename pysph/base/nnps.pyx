@@ -311,9 +311,9 @@ cdef class DomainManager:
     def set_radius_scale(self, double radius_scale):
         self.radius_scale = radius_scale
 
-    ####################################################################
-    # Functions for periodicity
-    ####################################################################
+    def compute_cell_size(self):
+        self._compute_cell_size()
+
     def setup_domain(self, *args, **kwargs):
         """General method that is called before NNPS can bin particles.
 
@@ -339,6 +339,9 @@ cdef class DomainManager:
             # create new periodic ghosts
             self._create_ghosts_periodic()
 
+    ####################################################################
+    # Functions for periodicity
+    ####################################################################
     cdef _remove_ghosts(self):
         """Remove all ghost particles from a previous step
 
@@ -803,6 +806,9 @@ cdef class NNPS:
 
         # number of particles per cell
         self.n_part_per_cell = [IntArray() for pa in particles]
+
+    def compute_cell_size(self):
+        self.domain.compute_cell_size()
 
     cpdef update(self):
         """Update the local data after particles have moved.
