@@ -26,7 +26,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef int get_number_of_particles(self)
 
 # Domain limits for the simulation
-cdef class DomainLimits:
+cdef class DomainManager:
     cdef public double xmin, xmax
     cdef public double ymin, ymax
     cdef public double zmin, zmax
@@ -38,6 +38,28 @@ cdef class DomainLimits:
     cdef public int dim
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
+
+    cdef public list pa_wrappers        # NNPS particle array wrappers
+    cdef public int narrays             # number of arrays
+    cdef public double cell_size        # distance to create ghosts
+    cdef bint in_parallel               # Flag to determine if in parallel
+    cdef public double radius_scale     # Radius scale for kernel
+
+    ############################################################################
+    # Functions for Periodicity
+    ############################################################################
+    # remove ghost particles from a previous iteration
+    cdef _remove_ghosts(self)
+    
+    # box-wrap particles within the physical domain
+    cdef _box_wrap_periodic(self)
+
+    # create new ghosts
+    cdef _create_ghosts_periodic(self)
+
+    # Compute the cell size across processors. The cell size is taken
+    # as max(h)*radius_scale
+    cdef _compute_cell_size(self)
 
 # Cell to hold particle indices
 cdef class Cell:
@@ -81,12 +103,11 @@ cdef class NNPS:
     cdef public list pa_wrappers         # list of particle array wrappers
     cdef public int narrays              # Number of particle arrays
 
-    cdef bint in_parallel                # Flag to determine if in parallel
     cdef public object comm              # MPI communicator object
     cdef public int rank                 # MPI rank
     cdef public int size                 # MPI size
 
-    cdef public DomainLimits domain      # Domain limits for the geometry
+    cdef public DomainManager domain     # Domain manager
     cdef public bint is_periodic         # flag for periodicity
 
     cdef public int dim                  # Dimensionality of the problem
@@ -111,10 +132,6 @@ cdef class NNPS:
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
     cdef _bin(self, int pa_index, UIntArray indices)
-
-    # Compute the cell size across processors. The cell size is taken
-    # as max(h)*radius_scale
-    cdef _compute_cell_size(self)
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
@@ -145,16 +162,6 @@ cdef class NNPS:
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
-
-    # Functions for Periodicity
-    # remove ghosts from a previous iteration
-    cdef _remove_ghosts(self)
-    
-    # box-wrap particles
-    cdef _box_wrap_periodic(self)
-
-    # create new periodic ghosts
-    cdef _create_ghosts_periodic(self)
 
     # count the number of particles in each cell
     cpdef count_n_part_per_cell(self)
