@@ -18,7 +18,7 @@ particle. This should remain constant through the simulation.
 """
 
 # PySPH imports
-from pysph.base.nnps import DomainLimits
+from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline
 from pysph.solver.solver import Solver
@@ -80,8 +80,8 @@ def create_particles(**kwargs):
     return [fluid,]
 
 # domain for periodicity
-domain = DomainLimits(xmin=0, xmax=1.0, ymin=0, ymax=1.0,
-                      periodic_in_x=True, periodic_in_y=True)
+domain = DomainManager(xmin=0, xmax=1.0, ymin=0, ymax=1.0,
+                       periodic_in_x=True, periodic_in_y=True)
 
 # Create the application.
 app = Application(domain=domain)
