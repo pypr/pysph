@@ -16,7 +16,7 @@ from pysph.sph.integrator_step import GasDFluidStep
 # PySPH sph imports
 from pysph.sph.equation import Group
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,\
-    SummationDensity, IdealGasEOS, MPMAccelerations
+    SummationDensity, IdealGasEOS, MPMAccelerations, Monaghan92Accelerations
 
 # problem constants
 dim = 2
@@ -141,8 +141,10 @@ equations = [
     # do the main acceleratio block.
     Group(
         equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                             alpha1=alpha1, alpha2=alpha2, beta=beta)
+            #MPMAccelerations(dest='fluid', sources=['fluid',],
+            #                  alpha1=alpha1, alpha2=alpha2, beta=beta)
+            Monaghan92Accelerations(dest='fluid', sources=['fluid',],
+                                    alpha=1.0, beta=2.0)
             ], update_nnps=False
         ),
     ]

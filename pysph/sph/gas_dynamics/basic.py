@@ -61,6 +61,46 @@ class IdealGasEOS(Equation):
 
         d_cs[d_idx] = sqrt( self.gamma * d_p[d_idx]/d_rho[d_idx] )
 
+class Monaghan92Accelerations(Equation):
+    def __init__(self, dest, sources, alpha=1.0, beta=2.0):
+        self.alpha = alpha
+        self.beta = beta
+
+        super(Monaghan92Accelerations, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+        d_ae[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_rho, s_rho, d_p, s_p, d_cs, s_cs,
+             d_au, d_av, d_aw, d_ae, s_m,
+             VIJ, DWIJ, XIJ, EPS, HIJ, R2IJ, RHOIJ1):
+
+        rhoi2 = d_rho[d_idx] * d_rho[d_idx]
+        rhoj2 = s_rho[s_idx] * s_rho[s_idx]
+        
+        tmpi = d_p[d_idx]/rhoi2
+        tmpj = s_p[s_idx]/rhoj2
+
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        piij = 0.0
+        if vijdotxij < 0:
+            muij = HIJ*vijdotxij/(R2IJ + EPS)
+            cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
+
+            piij = -self.alpha*cij*muij + self.beta*muij*muij
+            piij *= RHOIJ1            
+        
+        d_au[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[0]
+        d_av[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[1]
+        d_aw[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[2]
+        
+        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
+
+        d_ae[d_idx] += 0.5 * s_m[s_idx] * (tmpi + tmpj + piij) * vijdotdwij
+
 class MPMAccelerations(Equation):
     def __init__(self, dest, sources, alpha1=1.0, alpha2=0.1, beta=2.0):
         self.alpha1 = alpha1
