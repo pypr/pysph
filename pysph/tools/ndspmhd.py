@@ -7,7 +7,23 @@ from pysph.base.utils import get_particle_array_gasd as gpa
 from fortranfile import FortranFile
 
 def ndspmhd2pysph(fname, dim=2, read_type=False):
-    """Read a 2-dimensional output data file from NDSPMHD """
+    """Read output data file from NDSPMHD
+
+    Parameters:
+    
+    fname : str
+        NDSPMHD data filename
+
+    dim : int
+        Problem dimension
+
+    read_type : bint
+        Flag to read the `type` property for particles
+
+    Returns the ParticleArray representation of the data that can be
+    used in PySPH.
+
+    """
     f = FortranFile(fname)
 
     # get the header length
@@ -99,4 +115,4 @@ def ndspmhd2pysph(fname, dim=2, read_type=False):
     pa = gpa(name='fluid', x=x, y=y, m=m, h=h, rho=rho, e=e, p=p, 
              u=u, v=v, w=w, au=au, av=av, aw=aw, div=drhobdtbrho)
 
-    return [pa,]
+    return pa

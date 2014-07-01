@@ -18,7 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-"""Defines a file-derived class to read/write Fortran unformatted files.
+"""Defines a file-derived class to read/write Fortran unformatted files taken from
+
+http://wiki.scipy.org/Cookbook/FortranIO/FortranFile
 
 The assumption is that a Fortran unformatted file is being written by
 the Fortran runtime as a sequence of records.  Each record consists of
