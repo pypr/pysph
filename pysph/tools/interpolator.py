@@ -134,7 +134,7 @@ class Interpolator(object):
             array.get('temp_prop')[:] = data
 
         self.func_eval.compute(0.0, 0.1) # These are junk arguments.
-        result = self.pa.prop
+        result = self.pa.prop.copy()
         result.shape = self.shape
         return result.squeeze()
 
