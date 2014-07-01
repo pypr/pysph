@@ -132,7 +132,8 @@ class SPHEval(object):
             self.setup()
         self.nnps = nnps
         self.calc.set_nnps(nnps)
-        self.integrator.integrator.set_nnps(nnps)
+        if self.integrator is not None:
+            self.integrator.integrator.set_nnps(nnps)
 
     def setup(self):
         """Always call this first.
@@ -143,8 +144,16 @@ class SPHEval(object):
         self.calc = mod.SPHCalc(self.kernel, self.all_group.equations,
                                 *self.particle_arrays)
         self.sph_compute = self.calc.compute
-        integrator = mod.Integrator(self.calc, self.integrator.steppers)
-        self.integrator.set_integrator(integrator)
+        if self.integrator is not None:
+            integrator = mod.Integrator(self.calc, self.integrator.steppers)
+            self.integrator.set_integrator(integrator)
+
+    def update_particle_arrays(self, particle_arrays):
+        """Call this to update the particle arrays with new ones.  Make sure
+        though that the same properties exist in both or you will get a
+        segfault.
+        """
+        self.calc.update_particle_arrays(particle_arrays)
 
     ##########################################################################
     # Mako interface.
@@ -166,7 +175,8 @@ class SPHEval(object):
         helpers.append(self.all_group.get_equation_wrappers())
 
         # Integrator wrappers
-        helpers.append(self.integrator.get_stepper_code())
+        if self.integrator is not None:
+            helpers.append(self.integrator.get_stepper_code())
 
         return '\n'.join(helpers)
 
