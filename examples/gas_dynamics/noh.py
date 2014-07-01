@@ -138,13 +138,13 @@ equations = [
         ),
 
     # Now that we have the density, pressure and sound speeds, we can
-    # do the main acceleratio block.
+    # do the main acceleration block.
     Group(
         equations=[
-            #MPMAccelerations(dest='fluid', sources=['fluid',],
-            #                  alpha1=alpha1, alpha2=alpha2, beta=beta)
-            Monaghan92Accelerations(dest='fluid', sources=['fluid',],
-                                    alpha=1.0, beta=2.0)
+            MPMAccelerations(dest='fluid', sources=['fluid',],
+                              alpha1=alpha1, alpha2=alpha2, beta=beta)
+            #Monaghan92Accelerations(dest='fluid', sources=['fluid',],
+            #                        alpha=1.0, beta=2.0)
             ], update_nnps=False
         ),
     ]

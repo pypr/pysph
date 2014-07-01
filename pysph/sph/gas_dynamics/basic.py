@@ -56,9 +56,6 @@ class IdealGasEOS(Equation):
         
     def loop(self, d_idx, d_p, d_rho, d_e, d_cs):
         d_p[d_idx] = self.gamma1 * d_rho[d_idx] * d_e[d_idx]
-        if d_p[d_idx] < 0:
-            print 'IDEALGASEOS', d_idx, self.gamma1, d_rho[d_idx], d_e[d_idx]
-
         d_cs[d_idx] = sqrt( self.gamma * d_p[d_idx]/d_rho[d_idx] )
 
 class Monaghan92Accelerations(Equation):
