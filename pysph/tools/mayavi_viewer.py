@@ -12,7 +12,7 @@ import numpy
 import os
 import os.path
 
-from traits.api import (HasTraits, Instance, on_trait_change,
+from traits.api import (Array, HasTraits, Instance, on_trait_change,
         List, Str, Int, Range, Float, Bool, Button, Password, Property)
 from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
     TitleEditor, HGroup)
@@ -25,6 +25,9 @@ from tvtk.array_handler import array2vtk
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
 from pysph.solver.utils import load
+from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
+    Interpolator)
+
 
 import logging
 logger = logging.getLogger()
@@ -70,6 +73,149 @@ def sort_file_list(files):
 
     files.sort(_sort_func)
     return files
+
+
+##############################################################################
+# `InterpolatorView` class.
+##############################################################################
+class InterpolatorView(HasTraits):
+
+    # The bounds on which to interpolate.
+    bounds = Array(cols=3, dtype=float,
+                   desc='spatial bounds for the interpolation '\
+                        '(xmin, xmax, ymin, ymax, zmin, zmax)')
+
+    # The number of points to interpolate onto.
+    num_points = Int(100000, enter_set=True, auto_set=False,
+                     desc='number of points on which to interpolate')
+
+    # The particle arrays to interpolate from.
+    particle_arrays = List
+
+    # The scalar to interpolate.
+    scalar = Str('rho', desc='name of the active scalar to view')
+
+    # Sync'd trait with the scalar lut manager.
+    show_legend = Bool(False, desc='if the scalar legend is to be displayed')
+
+    # Enable/disable the interpolation
+    visible = Bool(False, desc='if the interpolation is to be displayed')
+
+    # A button to use the set bounds.
+    set_bounds = Button('Set Bounds')
+
+    # A button to recompute the bounds.
+    recompute_bounds = Button('Recompute Bounds')
+
+    #### Private traits. ######################################################
+
+    # The interpolator we are a view for.
+    interpolator = Instance(Interpolator)
+
+    # The mlab plot for this particle array.
+    plot = Instance(PipelineBase)
+
+    scalar_list = List
+
+    scene = Instance(MlabSceneModel)
+
+    source = Instance(PipelineBase)
+
+    _arrays_changed = Bool(False)
+
+    #### View definition ######################################################
+    view = View(Item(name='visible'),
+                Item(name='scalar',
+                     editor=EnumEditor(name='scalar_list')
+                    ),
+                Item(name='num_points'),
+                Item(name='bounds'),
+                Item(name='set_bounds', show_label=False),
+                Item(name='recompute_bounds', show_label=False),
+                Item(name='show_legend'),
+                )
+
+    #### Private protocol  ####################################################
+    def _change_bounds(self):
+        interp = self.interpolator
+        if interp is not None:
+            interp.set_domain(self.bounds, self.interpolator.shape)
+            self._update_plot()
+
+    def _setup_interpolator(self):
+        if self.interpolator is None:
+            interpolator = Interpolator(
+                self.particle_arrays, num_points=self.num_points
+            )
+            self.bounds = interpolator.bounds
+            self.interpolator = interpolator
+        else:
+            if self._arrays_changed:
+                self.interpolator.update_particle_arrays(self.particle_arrays)
+                self._arrays_changed = False
+
+    #### Trait handlers  ######################################################
+    def _particle_arrays_changed(self, pas):
+        self.scalar_list = pas[0].properties.keys()
+        self._arrays_changed = True
+        self._update_plot()
+
+    def _num_points_changed(self, value):
+        interp = self.interpolator
+        if interp is not None:
+            bounds = self.interpolator.bounds
+            shape = get_nx_ny_nz(value, bounds)
+            interp.set_domain(bounds, shape)
+            self._update_plot()
+
+    def _recompute_bounds_fired(self):
+        bounds = get_bounding_box(self.particle_arrays)
+        self.bounds = bounds
+        self._change_bounds()
+
+    def _set_bounds_fired(self):
+        self._change_bounds()
+
+    def _bounds_default(self):
+        return [0, 1, 0, 1, 0, 1]
+
+    @on_trait_change('scalar, visible')
+    def _update_plot(self):
+        if self.visible:
+            mlab = self.scene.mlab
+            self._setup_interpolator()
+            interp = self.interpolator
+            prop = interp.interpolate(self.scalar)
+            if self.source is None:
+                src = mlab.pipeline.scalar_field(
+                    interp.x, interp.y, interp.z, prop
+                )
+                self.source = src
+            else:
+                self.source.mlab_source.reset(
+                    x=interp.x, y=interp.y, z=interp.z, scalars=prop
+                )
+            src = self.source
+
+            if self.plot is None:
+                if interp.dim == 3:
+                    plot = mlab.pipeline.scalar_cut_plane(src)
+                else:
+                    plot = mlab.pipeline.surface(src)
+                self.plot = plot
+                scm = plot.module_manager.scalar_lut_manager
+                scm.set(show_legend=self.show_legend,
+                        use_default_name=False,
+                        data_name=self.scalar)
+                self.sync_trait('show_legend', scm, mutual=True)
+            else:
+                self.plot.visible = True
+                scm = self.plot.module_manager.scalar_lut_manager
+                scm.data_name = self.scalar
+        else:
+            if self.plot is not None:
+                self.plot.visible = False
+
 
 ##############################################################################
 # `ParticleArrayHelper` class.
@@ -219,6 +365,8 @@ class MayaviViewer(HasTraits):
     particle_arrays = List(Instance(ParticleArrayHelper), [])
     pa_names = List(Str, [])
 
+    interpolator = Instance(InterpolatorView)
+
     # The default scalar to load up when running the viewer.
     scalar = Str("rho")
 
@@ -319,7 +467,11 @@ class MayaviViewer(HasTraits):
                                                  deletable=False,
                                                  page_name='.name'
                                                  )
-                               )
+                               ),
+                          Item(name='interpolator',
+                               style='custom',
+                               show_label=False),
+                          layout='tabbed'
                          ),
                   ),
                   Item('scene', editor=SceneEditor(scene_class=MayaviScene),
@@ -327,8 +479,8 @@ class MayaviViewer(HasTraits):
                       ),
                 resizable=True,
                 title='PySPH Particle Viewer',
-                height=550,
-                width=880
+                height=640,
+                width=1024
                 )
 
     ######################################################################
@@ -367,10 +519,14 @@ class MayaviViewer(HasTraits):
         self.time_step = controller.get_dt()
         self.iteration = controller.get_count()
 
+        arrays = []
         for idx, name in enumerate(self.pa_names):
             pa = controller.get_named_particle_array(name)
+            arrays.append(pa)
             pah = self.particle_arrays[idx]
             pah.set(particle_array=pa, time=t)
+
+        self.interpolator.particle_arrays = arrays
 
         if self.record:
             self._do_snap()
@@ -463,6 +619,7 @@ class MayaviViewer(HasTraits):
         self.scene.mayavi_scene.children[:] = []
         self.particle_arrays = [ParticleArrayHelper(scene=self.scene, name=x) for x in
                                 self.pa_names]
+        self.interpolator = InterpolatorView(scene=self.scene)
         # Turn on the legend for the first particle array.
         if len(self.particle_arrays) > 0:
             self.particle_arrays[0].set(show_legend=True, show_time=True)
@@ -534,6 +691,7 @@ class MayaviViewer(HasTraits):
         pa_names = self.pa_names
 
         if len(pa_names) == 0:
+            self.interpolator = InterpolatorView(scene=self.scene)
             self.pa_names = names
             pas = []
             for name in names:
@@ -553,6 +711,8 @@ class MayaviViewer(HasTraits):
                 pa = arrays[name]
                 pah = self.particle_arrays[idx]
                 pah.set(particle_array=pa, time=t)
+
+        self.interpolator.particle_arrays = arrays.values()
 
         if self.record:
             self._do_snap()
