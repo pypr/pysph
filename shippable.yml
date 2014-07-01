@@ -28,6 +28,7 @@ install:
     - python setup.py develop
 
 before_script:
+    - rm -rf ~/.pysph/source
     - mkdir -p shippable/testresults
 
 script:
