@@ -21,8 +21,13 @@ class InterpolateFunction(Equation):
             d_prop[d_idx] /= d_number_density[d_idx]
 
 
-def get_bounding_box(particle_arrays):
+def get_bounding_box(particle_arrays, tight=False, stretch=0.05):
     """Find the size of the domain given a sequence of particle arrays.
+
+    If `tight` is True, the bounds are tight, if not the domain is stretched
+    along each dimension by an amount `stretch` specified as a percentage of
+    the length along that dimension is added in each dimension.
+
     """
     xmin, xmax = 1e20, -1e20
     ymin, ymax = 1e20, -1e20
@@ -35,7 +40,15 @@ def get_bounding_box(particle_arrays):
         ymax = max(ymax, y.max())
         zmin = min(zmin, z.min())
         zmax = max(zmax, z.max())
-    return xmin, xmax, ymin, ymax, zmin, zmax
+
+    bounds = np.asarray((xmin, xmax, ymin, ymax, zmin, zmax))
+    if not tight:
+        # Add the extra space.
+        lengths = stretch*np.repeat(bounds[1::2] - bounds[::2], 2)
+        lengths[::2] *= -1.0
+        bounds += lengths
+
+    return bounds
 
 def get_nx_ny_nz(num_points, bounds):
     """Given a number of points to use and the bounds, return a triplet
