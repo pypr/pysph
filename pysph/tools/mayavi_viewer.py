@@ -519,10 +519,14 @@ class MayaviViewer(HasTraits):
         self.time_step = controller.get_dt()
         self.iteration = controller.get_count()
 
+        arrays = []
         for idx, name in enumerate(self.pa_names):
             pa = controller.get_named_particle_array(name)
+            arrays.append(pa)
             pah = self.particle_arrays[idx]
             pah.set(particle_array=pa, time=t)
+
+        self.interpolator.particle_arrays = arrays
 
         if self.record:
             self._do_snap()
