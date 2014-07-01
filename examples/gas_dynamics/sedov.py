@@ -44,8 +44,17 @@ beta = 2.0
 kernel_factor = 1.2
 
 def create_particles(**kwargs):
-    fluid = ndspmhd.ndspmhd2pysph('ndspmhd-sedov-initial-conditions.dat')[0]
-    fluid.set_name('fluid')
+    data = numpy.load('ndspmhd-sedov-initial-conditions.npz')
+    x = data['x']
+    y = data['y']
+    
+    rho = data['rho']
+    p = data['p']
+    e = data['e']
+    h = data['h']
+    m = data['m']
+
+    fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m)    
 
     # set the initial smoothing length proportional to the particle
     # volume
@@ -66,7 +75,7 @@ integrator = PECIntegrator(fluid=GasDFluidStep())
 
 # Create the soliver
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=False)
+                dt=dt, tf=tf, adaptive_timestep=False, pfreq=25)
 
 # Define the SPH equations
 equations = [
