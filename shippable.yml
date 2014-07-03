@@ -14,7 +14,7 @@ before_install:
     # System dependencies via apt.
     - sudo apt-get install build-essential python-dev libopenmpi-dev
     # Again, the following are not useful without system_site_packages support.
-    - sudo apt-get install python-numpy python-mako python-mpi4py python-nose
+    - sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose
     # Build zoltan.
     - ./build_zoltan.sh $ZOLTAN_DIR
 
@@ -22,12 +22,14 @@ install:
     # These are needed because system_site_packages doesn't work.
     - pip install numpy
     - pip install cython
+    - pip install mpi4py
     - pip install mako nose
     # Build pysph.
     - make clean
     - python setup.py develop
 
 before_script:
+    - rm -rf ~/.pysph/source
     - mkdir -p shippable/testresults
 
 script:
