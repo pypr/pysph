@@ -804,7 +804,7 @@ cdef class NNPS:
         # number of particles per cell
         self.n_part_per_cell = [IntArray() for pa in particles]
 
-    def update_domain(self):
+    def update_domain(self, *args, **kwargs):
         self.domain.update()
 
     cpdef update(self):
