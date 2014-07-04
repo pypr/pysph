@@ -229,6 +229,7 @@ cdef class SPHCalc:
         #######################################################################
         % if group.update_nnps:
         # Updating NNPS.
+        nnps.update_domain()
         nnps.update()
         % endif
 
