@@ -59,7 +59,7 @@ cdef class DomainManager:
 
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
-    cdef _compute_cell_size(self)
+    cdef _compute_cell_size_for_binning(self)
 
 # Cell to hold particle indices
 cdef class Cell:
