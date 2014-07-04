@@ -1,0 +1,156 @@
+# Author: Prabhu Ramachandran
+# Copyright (c) 2014 Prabhu Ramachandran
+# License: BSD Style.
+
+# Standard library imports
+import unittest
+
+# Library imports.
+import numpy as np
+
+# Local imports
+from pysph.tools.interpolator import get_nx_ny_nz, Interpolator
+from pysph.base.utils import get_particle_array
+
+
+class TestGetNxNyNz(unittest.TestCase):
+    def test_should_work_for_1d_data(self):
+        # When
+        num_points = 100
+        bounds = (0.0, 1.5, 0.0, 0.0, 0.0, 0.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [100, 1, 1])
+
+        # When
+        num_points = 100
+        bounds = (0.0, 0.0, 0.0, 1.123, 0.0, 0.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [1, 100, 1])
+
+        # When
+        num_points = 100
+        bounds = (0.0, 0.0, 0.0, 0.0, 0.0, 3.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [1, 1, 100])
+
+    def test_should_work_for_2d_data(self):
+        # When
+        num_points = 100
+        bounds = (0.0, 1.0, 0.5, 1.5, 0.0, 0.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [10, 10, 1])
+
+        # When
+        num_points = 100
+        bounds = (0.0, 0.0, 0, 1, 0.5, 1.5)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [1, 10, 10])
+
+    def test_should_work_for_3d_data(self):
+        # When
+        num_points = 1000
+        bounds = (0.0, 1.0, 0.5, 1.5, -1.0, 0.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [10, 10, 10])
+
+        # When
+        num_points = 1000
+        bounds = (0.0, 1.0, 0.5, 1.5, -1.0, 2.0)
+        dims = get_nx_ny_nz(num_points, bounds)
+
+        # Then
+        self.assertListEqual(list(dims), [7, 7, 21])
+
+
+class TestInterpolator(unittest.TestCase):
+    def _make_2d_grid(self):
+        n = 11
+        x, y = np.mgrid[-1:1:n*1j,-1:1:n*1j]
+        dx = 2.0/(n-1)
+        z = np.zeros_like(x)
+        x, y, z = x.ravel(), y.ravel(), z.ravel()
+        m = np.ones_like(x)
+        p = np.ones_like(x)*2.0
+        h = np.ones_like(x)*2*dx
+        u = np.ones_like(x)*0.1
+        pa = get_particle_array(x=x, y=y, z=z, h=h, m=m, p=p, u=u)
+        return pa
+
+    def test_interpolator_should_work_on_2d_data(self):
+        # Given
+        pa = self._make_2d_grid()
+
+        # When.
+        ip = Interpolator([pa], num_points=1000)
+        p = ip.interpolate('p')
+        u = ip.interpolate('u')
+
+        # Then.
+        expect = np.ones_like(p)*2.0
+        self.assertTrue(np.allclose(p, expect))
+        expect = np.ones_like(u)*0.1
+        self.assertTrue(np.allclose(u, expect))
+
+    def test_interpolator_should_work_with_changed_data(self):
+        # Given
+        pa = self._make_2d_grid()
+        ip = Interpolator([pa], num_points=1000)
+        p = ip.interpolate('p')
+
+        # When.
+        pa.p *= 2.0
+        p = ip.interpolate('p')
+
+        # Then.
+        expect = np.ones_like(p)*4.0
+        self.assertTrue(np.allclose(p, expect))
+
+    def test_should_be_able_to_update_particle_arrays(self):
+        # Given
+        pa = self._make_2d_grid()
+        pa_new = self._make_2d_grid()
+        pa_new.p[:] = 10.0
+
+        ip = Interpolator([pa], num_points=1000)
+        p = ip.interpolate('p')
+
+        # When.
+        ip.update_particle_arrays([pa_new])
+        p = ip.interpolate('p')
+
+        # Then.
+        expect = np.ones_like(p)*10.0
+        self.assertTrue(np.allclose(p, expect))
+
+    def test_should_correctly_update_domain(self):
+        # Given
+        pa = self._make_2d_grid()
+        ip = Interpolator([pa], num_points=1000)
+        p = ip.interpolate('p')
+        bounds = ip.bounds
+        shape = ip.shape
+
+        # When.
+        ip.set_domain((0.0, 1.0, 0.0, 1.0, 0.0, 0.0), (11, 11, 1))
+        p = ip.interpolate('p')
+
+        # Then.
+        expect = np.ones_like(p)*2.0
+        self.assertTrue(np.allclose(p, expect))
+
+
+
+if __name__ == '__main__':
+    unittest.main()
