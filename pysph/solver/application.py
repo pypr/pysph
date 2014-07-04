@@ -617,7 +617,7 @@ class Application(object):
         # post-stage callback to the DomainManager.setup_domain
         # method. This method is responsible to computing the new cell
         # size and doing any periodicity checks if needed.
-        solver.add_post_stage_callback( nnps.domain.update )
+        solver.add_post_stage_callback( nnps.update_domain )
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:

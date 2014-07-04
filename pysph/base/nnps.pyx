@@ -805,7 +805,7 @@ cdef class NNPS:
         self.n_part_per_cell = [IntArray() for pa in particles]
 
     def update_domain(self):
-        self.domain.compute_cell_size()
+        self.domain.update()
 
     cpdef update(self):
         """Update the local data after particles have moved.
