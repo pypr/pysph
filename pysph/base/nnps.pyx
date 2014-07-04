@@ -311,10 +311,10 @@ cdef class DomainManager:
     def set_radius_scale(self, double radius_scale):
         self.radius_scale = radius_scale
 
-    def compute_cell_size(self):
-        self._compute_cell_size()
+    def compute_cell_size_for_binning(self):
+        self._compute_cell_size_for_binning()
 
-    def setup_domain(self, *args, **kwargs):
+    def update(self, *args, **kwargs):
         """General method that is called before NNPS can bin particles.
 
         This method is responsible for the computation of cell sizes
@@ -323,7 +323,7 @@ cdef class DomainManager:
 
         """
         # compute the cell sizes
-        self._compute_cell_size()
+        self._compute_cell_size_for_binning()
 
         # Periodicity is handled by adjusting particles according to a
         # given cubic domain box. In parallel, it is expected that the
@@ -575,7 +575,7 @@ cdef class DomainManager:
             copy.tag[:] = Ghost
             pa.append_parray(copy)
 
-    cdef _compute_cell_size(self):
+    cdef _compute_cell_size_for_binning(self):
         """Compute the cell size for the binning.
 
         The cell size is chosen as the kernel radius scale times the
@@ -804,8 +804,8 @@ cdef class NNPS:
         # number of particles per cell
         self.n_part_per_cell = [IntArray() for pa in particles]
 
-    def compute_cell_size(self):
-        self.domain.compute_cell_size()
+    def update_domain(self, *args, **kwargs):
+        self.domain.update()
 
     cpdef update(self):
         """Update the local data after particles have moved.
@@ -1055,8 +1055,10 @@ cdef class BoxSortNNPS(NNPS):
         # initialize the cells dict
         self.cells = {}
 
-        # compute the intial box sort
-        self.domain.setup_domain()
+        # compute the intial box sort. First, the Domain Manager's
+        # update method is called to comptue the maximum smoothing
+        # length for particle binning.
+        self.domain.update()
         self.update()
 
     cpdef _refresh(self):
@@ -1362,7 +1364,7 @@ cdef class LinkedListNNPS(NNPS):
         # compute the intial box sort for all local particles. The
         # DomainManager.setup_domain method is called to compute the
         # cell size.
-        self.domain.setup_domain()
+        self.domain.update()
         self.update()
 
     cdef _bin(self, int pa_index, UIntArray indices):
