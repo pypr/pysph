@@ -75,7 +75,7 @@ class TestGetNxNyNz(unittest.TestCase):
 
 
 class TestInterpolator(unittest.TestCase):
-    def _make_2d_grid(self):
+    def _make_2d_grid(self, name='fluid'):
         n = 11
         x, y = np.mgrid[-1:1:n*1j,-1:1:n*1j]
         dx = 2.0/(n-1)
@@ -85,10 +85,10 @@ class TestInterpolator(unittest.TestCase):
         p = np.ones_like(x)*2.0
         h = np.ones_like(x)*2*dx
         u = np.ones_like(x)*0.1
-        pa = get_particle_array(x=x, y=y, z=z, h=h, m=m, p=p, u=u)
+        pa = get_particle_array(name=name, x=x, y=y, z=z, h=h, m=m, p=p, u=u)
         return pa
 
-    def test_interpolator_should_work_on_2d_data(self):
+    def test_should_work_on_2d_data(self):
         # Given
         pa = self._make_2d_grid()
 
@@ -103,7 +103,44 @@ class TestInterpolator(unittest.TestCase):
         expect = np.ones_like(u)*0.1
         self.assertTrue(np.allclose(u, expect))
 
-    def test_interpolator_should_work_with_changed_data(self):
+    def test_should_work_with_multiple_arrays(self):
+        # Given
+        pa1 = self._make_2d_grid()
+        pa2 = self._make_2d_grid('solid')
+        pa2.p[:] = 4.0
+        pa2.u[:] = 0.2
+
+        # When.
+        ip = Interpolator([pa1, pa2], num_points=1000)
+        p = ip.interpolate('p')
+        u = ip.interpolate('u')
+
+        # Then.
+        expect = np.ones_like(p)*3.0
+        self.assertTrue(np.allclose(p, expect))
+        expect = np.ones_like(u)*0.15
+        self.assertTrue(np.allclose(u, expect))
+
+    def test_should_work_with_ghost_particles(self):
+        # Given
+        pa = self._make_2d_grid()
+        # Make half the particles ghosts.
+        n = pa.get_number_of_particles()
+        pa.tag[n/2:] = 1
+        pa.align_particles()
+
+        # When.
+        ip = Interpolator([pa], num_points=1000)
+        p = ip.interpolate('p')
+        u = ip.interpolate('u')
+
+        # Then.
+        expect = np.ones_like(p)*2.0
+        self.assertTrue(np.allclose(p, expect))
+        expect = np.ones_like(u)*0.1
+        self.assertTrue(np.allclose(u, expect))
+
+    def test_should_work_with_changed_data(self):
         # Given
         pa = self._make_2d_grid()
         ip = Interpolator([pa], num_points=1000)
@@ -139,8 +176,6 @@ class TestInterpolator(unittest.TestCase):
         pa = self._make_2d_grid()
         ip = Interpolator([pa], num_points=1000)
         p = ip.interpolate('p')
-        bounds = ip.bounds
-        shape = ip.shape
 
         # When.
         ip.set_domain((0.0, 1.0, 0.0, 1.0, 0.0, 0.0), (11, 11, 1))
@@ -150,6 +185,19 @@ class TestInterpolator(unittest.TestCase):
         expect = np.ones_like(p)*2.0
         self.assertTrue(np.allclose(p, expect))
 
+    def test_should_work_when_arrays_have_different_props(self):
+        # Given
+        pa1 = self._make_2d_grid()
+        pa1.add_property('junk', default=2.0)
+        pa2 = self._make_2d_grid('solid')
+
+        # When.
+        ip = Interpolator([pa1, pa2], num_points=1000)
+        junk = ip.interpolate('junk')
+
+        # Then.
+        expect = np.ones_like(junk)*1.0
+        self.assertTrue(np.allclose(junk, expect))
 
 
 if __name__ == '__main__':

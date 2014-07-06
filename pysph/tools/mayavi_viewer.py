@@ -156,7 +156,8 @@ class InterpolatorView(HasTraits):
 
     #### Trait handlers  ######################################################
     def _particle_arrays_changed(self, pas):
-        self.scalar_list = pas[0].properties.keys()
+        all_props = reduce(set.union, [set(x.properties.keys()) for x in pas])
+        self.scalar_list = list(all_props)
         self._arrays_changed = True
         self._update_plot()
 
