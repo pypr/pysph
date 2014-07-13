@@ -75,7 +75,8 @@ class Interpolator(object):
     grid.  This is particularly handy for visualization.
     """
 
-    def __init__(self, particle_arrays, num_points=125000, kernel=None):
+    def __init__(self, particle_arrays, num_points=125000, kernel=None,
+                 x=None, y=None, z=None):
         """
         Parameters
         ----------
@@ -83,6 +84,16 @@ class Interpolator(object):
         particle_arrays: A list of particle arrays.
         num_points: the number of points to interpolate on to.
         kernel: the kernel to use for interpolation.
+
+        x: ndarray: the x-coordinate of points on which to interpolate.
+        y: ndarray: the y-coordinate of points on which to interpolate.
+        z: ndarray: the z-coordinate of points on which to interpolate.
+
+
+        The x, y, z coordinates need not be specified, and if they are not,
+        the bounds of the interpolated domain is automatically computed and
+        `num_points` number of points are used in this domain uniformly placed.
+
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -97,27 +108,60 @@ class Interpolator(object):
         self.pa = None
         self.nnps = None
         self.func_eval = None
-        self.set_domain(bounds, shape)
+        if x is None and y is None and z is None:
+            self.set_domain(bounds, shape)
+        else:
+            self.set_interpolation_points(x=x, y=y, z=z)
 
     #### Interpolator protocol ################################################
-    def set_domain(self, bounds, shape):
-        """Set the domain to interpolate into.
+    def set_interpolation_points(self, x=None, y=None, z=None):
+        """Set the points on which we must interpolate the arrays.
 
-        Parameters:
-        -------------
+        Parameters
+        -----------
 
-        bounds: (xmin, xmax, ymin, ymax, zmin, zmax)
-        shape: (nx, ny, nz)
+        x: ndarray: the x-coordinate of points on which to interpolate.
+        y: ndarray: the y-coordinate of points on which to interpolate.
+        z: ndarray: the z-coordinate of points on which to interpolate.
+
+        If any of x, y, z is not passed it is assumed to be 0.0 and shaped
+        like the other non-None arrays.
+
         """
-        self.bounds = np.asarray(bounds)
-        self.shape = np.asarray(shape)
-        self.pa = self._create_particle_array()
+        tmp = None
+        for tmp in (x, y, z):
+            if tmp is not None:
+                break
+        if tmp is None:
+            raise RuntimeError('At least one non-None array must be given.')
+
+        def _get_array(_t):
+            return np.asarray(_t) if _t is not None else np.zeros_like(tmp)
+
+        x, y, z = _get_array(x), _get_array(y), _get_array(z)
+
+        self.shape = x.shape
+        self.pa = self._create_particle_array(x, y, z)
         arrays = self.particle_arrays + [self.pa]
 
         if self.func_eval is None:
             self._create_sph_eval(arrays)
 
         self.update_particle_arrays(self.particle_arrays)
+
+    def set_domain(self, bounds, shape):
+        """Set the domain to interpolate into.
+
+        Parameters:
+        -----------
+
+        bounds: (xmin, xmax, ymin, ymax, zmin, zmax)
+        shape: (nx, ny, nz)
+        """
+        self.bounds = np.asarray(bounds)
+        self.shape = np.asarray(shape)
+        x, y, z = self._create_default_points(self.bounds, self.shape)
+        self.set_interpolation_points(x, y, z)
 
     def interpolate(self, prop, gradient=False):
         """
@@ -160,13 +204,16 @@ class Interpolator(object):
         self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
 
-    def _create_particle_array(self):
-        b = self.bounds
-        n = self.shape
+    def _create_default_points(self, bounds, shape):
+        b = bounds
+        n = shape
         x, y, z = np.mgrid[b[0]:b[1]:n[0]*1j,
                            b[2]:b[3]:n[1]*1j,
                            b[4]:b[5]:n[2]*1j,
                           ]
+        return x, y, z
+
+    def _create_particle_array(self, x, y, z):
         xr = x.ravel()
         yr = y.ravel()
         zr = z.ravel()
