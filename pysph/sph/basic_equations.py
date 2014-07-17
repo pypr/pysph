@@ -157,4 +157,4 @@ class XSPHCorrection(Equation):
     def post_loop(self, d_idx, d_ax, d_ay, d_az, d_u, d_v, d_w):
         d_ax[d_idx] += d_u[d_idx]
         d_ay[d_idx] += d_v[d_idx]
-        d_az[d_idx] += d_w[d_idx]
+        d_az[d_idx] += d_w[d_idx]        

@@ -367,7 +367,7 @@ class TwoStageRigidBodyStep(IntegratorStep):
 
 ###############################################################################
 # `OneStageRigidBodyStep` class
-###############################################################################        
+###############################################################################
 class OneStageRigidBodyStep(IntegratorStep):
     """Simple one stage rigid-body motion """
     def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
@@ -399,3 +399,50 @@ class OneStageRigidBodyStep(IntegratorStep):
         d_x[d_idx] += dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
         d_y[d_idx] += dt * 0.5 * (d_v[d_idx] + d_v0[d_idx])
         d_z[d_idx] += dt * 0.5 * (d_w[d_idx] + d_w0[d_idx])
+
+
+###############################################################################
+# `VerletSymplecticWCSPHStep` class
+###############################################################################        
+class VerletSymplecticWCSPHStep(IntegratorStep):
+    """Symplectic second order integrator described in the review
+    paper by Monaghan:
+
+    J. Monaghan, "Smoothed Particle Hydrodynamics", Reports on
+    Progress in Physics, 2005, 68, pp 1703--1759 [JM05]
+
+    Notes:
+
+    This integrator should run in PEC mode since in the first stage,
+    the positions are updated using the current velocity. The
+    accelerations are then computed to advance to the full time step
+    values.
+
+    This version of the integrator does not update the density. That
+    is, the summation density is used instead of the continuity
+    equation.
+
+    """
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, dt=0.0):
+
+        dtb2 = 0.5 * dt
+
+        # Eq. (5.39) in [JM05]
+        d_x[d_idx] += dtb2 * d_u[d_idx]
+        d_y[d_idx] += dtb2 * d_v[d_idx]
+        d_z[d_idx] += dtb2 * d_w[d_idx]
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_ax, d_ay, d_az,
+               d_u, d_v, d_w, d_au, d_av, d_aw, dt=0.0):
+
+        dtb2 = 0.5 * dt
+
+        # Eq. (5.40) in [JM05]
+        d_u[d_idx] += dt * d_au[d_idx]
+        d_v[d_idx] += dt * d_av[d_idx]
+        d_w[d_idx] += dt * d_aw[d_idx]
+
+        # Eq. (5.41) in [JM05] using XSPH velocity correction
+        d_x[d_idx] += dtb2 * d_ax[d_idx]
+        d_y[d_idx] += dtb2 * d_ay[d_idx]
+        d_z[d_idx] += dtb2 * d_az[d_idx]
