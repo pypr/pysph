@@ -156,7 +156,8 @@ class InterpolatorView(HasTraits):
 
     #### Trait handlers  ######################################################
     def _particle_arrays_changed(self, pas):
-        self.scalar_list = pas[0].properties.keys()
+        all_props = reduce(set.union, [set(x.properties.keys()) for x in pas])
+        self.scalar_list = list(all_props)
         self._arrays_changed = True
         self._update_plot()
 
@@ -287,16 +288,14 @@ class ParticleArrayHelper(HasTraits):
         self._show_hidden_arrays_changed(self.show_hidden_arrays)
 
         # Update the plot.
-        x, y, z, u, v, w = pa.x, pa.y, pa.z, pa.u, pa.v, pa.w
+        x, y, z = pa.x, pa.y, pa.z
         s = getattr(pa, self.scalar)
         p = self.plot
         mlab = self.scene.mlab
         if p is None:
-            src = mlab.pipeline.vector_scatter(x, y, z, u, v, w,
-                                               scalars=s)
+            src = mlab.pipeline.scalar_scatter(x, y, z, s)
             p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
             p.actor.property.point_size = 3
-            p.mlab_source.dataset.point_data.scalars.name = self.scalar
             scm = p.module_manager.scalar_lut_manager
             scm.set(show_legend=self.show_legend,
                     use_default_name=False,
@@ -308,9 +307,9 @@ class ParticleArrayHelper(HasTraits):
             self.plot = p
         else:
             if len(x) == len(p.mlab_source.x):
-                p.mlab_source.set(x=x, y=y, z=z, scalars=s, u=u, v=v, w=w)
+                p.mlab_source.set(x=x, y=y, z=z, scalars=s)
             else:
-                p.mlab_source.reset(x=x, y=y, z=z, scalars=s, u=u, v=v, w=w)
+                p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
 
         # Setup the time.
         self._show_time_changed(self.show_time)
