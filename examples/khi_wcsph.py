@@ -12,7 +12,7 @@ from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
 from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
     SolidWallPressureBC, SolidWallNoSlipBC, ShepardFilteredVelocity, \
-    StateEquation, MomentumEquationArtificialStress
+    StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
     InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce, \
@@ -37,14 +37,17 @@ domain_width = 1.0
 domain_height = 1.0
 
 # numerical constants
+gy = -9.81
 alpha = 0.001
 wavelength = 1.0
 wavenumber = 2*numpy.pi/wavelength
-Ri = 0.1
+Ri = 0.01
 rho0 = rho1 = 1000.0
-rho2 = rho1
+rho2 = 1*rho1
 U = 0.5
 sigma = Ri * (rho1*rho2) * (2*U)**2/(wavenumber*(rho1 + rho2))
+
+# initial perturbation amplitude
 psi0 = 0.03*domain_height
 
 # discretization parameters
@@ -60,7 +63,7 @@ p0 = c0*c0*rho0
 nu = 0.125 * alpha * h0 * c0
 
 # time steps
-tf = 2.0
+tf = 5.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
@@ -119,6 +122,11 @@ def create_particles(**kwargs):
         if fluid.y[i] > domain_height/2 + psi0*domain_height*numpy.sin(2*numpy.pi*fluid.x[i]/(mode*domain_width)):
             fluid.u[i] = U
             fluid.color[i] = 1
+            fluid.rho[i] = rho1
+            fluid.m[i] = volume*rho1
+        else:
+            fluid.rho[i] = rho2
+            fluid.m[i] = rho2/rho1*volume*rho2
 
     # extract the top and bottom boundary particles
     indices = numpy.where( fluid.y > domain_height )[0]
@@ -157,14 +165,10 @@ kernel = WendlandQuintic(dim=2)
 
 # Create the Integrator.
 integrator = PECIntegrator( fluid=TransportVelocityStep() )
-
-# Create a solver.
-solver = Solver(
-    kernel=kernel, dim=dim, integrator=integrator,
-    dt=dt, tf=tf, adaptive_timestep=False)
+#integrator = PECIntegrator( fluid=VerletSymplecticWCSPHStep() )
 
 # create the equations
-equations = [
+tvf_equations = [
 
     # We first compute the mass and number density of the fluid
     # phase. This is used in all force computations henceforth. The
@@ -220,7 +224,8 @@ equations = [
     # been updated and can be used in the integration equations.
     Group(
         equations=[
-            SolidWallPressureBC(dest='wall', sources=['fluid'], p0=p0, rho0=rho0),
+            SolidWallPressureBC(dest='wall', sources=['fluid'], p0=p0, rho0=rho0, 
+                                gy=gy),
             
             ], ),
     
@@ -235,10 +240,14 @@ equations = [
             # wall particles is used in the gradient of pressure to
             # simulate a repulsive force.
             MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'wall'], pb=p0),
+                dest='fluid', sources=['fluid', 'wall'], pb=p0,
+                gy=gy),
 
             # Artificial viscosity for the fluid phase.
-            ClearyArtificialViscosity(dest='fluid', sources=['fluid'], dim=dim, alpha=alpha),
+            #ClearyArtificialViscosity(dest='fluid', sources=['fluid'], 
+            #                          dim=dim, alpha=alpha),
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
 
             # No-slip boundary condition using Adami et al's
             # generalized wall boundary condition. This equation
@@ -255,8 +264,13 @@ equations = [
             ], )
     ]
 
+# Create a solver.
+solver = Solver(
+    kernel=kernel, dim=dim, integrator=integrator,
+    dt=dt, tf=tf, adaptive_timestep=False)
+
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
+app.setup(solver=solver, equations=tvf_equations,
           particle_factory=create_particles)
 
 app.run()
