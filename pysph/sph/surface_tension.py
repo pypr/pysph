@@ -68,54 +68,6 @@ class ColorGradientUsingNumberDensity(Equation):
             # discretized Dirac Delta function
             d_ddelta[d_idx] = 1./mod_gradc
 
-class DiscretizedDiracDelta(Equation):
-    r"""Gradient of the color function using Eq. (14) of [SY11]:
-
-    .. math::
-
-        \delta^s = |\nabla C|_{0.8h} = \sum_b \frac{2C_{ab}}{(\psi_a +
-        \psi_b)}\nabla_{a} W(\boldsymbol{r}_{ab}, 0.8h)
-
-     Notes:
-
-     In the post loop of this equation, the discretized version of the
-     dirac-delta function and the interface normals are computed.
-
-    """
-    def initialize(self, d_idx, d_ddelta, d_cx2, d_cy2, d_cz2):
-
-        # color gradients
-        d_cx2[d_idx] = 0.0
-        d_cy2[d_idx] = 0.0
-        d_cz2[d_idx] = 0.0
-        
-        # dirac delta
-        d_ddelta[d_idx] = 0.0
-
-    def loop(self, d_idx, s_idx, d_color, s_color, d_cx2, d_cy2, d_cz2,
-             d_V, s_V, DWIJ):
-        
-        # average particle volume
-        psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
-
-        # difference in color divided by psiab
-        Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
-        
-        d_cx2[d_idx] += Cba * DWIJ[0]
-        d_cy2[d_idx] += Cba * DWIJ[1]
-        d_cz2[d_idx] += Cba * DWIJ[2]
-
-    def post_loop(self, d_idx, d_ddelta, d_cx2, d_cy2, d_cz2):
-        # absolute value of the color gradient
-        mod_gradc2 = d_cx2[d_idx]*d_cx2[d_idx] + \
-            d_cy2[d_idx]*d_cy2[d_idx] + \
-            d_cz2[d_idx]*d_cz2[d_idx]
-
-        # avoid sqrt computations on non-interface particles
-        # (particles for which the color gradient is zero)
-        if mod_gradc2 > 1e-14:
-            d_ddelta[d_idx] = sqrt( mod_gradc2 )
-
 class InterfaceCurvatureFromNumberDensity(Equation):
     """Interface curvature using number density. Eq. (15) in [SY11]:
 

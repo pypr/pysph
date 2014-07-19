@@ -15,8 +15,7 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce, \
-    DiscretizedDiracDelta
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
