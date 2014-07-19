@@ -20,7 +20,8 @@ class ColorGradientUsingNumberDensity(Equation):
         \nabla_{a} W_{ab}
 
     """
-    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz):
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz,
+                   d_ddelta):
 
         # color gradient
         d_cx[d_idx] = 0.0
@@ -31,6 +32,8 @@ class ColorGradientUsingNumberDensity(Equation):
         d_nx[d_idx] = 0.0
         d_ny[d_idx] = 0.0
         d_nz[d_idx] = 0.0
+
+        # discretized dirac delta
 
     def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
              d_V, s_V, DWIJ):
@@ -47,7 +50,7 @@ class ColorGradientUsingNumberDensity(Equation):
         d_cz[d_idx] += Cba * DWIJ[2]
 
     def post_loop(self, d_idx, d_cx, d_cy, d_cz,
-                  d_nx, d_ny, d_nz):
+                  d_nx, d_ny, d_nz, d_ddelta):
         # absolute value of the color gradient
         mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
             d_cy[d_idx]*d_cy[d_idx] + \
@@ -61,6 +64,9 @@ class ColorGradientUsingNumberDensity(Equation):
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
             d_ny[d_idx] = d_cy[d_idx] * mod_gradc
             d_nz[d_idx] = d_cz[d_idx] * mod_gradc
+
+            # discretized Dirac Delta function
+            d_ddelta[d_idx] = 1./mod_gradc
 
 class DiscretizedDiracDelta(Equation):
     r"""Gradient of the color function using Eq. (14) of [SY11]:

@@ -41,7 +41,7 @@ gy = -9.81
 alpha = 0.001
 wavelength = 1.0
 wavenumber = 2*numpy.pi/wavelength
-Ri = 0.01
+Ri = 0.1
 rho0 = rho1 = 1000.0
 rho2 = 1*rho1
 U = 0.5
@@ -63,7 +63,7 @@ p0 = c0*c0*rho0
 nu = 0.125 * alpha * h0 * c0
 
 # time steps
-tf = 5.0
+tf = 3.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
@@ -181,13 +181,10 @@ tvf_equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we can compute the Shepard
     # Filtered velocity required for the no-penetration boundary
-    # condition. Additionally, we compute the gradient of the color
-    # function with respect to the original smoothing length. This
-    # will compute the interface normals.
+    # condition.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
             ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
             ] ),
 
     #################################################################
@@ -200,16 +197,24 @@ tvf_equations = [
             ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
             ], update_nnps=True ),
 
-    # Compute the discretized dirac delta function and the interface
-    # curvature using the modified smoothing length.
+    # Compute the gradient of the color function with respect to the
+    # new smoothing length. At the end of this Group, we will have the
+    # interface normals and the discretized dirac delta function for
+    # the fluid-fluid interface.
     Group(equations=[
-            DiscretizedDiracDelta(dest='fluid', sources=['fluid', 'wall']),
+            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
+            ], 
+          ),
+
+    # Compute the interface curvature using the modified smoothing
+    # length and interface normals computed in the previous Group.
+    Group(equations=[
             InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
             ], ),
 
-    # Now rescale the smoothing length to the original
-    # value. Re-compute NNPS at the end of this Group since the
-    # smoothing lengths are modified.
+    # Now rescale the smoothing length to the original value for the
+    # rest of the computations. Re-compute NNPS at the end of this
+    # Group since the smoothing lengths are modified.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
             ], update_nnps=True,
@@ -218,10 +223,11 @@ tvf_equations = [
     # End Surface tension formulation
     #################################################################
 
-    # Once the pressure for the fluid phase has been updated, we can
-    # extrapolate the pressure to the wall ghost particles. After this
-    # group, the density and pressure of the boundary particles has
-    # been updated and can be used in the integration equations.
+    # Once the pressure for the fluid phase has been updated via the
+    # state-equation, we can extrapolate the pressure to the wall
+    # ghost particles. After this group, the density and pressure of
+    # the boundary particles has been updated and can be used in the
+    # integration equations.
     Group(
         equations=[
             SolidWallPressureBC(dest='wall', sources=['fluid'], p0=p0, rho0=rho0, 
@@ -244,8 +250,9 @@ tvf_equations = [
                 gy=gy),
 
             # Artificial viscosity for the fluid phase.
-            #ClearyArtificialViscosity(dest='fluid', sources=['fluid'], 
-            #                          dim=dim, alpha=alpha),
+            #ClearyArtificialViscosity(
+            #    dest='fluid', sources=['fluid'], dim=dim, alpha=alpha),
+
             MomentumEquationViscosity(
                 dest='fluid', sources=['fluid'], nu=nu),
 
