@@ -42,9 +42,9 @@ class SummationDensity(Equation):
         d_V[d_idx] = 0.0
         d_rho[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_V, d_rho, s_m, WIJ):
+    def loop(self, d_idx, d_V, d_rho, d_m, WIJ):
         d_V[d_idx] += WIJ
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+        d_rho[d_idx] += d_m[d_idx]*WIJ
 
 class VolumeSummation(Equation):
     """Number density for volume computation.
