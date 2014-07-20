@@ -96,7 +96,7 @@ def create_particles(**kwargs):
         'kappa',
         
         # filtered velocities
-        'uf', 'vf', 'wf', 
+        'uf', 'vf', 'wf',
         
         # transport velocities
         'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 
