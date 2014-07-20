@@ -1,4 +1,5 @@
-""" 2D Kelvin Helmoltz Instability example """
+""" 2D Kelvin Helmoltz Instability example using the Transport
+Velocity Formulation """
 import numpy
 
 # Particle generator
@@ -24,7 +25,7 @@ from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
 # Integrators and Steppers
-from pysph.sph.integrator_step import VerletSymplecticWCSPHStep, TransportVelocityStep
+from pysph.sph.integrator_step import TransportVelocityStep
 from pysph.sph.integrator import PECIntegrator
 
 # Domain manager for periodic domains

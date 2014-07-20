@@ -75,14 +75,15 @@ class IsothermalEOS(Equation):
 
     """
     def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0):
+                 rho0=1000.0, c0=1.0, p0=0.0):
         self.rho0 = rho0
         self.c0 = c0
         self.c02 = c0 * c0
+        self.p0 = p0
         super(IsothermalEOS, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_p):
-        d_p[d_idx] = self.c02 * (d_rho[d_idx] - self.rho0)
+        d_p[d_idx] = self.p0 + self.c02 * (d_rho[d_idx] - self.rho0)
 
 class ContinuityEquation(Equation):
     r"""Density rate:
