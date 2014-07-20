@@ -41,7 +41,7 @@ gy = -9.81
 alpha = 0.001
 wavelength = 1.0
 wavenumber = 2*numpy.pi/wavelength
-Ri = 0.1
+Ri = 0.05
 rho0 = rho1 = 1000.0
 rho2 = 1*rho1
 U = 0.5
@@ -52,7 +52,7 @@ psi0 = 0.03*domain_height
 
 # discretization parameters
 nghost_layers = 5
-dx = dy = 0.01
+dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
 volume = dx*dx
 hdx = 1.3
@@ -68,7 +68,7 @@ dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
-dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.85 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
     ghost_extent = (nghost_layers + 0.5)*dx
@@ -161,11 +161,12 @@ domain = DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
+#kernel = WendlandQuintic(dim=2)
+kernel = CubicSpline(dim=2)
+#kernel = Gaussian(dim=2)
 
 # Create the Integrator.
 integrator = PECIntegrator( fluid=TransportVelocityStep() )
-#integrator = PECIntegrator( fluid=VerletSymplecticWCSPHStep() )
 
 # create the equations
 tvf_equations = [
@@ -250,9 +251,6 @@ tvf_equations = [
                 gy=gy),
 
             # Artificial viscosity for the fluid phase.
-            #ClearyArtificialViscosity(
-            #    dest='fluid', sources=['fluid'], dim=dim, alpha=alpha),
-
             MomentumEquationViscosity(
                 dest='fluid', sources=['fluid'], nu=nu),
 

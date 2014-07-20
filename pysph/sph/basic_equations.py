@@ -71,7 +71,7 @@ class VelocityGradient2D(Equation):
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
-    :math:`p = c_0^2(\rho_0 - rho)`
+    :math:`p = p_0 + c_0^2(\rho_0 - rho)`
 
     """
     def __init__(self, dest, sources=None,

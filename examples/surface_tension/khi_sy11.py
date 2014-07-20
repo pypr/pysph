@@ -11,14 +11,14 @@ from pysph.sph.equation import Group
 
 # Equations for the fluid mechanics
 from pysph.sph.basic_equations import XSPHCorrection, IsothermalEOS, BodyForce
-from pysph.sph.wc.basic import PressureGradientUsingNumberDensity
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
+from pysph.sph.wc.basic import PressureGradientUsingNumberDensity
+from pysph.sph.wc.transport_velocity import SummationDensity, SolidWallPressureBC
 
 # Surface tension equations
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce, \
-    DiscretizedDiracDelta
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
 
 # PySPH solver and application
 from pysph.solver.application import Application
@@ -50,23 +50,19 @@ gy = -9.81
 
 # discretization parameters
 nghost_layers = 5
-dx = dy = 0.01
+dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
 volume = dx*dx
 hdx = 1.3
 h0 = hdx * dx
 rho0 = 1000.0
-c0 = 25.0
+c0 = 10.0
 p0 = c0*c0*rho0
 nu = 0.125 * alpha * h0 * c0
 
-# time steps
-tf = 2.0
-dt_cfl = 0.25 * h0/( 1.1*c0 )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
-
-dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
+# time steps and final time
+tf = 3.0
+dt = 1e-4
 
 def create_particles(**kwargs):
     ghost_extent = (nghost_layers + 0.5)*dx
@@ -140,7 +136,8 @@ def create_particles(**kwargs):
     wall.V[:] = 1./volume
 
     # set additional output arrays for the fluid
-    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta'])
+    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
+                             'p', 'rho', 'au', 'av'])
     
     print "2D KHI with %d fluid particles and %d wall particles"%(
             fluid.get_number_of_particles(), wall.get_number_of_particles())
@@ -181,8 +178,7 @@ equations = [
     # color function with respect to the original smoothing
     # length. This will compute the interface normals.
     Group(equations=[
-            IsothermalEOS(dest='fluid', sources=None, rho0=rho0, p0=p0, c0=c0),
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
+            IsothermalEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, p0=p0),
             ] ),
 
     #################################################################
@@ -195,10 +191,18 @@ equations = [
             ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
             ], update_nnps=True ),
 
+    # Compute the gradient of the color function with respect to the
+    # new smoothing length. At the end of this Group, we will have the
+    # interface normals and the discretized dirac delta function for
+    # the fluid-fluid interface.
+    Group(equations=[
+            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
+            ], 
+          ),
+
     # Compute the discretized dirac delta function and the interface
     # curvature using the modified smoothing length.
     Group(equations=[
-            DiscretizedDiracDelta(dest='fluid', sources=['fluid', 'wall']),
             InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
             ], ),
 
@@ -212,6 +216,17 @@ equations = [
     #################################################################
     # End Surface tension formulation
     #################################################################
+
+    # Once the pressure for the fluid phase has been updated via the
+    # state-equation, we can extrapolate the pressure to the wall
+    # ghost particles. After this group, the density and pressure of
+    # the boundary particles has been updated and can be used in the
+    # integration equations.
+    Group(
+        equations=[
+            SolidWallPressureBC(
+                dest='wall', sources=['fluid'], p0=p0, rho0=rho0, gy=gy),
+            ], ),
 
     # The main acceleration block
     Group(
@@ -228,11 +243,13 @@ equations = [
                 dest='fluid', sources=['fluid', 'wall']),
 
             # Artificial viscosity for the fluid phase.
-            ClearyArtificialViscosity(dest='fluid', sources=['fluid', 'wall'], 
-                                      dim=dim, alpha=alpha),
+            ClearyArtificialViscosity(
+                dest='fluid', sources=['fluid', 'wall'], 
+                dim=dim, alpha=alpha),
 
             # Surface tension force for the SY11 formulation
-            ShadlooYildizSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+            ShadlooYildizSurfaceTensionForce(
+                dest='fluid', sources=None, sigma=sigma),
 
             # XSPH Correction
             XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.1),
