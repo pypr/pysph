@@ -1,11 +1,12 @@
-"""Sedov point explosion problem.
+"""Two-dimensional Shocktube problem.
 
-Particles are distributed on concentric circles about the origin with
-increasing number of particles with increasing radius. A unit charge
-is distributed about the center which gives the initial pressure
-disturbance.
+The density is assumed to be uniform and the shocktube problem is
+defined by the pressure jump. The pressure jump of 10^5 (pl = 1000.0,
+pr = 0.01) corresponds to the Woodward and Colella strong shock or
+blastwave problem.
 
 """
+
 # NumPy and standard library imports
 import numpy
 from numpy import sin, cos, pi
