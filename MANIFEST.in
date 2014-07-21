@@ -1,5 +1,6 @@
-include MANIFEST.in Makefile *.py *.txt pip_requirements.txt
+include MANIFEST.in Makefile *.py *.txt pip_requirements.txt README.md
+include build_zoltan.sh shippable.yml
 recursive-include examples *.py
 recursive-include docs *.* *
-include pysph/base/*.src
-recursive-include pysph *.pxd *.clt *.h *.c
+recursive-include pysph *.pxd *.h *.c *.src
+recursive-include pyzoltan *.pxd *.h *.c *.src
