@@ -16,6 +16,10 @@ cimport numpy as np
 # Carrays
 from carray cimport UIntArray, IntArray, LongArray, DoubleArray
 
+# Compatibility for older MPI versions and later
+# mpi4py releases (Ubuntu 14.04 is one such).
+cdef extern from 'mpi-compat.h': pass
+
 # Error checking for Zoltan
 cdef _check_error(int ierr)
 
