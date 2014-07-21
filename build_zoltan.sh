@@ -28,7 +28,7 @@ Download()
     if [ -x "/usr/bin/curl" ] ; then
         curl -o $BUILD_DIR/$FNAME $URL
     else
-        wget -q -o $BUILD_DIR/$FNAME $URL
+        wget -q -O $BUILD_DIR/$FNAME $URL
     fi
 }
 
