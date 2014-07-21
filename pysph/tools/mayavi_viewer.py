@@ -12,15 +12,26 @@ import numpy
 import os
 import os.path
 
-from traits.api import (Array, HasTraits, Instance, on_trait_change,
-        List, Str, Int, Range, Float, Bool, Button, Password, Property)
-from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-    TitleEditor, HGroup)
-from mayavi.core.api import PipelineBase
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
-from pyface.timer.api import Timer, do_later
-from tvtk.api import tvtk
-from tvtk.array_handler import array2vtk
+try:
+    from traits.api import (Array, HasTraits, Instance, on_trait_change,
+                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+    from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
+                          TitleEditor, HGroup)
+    from mayavi.core.api import PipelineBase
+    from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+    from pyface.timer.api import Timer, do_later
+    from tvtk.api import tvtk
+    from tvtk.array_handler import array2vtk
+except ImportError:
+    from enthought.traits.api import (Array, HasTraits, Instance, on_trait_change,
+                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+    from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
+                          TitleEditor, HGroup)
+    from enthought.mayavi.core.api import PipelineBase
+    from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+    from enthought.pyface.timer.api import Timer, do_later
+    from enthought.tvtk.api import tvtk
+    from enthought.tvtk.array_handler import array2vtk
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
