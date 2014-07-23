@@ -12,15 +12,26 @@ import numpy
 import os
 import os.path
 
-from traits.api import (Array, HasTraits, Instance, on_trait_change,
-        List, Str, Int, Range, Float, Bool, Button, Password, Property)
-from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-    TitleEditor, HGroup)
-from mayavi.core.api import PipelineBase
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
-from pyface.timer.api import Timer, do_later
-from tvtk.api import tvtk
-from tvtk.array_handler import array2vtk
+try:
+    from traits.api import (Array, HasTraits, Instance, on_trait_change,
+                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+    from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
+                          TitleEditor, HGroup)
+    from mayavi.core.api import PipelineBase
+    from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+    from pyface.timer.api import Timer, do_later
+    from tvtk.api import tvtk
+    from tvtk.array_handler import array2vtk
+except ImportError:
+    from enthought.traits.api import (Array, HasTraits, Instance, on_trait_change,
+                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+    from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
+                          TitleEditor, HGroup)
+    from enthought.mayavi.core.api import PipelineBase
+    from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+    from enthought.pyface.timer.api import Timer, do_later
+    from enthought.tvtk.api import tvtk
+    from enthought.tvtk.array_handler import array2vtk
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
@@ -288,16 +299,14 @@ class ParticleArrayHelper(HasTraits):
         self._show_hidden_arrays_changed(self.show_hidden_arrays)
 
         # Update the plot.
-        x, y, z, u, v, w = pa.x, pa.y, pa.z, pa.u, pa.v, pa.w
+        x, y, z = pa.x, pa.y, pa.z
         s = getattr(pa, self.scalar)
         p = self.plot
         mlab = self.scene.mlab
         if p is None:
-            src = mlab.pipeline.vector_scatter(x, y, z, u, v, w,
-                                               scalars=s)
+            src = mlab.pipeline.scalar_scatter(x, y, z, s)
             p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
             p.actor.property.point_size = 3
-            p.mlab_source.dataset.point_data.scalars.name = self.scalar
             scm = p.module_manager.scalar_lut_manager
             scm.set(show_legend=self.show_legend,
                     use_default_name=False,
@@ -309,9 +318,9 @@ class ParticleArrayHelper(HasTraits):
             self.plot = p
         else:
             if len(x) == len(p.mlab_source.x):
-                p.mlab_source.set(x=x, y=y, z=z, scalars=s, u=u, v=v, w=w)
+                p.mlab_source.set(x=x, y=y, z=z, scalars=s)
             else:
-                p.mlab_source.reset(x=x, y=y, z=z, scalars=s, u=u, v=v, w=w)
+                p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
 
         # Setup the time.
         self._show_time_changed(self.show_time)

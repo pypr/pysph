@@ -199,6 +199,51 @@ class TestInterpolator(unittest.TestCase):
         expect = np.ones_like(junk)*1.0
         self.assertTrue(np.allclose(junk, expect))
 
+    def test_should_work_with_explicit_points_in_constructor(self):
+        # Given
+        pa = self._make_2d_grid()
+        x, y = np.random.random((2, 5, 5))
+        z = np.zeros_like(x)
+
+        # When.
+        ip = Interpolator([pa], x=x, y=y, z=z)
+        p = ip.interpolate('p')
+
+        # Then.
+        self.assertEqual(p.shape, x.shape)
+        expect = np.ones_like(x)*2.0
+        self.assertTrue(np.allclose(p, expect))
+
+    def test_should_work_with_explicit_points_without_z(self):
+        # Given
+        pa = self._make_2d_grid()
+        x, y = np.random.random((2, 5, 5))
+
+        # When.
+        ip = Interpolator([pa], x=x, y=y)
+        p = ip.interpolate('p')
+
+        # Then.
+        self.assertEqual(p.shape, x.shape)
+        expect = np.ones_like(x)*2.0
+        self.assertTrue(np.allclose(p, expect))
+
+    def test_that_set_interpolation_points_works(self):
+        # Given
+        pa = self._make_2d_grid()
+        ip = Interpolator([pa], num_points=1000)
+
+        # When.
+        x, y = np.random.random((2, 5, 5))
+        ip.set_interpolation_points(x=x, y=y)
+        p = ip.interpolate('p')
+
+        # Then.
+        self.assertEqual(p.shape, x.shape)
+        expect = np.ones_like(x)*2.0
+        self.assertTrue(np.allclose(p, expect))
+
+
 
 if __name__ == '__main__':
     unittest.main()

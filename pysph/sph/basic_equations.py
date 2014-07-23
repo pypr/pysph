@@ -71,18 +71,19 @@ class VelocityGradient2D(Equation):
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
-    :math:`p = c_0^2(\rho_0 - rho)`
+    :math:`p = p_0 + c_0^2(\rho_0 - rho)`
 
     """
     def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0):
+                 rho0=1000.0, c0=1.0, p0=0.0):
         self.rho0 = rho0
         self.c0 = c0
         self.c02 = c0 * c0
+        self.p0 = p0
         super(IsothermalEOS, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_p):
-        d_p[d_idx] = self.c02 * (d_rho[d_idx] - self.rho0)
+        d_p[d_idx] = self.p0 + self.c02 * (d_rho[d_idx] - self.rho0)
 
 class ContinuityEquation(Equation):
     r"""Density rate:
@@ -157,4 +158,4 @@ class XSPHCorrection(Equation):
     def post_loop(self, d_idx, d_ax, d_ay, d_az, d_u, d_v, d_w):
         d_ax[d_idx] += d_u[d_idx]
         d_ay[d_idx] += d_v[d_idx]
-        d_az[d_idx] += d_w[d_idx]
+        d_az[d_idx] += d_w[d_idx]        

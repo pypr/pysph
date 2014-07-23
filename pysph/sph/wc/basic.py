@@ -312,3 +312,36 @@ class UpdateSmoothingLengthFerrari(Equation):
         Vj = d_m[d_idx]/d_rho[d_idx]
 
         d_h[d_idx] = self.hdx * pow(Vj, self.dim1)
+
+
+class PressureGradientUsingNumberDensity(Equation):
+    r"""Pressure gradient discretized using number density:
+    
+    .. math::
+
+        \frac{d \boldsymbol{v}_a}{dt} = -\frac{1}{m_a}\sum_b
+        (\frac{p_a}{V_a^2} + \frac{p_b}{V_b^2})\nabla_a W_{ab}
+
+    """
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+        
+    def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, 
+             d_au, d_av, d_aw, d_p, s_p, d_V, s_V, DWIJ):
+
+        # particle volumes
+        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+
+        # pressure gradient term
+        pi = d_p[d_idx]; pj = s_p[s_idx]
+        pij = pi*Vi2 + pj*Vj2
+
+        # accelerations
+        tmp = -pij * 1.0/(d_m[d_idx])
+
+        d_au[d_idx] += tmp * DWIJ[0]
+        d_av[d_idx] += tmp * DWIJ[1]
+        d_aw[d_idx] += tmp * DWIJ[2]
