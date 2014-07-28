@@ -7,9 +7,12 @@ except ImportError:
 from mako.template import Template
 from os.path import dirname, join
 
-from pysph.sph.equation import Group, get_arrays_used_in_equation
 from pysph.base.ext_module import ExtModule
 from pysph.base.cython_generator import CythonGenerator
+from pysph.sph.equation import Group, get_arrays_used_in_equation
+from pysph.sph.integrator_cython_helper import IntegratorCythonHelper
+
+
 
 ###############################################################################
 def group_equations(equations):
@@ -93,6 +96,7 @@ class SPHCompiler(object):
         self.kernel = kernel
         self.nnps = None
         self.integrator = integrator
+        self.integrator_helper = IntegratorCythonHelper(integrator)
         self.cell_iteration = cell_iteration
 
         all_equations = []
@@ -121,9 +125,13 @@ class SPHCompiler(object):
         pa_names = ', '.join(parrays)
         path = join(dirname(__file__), 'sph_compiler.mako')
         template = Template(filename=path)
-        return template.render(helpers=helpers, array_names=array_names,
-                               pa_names=pa_names, object=self,
-                               integrator=self.integrator)
+        main = template.render(helpers=helpers, array_names=array_names,
+                               pa_names=pa_names, object=self)
+        if self.integrator is not None:
+            integrator_code = self.integrator_helper.get_code()
+        else:
+            integrator_code = ''
+        return main + integrator_code
 
     def set_nnps(self, nnps):
         if self.calc is None:
@@ -131,7 +139,7 @@ class SPHCompiler(object):
         self.nnps = nnps
         self.calc.set_nnps(nnps)
         if self.integrator is not None:
-            self.integrator.integrator.set_nnps(nnps)
+            self.integrator.set_nnps(nnps)
 
     def setup(self):
         """Always call this first.
@@ -143,8 +151,7 @@ class SPHCompiler(object):
                                 *self.particle_arrays)
         self.sph_compute = self.calc.compute
         if self.integrator is not None:
-            integrator = mod.Integrator(self.calc, self.integrator.steppers)
-            self.integrator.set_integrator(integrator)
+            self.integrator_helper.setup_compiled_module(mod, self.calc)
 
     def update_particle_arrays(self, particle_arrays):
         """Call this to update the particle arrays with new ones.  Make sure
@@ -171,10 +178,6 @@ class SPHCompiler(object):
 
         # Equation wrappers.
         helpers.append(self.all_group.get_equation_wrappers())
-
-        # Integrator wrappers
-        if self.integrator is not None:
-            helpers.append(self.integrator.get_stepper_code())
 
         return '\n'.join(helpers)
 
