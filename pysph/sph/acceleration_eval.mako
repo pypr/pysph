@@ -113,7 +113,7 @@ cdef class SPHCalc:
         ## sources are {source: Group([equations...])}
         ## all_eqs is a Group of all equations having this destination.
         #######################################################################
-        % for g_idx, group in enumerate(object.groups):
+        % for g_idx, group in enumerate(object.wrapped.groups):
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         #######################################################################
@@ -136,7 +136,7 @@ cdef class SPHCalc:
         % if all_eqs.has_initialize():
         # Initialization for destination ${dest}.
         for d_idx in range(NP_DEST):
-            ${indent(all_eqs.get_initialize_code(object.kernel), 3)}
+            ${indent(all_eqs.get_initialize_code(object.wrapped.kernel), 3)}
         % endif
         #######################################################################
         ## Handle all the equations that do not have a source.
@@ -144,7 +144,7 @@ cdef class SPHCalc:
         % if len(eqs_with_no_source.equations) > 0:
         # SPH Equations with no sources.
         for d_idx in range(NP_DEST):
-            ${indent(eqs_with_no_source.get_loop_code(object.kernel), 3)}
+            ${indent(eqs_with_no_source.get_loop_code(object.wrapped.kernel), 3)}
         % endif
         #######################################################################
         ## Iterate over sources.
@@ -160,7 +160,7 @@ cdef class SPHCalc:
         ${indent(object.get_src_array_setup(source, eq_group), 2)}
         src_array_index = src.index
 
-        % if object.cell_iteration:
+        % if object.wrapped.cell_iteration:
         #######################################################################
         ## Iterate over cells.
         #######################################################################
@@ -190,7 +190,7 @@ cdef class SPHCalc:
                     ###########################################################
                     ## Iterate over equations for the same set of neighbors.
                     ###########################################################
-                    ${indent(eq_group.get_loop_code(object.kernel), 5)}
+                    ${indent(eq_group.get_loop_code(object.wrapped.kernel), 5)}
         % else:
         #######################################################################
         ## Iterate over destination particles.
@@ -207,7 +207,7 @@ cdef class SPHCalc:
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
                 ###############################################################
-                ${indent(eq_group.get_loop_code(object.kernel), 4)}
+                ${indent(eq_group.get_loop_code(object.wrapped.kernel), 4)}
         % endif
 
         # Source ${source} done.
@@ -219,7 +219,7 @@ cdef class SPHCalc:
         % if all_eqs.has_post_loop():
         # Post loop for destination ${dest}.
         for d_idx in range(NP_DEST):
-            ${indent(all_eqs.get_post_loop_code(object.kernel), 3)}
+            ${indent(all_eqs.get_post_loop_code(object.wrapped.kernel), 3)}
         % endif
         # Destination ${dest} done.
         # ---------------------------------------------------------------------
