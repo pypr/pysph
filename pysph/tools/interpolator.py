@@ -5,7 +5,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
-from pysph.sph.sph_eval import SPHEval
+from pysph.sph.sph_compiler import SPHCompiler
 
 class InterpolateFunction(Equation):
     def initialize(self, d_idx, d_prop, d_number_density):
@@ -236,7 +236,7 @@ class Interpolator(object):
     def _create_sph_eval(self, arrays):
         names = [x.name for x in self.particle_arrays]
         equations = [InterpolateFunction(dest='interpolate', sources=names)]
-        self.func_eval = SPHEval(
+        self.func_eval = SPHCompiler(
             arrays, equations, self.kernel, integrator=None
         )
 

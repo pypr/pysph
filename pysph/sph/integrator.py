@@ -40,7 +40,7 @@ class Integrator(object):
         self.steppers = kw
         self.parallel_manager = None
         # This is set later when the underlying compiled integrator is created
-        # by the SPHEval.
+        # by the SPHCompiler.
         self.integrator = None
 
     ##########################################################################

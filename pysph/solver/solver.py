@@ -6,7 +6,7 @@ import numpy
 
 # PySPH imports
 from pysph.base.kernels import CubicSpline
-from pysph.sph.sph_eval import SPHEval
+from pysph.sph.sph_compiler import SPHCompiler
 
 from utils import FloatPBar, savez, load
 
@@ -94,8 +94,8 @@ class Solver(object):
         # set the particles to None
         self.particles = None
 
-        # Set the SPHEval instance to None.
-        self.sph_eval = None
+        # Set the SPHCompiler instance to None.
+        self.sph_compiler = None
 
         # solver time and iteration count
         self.t = 0
@@ -191,10 +191,10 @@ class Solver(object):
         if kernel is not None:
             self.kernel = kernel
 
-        self.sph_eval = SPHEval(particles, equations, self.kernel,
-                                self.integrator,
-                                cell_iteration=self.cell_iteration)
-        self.sph_eval.set_nnps(nnps)
+        self.sph_compiler = SPHCompiler(particles, equations, self.kernel,
+                                        self.integrator,
+                                        cell_iteration=self.cell_iteration)
+        self.sph_compiler.set_nnps(nnps)
 
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)
@@ -361,7 +361,7 @@ class Solver(object):
 
         # Compute the accelerations once for the predictor corrector
         # integrator to work correctly at the first time step.
-        self.sph_eval.compute(self.t, dt)
+        self.sph_compiler.compute(self.t, dt)
 
         # solution output times
         output_at_times = numpy.array( self.output_at_times )
@@ -445,7 +445,7 @@ class Solver(object):
                     # instant
                     old_dt = dt
                     dt = float( output_time - self.t )
-                    
+
                     self.force_output = True
 
             # set the adjusted time-step for the solver

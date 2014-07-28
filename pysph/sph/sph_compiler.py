@@ -85,9 +85,7 @@ def check_equation_array_properties(equation, particle_arrays):
 
 
 ###############################################################################
-# `SPHEval` class.
-###############################################################################
-class SPHEval(object):
+class SPHCompiler(object):
     def __init__(self, particle_arrays, equations, kernel,
                  integrator, cell_iteration=False):
         self.particle_arrays = particle_arrays
@@ -121,7 +119,7 @@ class SPHEval(object):
         array_names =  get_array_names(self.particle_arrays)
         parrays = [pa.name for pa in self.particle_arrays]
         pa_names = ', '.join(parrays)
-        path = join(dirname(__file__), 'sph_eval.mako')
+        path = join(dirname(__file__), 'sph_compiler.mako')
         template = Template(filename=path)
         return template.render(helpers=helpers, array_names=array_names,
                                pa_names=pa_names, object=self,
