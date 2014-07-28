@@ -25,9 +25,12 @@ class IntegratorCythonHelper(object):
         self.integrator = integrator
 
     def get_code(self):
-        path = join(dirname(__file__), 'integrator.mako')
-        template = Template(filename=path)
-        return template.render(helper=self)
+        if self.integrator is not None:
+            path = join(dirname(__file__), 'integrator.mako')
+            template = Template(filename=path)
+            return template.render(helper=self)
+        else:
+            return ''
 
     def setup_compiled_module(self, module, calc):
         # Create the compiled module.

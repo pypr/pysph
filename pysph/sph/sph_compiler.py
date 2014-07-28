@@ -19,10 +19,7 @@ class SPHCompiler(object):
     ##########################################################################
     def get_code(self):
         main = self.acceleration_eval_helper.get_code()
-        if self.integrator is not None:
-            integrator_code = self.integrator_helper.get_code()
-        else:
-            integrator_code = ''
+        integrator_code = self.integrator_helper.get_code()
         return main + integrator_code
 
     def set_nnps(self, nnps):
