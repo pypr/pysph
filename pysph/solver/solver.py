@@ -95,9 +95,8 @@ class Solver(object):
         # set the particles to None
         self.particles = None
 
-        # Set the SPHCompiler instance to None.
+        # Set the AccelerationEval instance to None.
         self.acceleration_eval = None
-        self.sph_compiler = None
 
         # solver time and iteration count
         self.t = 0
@@ -196,10 +195,15 @@ class Solver(object):
         self.acceleration_eval = AccelerationEval(
             particles, equations, self.kernel, self.cell_iteration
         )
-        self.sph_compiler = SPHCompiler(
+
+        sph_compiler = SPHCompiler(
             self.acceleration_eval, self.integrator
         )
-        self.sph_compiler.set_nnps(nnps)
+        sph_compiler.compile()
+
+        # Set the nnps for all concerned objects.
+        self.acceleration_eval.set_nnps(nnps)
+        self.integrator.set_nnps(nnps)
 
         # set the parallel manager for the integrator
         self.integrator.set_parallel_manager(self.pm)

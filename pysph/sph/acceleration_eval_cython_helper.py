@@ -39,72 +39,74 @@ def get_array_names(particle_arrays):
 ###############################################################################
 class AccelerationEvalCythonHelper(object):
     def __init__(self, acceleration_eval):
-        self.wrapped = acceleration_eval
+        self.object = acceleration_eval
 
     ##########################################################################
     # Public interface.
     ##########################################################################
     def get_code(self):
-        wrapped = self.wrapped
-        helpers = self.get_helpers()
-        array_names =  get_array_names(wrapped.particle_arrays)
-        parrays = [pa.name for pa in wrapped.particle_arrays]
+        object = self.object
+        header = self.get_header()
+        array_names =  get_array_names(object.particle_arrays)
+        parrays = [pa.name for pa in object.particle_arrays]
         pa_names = ', '.join(parrays)
         path = join(dirname(__file__), 'acceleration_eval.mako')
         template = Template(filename=path)
-        main = template.render(helpers=helpers, array_names=array_names,
-                               pa_names=pa_names, object=self)
+        main = template.render(header=header, array_names=array_names,
+                               pa_names=pa_names, helper=self)
         return main
 
     def setup_compiled_module(self, module):
         # Create the compiled module.
-        wrapped = self.wrapped
-        calc = module.SPHCalc(wrapped.kernel, wrapped.all_group.equations,
-                            *wrapped.particle_arrays)
-        wrapped.calc = calc
+        object = self.object
+        acceleration_eval = module.AccelerationEval(
+            object.kernel, object.all_group.equations,
+            object.particle_arrays
+        )
+        object.set_compiled_object(acceleration_eval)
 
     ##########################################################################
     # Mako interface.
     ##########################################################################
-    def get_helpers(self):
-        wrapped = self.wrapped
-        helpers = []
-        helpers.extend(get_code(wrapped.kernel))
+    def get_header(self):
+        object = self.object
+        headers = []
+        headers.extend(get_code(object.kernel))
 
-        # get helpers from the Equations
-        for equation in wrapped.all_group.equations:
-            helpers.extend(get_code(equation))
+        # get headers from the Equations
+        for equation in object.all_group.equations:
+            headers.extend(get_code(equation))
 
         # Kernel wrappers.
         cg = CythonGenerator()
-        cg.parse(wrapped.kernel)
-        helpers.append(cg.get_code())
+        cg.parse(object.kernel)
+        headers.append(cg.get_code())
 
         # Equation wrappers.
-        helpers.append(wrapped.all_group.get_equation_wrappers())
+        headers.append(object.all_group.get_equation_wrappers())
 
-        return '\n'.join(helpers)
+        return '\n'.join(headers)
 
     def get_equation_defs(self):
-        return self.wrapped.all_group.get_equation_defs()
+        return self.object.all_group.get_equation_defs()
 
     def get_equation_init(self):
-        return self.wrapped.all_group.get_equation_init()
+        return self.object.all_group.get_equation_init()
 
     def get_kernel_defs(self):
-        return 'cdef public %s kernel'%(self.wrapped.kernel.__class__.__name__)
+        return 'cdef public %s kernel'%(self.object.kernel.__class__.__name__)
 
     def get_kernel_init(self):
-        wrapped = self.wrapped
-        return 'self.kernel = %s(**kernel.__dict__)'%(wrapped.kernel.__class__.__name__)
+        object = self.object
+        return 'self.kernel = %s(**kernel.__dict__)'%(object.kernel.__class__.__name__)
 
     def get_variable_declarations(self):
-        group = self.wrapped.all_group
+        group = self.object.all_group
         ctx = group.context
         return group.get_variable_declarations(ctx)
 
     def get_array_declarations(self):
-        group = self.wrapped.all_group
+        group = self.object.all_group
         src, dest = group.get_array_names()
         src.update(dest)
         return group.get_array_declarations(src)

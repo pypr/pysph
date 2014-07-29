@@ -37,7 +37,7 @@ class Integrator(object):
         self.parallel_manager = None
         # This is set later when the underlying compiled integrator is created
         # by the SPHCompiler.
-        self.integrator = None
+        self.c_integrator = None
 
     ##########################################################################
     # Public interface.
@@ -50,13 +50,13 @@ class Integrator(object):
         self.fixed_h=fixed_h
 
     def set_nnps(self, nnps):
-        self.integrator.set_nnps(nnps)
+        self.c_integrator.set_nnps(nnps)
 
     def compute_h_minimum(self):
-        calc = self.integrator.sph_calc
+        a_eval = self.c_integrator.acceleration_eval
 
         hmin = 1.0
-        for pa in calc.particle_arrays:
+        for pa in a_eval.particle_arrays:
             h = pa.get_carray('h')
             h.update_min_max()
 
@@ -66,14 +66,14 @@ class Integrator(object):
         self.h_minimum = hmin
 
     def compute_time_step(self, dt, cfl):
-        calc = self.integrator.sph_calc
+        a_eval = self.c_integrator.acceleration_eval
 
         # different time step controls
-        dt_cfl_factor = calc.dt_cfl
-        dt_visc_factor = calc.dt_viscous
+        dt_cfl_factor = a_eval.dt_cfl
+        dt_visc_factor = a_eval.dt_viscous
 
         # force factor is acceleration squared
-        dt_force_factor = sqrt(calc.dt_force)
+        dt_force_factor = sqrt(a_eval.dt_force)
 
         # iterate over particles and find hmin if using vatialbe h
         if not self.fixed_h:
@@ -145,11 +145,13 @@ class Integrator(object):
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
 
-    def set_parallel_manager(self, pm):
-        self.integrator.set_parallel_manager(pm)
+    def set_compiled_object(self, c_integrator):
+        """Set the high-performance compiled object to call internally.
+        """
+        self.c_integrator = c_integrator
 
-    def set_integrator(self, integrator):
-        self.integrator = integrator
+    def set_parallel_manager(self, pm):
+        self.c_integrator.set_parallel_manager(pm)
 
     def set_post_stage_callback(self, callback):
         """This callback is called when the particles are moved, i.e
@@ -162,7 +164,7 @@ class Integrator(object):
         0.5*dt for a two stage predictor corrector integrator.
 
         """
-        self.integrator.set_post_stage_callback(callback)
+        self.c_integrator.set_post_stage_callback(callback)
 
     def step(self, time, dt):
         """This function is called by the solver.
@@ -170,7 +172,7 @@ class Integrator(object):
         To implement the integration step please override the
         ``one_timestep`` method.
         """
-        self.integrator.step(time, dt)
+        self.c_integrator.step(time, dt)
 
 
 ###############################################################################

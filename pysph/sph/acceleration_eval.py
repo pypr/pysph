@@ -69,24 +69,29 @@ class AccelerationEval(object):
             check_equation_array_properties(equation, particle_arrays)
 
         self.groups = [self._make_group(g) for g in self.equation_groups]
-        self.calc = None
+        self.c_acceleration_eval = None
 
     ##########################################################################
     # Public interface.
     ##########################################################################
     def compute(self, t, dt):
-        self.calc.compute(t, dt)
+        self.c_acceleration_eval.compute(t, dt)
+
+    def set_compiled_object(self, c_acceleration_eval):
+        """Set the high-performance compiled object to call internally.
+        """
+        self.c_acceleration_eval = c_acceleration_eval
 
     def set_nnps(self, nnps):
         self.nnps = nnps
-        self.calc.set_nnps(nnps)
+        self.c_acceleration_eval.set_nnps(nnps)
 
     def update_particle_arrays(self, particle_arrays):
         """Call this to update the particle arrays with new ones.  Make sure
         though that the same properties exist in both or you will get a
         segfault.
         """
-        self.calc.update_particle_arrays(particle_arrays)
+        self.c_acceleration_eval.update_particle_arrays(particle_arrays)
 
     ##########################################################################
     # Non-public interface.

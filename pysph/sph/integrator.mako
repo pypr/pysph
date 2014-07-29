@@ -18,7 +18,7 @@ ${helper.get_stepper_code()}
 # #############################################################################
 cdef class Integrator:
     cdef public ParticleArrayWrapper ${helper.get_particle_array_names()}
-    cdef public SPHCalc sph_calc
+    cdef public AccelerationEval acceleration_eval
     cdef public object parallel_manager
     cdef public NNPS nnps
     cdef public double dt, t, orig_t
@@ -26,11 +26,11 @@ cdef class Integrator:
 
     ${indent(helper.get_stepper_defs(), 1)}
 
-    def __init__(self, calc, steppers):
-        self.sph_calc = calc
+    def __init__(self, acceleration_eval, steppers):
+        self.acceleration_eval = acceleration_eval
         self._post_stage_callback = None
-        % for name in sorted(helper.integrator.steppers.keys()):
-        self.${name} = calc.${name}
+        % for name in sorted(helper.object.steppers.keys()):
+        self.${name} = acceleration_eval.${name}
         % endfor
         ${indent(helper.get_stepper_init(), 2)}
 
@@ -50,7 +50,7 @@ cdef class Integrator:
         self.nnps.update()
 
         # Evaluate
-        self.sph_calc.compute(self.t, self.dt)
+        self.acceleration_eval.compute(self.t, self.dt)
 
     cpdef do_post_stage(self, double stage_dt, int stage):
         """This is called after every stage of the integrator.
@@ -88,7 +88,7 @@ cdef class Integrator:
         cdef double dt = self.dt
         ${indent(helper.get_array_declarations(method), 2)}
 
-        % for dest in sorted(helper.integrator.steppers.keys()):
+        % for dest in sorted(helper.object.steppers.keys()):
         # ---------------------------------------------------------------------
         # Destination ${dest}.
         dst = self.${dest}

@@ -13,29 +13,27 @@ class SPHCompiler(object):
         self.integrator = integrator
         self.integrator_helper = IntegratorCythonHelper(integrator)
         self.ext_mod = None
+        self.module = None
 
-    ##########################################################################
-    # Public interface.
-    ##########################################################################
-    def get_code(self):
+    #### Public interface. ####################################################
+    def compile(self):
+        """Compile the generated code to an extension module and
+        setup the objects that need this by calling their setup_compiled_module.
+        """
+        if self.ext_mod is not None:
+            return
+        code = self._get_code()
+        self.ext_mod = ExtModule(code, verbose=True)
+        mod = self.ext_mod.load()
+        self.module = mod
+
+        self.acceleration_eval_helper.setup_compiled_module(mod)
+        cython_a_eval = self.acceleration_eval.c_acceleration_eval
+        if self.integrator is not None:
+            self.integrator_helper.setup_compiled_module(mod, cython_a_eval)
+
+    #### Private interface. ####################################################
+    def _get_code(self):
         main = self.acceleration_eval_helper.get_code()
         integrator_code = self.integrator_helper.get_code()
         return main + integrator_code
-
-    def set_nnps(self, nnps):
-        if self.ext_mod is None:
-            self.setup()
-        self.acceleration_eval.set_nnps(nnps)
-        if self.integrator is not None:
-            self.integrator.set_nnps(nnps)
-
-    def setup(self):
-        """Always call this first.
-        """
-        code = self.get_code()
-        self.ext_mod = ExtModule(code, verbose=True)
-        mod = self.ext_mod.load()
-        self.acceleration_eval_helper.setup_compiled_module(mod)
-        calc = self.acceleration_eval.calc
-        if self.integrator is not None:
-            self.integrator_helper.setup_compiled_module(mod, calc)

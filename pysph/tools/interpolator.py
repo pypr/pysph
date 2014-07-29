@@ -109,7 +109,6 @@ class Interpolator(object):
         self.pa = None
         self.nnps = None
         self.func_eval = None
-        self.sph_compiler = None
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)
         else:
@@ -204,7 +203,7 @@ class Interpolator(object):
         self.nnps = NNPS(dim=self.kernel.dim, particles=arrays,
                          radius_scale=self.kernel.radius_scale)
         self.nnps.update()
-        self.compiler.set_nnps(self.nnps)
+        self.func_eval.set_nnps(self.nnps)
 
     def _create_default_points(self, bounds, shape):
         b = bounds
@@ -239,7 +238,8 @@ class Interpolator(object):
         names = [x.name for x in self.particle_arrays]
         equations = [InterpolateFunction(dest='interpolate', sources=names)]
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
-        self.compiler = SPHCompiler(self.func_eval, None)
+        compiler = SPHCompiler(self.func_eval, None)
+        compiler.compile()
 
     def _get_max_h_in_arrays(self):
         hmax = -1.0

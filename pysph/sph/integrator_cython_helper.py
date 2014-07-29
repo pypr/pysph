@@ -20,33 +20,33 @@ class IntegratorCythonHelper(object):
     """A helper that generates Cython code for the Integrator class.
     """
     def __init__(self, integrator):
-        """
-        """
-        self.integrator = integrator
+        self.object = integrator
 
     def get_code(self):
-        if self.integrator is not None:
+        if self.object is not None:
             path = join(dirname(__file__), 'integrator.mako')
             template = Template(filename=path)
             return template.render(helper=self)
         else:
             return ''
 
-    def setup_compiled_module(self, module, calc):
+    def setup_compiled_module(self, module, acceleration_eval):
         # Create the compiled module.
-        cython_integrator = module.Integrator(calc, self.integrator.steppers)
+        cython_integrator = module.Integrator(
+            acceleration_eval, self.object.steppers
+        )
         # Setup the integrator to use this compiled module.
-        self.integrator.set_integrator(cython_integrator)
+        self.object.set_compiled_object(cython_integrator)
 
     ##########################################################################
     # Mako interface.
     ##########################################################################
     def get_particle_array_names(self):
-        return ', '.join(sorted(self.integrator.steppers.keys()))
+        return ', '.join(sorted(self.object.steppers.keys()))
 
     def get_stepper_code(self):
         classes = {}
-        for dest, stepper in self.integrator.steppers.iteritems():
+        for dest, stepper in self.object.steppers.iteritems():
             cls = stepper.__class__.__name__
             classes[cls] = stepper
 
@@ -59,7 +59,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_defs(self):
         lines = []
-        for dest, stepper in self.integrator.steppers.iteritems():
+        for dest, stepper in self.object.steppers.iteritems():
             cls_name = stepper.__class__.__name__
             code = 'cdef public {cls} {name}'.format(cls=cls_name,
                                                      name=dest+'_stepper')
@@ -68,7 +68,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_init(self):
         lines = []
-        for dest, stepper in self.integrator.steppers.iteritems():
+        for dest, stepper in self.object.steppers.iteritems():
             cls_name = stepper.__class__.__name__
             code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
                         .format(name=dest+'_stepper', cls=cls_name,
@@ -77,13 +77,13 @@ class IntegratorCythonHelper(object):
         return '\n'.join(lines)
 
     def get_args(self, dest, method):
-        stepper = self.integrator.steppers[dest]
+        stepper = self.object.steppers[dest]
         meth = getattr(stepper, method)
         return inspect.getargspec(meth).args
 
     def get_array_declarations(self, method):
         arrays = set()
-        for dest in self.integrator.steppers:
+        for dest in self.object.steppers:
             s, d = get_array_names(self.get_args(dest, method))
             arrays.update(s | d)
 
@@ -111,13 +111,13 @@ class IntegratorCythonHelper(object):
         method this will return ('initialize', 'stage1', 'stage2')
         """
         methods = set(['initialize'])
-        for stepper in self.integrator.steppers.values():
+        for stepper in self.object.steppers.values():
             stages = [x for x in dir(stepper) if x.startswith('stage')]
             methods.update(stages)
         return list(sorted(methods))
 
     def get_timestep_code(self):
-        method = self.integrator.one_timestep
+        method = self.object.one_timestep
         sourcelines = inspect.getsourcelines(method)[0]
         defn, lines = get_func_definition(sourcelines)
 	return dedent(''.join(lines))
