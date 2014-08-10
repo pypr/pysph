@@ -4,7 +4,7 @@ import unittest
 # Local imports.
 from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation
-from pysph.sph.sph_eval import check_equation_array_properties
+from pysph.sph.acceleration_eval import check_equation_array_properties
 from pysph.sph.basic_equations import SummationDensity
 
 class TestEquation(Equation):

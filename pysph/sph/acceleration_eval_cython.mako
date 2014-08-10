@@ -14,7 +14,7 @@ from pysph.base.nnps cimport NNPS
 
 from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray
 
-${helpers}
+${header}
 
 # #############################################################################
 cdef class ParticleArrayWrapper:
@@ -43,25 +43,36 @@ cdef class ParticleArrayWrapper:
 
 
 # #############################################################################
-cdef class SPHCalc:
+cdef class AccelerationEval:
     cdef public tuple particle_arrays
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
     cdef UIntArray nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
-    ${indent(object.get_kernel_defs(), 1)}
-    ${indent(object.get_equation_defs(), 1)}
+    ${indent(helper.get_kernel_defs(), 1)}
+    ${indent(helper.get_equation_defs(), 1)}
 
-    def __init__(self, kernel, equations, *particle_arrays):
-        self.particle_arrays = particle_arrays
+    def __init__(self, kernel, equations, particle_arrays):
+        self.particle_arrays = tuple(particle_arrays)
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
 
         self.nbrs = UIntArray()
-        ${indent(object.get_kernel_init(), 2)}
-        ${indent(object.get_equation_init(), 2)}
+        ${indent(helper.get_kernel_init(), 2)}
+        ${indent(helper.get_equation_init(), 2)}
+
+    cdef _initialize_dt_adapt(self, double* DT_ADAPT):
+        self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
+        DT_ADAPT[0] = self.dt_cfl
+        DT_ADAPT[1] = self.dt_force
+        DT_ADAPT[2] = self.dt_viscous
+
+    cdef _set_dt_adapt(self, double* DT_ADAPT):
+        self.dt_cfl = DT_ADAPT[0]
+        self.dt_force = DT_ADAPT[1]
+        self.dt_viscous = DT_ADAPT[2]
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -70,17 +81,6 @@ cdef class SPHCalc:
         for pa in particle_arrays:
             name = pa.name
             getattr(self, name).set_array(pa)
-
-    cdef initialize_dt_adapt(self, double* DT_ADAPT):
-        self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
-        DT_ADAPT[0] = self.dt_cfl
-        DT_ADAPT[1] = self.dt_force
-        DT_ADAPT[2] = self.dt_viscous
-
-    cdef set_dt_adapt(self, double* DT_ADAPT):
-        self.dt_cfl = DT_ADAPT[0]
-        self.dt_force = DT_ADAPT[1]
-        self.dt_viscous = DT_ADAPT[2]
 
     cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
@@ -92,20 +92,20 @@ cdef class SPHCalc:
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
         cdef double[3] DT_ADAPT
-        self.initialize_dt_adapt(DT_ADAPT)
+        self._initialize_dt_adapt(DT_ADAPT)
 
         #######################################################################
         ##  Declare all the arrays.
         #######################################################################
         # Arrays.\
-        ${indent(object.get_array_declarations(), 2)}
+        ${indent(helper.get_array_declarations(), 2)}
         #######################################################################
         ## Declare any variables.
         #######################################################################
         # Variables.\
 
         cdef int src_array_index, dst_array_index
-        ${indent(object.get_variable_declarations(), 2)}
+        ${indent(helper.get_variable_declarations(), 2)}
         #######################################################################
         ## Iterate over groups:
         ## Groups are organized as {destination: (eqs_with_no_source, sources, all_eqs)}
@@ -113,7 +113,7 @@ cdef class SPHCalc:
         ## sources are {source: Group([equations...])}
         ## all_eqs is a Group of all equations having this destination.
         #######################################################################
-        % for g_idx, group in enumerate(object.groups):
+        % for g_idx, group in enumerate(helper.object.groups):
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         #######################################################################
@@ -127,7 +127,7 @@ cdef class SPHCalc:
         #######################################################################
 
         dst = self.${dest}
-        ${indent(object.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 2)}
+        ${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 2)}
         dst_array_index = dst.index
 
         #######################################################################
@@ -136,7 +136,7 @@ cdef class SPHCalc:
         % if all_eqs.has_initialize():
         # Initialization for destination ${dest}.
         for d_idx in range(NP_DEST):
-            ${indent(all_eqs.get_initialize_code(object.kernel), 3)}
+            ${indent(all_eqs.get_initialize_code(helper.object.kernel), 3)}
         % endif
         #######################################################################
         ## Handle all the equations that do not have a source.
@@ -144,7 +144,7 @@ cdef class SPHCalc:
         % if len(eqs_with_no_source.equations) > 0:
         # SPH Equations with no sources.
         for d_idx in range(NP_DEST):
-            ${indent(eqs_with_no_source.get_loop_code(object.kernel), 3)}
+            ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 3)}
         % endif
         #######################################################################
         ## Iterate over sources.
@@ -157,10 +157,10 @@ cdef class SPHCalc:
         #######################################################################
 
         src = self.${source}
-        ${indent(object.get_src_array_setup(source, eq_group), 2)}
+        ${indent(helper.get_src_array_setup(source, eq_group), 2)}
         src_array_index = src.index
 
-        % if object.cell_iteration:
+        % if helper.object.cell_iteration:
         #######################################################################
         ## Iterate over cells.
         #######################################################################
@@ -190,7 +190,7 @@ cdef class SPHCalc:
                     ###########################################################
                     ## Iterate over equations for the same set of neighbors.
                     ###########################################################
-                    ${indent(eq_group.get_loop_code(object.kernel), 5)}
+                    ${indent(eq_group.get_loop_code(helper.object.kernel), 5)}
         % else:
         #######################################################################
         ## Iterate over destination particles.
@@ -207,7 +207,7 @@ cdef class SPHCalc:
                 ###############################################################
                 ## Iterate over the equations for the same set of neighbors.
                 ###############################################################
-                ${indent(eq_group.get_loop_code(object.kernel), 4)}
+                ${indent(eq_group.get_loop_code(helper.object.kernel), 4)}
         % endif
 
         # Source ${source} done.
@@ -219,7 +219,7 @@ cdef class SPHCalc:
         % if all_eqs.has_post_loop():
         # Post loop for destination ${dest}.
         for d_idx in range(NP_DEST):
-            ${indent(all_eqs.get_post_loop_code(object.kernel), 3)}
+            ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 3)}
         % endif
         # Destination ${dest} done.
         # ---------------------------------------------------------------------
@@ -237,92 +237,4 @@ cdef class SPHCalc:
         # Group ${g_idx} done.
         # ---------------------------------------------------------------------
         % endfor
-        self.set_dt_adapt(DT_ADAPT)
-
-
-% if integrator is not None:
-# #############################################################################
-cdef class Integrator:
-    cdef public ParticleArrayWrapper ${pa_names}
-    cdef public SPHCalc sph_calc
-    cdef public object parallel_manager
-    cdef public NNPS nnps
-    cdef public double dt, t, orig_t
-    cdef object _post_stage_callback
-
-    ${indent(integrator.get_stepper_defs(), 1)}
-
-    def __init__(self, calc, steppers):
-        self.sph_calc = calc
-        self._post_stage_callback = None
-        % for name in pa_names.split():
-        self.${name} = calc.${name}
-        % endfor
-        ${indent(integrator.get_stepper_init(), 2)}
-
-    def set_nnps(self, NNPS nnps):
-        self.nnps = nnps
-
-    def set_parallel_manager(self, object pm):
-        self.parallel_manager = pm
-
-    def set_post_stage_callback(self, object callback):
-        self._post_stage_callback = callback
-
-    cpdef compute_accelerations(self):
-        # update NNPS since particles have moved
-        if self.parallel_manager:
-            self.parallel_manager.update()
-        self.nnps.update()
-
-        # Evaluate
-        self.sph_calc.compute(self.t, self.dt)
-
-    cpdef do_post_stage(self, double stage_dt, int stage):
-        """This is called after every stage of the integrator.
-
-        Internally, this calls any post_stage_callback function that has
-        been given to take suitable action.
-
-        Parameters
-        ----------
-
-         - stage_dt : double: the timestep taken at this stage.
-
-         - stage : int: the stage completed (starting from 1).
-        """
-        self.t = self.orig_t + stage_dt
-        if self._post_stage_callback is not None:
-            self._post_stage_callback(self.t, self.dt, stage)
-
-    cpdef step(self, double t, double dt):
-        """Main step routine.
-        """
-        self.orig_t = t
-        self.t = t
-        self.dt = dt
-        self.one_timestep(t, dt)
-
-    cdef one_timestep(self, double t, double dt):
-        ${indent(integrator.get_timestep_code(), 2)}
-
-    % for method in integrator.get_stepper_method_wrapper_names():
-    cdef ${method}(self):
-        cdef long NP_DEST
-        cdef long d_idx
-        cdef ParticleArrayWrapper dst
-        cdef double dt = self.dt
-        ${indent(integrator.get_array_declarations(method), 2)}
-
-        % for dest in integrator.steppers:
-        # ---------------------------------------------------------------------
-        # Destination ${dest}.
-        dst = self.${dest}
-        # Only iterate over real particles.
-        NP_DEST = dst.size(real=True)
-        ${indent(integrator.get_array_setup(dest, method), 2)}
-        for d_idx in range(NP_DEST):
-            ${indent(integrator.get_stepper_loop(dest, method), 3)}
-        % endfor
-    % endfor
-% endif
+        self._set_dt_adapt(DT_ADAPT)
