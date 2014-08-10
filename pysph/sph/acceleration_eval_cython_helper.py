@@ -50,7 +50,7 @@ class AccelerationEvalCythonHelper(object):
         array_names =  get_array_names(object.particle_arrays)
         parrays = [pa.name for pa in object.particle_arrays]
         pa_names = ', '.join(parrays)
-        path = join(dirname(__file__), 'acceleration_eval.mako')
+        path = join(dirname(__file__), 'acceleration_eval_cython.mako')
         template = Template(filename=path)
         main = template.render(header=header, array_names=array_names,
                                pa_names=pa_names, helper=self)

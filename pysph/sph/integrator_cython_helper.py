@@ -24,7 +24,7 @@ class IntegratorCythonHelper(object):
 
     def get_code(self):
         if self.object is not None:
-            path = join(dirname(__file__), 'integrator.mako')
+            path = join(dirname(__file__), 'integrator_cython.mako')
             template = Template(filename=path)
             return template.render(helper=self)
         else:
