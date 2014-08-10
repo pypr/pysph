@@ -6,13 +6,9 @@ These classes are used to generate the code for the actual integrators
 from the `sph_eval` module.
 """
 
-import inspect
 from numpy import sqrt
-from textwrap import dedent
 
 # Local imports.
-from pysph.sph.equation import get_array_names
-from pysph.base.cython_generator import CythonGenerator, get_func_definition
 from .integrator_step import IntegratorStep
 
 ###############################################################################
@@ -40,8 +36,8 @@ class Integrator(object):
         self.steppers = kw
         self.parallel_manager = None
         # This is set later when the underlying compiled integrator is created
-        # by the SPHEval.
-        self.integrator = None
+        # by the SPHCompiler.
+        self.c_integrator = None
 
     ##########################################################################
     # Public interface.
@@ -53,11 +49,14 @@ class Integrator(object):
 
         self.fixed_h=fixed_h
 
+    def set_nnps(self, nnps):
+        self.c_integrator.set_nnps(nnps)
+
     def compute_h_minimum(self):
-        calc = self.integrator.sph_calc
+        a_eval = self.c_integrator.acceleration_eval
 
         hmin = 1.0
-        for pa in calc.particle_arrays:
+        for pa in a_eval.particle_arrays:
             h = pa.get_carray('h')
             h.update_min_max()
 
@@ -67,14 +66,14 @@ class Integrator(object):
         self.h_minimum = hmin
 
     def compute_time_step(self, dt, cfl):
-        calc = self.integrator.sph_calc
+        a_eval = self.c_integrator.acceleration_eval
 
         # different time step controls
-        dt_cfl_factor = calc.dt_cfl
-        dt_visc_factor = calc.dt_viscous
+        dt_cfl_factor = a_eval.dt_cfl
+        dt_visc_factor = a_eval.dt_viscous
 
         # force factor is acceleration squared
-        dt_force_factor = sqrt(calc.dt_force)
+        dt_force_factor = sqrt(a_eval.dt_force)
 
         # iterate over particles and find hmin if using vatialbe h
         if not self.fixed_h:
@@ -146,11 +145,13 @@ class Integrator(object):
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
 
-    def set_parallel_manager(self, pm):
-        self.integrator.set_parallel_manager(pm)
+    def set_compiled_object(self, c_integrator):
+        """Set the high-performance compiled object to call internally.
+        """
+        self.c_integrator = c_integrator
 
-    def set_integrator(self, integrator):
-        self.integrator = integrator
+    def set_parallel_manager(self, pm):
+        self.c_integrator.set_parallel_manager(pm)
 
     def set_post_stage_callback(self, callback):
         """This callback is called when the particles are moved, i.e
@@ -163,7 +164,7 @@ class Integrator(object):
         0.5*dt for a two stage predictor corrector integrator.
 
         """
-        self.integrator.set_post_stage_callback(callback)
+        self.c_integrator.set_post_stage_callback(callback)
 
     def step(self, time, dt):
         """This function is called by the solver.
@@ -171,87 +172,7 @@ class Integrator(object):
         To implement the integration step please override the
         ``one_timestep`` method.
         """
-        self.integrator.step(time, dt)
-
-    ##########################################################################
-    # Mako interface.
-    ##########################################################################
-    def get_stepper_code(self):
-        classes = {}
-        for dest, stepper in self.steppers.iteritems():
-            cls = stepper.__class__.__name__
-            classes[cls] = stepper
-
-        wrappers = []
-        code_gen = CythonGenerator()
-        for cls in sorted(classes.keys()):
-            code_gen.parse(classes[cls])
-            wrappers.append(code_gen.get_code())
-        return '\n'.join(wrappers)
-
-    def get_stepper_defs(self):
-        lines = []
-        for dest, stepper in self.steppers.iteritems():
-            cls_name = stepper.__class__.__name__
-            code = 'cdef public {cls} {name}'.format(cls=cls_name,
-                                                     name=dest+'_stepper')
-            lines.append(code)
-        return '\n'.join(lines)
-
-    def get_stepper_init(self):
-        lines = []
-        for dest, stepper in self.steppers.iteritems():
-            cls_name = stepper.__class__.__name__
-            code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
-                        .format(name=dest+'_stepper', cls=cls_name,
-                                dest=dest)
-            lines.append(code)
-        return '\n'.join(lines)
-
-    def get_args(self, dest, method):
-        stepper = self.steppers[dest]
-        meth = getattr(stepper, method)
-        return inspect.getargspec(meth).args
-
-    def get_array_declarations(self, method):
-        arrays = set()
-        for dest in self.steppers:
-            s, d = get_array_names(self.get_args(dest, method))
-            arrays.update(s | d)
-
-        decl = []
-        for arr in sorted(arrays):
-            decl.append('cdef double* %s'%arr)
-        return '\n'.join(decl)
-
-    def get_array_setup(self, dest, method):
-        s, d = get_array_names(self.get_args(dest, method))
-        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in s|d]
-        return '\n'.join(lines)
-
-    def get_stepper_loop(self, dest, method):
-        args = self.get_args(dest, method)
-        if 'self' in args:
-            args.remove('self')
-        call_args = ', '.join(args)
-        c = 'self.{obj}.{method}({args})'\
-                .format(obj=dest+'_stepper', method=method, args=call_args)
-        return c
-
-    def get_stepper_method_wrapper_names(self):
-        """Returns the names of the methods we should wrap.  For a 2 stage
-        method this will return ('initialize', 'stage1', 'stage2')
-        """
-        methods = set(['initialize'])
-        for stepper in self.steppers.values():
-            stages = [x for x in dir(stepper) if x.startswith('stage')]
-            methods.update(stages)
-        return list(sorted(methods))
-
-    def get_timestep_code(self):
-        sourcelines = inspect.getsourcelines(self.one_timestep)[0]
-        defn, lines = get_func_definition(sourcelines)
-	return dedent(''.join(lines))
+        self.c_integrator.step(time, dt)
 
 
 ###############################################################################
@@ -297,6 +218,7 @@ class PECIntegrator(Integrator):
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
+
 
 ###############################################################################
 # `EPECIntegrator` class
