@@ -6,6 +6,9 @@ for example in KHI simulations. The references are as under:
    isntability using smoothed particle hydrodynamics", IJNME, 2011,
    87, pp 988--1006 [SY11]
 
+ - Joseph P. Morris "Simulating surface tension with smoothed particle
+   hydrodynamics", JCP, 2000, 33, pp 333--353 [JM00]
+
 """
 from pysph.sph.equation import Equation
 
@@ -19,7 +22,19 @@ class ColorGradientUsingNumberDensity(Equation):
         \nabla C_a = \sum_b \frac{2 C_b - C_a}{\psi_a + \psi_a}
         \nabla_{a} W_{ab}
 
+
+    Using the gradient of the color function, the normal and
+    discretized dirac delta is calculated in the post
+    loop. 
+    
+    Singularities are avoided as per the recommendation by [JM00] (see eqs
+    20 & 21) using the parameter :math:`\epsilon`
+
     """
+    def __init__(self, dest, sources=None, epsilon=1e-6):
+        self.epsilon2 = epsilon*epsilon
+        super(ColorGradientUsingNumberDensity, self).__init__(dest, sources)
+
     def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz,
                    d_ddelta):
 
@@ -34,6 +49,7 @@ class ColorGradientUsingNumberDensity(Equation):
         d_nz[d_idx] = 0.0
 
         # discretized dirac delta
+        d_ddelta[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
              d_V, s_V, DWIJ):
@@ -41,7 +57,7 @@ class ColorGradientUsingNumberDensity(Equation):
         # average particle volume
         psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
 
-        # difference in color divided by psiab
+        # difference in color divided by psiab. Eq. (13) in [SY11]
         Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
         
         # color gradient
@@ -57,8 +73,9 @@ class ColorGradientUsingNumberDensity(Equation):
             d_cz[d_idx]*d_cz[d_idx]
 
         # avoid sqrt computations on non-interface particles
-        # (particles for which the color gradient is zero)
-        if mod_gradc2 > 1e-14:
+        # (particles for which the color gradient is zero) Eq. (19,
+        # 20) in [JM00]
+        if mod_gradc2 > self.epsilon2:
             mod_gradc = 1./sqrt( mod_gradc2 )
 
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
