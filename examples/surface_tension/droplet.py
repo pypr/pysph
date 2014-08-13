@@ -169,11 +169,10 @@ equations = [
     # Begin Surface tension formulation
     #################################################################
     # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS is updated after this group to get the new
-    # list of neighbors.
+    # quantities.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=factor1)
-            ], update_nnps=True ),
+            ], update_nnps=False ),
 
     # Compute the gradient of the color function with respect to the
     # new smoothing length. At the end of this Group, we will have the
@@ -191,11 +190,10 @@ equations = [
             ], ),
 
     # Now rescale the smoothing length to the original value for the
-    # rest of the computations. Re-compute NNPS at the end of this
-    # Group since the smoothing lengths are modified.
+    # rest of the computations.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=factor2)
-            ], update_nnps=True,
+            ], update_nnps=False,
           ),
     #################################################################
     # End Surface tension formulation

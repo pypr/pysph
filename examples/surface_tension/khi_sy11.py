@@ -185,11 +185,11 @@ equations = [
     # Begin Surface tension formulation
     #################################################################
     # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS is updated after this group to get the new
-    # list of neighbors.
+    # quantities. The NNPS need not be updated since the smoothing
+    # length is decreased.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
-            ], update_nnps=True ),
+            ], update_nnps=False ),
 
     # Compute the gradient of the color function with respect to the
     # new smoothing length. At the end of this Group, we will have the
@@ -200,18 +200,17 @@ equations = [
             ], 
           ),
 
-    # Compute the discretized dirac delta function and the interface
-    # curvature using the modified smoothing length.
+    # Compute the interface curvature using the modified smoothing
+    # length and interface normals computed in the previous Group.
     Group(equations=[
             InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
             ], ),
 
-    # Now rescale the smoothing length to the original
-    # value. Re-compute NNPS at the end of this Group since the
-    # smoothing lengths are modified.
+    # Now rescale the smoothing length to the original value for the
+    # rest of the computations.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
-            ], update_nnps=True,
+            ], update_nnps=False,
           ),
     #################################################################
     # End Surface tension formulation
