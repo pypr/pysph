@@ -161,8 +161,8 @@ domain = DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
 app = Application(domain=domain)
 
 # Create the kernel
-#kernel = WendlandQuintic(dim=2)
-kernel = CubicSpline(dim=2)
+kernel = WendlandQuintic(dim=2)
+#kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
 # Create the Integrator.
