@@ -36,7 +36,7 @@ class ColorGradientUsingNumberDensity(Equation):
         super(ColorGradientUsingNumberDensity, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz,
-                   d_ddelta):
+                   d_ddelta, d_N):
 
         # color gradient
         d_cx[d_idx] = 0.0
@@ -50,6 +50,9 @@ class ColorGradientUsingNumberDensity(Equation):
 
         # discretized dirac delta
         d_ddelta[d_idx] = 0.0
+
+        # reliability indicator for normals
+        d_N[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
              d_V, s_V, DWIJ):
@@ -66,7 +69,7 @@ class ColorGradientUsingNumberDensity(Equation):
         d_cz[d_idx] += Cba * DWIJ[2]
 
     def post_loop(self, d_idx, d_cx, d_cy, d_cz,
-                  d_nx, d_ny, d_nz, d_ddelta):
+                  d_nx, d_ny, d_nz, d_N, d_ddelta):
         # absolute value of the color gradient
         mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
             d_cy[d_idx]*d_cy[d_idx] + \
@@ -76,6 +79,10 @@ class ColorGradientUsingNumberDensity(Equation):
         # (particles for which the color gradient is zero) Eq. (19,
         # 20) in [JM00]
         if mod_gradc2 > self.epsilon2:
+            # this normal is reliable in the sense of [JM00]
+            d_N[d_idx] = 1.0
+
+            # compute the normals
             mod_gradc = 1./sqrt( mod_gradc2 )
 
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
@@ -95,11 +102,16 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         \nabla_a W_{ab}
 
     """
-    def initialize(self, d_idx, d_kappa):
+    def __init__(self, dest, sources=None, with_morris_correction=True):
+        self.with_morris_correction = with_morris_correction
+        super(InterfaceCurvatureFromNumberDensity,self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_kappa, d_wij_sum):
         d_kappa[d_idx] = 0.0
+        d_wij_sum[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_kappa, d_nx, d_ny, d_nz, s_nx, s_ny, s_nz, 
-             d_V, s_V, DWIJ):
+             d_V, s_V, d_N, s_N, d_wij_sum, s_rho, s_m, WIJ, DWIJ):
         
         nijdotdwij = (d_nx[d_idx] - s_nx[s_idx]) * DWIJ[0] + \
             (d_ny[d_idx] - s_ny[s_idx]) * DWIJ[1] + \
@@ -108,8 +120,21 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         # averaged particle number density
         psiij1 = 2.0/(d_V[d_idx] + s_V[s_idx])
 
-        # Eq. (15) in [SY11]
-        d_kappa[d_idx] += psiij1 * nijdotdwij
+        # local number density with reliable normals Eq. (24) in [JM00]
+        tmp = 1.0
+        if self.with_morris_correction:
+            tmp = min(d_N[d_idx], s_N[s_idx])
+
+        d_wij_sum[d_idx] += tmp * s_m[s_idx]/s_rho[s_idx] * WIJ
+
+        # Eq. (15) in [SY11] with correction Eq. (22) in [JM00]
+        d_kappa[d_idx] += tmp * psiij1 * nijdotdwij
+
+    def post_loop(self, d_idx, d_wij_sum, d_nx, d_kappa):
+        # correct the curvature estimate. Eq. (23) in [JM00]
+        if self.with_morris_correction:
+            if d_wij_sum[d_idx] > 1e-12:
+                d_kappa[d_idx] /= d_wij_sum[d_idx]
 
 class ShadlooYildizSurfaceTensionForce(Equation):
     """Acceleration due to surface tension force Eq. (7,9) in [SY11]:

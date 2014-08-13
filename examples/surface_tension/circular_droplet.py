@@ -1,8 +1,10 @@
 """Deformation of a square droplet"""
 
 import numpy
+from numpy import sin, cos, pi
 
 # Particle generator
+import pysph.tools.uniform_distribution as ud
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
 
@@ -35,6 +37,7 @@ from pysph.base.nnps import DomainManager
 dim = 2
 domain_width = 1.0
 domain_height = 1.0
+radial = False
 
 # numerical constants
 wavelength = 1.0
@@ -46,34 +49,45 @@ sigma = 1.0
 
 # set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
 # interface. Larger values result in a thick interface.
-factor1 = 0.8
+factor1 = 1.0
 factor2 = 1./factor1
-
-# initial perturbation amplitude
-psi0 = 0.03*domain_height
 
 # discretization parameters
 dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
-volume = dx*dx
-hdx = 1.3
+hdx = 2.0
 h0 = hdx * dx
 rho0 = 1000.0
-c0 = 10.0
+c0 = 20.0
 p0 = c0*c0*rho0
-nu = 1.0/rho0
+nu = 0.01
 
 # time steps
-tf = 3.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
+tf = 5*dt
 
-def create_particles(**kwargs):
-    x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
-    x = x.ravel(); y = y.ravel()
+# SPH kernel
+kernel = WendlandQuintic(dim=2)
+#kernel = CubicSpline(dim=2)
+#kernel = Gaussian(dim=2)
+
+def create_particles(hcp=False, **kwargs):
+    if hcp:
+        data = ud.uniform_distribution_hcp2D(
+            dx, 0, domain_width, 0, domain_height, adjust=True)
+        x, y = data[0], data[1]
+
+        wij_sum_estimate = ud.get_number_density_hcp(dx, dy, kernel, h0)
+        volume = 1./wij_sum_estimate
+
+    else:
+        x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
+        x = x.ravel(); y = y.ravel()
+        volume = dx*dx
 
     m = numpy.ones_like(x) * volume * rho0
     rho = numpy.ones_like(x) * rho0
@@ -103,8 +117,12 @@ def create_particles(**kwargs):
         # imposed accelerations on the solid wall
         'ax', 'ay', 'az', 'wij', 
        
-        # velocity of magnitude squared
+        # velocity of magnitude squared needed for TVF
         'vmag2',
+
+        # variable to indicate reliable normals and normalizing
+        # constant
+        'N', 'wij_sum'
         
         ]
 
@@ -113,17 +131,17 @@ def create_particles(**kwargs):
         name='fluid', x=x, y=y, h=h, m=m, rho=rho, cs=cs, 
         additional_props=additional_props)
 
-    # set the color of the inner square
+    # set the color of the inner circle
     for i in range(x.size):
-        if ( (fluid.x[i] > 0.35) and (fluid.x[i] < 0.65) ):
-            if ( (fluid.y[i] > 0.35) and (fluid.y[i] < 0.65) ):
-                fluid.color[i] = 1.0
+        if ( ((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) < 0.25**2 ):
+            fluid.color[i] = 1.0
                 
     # particle volume
     fluid.V[:] = 1./volume
 
     # set additional output arrays for the fluid
-    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta'])
+    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta', 'p', 
+                             'kappa', 'N'])
     
     print "2D Square droplet deformation with %d fluid particles"%(
             fluid.get_number_of_particles())
@@ -137,11 +155,6 @@ domain = DomainManager(
 
 # Create the application.
 app = Application(domain=domain)
-
-# Create the kernel
-kernel = WendlandQuintic(dim=2)
-#kernel = CubicSpline(dim=2)
-#kernel = Gaussian(dim=2)
 
 # Create the Integrator.
 integrator = PECIntegrator( fluid=TransportVelocityStep() )
@@ -158,9 +171,7 @@ equations = [
             ] ),
     
     # Given the updated number density for the fluid, we can update
-    # the fluid pressure. Additionally, we can compute the Shepard
-    # Filtered velocity required for the no-penetration boundary
-    # condition.
+    # the fluid pressure.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
             ] ),
@@ -179,14 +190,16 @@ equations = [
     # interface normals and the discretized dirac delta function for
     # the fluid-fluid interface.
     Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid']),
+            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
+                                            epsilon=0.01/h0),
             ], 
           ),
 
     # Compute the interface curvature using the modified smoothing
     # length and interface normals computed in the previous Group.
     Group(equations=[
-            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
+            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
+                                                with_morris_correction=True),
             ], ),
 
     # Now rescale the smoothing length to the original value for the
@@ -204,11 +217,7 @@ equations = [
         equations=[
 
             # Gradient of pressure for the fluid phase using the
-            # number density formulation. No penetration boundary
-            # condition using Adami et al's generalized wall boundary
-            # condition. The extrapolated pressure and density on the
-            # wall particles is used in the gradient of pressure to
-            # simulate a repulsive force.
+            # number density formulation.
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid'], pb=p0),
 
