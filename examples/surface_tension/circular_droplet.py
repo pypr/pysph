@@ -1,4 +1,4 @@
-"""Deformation of a square droplet"""
+"""Curvature computation for a circular droplet"""
 
 import numpy
 from numpy import sin, cos, pi
@@ -47,11 +47,6 @@ rho2 = 1*rho1
 U = 0.5
 sigma = 1.0
 
-# set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
-# interface. Larger values result in a thick interface.
-factor1 = 1.0
-factor2 = 1./factor1
-
 # discretization parameters
 dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
@@ -61,6 +56,15 @@ rho0 = 1000.0
 c0 = 20.0
 p0 = c0*c0*rho0
 nu = 0.01
+
+# set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
+# interface. Larger values result in a thick interface. Set factor1 =
+# 1 for the Morris Method I
+factor1 = 1.0
+factor2 = 1./factor1
+
+# correction factor for Morris's Method I. Set with_morris_correction
+# to True when using this correction.
 epsilon = 0.01/h0
 
 # time steps
