@@ -102,7 +102,7 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         \nabla_a W_{ab}
 
     """
-    def __init__(self, dest, sources=None, with_morris_correction=True):
+    def __init__(self, dest, sources=None, with_morris_correction=False):
         self.with_morris_correction = with_morris_correction
         super(InterfaceCurvatureFromNumberDensity,self).__init__(dest, sources)
 

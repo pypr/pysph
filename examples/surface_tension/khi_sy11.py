@@ -101,6 +101,10 @@ def create_particles(**kwargs):
        
         # velocity of magnitude squared
         'vmag2',
+
+        # variable to indicate reliable normals and normalizing
+        # constant
+        'N', 'wij_sum',
         
         ]
 
