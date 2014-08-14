@@ -18,7 +18,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, SolidWallPressureB
 # Surface tension equations
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor
 
 # PySPH solver and application
 from pysph.solver.application import Application
@@ -82,7 +83,7 @@ def create_particles(**kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -180,9 +181,11 @@ equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we compute the gradient of the
     # color function with respect to the original smoothing
-    # length. This will compute the interface normals.
+    # length. This will compute the interface normals. Also compute
+    # the smoothed color based on the color index for a particle.
     Group(equations=[
             IsothermalEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'] ),
             ] ),
 
     #################################################################

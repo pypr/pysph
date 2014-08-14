@@ -4,7 +4,6 @@ import numpy
 from numpy import sin, cos, pi
 
 # Particle generator
-import pysph.tools.uniform_distribution as ud
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
 
@@ -18,7 +17,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -61,6 +61,7 @@ rho0 = 1000.0
 c0 = 20.0
 p0 = c0*c0*rho0
 nu = 0.01
+epsilon = 0.01/h0
 
 # time steps
 dt_cfl = 0.25 * h0/( 1.1*c0 )
@@ -75,15 +76,17 @@ kernel = WendlandQuintic(dim=2)
 #kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
-def create_particles(hcp=False, **kwargs):
-    if hcp:
-        data = ud.uniform_distribution_hcp2D(
-            dx, 0, domain_width, 0, domain_height, adjust=True)
-        x, y = data[0], data[1]
+def create_particles(staggered=True, **kwargs):
+    if staggered:
+        x1, y1 = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
+        x2, y2 = numpy.mgrid[ dx:domain_width:dx, dy:domain_height:dy ]
 
-        wij_sum_estimate = ud.get_number_density_hcp(dx, dy, kernel, h0)
-        volume = 1./wij_sum_estimate
-
+        x1 = x1.ravel(); y1 = y1.ravel()
+        x2 = x2.ravel(); y2 = y2.ravel()
+        
+        x = numpy.concatenate( [x1, x2] )
+        y = numpy.concatenate( [y1, y2] )
+        volume = dx*dx/2
     else:
         x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
         x = x.ravel(); y = y.ravel()
@@ -100,7 +103,7 @@ def create_particles(hcp=False, **kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -122,7 +125,7 @@ def create_particles(hcp=False, **kwargs):
 
         # variable to indicate reliable normals and normalizing
         # constant
-        'N', 'wij_sum'
+        'N', 'wij_sum'        
         
         ]
 
@@ -133,7 +136,7 @@ def create_particles(hcp=False, **kwargs):
 
     # set the color of the inner circle
     for i in range(x.size):
-        if ( ((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) < 0.25**2 ):
+        if ( ((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) <= 0.25**2 ):
             fluid.color[i] = 1.0
                 
     # particle volume
@@ -141,9 +144,9 @@ def create_particles(hcp=False, **kwargs):
 
     # set additional output arrays for the fluid
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta', 'p', 
-                             'kappa', 'N'])
+                             'kappa', 'N', 'scolor'])
     
-    print "2D Square droplet deformation with %d fluid particles"%(
+    print "2D Circular droplet deformation with %d fluid particles"%(
             fluid.get_number_of_particles())
 
     return [fluid,]
@@ -167,13 +170,15 @@ equations = [
     # number density (1/volume) is explicitly set for the solid phase
     # and this isn't modified for the simulation.
     Group(equations=[
-            SummationDensity( dest='fluid', sources=['fluid'] )
+            SummationDensity( dest='fluid', sources=['fluid'] ),
             ] ),
     
     # Given the updated number density for the fluid, we can update
-    # the fluid pressure.
+    # the fluid pressure. Also compute the smoothed color based on the
+    # color index for a particle.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
             ] ),
 
     #################################################################
@@ -191,7 +196,7 @@ equations = [
     # the fluid-fluid interface.
     Group(equations=[
             ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
-                                            epsilon=0.01/h0),
+                                            epsilon=epsilon),
             ], 
           ),
 
@@ -237,7 +242,7 @@ equations = [
 # Create a solver.
 solver = Solver(
     kernel=kernel, dim=dim, integrator=integrator,
-    dt=dt, tf=tf, adaptive_timestep=False)
+    dt=dt, tf=tf, adaptive_timestep=False, pfreq=1)
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,

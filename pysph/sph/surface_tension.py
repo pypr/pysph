@@ -14,8 +14,37 @@ from pysph.sph.equation import Equation
 
 from math import sqrt
 
+class SmoothedColor(Equation):
+    r"""Smoothed color function. Eq. (17) in [JM00]
+
+    .. math::
+    
+        c_a = \sum_b \frac{m_b}{\rho_b} c_b^i \nabla_a W_{ab}\,,
+
+    where, :math:`c_b^i` is the color index associated with a
+    particle.
+
+    """
+    def __init__(self, dest, sources=None, smooth=False):
+        self.smooth = smooth
+        super(SmoothedColor, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_scolor):
+        d_scolor[d_idx]  = 0.0
+
+    def loop(self, d_idx, s_idx, d_rho, s_rho, s_m,
+             s_color, d_scolor, WIJ):
+
+        # Smoothed color Eq. (17) in [JM00]
+        d_scolor[d_idx] += s_m[s_idx]/s_rho[s_idx] * s_color[s_idx] * WIJ
+
+    def post_loop(self, d_idx, d_color, d_scolor):
+        # overwrite the smoothed color if not needed
+        if not self.smooth:
+            d_scolor[d_idx] = d_color[d_idx]
+
 class ColorGradientUsingNumberDensity(Equation):
-    """Gradient of the color function using Eq. (13) of [SY11]:
+    r"""Gradient of the color function using Eq. (13) of [SY11]:
 
     .. math::
 
@@ -54,14 +83,14 @@ class ColorGradientUsingNumberDensity(Equation):
         # reliability indicator for normals
         d_N[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
+    def loop(self, d_idx, s_idx, d_scolor, s_scolor, d_cx, d_cy, d_cz,
              d_V, s_V, DWIJ):
         
         # average particle volume
         psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
 
         # difference in color divided by psiab. Eq. (13) in [SY11]
-        Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
+        Cba = (s_scolor[s_idx] - d_scolor[d_idx]) * psiab1
         
         # color gradient
         d_cx[d_idx] += Cba * DWIJ[0]
@@ -93,7 +122,7 @@ class ColorGradientUsingNumberDensity(Equation):
             d_ddelta[d_idx] = 1./mod_gradc
 
 class InterfaceCurvatureFromNumberDensity(Equation):
-    """Interface curvature using number density. Eq. (15) in [SY11]:
+    r"""Interface curvature using number density. Eq. (15) in [SY11]:
 
     .. math::
 
@@ -137,7 +166,7 @@ class InterfaceCurvatureFromNumberDensity(Equation):
                 d_kappa[d_idx] /= d_wij_sum[d_idx]
 
 class ShadlooYildizSurfaceTensionForce(Equation):
-    """Acceleration due to surface tension force Eq. (7,9) in [SY11]:
+    r"""Acceleration due to surface tension force Eq. (7,9) in [SY11]:
 
     .. math:
 

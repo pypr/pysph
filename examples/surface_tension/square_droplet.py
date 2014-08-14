@@ -16,7 +16,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -86,7 +87,7 @@ def create_particles(**kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -128,7 +129,7 @@ def create_particles(**kwargs):
 
     # set additional output arrays for the fluid
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
-                             'kappa', 'N'])
+                             'kappa', 'N', 'scolor'])
     
     print "2D Square droplet deformation with %d fluid particles"%(
             fluid.get_number_of_particles())
@@ -165,9 +166,11 @@ equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we can compute the Shepard
     # Filtered velocity required for the no-penetration boundary
-    # condition.
+    # condition. Also compute the smoothed color based on the color
+    # index for a particle.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
             ] ),
 
     #################################################################
