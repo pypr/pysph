@@ -284,7 +284,7 @@ class SY11DiracDelta(Equation):
     """
     def __init__(self, dest, sources=None, epsilon=1e-6):
         self.epsilon2 = epsilon*epsilon
-        super(SY11ColorGradient, self).__init__(dest, sources)
+        super(SY11DiracDelta, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_cx, d_cy, d_cz, d_ddelta):
         # color gradient

@@ -18,7 +18,7 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
 from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
     ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
     SmoothedColor, AdamiColorGradient, MorrisColorGradient, SY11ColorGradient, \
-    AdamiReproducingDivergence    
+    SY11DiracDelta, AdamiReproducingDivergence
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -163,9 +163,11 @@ sy11_equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we can compute the Shepard
     # Filtered velocity required for the no-penetration boundary
-    # condition.
+    # condition. Also compute the gradient of the color function to
+    # compute the normal at the interface.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            SY11ColorGradient(dest='fluid', sources=['fluid'])
             ] ),
 
     #################################################################
@@ -177,12 +179,10 @@ sy11_equations = [
             ScaleSmoothingLength(dest='fluid', sources=None, factor=factor1)
             ], update_nnps=False ),
 
-    # Compute the gradient of the color function with respect to the
-    # new smoothing length. At the end of this Group, we will have the
-    # interface normals and the discretized dirac delta function for
-    # the fluid-fluid interface.
+    # Compute the discretized dirac delta with respect to the new
+    # smoothing length.
     Group(equations=[
-            SY11ColorGradient(dest='fluid', sources=['fluid'])
+            SY11DiracDelta(dest='fluid', sources=['fluid'])
             ], 
           ),
 
