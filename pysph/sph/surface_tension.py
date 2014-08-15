@@ -9,6 +9,10 @@ for example in KHI simulations. The references are as under:
  - Joseph P. Morris "Simulating surface tension with smoothed particle
    hydrodynamics", JCP, 2000, 33, pp 333--353 [JM00]
 
+ - Adami et al. "A new surface-tension formulation for multi-phase SPH
+   using a reproducing divergence approximation", JCP 2010, 229, pp
+   5011--5021 [A10]
+
 """
 from pysph.sph.equation import Equation
 
@@ -121,6 +125,204 @@ class ColorGradientUsingNumberDensity(Equation):
             # discretized Dirac Delta function
             d_ddelta[d_idx] = 1./mod_gradc
 
+class MorrisColorGradient(Equation):
+    r"""Gradient of the color function using Eq. (17) of [JM00]:
+
+    .. math::
+
+        \nabla c_a = \sum_b \frac{m_b}{\rho_b}(c_b - c_a) \nabla_{a}
+        W_{ab}\,,
+
+    where a smoothed representation of the color is used in the
+    equation. Using the gradient of the color function, the normal and
+    discretized dirac delta is calculated in the post loop.
+    
+    Singularities are avoided as per the recommendation by [JM00] (see eqs
+    20 & 21) using the parameter :math:`\epsilon`
+
+    """
+    def __init__(self, dest, sources=None, epsilon=1e-6):
+        self.epsilon2 = epsilon*epsilon
+        super(MorrisColorGradient, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz,
+                   d_ddelta, d_N):
+
+        # color gradient
+        d_cx[d_idx] = 0.0
+        d_cy[d_idx] = 0.0
+        d_cz[d_idx] = 0.0
+
+        # interface normals
+        d_nx[d_idx] = 0.0
+        d_ny[d_idx] = 0.0
+        d_nz[d_idx] = 0.0
+
+        # reliability indicator for normals and dirac delta
+        d_N[d_idx] = 0.0
+        d_ddelta[d_idx] = 0.0        
+
+    def loop(self, d_idx, s_idx, d_scolor, s_scolor, d_cx, d_cy, d_cz,
+             s_m, s_rho, DWIJ):
+        
+        # Eq. (17) in [JM00]
+        Cba = (s_scolor[s_idx] - d_scolor[d_idx]) * s_m[s_idx]/s_rho[s_idx]
+        
+        # color gradient
+        d_cx[d_idx] += Cba * DWIJ[0]
+        d_cy[d_idx] += Cba * DWIJ[1]
+        d_cz[d_idx] += Cba * DWIJ[2]
+
+    def post_loop(self, d_idx, d_cx, d_cy, d_cz,
+                  d_nx, d_ny, d_nz, d_N, d_ddelta):
+        # absolute value of the color gradient
+        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
+            d_cy[d_idx]*d_cy[d_idx] + \
+            d_cz[d_idx]*d_cz[d_idx]
+
+        # avoid sqrt computations on non-interface particles
+        # (particles for which the color gradient is zero) Eq. (19,
+        # 20) in [JM00]
+        if mod_gradc2 > self.epsilon2:
+            # this normal is reliable in the sense of [JM00]
+            d_N[d_idx] = 1.0
+
+            # compute the normals
+            mod_gradc = 1./sqrt( mod_gradc2 )
+
+            d_nx[d_idx] = d_cx[d_idx] * mod_gradc
+            d_ny[d_idx] = d_cy[d_idx] * mod_gradc
+            d_nz[d_idx] = d_cz[d_idx] * mod_gradc
+
+            # discretized Dirac Delta function
+            d_ddelta[d_idx] = 1./mod_gradc
+
+class SY11ColorGradient(Equation):
+    r"""Gradient of the color function using Eq. (13) of [SY11]:
+
+    .. math::
+
+        \nabla C_a = \sum_b \frac{2 C_b - C_a}{\psi_a + \psi_a}
+        \nabla_{a} W_{ab}
+
+
+    Using the gradient of the color function, the normal and
+    discretized dirac delta is calculated in the post
+    loop. 
+
+    """
+    def __init__(self, dest, sources=None, epsilon=1e-6):
+        self.epsilon2 = epsilon*epsilon
+        super(SY11ColorGradient, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz,
+                   d_ddelta, d_N):
+
+        # color gradient
+        d_cx[d_idx] = 0.0
+        d_cy[d_idx] = 0.0
+        d_cz[d_idx] = 0.0
+
+        # interface normals
+        d_nx[d_idx] = 0.0
+        d_ny[d_idx] = 0.0
+        d_nz[d_idx] = 0.0
+
+        # discretized dirac delta
+        d_ddelta[d_idx] = 0.0
+
+        # reliability indicator for normals
+        d_N[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
+             d_V, s_V, DWIJ):
+        
+        # average particle volume
+        psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
+
+        # difference in color divided by psiab. Eq. (13) in [SY11]
+        Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
+        
+        # color gradient
+        d_cx[d_idx] += Cba * DWIJ[0]
+        d_cy[d_idx] += Cba * DWIJ[1]
+        d_cz[d_idx] += Cba * DWIJ[2]
+
+    def post_loop(self, d_idx, d_cx, d_cy, d_cz,
+                  d_nx, d_ny, d_nz, d_N, d_ddelta):
+        # absolute value of the color gradient
+        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
+            d_cy[d_idx]*d_cy[d_idx] + \
+            d_cz[d_idx]*d_cz[d_idx]
+
+        # avoid sqrt computations on non-interface particles
+        if mod_gradc2 > self.epsilon2:
+            # this normal is reliable in the sense of [JM00]
+            d_N[d_idx] = 1.0
+
+            # compute the normals
+            mod_gradc = 1./sqrt( mod_gradc2 )
+
+            d_nx[d_idx] = d_cx[d_idx] * mod_gradc
+            d_ny[d_idx] = d_cy[d_idx] * mod_gradc
+            d_nz[d_idx] = d_cz[d_idx] * mod_gradc
+
+            # discretized Dirac Delta function
+            d_ddelta[d_idx] = 1./mod_gradc
+
+class SY11DiracDelta(Equation):
+    r"""Discretized dirac-delta for the SY11 formulation Eq. (14) in [SY11]
+
+    This is essentially the same as computing the color gradient, the
+    only difference being that this might be called with a reduced
+    smoothing length.
+
+    Note that the normals should be computed using the
+    SY11ColorGradient equation. This function will effectively
+    overwrite the color gradient.
+
+    """
+    def __init__(self, dest, sources=None, epsilon=1e-6):
+        self.epsilon2 = epsilon*epsilon
+        super(SY11ColorGradient, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_ddelta):
+        # color gradient
+        d_cx[d_idx] = 0.0
+        d_cy[d_idx] = 0.0
+        d_cz[d_idx] = 0.0
+
+        # discretized dirac delta
+        d_ddelta[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_color, s_color, d_cx, d_cy, d_cz,
+             d_V, s_V, DWIJ):
+        
+        # average particle volume
+        psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
+
+        # difference in color divided by psiab. Eq. (13) in [SY11]
+        Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
+        
+        # color gradient
+        d_cx[d_idx] += Cba * DWIJ[0]
+        d_cy[d_idx] += Cba * DWIJ[1]
+        d_cz[d_idx] += Cba * DWIJ[2]
+
+    def post_loop(self, d_idx, d_cx, d_cy, d_cz,
+                  d_nx, d_ny, d_nz, d_N, d_ddelta):
+        # absolute value of the color gradient
+        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
+            d_cy[d_idx]*d_cy[d_idx] + \
+            d_cz[d_idx]*d_cz[d_idx]
+
+        # avoid sqrt computations on non-interface particles
+        if mod_gradc2 > self.epsilon2:
+            mod_gradc = sqrt( mod_gradc2 )
+
+            # discretized Dirac Delta function
+            d_ddelta[d_idx] = mod_gradc
+
 class InterfaceCurvatureFromNumberDensity(Equation):
     r"""Interface curvature using number density. Eq. (15) in [SY11]:
 
@@ -131,8 +333,9 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         \nabla_a W_{ab}
 
     """
-    def __init__(self, dest, sources=None, with_morris_correction=False):
+    def __init__(self, dest, sources=None, with_morris_correction=True):
         self.with_morris_correction = with_morris_correction
+
         super(InterfaceCurvatureFromNumberDensity,self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_kappa, d_wij_sum):
@@ -202,3 +405,147 @@ class ShadlooYildizSurfaceTensionForce(Equation):
         d_au[d_idx] += tmp * d_nx[d_idx]
         d_av[d_idx] += tmp * d_ny[d_idx]
         d_aw[d_idx] += tmp * d_nz[d_idx]
+
+class CSFSurfaceTensionForce(Equation):
+    r"""Acceleration due to surface tension force Eq. (25) in [JM00]:
+
+    .. math:
+
+        \frac{d\boldsymbol{v}_a}{dt} = \frac{1}{rho_a} \sigma_b \kappa_a
+        \boldsymbol{n}_a
+
+    Note that as per Eq. (17) in [JM00], the un-normalized normal is
+    basically the gradient of the color function. The acceleration
+    term therefore depends on the gradient of the color field.
+    
+    """
+    def __init__(self, dest, sources=None, sigma=0.1):
+        self.sigma = sigma
+        
+        # base class initialization
+        super(CSFSurfaceTensionForce, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, d_au, d_av, d_aw, d_kappa,
+             d_cx, d_cy, d_cz, d_rho):
+
+        rhoi = 1./d_rho[d_idx]
+
+        # acceleration per uint mass term Eq. (25) in [JM00]
+        tmp = self.sigma * d_kappa[d_idx] * rhoi
+
+        d_au[d_idx] += tmp * d_cx[d_idx]
+        d_av[d_idx] += tmp * d_cy[d_idx]
+        d_aw[d_idx] += tmp * d_cz[d_idx]
+
+class AdamiColorGradient(Equation):
+    r"""Gradient of color Eq. (14) in [A10]
+
+    .. math::
+
+        \nabla c_a = \frac{1}{V_a}\sum_b \left[V_a^2 + V_b^2
+        \right]\tilde{c}_{ab}\nabla_a W_{ab}\,,
+
+    where, the average :math:`\tilde{c}_{ab}` is defined as
+
+    .. math::
+
+        \tilde{c}_{ab} = \frac{\rho_b}{\rho_a + \rho_b}c_a +
+        \frac{\rho_a}{\rho_a + \rho_b}c_b
+
+    """
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz, d_N):
+        d_cx[d_idx] = 0.0
+        d_cy[d_idx] = 0.0
+        d_cz[d_idx] = 0.0
+
+        d_nx[d_idx] = 0.0
+        d_ny[d_idx] = 0.0
+        d_nz[d_idx] = 0.0
+
+        # reliability indicator for normals
+        d_N[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_V, s_V, d_rho, s_rho, 
+             d_cx, d_cy, d_cz, d_color, s_color, DWIJ):
+
+        # particle volumes
+        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+
+        # averaged particle color
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        rhoij1 = 1./(rhoi + rhoj)
+        
+        # Eq. (15) in [A10]
+        cij = rhoj*rhoij1*d_color[d_idx] + rhoi*rhoij1*s_color[s_idx]
+        
+        # comute the gradient
+        tmp = cij * (Vi2 + Vj2)/Vi
+
+        d_cx[d_idx] += tmp * DWIJ[0]
+        d_cy[d_idx] += tmp * DWIJ[1]
+        d_cz[d_idx] += tmp * DWIJ[2]
+
+    def post_loop(self, d_idx, d_cx, d_cy, d_cz,
+                  d_nx, d_ny, d_nz, d_N):
+        # absolute value of the color gradient
+        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
+            d_cy[d_idx]*d_cy[d_idx] + \
+            d_cz[d_idx]*d_cz[d_idx]
+
+        # avoid sqrt computations on non-interface particles
+        if mod_gradc2 > 1e-14:
+            # this normal is reliable in the sense of [JM00]
+            d_N[d_idx] = 1.0
+
+            # compute the normals
+            mod_gradc = 1./sqrt( mod_gradc2 )
+
+            d_nx[d_idx] = d_cx[d_idx] * mod_gradc
+            d_ny[d_idx] = d_cy[d_idx] * mod_gradc
+            d_nz[d_idx] = d_cz[d_idx] * mod_gradc
+
+class AdamiReproducingDivergence(Equation):
+    r"""Reproducing divergence approximation Eq. (20) in [A10] to
+    compute the curvature
+
+    .. math::
+
+        \nabla \cdot \boldsymbol{\phi}_a = d\frac{\sum_b
+        \boldsymbol{\phi}_{ab}\cdot \nabla_a
+        W_{ab}V_b}{\sum_b\boldsymbol{x}_{ab}\cdot \nabla_a W_{ab} V_b}
+
+    """
+    def __init__(self, dest, sources=None, dim=2):
+        self.dim = dim
+        super(AdamiReproducingDivergence,self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_kappa, d_wij_sum):
+        d_kappa[d_idx] = 0.0
+        d_wij_sum[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_kappa, d_wij_sum, 
+             d_nx, d_ny, d_nz, s_nx, s_ny, s_nz, d_V, s_V,
+             DWIJ, XIJ):
+        # particle volumes
+        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
+        
+        # dot product in the numerator of Eq. (20)
+        nijdotdwij = d_nx[d_idx]*DWIJ[0] + d_ny[d_idx]*DWIJ[1] + d_nz[d_idx]*DWIJ[2]
+        
+        # dot product in the denominator of Eq. (20)
+        xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+        
+        # accumulate the contributions
+        d_kappa[d_idx] += self.dim*nijdotdwij * Vj
+        d_wij_sum[d_idx] += xijdotdwij * Vj
+
+    def post_loop(self, d_idx, d_kappa, d_wij_sum):
+        # normalize the curvature estimate
+        d_kappa[d_idx] /= d_wij_sum[d_idx]

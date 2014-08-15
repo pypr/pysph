@@ -4,7 +4,7 @@ import numpy
 
 # Particle generator
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
+from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
 
 # SPH Equations and Group
 from pysph.sph.equation import Group
@@ -15,9 +15,10 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     SolidWallPressureBC, SolidWallNoSlipBC, ShepardFilteredVelocity, \
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
-from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
-    SmoothedColor
+from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
+    ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
+    SmoothedColor, AdamiColorGradient, MorrisColorGradient, SY11ColorGradient, \
+    AdamiReproducingDivergence    
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -38,11 +39,6 @@ domain_width = 1.0
 domain_height = 1.0
 
 # numerical constants
-wavelength = 1.0
-wavenumber = 2*numpy.pi/wavelength
-rho0 = rho1 = 1000.0
-rho2 = 1*rho1
-U = 0.5
 sigma = 1.0
 
 # set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
@@ -50,22 +46,23 @@ sigma = 1.0
 factor1 = 0.8
 factor2 = 1./factor1
 
-# initial perturbation amplitude
-psi0 = 0.03*domain_height
-
 # discretization parameters
 dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
 volume = dx*dx
-hdx = 1.5
+hdx = 1.3
 h0 = hdx * dx
 rho0 = 1000.0
-c0 = 10.0
+c0 = 20.0
 p0 = c0*c0*rho0
 nu = 1.0/rho0
 
+# correction factor for Morris's Method I. Set with_morris_correction
+# to True when using this correction.
+epsilon = 0.01/h0
+
 # time steps
-tf = 3.0
+tf = 2.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
@@ -129,7 +126,7 @@ def create_particles(**kwargs):
 
     # set additional output arrays for the fluid
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
-                             'kappa', 'N', 'scolor'])
+                             'kappa', 'N', 'scolor', 'p'])
     
     print "2D Square droplet deformation with %d fluid particles"%(
             fluid.get_number_of_particles())
@@ -146,6 +143,7 @@ app = Application(domain=domain)
 
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
+#kernel = QuinticSpline(dim=2)
 #kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
@@ -153,8 +151,7 @@ kernel = WendlandQuintic(dim=2)
 integrator = PECIntegrator( fluid=TransportVelocityStep() )
 
 # create the equations
-equations = [
-
+sy11_equations = [
     # We first compute the mass and number density of the fluid
     # phase. This is used in all force computations henceforth. The
     # number density (1/volume) is explicitly set for the solid phase
@@ -166,11 +163,9 @@ equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we can compute the Shepard
     # Filtered velocity required for the no-penetration boundary
-    # condition. Also compute the smoothed color based on the color
-    # index for a particle.
+    # condition.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
-            SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
             ] ),
 
     #################################################################
@@ -187,8 +182,7 @@ equations = [
     # interface normals and the discretized dirac delta function for
     # the fluid-fluid interface.
     Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'], 
-                                            epsilon=0.01/h0),
+            SY11ColorGradient(dest='fluid', sources=['fluid'])
             ], 
           ),
 
@@ -235,13 +229,133 @@ equations = [
             ], )
     ]
 
+morris_equations = [
+
+    # We first compute the mass and number density of the fluid
+    # phase. This is used in all force computations henceforth. The
+    # number density (1/volume) is explicitly set for the solid phase
+    # and this isn't modified for the simulation.
+    Group(equations=[
+            SummationDensity( dest='fluid', sources=['fluid'] )
+            ] ),
+    
+    # Given the updated number density for the fluid, we can update
+    # the fluid pressure. Additionally, we can compute the Shepard
+    # Filtered velocity required for the no-penetration boundary
+    # condition. Also compute the smoothed color based on the color
+    # index for a particle.
+    Group(equations=[
+            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
+            ] ),
+
+    #################################################################
+    # Begin Surface tension formulation
+    #################################################################
+    # Compute the gradient of the smoothed color field. At the end of
+    # this Group, we will have the interface normals and the
+    # discretized dirac delta function for the fluid-fluid interface.
+    Group(equations=[
+            MorrisColorGradient(dest='fluid', sources=['fluid'], 
+                                epsilon=epsilon),
+            ], 
+          ),
+
+    # Compute the interface curvature computed in the previous Group.
+    Group(equations=[
+            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
+                                                with_morris_correction=True),
+            ], ),
+    #################################################################
+    # End Surface tension formulation
+    #################################################################
+
+    # The main acceleration block
+    Group(
+        equations=[
+
+            # Gradient of pressure for the fluid phase
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid'], pb=p0),
+
+            # Artificial viscosity for the fluid phase.
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+
+            # Surface tension force for the Morris formulation
+            CSFSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                                               
+            ], )
+    ]
+
+adami_equations = [
+
+    # We first compute the mass and number density of the fluid
+    # phase. This is used in all force computations henceforth. The
+    # number density (1/volume) is explicitly set for the solid phase
+    # and this isn't modified for the simulation.
+    Group(equations=[
+            SummationDensity( dest='fluid', sources=['fluid'] )
+            ] ),
+    
+    # Given the updated number density for the fluid, we can update
+    # the fluid pressure. Additionally, we can compute the Shepard
+    # Filtered velocity required for the no-penetration boundary
+    # condition.
+    Group(equations=[
+            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            ] ),
+
+    #################################################################
+    # Begin Surface tension formulation
+    #################################################################
+    # Compute the gradient of the color field.
+    Group(equations=[
+            AdamiColorGradient(dest='fluid', sources=['fluid']),
+            ], 
+          ),
+
+    # Compute the interface curvature using the color gradients
+    # computed in the previous Group.
+    Group(equations=[
+            AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
+                                       dim=2),
+            ], ),
+    #################################################################
+    # End Surface tension formulation
+    #################################################################
+
+    # The main acceleration block
+    Group(
+        equations=[
+
+            # Gradient of pressure for the fluid phase
+            MomentumEquationPressureGradient(
+                dest='fluid', sources=['fluid'], pb=p0),
+
+            # Artificial viscosity for the fluid phase.
+            MomentumEquationViscosity(
+                dest='fluid', sources=['fluid'], nu=nu),
+
+            # Surface tension force for the CSF formulation
+            CSFSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+
+            # Artificial stress for the fluid phase
+            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                                               
+            ], )
+    ]
+
 # Create a solver.
 solver = Solver(
     kernel=kernel, dim=dim, integrator=integrator,
     dt=dt, tf=tf, adaptive_timestep=False)
 
 # Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
+app.setup(solver=solver, equations=morris_equations,
           particle_factory=create_particles)
 
 app.run()
