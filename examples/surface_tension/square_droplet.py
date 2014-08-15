@@ -314,7 +314,8 @@ adami_equations = [
     #################################################################
     # Compute the gradient of the color field.
     Group(equations=[
-            AdamiColorGradient(dest='fluid', sources=['fluid']),
+            SY11ColorGradient(dest='fluid', sources=['fluid']),
+            #AdamiColorGradient(dest='fluid', sources=['fluid']),
             ], 
           ),
 

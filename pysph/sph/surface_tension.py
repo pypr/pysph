@@ -532,20 +532,24 @@ class AdamiReproducingDivergence(Equation):
 
     def loop(self, d_idx, s_idx, d_kappa, d_wij_sum, 
              d_nx, d_ny, d_nz, s_nx, s_ny, s_nz, d_V, s_V,
-             DWIJ, XIJ):
+             DWIJ, XIJ, RIJ, EPS):
         # particle volumes
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         
         # dot product in the numerator of Eq. (20)
-        nijdotdwij = d_nx[d_idx]*DWIJ[0] + d_ny[d_idx]*DWIJ[1] + d_nz[d_idx]*DWIJ[2]
+        nijdotdwij = (d_nx[d_idx] - s_nx[s_idx]) * DWIJ[0] + \
+            (d_ny[d_idx] - s_ny[s_idx]) * DWIJ[1] + \
+            (d_nz[d_idx] - s_nz[s_idx]) * DWIJ[2]
         
         # dot product in the denominator of Eq. (20)
         xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+        xijdotdwij /= (RIJ + EPS)
         
         # accumulate the contributions
-        d_kappa[d_idx] += self.dim*nijdotdwij * Vj
-        d_wij_sum[d_idx] += xijdotdwij * Vj
+        d_kappa[d_idx] += nijdotdwij * Vj
+        d_wij_sum[d_idx] += RIJ * xijdotdwij * Vj
 
     def post_loop(self, d_idx, d_kappa, d_wij_sum):
         # normalize the curvature estimate
         d_kappa[d_idx] /= d_wij_sum[d_idx]
+        d_kappa[d_idx] *= self.dim
