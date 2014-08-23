@@ -18,7 +18,7 @@ from time import time
 
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_wcsph
-from pysph.base.kernels import CubicSpline, Gaussian
+from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline, WendlandQuintic
 from pyzoltan.core.carray import LongArray
 
 # PySPH solver and integrator
@@ -107,8 +107,10 @@ app = Application()
 
 # Set the SPH kernel. The spline based kernels are much more efficient
 #(but less accurate) than the Gaussian
-kernel = CubicSpline(dim=2)
-#kernel = Gaussian(dim=2)
+#kernel = CubicSpline(dim=2)
+kernel = Gaussian(dim=2)
+#kernel = QuinticSpline(dim=2)
+#kernel = WendlandQuintic(dim=2)
 
 # Create the Integrator. Currently, PySPH supports multi-step  style
 # integrators.  Predict-Correct-Evaluate (PEC) and

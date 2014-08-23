@@ -17,9 +17,8 @@ This tutorial illustrates the following:
 # PySPH imports
 from pyzoltan.core.carray import UIntArray
 from pysph.base import utils
-from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import DomainManager, LinkedListNNPS
-from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline
+from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline, WendlandQuintic
 from pysph.tools.uniform_distribution import uniform_distribution_cubic2D, \
     uniform_distribution_hcp2D, get_number_density_hcp
 
@@ -42,9 +41,10 @@ x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution_hcp2D(
     dx, xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0, adjust=True)
 
 # SPH kernel
-k = CubicSpline(dim=2)
+#k = CubicSpline(dim=2)
 #k = Gaussian(dim=2)
 #k = QuinticSpline(dim=2)
+k = WendlandQuintic(dim=2)
 
 # for the hexagonal particle spacing, dx*dy is only an approximate
 # expression for the particle volume. As far as the summation density
