@@ -1,11 +1,18 @@
-"""Curvature computation for a circular droplet"""
+r"""Curvature computation for a circular droplet
+
+For particles distributed in a box, an initial circular interface is
+distinguished by coloring the particles within a circle. The resulting
+equations can then be used to check for the numerical curvature and
+discretized dirac-delta function based on this artificial interface.
+
+"""
 
 import numpy
 from numpy import sin, cos, pi
 
 # Particle generator
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
+from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
 
 # SPH Equations and Group
 from pysph.sph.equation import Group
@@ -37,7 +44,6 @@ from pysph.base.nnps import DomainManager
 dim = 2
 domain_width = 1.0
 domain_height = 1.0
-radial = False
 
 # numerical constants
 wavelength = 1.0
@@ -77,6 +83,7 @@ tf = 5*dt
 
 # SPH kernel
 kernel = WendlandQuintic(dim=2)
+#kernel = QuinticSpline(dim=2)
 #kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 

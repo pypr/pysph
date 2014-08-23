@@ -1,5 +1,47 @@
-"""Deformation of a square droplet"""
+r"""Deformation of a square droplet. 
 
+ 
+_______________________________
+|                             |
+|                             |
+|              0              |
+|                             |
+|        ___________          |
+|        |         |          |
+|        |    1    |          |
+|        |         |          |
+|        |_________|          |
+|                             |
+|                             |
+|                             |
+|                             |
+|_____________________________|
+
+
+
+Initially, two two fluids of the same density are distinguished by a
+color index assigned to them and allowed to settle under the effects
+of surface tension. It is expected that the surface tension at the
+interface between the two fluids deforms the initially square droplet
+into a cirular droplet to minimize the interface area/length.
+
+The references for this problem are 
+
+ - J. Morris "Simulating surface tension with smoothed particle
+   hydrodynamics", 2000, IJNMF, 33, pp 333--353 [JM00]
+
+ - S. Adami, X.Y. Hu, N.A. Adams "A new surface tension formulation
+   for multi-phase SPH using a reproducing divergence approximation",
+   2010, JCP, 229, pp 5011--5021 [AHA10]
+
+ - M. S. Shadloo, M. Yildiz "Numerical modelling of Kelvin-Helmholtz
+   instability using smoothed particle hydrodynamics", IJNME, 2011,
+   87, pp 988--1006 [SY11]
+
+The surface-tension model used currently is the CSF model based on
+interface curvature and normals computed from the color function.
+
+"""
 import numpy
 
 # Particle generator
