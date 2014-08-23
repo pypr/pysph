@@ -18,14 +18,14 @@ from time import time
 
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_wcsph
-from pysph.base.kernels import CubicSpline, Gaussian
+from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline
 from pyzoltan.core.carray import LongArray
 
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import WCSPHStep
+from pysph.sph.integrator import EPECIntegrator, PECIntegrator, TVDRK3Integrator
+from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
 
 # PySPH sph imports
 from pysph.sph.equation import Group
@@ -109,12 +109,14 @@ app = Application()
 #(but less accurate) than the Gaussian
 kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
+#kernel = QuinticSpline(dim=2)
 
-# Create the Integrator. Currently, PySPH supports multi-step  style
-# integrators.  Predict-Correct-Evaluate (PEC) and
-# Evaluate-Predict-Evaluate-Correct (EPEC) are available. The default faster
-# mode is PEC  which requies one less force  evaluation per iteration.
-integrator = PECIntegrator(fluid=WCSPHStep())
+# Create the Integrator. Currently, PySPH supports multi-stage,
+# predictor corrector and a TVD-RK3 integrators.
+
+#integrator = PECIntegrator(fluid=WCSPHStep()) 
+#integrator = EPECIntegrator(fluid=WCSPHStep())
+integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
 
 # Construct the solver. tdamp determines the time until which smaller
 # time-steps are used when using adaptive time-steps. Use the tdamp
