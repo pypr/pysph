@@ -458,7 +458,7 @@ class AdamiColorGradient(Equation):
         \frac{\rho_a}{\rho_a + \rho_b}c_b
 
     """
-    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz, d_N):
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz, d_ddelta, d_N):
         d_cx[d_idx] = 0.0
         d_cy[d_idx] = 0.0
         d_cz[d_idx] = 0.0
@@ -469,6 +469,9 @@ class AdamiColorGradient(Equation):
 
         # reliability indicator for normals
         d_N[d_idx] = 0.0
+
+        # Discretized dirac-delta
+        d_ddelta[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_V, s_V, d_rho, s_rho, 
              d_cx, d_cy, d_cz, d_color, s_color, DWIJ):
@@ -493,14 +496,14 @@ class AdamiColorGradient(Equation):
         d_cz[d_idx] += tmp * DWIJ[2]
 
     def post_loop(self, d_idx, d_cx, d_cy, d_cz,
-                  d_nx, d_ny, d_nz, d_N):
+                  d_nx, d_ny, d_nz, d_ddelta, d_N):
         # absolute value of the color gradient
         mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + \
             d_cy[d_idx]*d_cy[d_idx] + \
             d_cz[d_idx]*d_cz[d_idx]
 
         # avoid sqrt computations on non-interface particles
-        if mod_gradc2 > 1e-14:
+        if mod_gradc2 > 1e-6:
             # this normal is reliable in the sense of [JM00]
             d_N[d_idx] = 1.0
 
@@ -511,6 +514,11 @@ class AdamiColorGradient(Equation):
             d_ny[d_idx] = d_cy[d_idx] * mod_gradc
             d_nz[d_idx] = d_cz[d_idx] * mod_gradc
 
+            # discretized dirac delta
+            d_ddelta[d_idx] = 1./mod_gradc
+
+# FIXME: The implementation based on the formulation presented in
+# [A10] seems to be incorrect.
 class AdamiReproducingDivergence(Equation):
     r"""Reproducing divergence approximation Eq. (20) in [A10] to
     compute the curvature

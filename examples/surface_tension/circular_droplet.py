@@ -25,7 +25,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
     InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
-    SmoothedColor
+    SmoothedColor, AdamiColorGradient, AdamiReproducingDivergence,\
+    MorrisColorGradient
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -56,7 +57,7 @@ sigma = 1.0
 # discretization parameters
 dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
-hdx = 2.0
+hdx = 1.5
 h0 = hdx * dx
 rho0 = 1000.0
 c0 = 20.0
@@ -82,8 +83,8 @@ dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
 tf = 5*dt
 
 # SPH kernel
-kernel = WendlandQuintic(dim=2)
-#kernel = QuinticSpline(dim=2)
+#kernel = WendlandQuintic(dim=2)
+kernel = QuinticSpline(dim=2)
 #kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
@@ -206,8 +207,10 @@ equations = [
     # interface normals and the discretized dirac delta function for
     # the fluid-fluid interface.
     Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
-                                            epsilon=epsilon),
+            MorrisColorGradient(dest='fluid', sources=['fluid'], epsilon=0.01/h0),
+            #ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
+            #                                epsilon=epsilon),
+            #AdamiColorGradient(dest='fluid', sources=['fluid']),
             ], 
           ),
 
@@ -216,6 +219,8 @@ equations = [
     Group(equations=[
             InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
                                                 with_morris_correction=True),
+            #AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
+            #                           dim=2),
             ], ),
 
     # Now rescale the smoothing length to the original value for the
