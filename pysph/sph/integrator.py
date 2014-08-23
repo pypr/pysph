@@ -219,7 +219,6 @@ class PECIntegrator(Integrator):
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
 
-
 ###############################################################################
 # `EPECIntegrator` class
 ###############################################################################
@@ -272,3 +271,37 @@ class EPECIntegrator(Integrator):
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
+
+###############################################################################
+# `TVDRK3Integrator` class
+###############################################################################
+class TVDRK3Integrator(Integrator):
+    r"""
+    In the TVD-RK3 integrator, the system is advanced using:
+
+    .. math::
+
+        y^{n + \frac{1}{3}} = y^n + \Delta t F( y^n )
+
+        y^{n + \frac{2}{3}} = \frac{3}{4}y^n + \frac{1}{4}(y^{n + \frac{1}{3}} + \Delta t F(y^{n + \frac{1}{3}}))
+
+        y^{n + 1} = \frac{1}{3}y^n + \frac{2}{3}(y^{n + \frac{2}{3}} + \Delta t F(y^{n + \frac{2}{3}}))
+
+    """
+    def one_timestep(self, t, dt):
+        self.initialize()
+
+        # stage 1
+        self.compute_accelerations()
+        self.stage1()
+        self.do_post_stage(1./3*dt, 1)
+
+        # stage 2
+        self.compute_accelerations()
+        self.stage2()
+        self.do_post_stage(2./3*dt, 2)
+
+        # stage 3 and end
+        self.compute_accelerations()
+        self.stage3()
+        self.do_post_stage(dt, 3)
