@@ -62,7 +62,7 @@ nu = 1.0/rho0
 epsilon = 0.01/h0
 
 # time steps
-tf = 2.0
+tf = 1.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
@@ -142,8 +142,8 @@ domain = DomainManager(
 app = Application(domain=domain)
 
 # Create the kernel
-kernel = WendlandQuintic(dim=2)
-#kernel = QuinticSpline(dim=2)
+#kernel = WendlandQuintic(dim=2)
+kernel = QuinticSpline(dim=2)
 #kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
@@ -314,8 +314,7 @@ adami_equations = [
     #################################################################
     # Compute the gradient of the color field.
     Group(equations=[
-            SY11ColorGradient(dest='fluid', sources=['fluid']),
-            #AdamiColorGradient(dest='fluid', sources=['fluid']),
+            AdamiColorGradient(dest='fluid', sources=['fluid']),
             ], 
           ),
 
