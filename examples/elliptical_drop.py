@@ -18,7 +18,7 @@ from time import time
 
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_wcsph
-from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline
+from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline, WendlandQuintic
 from pyzoltan.core.carray import LongArray
 
 # PySPH solver and integrator
@@ -110,6 +110,7 @@ app = Application()
 kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 #kernel = QuinticSpline(dim=2)
+#kernel = WendlandQuintic(dim=2)
 
 # Create the Integrator. Currently, PySPH supports multi-stage,
 # predictor corrector and a TVD-RK3 integrators.
