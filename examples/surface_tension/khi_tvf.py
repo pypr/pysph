@@ -16,7 +16,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -52,10 +53,10 @@ psi0 = 0.03*domain_height
 
 # discretization parameters
 nghost_layers = 5
-dx = dy = 0.0125
+dx = dy = 0.01
 dxb2 = dyb2 = 0.5 * dx
 volume = dx*dx
-hdx = 1.3
+hdx = 1.5
 h0 = hdx * dx
 rho0 = 1000.0
 c0 = 25.0
@@ -68,7 +69,7 @@ dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
-dt = 0.85 * min(dt_cfl, dt_viscous, dt_force)
+dt = 0.8 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
     ghost_extent = (nghost_layers + 0.5)*dx
@@ -87,7 +88,7 @@ def create_particles(**kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -106,6 +107,10 @@ def create_particles(**kwargs):
        
         # velocity of magnitude squared
         'vmag2',
+
+        # variable to indicate reliable normals and normalizing
+        # constant
+        'N', 'wij_sum',
         
         ]
 
@@ -146,7 +151,8 @@ def create_particles(**kwargs):
     wall.V[:] = 1./volume
 
     # set additional output arrays for the fluid
-    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta'])
+    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
+                             'kappa', 'N', 'p', 'rho'])
     
     print "2D KHI with %d fluid particles and %d wall particles"%(
             fluid.get_number_of_particles(), wall.get_number_of_particles())
@@ -161,8 +167,8 @@ domain = DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
 app = Application(domain=domain)
 
 # Create the kernel
-#kernel = WendlandQuintic(dim=2)
-kernel = CubicSpline(dim=2)
+kernel = WendlandQuintic(dim=2)
+#kernel = CubicSpline(dim=2)
 #kernel = Gaussian(dim=2)
 
 # Create the Integrator.
@@ -182,43 +188,46 @@ tvf_equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we can compute the Shepard
     # Filtered velocity required for the no-penetration boundary
-    # condition.
+    # condition. Also compute the smoothed color based on the color
+    # index for a particle.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
             ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SmoothedColor( dest='fluid', sources=['fluid'] ),
             ] ),
 
     #################################################################
     # Begin Surface tension formulation
     #################################################################
     # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS is updated after this group to get the new
-    # list of neighbors.
+    # quantities. The NNPS need not be updated since the smoothing
+    # length is decreased.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
-            ], update_nnps=True ),
+            ], update_nnps=False ),
 
     # Compute the gradient of the color function with respect to the
     # new smoothing length. At the end of this Group, we will have the
     # interface normals and the discretized dirac delta function for
     # the fluid-fluid interface.
     Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
+            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall'],
+                                            epsilon=0.01/h0),
             ], 
           ),
 
     # Compute the interface curvature using the modified smoothing
     # length and interface normals computed in the previous Group.
     Group(equations=[
-            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
+            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
+                                                with_morris_correction=True),
             ], ),
 
     # Now rescale the smoothing length to the original value for the
-    # rest of the computations. Re-compute NNPS at the end of this
-    # Group since the smoothing lengths are modified.
+    # rest of the computations.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
-            ], update_nnps=True,
+            ], update_nnps=False,
           ),
     #################################################################
     # End Surface tension formulation
