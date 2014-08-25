@@ -60,6 +60,34 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
 
     return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline int get_valid_cell_index(
+    cIntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
+    """Return the flattened index for a valid cell"""
+    cdef int ncx = ncells_per_dim.data[0]
+    cdef int ncy = ncells_per_dim.data[1]
+    cdef int ncz = ncells_per_dim.data[2]
+
+    cdef int cell_index = -1
+
+    # basic test for valid indices.
+    cdef bint is_valid = (cid.x > -1) and (cid.y > -1) and (cid.z > -1)
+    
+    # additional check for 1D.
+    if dim == 1:
+        if ( (cid.y > ncy) or (cid.z > ncz) ):
+            is_valid = False
+
+    # flatten the cell index for valid cells
+    if is_valid:
+        cell_index = flatten(cid, ncells_per_dim, dim)
+        
+        if not (-1 < cell_index < n_cells):
+            cell_index = -1
+            
+    return cell_index
+
 def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
     cdef cIntPoint _cid = cid.data
@@ -1637,26 +1665,25 @@ cdef class LinkedListNNPS(NNPS):
                     cid.z = _cid.z + shifts.data[iz]
 
                     # Only consider valid cell indices
-                    if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
-                        cell_index = flatten( cid, ncells_per_dim, dim )
-                        if -1 < cell_index < n_cells:
+                    cell_index = get_valid_cell_index(cid, ncells_per_dim, dim, n_cells)
+                    if cell_index > -1:
 
-                            # get the first particle and begin iteration
-                            _next = head.data[ cell_index ]
-                            while( _next != UINT_MAX ):
-                                hj2 = radius_scale * s_h.data[_next]
-                                hj2 *= hj2
+                        # get the first particle and begin iteration
+                        _next = head.data[ cell_index ]
+                        while( _next != UINT_MAX ):
+                            hj2 = radius_scale * s_h.data[_next]
+                            hj2 *= hj2
 
-                                xij2 = norm2( s_x.data[_next]-xi.x,
-                                              s_y.data[_next]-xi.y,
-                                              s_z.data[_next]-xi.z )
+                            xij2 = norm2( s_x.data[_next]-xi.x,
+                                          s_y.data[_next]-xi.y,
+                                          s_z.data[_next]-xi.z )
 
-                                # select neighbor
-                                if ( (xij2 < hi2) or (xij2 < hj2) ):
-                                    nbrs.append( _next )
+                            # select neighbor
+                            if ( (xij2 < hi2) or (xij2 < hj2) ):
+                                nbrs.append( _next )
 
-                                # get the 'next' particle in this cell
-                                _next = next.data[_next]
+                            # get the 'next' particle in this cell
+                            _next = next.data[_next]
 
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs):
