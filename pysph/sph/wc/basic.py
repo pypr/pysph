@@ -18,7 +18,7 @@ class TaitEOS(Equation):
 
     """
     def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0, gamma=7.0, p0=0.0):
+                 rho0=1000.0, c0=1.0, gamma=7.0, p0=0.0, niter=2):
         self.rho0 = rho0
         self.rho01 = 1.0/rho0
         self.c0 = c0
@@ -26,6 +26,10 @@ class TaitEOS(Equation):
         self.gamma1 = 0.5*(gamma - 1.0)
         self.B = rho0*c0*c0/gamma
         self.p0 = p0
+        
+        self.citer = 0
+        self.niter = niter
+
         super(TaitEOS, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_p, d_cs):
@@ -34,6 +38,16 @@ class TaitEOS(Equation):
 
         d_p[d_idx] = self.p0 + self.B * (tmp - 1.0)
         d_cs[d_idx] = self.c0 * pow( ratio, self.gamma1 )
+
+    def post_loop(self):
+        self.citer += 1
+
+    def converged(self):
+        if self.citer > self.niter:
+            self.citer = 0
+            return 1
+        else:
+            return -1
 
 class TaitEOSHGCorrection(Equation):
     r"""Tait Equation of state with Hughes and Graham Correction
