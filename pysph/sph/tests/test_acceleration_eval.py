@@ -133,7 +133,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([6., 8., 10., 10., 10., 10., 10., 10.,  8.,  6.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_iterate_iterated_group(self):
@@ -151,5 +151,5 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([6., 8., 10., 10., 10., 10., 10., 10.,  8.,  6.])*4
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*4
         self.assertListEqual(list(pa.u), list(expect))
