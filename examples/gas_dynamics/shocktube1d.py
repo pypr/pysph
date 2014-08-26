@@ -82,8 +82,8 @@ def create_particles(**kwargs):
 
     # thermal energy from the ideal gas EOS
     e = p/(gamma1*rho)
-    
-    fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m)    
+
+    fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
 
     print "2D Shocktube with %d particles"%(fluid.get_number_of_particles())
 
@@ -105,52 +105,73 @@ solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
 # Define the SPH equations
 equations = [
 
-    # Scale smoothing length. Since the particle smoothing lengths are
-    # updated, we need to re-compute the neighbors
+    ################ BEGIN ADAPTIVE DENSITY-H ###################
+    # For the Newton-Raphson, iterative solution for the
+    # density-smoothing length relation, we use place the
+    # SummationDensity Equation in a Group with the iterate argumet
+    # set to True. After this Group, the density and the consitent
+    # smoothing length is available for the particles.
+
     Group(
         equations=[
-            ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0),
-            ], update_nnps=True
+            SummationDensity(dest='fluid', sources=['fluid',], 
+                             k=kernel_factor, density_iterations=True, dim=1, htol=1e-3),
+            ], update_nnps=True, iterate=True, max_iterations=50,
         ),
 
-    # Given the new smoothing lengths and (possibly) new neighbors, we
-    # compute the pilot density.
-    Group(
-        equations=[
-            SummationDensity(dest='fluid', sources=['fluid',]),
-            ], update_nnps=False
-        ),
+    # # # For the GSPH density and smoothing length update algorithm, we
+    # # # first scale the smoothing lengths to get the pilot density
+    # # # estimate. Since the particle smoothing lengths are updated, we
+    # # # need to re-compute the neighbors.
+    
+    # Group( equations=[
+    #        ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0), ],
+    #       update_nnps=True ),
 
-    # Once the pilot density has been computed, we can update the
-    # smoothing length from the new estimate of particle volume. Once
-    # again, the NNPS must be updated to reflect the updated smoothing
-    # lengths
-    Group(
-        equations=[
-            UpdateSmoothingLengthFromVolume(
-                dest='fluid', sources=None, k=kernel_factor, dim=dim),
-            ], update_nnps=True
-        ),
+    # # # Given the new smoothing lengths and (possibly) new neighbors, we
+    # # # compute the pilot density.
 
-    # Now that we have the correct smoothing length, we need to
-    # evaluate the density which will be used in the
-    # accelerations.
-    Group(
-        equations=[
-            SummationDensity(dest='fluid', sources=['fluid',]),
-            ], update_nnps=False
-        ),
+    # Group(
+    #    equations=[
+    #        SummationDensity(dest='fluid', sources=['fluid',]),
+    #        ], update_nnps=False
+    #    ),
 
-    # The equation of state is also done now to update the particle
-    # pressure and sound speeds.
+    # # # Once the pilot density has been computed, we can update the
+    # # # smoothing length from the new estimate of particle volume. Once
+    # # # again, the NNPS must be updated to reflect the updated smoothing
+    # # # lengths
+
+    # Group(
+    #     equations=[
+    #         UpdateSmoothingLengthFromVolume(
+    #             dest='fluid', sources=None, k=kernel_factor, dim=dim),
+    #         ], update_nnps=True
+    #     ),    
+
+    # # # Now that we have the correct smoothing length, we need to
+    # # # evaluate the density which will be used in the
+    # # # accelerations.
+
+    # Group(
+    #    equations=[
+    #        SummationDensity(dest='fluid', sources=['fluid',]),
+    #        ], update_nnps=False
+    #    ),
+
+    ################ END ADAPTIVE DENSITY-H ###################
+
+    # Now that we hav the updated density and smoothing lengths, we
+    # can update the pressure and sound speed with the equation of
+    # state.
+
     Group(
         equations=[
             IdealGasEOS(dest='fluid', sources=None, gamma=gamma),
             ], update_nnps=False
         ),
 
-    # Now that we have the density, pressure and sound speeds, we can
-    # do the main acceleratio block.
+    # We're all set to compute the accelerations now
     Group(
         equations=[
             MPMAccelerations(dest='fluid', sources=['fluid',],
