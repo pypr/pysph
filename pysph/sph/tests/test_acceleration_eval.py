@@ -1,11 +1,21 @@
 
+# Standard library imports.
 import unittest
+
+# Library imports.
+import numpy as np
 
 # Local imports.
 from pysph.base.utils import get_particle_array
-from pysph.sph.equation import Equation
-from pysph.sph.acceleration_eval import check_equation_array_properties
+from pysph.sph.equation import Equation, Group
+from pysph.sph.acceleration_eval import (AccelerationEval,
+    check_equation_array_properties)
 from pysph.sph.basic_equations import SummationDensity
+from pysph.base.kernels import CubicSpline
+from pysph.base.nnps import LinkedListNNPS as NNPS
+from pysph.sph.sph_compiler import SPHCompiler
+
+
 
 class TestEquation(Equation):
     def initialize(self, d_idx, d_rho, d_V):
@@ -66,3 +76,80 @@ class TestCheckEquationArrayProps(unittest.TestCase):
 
         # Then
         check_equation_array_properties(eq, [f, s])
+
+
+class SimpleEquation(Equation):
+    def __init__(self, dest, sources):
+        super(SimpleEquation, self).__init__(dest, sources)
+        self.count = 0
+
+    def loop(self, d_idx, d_au, s_idx, s_m):
+        #print d_idx, s_idx
+        d_au[d_idx] += s_m[s_idx]
+
+    def post_loop(self, d_idx, d_u, d_au):
+        d_u[d_idx] = d_au[d_idx]
+
+    def converged(self):
+        self.count += 1
+        result = self.count - 1
+        if result > 0:
+            # Reset the count for the next loop.
+            self.count = 0
+        return result
+
+
+class TestAccelerationEval1D(unittest.TestCase):
+    def setUp(self):
+        self.dim = 1
+        n = 10
+        dx = 1.0/(n-1)
+        x = np.linspace(0, 1, n)
+        m = np.ones_like(x)
+        h = np.ones_like(x)*dx
+        pa = get_particle_array(name='fluid', x=x, h=h, m=m)
+        self.pa = pa
+
+    def _make_accel_eval(self, equations):
+        arrays = [self.pa]
+        kernel = CubicSpline(dim=self.dim)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel
+        )
+        comp = SPHCompiler(a_eval, integrator=None)
+        comp.compile()
+        nnps = NNPS(dim=kernel.dim, particles=arrays)
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        return a_eval
+
+    def test_should_not_iterate_normal_group(self):
+        # Given
+        pa = self.pa
+        equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([6., 8., 10., 10., 10., 10., 10., 10.,  8.,  6.])
+        self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_iterate_iterated_group(self):
+        # Given
+        pa = self.pa
+        equations = [Group(
+            equations=[SimpleEquation(dest='fluid', sources=['fluid']),
+                       SimpleEquation(dest='fluid', sources=['fluid']),
+                      ],
+            iterate=True
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([6., 8., 10., 10., 10., 10., 10., 10.,  8.,  6.])*4
+        self.assertListEqual(list(pa.u), list(expect))
