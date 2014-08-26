@@ -229,6 +229,11 @@ def get_particle_array_gasd(**props):
         'converged']
 
     pa = get_particle_array( additional_props=required_props, **props )
+    
+    # set the intial smoothing length h0 to the particle smoothing
+    # length. This can result in an annoying error in the density
+    # iterations which require the h0 array
+    pa.h0[:] = pa.h[:]
 
     pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
                            'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh'] )
