@@ -106,10 +106,10 @@ equations = [
 
     ################ BEGIN ADAPTIVE DENSITY-H ###################
     # For the Newton-Raphson, iterative solution for the
-    # density-smoothing length relation, we use place the
-    # SummationDensity Equation in a Group with the iterate argumet
-    # set to True. After this Group, the density and the consitent
-    # smoothing length is available for the particles.
+    # density-smoothing length relation, we place the SummationDensity
+    # Equation in a Group with the iterate argumnet set to True. After
+    # this Group, the density and the consitent smoothing length is
+    # available for the particles.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid',], 

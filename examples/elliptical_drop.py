@@ -140,7 +140,7 @@ equations = [
     # Equation of state: p = f(rho)
     Group(equations=[
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
-            ],),
+            ], real=False),
 
     # Block for the accelerations. Choose between either the Delta-SPH
     # formulation or the standard Monaghan 1994 formulation
@@ -157,7 +157,7 @@ equations = [
             # XSPH velocity correction
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
-            ], iterate=True, update_nnps=True),
+            ],),
 
     # Update smoothing lengths at the end.
     Group( equations=[

@@ -22,9 +22,25 @@ class UpdateSmoothingLengthFromVolume(Equation):
 
 class SummationDensity(Equation):
     def __init__(
-        self, dest, sources=None, dim=2, density_iterations=False, iterate_only_once=False,
-        k=1.2, htol=1e-6):
+        self, dest, sources=None, dim=2, 
+        density_iterations=False, iterate_only_once=False, k=1.2, htol=1e-6):
+        r"""Summation density with iterative solution of the smoothing lengths.
 
+        Parameters:
+        
+        density_iterations : bint
+            Flag to indicate density iterations are required.
+
+        iterate_only_once : bint 
+            Flag to indicate if only one iteration is required
+
+        k : double
+            Kernel scaling factor
+
+        htol : double
+            Iteration tolerance
+
+        """
         self.density_iterations = density_iterations
         self.iterate_only_once = iterate_only_once
         self.dim = dim
