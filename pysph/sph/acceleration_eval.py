@@ -9,6 +9,13 @@ from pysph.sph.equation import Group, get_arrays_used_in_equation
 
 ###############################################################################
 def group_equations(equations):
+    """Checks the given equations and ensures the following:
+
+     - Raises an error if the user  mixes Groups and Equations.
+
+     - If only equations are given as a list, return a single group with all
+       these equations.
+    """
     only_groups = [x for x in equations if isinstance(x, Group)]
     if len(only_groups) > 0 and len(only_groups) != len(equations):
         raise ValueError('All elements must be Groups if you use groups.')
@@ -75,6 +82,9 @@ class AccelerationEval(object):
     # Public interface.
     ##########################################################################
     def compute(self, t, dt):
+        """Compute the accelerations given the current time, t, and the
+        timestep, dt.
+        """
         self.c_acceleration_eval.compute(t, dt)
 
     def set_compiled_object(self, c_acceleration_eval):
@@ -107,6 +117,7 @@ class AccelerationEval(object):
         dests = OrderedDict()
         dests.real = group.real
         dests.update_nnps = group.update_nnps
+        dests.iterate = group.iterate
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.

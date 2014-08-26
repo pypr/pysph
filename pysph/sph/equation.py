@@ -311,8 +311,14 @@ class Equation(object):
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
         self.name = self.__class__.__name__ if name is None else name
+        # The name of the variable used in the compliled AccelerationEval
+        # instance.
         self.var_name = ''
 
+    def converged(self):
+        """Return > 0 to indicate converged iterations and < 0 otherwise.
+        """
+        return 1.0
 
 ###############################################################################
 # `Group` class.
@@ -326,7 +332,7 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True, update_nnps=False):
+    def __init__(self, equations, real=True, update_nnps=False, iterate=False):
         """Constructor.
 
         Parameters
@@ -337,8 +343,12 @@ class Group(object):
         - real: bool: specifies if only non-remote/non-ghost particles should
                       be operated on.
 
-        - update_nnps: bool: specifies if the neighbors should be re-computed 
+        - update_nnps: bool: specifies if the neighbors should be re-computed
                        locally after this group
+
+        - iterate: bool: specifies if the group should continue iterating
+                         until each equation's "converged()" methods returns
+                         with a postive value.
 
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
@@ -351,6 +361,7 @@ class Group(object):
         """
         self.real = real
         self.update_nnps = update_nnps
+        self.iterate = iterate
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
@@ -542,6 +553,14 @@ class Group(object):
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
+
+    def get_converged_condition(self):
+        code = []
+        for equation in self.equations:
+            code.append('(self.%s.converged() > 0)'%equation.var_name)
+        # Note, we use '&' because we want to call converged on all equations.
+        # and not be short-circuited by the first one that returns False.
+        return ' & '.join(code)
 
     def get_equation_wrappers(self):
         classes = defaultdict(lambda: 0)
