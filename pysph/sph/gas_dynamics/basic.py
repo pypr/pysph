@@ -30,7 +30,7 @@ class SummationDensity(Equation):
         d_arho[d_idx]  = 0.0
         
     def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
-             s_m, VIJ, WI, DWI):
+             d_dwdh, s_m, VIJ, WI, DWI, GHI):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
@@ -44,6 +44,9 @@ class SummationDensity(Equation):
         # gradient of density
         d_grhox[d_idx] += mj * DWI[0]
         d_grhoy[d_idx] += mj * DWI[1]
+
+        # gradient of kernel w.r.t h
+        d_dwdh[d_idx] += mj * GHI
 
     def post_loop(self, d_idx, d_arho, d_rho, d_div):
         d_div[d_idx] = -d_arho[d_idx]/d_rho[d_idx]

@@ -222,6 +222,19 @@ def precomputed_symbols():
     c.DWJ = BasicCodeBlock(
                 code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
+
+    c.GHI = BasicCodeBlock(
+                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])", 
+                GHI=0.0)
+
+    c.GHJ = BasicCodeBlock(
+                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])", 
+                GHJ=0.0)
+
+    c.GHIJ= BasicCodeBlock(
+                code="GHIJ = GRADH(XIJ, RIJ, HIJ)", 
+                GHIJ=0.0)
+    
     return c
 
 
@@ -429,9 +442,10 @@ class Group(object):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
             g_func = 'self.kernel.gradient'
+            h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
-            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
+            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func).replace('GRADH', h_func)
         else:
             return code
 

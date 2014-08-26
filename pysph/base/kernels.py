@@ -34,23 +34,17 @@ class CubicSpline(object):
     def get_deltap(self):
         return 2./3
 
-    def _get_factor(self, h1):
-        fac = 0.0
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
         elif self.dim == 2:
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-
-        return fac
-
-    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
-        h1 = 1./h
-        q = rij*h1
-
-        # get the kernel normalizing factor
-        fac = self._get_factor(h1)
         
         tmp2 = 2. - q
         if ( q > 2.0 ):
@@ -68,7 +62,12 @@ class CubicSpline(object):
         q = rij*h1
 
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient.
         tmp2 = 2. - q
@@ -91,7 +90,12 @@ class CubicSpline(object):
         h1 = 1./h; q = rij * h1
         
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # kernel and gradient evaluated at q
         tmp2 = 2. - q
@@ -123,8 +127,11 @@ class WendlandQuintic(object):
     def get_deltap(self):
         return 0.5
 
-    def _get_factor(self, h1):
-        val = 0.0
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1.0/h
+        q = rij*h1
+
+        # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
         elif self.dim == 2:
@@ -132,14 +139,6 @@ class WendlandQuintic(object):
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
 
-        return val
-
-    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
-        h1 = 1.0/h
-        q = rij*h1
-
-        # get the kernel normalizing factor
-        fac = _get_factor(h1)
         val = 0.0
 
         tmp = 1. - 0.5 * q
@@ -153,7 +152,12 @@ class WendlandQuintic(object):
         q = rij*h1
         
         # get the kernel normalizing factor
-        fac = _get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient
         val = 0.0
@@ -169,9 +173,14 @@ class WendlandQuintic(object):
 
     def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h; q = rij*h1
-        
+
         # get the kernel normalizing factor
-        fac = _get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the kernel and gradient at q
         w = 0.0; dw = 0.0
@@ -196,22 +205,17 @@ class Gaussian(object):
     def get_deltap(self):
         return 2.2360679774997898
 
-    def _get_factor(self, h1):
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
         elif self.dim == 2:
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-
-        return fac
-
-    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
-        h1 = 1./h
-        q = rij*h1
-
-        # get the kernel normalizing factor
-        fac = self._get_factor(h1)
         
         val = 0.0
         if ( q < 3.0 ):
@@ -224,7 +228,12 @@ class Gaussian(object):
         q = rij*h1
 
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient
         val = 0.0
@@ -241,7 +250,12 @@ class Gaussian(object):
         h1 = 1./h; q= rij*h1
         
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # kernel and gradient evaluated at q
         w = 0.0; dw = 0.0
@@ -265,20 +279,17 @@ class QuinticSpline(object):
     def get_deltap(self):
         return 1.0
 
-    def _get_factor(self, h1):
-        if self.dim == 1:
-            fac = self.fac * h1
-        if self.dim == 2:
-            fac = self.fac * h1 * h1
-        elif self.dim == 3:
-            fac = self.fac * h1 * h1 * h1
-
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
         q = rij*h1
 
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         tmp3 = 3. - q
         tmp2 = 2. - q
@@ -305,7 +316,12 @@ class QuinticSpline(object):
         q = rij*h1
 
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         tmp3 = 3. - q
         tmp2 = 2. - q
@@ -341,7 +357,12 @@ class QuinticSpline(object):
         h1 = 1./h; q = rij*h1
 
         # get the kernel normalizing factor
-        fac = self._get_factor(h1)
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         tmp3 = 3. - q
         tmp2 = 2. - q
