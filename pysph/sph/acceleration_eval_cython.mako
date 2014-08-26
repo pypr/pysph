@@ -247,7 +247,6 @@ cdef class AccelerationEval:
             % if group.iterate:
             # Check for convergence or timeout
             if ${all_eqs.get_converged_condition()} or (niterations == max_iterations):
-                print 'Converged at', niterations
                 niterations = 0                
                 break
             niterations += 1

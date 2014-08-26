@@ -31,16 +31,16 @@ class SummationDensity(Equation):
         self.k = k
         self.htol = htol
 
-        # by default, we set the has_converged attribute to True. If
+        # by default, we set the equation_has_converged attribute to True. If
         # density_iterations is set to True, we will have at least one
         # iteration to determine the new smoothing lengths since the
         # 'converged' property of the particles is intialized to False
-        self.has_converged = True
+        self.equation_has_converged = 1
 
         super(SummationDensity, self).__init__(dest, sources)
         
     def initialize(
-        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_converged, d_omega):
+        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_omega):
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
         
@@ -48,12 +48,14 @@ class SummationDensity(Equation):
         d_grhoy[d_idx] = 0.0
         d_arho[d_idx]  = 0.0
 
-        # set the initial converged attribute to False
-        d_converged[d_idx] = 0
-
         # Set the default omega to 1.0.
         d_omega[d_idx] = 1.0
-        
+
+        # set the converged attribute for the Equation to True. Within
+        # the post-loop, if any particle hasn't converged, this is set
+        # to False. The Group can therefore iterate till convergence.
+        self.equation_has_converged = 1
+
     def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
              d_dwdh, s_m, VIJ, WI, DWI, GHI):
 
@@ -79,8 +81,6 @@ class SummationDensity(Equation):
         # iteratively find smoothing length consistent with the
         if self.density_iterations:
             if not ( d_converged[d_idx] == 1 ):
-                #print 'Checking convergence for particle ', d_idx
-                
                 # current mass and smoothing length. The initial
                 # smoothing length h0 for this particle must be set
                 # outside the Group (that is, in the integrator)
@@ -91,12 +91,12 @@ class SummationDensity(Equation):
                 rhoi = mi/(hi/self.k)**self.dim
 
                 dhdrhoi = -hi/( self.dim*d_rho[d_idx] )
-                dwdhsumi = d_dwdh[d_idx]
-                omegai = 1.0 - dhdrhoi*dwdhsumi
+                dwdhi = d_dwdh[d_idx]
+                omegai = 1.0 - dhdrhoi*dwdhi
 
-                # This is going in the denominator
-                if omegai < 1e-6:
-                    if ( abs(omegai) == 0 ): omegai = 1.0
+                # correct omegai
+                if omegai < 0:
+                    omegai = 1.0
 
                 # kernel multiplier. These are the multiplicative
                 # pre-factors, or the "grah-h" terms in the
@@ -114,7 +114,7 @@ class SummationDensity(Equation):
                 # Nanny control for h
                 if ( hnew > 1.2 * hi ):
                     hnew = 1.2 * hi
-                if ( hnew < 0.8 * hi ):
+                elif ( hnew < 0.8 * hi ):
                     hnew = 0.8 * hi
                 
                 # overwrite if gone awry
@@ -125,7 +125,11 @@ class SummationDensity(Equation):
                 diff = abs( hnew-hi )/hi0
                 
                 if not ( (diff < self.htol) and (omegai > 0) or self.iterate_only_once):
-                    self.has_converged = False
+                    # this particle hasn't converged. This means the
+                    # entire group must be repeated until this fellow
+                    # has converged, or till the maximum iteration has
+                    # been reached.
+                    self.equation_has_converged = -1
                     
                     # set particle properties for the next
                     # iteration. For the 'converged' array, a value of
@@ -133,7 +137,6 @@ class SummationDensity(Equation):
                     d_h[d_idx] = hnew
                     d_converged[d_idx] = 0
                 else:
-                    #print 'Particle %d has converged'%(d_idx), hi, hi0, hnew, diff
                     d_arho[d_idx] *= d_omega[d_idx]
                     d_ah[d_idx] = d_arho[d_idx] * dhdrhoi
                     d_converged[d_idx] = 1
@@ -142,8 +145,7 @@ class SummationDensity(Equation):
         d_div[d_idx] = -d_arho[d_idx]/d_rho[d_idx]
 
     def converged(self):
-        return self.has_converged
-                    
+        return self.equation_has_converged
 
 class IdealGasEOS(Equation):
     def __init__(self, dest, sources=None, gamma=1.4):
