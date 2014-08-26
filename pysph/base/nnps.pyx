@@ -65,7 +65,6 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
 cdef inline int get_valid_cell_index(
     cIntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
     """Return the flattened index for a valid cell"""
-    cdef int ncx = ncells_per_dim.data[0]
     cdef int ncy = ncells_per_dim.data[1]
     cdef int ncz = ncells_per_dim.data[2]
 
