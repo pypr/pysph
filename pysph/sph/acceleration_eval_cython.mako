@@ -117,6 +117,8 @@ cdef class AccelerationEval:
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         % if group.iterate:
+        cdef int max_iterations = ${group.max_iterations}
+        cdef int niterations = 0
         while True:
         % else:
         if True:
@@ -243,9 +245,13 @@ cdef class AccelerationEval:
             ## Break the iteration for the group.
             #######################################################################
             % if group.iterate:
-            # Check for convergence.
-            if ${all_eqs.get_converged_condition()}:
+            # Check for convergence or timeout
+            if ${all_eqs.get_converged_condition()} or (niterations == max_iterations):
+                print 'Converged at', niterations
+                niterations = 0                
                 break
+            niterations += 1
+            
             % endif
 
         # Group ${g_idx} done.

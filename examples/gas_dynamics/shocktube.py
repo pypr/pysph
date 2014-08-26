@@ -81,7 +81,7 @@ def create_particles(**kwargs):
     # thermal energy from the ideal gas EOS
     e = p/(gamma1*rho)
     
-    fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m)    
+    fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
 
     print "2D Shocktube with %d particles"%(fluid.get_number_of_particles())
 
@@ -104,32 +104,34 @@ solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
 # Define the SPH equations
 equations = [
 
-    # Scale smoothing length. Since the particle smoothing lengths are
-    # updated, we need to re-compute the neighbors
-    Group(
-        equations=[
-            ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0),
-            ], update_nnps=True
-        ),
+    # # Scale smoothing length. Since the particle smoothing lengths are
+    # # updated, we need to re-compute the neighbors
+    # Group(
+    #     equations=[
+    #         ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0),
+    #         ], update_nnps=True
+    #     ),
 
     # Given the new smoothing lengths and (possibly) new neighbors, we
     # compute the pilot density.
     Group(
         equations=[
-            SummationDensity(dest='fluid', sources=['fluid',]),
-            ], update_nnps=False
+            SummationDensity(
+                dest='fluid', sources=['fluid',], 
+                dim=2, density_iterations=True, iterate_only_once=False, k=kernel_factor),
+            ], update_nnps=True, iterate=True, max_iterations=20
         ),
 
-    # Once the pilot density has been computed, we can update the
-    # smoothing length from the new estimate of particle volume. Once
-    # again, the NNPS must be updated to reflect the updated smoothing
-    # lengths
-    Group(
-        equations=[
-            UpdateSmoothingLengthFromVolume(
-                dest='fluid', sources=None, k=kernel_factor, dim=dim),
-            ], update_nnps=True
-        ),
+    # # Once the pilot density has been computed, we can update the
+    # # smoothing length from the new estimate of particle volume. Once
+    # # again, the NNPS must be updated to reflect the updated smoothing
+    # # lengths
+    # Group(
+    #     equations=[
+    #         UpdateSmoothingLengthFromVolume(
+    #             dest='fluid', sources=None, k=kernel_factor, dim=dim),
+    #         ], update_nnps=True
+    #     ),
 
     # Now that we have the correct smoothing length, we need to
     # evaluate the density which will be used in the

@@ -21,13 +21,38 @@ class UpdateSmoothingLengthFromVolume(Equation):
         d_h[d_idx] = self.k * pow( d_m[d_idx]/d_rho[d_idx], self.dim1)
 
 class SummationDensity(Equation):
-    def initialize(self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho):
+    def __init__(
+        self, dest, sources=None, dim=2, density_iterations=False, iterate_only_once=False,
+        k=1.2, htol=1e-6):
+
+        self.density_iterations = density_iterations
+        self.iterate_only_once = iterate_only_once
+        self.dim = dim
+        self.k = k
+        self.htol = htol
+
+        # by default, we set the has_converged attribute to True. If
+        # density_iterations is set to True, we will have at least one
+        # iteration to determine the new smoothing lengths since the
+        # 'converged' property of the particles is intialized to False
+        self.has_converged = True
+
+        super(SummationDensity, self).__init__(dest, sources)
+        
+    def initialize(
+        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_converged, d_omega):
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
         
         d_grhox[d_idx] = 0.0
         d_grhoy[d_idx] = 0.0
         d_arho[d_idx]  = 0.0
+
+        # set the initial converged attribute to False
+        d_converged[d_idx] = 0
+
+        # Set the default omega to 1.0.
+        d_omega[d_idx] = 1.0
         
     def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
              d_dwdh, s_m, VIJ, WI, DWI, GHI):
@@ -48,8 +73,77 @@ class SummationDensity(Equation):
         # gradient of kernel w.r.t h
         d_dwdh[d_idx] += mj * GHI
 
-    def post_loop(self, d_idx, d_arho, d_rho, d_div):
+    def post_loop(self, d_idx, d_arho, d_rho, d_div, d_omega, d_dwdh,
+                  d_h0, d_h, d_m, d_ah, d_converged):
+
+        # iteratively find smoothing length consistent with the
+        if self.density_iterations:
+            if not ( d_converged[d_idx] == 1 ):
+                #print 'Checking convergence for particle ', d_idx
+                
+                # current mass and smoothing length. The initial
+                # smoothing length h0 for this particle must be set
+                # outside the Group (that is, in the integrator)
+                mi = d_m[d_idx]; hi = d_h[d_idx]; hi0 = d_h0[d_idx]
+                
+                # density from the mass, smoothing length and kernel
+                # scale factor
+                rhoi = mi/(hi/self.k)**self.dim
+
+                dhdrhoi = -hi/( self.dim*d_rho[d_idx] )
+                dwdhsumi = d_dwdh[d_idx]
+                omegai = 1.0 - dhdrhoi*dwdhsumi
+
+                # This is going in the denominator
+                if omegai < 1e-6:
+                    if ( abs(omegai) == 0 ): omegai = 1.0
+
+                # kernel multiplier. These are the multiplicative
+                # pre-factors, or the "grah-h" terms in the
+                # equations. Remember that the equations use 1/omega
+                gradhi = 1.0/omegai
+                d_omega[d_idx] = gradhi
+
+                # the non-linear function and it's derivative
+                func = rhoi - d_rho[d_idx]
+                dfdh = omegai/dhdrhoi
+
+                # Newton Raphson estimate for the new h
+                hnew = hi - func/dfdh
+
+                # Nanny control for h
+                if ( hnew > 1.2 * hi ):
+                    hnew = 1.2 * hi
+                if ( hnew < 0.8 * hi ):
+                    hnew = 0.8 * hi
+                
+                # overwrite if gone awry
+                if ( (hnew <= 1e-6) or (gradhi < 1e-6) ):
+                    hnew = self.k * (mi/d_rho[d_idx])**(1./self.dim)
+
+                # check for convergence
+                diff = abs( hnew-hi )/hi0
+                
+                if not ( (diff < self.htol) and (omegai > 0) or self.iterate_only_once):
+                    self.has_converged = False
+                    
+                    # set particle properties for the next
+                    # iteration. For the 'converged' array, a value of
+                    # 0 indicates the particle hasn't converged
+                    d_h[d_idx] = hnew
+                    d_converged[d_idx] = 0
+                else:
+                    #print 'Particle %d has converged'%(d_idx), hi, hi0, hnew, diff
+                    d_arho[d_idx] *= d_omega[d_idx]
+                    d_ah[d_idx] = d_arho[d_idx] * dhdrhoi
+                    d_converged[d_idx] = 1
+
+        # comptue the divergence of velocity
         d_div[d_idx] = -d_arho[d_idx]/d_rho[d_idx]
+
+    def converged(self):
+        return self.has_converged
+                    
 
 class IdealGasEOS(Equation):
     def __init__(self, dest, sources=None, gamma=1.4):

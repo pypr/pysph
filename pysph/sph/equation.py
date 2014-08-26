@@ -345,7 +345,8 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True, update_nnps=False, iterate=False):
+    def __init__(self, equations, real=True, update_nnps=False, iterate=False, 
+                 max_iterations=1):
         """Constructor.
 
         Parameters
@@ -363,6 +364,9 @@ class Group(object):
                          until each equation's "converged()" methods returns
                          with a postive value.
 
+        - max_iterations: int: specifies the maximum number of times this 
+                          group should be iterated
+
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
         in each processor.  This is because we must update the
@@ -374,7 +378,11 @@ class Group(object):
         """
         self.real = real
         self.update_nnps = update_nnps
+
+        # iterative groups
         self.iterate = iterate
+        self.max_iterations = max_iterations
+        
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
