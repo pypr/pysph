@@ -94,6 +94,8 @@ cdef class AccelerationEval:
         cdef double[3] DT_ADAPT
         self._initialize_dt_adapt(DT_ADAPT)
 
+        cdef int max_iterations, _iteration_count
+
         #######################################################################
         ##  Declare all the arrays.
         #######################################################################
@@ -117,6 +119,8 @@ cdef class AccelerationEval:
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         % if group.iterate:
+        max_iterations = ${group.max_iterations}
+        _iteration_count = 0
         while True:
         % else:
         if True:
@@ -243,9 +247,12 @@ cdef class AccelerationEval:
             ## Break the iteration for the group.
             #######################################################################
             % if group.iterate:
-            # Check for convergence.
-            if ${all_eqs.get_converged_condition()}:
+            # Check for convergence or timeout
+            if ${all_eqs.get_converged_condition()} or (_iteration_count == max_iterations):
+                _iteration_count = 0
                 break
+            _iteration_count += 1
+            
             % endif
 
         # Group ${g_idx} done.

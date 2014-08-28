@@ -107,8 +107,8 @@ app = Application()
 
 # Set the SPH kernel. The spline based kernels are much more efficient
 #(but less accurate) than the Gaussian
-kernel = CubicSpline(dim=2)
-#kernel = Gaussian(dim=2)
+#kernel = CubicSpline(dim=2)
+kernel = Gaussian(dim=2)
 #kernel = QuinticSpline(dim=2)
 #kernel = WendlandQuintic(dim=2)
 
@@ -140,7 +140,7 @@ equations = [
     # Equation of state: p = f(rho)
     Group(equations=[
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
-            ], real=False ),
+            ], real=False),
 
     # Block for the accelerations. Choose between either the Delta-SPH
     # formulation or the standard Monaghan 1994 formulation
@@ -157,7 +157,7 @@ equations = [
             # XSPH velocity correction
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
-            ]),
+            ],),
 
     # Update smoothing lengths at the end.
     Group( equations=[
