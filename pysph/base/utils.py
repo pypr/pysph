@@ -224,13 +224,19 @@ def get_particle_array_gasd(**props):
     "Get the particle array with requisite properties for gas-dynamics"
     required_props = [
         'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
-        'au', 'av', 'aw', 'arho', 'ae', 'am', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
-        'rho0', 'e0', 'div', 'grhox', 'grhoy', 'grhoz']
+        'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
+        'rho0', 'e0', 'h0', 'div', 'grhox', 'grhoy', 'grhoz', 'dwdh', 'omega',
+        'converged']
 
     pa = get_particle_array( additional_props=required_props, **props )
     
+    # set the intial smoothing length h0 to the particle smoothing
+    # length. This can result in an annoying error in the density
+    # iterations which require the h0 array
+    pa.h0[:] = pa.h[:]
+
     pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
-                           'au', 'av', 'ae', 'pid', 'gid', 'tag'] )
+                           'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh'] )
 
     return pa
 

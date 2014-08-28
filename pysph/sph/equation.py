@@ -222,6 +222,19 @@ def precomputed_symbols():
     c.DWJ = BasicCodeBlock(
                 code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
+
+    c.GHI = BasicCodeBlock(
+                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])", 
+                GHI=0.0)
+
+    c.GHJ = BasicCodeBlock(
+                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])", 
+                GHJ=0.0)
+
+    c.GHIJ= BasicCodeBlock(
+                code="GHIJ = GRADH(XIJ, RIJ, HIJ)", 
+                GHIJ=0.0)
+    
     return c
 
 
@@ -332,7 +345,8 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True, update_nnps=False, iterate=False):
+    def __init__(self, equations, real=True, update_nnps=False, iterate=False, 
+                 max_iterations=1):
         """Constructor.
 
         Parameters
@@ -350,6 +364,9 @@ class Group(object):
                          until each equation's "converged()" methods returns
                          with a postive value.
 
+        - max_iterations: int: specifies the maximum number of times this 
+                          group should be iterated
+
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
         in each processor.  This is because we must update the
@@ -361,7 +378,11 @@ class Group(object):
         """
         self.real = real
         self.update_nnps = update_nnps
+
+        # iterative groups
         self.iterate = iterate
+        self.max_iterations = max_iterations
+        
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
@@ -429,9 +450,10 @@ class Group(object):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
             g_func = 'self.kernel.gradient'
+            h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
-            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
+            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func).replace('GRADH', h_func)
         else:
             return code
 

@@ -322,6 +322,37 @@ def test_flatten_unflatten():
         # the unflattened index should match with cid
         assert( cid == unflattened )
 
+def test_1D_get_valid_cell_index():
+    dim = 1
+
+    # simulate a dummy distribution such that 10 cells are along the
+    # 'x' direction 
+    n_cells = 10
+    ncells_per_dim = IntArray(3)
+
+    ncells_per_dim[0] = n_cells
+    ncells_per_dim[1] = 0
+    ncells_per_dim[2] = 0
+
+    # target cell
+    cx = 1; cy = cz = 0
+    
+    # as long as cy and cz are 0, the function should return the valid
+    # flattened cell index for the cell
+    for i in [-1, 0, 1]:
+        index = nnps.py_get_valid_cell_index(
+            IntPoint(cx+i, cy, cz), ncells_per_dim, dim, n_cells)
+        assert index != -1
+
+    # index should be -1 whenever cy and cz are > 1. This is
+    # specifically the case that was failing earlier.
+    for j in [-1,  1]:
+        for k in [-1, 1]:
+            index = nnps.py_get_valid_cell_index(
+                IntPoint(cx,cy+j,cz+k), ncells_per_dim, dim, n_cells)
+            assert index == -1
+    
+
 def test_get_centroid():
     """Test 'get_centroid'"""
     cell = nnps.Cell(IntPoint(0, 0, 0), cell_size=0.1, narrays=1)

@@ -118,6 +118,7 @@ class AccelerationEval(object):
         dests.real = group.real
         dests.update_nnps = group.update_nnps
         dests.iterate = group.iterate
+        dests.max_iterations = group.max_iterations
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.

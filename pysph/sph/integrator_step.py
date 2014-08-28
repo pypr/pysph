@@ -346,8 +346,9 @@ class AdamiVerletStep(IntegratorStep):
 ###############################################################################
 class GasDFluidStep(IntegratorStep):
     """Predictor Corrector integrator for Gas-dynamics"""
-    def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e, d_e0):
+    def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z, d_h,
+                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e, d_e0, d_h0,
+                   d_converged):
         d_x0[d_idx] = d_x[d_idx]
         d_y0[d_idx] = d_y[d_idx]
         d_z0[d_idx] = d_z[d_idx]
@@ -357,6 +358,11 @@ class GasDFluidStep(IntegratorStep):
         d_w0[d_idx] = d_w[d_idx]
 
         d_e0[d_idx] = d_e[d_idx]
+
+        d_h0[d_idx] = d_h[d_idx]
+
+        # set the converged attribute to 0 at the beginning of a Group
+        d_converged[d_idx] = 0
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e0, d_e, d_au, d_av,

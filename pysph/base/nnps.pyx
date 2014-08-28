@@ -60,6 +60,12 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
 
     return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
 
+def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
+    """Python wrapper"""
+    cdef cIntPoint _cid = cid.data
+    cdef int flattened_index = flatten( _cid, ncells_per_dim, dim )
+    return flattened_index
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cdef inline int get_valid_cell_index(
@@ -70,28 +76,30 @@ cdef inline int get_valid_cell_index(
 
     cdef int cell_index = -1
 
-    # basic test for valid indices.
+    # basic test for valid indices. Since we bin the particles with
+    # respect to the origin, negative indices can never occur. 
     cdef bint is_valid = (cid.x > -1) and (cid.y > -1) and (cid.z > -1)
     
-    # additional check for 1D.
+    # additional check for 1D. This is because we search in all 26
+    # neighboring cells for neighbors. In 1D this can be problematic
+    # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
+    # result in a valid cell with a flattened index < ncells
     if dim == 1:
         if ( (cid.y > ncy) or (cid.z > ncz) ):
             is_valid = False
 
-    # flatten the cell index for valid cells
+    # Given the validity of the cells, return the flattened cell index
     if is_valid:
         cell_index = flatten(cid, ncells_per_dim, dim)
-        
+
         if not (-1 < cell_index < n_cells):
             cell_index = -1
             
     return cell_index
 
-def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
-    """Python wrapper"""
-    cdef cIntPoint _cid = cid.data
-    cdef int flattened_index = flatten( _cid, ncells_per_dim, dim )
-    return flattened_index
+def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
+    """Return the flattened cell index for a valid cell"""
+    return get_valid_cell_index(cid.data, ncells_per_dim, dim, n_cells)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
