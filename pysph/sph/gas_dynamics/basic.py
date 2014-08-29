@@ -56,7 +56,8 @@ class SummationDensity(Equation):
         super(SummationDensity, self).__init__(dest, sources)
         
     def initialize(
-        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_omega):
+        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_dwdh):
+
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
         
@@ -64,8 +65,7 @@ class SummationDensity(Equation):
         d_grhoy[d_idx] = 0.0
         d_arho[d_idx]  = 0.0
 
-        # Set the default omega to 1.0.
-        d_omega[d_idx] = 1.0
+        d_dwdh[d_idx] = 0.0
 
         # set the converged attribute for the Equation to True. Within
         # the post-loop, if any particle hasn't converged, this is set
@@ -73,7 +73,7 @@ class SummationDensity(Equation):
         self.equation_has_converged = 1
 
     def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
-             d_dwdh, s_m, VIJ, WI, DWI, GHI):
+             d_dwdh, s_m, d_converged, VIJ, WI, DWI, GHI):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
@@ -87,7 +87,7 @@ class SummationDensity(Equation):
         # gradient of density
         d_grhox[d_idx] += mj * DWI[0]
         d_grhoy[d_idx] += mj * DWI[1]
-
+        
         # gradient of kernel w.r.t h
         d_dwdh[d_idx] += mj * GHI
 
