@@ -229,8 +229,8 @@ class MPMAccelerations(Equation):
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs,
              d_e, s_e, d_rho, s_rho, d_au, d_av, d_aw, d_ae,
-             XIJ, VIJ, DWI, DWJ, DWIJ, HIJ, EPS, RIJ, R2IJ, RHOIJ,
-             DT_ADAPT):
+             d_omega, s_omega, XIJ, VIJ, DWI, DWJ, DWIJ, HIJ,
+             EPS, RIJ, R2IJ, RHOIJ, DT_ADAPT):
 
         # particle pressure
         pi = d_p[d_idx]
@@ -287,14 +287,18 @@ class MPMAccelerations(Equation):
             # viscous contribution to the thermal energy
             d_ae[d_idx] += -0.5*mj/RHOIJ*self.alpha1*vsig1*dot*dot*Fij
 
+        # grad-h correction terms. These will be set to 1.0 by the
+        # integrator and thus can be used safely.
+        omegai = d_omega[d_idx]; omegaj = s_omega[s_idx]
+
         # gradient terms
-        d_au[d_idx] += -mj*(pibrhoi2*DWI[0] + pjbrhoj2*DWJ[0])
-        d_av[d_idx] += -mj*(pibrhoi2*DWI[1] + pjbrhoj2*DWJ[1])
-        d_aw[d_idx] += -mj*(pibrhoi2*DWI[2] + pjbrhoj2*DWJ[2])
+        d_au[d_idx] += -mj*(pibrhoi2*omegai*DWI[0] + pjbrhoj2*omegaj*DWJ[0])
+        d_av[d_idx] += -mj*(pibrhoi2*omegai*DWI[1] + pjbrhoj2*omegaj*DWJ[1])
+        d_aw[d_idx] += -mj*(pibrhoi2*omegai*DWI[2] + pjbrhoj2*omegaj*DWJ[2])
 
         # accelerations for the thermal energy
         vijdotdwi = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
-        d_ae[d_idx] += mj * pibrhoi2 * vijdotdwi
+        d_ae[d_idx] += mj * pibrhoi2 * omegai * vijdotdwi
 
         # thermal conduction
         eij = d_e[d_idx] - s_e[s_idx]
