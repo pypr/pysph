@@ -243,6 +243,9 @@ class MPMAccelerations(Equation):
         # pj/rhoj**2
         rhoj2 = s_rho[s_idx]*s_rho[s_idx]
         pjbrhoj2 = pj/rhoj2
+
+        # averaged sound speed
+        cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
         
         # averaged mass
         mi = d_m[d_idx]
@@ -264,7 +267,7 @@ class MPMAccelerations(Equation):
             XIJ[1] /= RIJ
             XIJ[2] /= RIJ
 
-        # v_{ij} \cdot r_{ij}
+        # v_{ij} \cdot r_{ij} or vijdotxij
         dot = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
         
         # scalar part of the kernel gradient DWIJ
@@ -272,8 +275,11 @@ class MPMAccelerations(Equation):
 
         # signal velocities
         pdiff = abs(pi-pj)
-        vsig1 = 0.5 * max(ci + cj - self.beta*dot, 0.0)
+        vsig1 = 0.5 * max(cij - self.beta*dot, 0.0)
         vsig2 = sqrt( pdiff/RHOIJ )
+
+        # compute the Courant-limited time step factor.
+        DT_ADAPT[0] = max( DT_ADAPT[0], cij + self.beta * dot )
 
         # Artificial viscosity
         if dot <= 0.0:
