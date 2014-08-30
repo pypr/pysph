@@ -50,8 +50,8 @@ nl = 320; nr = 40
 dxl = 0.5/nl; dxr = 8*dxl
 
 # scheme constants
-alpha1 = 1.0
-alpha2 = 0.1
+a1 = 1.0
+a2 = 0.5
 beta = 2.0
 kernel_factor = 1.2
 h0 = kernel_factor*dxr
@@ -83,7 +83,12 @@ def create_particles(**kwargs):
     # thermal energy from the ideal gas EOS
     e = p/(gamma1*rho)
 
-    fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
+    # viscosity parameters
+    alpha1 = numpy.ones_like(x) * a1
+    alpha2 = numpy.ones_like(x) * a2
+
+    fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy(), 
+                alpha1=alpha1, alpha2=alpha2)
 
     print "1D Shocktube with %d particles"%(fluid.get_number_of_particles())
 
@@ -100,7 +105,7 @@ integrator = PECIntegrator(fluid=GasDFluidStep())
 
 # Create the soliver
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
+                dt=dt, tf=tf, adaptive_timestep=True, pfreq=50)
 
 # SPH equations using the Newton-Raphson iterations to determine the
 # consistent smoothing length with the density.
@@ -132,8 +137,9 @@ equations_density_iterations = [
     # do the main acceleratio block.
     Group(
         equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
+            MPMAccelerations(
+                dest='fluid', sources=['fluid',], beta=beta,
+                update_alapha1=True, update_alapha2=True),
             ], update_nnps=False
         ),
     ]
@@ -196,8 +202,7 @@ equations_pilot_density_adaptive_h = [
     # do the main acceleratio block.
     Group(
         equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
+            MPMAccelerations(dest='fluid', sources=['fluid',],beta=beta)
             ], update_nnps=False
         ),
     ]
