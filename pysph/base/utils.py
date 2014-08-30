@@ -226,7 +226,8 @@ def get_particle_array_gasd(**props):
         'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
         'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
         'rho0', 'e0', 'h0', 'div', 'grhox', 'grhoy', 'grhoz', 'dwdh', 'omega',
-        'converged']
+        'converged', 'alpha1', 'alpha10', 'aalpha1', 'alpha2', 'alpha20', 'aalpha2',
+        'del2e']
 
     pa = get_particle_array( additional_props=required_props, **props )
     
@@ -236,7 +237,7 @@ def get_particle_array_gasd(**props):
     pa.h0[:] = pa.h[:]
 
     pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
-                           'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh'] )
+                           'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh', 'alpha1', 'alpha2'] )
 
     return pa
 
