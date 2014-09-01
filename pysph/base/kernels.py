@@ -38,18 +38,20 @@ class CubicSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
-
-        if ( q >= 2.0 ):
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+        
+        tmp2 = 2. - q
+        if ( q > 2.0 ):
             val = 0.0
 
-        elif ( q >= 1.0 ):
-            val = 0.25 * ( 2-q ) * ( 2-q ) * ( 2-q )
-
+        elif ( q > 1.0 ):
+            val = 0.25 * tmp2 * tmp2 * tmp2
         else:
             val = 1 - 1.5 * q * q * (1 - 0.5 * q)
 
@@ -59,18 +61,21 @@ class CubicSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient.
+        tmp2 = 2. - q
         if (rij > 1e-12):
-            if (q >= 2.0):
+            if (q > 2.0):
                 val = 0.0
-            elif ( q >= 1.0 ):
-                val = -0.75 * (2-q)*(2-q) * h1/rij
+            elif ( q > 1.0 ):
+                val = -0.75 * tmp2*tmp2 * h1/rij
             else:
                 val = -3.0*q * (1 - 0.75*q) * h1/rij
         else:
@@ -81,6 +86,31 @@ class CubicSpline(object):
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
 
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h; q = rij * h1
+        
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # kernel and gradient evaluated at q
+        tmp2 = 2. - q
+        if ( q > 2.0 ):
+            w = 0.0
+            dw = 0.0
+            
+        elif ( q > 1.0 ):
+            w = 0.25 * tmp2 * tmp2 * tmp2
+            dw = -0.75 * tmp2 * tmp2
+        else:
+            w = 1 - 1.5 * q * q * (1 - 0.5 * q)
+            dw = -3.0*q * (1 - 0.75*q)
+
+        return -fac * h1 * ( dw*q + w*self.dim )
 
 class WendlandQuintic(object):
     def __init__(self, dim=2):
@@ -100,16 +130,20 @@ class WendlandQuintic(object):
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0/h
         q = rij*h1
-        
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         val = 0.0
-        if ( q <= 2.0 ):
-            val = (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * (2*q + 1)
+
+        tmp = 1. - 0.5 * q
+        if ( q < 2.0 ):
+            val = tmp * tmp * tmp * tmp * (2.0*q + 1.0)
 
         return val * fac
 
@@ -117,22 +151,45 @@ class WendlandQuintic(object):
         h1 = 1./h
         q = rij*h1
         
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient
         val = 0.0
-        if ( q <= 2.0 ):
+        tmp = 1.0 - 0.5*q
+        if ( q < 2.0 ):
             if (rij > 1e-12):
-                val = -5 * q * (1-0.5*q) * (1-0.5*q) * (1-0.5*q) * h1/rij
+                val = -5.0 * q * tmp * tmp * tmp * h1/rij
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h; q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the kernel and gradient at q
+        w = 0.0; dw = 0.0
+        tmp = 1.0 - 0.5*q
+        if ( q < 2.0 ):
+            w = tmp * tmp * tmp * tmp * (2.0*q + 1.0)
+            dw = -5.0 * q * tmp * tmp * tmp
+
+        return -fac * h1 * ( dw*q + w*self.dim )
 
 class Gaussian(object):
     def __init__(self, dim=2):
@@ -152,14 +209,16 @@ class Gaussian(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
-
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+        
         val = 0.0
-        if ( q <= 3.0 ):
+        if ( q < 3.0 ):
             val = exp(-q*q) * fac
 
         return val
@@ -168,22 +227,43 @@ class Gaussian(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
         # compute the gradient
         val = 0.0
-        if (q <= 3.0):
+        if (q < 3.0):
             if (rij > 1e-12):
-                val = -2 * q * exp(-q*q) * h1/rij
+                val = -2.0* q * exp(-q*q) * h1/rij
 
         tmp = val * fac
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0., 0.], rij=1.0, h=1.0):
+        h1 = 1./h; q= rij*h1
+        
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # kernel and gradient evaluated at q
+        w = 0.0; dw = 0.0
+        if ( q < 3.0 ):
+            w = exp(-q*q)
+            dw = -2.0 * q * w
+            
+        return -fac * h1 * ( dw*q + w*self.dim )
 
 class QuinticSpline(object):
     def __init__(self, dim=2):
@@ -194,7 +274,8 @@ class QuinticSpline(object):
 
         self.fac = M_1_PI * 7.0/478.0
 
-    # this is incorrect for the moment and needs to be calculated
+    # FIXME: this is incorrect for the moment and needs to be
+    # calculated. Do not use this kernel with Monaghan style.
     def get_deltap(self):
         return 1.0
 
@@ -202,23 +283,31 @@ class QuinticSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
+        tmp3 = 3. - q
+        tmp2 = 2. - q
+        tmp1 = 1. - q
         if ( q > 3.0 ):
             val = 0.0
 
         elif ( q > 2.0 ):
-            val = (3.0-q)**5
+            val = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
 
         elif ( q > 1.0 ):
-            val = (3.0-q)**5 - 6.0*(2.0-q)**5
+            val = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
+            val -= 6.0 * tmp2 * tmp2 * tmp2 * tmp2 * tmp2
 
         else:
-            val = (3.0-q)**5 - 6*(2.0-q)**5 + 15.0*(1.0-q)**5
+            val = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
+            val -= 6.0 * tmp2 * tmp2 * tmp2 * tmp2 * tmp2
+            val += 15. * tmp1 * tmp1 * tmp1 * tmp1 * tmp1
 
         return val * fac
 
@@ -226,26 +315,36 @@ class QuinticSpline(object):
         h1 = 1./h
         q = rij*h1
 
-        fac = self.fac * h1
-        if self.dim > 1:
-            fac *= h1
-        if self.dim > 2:
-            fac *= h1
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
 
+        tmp3 = 3. - q
+        tmp2 = 2. - q
+        tmp1 = 1. - q
+        
         # compute the gradient
         if (rij > 1e-12):
             if ( q > 3.0 ):
                 val = 0.0
 
             elif ( q > 2.0 ):
-                val = -5.0 * (3.0 - q)**4 * h1/rij
+                val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+                val *= h1/rij
 
             elif ( q > 1.0 ):
-                val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4) * h1/rij
-
+                val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+                val += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
+                val *= h1/rij
             else:
-                val = (-5.0 * (3.0 - q)**4 + 30.0 * (2.0 - q)**4 - 75.0 * (1.0 - q)**4) * h1/rij
-
+                val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+                val += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
+                val -= 75.0 * tmp1 * tmp1 * tmp1 * tmp1
+                val *= h1/rij
         else:
             val = 0.0
 
@@ -253,3 +352,44 @@ class QuinticSpline(object):
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h; q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        tmp3 = 3. - q
+        tmp2 = 2. - q
+        tmp1 = 1. - q
+        
+        # compute the kernel & gradient at q
+        if ( q > 3.0 ):
+            w = 0.0
+            dw = 0.0
+
+        elif ( q > 2.0 ):
+            w = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
+            dw = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+
+        elif ( q > 1.0 ):
+            w = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
+            w -= 6.0 * tmp2 * tmp2 * tmp2 * tmp2 * tmp2
+
+            dw = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+            dw += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
+        else:
+            w = tmp3 * tmp3 * tmp3 * tmp3 * tmp3
+            w -= 6.0 * tmp2 * tmp2 * tmp2 * tmp2 * tmp2
+            w += 15. * tmp1 * tmp1 * tmp1 * tmp1 * tmp1
+
+            dw = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
+            dw += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
+            dw -= 75.0 * tmp1 * tmp1 * tmp1 * tmp1
+
+        return -fac * h1 * ( dw*q + w*self.dim )

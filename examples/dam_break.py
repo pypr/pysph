@@ -83,8 +83,8 @@ from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import EPECIntegrator
-from pysph.sph.integrator_step import WCSPHStep
+from pysph.sph.integrator import PECIntegrator, EPECIntegrator, TVDRK3Integrator
+from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
 
 dim = 2
 fluid_column_height = 2.0
@@ -123,12 +123,12 @@ app = Application()
 # Create the kernel
 kernel = WendlandQuintic(dim=2)
 
-# Create the Integrator. Currently, PySPH supports Predictor Corrector
-# style integrators which can be operated in two modes
-# Predict-Correct-Evaluate (PEC) and Evaluate-Predict-Evaluate-Correct
-# (EPEC). The default faster mode is PEC which requies one less force
-# evaluation per iteration.
-integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
+
+# Create the Integrator. Currently, PySPH supports multi-stage,
+# predictor corrector and a TVD-RK3 integrators.
+
+#integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
+integrator = TVDRK3Integrator(fluid=WCSPHTVDRK3Step(), boundary=WCSPHTVDRK3Step())
 
 # Create a solver. Damping time is taken as 0.1% of the final time
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,

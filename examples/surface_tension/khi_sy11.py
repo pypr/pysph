@@ -18,7 +18,8 @@ from pysph.sph.wc.transport_velocity import SummationDensity, SolidWallPressureB
 # Surface tension equations
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor
 
 # PySPH solver and application
 from pysph.solver.application import Application
@@ -82,7 +83,7 @@ def create_particles(**kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -101,6 +102,10 @@ def create_particles(**kwargs):
        
         # velocity of magnitude squared
         'vmag2',
+
+        # variable to indicate reliable normals and normalizing
+        # constant
+        'N', 'wij_sum',
         
         ]
 
@@ -176,20 +181,22 @@ equations = [
     # Given the updated number density for the fluid, we can update
     # the fluid pressure. Additionally, we compute the gradient of the
     # color function with respect to the original smoothing
-    # length. This will compute the interface normals.
+    # length. This will compute the interface normals. Also compute
+    # the smoothed color based on the color index for a particle.
     Group(equations=[
             IsothermalEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'] ),
             ] ),
 
     #################################################################
     # Begin Surface tension formulation
     #################################################################
     # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS is updated after this group to get the new
-    # list of neighbors.
+    # quantities. The NNPS need not be updated since the smoothing
+    # length is decreased.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
-            ], update_nnps=True ),
+            ], update_nnps=False ),
 
     # Compute the gradient of the color function with respect to the
     # new smoothing length. At the end of this Group, we will have the
@@ -200,18 +207,17 @@ equations = [
             ], 
           ),
 
-    # Compute the discretized dirac delta function and the interface
-    # curvature using the modified smoothing length.
+    # Compute the interface curvature using the modified smoothing
+    # length and interface normals computed in the previous Group.
     Group(equations=[
             InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
             ], ),
 
-    # Now rescale the smoothing length to the original
-    # value. Re-compute NNPS at the end of this Group since the
-    # smoothing lengths are modified.
+    # Now rescale the smoothing length to the original value for the
+    # rest of the computations.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
-            ], update_nnps=True,
+            ], update_nnps=False,
           ),
     #################################################################
     # End Surface tension formulation

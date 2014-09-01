@@ -1,10 +1,18 @@
-"""Deformation of a square droplet"""
+r"""Curvature computation for a circular droplet
+
+For particles distributed in a box, an initial circular interface is
+distinguished by coloring the particles within a circle. The resulting
+equations can then be used to check for the numerical curvature and
+discretized dirac-delta function based on this artificial interface.
+
+"""
 
 import numpy
+from numpy import sin, cos, pi
 
 # Particle generator
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
+from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
 
 # SPH Equations and Group
 from pysph.sph.equation import Group
@@ -16,7 +24,9 @@ from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPr
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
-    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce
+    InterfaceCurvatureFromNumberDensity, ShadlooYildizSurfaceTensionForce,\
+    SmoothedColor, AdamiColorGradient, AdamiReproducingDivergence,\
+    MorrisColorGradient
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -44,36 +54,55 @@ rho2 = 1*rho1
 U = 0.5
 sigma = 1.0
 
-# set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
-# interface. Larger values result in a thick interface.
-factor1 = 0.8
-factor2 = 1./factor1
-
-# initial perturbation amplitude
-psi0 = 0.03*domain_height
-
 # discretization parameters
 dx = dy = 0.0125
 dxb2 = dyb2 = 0.5 * dx
-volume = dx*dx
-hdx = 1.3
+hdx = 1.5
 h0 = hdx * dx
 rho0 = 1000.0
-c0 = 10.0
+c0 = 20.0
 p0 = c0*c0*rho0
-nu = 1.0/rho0
+nu = 0.01
+
+# set factor1 to [0.5 ~ 1.0] to simulate a thick or thin
+# interface. Larger values result in a thick interface. Set factor1 =
+# 1 for the Morris Method I
+factor1 = 1.0
+factor2 = 1./factor1
+
+# correction factor for Morris's Method I. Set with_morris_correction
+# to True when using this correction.
+epsilon = 0.01/h0
 
 # time steps
-tf = 3.0
 dt_cfl = 0.25 * h0/( 1.1*c0 )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
+tf = 5*dt
 
-def create_particles(**kwargs):
-    x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
-    x = x.ravel(); y = y.ravel()
+# SPH kernel
+#kernel = WendlandQuintic(dim=2)
+kernel = QuinticSpline(dim=2)
+#kernel = CubicSpline(dim=2)
+#kernel = Gaussian(dim=2)
+
+def create_particles(staggered=True, **kwargs):
+    if staggered:
+        x1, y1 = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
+        x2, y2 = numpy.mgrid[ dx:domain_width:dx, dy:domain_height:dy ]
+
+        x1 = x1.ravel(); y1 = y1.ravel()
+        x2 = x2.ravel(); y2 = y2.ravel()
+        
+        x = numpy.concatenate( [x1, x2] )
+        y = numpy.concatenate( [y1, y2] )
+        volume = dx*dx/2
+    else:
+        x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
+        x = x.ravel(); y = y.ravel()
+        volume = dx*dx
 
     m = numpy.ones_like(x) * volume * rho0
     rho = numpy.ones_like(x) * rho0
@@ -86,7 +115,7 @@ def create_particles(**kwargs):
         'V', 
 
         # color and gradients
-        'color', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
+        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
         
         # discretized interface normals and dirac delta
         'nx', 'ny', 'nz', 'ddelta',
@@ -103,8 +132,12 @@ def create_particles(**kwargs):
         # imposed accelerations on the solid wall
         'ax', 'ay', 'az', 'wij', 
        
-        # velocity of magnitude squared
+        # velocity of magnitude squared needed for TVF
         'vmag2',
+
+        # variable to indicate reliable normals and normalizing
+        # constant
+        'N', 'wij_sum'        
         
         ]
 
@@ -113,19 +146,19 @@ def create_particles(**kwargs):
         name='fluid', x=x, y=y, h=h, m=m, rho=rho, cs=cs, 
         additional_props=additional_props)
 
-    # set the color of the inner square
+    # set the color of the inner circle
     for i in range(x.size):
-        if ( (fluid.x[i] > 0.35) and (fluid.x[i] < 0.65) ):
-            if ( (fluid.y[i] > 0.35) and (fluid.y[i] < 0.65) ):
-                fluid.color[i] = 1.0
+        if ( ((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) <= 0.25**2 ):
+            fluid.color[i] = 1.0
                 
     # particle volume
     fluid.V[:] = 1./volume
 
     # set additional output arrays for the fluid
-    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta'])
+    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta', 'p', 
+                             'kappa', 'N', 'scolor'])
     
-    print "2D Square droplet deformation with %d fluid particles"%(
+    print "2D Circular droplet deformation with %d fluid particles"%(
             fluid.get_number_of_particles())
 
     return [fluid,]
@@ -138,11 +171,6 @@ domain = DomainManager(
 # Create the application.
 app = Application(domain=domain)
 
-# Create the kernel
-kernel = WendlandQuintic(dim=2)
-#kernel = CubicSpline(dim=2)
-#kernel = Gaussian(dim=2)
-
 # Create the Integrator.
 integrator = PECIntegrator( fluid=TransportVelocityStep() )
 
@@ -154,48 +182,52 @@ equations = [
     # number density (1/volume) is explicitly set for the solid phase
     # and this isn't modified for the simulation.
     Group(equations=[
-            SummationDensity( dest='fluid', sources=['fluid'] )
+            SummationDensity( dest='fluid', sources=['fluid'] ),
             ] ),
     
     # Given the updated number density for the fluid, we can update
-    # the fluid pressure. Additionally, we can compute the Shepard
-    # Filtered velocity required for the no-penetration boundary
-    # condition.
+    # the fluid pressure. Also compute the smoothed color based on the
+    # color index for a particle.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+            SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
             ] ),
 
     #################################################################
     # Begin Surface tension formulation
     #################################################################
     # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS is updated after this group to get the new
-    # list of neighbors.
+    # quantities.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=factor1)
-            ], update_nnps=True ),
+            ], update_nnps=False ),
 
     # Compute the gradient of the color function with respect to the
     # new smoothing length. At the end of this Group, we will have the
     # interface normals and the discretized dirac delta function for
     # the fluid-fluid interface.
     Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid']),
+            MorrisColorGradient(dest='fluid', sources=['fluid'], epsilon=0.01/h0),
+            #ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
+            #                                epsilon=epsilon),
+            #AdamiColorGradient(dest='fluid', sources=['fluid']),
             ], 
           ),
 
     # Compute the interface curvature using the modified smoothing
     # length and interface normals computed in the previous Group.
     Group(equations=[
-            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
+            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
+                                                with_morris_correction=True),
+            #AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
+            #                           dim=2),
             ], ),
 
     # Now rescale the smoothing length to the original value for the
-    # rest of the computations. Re-compute NNPS at the end of this
-    # Group since the smoothing lengths are modified.
+    # rest of the computations.
     Group(equations=[
             ScaleSmoothingLength(dest='fluid', sources=None, factor=factor2)
-            ], update_nnps=True,
+            ], update_nnps=False,
           ),
     #################################################################
     # End Surface tension formulation
@@ -206,11 +238,7 @@ equations = [
         equations=[
 
             # Gradient of pressure for the fluid phase using the
-            # number density formulation. No penetration boundary
-            # condition using Adami et al's generalized wall boundary
-            # condition. The extrapolated pressure and density on the
-            # wall particles is used in the gradient of pressure to
-            # simulate a repulsive force.
+            # number density formulation.
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid'], pb=p0),
 
@@ -230,7 +258,7 @@ equations = [
 # Create a solver.
 solver = Solver(
     kernel=kernel, dim=dim, integrator=integrator,
-    dt=dt, tf=tf, adaptive_timestep=False)
+    dt=dt, tf=tf, adaptive_timestep=False, pfreq=1)
 
 # Setup the application and solver.  This also generates the particles.
 app.setup(solver=solver, equations=equations,

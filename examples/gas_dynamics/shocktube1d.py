@@ -1,15 +1,20 @@
-"""Two-dimensional Shocktube problem.
+"""Classic Sod's shock-tube test.
 
-The density is assumed to be uniform and the shocktube problem is
-defined by the pressure jump. The pressure jump of 10^5 (pl = 1000.0,
-pr = 0.01) corresponds to the Woodward and Colella strong shock or
-blastwave problem.
+Two regions of a quiescient gas are separated by an imaginary
+diaphgram that is instantaneously ruptured at t = 0. The two states
+(left,right) are defined by the properties:
+
+     left                               right
+  
+     density = 1.0                      density = 0.125
+     pressure = 1.0                     pressure = 0.1
+
+The solution examined at the final time T = 0.15s
 
 """
 
 # NumPy and standard library imports
 import numpy
-from numpy import sin, cos, pi
 
 # PySPH base and carray imports
 from pysph.base.nnps import DomainManager
@@ -31,66 +36,67 @@ from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength, UpdateSmoothingLe
 from pysph.tools import uniform_distribution as ud
 
 # Numerical constants
-dim = 2
+dim = 1
 gamma = 1.4
 gamma1 = gamma - 1.0
 
 # solution parameters
-dt = 7.5e-6
-tf = 0.0075
+dt = 1e-4
+tf = 0.15
 
-# domain size
-xmin = -0.75; xmax = 0.75
-dx = 0.01
-ymin = 0; ymax = 30*dx
+# domain size and discretization parameters
+xmin = 0; xmax = 1.0
+nl = 320; nr = 40
+dxl = 0.5/nl; dxr = 8*dxl
 
 # scheme constants
-alpha1 = 1.0
-alpha2 = 0.1
+a1 = 1.0
+a2 = 0.5
 beta = 2.0
 kernel_factor = 1.2
-h0 = kernel_factor*dx
+h0 = kernel_factor*dxr
 
 # The SPH kernel
 kernel = Gaussian(dim=dim)
 
 def create_particles(**kwargs):
-    global dx
-    data = ud.uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax)
-    
-    x = data[0]; y = data[1]
-    dx = data[2]; dy = data[3]
-
-    # volume estimate
-    volume = dx*dy
+    # particle positions
+    x1 = numpy.arange( 0.5*dxl, 0.5, dxl )
+    x2 = numpy.arange( 0.5 + 0.5*dxr, 1.0, dxr )
+    x = numpy.concatenate( [x1, x2] )
 
     # indices on either side of the initial discontinuity
-    right_indices = numpy.where( x > 0.0 )[0]
+    right_indices = numpy.where( x > 0.5 )[0]
 
-    # density is uniform
+    # density
     rho = numpy.ones_like(x)
+    rho[right_indices] = 0.125
     
-    # pl = 100.0, pr = 0.1
-    p = numpy.ones_like(x) * 1000.0
-    p[right_indices] = 0.01
+    # pl = 1.0, pr = 0.1
+    p = numpy.ones_like(x)
+    p[right_indices] = 0.1
     
     # const h and mass
     h = numpy.ones_like(x) * h0
-    m = numpy.ones_like(x) * volume * rho
+    m = numpy.ones_like(x) * dxl
 
     # thermal energy from the ideal gas EOS
     e = p/(gamma1*rho)
-    
-    fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
 
-    print "2D Shocktube with %d particles"%(fluid.get_number_of_particles())
+    # viscosity parameters
+    alpha1 = numpy.ones_like(x) * a1
+    alpha2 = numpy.ones_like(x) * a2
+
+    fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy(), 
+                alpha1=alpha1, alpha2=alpha2)
+
+    print "1D Shocktube with %d particles"%(fluid.get_number_of_particles())
 
     return [fluid,]
 
 # Create the application.
 domain = DomainManager(
-    xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, 
-    periodic_in_x=True, periodic_in_y=True)
+    xmin=xmin, xmax=xmax, periodic_in_x=True)
 
 app = Application(domain=domain)
 
@@ -99,8 +105,7 @@ integrator = PECIntegrator(fluid=GasDFluidStep())
 
 # Create the soliver
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
-
+                dt=dt, tf=tf, adaptive_timestep=True, pfreq=50)
 
 # SPH equations using the Newton-Raphson iterations to determine the
 # consistent smoothing length with the density.
@@ -132,8 +137,9 @@ equations_density_iterations = [
     # do the main acceleratio block.
     Group(
         equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
+            MPMAccelerations(
+                dest='fluid', sources=['fluid',], beta=beta,
+                update_alapha1=True, update_alapha2=True),
             ], update_nnps=False
         ),
     ]
@@ -196,8 +202,7 @@ equations_pilot_density_adaptive_h = [
     # do the main acceleratio block.
     Group(
         equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
+            MPMAccelerations(dest='fluid', sources=['fluid',],beta=beta)
             ], update_nnps=False
         ),
     ]

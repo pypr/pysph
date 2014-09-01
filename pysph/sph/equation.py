@@ -222,6 +222,19 @@ def precomputed_symbols():
     c.DWJ = BasicCodeBlock(
                 code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
                 DWJ=[0.0, 0.0, 0.0])
+
+    c.GHI = BasicCodeBlock(
+                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])", 
+                GHI=0.0)
+
+    c.GHJ = BasicCodeBlock(
+                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])", 
+                GHJ=0.0)
+
+    c.GHIJ= BasicCodeBlock(
+                code="GHIJ = GRADH(XIJ, RIJ, HIJ)", 
+                GHIJ=0.0)
+    
     return c
 
 
@@ -311,8 +324,14 @@ class Equation(object):
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
         self.name = self.__class__.__name__ if name is None else name
+        # The name of the variable used in the compliled AccelerationEval
+        # instance.
         self.var_name = ''
 
+    def converged(self):
+        """Return > 0 to indicate converged iterations and < 0 otherwise.
+        """
+        return 1.0
 
 ###############################################################################
 # `Group` class.
@@ -326,7 +345,8 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True, update_nnps=False):
+    def __init__(self, equations, real=True, update_nnps=False, iterate=False, 
+                 max_iterations=1):
         """Constructor.
 
         Parameters
@@ -337,8 +357,15 @@ class Group(object):
         - real: bool: specifies if only non-remote/non-ghost particles should
                       be operated on.
 
-        - update_nnps: bool: specifies if the neighbors should be re-computed 
+        - update_nnps: bool: specifies if the neighbors should be re-computed
                        locally after this group
+
+        - iterate: bool: specifies if the group should continue iterating
+                         until each equation's "converged()" methods returns
+                         with a postive value.
+
+        - max_iterations: int: specifies the maximum number of times this 
+                          group should be iterated
 
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
@@ -351,6 +378,11 @@ class Group(object):
         """
         self.real = real
         self.update_nnps = update_nnps
+
+        # iterative groups
+        self.iterate = iterate
+        self.max_iterations = max_iterations
+        
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
         self.context = Context()
@@ -418,9 +450,10 @@ class Group(object):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
             g_func = 'self.kernel.gradient'
+            h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
-            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func)
+            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func).replace('GRADH', h_func)
         else:
             return code
 
@@ -542,6 +575,14 @@ class Group(object):
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
+
+    def get_converged_condition(self):
+        code = []
+        for equation in self.equations:
+            code.append('(self.%s.converged() > 0)'%equation.var_name)
+        # Note, we use '&' because we want to call converged on all equations.
+        # and not be short-circuited by the first one that returns False.
+        return ' & '.join(code)
 
     def get_equation_wrappers(self):
         classes = defaultdict(lambda: 0)

@@ -5,7 +5,8 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
-from pysph.sph.sph_eval import SPHEval
+from pysph.sph.acceleration_eval import AccelerationEval
+from pysph.sph.sph_compiler import SPHCompiler
 
 class InterpolateFunction(Equation):
     def initialize(self, d_idx, d_prop, d_number_density):
@@ -145,7 +146,7 @@ class Interpolator(object):
         arrays = self.particle_arrays + [self.pa]
 
         if self.func_eval is None:
-            self._create_sph_eval(arrays)
+            self._compile_acceleration_eval(arrays)
 
         self.update_particle_arrays(self.particle_arrays)
 
@@ -233,12 +234,12 @@ class Interpolator(object):
         )
         return pa
 
-    def _create_sph_eval(self, arrays):
+    def _compile_acceleration_eval(self, arrays):
         names = [x.name for x in self.particle_arrays]
         equations = [InterpolateFunction(dest='interpolate', sources=names)]
-        self.func_eval = SPHEval(
-            arrays, equations, self.kernel, integrator=None
-        )
+        self.func_eval = AccelerationEval(arrays, equations, self.kernel)
+        compiler = SPHCompiler(self.func_eval, None)
+        compiler.compile()
 
     def _get_max_h_in_arrays(self):
         hmax = -1.0

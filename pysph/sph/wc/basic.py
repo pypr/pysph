@@ -26,6 +26,7 @@ class TaitEOS(Equation):
         self.gamma1 = 0.5*(gamma - 1.0)
         self.B = rho0*c0*c0/gamma
         self.p0 = p0
+        
         super(TaitEOS, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_rho, d_p, d_cs):
