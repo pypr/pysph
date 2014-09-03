@@ -69,7 +69,7 @@ If you wish to see a working and complete  build/test script please see the
 hosted at `Drone.io <http://drone.io>`_.
 
 -------------------------------------------------
-Building and Installing PySPH in Linux and MacOS
+Building and Installing PySPH on Linux and MacOS
 -------------------------------------------------
 
 ^^^^^^^^^^^^^^
@@ -108,30 +108,45 @@ To test PySPH from the source distribution you can do::
 
 This should run all the tests.
 
--------------------------------------------------
-Building and Installing PySPH in Windows
--------------------------------------------------
+---------------------------------------------------------
+Building and Installing PySPH on Windows using WinPython
+---------------------------------------------------------
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Getting Core Dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To install PySPH you require to have python installed on your system. We suggest you download WinPython 2.7.x.x. To obtain the core dependencies, download the corresponding binaries from Christoph Gohlke's `Unofficial Windows Binaries for Python Extension Packages <http://www.lfd.uci.edu/~gohlke/pythonlibs/>`_. Mayavi is available through the binary ETS. 
+To install PySPH you require to have python installed on your system. We 
+suggest you download WinPython_ 2.7.x.x. To obtain the core dependencies, 
+download the corresponding binaries from Christoph Gohlke's `Unofficial 
+Windows Binaries for Python Extension Packages <http://www.lfd.uci.edu/~gohlke/pythonlibs/>`_. 
+Mayavi is available through the binary ETS. 
 
-You can now add these binaries to your WinPython installation by going to WinPython Control Panel. The option to add packages is available under the section Install/upgrade packages.
+You can now add these binaries to your WinPython installation by going to 
+WinPython Control Panel. The option to add packages is available under the
+section Install/upgrade packages.
+
+.. _WinPython: http://winpython.sourceforge.net/
 
 ^^^^^^^^^^^^^^
 Getting PySPH
 ^^^^^^^^^^^^^^
 
-Now, you can get a ZIP or tarball from the `pysph site <https://bitbucket.org/pysph/pysph>`_. You can unzip/untar this and use the
-sources. Make sure to set your system PATH variable pointing to the location of the  scripts as required. If you have installed WinPython 2.7.4 64-bit, make sure to set your system PATH variables to "<path to installation folder>/python-2.7.6.amd64" and "<path to installation folder>/python-2.7.6.amd64/Scripts/".
+Now, you can get a ZIP or tarball from the `pysph site <https://bitbucket.org/pysph/pysph>`_. 
+You can unzip/untar this and use the sources. Make sure to set your system PATH variable 
+pointing to the location of the  scripts as required. If you have installed WinPython 2.7.6 64-bit, 
+make sure to set your system PATH variables to "<path to installation folder>/python-2.7.6.amd64" 
+and "<path to installation folder>/python-2.7.6.amd64/Scripts/".
 
-Open Command Prompt and change your directory to where PySPH is located. Moving into the directory, you will see a file named setup.py To install PySPH, one simply needs to::
+Open Command Prompt and change your directory to where PySPH is located. Moving into the directory, 
+you will see a file named setup.py To install PySPH, one simply needs to::
 
 	> python setup.py install
 
-This should install the package PySPH. A common error that may occur is "unable to find vcvarsall.bat". Please follow this post_ to sort out your problem. If you don't have any sort of C++ compiler, we recommend you to download `VS2010 Express Edition <http://www.visualstudio.com/en-us/downloads#d-2010-express>`_. To test your PySPH installation, you can do the tests as given above.
+This should install the package PySPH. A common error that may occur is "unable to find vcvarsall.bat". 
+Please follow this post_ to sort out your problem. If you don't have any sort of C++ compiler, 
+we recommend you to download `VS2010 Express Edition <http://www.visualstudio.com/en-us/downloads#d-2010-express>`_. 
+To test your PySPH installation, you can do the tests as given above.
 
 .. _post: http://stackoverflow.com/questions/2817869/error-unable-to-find-vcvarsall-bat
 
