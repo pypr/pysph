@@ -1,7 +1,7 @@
 .. _introduction:
 
 ==========================
-Using the PySPH framework
+Using the PySPH library
 ==========================
 
 In this document, we describe the fundamental data structures for
@@ -215,7 +215,7 @@ construct a :py:class:`DomainLimits` object like so
 
 where `xmin ... zmax` are floating point arguments delimiting the
 simulation domain and `periodic_in_x,y,z` are bools defining the
-periodic axes. 
+periodic axes.
 
 When the :py:class:`NNPS` object is constructed with this
 :py:class:`DomainLimits`, care is taken to create periodic ghosts for
@@ -230,20 +230,20 @@ particles are given a special **tag** defined by
        Remote = 1
        Ghost = 2
 
-.. note:: 
+.. note::
 
    The *Local* tag is used to for ordinary particles assigned and
    owned by a given processor. This is the default tag for all
    particles.
 
-.. note:: 
+.. note::
 
    The *Remote* tag is used for ordinary particles assigned to but not
    owned by a given processor. Particles with this tag are typically
    used to satisfy neighbor queries *across* processor boundaries in a
    parallel simulation.
 
-.. note:: 
+.. note::
 
    The *Ghost* tag is used for particles that are created to satisfy
    boundary conditions locally.
@@ -263,7 +263,7 @@ There is no preference given to the tags other than the fact that a
 particle with a non-zero tag is placed after *all* particles with a
 zero (*Local*) tag. Intuitively, the local particles represent *real*
 particles or particles that we want to do active computation on
-(destination particles). 
+(destination particles).
 
 The data attribute `ParticleArray.num_real_particles` returns the
 number of real or *Local* particles. The total number of particles in
@@ -277,9 +277,9 @@ of PySPH:
 
    >>> x = numpy.array( [0, 1, 2, 3], dtype=numpy.float64 )
    >>> tag = numpy.array( [0, 2, 0, 1], dtype=numpy.int32 )
-   
+
    >>> pa = utils.get_particle_array(x=x, tag=tag)
-   
+
    >>> print pa.get_number_of_particles()                     # total number of particles
    >>> 4
    >>> print pa.num_real_particles                            # no. of particles with tag 0
@@ -287,7 +287,7 @@ of PySPH:
 
    >>> x, tag = pa.get('x', 'tag', only_real_particles=True)  # get only real particles (tag == 0)
    >>> print x
-   >>> [0. 2.]                           
+   >>> [0. 2.]
    >>> print tag
    >>> [0 0]
 
@@ -318,7 +318,7 @@ with our example, we can instantiate a
 :py:class:`ZoltanParallelManagerGeometric` object as:
 
 .. code-block:: python
- 
+
    >>> ... # create particles
    >>> from pysph.parallel import ZoltanParallelManagerGeometric
    >>> pm = ZoltanParallelManagerGeometric(dim, particles, comm, radius_scale, lb_method)
@@ -357,7 +357,7 @@ estimation of particle density from a given distribution of particles.
 
 We consider particles distributed on a uniform Cartesian lattice (
 :math:`\Delta x = \Delta y = \Delta`) in a doubly periodic domain
-:math:`[0,1]\times[0,1]`. 
+:math:`[0,1]\times[0,1]`.
 
 The particle mass is set equal to the "volume" :math:`\Delta^2`
 associated with each particle and the smoothing length is taken as
@@ -397,12 +397,12 @@ distribution is given below
    # Create the periodic DomainLimits object and NNPS
    domain = DomainLimits(xmin=0., xmax=1., ymin=0., ymax=1., periodic_in_x=True, periodic_in_y=True)
    nps = LinkedListNNPS(dim=2, particles=[pa,], radius_scale=2.0, domain=domain)
-   
+
    # The SPH kernel. The dimension argument is needed for the correct normalization constant
    k = CubicSpline(dim=2)
 
 .. note::
-   
+
    Notice that the particles were created with an offset of
    :math:`\frac{\Delta}{2}`. This is required since the
    :py:class:`NNPS` object will *box-wrap* particles near periodic
