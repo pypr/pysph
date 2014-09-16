@@ -19,20 +19,24 @@ Core dependencies
 The core dependencies are:
 
   - NumPy_
-  - nose_ for running the unit tests
   - Cython_ (ideally version 0.19 and above)
   - Mako_
+  - nose_ for running the unit tests.
 
-Cython and Mako can be installed from the command line using::
+Cython_ and Mako_ can be installed from the command line using::
 
     $ easy_install Cython mako
 
+or using pip_::
+
+    $ pip install Cython mako
 
 .. _NumPy: http://numpy.scipy.org
 .. _Enthought Canopy: https://www.enthought.com/products/canopy/
 .. _Cython: http://www.cython.org
 .. _nose: https://pypi.python.org/pypi/nose
 .. _Mako: https://pypi.python.org/pypi/Mako
+.. _pip: http://www.pip-installer.org
 
 ^^^^^^^^^^^^^^^^^^^^^^
 Optional dependencies
@@ -54,19 +58,32 @@ data management library.
 Building and linking PyZoltan
 -------------------------------
 
- 1. Build Zoltan with the following compile options::
+We've provided a simple Zoltan build script in the repository.  This works on
+Linux and OS X but not on Windows.  It can be used as so::
 
-    $ ../configure --with-cflags=-fPIC --enable-mpi -with-mpi-incdir=/usr/include/openmpi-x86_64 --with-mpi-libdir=/usr/lib64/openmpi/lib --prefix=/home/<username>/usr/local/Zoltan --with-mpi-compilers=/usr/lib64/openmpi/bin/
+    $ ./build_zoltan.sh  INSTALL_PREFIX
 
- Of course, you have to provide the appropriate MPI directories on your system.
+where the ``INSTALL_PREFIX`` is where the library and includes will be
+installed.  You may edit and tweak the build to suit your installation.
+However, this script  what we use to build Zoltan on our continuous
+integration servers on Drone_ and Shippable_.
 
- 2. Declare the environment variables ``ZOLTAN_INCLUDE`` and ``ZOLTAN_LIBRARY``.
+Declare the environment variables ``ZOLTAN_INCLUDE`` and ``ZOLTAN_LIBRARY``.
+If you used the above script, this would be::
 
- 3. Install PySPH. The PyZoltan wrappers will be compiled and available.
+    $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
+    $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
 
-If you wish to see a working and complete  build/test script please see the
-`continous build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`_
+Install PySPH. The PyZoltan wrappers will be compiled and available.
+
+If you wish to see a working build/test script please see our
+`shippable.yml <https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`_.
+Or you could see the `build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`_
 hosted at `Drone.io <http://drone.io>`_.
+
+
+.. _Drone: http://drone.io
+.. _Shippable: http://shippable.com
 
 -------------------------------------------------
 Building and Installing PySPH on Linux and MacOS
@@ -76,15 +93,14 @@ Building and Installing PySPH on Linux and MacOS
 Getting PySPH
 ^^^^^^^^^^^^^^
 
-The best way to currently get PySPH is via git_::
+The best way to currently get PySPH is via git_ ::
 
-   $ git clone https://bitbucket.org/pysph/pysph.git
+    $ git clone https://bitbucket.org/pysph/pysph.git
 
 If you do not have git or do not wish to bother with it (a bad idea), you can
 get a ZIP or tarball from the `pysph site
 <https://bitbucket.org/pysph/pysph>`_. You can unzip/untar this and use the
 sources.
-
 
 .. _git: http://git-scm.com/
 
@@ -104,9 +120,13 @@ Running the tests
 
 To test PySPH from the source distribution you can do::
 
-   $ nosetests -A"slow==False"
+   $ nosetests -A slow==False pysph
 
-This should run all the tests.
+This should run all the tests.  This will not run some of the tests that take
+a long while.  To run all the tests you can run::
+
+   $ nosetests pysph
+
 
 ---------------------------------------------------------
 Building and Installing PySPH on Windows using WinPython
@@ -116,13 +136,14 @@ Building and Installing PySPH on Windows using WinPython
 Getting Core Dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-To install PySPH you require to have python installed on your system. We 
-suggest you download WinPython_ 2.7.x.x. To obtain the core dependencies, 
-download the corresponding binaries from Christoph Gohlke's `Unofficial 
-Windows Binaries for Python Extension Packages <http://www.lfd.uci.edu/~gohlke/pythonlibs/>`_. 
-Mayavi is available through the binary ETS. 
+To install PySPH you require to have python installed on your system. We
+suggest you download WinPython_ 2.7.x.x. To obtain the core dependencies,
+download the corresponding binaries from Christoph Gohlke's `Unofficial
+Windows Binaries for Python Extension Packages
+<http://www.lfd.uci.edu/~gohlke/pythonlibs/>`_. Mayavi is available through
+the binary ETS.
 
-You can now add these binaries to your WinPython installation by going to 
+You can now add these binaries to your WinPython installation by going to
 WinPython Control Panel. The option to add packages is available under the
 section Install/upgrade packages.
 
@@ -132,23 +153,107 @@ section Install/upgrade packages.
 Getting PySPH
 ^^^^^^^^^^^^^^
 
-Now, you can get a ZIP or tarball from the `pysph site <https://bitbucket.org/pysph/pysph>`_. 
-You can unzip/untar this and use the sources. Make sure to set your system PATH variable 
-pointing to the location of the  scripts as required. If you have installed WinPython 2.7.6 64-bit, 
-make sure to set your system PATH variables to "<path to installation folder>/python-2.7.6.amd64" 
-and "<path to installation folder>/python-2.7.6.amd64/Scripts/".
+Now, you can get a ZIP or tarball from the `pysph site
+<https://bitbucket.org/pysph/pysph>`_. You can unzip/untar this and use the
+sources. Make sure to set your system PATH variable pointing to the location
+of the  scripts as required. If you have installed WinPython 2.7.6 64-bit,
+make sure to set your system PATH variables to ``<path to installation
+folder>/python-2.7.6.amd64`` and ``<path to installation
+folder>/python-2.7.6.amd64/Scripts/``.
 
-Open Command Prompt and change your directory to where PySPH is located. Moving into the directory, 
-you will see a file named setup.py To install PySPH, one simply needs to::
+Open Command Prompt and change your directory to where PySPH is located.
+Moving into the directory, you will see a file named setup.py To install
+PySPH, one simply needs to::
 
-	> python setup.py install
+    > python setup.py install
 
-This should install the package PySPH. A common error that may occur is "unable to find vcvarsall.bat". 
-Please follow this post_ to sort out your problem. If you don't have any sort of C++ compiler, 
-we recommend you to download `VS2010 Express Edition <http://www.visualstudio.com/en-us/downloads#d-2010-express>`_. 
-To test your PySPH installation, you can do the tests as given above.
+This should install the package PySPH. A common error message you may
+encounter is "unable to find vcvarsall.bat". Please follow this post_ to sort
+out your problem. If you don't have any sort of C++ compiler, we recommend you
+to download `VS2010 Express Edition
+<http://www.visualstudio.com/en-us/downloads#d-2010-express>`_. To test your
+PySPH installation, you can do the tests as given above.
 
 .. _post: http://stackoverflow.com/questions/2817869/error-unable-to-find-vcvarsall-bat
+
+-------------------------------
+Using a virtualenv for PySPH
+-------------------------------
+
+A virtualenv_ allows you to create an isolated environment for PySPH and its
+related packages.  This is useful in a variety of situations.
+
+    - Your OS does not provide a recent enough Cython_ version (say you are
+      running Debian stable).
+    - You do not have root access to install any packages PySPH requires.
+    - You do not want to mess up your system.
+    - You wish to use other packages with conflicting requirements.
+    - You want PySPH and its related packages to be in an "isolated" environment.
+
+You can either install virtualenv_ (or ask your system administrator to) or
+just download the `virtualenv.py
+<http://github.com/pypa/virtualenv/tree/master/virtualenv.py>`_ script and use
+it.
+
+.. _virtualenv: http://www.virtualenv.org
+
+Create a virtualenv like so::
+
+    $ virtualenv pysph_env
+
+This creates a directory called ``pysph_env`` which contains all the relevant
+files for your virtualenv, this includes any new packages you wish to install
+into it.  You can delete this directory if you don't want it anymore for some
+reason.  If you want this virtualenv to also "inherit" packages from your
+system you can create the virtualenv like so::
+
+    $ virtualenv --system-site-packages pysph_env
+
+Once you create a virtualenv you can activate it as follows (on a bash shell)::
+
+    $ source pysph_env/bin/activate
+
+On Windows you run a bat file as follows::
+
+    $ pysph_env/bin/activate
+
+This sets up the PATH to point to your virtualenv's Python.  You may now run
+any normal Python commands and it will use your virtualenv's Python.  For
+example you can do the following::
+
+    $ virtualenv myenv
+    $ source myenv/bin/activate
+    (myenv) $ pip install Cython mako nose
+    (myenv) $ cd pysph
+    (myenv) $ python setup.py install
+
+Now PySPH will be installed into ``myenv``.  You may deactivate your
+virtualenv using the ``deactivate`` command::
+
+    (myenv) $ deactivate
+    $
+
+On Windows, use ``myenv\Scripts\activate.bat`` and
+``myenv\Scripts\deactivate.bat``.
+
+If for whatever reason you wish to delete ``myenv`` just remove the entire
+directory::
+
+    $ rm -rf myenv
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Using Virtualenv on Canopy
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you are using `Enthought Canopy`_, it already bundles virtualenv for you but
+you should use the ``venv`` script.  For example::
+
+    $ venv --help
+    $ venv --system-site-packages myenv
+    $ source myenv/bin/activate
+
+The rest of the steps are the same as above.
+
 
 ---------------------
 Running the examples
@@ -168,7 +273,7 @@ generated by the simulation (after the simulation is complete or during the
 simulation) by running the ``pysph_viewer`` application.  To view the
 simulated data you may do::
 
-    $ pysph_viewer cavity_output/*.npz
+    $ pysph_viewer elliptical_drop_output/*.npz
 
 If you have Mayavi_ installed this should show a UI that looks like:
 
@@ -176,14 +281,14 @@ If you have Mayavi_ installed this should show a UI that looks like:
     :width: 800px
     :alt: PySPH viewer
 
-There are other examples like those in the ``TransportVelocity`` directory::
+There are other examples like those in the ``transport_velocity`` directory::
 
-    $ cd TransportVelocity
+    $ cd transport_velocity
     $ python cavity.py
 
 This runs the driven cavity problem using the transport velocity formulation
 of Adami et al. You can verify the results for this problem using the helper
-script ``examples/TransportVelocity/ldcavity_results.py`` to plot, for example
+script ``examples/transport_velocity/ldcavity_results.py`` to plot, for example
 the streamlines:
 
 .. image:: ../Images/ldc-streamlines.png
