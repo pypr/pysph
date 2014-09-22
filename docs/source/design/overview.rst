@@ -1,18 +1,18 @@
 .. _design_overview:
 
 =====================
-PySPH code generation
+The PySPH framework
 =====================
 
-This document is an introduction to the design of PySPH. Read this if
-you want to understand the automatic code generation and possibly
-extend PySPH to solve problems other than those provided in the main
+This document is an introduction to the design of PySPH. This provides
+additional high-level details on the functionality that the PySPH framework
+provides.  This should allow you to use PySPH effectively and extend the
+framework to solve problems other than those provided in the main
 distribution.
 
-To elucidate some of the internal details of PySPH, we will consider a
-typical SPH problem and proceed to write the code that implements
-it. Thereafter, we will describe auto-generated code that PySPH
-generates.
+To elucidate some of the internal details of PySPH, we will consider a typical
+SPH problem and proceed to write the code that implements it. Thereafter, we
+will look at how this is implemented using the PySPH framework.
 
 The dam-break problem
 -------------------------
@@ -502,10 +502,9 @@ It is instantiated as:
 	   d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
 Notice that the ``initialize`` method merely sets the value to zero.  The
-``loop`` method also defines a few new quantities like ``DWIJ``, ``VIJ`` etc.
-The method also prescribes default values to these quantities.  These are
-precomputed quantities and are automatically provided depending on the
-equations needed for a particular source/destination pair.  The following
+``loop`` method also accepts a few new quantities like ``DWIJ``, ``VIJ`` etc.
+These are precomputed quantities and are automatically provided depending on
+the equations needed for a particular source/destination pair.  The following
 precomputed quantites are available:
 
     - ``HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])``.
@@ -567,6 +566,19 @@ The integrator stepper code is similar to the equations in that they are all
 written in pure Python and Cython code is automatically generated from it.
 The simplest integrator is the Euler integrator which looks like this::
 
+    class EulerIntegrator(Integrator):
+        def one_timestep(self, t, dt):
+            self.initialize()
+            self.compute_accelerations()
+            self.stage1()
+            self.do_post_stage(dt, 1)
+
+
+Note that in this case the integrator only needs to implement one timestep
+using the ``one_timestep`` method above.  The ``initialize`` and ``stage``
+methods need to be implemented in stepper classes which perform the actual
+stepping of the values.  Here is the stepper for the Euler integrator::
+
     class EulerStep(IntegratorStep):
         def initialize(self):
             pass
@@ -589,5 +601,5 @@ called.
 
 It is important to note that if there are additional variables to be stepped
 in addition to these standard ones, you must write your own stepper.
-Currently, only predictor-corrector steppers are supported by the framework.
-Take a look at the :doc:`../reference/integrator` for more examples.
+Currently, only certain steppers are supported by the framework. Take a look
+at the :doc:`../reference/integrator` for more examples.

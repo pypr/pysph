@@ -1,8 +1,8 @@
 .. _pyzoltan-docs:
 
-==============
-Introduction
-==============
+=========================
+Introduction to PyZoltan
+=========================
 
 .. py:currentmodule:: pyzoltan.core.zoltan
 
@@ -94,7 +94,7 @@ assignment:
    cycle.
 
 .. note::
- 
+
    The data type of the global identifiers is of type `ZOLTAN_ID_TYPE`
    (default uint32). This is set at the time of building the Zoltan
    library.
@@ -120,7 +120,7 @@ been initialized, we instantiate the
 	dim=3, comm=comm, x=xa, y=ya, z=za, gid=gida)
 
     pz.set_lb_method('RCB')
-    pz.Zoltan_Set_Param('DEBUG_LEVEL', '1')  
+    pz.Zoltan_Set_Param('DEBUG_LEVEL', '1')
 
 .. note::
 
@@ -132,7 +132,7 @@ The complete list of parameters can be found in the Zoltan reference
 manual. All parameters are supported through the wrapper
 :py:meth:`PyZoltan.Zoltan_Set_Param` method. In this example, we set
 the desired load balancing algorithm (Recursive Coordinate Bisection)
-and the output debug level. 
+and the output debug level.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Calling the load balance function
@@ -159,7 +159,7 @@ And similar arrays for the import lists. The import/export lists
 returned by Zoltan give an application all the information required to
 initiate the data transfer.
 
-.. note:: 
+.. note::
 
    Zoltan does **not** perform the data transfer. The data transfer
    must be done by the application or using the Unstructured
@@ -178,7 +178,7 @@ shown below.
 
 We can see that the `RCB` method has resulted in cuts orthogonal to
 the domain axes. Each processor has exactly one fourth of the total
-number of particles. 
+number of particles.
 
 The code for this example can be found in
 `pyzoltan/core/tests/3d_partition.py`
@@ -195,18 +195,18 @@ exported to remote processors but do not know in advance which objects
 need to be imported. The matter is complicated for dynamic
 applications because without a knowledge of the number of objects to
 be imported, we cannot allocate buffers of appropriate size on the
-receiving end. 
+receiving end.
 
 For these scenarios when only one set (either import or export) of
 arrays is available, we use the
 :py:meth:`PyZoltan.Zoltan_Invert_Lists` method to get the other
-set. 
+set.
 
 :py:class:`PyZoltan` exposes this important utility function from
 Zoltan by assuming that the export lists are known to the
 application. Upon return from this method, the relevant import lists
 are also known. Note that the behaviour of import and export lists can
-be interchanged from the application. 
+be interchanged from the application.
 
 A simple example demonstrating this is given below:
 
@@ -275,7 +275,7 @@ is shown below::
 
 We can see that after a call to this method, each processor knows of
 remote data that must be received. In an application, this information
-can be used to effect the data transfer. 
+can be used to effect the data transfer.
 
 Another option is to use the unstructured communication utilities
 offered by Zoltan. This is described next.
@@ -290,7 +290,7 @@ In the previous section, we saw how to use the Zoltan library function
 to invert a set of export indices to get corresponding import
 indices. Naturally, with a little bit of work, we can structure the
 requisite communication (`MPI` send and receives) to exchange the
-data. 
+data.
 
 This set of operations is fairly common and Zoltan_ (PyZoltan)
 provides a very convenient utility called :py:class:`ZComm` to perform
@@ -415,12 +415,12 @@ Reversing the communication plan
 It is often the case for dynamic applications that objects initially
 shared with remote processors have their values updated on remote
 processors. Subsequently, these updated values are required on the
-originating processor, necessitating them to be communicated back. 
+originating processor, necessitating them to be communicated back.
 
 For such scenarios, the communication plan represented by
 :py:class:`ZComm` can be used to *reverse* the communication. That is
 the data that was originally sent will be treated as a receive and
-vice-versa. 
+vice-versa.
 
 To illustrate the use of this feature, we continue with our
 example. The received data (array of unsigned ints) is modified on the
@@ -444,7 +444,7 @@ remote processor and communicated back using the
 
 The output from this when run on 3 processors is::
 
-    $ mpirun  -n 3  python zcomm.py 
+    $ mpirun  -n 3  python zcomm.py
     Proc 1, Sending [1054 1692 2034] to [0 2 0]
     Proc 0, Sending [214] to [2]
     Proc 2, Sending [2720 3034 2511 2412 2975] to [0 1 0 0 1]
@@ -473,7 +473,7 @@ The use of this feature is highly problem dependent since the user
 defined data will necessarily change for different applications. We
 use a simple example demonstrating it's use. Each processor stores
 ownership of the object in the distributed directory *without* any
-user data associated with each entry. 
+user data associated with each entry.
 
 We begin with the standard set of imports and create some data on each
 processor and assign each object a unique global identifier:
@@ -534,7 +534,7 @@ indices `numObjectsTotal + rank` and `numObjectsTotal - rank`:
 
 The result from this quey with :math:`3` processors is shown below::
 
-    $ mpirun  -n 3 python zoltan_dd.py 
+    $ mpirun  -n 3 python zoltan_dd.py
     Processor 0, query_gids = [5 5], owner_parts = [1 1], owner_data = [1 1]
     Processor 1, query_gids = [6 4], owner_parts = [1 0], owner_data = [1 0]
     Processor 2, query_gids = [7 3], owner_parts = [1 0], owner_data = [1 0]
