@@ -56,7 +56,8 @@ class SummationDensity(Equation):
         super(SummationDensity, self).__init__(dest, sources)
         
     def initialize(
-        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_omega):
+        self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_dwdh):
+
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
         
@@ -64,8 +65,7 @@ class SummationDensity(Equation):
         d_grhoy[d_idx] = 0.0
         d_arho[d_idx]  = 0.0
 
-        # Set the default omega to 1.0.
-        d_omega[d_idx] = 1.0
+        d_dwdh[d_idx] = 0.0
 
         # set the converged attribute for the Equation to True. Within
         # the post-loop, if any particle hasn't converged, this is set
@@ -73,7 +73,7 @@ class SummationDensity(Equation):
         self.equation_has_converged = 1
 
     def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
-             d_dwdh, s_m, VIJ, WI, DWI, GHI):
+             d_dwdh, s_m, d_converged, VIJ, WI, DWI, GHI):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
@@ -87,7 +87,7 @@ class SummationDensity(Equation):
         # gradient of density
         d_grhox[d_idx] += mj * DWI[0]
         d_grhoy[d_idx] += mj * DWI[1]
-
+        
         # gradient of kernel w.r.t h
         d_dwdh[d_idx] += mj * GHI
 
@@ -214,23 +214,39 @@ class Monaghan92Accelerations(Equation):
         d_ae[d_idx] += 0.5 * s_m[s_idx] * (tmpi + tmpj + piij) * vijdotdwij
 
 class MPMAccelerations(Equation):
-    def __init__(self, dest, sources, alpha1=1.0, alpha2=0.1, beta=2.0):
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
+    def __init__(
+        self, dest, sources, beta=2.0, 
+        update_alapha1=False, update_alapha2=False, 
+        alpha1_min=0.1, alpha2_min=0.1, sigma=0.1):
 
         self.beta = beta
+        self.sigma = sigma
+
+        self.update_alapha1 = update_alapha1
+        self.update_alapha2 = update_alapha2
+
+        self.alpha1_min = alpha1_min
+        self.alpha2_min = alpha2_min
+
         super(MPMAccelerations, self).__init__(dest, sources)
         
-    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae, d_am):
+    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae, d_am,
+                   d_aalpha1, d_aalpha2, d_del2e):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
         d_ae[d_idx] = 0.0
 
+        d_aalpha1[d_idx] = 0.0
+        d_aalpha2[d_idx] = 0.0
+
+        d_del2e[d_idx] = 0.0
+
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs,
              d_e, s_e, d_rho, s_rho, d_au, d_av, d_aw, d_ae,
-             XIJ, VIJ, DWI, DWJ, DWIJ, HIJ, EPS, RIJ, R2IJ, RHOIJ,
-             DT_ADAPT):
+             d_omega, s_omega, XIJ, VIJ, DWI, DWJ, DWIJ, HIJ,
+             d_del2e, d_alpha1, s_alpha1, d_alpha2, s_alpha2,
+             EPS, RIJ, R2IJ, RHOIJ, DT_ADAPT):
 
         # particle pressure
         pi = d_p[d_idx]
@@ -243,6 +259,9 @@ class MPMAccelerations(Equation):
         # pj/rhoj**2
         rhoj2 = s_rho[s_idx]*s_rho[s_idx]
         pjbrhoj2 = pj/rhoj2
+
+        # averaged sound speed
+        cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
         
         # averaged mass
         mi = d_m[d_idx]
@@ -253,7 +272,7 @@ class MPMAccelerations(Equation):
         ci = d_cs[d_idx]
         cj = s_cs[s_idx]
         cij = 0.5 * (ci + cj)
-        
+
         # normalized interaction vector
         if RIJ < 1e-8:
             XIJ[0] = 0.0
@@ -264,7 +283,7 @@ class MPMAccelerations(Equation):
             XIJ[1] /= RIJ
             XIJ[2] /= RIJ
 
-        # v_{ij} \cdot r_{ij}
+        # v_{ij} \cdot r_{ij} or vijdotxij
         dot = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
         
         # scalar part of the kernel gradient DWIJ
@@ -272,30 +291,57 @@ class MPMAccelerations(Equation):
 
         # signal velocities
         pdiff = abs(pi-pj)
-        vsig1 = 0.5 * max(ci + cj - self.beta*dot, 0.0)
+        vsig1 = 0.5 * max(cij - self.beta*dot, 0.0)
         vsig2 = sqrt( pdiff/RHOIJ )
+
+        # compute the Courant-limited time step factor.
+        DT_ADAPT[0] = max( DT_ADAPT[0], cij + self.beta * dot )
 
         # Artificial viscosity
         if dot <= 0.0:
 
             # viscosity
-            tmpv = mj/RHOIJ * self.alpha1 * vsig1 * dot
+            alpha1 = 0.5 * (d_alpha1[d_idx] + s_alpha1[s_idx])
+            tmpv = mj/RHOIJ * alpha1 * vsig1 * dot
             d_au[d_idx] += tmpv * DWIJ[0]
             d_av[d_idx] += tmpv * DWIJ[1]
             d_aw[d_idx] += tmpv * DWIJ[2]
 
             # viscous contribution to the thermal energy
-            d_ae[d_idx] += -0.5*mj/RHOIJ*self.alpha1*vsig1*dot*dot*Fij
+            d_ae[d_idx] += -0.5*mj/RHOIJ*alpha1*vsig1*dot*dot*Fij
+
+        # grad-h correction terms. These will be set to 1.0 by the
+        # integrator and thus can be used safely.
+        omegai = d_omega[d_idx]; omegaj = s_omega[s_idx]
 
         # gradient terms
-        d_au[d_idx] += -mj*(pibrhoi2*DWI[0] + pjbrhoj2*DWJ[0])
-        d_av[d_idx] += -mj*(pibrhoi2*DWI[1] + pjbrhoj2*DWJ[1])
-        d_aw[d_idx] += -mj*(pibrhoi2*DWI[2] + pjbrhoj2*DWJ[2])
+        d_au[d_idx] += -mj*(pibrhoi2*omegai*DWI[0] + pjbrhoj2*omegaj*DWJ[0])
+        d_av[d_idx] += -mj*(pibrhoi2*omegai*DWI[1] + pjbrhoj2*omegaj*DWJ[1])
+        d_aw[d_idx] += -mj*(pibrhoi2*omegai*DWI[2] + pjbrhoj2*omegaj*DWJ[2])
 
         # accelerations for the thermal energy
         vijdotdwi = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
-        d_ae[d_idx] += mj * pibrhoi2 * vijdotdwi
+        d_ae[d_idx] += mj * pibrhoi2 * omegai * vijdotdwi
 
         # thermal conduction
+        alpha2 = 0.5 * (d_alpha2[d_idx] + s_alpha2[s_idx])
         eij = d_e[d_idx] - s_e[s_idx]
-        d_ae[d_idx] += mj/RHOIJ * self.alpha2 * vsig2 * eij * Fij
+        d_ae[d_idx] += mj/RHOIJ * alpha2 * vsig2 * eij * Fij
+
+        # Laplacian of thermal energy
+        d_del2e[d_idx] += mj/s_rho[s_idx] * eij/(RIJ + EPS) * Fij
+
+    def post_loop(self, d_idx, d_h, d_cs, d_alpha1, d_aalpha1, d_div, 
+                  d_del2e, d_e, d_alpha2, d_aalpha2):
+
+        hi = d_h[d_idx]
+        tau = hi/(self.sigma*d_cs[d_idx])
+
+        if self.update_alapha1:
+            S1 = max( -d_div[d_idx], 0.0 )
+            d_aalpha1[d_idx] = (self.alpha1_min - d_alpha1[d_idx])/tau + S1
+
+        if self.update_alapha2:
+            #S2 = d_h[d_idx] * abs(d_del2e[d_idx])/sqrt(d_e[d_idx])
+            S2 = 0.01 * d_h[d_idx] * d_del2e[d_idx]
+            d_aalpha2[d_idx] = (self.alpha2_min - d_alpha2[d_idx])/tau + S2

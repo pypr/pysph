@@ -1,10 +1,6 @@
 PySPH: a Python-based SPH framework
 ====================================
 
-.. image:: https://drone.io/bitbucket.org/pysph/pysph/status.png
-    :alt: Build Status
-    :target: https://drone.io/bitbucket.org/pysph/pysph/latest
-
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics (SPH)
 simulations.  It is implemented in Python_ and the performance critical parts
@@ -29,7 +25,8 @@ Features
   - User scripts and equations are written in pure Python.
   - Flexibility to define arbitrary SPH equations operating on particles.
   - Solver framework to add arbitrary collection of particles.
-  - High-performance.
+  - High-performance: our performance is comparable to hand-written solvers
+    implemented in FORTRAN.
   - Seamless parallel integration using Zoltan_.
 
 Solvers
@@ -57,13 +54,18 @@ following formulations are currently implemented:
 
 .. figure:: ../Images/rings-collision.png
    :align: center
-   
+
    Collision of two elastic rings.
+
+
+- `Compressible SPH`_ (Puri et al. 2014, JCP, Vol. 256, pp 308--333)
 
 .. _`Weakly Compressible SPH (WCSPH)`: http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250
 
 .. _`Transport Velocity Formulation`: http://dx.doi.org/10.1016/j.jcp.2013.01.043
 
 .. _`SPH for elastic dynamics`: http://dx.doi.org/10.1016/S0045-7825(01)00254-7
+
+.. _`Compressible SPH`: http://dx.doi.org/10.1016/j.jcp.2013.08.060
 
 .. _`Test 2`: https://wiki.manchester.ac.uk/spheric/index.php/Test2

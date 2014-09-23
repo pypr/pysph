@@ -73,7 +73,7 @@ class Integrator(object):
         dt_visc_factor = a_eval.dt_viscous
 
         # force factor is acceleration squared
-        dt_force_factor = sqrt(a_eval.dt_force)
+        dt_force_factor = a_eval.dt_force
 
         # iterate over particles and find hmin if using vatialbe h
         if not self.fixed_h:
@@ -90,7 +90,7 @@ class Integrator(object):
 
         # stable time step based on force criterion
         if dt_force_factor > 0:
-            dt_force = sqrt( hmin/dt_force_factor )
+            dt_force = sqrt( hmin/sqrt(dt_force_factor) )
 
         # stable time step based on viscous condition
         if dt_visc_factor > 0:
