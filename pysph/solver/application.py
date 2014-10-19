@@ -355,7 +355,15 @@ class Application(object):
         the logging automatically.
 
         """
-        (options, args) = self.opt_parse.parse_args(self.args)
+        try:
+            # If this is being run inside an IPython console or notebook
+            # then this is defined and we should not parse the command line
+            # arguments.
+            __IPYTHON__
+        except NameError:
+            (options, args) = self.opt_parse.parse_args(self.args)
+        else:
+            (options, args) = self.opt_parse.parse_args([])
         self.options = options
 
         # Setup logging based on command line options.
