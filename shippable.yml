@@ -1,5 +1,9 @@
 language: python
 
+# See here: http://docs.shippable.com/en/latest/config.html#caching-minions
+# Add [reset_minion] to the commit message to reset the minion.
+cache: true
+
 python:
     - 2.7
 
