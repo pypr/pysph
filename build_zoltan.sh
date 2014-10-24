@@ -36,7 +36,7 @@ Download()
 Build()
 {
     cd $BUILD_DIR
-    tar xzf zoltan_distrib*.tar.gz &> /dev/null
+    tar xzf zoltan_distrib*.tar.gz
     cd Zoltan_v3.8
     mkdir build
     cd build

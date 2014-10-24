@@ -1,7 +1,6 @@
 PySPH: a Python-based SPH framework
 -------------------------------------
-
-[![Build Status](https://api.shippable.com/projects/53a87e47f989286000c78a06/badge/master)](https://www.shippable.com/projects/53a87e47f989286000c78a06)
+[![Build Status](https://api.shippable.com/projects/540e849c3479c5ea8f9f030e/badge?branchName=master)](https://app.shippable.com/projects/540e849c3479c5ea8f9f030e/builds/latest)
 [![Build Status](https://drone.io/bitbucket.org/pysph/pysph/status.png)](https://drone.io/bitbucket.org/pysph/pysph/latest)
 
 
