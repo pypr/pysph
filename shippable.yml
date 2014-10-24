@@ -19,11 +19,10 @@ before_install:
     - ./build_zoltan.sh $HOME/zoltan
 
 install:
-    # These are needed because system_site_packages doesn't work.
-    - pip install numpy
+    # This hack gets system_site_packages doesn't woking.
+    - rm $VIRTUAL_ENV/lib/python2.7/no-global-site-packages.txt
+    # We need a recent version of Cython.
     - pip install cython
-    - pip install mpi4py
-    - pip install mako nose
     # Build pysph.
     - make clean
     - python setup.py develop
