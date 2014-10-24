@@ -13,16 +13,15 @@ env:
 before_install:
     # System dependencies via apt.
     - sudo apt-get install build-essential python-dev libopenmpi-dev
-    # Again, the following are not useful without system_site_packages support.
     - sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose
     # Build zoltan.
     - ./build_zoltan.sh $HOME/zoltan
 
 install:
-    # This hack gets system_site_packages doesn't woking.
+    # This hack gets system_site_packages working.
     - rm $VIRTUAL_ENV/lib/python2.7/no-global-site-packages.txt
     # We need a recent version of Cython.
-    - pip install cython
+    - pip install --upgrade cython
     # Build pysph.
     - make clean
     - python setup.py develop
