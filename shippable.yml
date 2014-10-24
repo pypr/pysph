@@ -8,7 +8,7 @@ virtualenv:
     system_site_packages: true
 
 env:
-    - ZOLTAN_DIR=$HOME/zoltan ZOLTAN_INCLUDE=$ZOLTAN_DIR/include ZOLTAN_LIBRARY=$ZOLTAN_DIR/lib
+    - ZOLTAN_INCLUDE=$HOME/zoltan/include ZOLTAN_LIBRARY=$HOME/zoltan/lib
 
 before_install:
     # System dependencies via apt.
@@ -16,7 +16,7 @@ before_install:
     # Again, the following are not useful without system_site_packages support.
     - sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose
     # Build zoltan.
-    - ./build_zoltan.sh $ZOLTAN_DIR
+    - ./build_zoltan.sh $HOME/zoltan
 
 install:
     # These are needed because system_site_packages doesn't work.
