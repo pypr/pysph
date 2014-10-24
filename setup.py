@@ -51,7 +51,7 @@ def get_zoltan_directory(varname):
         return ''
     if not path.exists(d):
         print "*"*80
-        print varname, "incorrectly set, not using ZOLTAN!"
+        print "%s incorrectly set to %s, not using ZOLTAN!"%(varname, d)
         print "*"*80
         return ''
     return d
