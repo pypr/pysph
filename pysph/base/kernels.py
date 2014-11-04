@@ -274,10 +274,8 @@ class QuinticSpline(object):
 
         self.fac = M_1_PI * 7.0/478.0
 
-    # FIXME: this is incorrect for the moment and needs to be
-    # calculated. Do not use this kernel with Monaghan style.
     def get_deltap(self):
-        return 1.0
+        return 0.759298480738450
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
