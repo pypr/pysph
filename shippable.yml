@@ -1,5 +1,9 @@
 language: python
 
+# See here: http://docs.shippable.com/en/latest/config.html#caching-minions
+# Add [reset_minion] to the commit message to reset the minion.
+cache: true
+
 python:
     - 2.7
 
@@ -8,22 +12,20 @@ virtualenv:
     system_site_packages: true
 
 env:
-    - ZOLTAN_DIR=$HOME/zoltan ZOLTAN_INCLUDE=$ZOLTAN_DIR/include ZOLTAN_LIBRARY=$ZOLTAN_DIR/lib
+    - ZOLTAN_INCLUDE=$HOME/zoltan/include ZOLTAN_LIBRARY=$HOME/zoltan/lib
 
 before_install:
     # System dependencies via apt.
     - sudo apt-get install build-essential python-dev libopenmpi-dev
-    # Again, the following are not useful without system_site_packages support.
     - sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose
     # Build zoltan.
-    - ./build_zoltan.sh $ZOLTAN_DIR
+    - ./build_zoltan.sh $HOME/zoltan
 
 install:
-    # These are needed because system_site_packages doesn't work.
-    - pip install numpy
-    - pip install cython
-    - pip install mpi4py
-    - pip install mako nose
+    # This hack gets system_site_packages working.
+    - rm $VIRTUAL_ENV/lib/python2.7/no-global-site-packages.txt
+    # We need a recent version of Cython.
+    - pip install --upgrade cython
     # Build pysph.
     - make clean
     - python setup.py develop
