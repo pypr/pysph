@@ -224,17 +224,17 @@ def precomputed_symbols():
                 DWJ=[0.0, 0.0, 0.0])
 
     c.GHI = BasicCodeBlock(
-                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])", 
+                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])",
                 GHI=0.0)
 
     c.GHJ = BasicCodeBlock(
-                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])", 
+                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])",
                 GHJ=0.0)
 
     c.GHIJ= BasicCodeBlock(
-                code="GHIJ = GRADH(XIJ, RIJ, HIJ)", 
+                code="GHIJ = GRADH(XIJ, RIJ, HIJ)",
                 GHIJ=0.0)
-    
+
     return c
 
 
@@ -345,7 +345,7 @@ class Group(object):
 
     pre_comp = precomputed_symbols()
 
-    def __init__(self, equations, real=True, update_nnps=False, iterate=False, 
+    def __init__(self, equations, real=True, update_nnps=False, iterate=False,
                  max_iterations=1):
         """Constructor.
 
@@ -362,9 +362,9 @@ class Group(object):
 
         - iterate: bool: specifies if the group should continue iterating
                          until each equation's "converged()" methods returns
-                         with a postive value.
+                         with a positive value.
 
-        - max_iterations: int: specifies the maximum number of times this 
+        - max_iterations: int: specifies the maximum number of times this
                           group should be iterated
 
         Note that when running simulations in parallel, one should typically
@@ -382,9 +382,17 @@ class Group(object):
         # iterative groups
         self.iterate = iterate
         self.max_iterations = max_iterations
-        
+
+        only_groups = [x for x in equations if isinstance(x, Group)]
+        if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
+            raise ValueError('All elements must be Groups if you use sub groups.')
+
+        # This group has only sub-groups.
+        self.has_subgroups = len(only_groups) > 0
+
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
+
         self.context = Context()
         self.update()
 
@@ -498,7 +506,8 @@ class Group(object):
     # Public interface.
     ##########################################################################
     def update(self):
-        self._setup_precomputed()
+        if not self.has_subgroups:
+            self._setup_precomputed()
 
     def get_array_names(self, recompute=False):
         """Returns two sets of array names, the first being source_arrays
@@ -577,12 +586,16 @@ class Group(object):
         return self._set_kernel(code, kernel)
 
     def get_converged_condition(self):
-        code = []
-        for equation in self.equations:
-            code.append('(self.%s.converged() > 0)'%equation.var_name)
-        # Note, we use '&' because we want to call converged on all equations.
-        # and not be short-circuited by the first one that returns False.
-        return ' & '.join(code)
+        if self.has_subgroups:
+            code = [g.get_converged_condition() for g in self.equations]
+            return ' & '.join(code)
+        else:
+            code = []
+            for equation in self.equations:
+                code.append('(self.%s.converged() > 0)'%equation.var_name)
+            # Note, we use '&' because we want to call converged on all equations.
+            # and not be short-circuited by the first one that returns False.
+            return ' & '.join(code)
 
     def get_equation_wrappers(self):
         classes = defaultdict(lambda: 0)
