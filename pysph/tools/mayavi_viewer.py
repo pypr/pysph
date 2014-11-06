@@ -827,6 +827,9 @@ def main(args=None):
             if arg.endswith('.npz'):
                 files.extend(glob.glob(arg))
                 continue
+            elif os.path.isdir(arg):
+                files.extend(glob.glob(os.path.join(arg, '*.npz')))
+                continue
             else:
                 usage()
                 sys.exit(1)
