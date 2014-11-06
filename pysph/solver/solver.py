@@ -448,14 +448,18 @@ class Solver(object):
 
                 if numpy.any( condition ):
                     output_time = output_at_times[ numpy.where(condition) ]
+                    if abs(output_time - self.t) > 1e-14:
+                        # It sometimes happens that the current time is just
+                        # shy of the requested output time which results in a
+                        # ridiculously small dt so we skip that case.
 
-                    # save the old time-step and compute the new
-                    # time-step to fall on the specified output time
-                    # instant
-                    old_dt = dt
-                    dt = float( output_time - self.t )
+                        # save the old time-step and compute the new
+                        # time-step to fall on the specified output time
+                        # instant
+                        old_dt = dt
+                        dt = float( output_time - self.t )
 
-                    self.force_output = True
+                        self.force_output = True
 
             # set the adjusted time-step for the solver
             self.dt = dt
