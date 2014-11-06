@@ -203,7 +203,11 @@ class Gaussian(object):
             self.fac *= 0.5*M_2_SQRTPI
 
     def get_deltap(self):
-        return 2.2360679774997898
+        # The inflection point is at q=1/sqrt(2)
+        # the deltap values for some standard kernels
+        # have been tabulated in sec 3.2 of
+        # http://cfd.mace.manchester.ac.uk/sph/SPH_PhDs/2008/crespo_thesis.pdf
+        return 0.70710678118654746
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h
@@ -275,6 +279,9 @@ class QuinticSpline(object):
         self.fac = M_1_PI * 7.0/478.0
 
     def get_deltap(self):
+        # The inflection points for the polynomial are obtained as
+        # http://www.wolframalpha.com/input/?i=%28%283-x%29%5E5+-+6*%282-x%29%5E5+%2B+15*%281-x%29%5E5%29%27%27
+        # the only permissible value is taken
         return 0.759298480738450
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
