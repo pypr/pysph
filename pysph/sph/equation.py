@@ -346,7 +346,7 @@ class Group(object):
     pre_comp = precomputed_symbols()
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
-                 max_iterations=1):
+                 max_iterations=1, min_iterations=0):
         """Constructor.
 
         Parameters
@@ -365,7 +365,10 @@ class Group(object):
                          with a positive value.
 
         - max_iterations: int: specifies the maximum number of times this
-                          group should be iterated
+                          group should be iterated.
+
+        - min_iterations: int: specifies the minimum number of times this
+                          group should be iterated.
 
         Note that when running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
@@ -382,6 +385,7 @@ class Group(object):
         # iterative groups
         self.iterate = iterate
         self.max_iterations = max_iterations
+        self.min_iterations = min_iterations
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
