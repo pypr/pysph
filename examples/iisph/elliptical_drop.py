@@ -23,7 +23,7 @@ SPH equations.
 from numpy import ones_like, mgrid, sqrt
 
 # PySPH base and carray imports
-from pysph.base.utils import get_particle_array_wcsph
+from pysph.base.utils import get_particle_array_iisph
 from pysph.base.kernels import CubicSpline
 
 # PySPH solver and integrator
@@ -91,21 +91,11 @@ def get_circular_patch(dx=0.025, **kwargs):
         if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
             indices.append(i)
 
-    pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
+    pa = get_particle_array_iisph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
                                   name=name)
     pa.remove_particles(indices)
 
     print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
-
-    # add requisite variables needed for this formulation
-    for name in ('uadv', 'vadv', 'wadv', 'rho_adv',
-                 'au', 'av', 'aw',
-                 'dii0', 'dii1', 'dii2',
-                 'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p0' ):
-        pa.add_property(name)
-
-    # set the output property arrays
-    pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'h', 'p', 'pid', 'tag', 'gid'] )
 
     return [pa,]
 

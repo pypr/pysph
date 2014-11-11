@@ -35,8 +35,7 @@ def arange_long(start, stop=-1):
         return arange
 
 
-def get_particle_array(
-    additional_props=None, **props):
+def get_particle_array(additional_props=None, **props):
     """ Create and return a particle array with default properties
 
     Parameters
@@ -197,10 +196,24 @@ def get_particle_array_wcsph(**props):
     # create the particle array
     pa = ParticleArray(name=name, **prop_dict)
 
-    # default property arrays to save out. 
+    # default property arrays to save out.
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
                            'pid', 'gid', 'tag', 'p'] )
 
+    return pa
+
+def get_particle_array_iisph(**props):
+    """Get a particle array for the IISPH formulation."""
+    iisph_props = ['uadv', 'vadv', 'wadv', 'rho_adv',
+                 'au', 'av', 'aw','ax', 'ay', 'az',
+                 'dii0', 'dii1', 'dii2', 'V',
+                 'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
+                 'rho0'
+                 ]
+    pa = get_particle_array(additional_props=iisph_props, **props)
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid',
+                           'rho_adv', 'V', 'aii'] )
     return pa
 
 def get_particle_array_tvf_fluid(**props):
@@ -230,7 +243,7 @@ def get_particle_array_gasd(**props):
         'del2e']
 
     pa = get_particle_array( additional_props=required_props, **props )
-    
+
     # set the intial smoothing length h0 to the particle smoothing
     # length. This can result in an annoying error in the density
     # iterations which require the h0 array
@@ -253,7 +266,7 @@ def get_particles_info(particles):
     for parray in particles:
         info[ parray.name ] = {}
         for prop_name, prop in parray.properties.iteritems():
-            
+
             info[ parray.name ][prop_name] = {
                 'name':prop_name, 'type':prop.get_c_type(),
                 'default':parray.default_values[prop_name],
@@ -268,4 +281,3 @@ def create_dummy_particles(info):
         particles.append( ParticleArray(name=name, **prop_dict) )
 
     return particles
-
