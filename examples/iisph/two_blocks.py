@@ -84,7 +84,7 @@ equations = [
             AdvectionAcceleration(
                 dest='fluid', sources=None, gx=0.0, gy=0.0, gz=0.0
             ),
-            ViscosityAcceleration(dest='fluid', sources=['fluid'], nu=8.9e-4),
+            #ViscosityAcceleration(dest='fluid', sources=['fluid'], nu=8.9e-4),
             ComputeDII(dest='fluid', sources=['fluid']),
         ]
     ),
