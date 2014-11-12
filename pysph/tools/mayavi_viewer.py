@@ -14,7 +14,8 @@ import os.path
 
 try:
     from traits.api import (Array, HasTraits, Instance, on_trait_change,
-                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+                            List, Str, Int, Range, Float, Bool, Button,
+                            Directory, Password, Property)
     from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup)
     from mayavi.core.api import PipelineBase
@@ -24,7 +25,8 @@ try:
     from tvtk.array_handler import array2vtk
 except ImportError:
     from enthought.traits.api import (Array, HasTraits, Instance, on_trait_change,
-                            List, Str, Int, Range, Float, Bool, Button, Password, Property)
+                            List, Str, Int, Range, Float, Bool, Button,
+                            Directory, Password, Property)
     from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup)
     from enthought.mayavi.core.api import PipelineBase
@@ -394,6 +396,7 @@ class MayaviViewer(HasTraits):
     ########################################
     # Traits to view saved solver output.
     files = List(Str, [])
+    directory = Directory()
     current_file = Str('', desc='the file being viewed currently')
     update_files = Button('Refresh')
     file_count = Range(low='_low', high='n_files', value=0,
@@ -440,6 +443,7 @@ class MayaviViewer(HasTraits):
                           defined_when='n_files==-1',
                           ),
                     Group(
+                          Item(name='directory'),
                           Item(name='current_file'),
                           Item(name='file_count'),
                           HGroup(Item(name='play'),
@@ -671,6 +675,7 @@ class MayaviViewer(HasTraits):
         else:
             d = os.path.dirname(os.path.abspath(value[0]))
             self.movie_directory = os.path.join(d, 'movie')
+            self.set(directory=d, trait_change_notify=False)
         self.n_files = len(value) - 1
         self.frame_interval = 1
         fc = self.file_count
@@ -761,6 +766,16 @@ class MayaviViewer(HasTraits):
         sort_file_list(files)
         self.files = files
         self.file_count = fc
+
+    def _directory_changed(self, d):
+        files = glob.glob(os.path.join(d, '*.npz'))
+        if len(files) > 0:
+            files = glob_files(files[0])
+            sort_file_list(files)
+            self.files = files
+            self.file_count = min(self.file_count, len(files))
+        else:
+            pass
 
 ######################################################################
 def usage():
