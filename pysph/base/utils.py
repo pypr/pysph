@@ -212,8 +212,7 @@ def get_particle_array_iisph(**props):
                  ]
     pa = get_particle_array(additional_props=iisph_props, **props)
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
-                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid',
-                           'rho_adv', 'V', 'aii'] )
+                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'] )
     return pa
 
 def get_particle_array_tvf_fluid(**props):
