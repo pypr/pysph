@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to PySPH's documentation!
-=================================
+Welcome to the PySPH documentation!
+====================================
 
 *********************************
 Installation and getting started
@@ -15,33 +15,18 @@ Installation and getting started
 
    overview.rst
    installation.rst
-   using_pysph.rst
-
-**********
-Tutorials
-**********
-
-.. toctree::
-   :maxdepth: 1
-
    tutorial/circular_patch.rst
 
-**************************************
-Extending PySPH and code-generation
-**************************************
+
+***************************
+The framework and library
+***************************
 
 .. toctree::
    :maxdepth: 2
 
    design/overview.rst
-
-**********
-PyZoltan
-**********
-
-.. toctree::
-   :maxdepth: 2
-   
+   using_pysph.rst
    pyzoltan/overview
 
 ************************
