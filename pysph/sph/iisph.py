@@ -25,9 +25,9 @@ class IISPHStep(IntegratorStep):
         d_v[d_idx] = d_vadv[d_idx] + dt * d_av[d_idx]
         d_w[d_idx] = d_wadv[d_idx] + dt * d_aw[d_idx]
 
-        d_x[d_idx] += dt * d_ax[d_idx]
-        d_y[d_idx] += dt * d_ay[d_idx]
-        d_z[d_idx] += dt * d_az[d_idx]
+        d_x[d_idx] += dt * d_u[d_idx]
+        d_y[d_idx] += dt * d_v[d_idx]
+        d_z[d_idx] += dt * d_w[d_idx]
 
 
 class NumberDensity(Equation):
@@ -254,13 +254,13 @@ class PressureSolve(Equation):
         tmp = self.rho0 - d_rho_adv[d_idx] - d_p[d_idx]
         p = (1.0 - self.omega)*d_piter[d_idx] + self.omega/d_aii[d_idx]*tmp
 
-        aii_min = dt*dt*1e-2
+        aii_min = dt*dt*0.01
 
         # Clamp pressure to positive values.
         if p < 0.0:
             p = 0.0
         elif abs(d_aii[d_idx]) < aii_min :
-            p = d_p0[d_idx]
+            p = 0.0
         else:
             compression =  p*d_aii[d_idx] - tmp
             self.compression += compression

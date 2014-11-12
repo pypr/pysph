@@ -10,7 +10,6 @@ from db_geometry import create_2D_filled_region
 
 from pysph.base.kernels import CubicSpline
 from pysph.base.utils import get_particle_array_iisph
-from pysph.sph.basic_equations import XSPHCorrection
 from pysph.sph.equation import Group
 
 from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII, ComputeDII,
@@ -66,8 +65,9 @@ integrator = EulerIntegrator(fluid=IISPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf,
+                dt=dt, tf=tf, adaptive_timestep=True,
                 fixed_h=False)
+solver.set_print_freq(10)
 
 # create the equations
 equations = [
@@ -109,7 +109,7 @@ equations = [
                 equations=[
                     PressureSolve(
                         dest='fluid', sources=['fluid'], rho0=rho0,
-                        tolerance=1e-3, debug=True
+                        tolerance=1e-3, debug=False
                     ),
                   ]
             ),
@@ -122,7 +122,6 @@ equations = [
     Group(
         equations=[
             PressureForce(dest='fluid', sources=['fluid']),
-            XSPHCorrection(dest='fluid', sources=['fluid']),
         ],
     ),
 ]

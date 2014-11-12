@@ -3,6 +3,13 @@ the art classical SPH for free surface flows", Benedict D Rogers,
 Robert A, Dalrymple and Alex J.C Crespo, Journal of Hydraulic
 Research, Vol 48, Extra Issue (2010), pp 6-27
 
+This version uses the Implicit Incompressible SPH technique described by
+
+M. Ihmsen, J. Cornelis, B. Solenthaler, C. Horvath, M. Teschner, "Implicit
+Incompressible SPH," IEEE Transactions on Visualization and Computer Graphics,
+vol. 20, no. 3, pp. 426-435, March 2014.
+http://dx.doi.org/10.1109/TVCG.2013.105
+
 
 Setup:
 ------
@@ -62,14 +69,6 @@ Number of particles = 27639 + 1669 = 29308
 
 
 ro = 1000.0
-co = 10*sqrt(2*9.81*2) ~ 65.0
-gamma = 7.0
-
-Artificial Viscosity:
-alpha = 0.5
-
-XSPH Correction:
-eps = 0.5
 
 """
 
@@ -77,18 +76,17 @@ import sys
 import os
 # Need this to import db_geometry.
 sys.path.append(os.pardir)
-import numpy
 from db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline
-from pysph.sph.basic_equations import XSPHCorrection
 from pysph.sph.equation import Group
 
-from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII, ComputeAIIBoundary,
-    ComputeDII,
-    ComputeDIIBoundary, ComputeDIJPJ, ComputeRhoAdvection, ComputeRhoBoundary,
-    IISPHStep, NumberDensity, PressureSolve, PressureSolveBoundary,
-    PressureForce, PressureForceBoundary, SummationDensity, SummationDensityBoundary)
+from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII,
+    ComputeAIIBoundary, ComputeDII, ComputeDIIBoundary, ComputeDIJPJ,
+    ComputeRhoAdvection, ComputeRhoBoundary, IISPHStep, NumberDensity,
+    PressureSolve, PressureSolveBoundary, PressureForce,
+    PressureForceBoundary, SummationDensity, SummationDensityBoundary,
+    ViscosityAcceleration)
 
 from pysph.sph.integrator import EulerIntegrator
 
@@ -103,7 +101,7 @@ container_height = 3.0
 container_width  = 4.0
 nboundary_layers=2
 
-dt = 1e-3
+dt = 1e-2
 tf = 2.5
 
 hdx = 1.0
@@ -122,8 +120,8 @@ geom = DamBreak2DGeometry(
 
 def create_particles(**kw):
     fluid, boundary = geom.create_particles(**kw)
-    boundary.x -= 0.05
-    boundary.y -= 0.05
+    boundary.x -= 0.025
+    boundary.y -= 0.025
     return [fluid, boundary]
 
 # Create the application.
@@ -140,8 +138,9 @@ integrator = EulerIntegrator(fluid=IISPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf,
+                dt=dt, tf=tf, adaptive_timestep=True,
                 fixed_h=False)
+solver.set_print_freq(10)
 
 # create the equations
 equations = [
@@ -169,6 +168,9 @@ equations = [
         equations=[
             AdvectionAcceleration(
                 dest='fluid', sources=None, gx=0.0, gy=-9.81, gz=0.0
+            ),
+            ViscosityAcceleration(
+                dest='fluid', sources=['fluid', 'boundary'], nu=8.9e-4
             ),
             ComputeDII(dest='fluid', sources=['fluid']),
             ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
@@ -212,7 +214,6 @@ equations = [
         equations=[
             PressureForce(dest='fluid', sources=['fluid']),
             PressureForceBoundary(dest='fluid', sources=['boundary'], rho0=ro),
-            XSPHCorrection(dest='fluid', sources=['fluid']),
         ],
     ),
 ]

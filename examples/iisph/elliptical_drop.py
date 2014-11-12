@@ -31,7 +31,6 @@ from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
 # PySPH sph imports
-from pysph.sph.basic_equations import XSPHCorrection
 from pysph.sph.equation import Group
 from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII, ComputeDII,
     ComputeDIJPJ, ComputeRhoAdvection, IISPHStep, PressureSolve, PressureForce,
@@ -175,7 +174,6 @@ equations = [
     Group(
         equations=[
             PressureForce(dest='fluid', sources=['fluid']),
-            XSPHCorrection(dest='fluid', sources=['fluid']),
         ],
     ),
 
