@@ -98,13 +98,31 @@ class ViscosityAcceleration(Equation):
         self.nu = nu
         super(ViscosityAcceleration, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_au, d_av, d_aw, s_idx, s_rho, s_m, EPS,
+    def loop(self, d_idx, d_au, d_av, d_aw, s_idx, s_m, EPS,
+             VIJ, XIJ, RHOIJ1, R2IJ, DWIJ):
+        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
+        fac = self.nu*s_m[s_idx]*RHOIJ1*vijdotxij/(R2IJ + EPS)
+        d_au[d_idx] += fac*DWIJ[0]
+        d_av[d_idx] += fac*DWIJ[1]
+        d_aw[d_idx] += fac*DWIJ[2]
+
+class ViscosityAccelerationBoundary(Equation):
+    """The acceleration on the fluid due to a boundary.
+    """
+    def __init__(self, dest, sources=None, rho0=1.0, nu=1.0):
+        self.nu = nu
+        self.rho0 = rho0
+        super(ViscosityAccelerationBoundary, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_au, d_av, d_aw, d_rho, s_idx, s_V, EPS,
              VIJ, XIJ, R2IJ, DWIJ):
-        xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
-        fac = 2.0*self.nu*s_m[s_idx]/s_rho[s_idx]*xijdotdwij/(R2IJ + EPS)
-        d_au[d_idx] += fac*VIJ[0]
-        d_av[d_idx] += fac*VIJ[1]
-        d_aw[d_idx] += fac*VIJ[2]
+        phi_b = self.rho0/(s_V[s_idx]*d_rho[d_idx])
+        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
+
+        fac = self.nu*phi_b*vijdotxij/(R2IJ + EPS)
+        d_au[d_idx] += fac*DWIJ[0]
+        d_av[d_idx] += fac*DWIJ[1]
+        d_aw[d_idx] += fac*DWIJ[2]
 
 
 class ComputeDII(Equation):

@@ -86,7 +86,7 @@ from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII,
     ComputeRhoAdvection, ComputeRhoBoundary, IISPHStep, NumberDensity,
     PressureSolve, PressureSolveBoundary, PressureForce,
     PressureForceBoundary, SummationDensity, SummationDensityBoundary,
-    ViscosityAcceleration)
+    ViscosityAcceleration, ViscosityAccelerationBoundary)
 
 from pysph.sph.integrator import EulerIntegrator
 
@@ -107,6 +107,7 @@ tf = 2.5
 hdx = 1.0
 dx = dy = 0.02
 ro = 1000.0
+nu = 8.9e-4
 beta = 0.0
 
 geom = DamBreak2DGeometry(
@@ -170,7 +171,10 @@ equations = [
                 dest='fluid', sources=None, gx=0.0, gy=-9.81, gz=0.0
             ),
             ViscosityAcceleration(
-                dest='fluid', sources=['fluid', 'boundary'], nu=8.9e-4
+                dest='fluid', sources=['fluid'], nu=nu
+            ),
+            ViscosityAccelerationBoundary(
+                dest='fluid', sources=['boundary'], nu=nu, rho0=ro,
             ),
             ComputeDII(dest='fluid', sources=['fluid']),
             ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
