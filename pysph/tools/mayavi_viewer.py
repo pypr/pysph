@@ -15,7 +15,7 @@ import os.path
 try:
     from traits.api import (Array, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Password, Property)
+                            Directory, Password, Property, cached_property)
     from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup)
     from mayavi.core.api import PipelineBase
@@ -26,7 +26,7 @@ try:
 except ImportError:
     from enthought.traits.api import (Array, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Password, Property)
+                            Directory, Password, Property, cached_property)
     from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup)
     from enthought.mayavi.core.api import PipelineBase
@@ -169,7 +169,10 @@ class InterpolatorView(HasTraits):
 
     #### Trait handlers  ######################################################
     def _particle_arrays_changed(self, pas):
-        all_props = reduce(set.union, [set(x.properties.keys()) for x in pas])
+        if len(pas) > 0:
+            all_props = reduce(set.union, [set(x.properties.keys()) for x in pas])
+        else:
+            all_props = set()
         self.scalar_list = list(all_props)
         self._arrays_changed = True
         self._update_plot()
@@ -386,12 +389,14 @@ class MayaviViewer(HasTraits):
 
     ########################################
     # Traits to pull data from a live solver.
+    live_mode = Bool(False, desc='if data is obtained from a running solver '\
+                                 'or from saved files')
     host = Str('localhost', desc='machine to connect to')
     port = Int(8800, desc='port to use to connect to solver')
     authkey = Password('pysph', desc='authorization key')
     host_changed = Bool(True)
     client = Instance(MultiprocessingClient)
-    controller = Property()
+    controller = Property(depends_on='live_mode, host_changed')
 
     ########################################
     # Traits to view saved solver output.
@@ -399,12 +404,12 @@ class MayaviViewer(HasTraits):
     directory = Directory()
     current_file = Str('', desc='the file being viewed currently')
     update_files = Button('Refresh')
-    file_count = Range(low='_low', high='n_files', value=0,
+    file_count = Range(low='_low', high='_n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
     loop = Bool(False, desc='if the animation is looped')
     # This is len(files) - 1.
-    n_files = Int(-1)
+    _n_files = Int(0)
     _low = Int(0)
     _play_count = Int(0)
 
@@ -435,33 +440,40 @@ class MayaviViewer(HasTraits):
     # The layout of the dialog created
     view = View(HSplit(
                   Group(
+                    Item(name='live_mode'),
                     Group(
-                          Item(name='host'),
-                          Item(name='port'),
-                          Item(name='authkey'),
-                          label='Connection',
-                          defined_when='n_files==-1',
-                          ),
-                    Group(
-                          Item(name='directory'),
-                          Item(name='current_file'),
-                          Item(name='file_count'),
-                          HGroup(Item(name='play'),
-                                 Item(name='loop'),
-                                 Item(name='update_files', show_label=False),
-                                ),
-                          label='Saved Data',
-                          defined_when='n_files>-1',
-                          ),
+                        Group(
+                            Item(name='directory'),
+                            Item(name='current_file'),
+                            Item(name='file_count'),
+                            HGroup(Item(name='play'),
+                                    Item(name='loop'),
+                                    Item(name='update_files', show_label=False),
+                                    ),
+                            label='Saved Data',
+                            selected=True,
+                            enabled_when='not live_mode',
+                            ),
+                        Group(
+                            Item(name='host'),
+                            Item(name='port'),
+                            Item(name='authkey'),
+                            label='Connection',
+                            enabled_when='live_mode',
+                            ),
+                        layout='tabbed'
+                        ),
                     Group(
                         Group(
                               Item(name='current_time'),
                               Item(name='time_step'),
                               Item(name='iteration'),
                               Item(name='pause_solver',
-                                   enabled_when='n_files==-1'),
+                                   enabled_when='live_mode'
+                                   ),
                               Item(name='interval',
-                                   enabled_when='n_files==-1'),
+                                   enabled_when='not live_mode'
+                                   ),
                               label='Solver',
                              ),
                         Group(
@@ -500,9 +512,9 @@ class MayaviViewer(HasTraits):
     ######################################################################
     # `MayaviViewer` interface.
     ######################################################################
-    @on_trait_change('scene.activated')
+    @on_trait_change('scene:activated')
     def start_timer(self):
-        if self.n_files > -1:
+        if not self.live_mode:
             # No need for the timer if we are rendering files.
             return
 
@@ -511,10 +523,11 @@ class MayaviViewer(HasTraits):
         if not t.IsRunning():
             t.Start(int(self.interval*1000))
 
-    @on_trait_change('scene.activated')
+    @on_trait_change('scene:activated')
     def update_plot(self):
+
         # No need to do this if files are being used.
-        if self.n_files > -1:
+        if not self.live_mode:
             return
 
         # do not update if solver is paused
@@ -523,7 +536,6 @@ class MayaviViewer(HasTraits):
 
         if self.client is None:
             self.host_changed = True
-            return
 
         controller = self.controller
         if controller is None:
@@ -577,11 +589,13 @@ class MayaviViewer(HasTraits):
     ######################################################################
     @on_trait_change('host,port,authkey')
     def _mark_reconnect(self):
-        self.host_changed = True
+        if self.live_mode:
+            self.host_changed = True
 
+    @cached_property
     def _get_controller(self):
         ''' get the controller, also sets the iteration count '''
-        if self.n_files > -1:
+        if not self.live_mode:
             return None
 
         reconnect = self.host_changed
@@ -623,14 +637,15 @@ class MayaviViewer(HasTraits):
             return self.client.controller
 
     def _client_changed(self, old, new):
-        if self.n_files > -1:
+        if not self.live_mode:
             return
+
+        self._clear()
         if new is None:
             return
         else:
             self.pa_names = self.client.controller.get_particle_array_names()
 
-        self.scene.mayavi_scene.children[:] = []
         self.particle_arrays = [ParticleArrayHelper(scene=self.scene, name=x) for x in
                                 self.pa_names]
         self.interpolator = InterpolatorView(scene=self.scene)
@@ -657,13 +672,14 @@ class MayaviViewer(HasTraits):
         return Timer(int(self.interval*1000), self._timer_event)
 
     def _pause_solver_changed(self, value):
-        c = self.controller
-        if c is None:
-            return
-        if value:
-            c.pause_on_next()
-        else:
-            c.cont()
+        if self.live_mode:
+            c = self.controller
+            if c is None:
+                return
+            if value:
+                c.pause_on_next()
+            else:
+                c.cont()
 
     def _record_changed(self, value):
         if value:
@@ -676,7 +692,7 @@ class MayaviViewer(HasTraits):
             d = os.path.dirname(os.path.abspath(value[0]))
             self.movie_directory = os.path.join(d, 'movie')
             self.set(directory=d, trait_change_notify=False)
-        self.n_files = len(value) - 1
+        self._n_files = len(value) - 1
         self.frame_interval = 1
         fc = self.file_count
         self.file_count = 0
@@ -684,7 +700,7 @@ class MayaviViewer(HasTraits):
             # Force an update when our original file count is 0.
             self._file_count_changed(fc)
         t = self.timer
-        if self.n_files > -1:
+        if not self.live_mode:
             if t.IsRunning():
                 t.Stop()
         else:
@@ -716,10 +732,6 @@ class MayaviViewer(HasTraits):
                 # Must set this after setting the scene.
                 pah.set(particle_array=pa, time=t)
                 pas.append(pah)
-                # Turn on the legend for the first particle array.
-
-            if len(pas) > 0:
-                pas[0].set(show_legend=True, show_time=True)
             self.particle_arrays = pas
         else:
             for idx, name in enumerate(pa_names):
@@ -743,8 +755,12 @@ class MayaviViewer(HasTraits):
             t.Stop()
             t.callable = self._timer_event
 
+    def _clear(self):
+        self.pa_names = []
+        self.scene.mayavi_scene.children[:] = []
+
     def _play_event(self):
-        nf = self.n_files
+        nf = self._n_files
         pc = self.file_count
         pc += 1
         if pc > nf:
@@ -770,12 +786,24 @@ class MayaviViewer(HasTraits):
     def _directory_changed(self, d):
         files = glob.glob(os.path.join(d, '*.npz'))
         if len(files) > 0:
+            self._clear()
             files = glob_files(files[0])
             sort_file_list(files)
             self.files = files
             self.file_count = min(self.file_count, len(files))
         else:
             pass
+
+    def _live_mode_changed(self, value):
+        if value:
+            self.client = None
+            self._clear()
+            self._mark_reconnect()
+            self.start_timer()
+        else:
+            self.client = None
+            self._clear()
+            self.timer.Stop()
 
 ######################################################################
 def usage():
@@ -857,12 +885,11 @@ def main(args=None):
         kw[key] = val
 
     sort_file_list(files)
-    # This hack to set n_files first is a dirty hack to work around issues with
-    # setting up the UI but setting the files only after the UI is activated.
+    live_mode = len(files) == 0
+
     # If we set the particle arrays before the scene is activated, the arrays
-    # are not displayed on screen so we use do_later to set the files.  We set
-    # n_files to number of files so as to set the UI up correctly.
-    m = MayaviViewer(n_files=len(files) - 1)
+    # are not displayed on screen so we use do_later to set the  files.
+    m = MayaviViewer(live_mode=live_mode)
     do_later(m.set, files=files, **kw)
     m.configure_traits()
 
