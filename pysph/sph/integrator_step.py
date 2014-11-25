@@ -8,15 +8,10 @@ Implement as many stages as needed.
 # `IntegratorStep` class
 ###############################################################################
 class IntegratorStep(object):
-    """Subclass this and implement the methods ``stage1`` and ``stage2``.
+    """Subclass this and implement the methods ``initialize``, ``stage1`` etc.
     Use the same conventions as the equations.
     """
-    def initialize(self):
-        pass
-    def stage1(self):
-        pass
-    def stage2(self):
-        pass
+    pass
 
 
 ###############################################################################
@@ -103,7 +98,7 @@ class WCSPHTVDRK3Step(IntegratorStep):
     r"""TVD RK3 stepper for WCSPH
 
     This integrator requires :math:`2` stages for the storage of the
-    acceleration variables. 
+    acceleration variables.
 
     """
     def initialize(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
@@ -119,7 +114,7 @@ class WCSPHTVDRK3Step(IntegratorStep):
         d_rho0[d_idx] = d_rho[d_idx]
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho, 
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_rho0, d_rho,
                d_au, d_av, d_aw, d_ax, d_ay, d_az, d_arho,
                dt=0.0):
 
@@ -375,7 +370,7 @@ class GasDFluidStep(IntegratorStep):
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
                d_u0, d_v0, d_w0, d_u, d_v, d_w, d_e0, d_e, d_au, d_av,
-               d_aw, d_ae, d_rho, d_rho0, d_arho, d_h, d_h0, d_ah, 
+               d_aw, d_ae, d_rho, d_rho0, d_arho, d_h, d_h0, d_ah,
                d_alpha1, d_aalpha1, d_alpha10,
                d_alpha2, d_aalpha2, d_alpha20,
                dt=0.0):
@@ -407,7 +402,7 @@ class GasDFluidStep(IntegratorStep):
                d_alpha1, d_aalpha1, d_alpha10,
                d_alpha2, d_aalpha2, d_alpha20,
                d_aw, d_ae, dt=0.0):
-        
+
         d_u[d_idx] = d_u0[d_idx] + dt * d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dt * d_av[d_idx]
         d_w[d_idx] = d_w0[d_idx] + dt * d_aw[d_idx]
@@ -425,17 +420,17 @@ class GasDFluidStep(IntegratorStep):
 
 ###############################################################################
 # `TwoStageRigidBodyStep` class
-###############################################################################        
+###############################################################################
 class TwoStageRigidBodyStep(IntegratorStep):
     """Simple rigid-body motion
 
     At each stage of the integrator, the prescribed velocity and
-    accelerations are incremented by dt/2. 
+    accelerations are incremented by dt/2.
 
     Note that the time centered velocity is used for updating the
     particle positions. This ensures exact motion for a constant
     acceleration.
-    
+
     """
     def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
                    d_u, d_v, d_w, d_u0, d_v0, d_w0):
@@ -447,9 +442,9 @@ class TwoStageRigidBodyStep(IntegratorStep):
         d_x0[d_idx] = d_x[d_idx]
         d_y0[d_idx] = d_y[d_idx]
         d_z0[d_idx] = d_z[d_idx]
-        
+
     def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, 
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
                dt=0.0):
 
         dtb2 = 0.5*dt
@@ -493,7 +488,7 @@ class OneStageRigidBodyStep(IntegratorStep):
         d_z0[d_idx] = d_z[d_idx]
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az, 
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
                dt=0.0):
         pass
 
@@ -514,7 +509,7 @@ class OneStageRigidBodyStep(IntegratorStep):
 
 ###############################################################################
 # `VerletSymplecticWCSPHStep` class
-###############################################################################        
+###############################################################################
 class VerletSymplecticWCSPHStep(IntegratorStep):
     """Symplectic second order integrator described in the review
     paper by Monaghan:

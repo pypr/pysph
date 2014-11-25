@@ -22,7 +22,7 @@ Y
 
 import numpy
 from numpy import concatenate, where, array
-from pysph.base.utils import get_particle_array_wcsph
+from pysph.base.utils import get_particle_array_wcsph, get_particle_array_iisph
 
 def create_2D_tank(x1,y1,x2,y2,dx):
     """ Generate an open rectangular tank.
@@ -89,7 +89,7 @@ class DamBreak2DGeometry(object):
                  fluid_column_width=1.0, fluid_column_height=2.0,
                  dx=0.03, dy=0.03, nboundary_layers=4,
                  ro=1000.0, co=1.0, with_obstacle=False,
-                 beta=1.0, nfluid_offset=2, hdx=1.5):
+                 beta=1.0, nfluid_offset=2, hdx=1.5, iisph=False):
 
         self.container_width = container_width
         self.container_height = container_height
@@ -102,6 +102,7 @@ class DamBreak2DGeometry(object):
         self.hdx = hdx
         self.dx = dx
         self.dy = dy
+        self.iisph = iisph
 
         self.nsolid = 0
         self.nfluid = 0
@@ -156,14 +157,20 @@ class DamBreak2DGeometry(object):
                          hdx=1.5, **kwargs):
         nfluid = self.nfluid
         xf, yf = self.get_fluid(nfluid_offset)
-        fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
+        if self.iisph:
+            fluid = get_particle_array_iisph(name='fluid', x=xf, y=yf)
+        else:
+            fluid = get_particle_array_wcsph(name='fluid', x=xf, y=yf)
 
         fluid.gid[:] = range(fluid.get_number_of_particles())
 
         np = nfluid
 
         xb, yb = self.get_wall(nboundary_layers)
-        boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
+        if self.iisph:
+            boundary = get_particle_array_iisph(name='boundary', x=xb, y=yb)
+        else:
+            boundary = get_particle_array_wcsph(name='boundary', x=xb, y=yb)
 
         np += boundary.get_number_of_particles()
 
@@ -171,14 +178,22 @@ class DamBreak2DGeometry(object):
 
         # smoothing length, mass and density
         fluid.h[:] = numpy.ones_like(xf) * hdx * dx
-        fluid.m[:] = dx * dy * 0.5 * ro
+        if nfluid_offset == 2:
+            fluid.m[:] = dx * dy * ro * 0.5
+        else:
+            fluid.m[:] = dx * dy * ro
         fluid.rho[:] = ro
-        fluid.rho0[:] = ro
+        if not self.iisph:
+            fluid.rho0[:] = ro
 
         boundary.h[:] = numpy.ones_like(xb) * hdx * dx
-        boundary.m[:] = dx * dy * 0.5 * ro
+        if nboundary_layers == 2:
+            boundary.m[:] = dx * dy * ro * 0.5
+        else:
+            boundary.m[:] = dx * dy * ro
         boundary.rho[:] = ro
-        boundary.rho0[:] = ro
+        if not self.iisph:
+            boundary.rho0[:] = ro
 
         # create the particles list
         particles = [fluid, boundary]
@@ -186,14 +201,15 @@ class DamBreak2DGeometry(object):
         if self.with_obstacle:
             xo, yo = create_obstacle( x1=2.5, x2=2.5+dx, height=0.25, dx=dx )
             gido = numpy.array( range(xo.size), dtype=numpy.uint32 )
-            
+
             obstacle = get_particle_array_wcsph(name='obstacle',x=xo, y=yo)
-            
+
             obstacle.h[:] = numpy.ones_like(xo) * hdx * dx
             obstacle.m[:] = dx * dy * 0.5 * ro
             obstacle.rho[:] = ro
-            obstacle.rho0[:] = ro
-            
+            if not self.iisph:
+                obstacle.rho0[:] = ro
+
             # add the obstacle to the boundary particles
             boundary.append_parray( obstacle )
 
@@ -205,6 +221,8 @@ class DamBreak2DGeometry(object):
         # boundary particles can do with a reduced list of properties
         # to be saved to disk since they are fixed
         boundary.set_output_arrays( ['x', 'y', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
+        if self.iisph:
+            boundary.add_output_arrays(['V'])
 
         print "2D dam break with %d fluid, %d boundary particles"%(
             fluid.get_number_of_particles(),
@@ -273,7 +291,7 @@ class DamBreak3DGeometry(object):
 
         cw2 = 0.5 * container_width
         ymin, ymax = -cw2 - ghostlims, cw2 + ghostlims
-            
+
         # create all particles
         eps = 0.1 * dx
         xx, yy, zz = numpy.mgrid[xmin:xmax+eps:dx,

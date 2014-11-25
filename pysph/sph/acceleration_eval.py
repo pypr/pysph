@@ -58,56 +58,39 @@ def check_equation_array_properties(equation, particle_arrays):
 
 
 ###############################################################################
-class AccelerationEval(object):
-    def __init__(self, particle_arrays, equations, kernel,
-                 cell_iteration=False):
-        self.particle_arrays = particle_arrays
-        self.equation_groups = group_equations(equations)
-        self.kernel = kernel
-        self.nnps = None
-        self.cell_iteration = cell_iteration
+class MegaGroup(object):
+    """A mega-group refactors actual equation Groups into a more
+    organized form as described below.  They inherit all properties of the
+    Group so these can be used while generating code but delegate the tasks to
+    real groups underneath that are assembled from the original group.
 
-        all_equations = []
-        for group in self.equation_groups:
-            all_equations.extend(group.equations)
-        self.all_group = Group(equations=all_equations)
+    MegaGroups are organized as:
+        {destination: (eqs_with_no_source, sources, all_eqs)}
+        eqs_with_no_source: Group([equations]) all SPH Equations with no source.
+        sources are {source: Group([equations...])}
+        all_eqs is a Group of all equations having this destination.
 
-        for equation in all_equations:
-            check_equation_array_properties(equation, particle_arrays)
+    This is what is stored in the `data` attribute.
+    """
+    def __init__(self, group):
+        self._orig_group = group
+        self._copy_props(group)
+        self.data = self._make_data(group)
 
-        self.groups = [self._make_group(g) for g in self.equation_groups]
-        self.c_acceleration_eval = None
+    def get_converged_condition(self):
+        return self._orig_group.get_converged_condition()
 
-    ##########################################################################
-    # Public interface.
-    ##########################################################################
-    def compute(self, t, dt):
-        """Compute the accelerations given the current time, t, and the
-        timestep, dt.
-        """
-        self.c_acceleration_eval.compute(t, dt)
+    def _copy_props(self, group):
+        for key in ('real', 'update_nnps', 'iterate',
+                    'max_iterations', 'min_iterations', 'has_subgroups'):
+            setattr(self, key, getattr(group, key))
 
-    def set_compiled_object(self, c_acceleration_eval):
-        """Set the high-performance compiled object to call internally.
-        """
-        self.c_acceleration_eval = c_acceleration_eval
-
-    def set_nnps(self, nnps):
-        self.nnps = nnps
-        self.c_acceleration_eval.set_nnps(nnps)
-
-    def update_particle_arrays(self, particle_arrays):
-        """Call this to update the particle arrays with new ones.  Make sure
-        though that the same properties exist in both or you will get a
-        segfault.
-        """
-        self.c_acceleration_eval.update_particle_arrays(particle_arrays)
-
-    ##########################################################################
-    # Non-public interface.
-    ##########################################################################
-    def _make_group(self, group):
+    def _make_data(self, group):
         equations = group.equations
+
+        if group.has_subgroups:
+            return [MegaGroup(g) for g in equations]
+
         dest_list = []
         for equation in equations:
             dest = equation.dest
@@ -115,10 +98,6 @@ class AccelerationEval(object):
                 dest_list.append(dest)
 
         dests = OrderedDict()
-        dests.real = group.real
-        dests.update_nnps = group.update_nnps
-        dests.iterate = group.iterate
-        dests.max_iterations = group.max_iterations
         for dest in dest_list:
             sources = defaultdict(list)
             eqs_with_no_source = [] # For equations that have no source.
@@ -145,3 +124,54 @@ class AccelerationEval(object):
                            Group(all_equations))
 
         return dests
+
+
+###############################################################################
+class AccelerationEval(object):
+    def __init__(self, particle_arrays, equations, kernel,
+                 cell_iteration=False):
+        self.particle_arrays = particle_arrays
+        self.equation_groups = group_equations(equations)
+        self.kernel = kernel
+        self.nnps = None
+        self.cell_iteration = cell_iteration
+
+        all_equations = []
+        for group in self.equation_groups:
+            if group.has_subgroups:
+                for g in group.equations:
+                    all_equations.extend(g.equations)
+            else:
+                all_equations.extend(group.equations)
+        self.all_group = Group(equations=all_equations)
+
+        for equation in all_equations:
+            check_equation_array_properties(equation, particle_arrays)
+
+        self.mega_groups = [MegaGroup(g) for g in self.equation_groups]
+        self.c_acceleration_eval = None
+
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def compute(self, t, dt):
+        """Compute the accelerations given the current time, t, and the
+        timestep, dt.
+        """
+        self.c_acceleration_eval.compute(t, dt)
+
+    def set_compiled_object(self, c_acceleration_eval):
+        """Set the high-performance compiled object to call internally.
+        """
+        self.c_acceleration_eval = c_acceleration_eval
+
+    def set_nnps(self, nnps):
+        self.nnps = nnps
+        self.c_acceleration_eval.set_nnps(nnps)
+
+    def update_particle_arrays(self, particle_arrays):
+        """Call this to update the particle arrays with new ones.  Make sure
+        though that the same properties exist in both or you will get a
+        segfault.
+        """
+        self.c_acceleration_eval.update_particle_arrays(particle_arrays)

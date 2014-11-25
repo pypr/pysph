@@ -6,6 +6,127 @@ ${' '*4*level}${l}
 % endfor
 </%def>
 
+<%def name="do_group(helper, group, level=0)" buffered="True">
+#######################################################################
+## Iterate over destinations in this group.
+#######################################################################
+% for dest, (eqs_with_no_source, sources, all_eqs) in group.data.iteritems():
+# ---------------------------------------------------------------------
+# Destination ${dest}.\
+#######################################################################
+## Setup destination array pointers.
+#######################################################################
+
+dst = self.${dest}
+${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 0)}
+dst_array_index = dst.index
+
+#######################################################################
+## Initialize all equations for this destination.
+#######################################################################
+% if all_eqs.has_initialize():
+# Initialization for destination ${dest}.
+for d_idx in range(NP_DEST):
+    ${indent(all_eqs.get_initialize_code(helper.object.kernel), 1)}
+% endif
+#######################################################################
+## Handle all the equations that do not have a source.
+#######################################################################
+% if len(eqs_with_no_source.equations) > 0:
+# SPH Equations with no sources.
+for d_idx in range(NP_DEST):
+    ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
+% endif
+#######################################################################
+## Iterate over sources.
+#######################################################################
+% for source, eq_group in sources.iteritems():
+# --------------------------------------
+# Source ${source}.\
+#######################################################################
+## Setup source array pointers.
+#######################################################################
+
+src = self.${source}
+${indent(helper.get_src_array_setup(source, eq_group), 0)}
+src_array_index = src.index
+
+% if helper.object.cell_iteration:
+#######################################################################
+## Iterate over cells.
+#######################################################################
+ncells = nnps.get_number_of_cells()
+for cell_index in range(ncells):
+    # Find potential neighbors from nearby cells for this cell.
+    nnps.get_particles_in_neighboring_cells(
+        cell_index, src_array_index, potential_nbrs
+    )
+
+    # Get the indices for each particle in this cell
+    nnps.get_particles_in_cell(
+        cell_index, dst_array_index, particle_indices
+    )
+    for _index in range(particle_indices.length):
+        # The destination index.
+        d_idx = particle_indices[_index]
+        # Get the neigbors for this destination index.
+        nnps.get_nearest_particles_filtered(
+            src_array_index, dst_array_index, d_idx,
+            potential_nbrs, nbrs
+        )
+
+        # Now iterate over the neighbors.
+        for nbr_idx in range(nbrs.length):
+            s_idx = <int>nbrs.data[nbr_idx]
+            ###########################################################
+            ## Iterate over equations for the same set of neighbors.
+            ###########################################################
+            ${indent(eq_group.get_loop_code(helper.object.kernel), 3)}
+% else:
+#######################################################################
+## Iterate over destination particles.
+#######################################################################
+for d_idx in range(NP_DEST):
+    ###################################################################
+    ## Find and iterate over neighbors.
+    ###################################################################
+    nnps.get_nearest_particles(
+        src_array_index, dst_array_index, d_idx, nbrs)
+
+    for nbr_idx in range(nbrs.length):
+        s_idx = <int>nbrs.data[nbr_idx]
+        ###############################################################
+        ## Iterate over the equations for the same set of neighbors.
+        ###############################################################
+        ${indent(eq_group.get_loop_code(helper.object.kernel), 2)}
+% endif
+
+# Source ${source} done.
+# --------------------------------------
+% endfor
+###################################################################
+## Do any post_loop assignments for the destination.
+###################################################################
+% if all_eqs.has_post_loop():
+# Post loop for destination ${dest}.
+for d_idx in range(NP_DEST):
+    ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
+% endif
+# Destination ${dest} done.
+# ---------------------------------------------------------------------
+
+#######################################################################
+## Update NNPS locally if needed
+#######################################################################
+% if group.update_nnps:
+# Updating NNPS.
+nnps.update_domain()
+nnps.update()
+% endif
+
+% endfor
+</%def>
+
 from libc.math cimport *
 from libc.math cimport M_PI as pi
 cimport numpy
@@ -94,7 +215,7 @@ cdef class AccelerationEval:
         cdef double[3] DT_ADAPT
         self._initialize_dt_adapt(DT_ADAPT)
 
-        cdef int max_iterations, _iteration_count
+        cdef int max_iterations, min_iterations, _iteration_count
 
         #######################################################################
         ##  Declare all the arrays.
@@ -115,144 +236,36 @@ cdef class AccelerationEval:
         ## sources are {source: Group([equations...])}
         ## all_eqs is a Group of all equations having this destination.
         #######################################################################
-        % for g_idx, group in enumerate(helper.object.groups):
+        % for g_idx, group in enumerate(helper.object.mega_groups):
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         % if group.iterate:
         max_iterations = ${group.max_iterations}
-        _iteration_count = 0
+        min_iterations = ${group.min_iterations}
+        _iteration_count = 1
         while True:
         % else:
         if True:
         % endif
-            #######################################################################
-            ## Iterate over destinations in this group.
-            #######################################################################
-            % for dest, (eqs_with_no_source, sources, all_eqs) in group.iteritems():
-            # ---------------------------------------------------------------------
-            # Destination ${dest}.\
-            #######################################################################
-            ## Setup destination array pointers.
-            #######################################################################
 
-            dst = self.${dest}
-            ${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 3)}
-            dst_array_index = dst.index
+            % if group.has_subgroups:
+            % for sg_idx, sub_group in enumerate(group.data):
+            # Doing subgroup ${sg_idx}
+            ${indent(do_group(helper, sub_group, 3), 3)}
+            % endfor
 
-            #######################################################################
-            ## Initialize all equations for this destination.
-            #######################################################################
-            % if all_eqs.has_initialize():
-            # Initialization for destination ${dest}.
-            for d_idx in range(NP_DEST):
-                ${indent(all_eqs.get_initialize_code(helper.object.kernel), 4)}
-            % endif
-            #######################################################################
-            ## Handle all the equations that do not have a source.
-            #######################################################################
-            % if len(eqs_with_no_source.equations) > 0:
-            # SPH Equations with no sources.
-            for d_idx in range(NP_DEST):
-                ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 4)}
-            % endif
-            #######################################################################
-            ## Iterate over sources.
-            #######################################################################
-            % for source, eq_group in sources.iteritems():
-            # --------------------------------------
-            # Source ${source}.\
-            #######################################################################
-            ## Setup source array pointers.
-            #######################################################################
-
-            src = self.${source}
-            ${indent(helper.get_src_array_setup(source, eq_group), 3)}
-            src_array_index = src.index
-
-            % if helper.object.cell_iteration:
-            #######################################################################
-            ## Iterate over cells.
-            #######################################################################
-            ncells = nnps.get_number_of_cells()
-            for cell_index in range(ncells):
-                # Find potential neighbors from nearby cells for this cell.
-                nnps.get_particles_in_neighboring_cells(
-                    cell_index, src_array_index, potential_nbrs
-                )
-
-                # Get the indices for each particle in this cell
-                nnps.get_particles_in_cell(
-                    cell_index, dst_array_index, particle_indices
-                )
-                for _index in range(particle_indices.length):
-                    # The destination index.
-                    d_idx = particle_indices[_index]
-                    # Get the neigbors for this destination index.
-                    nnps.get_nearest_particles_filtered(
-                        src_array_index, dst_array_index, d_idx,
-                        potential_nbrs, nbrs
-                    )
-
-                    # Now iterate over the neighbors.
-                    for nbr_idx in range(nbrs.length):
-                        s_idx = <int>nbrs.data[nbr_idx]
-                        ###########################################################
-                        ## Iterate over equations for the same set of neighbors.
-                        ###########################################################
-                        ${indent(eq_group.get_loop_code(helper.object.kernel), 6)}
             % else:
-            #######################################################################
-            ## Iterate over destination particles.
-            #######################################################################
-            for d_idx in range(NP_DEST):
-                ###################################################################
-                ## Find and iterate over neighbors.
-                ###################################################################
-                nnps.get_nearest_particles(
-                    src_array_index, dst_array_index, d_idx, nbrs)
-
-                for nbr_idx in range(nbrs.length):
-                    s_idx = <int>nbrs.data[nbr_idx]
-                    ###############################################################
-                    ## Iterate over the equations for the same set of neighbors.
-                    ###############################################################
-                    ${indent(eq_group.get_loop_code(helper.object.kernel), 5)}
+            ${indent(do_group(helper, group, 3), 3)}
             % endif
-
-            # Source ${source} done.
-            # --------------------------------------
-            % endfor
-            ###################################################################
-            ## Do any post_loop assignments for the destination.
-            ###################################################################
-            % if all_eqs.has_post_loop():
-            # Post loop for destination ${dest}.
-            for d_idx in range(NP_DEST):
-                ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 4)}
-            % endif
-            # Destination ${dest} done.
-            # ---------------------------------------------------------------------
-
-            #######################################################################
-            ## Update NNPS locally if needed
-            #######################################################################
-            % if group.update_nnps:
-            # Updating NNPS.
-            nnps.update_domain()
-            nnps.update()
-            % endif
-
-            % endfor
             #######################################################################
             ## Break the iteration for the group.
             #######################################################################
             % if group.iterate:
             # Check for convergence or timeout
-            if ${all_eqs.get_converged_condition()} or (_iteration_count == max_iterations):
-                _iteration_count = 0
+            if (_iteration_count >= min_iterations) and (${group.get_converged_condition()} or (_iteration_count == max_iterations)):
+                _iteration_count = 1
                 break
             _iteration_count += 1
-            
             % endif
 
         # Group ${g_idx} done.
