@@ -83,6 +83,10 @@ class SimpleEquation(Equation):
         super(SimpleEquation, self).__init__(dest, sources)
         self.count = 0
 
+    def initialize(self, d_idx, d_u, d_au):
+        d_u[d_idx] = 0.0
+        d_au[d_idx] = 0.0
+
     def loop(self, d_idx, d_au, s_idx, s_m):
         #print d_idx, s_idx
         d_au[d_idx] += s_m[s_idx]
@@ -151,5 +155,27 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*4
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*2
+        self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_iterate_nested_groups(self):
+        pa = self.pa
+        equations = [Group(
+            equations=[
+                Group(
+                    equations=[SimpleEquation(dest='fluid', sources=['fluid'])]
+                ),
+                Group(
+                    equations=[SimpleEquation(dest='fluid', sources=['fluid'])],
+                ),
+            ],
+            iterate=True,
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
