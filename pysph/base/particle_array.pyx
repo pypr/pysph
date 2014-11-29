@@ -88,28 +88,36 @@ cdef class ParticleArray:
     """
     Class to represent a collection of particles.
 
-    **Member variables**
+    **Important Member variables**
      - name - name of this particle array.
-     - properties - for every property, gives the index into the list where the
-       property array is found.
-     - property_arrays - list of arrays, one for each property.
-       for internal calculations.
-     - is_dirty - indicates if the particle positions have changed.
-     - standard_name_map - a map from a few standard property names to the
-       actual names used in this particle array.
+     - properties - dictionary of {prop_name:carray}.
 
-    **Notes**
-     - the property 'tag' is always the 0th property.
+    Examples
+    ---------
 
-    **Issues**
-     - Decision on standard_name_map to be made.
+    There are many ways to create a ParticleArray::
+
+        >>> p = ParticleArray(name='fluid', x=[1.,2., 3., 4.])
+        >>> p.name
+        'fluid'
+        >>> p.x, p.tag, p.pid, p.gid
+
+    For a full specification of properties with their type etc.::
+
+        >>> p = ParticleArray(name='fluid',
+        ...                   x=dict(data=[1,2], type='int', default=1))
+        >>> p.get_carray('x').get_c_type()
+        'int'
+
+    The default value is what is used to set the default value when a new
+    particle is added and the arrays auto-resized.
 
     """
     ######################################################################
     # `object` interface
     ######################################################################
     def __cinit__(self, str name='', default_particle_tag=Local,
-                  constants={}, *args, **props):
+                  constants={}, **props):
         """ Constructor
 
         Parameters
@@ -118,12 +126,20 @@ cdef class ParticleArray:
         name : str
             name of this particle array.
 
-        props : dict
-            dictionary of properties for every particle in this array
+        default_particle_tag : one of Local, Remote or Ghost
+
+        constants : dict
+            dictionary of constant arrays for the entire particle array.  These
+            must be arrays and are not resized when particles are added or
+            removed.
+
+        **props :
+            any additional keyword arguments are taken to be properties, one
+            for each property.
 
         """
-        self.properties = {'tag':IntArray(0),'pid':IntArray(0), 'gid':UIntArray(0)}
-        self.default_values = {'tag':default_particle_tag, 'pid':0, 'gid':_UINT_MAX}
+        self.properties = {}
+        self.default_values = {'tag':default_particle_tag}
 
         self.constants = {}
         self.constants.update(constants)
@@ -135,11 +151,7 @@ cdef class ParticleArray:
         self.is_dirty = True
         self.indices_invalid = True
 
-        # static particle arrays
-        self.is_static = False
-
-        if props:
-            self.initialize(**props)
+        self._initialize(**props)
 
         # default lb_props are all the arrays
         self.lb_props = self.properties.keys()
@@ -210,127 +222,8 @@ cdef class ParticleArray:
             self.add_property(**props[prop])
         self.num_real_particles = numpy.sum(props['tag']['data']==Local)
 
-    ######################################################################
-    # `Public` interface
-    ######################################################################
-    def set_output_arrays(self, list props):
-        """Set the list of output arrays for this ParticleArray
-
-        Parameters:
-        
-        props : list
-            The list of property arrays
-
-        In PySPH, the solver obtains the list of property arrays to
-        output by calling the `ParticleArray.get_property_arrays`
-        method. If detailed output is not requested, the
-        `output_property_arrays` attribute is used to determine the
-        arrays that will be written to file
-
-        """
-        # first check if the arrays are valid and raise a warning
-        for prop in props:
-            self._check_property(prop)
-
-        self.output_property_arrays = props
-
-    def add_output_arrays(self, list props):
-        """Append props to the existing list of output arrays
-
-        Parameters:
-        
-        props : list
-            The additional list of property arrays to save
-
-        """
-        # first check if the arrays are valid and raise a warning
-        for prop in props:
-            self._check_property(prop)
-
-        # add to the existing list
-        self.output_property_arrays.extend(props)
-        self.output_property_arrays = list( set(self.output_property_arrays) )
-
-    def get_property_arrays(self, all=True, only_real=True):
-        """Return a dictionary of arrays held by the `ParticleArray` container 
-
-        Parameters:
-
-        all : bint
-            Flag to select all arrays
-
-        only_real : bint
-            Flag to select Local/Remote particles
-
-        Notes:
-        
-        The dictionary returned is keyed on the property name and the
-        value is the NumPy array representing the data. If `all` is
-        set to False, the list of arrays is determined by the
-        `output_property_arrays` data attribute.
-
-        """
-        # the dictionary to be returned
-        ret = {}
-        
-        # the list of properties
-        props = self.output_property_arrays
-        if ( all or (props == []) ):
-            props = self.properties.keys()
-
-        # number of particles
-        num_particles = self.get_number_of_particles(only_real)
-
-        # add the property arrays
-        for prop in props:
-            prop_array = self.properties[ prop ].get_npy_array()[:num_particles]
-            ret[prop] = prop_array
-        
-        # add constants if any
-        for prop in self.constants:
-            ret[prop] = self.constants[prop]
-
-        return ret
-
-    cpdef set_dirty(self, bint value):
-        """ Set the is_dirty variable to given value """
-        self.is_dirty = value
-
-    cpdef set_indices_invalid(self, bint value):
-        """ Set the indices_invalid to the given value """
-        self.indices_invalid = value
-
-    cpdef has_array(self, str arr_name):
-        """ Returns true if the array arr_name is present """
-        return self.properties.has_key(arr_name)
-
-    def clear(self):
-        """ Clear all data held by this array """
-        self.properties = {'tag':IntArray(0), 'pid':IntArray(0)}
-        tag_def_values = self.default_values['tag']
-        self.default_values.clear()
-        self.default_values = {'tag':tag_def_values,'pid':0}
-
-        self.is_dirty = True
-        self.indices_invalid = True
-
-    cpdef set_time(self, double time):
-        self.time = time
-
-    cpdef double get_time(self):
-        return self.time
-
-    cpdef set_name(self, str name):
-        self.name = name
-
-    cpdef set_static(self, bint is_static):
-        self.is_static = is_static
-
-    def set_lb_props(self, list lb_props):
-        self.lb_props = lb_props
-
-    def initialize(self, **props):
-        """ Initialize the particle array with the given props
+    def _initialize(self, **props):
+        """ Initialize the particle array with the given properties.
 
         **Parameters**
 
@@ -353,7 +246,7 @@ cdef class ParticleArray:
         cdef bint tag_present = False
         cdef numpy.ndarray a, arr, npyarr
         cdef IntArray tagarr
-        cdef str prop
+        cdef str name
 
         self.clear()
 
@@ -363,12 +256,131 @@ cdef class ParticleArray:
             return
 
         # add the properties
-        for prop in props.keys():
-            prop_info = props[prop]
-            prop_info['name'] = prop
+        for name, prop in props.iteritems():
+            if isinstance(prop, dict):
+                prop_info = prop
+                prop_info['name'] = name
+            else:
+                prop_info = dict(name=name, data=prop)
             self.add_property(**prop_info)
 
         self.align_particles()
+
+    ######################################################################
+    # `Public` interface
+    ######################################################################
+    def set_output_arrays(self, list props):
+        """Set the list of output arrays for this ParticleArray
+
+        Parameters:
+
+        props : list
+            The list of property arrays
+
+        In PySPH, the solver obtains the list of property arrays to
+        output by calling the `ParticleArray.get_property_arrays`
+        method. If detailed output is not requested, the
+        `output_property_arrays` attribute is used to determine the
+        arrays that will be written to file
+
+        """
+        # first check if the arrays are valid and raise a warning
+        for prop in props:
+            self._check_property(prop)
+
+        self.output_property_arrays = props
+
+    def add_output_arrays(self, list props):
+        """Append props to the existing list of output arrays
+
+        Parameters:
+
+        props : list
+            The additional list of property arrays to save
+
+        """
+        # first check if the arrays are valid and raise a warning
+        for prop in props:
+            self._check_property(prop)
+
+        # add to the existing list
+        self.output_property_arrays.extend(props)
+        self.output_property_arrays = list( set(self.output_property_arrays) )
+
+    def get_property_arrays(self, all=True, only_real=True):
+        """Return a dictionary of arrays held by the `ParticleArray` container
+
+        Parameters:
+
+        all : bint
+            Flag to select all arrays
+
+        only_real : bint
+            Flag to select Local/Remote particles
+
+        Notes:
+
+        The dictionary returned is keyed on the property name and the
+        value is the NumPy array representing the data. If `all` is
+        set to False, the list of arrays is determined by the
+        `output_property_arrays` data attribute.
+
+        """
+        # the dictionary to be returned
+        ret = {}
+
+        # the list of properties
+        props = self.output_property_arrays
+        if ( all or (props == []) ):
+            props = self.properties.keys()
+
+        # number of particles
+        num_particles = self.get_number_of_particles(only_real)
+
+        # add the property arrays
+        for prop in props:
+            prop_array = self.properties[ prop ].get_npy_array()[:num_particles]
+            ret[prop] = prop_array
+
+        # add constants if any
+        for prop in self.constants:
+            ret[prop] = self.constants[prop]
+
+        return ret
+
+    cpdef set_dirty(self, bint value):
+        """ Set the is_dirty variable to given value """
+        self.is_dirty = value
+
+    cpdef set_indices_invalid(self, bint value):
+        """ Set the indices_invalid to the given value """
+        self.indices_invalid = value
+
+    cpdef has_array(self, str arr_name):
+        """ Returns true if the array arr_name is present """
+        return self.properties.has_key(arr_name)
+
+    def clear(self):
+        """ Clear all data held by this array """
+        self.properties = {'tag':IntArray(0), 'pid':IntArray(0), 'gid':UIntArray(0)}
+        tag_def_values = self.default_values['tag']
+        self.default_values.clear()
+        self.default_values = {'tag':tag_def_values, 'pid':0, 'gid':_UINT_MAX}
+
+        self.is_dirty = True
+        self.indices_invalid = True
+
+    cpdef set_time(self, double time):
+        self.time = time
+
+    cpdef double get_time(self):
+        return self.time
+
+    cpdef set_name(self, str name):
+        self.name = name
+
+    def set_lb_props(self, list lb_props):
+        self.lb_props = lb_props
 
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """

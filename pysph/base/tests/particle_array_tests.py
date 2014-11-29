@@ -113,6 +113,22 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.z, [0, 0]), True)
         self.assertEqual(check_array(p.h, [0.1, 0.1]), True)
 
+    def test_constructor_works_with_simple_props(self):
+        x = [1, 2, 3, 4.]
+        y = [0., 1., 2., 3.]
+        p = particle_array.ParticleArray(x=x, y=y, name='fluid')
+        self.assertEqual(p.name, 'fluid')
+
+        self.assertEqual(p.properties.has_key('x'), True)
+        self.assertEqual(p.properties.has_key('y'), True)
+        self.assertEqual(p.properties.has_key('tag'), True)
+        self.assertEqual(p.properties.has_key('pid'), True)
+        self.assertEqual(p.properties.has_key('gid'), True)
+
+        # get the properties are check if they are the same
+        self.assertEqual(check_array(p.x, x), True)
+        self.assertEqual(check_array(p.y, y), True)
+
     def test_get_number_of_particles(self):
         """
         Tests the get_number_of_particles of particles.
@@ -194,12 +210,15 @@ class ParticleArrayTest(unittest.TestCase):
 
         p.clear()
 
-        self.assertEqual(len(p.properties), 2)
+        self.assertEqual(len(p.properties), 3)
         self.assertEqual(p.properties.has_key('tag'), True)
         self.assertEqual(p.properties['tag'].length, 0)
 
         self.assertEqual(p.properties.has_key('pid'), True)
         self.assertEqual(p.properties['pid'].length, 0)
+
+        self.assertEqual(p.properties.has_key('gid'), True)
+        self.assertEqual(p.properties['gid'].length, 0)
 
         self.assertEqual(p.is_dirty, True)
 
