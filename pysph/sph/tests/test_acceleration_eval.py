@@ -28,6 +28,15 @@ class TestEquation(Equation):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 
+class FindTotalMass(Equation):
+    def initialize(self, d_idx, d_m, d_total_mass):
+        # FIXME: This is stupid and should be fixed if we add a separate
+        # initialize_once function or so.
+        d_total_mass[0] = 0.0
+
+    def post_loop(self, d_idx, d_m, d_total_mass):
+        d_total_mass[0] += d_m[d_idx]
+
 class TestCheckEquationArrayProps(unittest.TestCase):
 
     def test_should_pass_when_properties_exist(self):
@@ -77,6 +86,22 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         # Then
         check_equation_array_properties(eq, [f, s])
 
+    def test_should_check_constants(self):
+        # Given
+        f = get_particle_array(name='f')
+
+        # When
+        eq = FindTotalMass(dest='f', sources=['f'])
+
+        # Then.
+        self.assertRaises(RuntimeError,
+                          check_equation_array_properties, eq, [f])
+
+        # When.
+        f.add_constant('total_mass', 0.0)
+
+        # Then.
+        check_equation_array_properties(eq, [f])
 
 class SimpleEquation(Equation):
     def __init__(self, dest, sources):
@@ -126,6 +151,19 @@ class TestAccelerationEval1D(unittest.TestCase):
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval
+
+    def test_should_support_constants(self):
+        # Given
+        pa = self.pa
+        pa.add_constant('total_mass', 0.0)
+        equations = [FindTotalMass (dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        self.assertEqual(pa.total_mass, 10.0)
 
     def test_should_not_iterate_normal_group(self):
         # Given

@@ -156,6 +156,8 @@ cdef class ParticleArrayWrapper:
         props = props.union(['tag', 'pid', 'gid'])
         for prop in props:
             setattr(self, prop, pa.get_carray(prop))
+        for prop in pa.constants.keys():
+            setattr(self, prop, pa.get_carray(prop))
 
         self.name = pa.name
 
