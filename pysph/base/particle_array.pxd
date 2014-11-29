@@ -97,6 +97,7 @@ cdef class ParticleArray:
     cpdef remove_tagged_particles(self, int tag)
 
     # function to add any property
+    cpdef add_constant(self, str name, data)
     cpdef add_property(self, str name, str type=*, default=*, data=*)
     cpdef remove_property(self, str prop_name)
 

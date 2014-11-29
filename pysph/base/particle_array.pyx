@@ -112,12 +112,16 @@ cdef class ParticleArray:
     The default value is what is used to set the default value when a new
     particle is added and the arrays auto-resized.
 
+    To create constants that are not resized with added/removed particles::
+
+        >>> p = ParticleArray(name='f', x=[1,2], constants={'c':[0.,0.,0.]})
+
     """
     ######################################################################
     # `object` interface
     ######################################################################
     def __cinit__(self, str name='', default_particle_tag=Local,
-                  constants={}, **props):
+                  constants=None, **props):
         """ Constructor
 
         Parameters
@@ -131,27 +135,27 @@ cdef class ParticleArray:
         constants : dict
             dictionary of constant arrays for the entire particle array.  These
             must be arrays and are not resized when particles are added or
-            removed.
+            removed.  These are stored as CArrays internally.
 
         **props :
             any additional keyword arguments are taken to be properties, one
             for each property.
 
         """
-        self.properties = {}
-        self.default_values = {'tag':default_particle_tag}
-
-        self.constants = {}
-        self.constants.update(constants)
-
-        # set the default time
         self.time = 0.0
-
         self.name = name
         self.is_dirty = True
         self.indices_invalid = True
 
+        self.properties = {}
+        self.default_values = {'tag':default_particle_tag}
+
         self._initialize(**props)
+
+        self.constants = {}
+        if constants is not None:
+            for const, data in constants.iteritems():
+                self.add_constant(name=const, data=data)
 
         # default lb_props are all the arrays
         self.lb_props = self.properties.keys()
@@ -170,27 +174,20 @@ cdef class ParticleArray:
         if name in keys:
             return self._get_real_particle_prop(name)
         elif name in self.constants:
-            return self.constants[name]
+            return self.constants[name].get_npy_array()
         else:
-            msg = """ ParticleArray %s has no property %s """%(self.name,
-                                                               name)
+            msg = "ParticleArray %s has no property/constant %s."\
+                    %(self.name, name)
             raise AttributeError(msg)
 
     def __setattr__(self, name, value):
         """ Convenience, to set particle property arrays as an attribute """
-        keys = self.properties.keys()
-        if name in keys:
-            self.set(**{name:value})
-        elif name in self.constants:
-            self.constants[name] = value
-        else:
-            raise AttributeError, 'property %s not found'%(name)
+        self.set(**{name:value})
 
     def __reduce__(self):
         """ Implemented to facilitate pickling of extension types """
         d = {}
         d['name'] = self.name
-        d['constants'] = self.constants
         props = {}
         default_values = {}
 
@@ -204,11 +201,19 @@ cdef class ParticleArray:
 
         d['properties'] = props
 
+        props = {}
+        for prop, arr in self.constants.iteritems():
+            pinfo = dict(name=prop, data=arr)
+            props[prop] = pinfo
+
+        d['constants'] = props
+
         return (ParticleArray, (), d)
 
     def __setstate__(self, d):
         """ Load the particle array object from the saved dictionary """
         self.properties = {}
+        self.constants = {}
         self.property_arrays = []
         self.default_values = {}
         self.is_dirty = True
@@ -217,9 +222,13 @@ cdef class ParticleArray:
 
         self.name = d['name']
         props = d['properties']
-        self.constants = d['constants']
         for prop in props:
             self.add_property(**props[prop])
+
+        consts = d['constants']
+        for prop in consts:
+            self.add_constant(**consts[prop])
+
         self.num_real_particles = numpy.sum(props['tag']['data']==Local)
 
     def _initialize(self, **props):
@@ -652,7 +661,7 @@ cdef class ParticleArray:
                         arg_array.get_npy_array()[:self.num_real_particles])
 
                 else:
-                    result.append(self.constants[arg])
+                    result.append(self.constants[arg].get_npy_array())
         else:
             for i in range(nargs):
                 arg = args[i]
@@ -662,7 +671,7 @@ cdef class ParticleArray:
                     arg_array = self.properties[arg]
                     result.append(arg_array.get_npy_array())
                 else:
-                    result.append(self.constants[arg])
+                    result.append(self.constants[arg].get_npy_array())
 
         if nargs == 1:
             return result[0]
@@ -705,6 +714,10 @@ cdef class ParticleArray:
             if self.properties.has_key(prop):
                 prop_array = self.properties[prop]
                 prop_array.set_data(proparr)
+            elif self.constants.has_key(prop):
+                prop_array = self.constants[prop]
+                prop_array.set_data(proparr)
+
             # if the tag property is being set, the alignment will have to be
             # changed.
             if prop == 'tag':
@@ -713,11 +726,38 @@ cdef class ParticleArray:
                 self.set_dirty(True)
 
     cpdef BaseArray get_carray(self, str prop):
-        """ Return the c-array for the property """
+        """ Return the c-array for the property or constant.
+        """
         if PyDict_Contains(self.properties, prop) == 1:
             return <BaseArray>PyDict_GetItem(self.properties, prop)
+        elif PyDict_Contains(self.constants, prop) == 1:
+            return <BaseArray>PyDict_GetItem(self.constants, prop)
         else:
             return None
+
+    cpdef add_constant(self, str name, data):
+        """Add a constant property to the particle array.
+
+        A constant property is an array but has a fixed size in that it is
+        never resized as particles are added or removed.  These properties
+        are always stored internally as CArrays.
+
+        An example of where this is useful is if you need to calculate the
+        center of mass of a solid body or the net force on the body.
+
+        Parameters
+        -----------
+
+        - name: str: name of the constant
+        - data: array-like: the value for the data.
+        """
+        if name in self.constants:
+            raise RuntimeError('Constant called "%s" already exists.'%name)
+        if name in self.properties:
+            raise RuntimeError('Property called "%s" already exists.'%name)
+
+        array_data = numpy.atleast_1d(data)
+        self.constants[name] = self._create_c_array_from_npy_array(array_data)
 
     cpdef add_property(self, str name, str type='double', default=None, data=None):
         """ Add a new property to the particle array.
@@ -905,7 +945,7 @@ cdef class ParticleArray:
             raise AttributeError, 'property %s not present'%(prop)
 
     cdef object _create_c_array_from_npy_array(self, numpy.ndarray np_array):
-        """ Create and return  a carray array from the given numpy array
+        """ Create and return  a carray array from the given numpy array.
 
         **Notes**
          - this function is used only when a C array needs to be
