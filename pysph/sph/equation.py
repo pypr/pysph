@@ -475,8 +475,9 @@ class Group(object):
         # Calculate the precomputed symbols for this equation.
         all_args = set()
         for equation in self.equations:
-            args = inspect.getargspec(equation.loop).args
-            all_args.update(args)
+            if hasattr(equation, 'loop'):
+                args = inspect.getargspec(equation.loop).args
+                all_args.update(args)
         all_args.discard('self')
 
         pre = self.pre_comp
