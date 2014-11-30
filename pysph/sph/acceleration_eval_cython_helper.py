@@ -29,7 +29,7 @@ def get_array_names(particle_arrays):
     """
     props = set()
     for array in particle_arrays:
-        for name in array.properties.keys():
+        for name in array.properties.keys() + array.constants.keys():
             props.add(name)
     props.difference_update(set(('tag', 'pid', 'gid')))
     array_names = ', '.join(sorted(props))

@@ -59,9 +59,6 @@ cdef class ParticleArray:
     # the number of real particles.
     cdef public long num_real_particles
 
-    # indicates whether the array is static
-    cdef public bint is_static
-
     # a list of props to be used for load balancing
     cdef public list lb_props
 
@@ -88,8 +85,6 @@ cdef class ParticleArray:
     cpdef set_time(self, double time)
     cpdef double get_time(self)
 
-    cpdef set_static(self, bint is_static)
-
     cpdef set_name(self, str name)
 
     cpdef set_dirty(self, bint val)
@@ -102,6 +97,7 @@ cdef class ParticleArray:
     cpdef remove_tagged_particles(self, int tag)
 
     # function to add any property
+    cpdef add_constant(self, str name, data)
     cpdef add_property(self, str name, str type=*, default=*, data=*)
     cpdef remove_property(self, str prop_name)
 
