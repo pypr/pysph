@@ -23,5 +23,13 @@ class SummationDensityTestCase(unittest.TestCase):
         run_parallel_script.run(filename='./summation_density.py', nprocs=4,
                                 path=path)
 
+class MPIReduceArrayTestCase(unittest.TestCase):
+
+    @attr(slow=False, parallel=True)
+    def test_mpi_reduce_array(self):
+        run_parallel_script.run(
+            filename='./reduce_array.py', nprocs=4, path=path
+        )
+
 if __name__ == '__main__':
     unittest.main()
