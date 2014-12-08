@@ -15,6 +15,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.sph_compiler import SPHCompiler
 
+from pysph.base.reduce_array import reduce_array
 
 
 class TestEquation(Equation):
@@ -128,6 +129,11 @@ class SimpleEquation(Equation):
         return result
 
 
+class SimpleReduction(Equation):
+    def reduce(self, dst):
+        dst.total_mass[0] = reduce_array(dst.m, op='sum')
+
+
 class TestAccelerationEval1D(unittest.TestCase):
     def setUp(self):
         self.dim = 1
@@ -217,3 +223,17 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_run_reduce(self):
+        # Given.
+        pa = self.pa
+        pa.add_constant('total_mass', 0.0)
+        equations = [SimpleReduction(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.sum(pa.m)
+        self.assertAlmostEqual(pa.total_mass[0], expect, 14)

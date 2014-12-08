@@ -192,8 +192,9 @@ class Solver(object):
         if kernel is not None:
             self.kernel = kernel
 
+        mode = 'mpi' if self.in_parallel else 'serial'
         self.acceleration_eval = AccelerationEval(
-            particles, equations, self.kernel, self.cell_iteration
+            particles, equations, self.kernel, self.cell_iteration, mode
         )
 
         sph_compiler = SPHCompiler(
