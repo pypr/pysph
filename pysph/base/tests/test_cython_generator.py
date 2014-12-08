@@ -5,7 +5,7 @@ from textwrap import dedent
 from math import pi, sin
 
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
-    all_numeric)
+    KnownType, all_numeric)
 
 def declare(*args):
     pass
@@ -26,7 +26,7 @@ class EqWithReturn(BasicEq):
         return d_x[d_idx]
 
 class EqWithKnownTypes:
-    def some_func(self, d_idx, d_p, WIJ, DWIJ):
+    def some_func(self, d_idx, d_p, WIJ, DWIJ, user):
         d_p[d_idx] = WIJ*DWIJ[0]
 
 class EqWithMatrix:
@@ -219,7 +219,10 @@ class TestCythonCodeGenerator(TestBase):
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
     def test_method_with_known_types(self):
-        cg = CythonGenerator(known_types={'WIJ':0.0, 'DWIJ':[0.0, 0.0, 0.0]})
+        cg = CythonGenerator(
+            known_types={'WIJ':0.0, 'DWIJ':[0.0, 0.0, 0.0],
+                         'user': KnownType('ndarray')}
+        )
         cg.parse(EqWithKnownTypes())
         expect = dedent("""
         cdef class EqWithKnownTypes:
@@ -227,7 +230,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ):
+            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ, ndarray user):
                 d_p[d_idx] = WIJ*DWIJ[0]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
