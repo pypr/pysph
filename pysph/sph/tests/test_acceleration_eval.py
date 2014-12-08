@@ -131,7 +131,7 @@ class SimpleEquation(Equation):
 
 class SimpleReduction(Equation):
     def reduce(self, dst):
-        dst.total_mass[0] = reduce_array(dst.m, op='sum')
+        dst.total_mass[0] = reduce_array(dst.array.m, op='sum')
 
 
 class TestAccelerationEval1D(unittest.TestCase):

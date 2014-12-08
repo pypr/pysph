@@ -31,5 +31,12 @@ class MPIReduceArrayTestCase(unittest.TestCase):
             filename='./reduce_array.py', nprocs=4, path=path
         )
 
+    @attr(slow=False, parallel=True)
+    def test_parallel_reduce(self):
+        run_parallel_script.run(
+            filename='./simple_reduction.py', nprocs=4, path=path
+        )
+
+
 if __name__ == '__main__':
     unittest.main()
