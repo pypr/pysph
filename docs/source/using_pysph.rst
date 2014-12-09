@@ -134,6 +134,35 @@ To set a given list of properties to zero:
    >>> props = ['au', 'av', 'aw']
    >>> pa.set_to_zero(props)
 
+Properties in a particle array are automatically sized depending on the number
+of particles.  There are times when fixed size properties are required.  For
+example if the total mass or total force on a particle array needs to be
+calculated, a fixed size constant can be added.  This can be done by adding a
+``constant`` to the array as illustrated below:
+
+.. code-block::python
+
+    >>> pa.add_constant('total_mass', 0.0)
+    >>> pa.add_constant('total_force', [0.0, 0.0, 0.0])
+    >>> print pa.total_mass, pa.total_force
+
+In the above, the ``total_mass`` is a fixed ``DoubleArray`` of length 1 and
+the ``total_force`` is a fixed ``DoubleArray`` of length 3.  These constants
+will never be resized as one adds or removes particles to/from the particle
+array.  The constants may be used inside of SPH equations just like any other
+property.
+
+The constants can also set in the constructor of the :py:class:`ParticleArray`
+by passing a dictionary of constants as a ``constants`` keyword argument.  For
+example:
+
+.. code-block::python
+
+    >>> pa = ParticleArray(
+    ...     name='test', x=x,
+    ...     constants=dict(total_mass=0.0, total_force=[0.0, 0.0, 0.0])
+    ... )
+
 Take a look at :py:class:`ParticleArray` reference documentation for
 some of the other methods and their uses.
 

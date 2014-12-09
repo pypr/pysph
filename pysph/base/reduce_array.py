@@ -19,11 +19,10 @@ def serial_reduce_array(array, op='sum'):
 
     Currently, only 'sum', 'max', 'min' and 'prod' are supported.
 
-    Parameters
-    -----------
+    **Parameters**
 
-    array: numpy.ndarray: Any numpy array (1D).
-    op: str: reduction operation, one of ('sum', 'prod', 'min', 'max')
+     - array: numpy.ndarray: Any numpy array (1D).
+     - op: str: reduction operation, one of ('sum', 'prod', 'min', 'max')
 
     """
     _check_operation(op)
@@ -41,11 +40,10 @@ def mpi_reduce_array(array, op='sum'):
 
     Currently, only 'sum', 'max', 'min' and 'prod' are supported.
 
-    Parameters
-    -----------
+    **Parameters**
 
-    array: numpy.ndarray: Any numpy array (1D).
-    op: str: reduction operation, one of ('sum', 'prod', 'min', 'max')
+     - array: numpy.ndarray: Any numpy array (1D).
+     - op: str: reduction operation, one of ('sum', 'prod', 'min', 'max')
 
     """
     value = serial_reduce_array(array, op)
