@@ -208,7 +208,7 @@ def get_particle_array_iisph(constants=None, **props):
                  'au', 'av', 'aw','ax', 'ay', 'az',
                  'dii0', 'dii1', 'dii2', 'V',
                  'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
-                 'rho0'
+                 'compression'
                  ]
     pa = get_particle_array(
         constants=constants, additional_props=iisph_props, **props
