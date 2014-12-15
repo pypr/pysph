@@ -19,7 +19,7 @@ from textwrap import dedent
 
 # Local imports.
 from pysph.base.ast_utils import get_symbols
-from pysph.base.cython_generator import CythonGenerator
+from pysph.base.cython_generator import CythonGenerator, KnownType
 
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
@@ -288,7 +288,9 @@ def get_predefined_types(precomp):
     """Return a dictionary that can be used by a CythonGenerator for
     the precomputed symbols.
     """
-    result = {'DT_ADAPT':[0.0, 0.0, 0.0]}
+    result = {'DT_ADAPT':[0.0, 0.0, 0.0],
+              'dst': KnownType('ParticleArrayWrapper'),
+              'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.iteritems():
         result[sym] = value.context[sym]
     return result
@@ -428,13 +430,13 @@ class Group(object):
         return '\n'.join(decl)
 
     def _has_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop')
+        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
         for equation in self.equations:
             if hasattr(equation, kind):
                 return True
 
     def _get_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop')
+        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
         # We assume here that precomputed quantities are only relevant
         # for loops and not post_loops and initialization.
         pre = []
@@ -589,6 +591,12 @@ class Group(object):
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
+
+    def has_reduce(self):
+        return self._has_code('reduce')
+
+    def get_reduce_code(self):
+        return self._get_code(kind='reduce')
 
     def get_converged_condition(self):
         if self.has_subgroups:

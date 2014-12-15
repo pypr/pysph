@@ -129,12 +129,25 @@ class MegaGroup(object):
 ###############################################################################
 class AccelerationEval(object):
     def __init__(self, particle_arrays, equations, kernel,
-                 cell_iteration=False):
+                 cell_iteration=False, mode='serial'):
+        """
+
+        Parameters
+        ----------
+
+        particle_arrays: list(ParticleArray): A list of particle arrays to use.
+        equations: list: A list of equations/groups.
+        kernel: The kernel to use.
+        cell_iteration: bool:
+                should cell iteration be used for the computation.
+        parallel: str: One of 'serial', 'mpi'.
+        """
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
         self.kernel = kernel
         self.nnps = None
         self.cell_iteration = cell_iteration
+        self.mode = mode
 
         all_equations = []
         for group in self.equation_groups:

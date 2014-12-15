@@ -51,6 +51,7 @@ src = self.${source}
 ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
+% if eq_group.has_loop():
 % if helper.object.cell_iteration:
 #######################################################################
 ## Iterate over cells.
@@ -100,7 +101,7 @@ for d_idx in range(NP_DEST):
         ###############################################################
         ${indent(eq_group.get_loop_code(helper.object.kernel), 2)}
 % endif
-
+% endif ## if eq_group.has_loop():
 # Source ${source} done.
 # --------------------------------------
 % endfor
@@ -112,6 +113,14 @@ for d_idx in range(NP_DEST):
 for d_idx in range(NP_DEST):
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
+
+###################################################################
+## Do any reductions for the destination.
+###################################################################
+% if all_eqs.has_reduce():
+${indent(all_eqs.get_reduce_code(), 0)}
+% endif
+
 # Destination ${dest} done.
 # ---------------------------------------------------------------------
 
@@ -132,6 +141,11 @@ from libc.math cimport M_PI as pi
 cimport numpy
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
+% if helper.object.mode == 'serial':
+from pysph.base.reduce_array import serial_reduce_array as reduce_array
+% elif helper.object.mode == 'mpi':
+from pysph.base.reduce_array import mpi_reduce_array as reduce_array
+% endif
 
 from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray
 
