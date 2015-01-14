@@ -64,15 +64,12 @@ class VolumeFromMassDensity(Equation):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
 
 class ShepardFilteredVelocity(Equation):
-    r"""Shepard filtered smooth velocity Eq. (22) in REF2:
+    r"""Shepard filtered smooth velocity Eq. (22) in REF1:
     
     .. math::
 
-        \tilde{\boldsymbol{v}}_a = \frac{1}{V_a}\sum_b
-        \boldsymbol{v}_b W_{ab},
-
-    where :math:`V` is the particle volume computed through either
-    `VolumeSummation` or `SummationDensity`.
+        \tilde{\boldsymbol{v}}_a = \frac{\sum_b\boldsymbol{v}_b W_{ab}}
+        {\sum_b W_{ab}}
 
     Notes:
 
@@ -80,21 +77,29 @@ class ShepardFilteredVelocity(Equation):
     *filtered* velocity variables :math:`uf, vf, wf`.
 
     """
-    def initialize(self, d_idx, d_uf, d_vf, d_wf):
+    def initialize(self, d_idx, d_uf, d_vf, d_wf, d_wij):
         d_uf[d_idx] = 0.0
         d_vf[d_idx] = 0.0
         d_wf[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_uf, d_vf, d_wf,
-             s_u, s_v, s_w, d_V, WIJ):
+             s_u, s_v, s_w, d_wij, WIJ):
 
-        # normalized kernel WIJ
-        wij = 1./d_V[d_idx] * WIJ
-        
-        # sum in Eq. (22)
-        d_uf[d_idx] += s_u[s_idx] * wij
-        d_vf[d_idx] += s_v[s_idx] * wij
-        d_wf[d_idx] += s_w[s_idx] * wij
+        # normalisation factor is different from 'V' as the particles 
+        # near the boundary do not have full kernel support
+        d_wij[d_idx] += WIJ
+
+        # sum in Eq. (22) 
+        # this will be normalized in post loop
+        d_uf[d_idx] += s_u[s_idx] * WIJ
+        d_vf[d_idx] += s_v[s_idx] * WIJ
+        d_wf[d_idx] += s_w[s_idx] * WIJ
+
+    def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx):
+        d_uf[d_idx] /= d_wij[d_idx]
+        d_vf[d_idx] /= d_wij[d_idx]
+        d_wf[d_idx] /= d_wij[d_idx]
 
 class ContinuityEquation(Equation):
     r"""Conservation of mass equation Eq (6) in REF1

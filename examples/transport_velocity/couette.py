@@ -26,7 +26,7 @@ import numpy as np
 # domain and reference values
 Re = 0.0125
 d = 0.5; Ly = 2*d; Lx = 0.4*Ly
-rho0 = 1.0; nu = 1.0
+rho0 = 1.0; nu = 0.01
 
 # upper wall velocity based on the Reynolds number and channel width
 Vmax = nu*Re/(2*d)
@@ -43,7 +43,7 @@ dt_cfl = 0.25 * h0/( c0 + Vmax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
-tf = 2.0
+tf = 100.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
@@ -77,7 +77,10 @@ def create_particles(**kwargs):
     # add requisite properties to the arrays:
     # particle volume
     fluid.add_property('V')
-    channel.add_property('V' )
+    channel.add_property('V')
+    
+    # kernel summation correction for the fluid
+    fluid.add_property('wij')
 
     # advection velocities and accelerations
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
@@ -85,7 +88,6 @@ def create_particles(**kwargs):
 
     # kernel summation correction for the channel
     channel.add_property('wij')
-
 
     channel.add_property('ax')
     channel.add_property('ay')
