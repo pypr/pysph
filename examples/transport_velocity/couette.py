@@ -78,9 +78,6 @@ def create_particles(**kwargs):
     # particle volume
     fluid.add_property('V')
     channel.add_property('V')
-    
-    # kernel summation correction for the fluid
-    fluid.add_property('wij')
 
     # advection velocities and accelerations
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
@@ -93,9 +90,14 @@ def create_particles(**kwargs):
     channel.add_property('ay')
     channel.add_property('az')
 
-    # Shepard filtered velocities for the fluid
+    # Shepard filtered velocities for the channel
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        channel.add_property(name)
+    
+    # dummy velocities for the channel
+    # required for the no-slip BC
+    for name in ['ug','vg','wg']:
+        channel.add_property(name)
 
     # magnitude of velocity
     fluid.add_property('vmag2')
@@ -159,12 +161,12 @@ equations = [
             ], real=False),
 
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the 
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ShepardFilteredVelocity(dest='channel', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can
