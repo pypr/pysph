@@ -10,6 +10,7 @@
 from numpy import sqrt
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
+from pysph.base.reduce_array import reduce_array
 
 
 class IISPHStep(IntegratorStep):
@@ -38,7 +39,7 @@ class NumberDensity(Equation):
         d_V[d_idx] += WIJ
 
 class SummationDensity(Equation):
-    def initialize(self, d_idx, d_rho, d_rho0):
+    def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
 
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
@@ -237,15 +238,13 @@ class PressureSolve(Equation):
         self.rho0 = rho0
         self.omega = omega
         self.compression = 0.0
-        self.count = 0
         self.debug = debug
         self.tolerance = tolerance
         super(PressureSolve, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_p):
+    def initialize(self, d_idx, d_p, d_compression):
         d_p[d_idx] = 0.0
-        self.compression = 0.0
-        self.count = 0
+        d_compression[d_idx] = 0.0
 
     def loop(self, d_idx, d_p, d_piter, d_rho, d_m, d_dijpj0, d_dijpj1, d_dijpj2,
              s_idx, s_m, s_dii0, s_dii1, s_dii2,
@@ -267,7 +266,8 @@ class PressureSolve(Equation):
         # This is corrected in the post_loop.
         d_p[d_idx] += s_m[s_idx]*tmpdotdwij
 
-    def post_loop(self, d_idx, d_piter, d_p0, d_p, d_aii, d_rho_adv, d_rho, dt=0.0):
+    def post_loop(self, d_idx, d_piter, d_p0, d_p, d_aii, d_rho_adv, d_rho,
+                  d_compression, dt=0.0):
         #tmp = d_rho[d_idx] - d_rho_adv[d_idx] - d_p[d_idx]
         tmp = self.rho0 - d_rho_adv[d_idx] - d_p[d_idx]
         p = (1.0 - self.omega)*d_piter[d_idx] + self.omega/d_aii[d_idx]*tmp
@@ -280,25 +280,30 @@ class PressureSolve(Equation):
         elif abs(d_aii[d_idx]) < aii_min :
             p = 0.0
         else:
-            compression =  p*d_aii[d_idx] - tmp
-            self.compression += compression
-            self.count += 1
+            d_compression[d_idx] = abs(p*d_aii[d_idx] - tmp)
 
         d_piter[d_idx] = p
         d_p[d_idx] = p
 
-    def converged(self):
-        count = self.count
-        debug = self.debug
-        ratio = abs(self.compression/count/self.rho0) if count > 0 else 0
+    def reduce(self, dst):
+        count = reduce_array(dst.array.compression > 0.0, 'sum')
+        if count > 0:
+            comp = reduce_array(dst.array.compression, 'sum')/count/self.rho0
+        else:
+            comp = 0.0
+        self.compression = comp
 
-        if ratio > self.tolerance:
+    def converged(self):
+        debug = self.debug
+        compression = self.compression
+
+        if compression > self.tolerance:
             if debug:
-                print "Not converged:", ratio
+                print "Not converged:", compression
             return -1.0
         else:
             if debug:
-                print "Converged:", ratio
+                print "Converged:", compression
             return 1.0
 
 class PressureSolveBoundary(Equation):

@@ -33,6 +33,10 @@ SPH equations
    :undoc-members:
 
 
+.. automodule:: pysph.base.reduce_array
+   :members:
+   :undoc-members:
+
 Group of equations
 -------------------
 

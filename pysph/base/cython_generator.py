@@ -68,6 +68,16 @@ class CodeGenerationError(Exception):
 class Undefined(object):
     pass
 
+class KnownType(object):
+    """Simple object to specify a known type as a string.
+
+    Smells but is convenient as the type may be one available only inside
+    Cython without a corresponding Python type.
+    """
+    def __init__(self, type_str):
+        self.type = type_str
+
+
 class CythonGenerator(object):
     def __init__(self, known_types=None, python_methods=False):
         """
@@ -103,7 +113,9 @@ class CythonGenerator(object):
             return 'double*'
         if name in ['s_idx', 'd_idx']:
             return 'long'
-        if value is Undefined:
+        if isinstance(value, KnownType):
+            return value.type
+        if value is Undefined or isinstance(value, Undefined):
             raise CodeGenerationError('Unknown type, for %s'%name)
 
         if isinstance(value, bool):
