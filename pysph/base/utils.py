@@ -217,6 +217,25 @@ def get_particle_array_iisph(constants=None, **props):
                            'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'] )
     return pa
 
+def get_particle_array_rigid_body(constants=None, **props):
+    extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'tx', 'ty', 'tz']
+    consts = {'total_mass':0.0,
+              'cm': [0.0, 0.0, 0.0],
+              # The mi are also used to temporarily reduce mass, center of mass
+              # and the interia components which are 10 in number.
+              'mi': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+              'total_force': [0.0, 0.0, 0.0],
+              'total_torque': [0.0, 0.0, 0.0]
+              }
+    if constants:
+        consts.update(constants)
+    pa = get_particle_array(constants=consts, additional_props=extra_props,
+                            **props)
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V',
+                           'fx', 'fy', 'fz', 'tx', 'ty', 'tz'] )
+    return pa
+
 def get_particle_array_tvf_fluid(constants=None, **props):
     "Get the fluid array for the transport velocity formulation"
     tv_props = ['uf', 'vf', 'wf','uhat', 'vhat', 'what',
