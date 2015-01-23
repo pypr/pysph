@@ -16,8 +16,7 @@ from pysph.sph.integrator_step import TransportVelocityStep
 from pysph.sph.equation import Group
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
-    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    ShepardFilteredVelocity
+    MomentumEquationArtificialStress, SolidWallPressureBC
 
 # numpy
 import numpy as np
@@ -121,7 +120,6 @@ equations = [
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
             ], real=False),
 
     # The main accelerations block. The acceleration arrays for the

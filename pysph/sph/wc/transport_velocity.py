@@ -63,8 +63,8 @@ class VolumeFromMassDensity(Equation):
     def loop(self, d_idx, d_V, d_rho, d_m):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
 
-class ShepardFilteredVelocity(Equation):
-    r"""Shepard filtered smooth velocity Eq. (22) in REF1:
+class SetWallVelocity(Equation):
+    r"""Extrapolating the fluid velocity on to the wall Eq. (22) in REF1:
     
     .. math::
 

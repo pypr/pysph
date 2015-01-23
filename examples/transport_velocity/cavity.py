@@ -16,7 +16,7 @@ from pysph.sph.equation import Group
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    ShepardFilteredVelocity
+    SetWallVelocity
 
 # numpy
 import numpy as np
@@ -72,7 +72,7 @@ def create_particles(**kwargs):
     fluid.add_property('V')
     solid.add_property('V' )
 
-    # Shepard filtered velocities for the solid
+    # extrapolated velocities for the solid
     for name in ['uf', 'vf', 'wf']:
         solid.add_property(name)
 
@@ -153,12 +153,12 @@ equations = [
 
 
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='solid', sources=['fluid']),
+            SetWallVelocity(dest='solid', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can
