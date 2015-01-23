@@ -90,12 +90,17 @@ def create_particles(**kwargs):
     solid.add_property('ay')
     solid.add_property('az')
 
-    # Shepard filtered velocities for the fluid
+    # Shepard filtered velocities for the solid
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        solid.add_property(name)
+
+    # dummy velocities for the solid wall
+    # required for the no-slip BC
+    for name in ['ug', 'vg', 'wg']:
+        solid.add_property(name)
 
     # magnitude of velocity
-    fluid.add_property('vmag')
+    fluid.add_property('vmag2')
 
     # density acceleration
     fluid.add_property('arho')
@@ -157,7 +162,7 @@ equations = [
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            ShepardFilteredVelocity(dest='solid', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can

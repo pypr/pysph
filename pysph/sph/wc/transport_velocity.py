@@ -98,10 +98,15 @@ class ShepardFilteredVelocity(Equation):
 
     def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx,
             d_ug, d_vg, d_wg, d_u, d_v, d_w):
-        d_uf[d_idx] /= d_wij[d_idx]
-        d_vf[d_idx] /= d_wij[d_idx]
-        d_wf[d_idx] /= d_wij[d_idx]
-        
+
+        # calculation is done only for the relevant boundary particles.
+        # d_wij (and d_uf) is 0 for particles sufficiently away from the
+        # solid-fluid interface
+        if d_wij[d_idx] > 1e-12:
+            d_uf[d_idx] /= d_wij[d_idx]
+            d_vf[d_idx] /= d_wij[d_idx]
+            d_wf[d_idx] /= d_wij[d_idx]
+
         # Dummy velocities at the ghost points using Eq. (23),
         # d_u, d_v, d_w are the prescribed wall velocities.
         d_ug[d_idx] = 2*d_u[d_idx] - d_uf[d_idx]
