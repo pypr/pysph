@@ -210,8 +210,14 @@ def get_particle_array_iisph(constants=None, **props):
                  'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
                  'compression'
                  ]
+    # Used to calculate the total compression first index is count and second
+    # the compression.
+    consts = {'tmp_comp': [0.0, 0.0]}
+    if constants:
+        consts.update(constants)
+
     pa = get_particle_array(
-        constants=constants, additional_props=iisph_props, **props
+        constants=consts, additional_props=iisph_props, **props
     )
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
                            'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'] )

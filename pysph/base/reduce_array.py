@@ -14,6 +14,14 @@ def _check_operation(op):
     if op not in valid_ops:
         raise RuntimeError(msg)
 
+def _get_npy_array(array_or_carray):
+    """Return a numpy array from given carray or numpy array.
+    """
+    if isinstance(array_or_carray, BaseArray):
+        return array_or_carray.get_npy_array()
+    else:
+        return array_or_carray
+
 def serial_reduce_array(array, op='sum'):
     """Reduce an array given an array and a suitable reduction operation.
 
@@ -28,12 +36,14 @@ def serial_reduce_array(array, op='sum'):
     _check_operation(op)
     ops = {'sum': np.sum, 'prod': np.prod,
            'max': np.max, 'min': np.min}
-    if isinstance(array, BaseArray):
-        np_array = array.get_npy_array()
-    else:
-        np_array = array
+    np_array = _get_npy_array(array)
     return ops[op](np_array)
 
+
+def dummy_reduce_array(array, op='sum'):
+    """Simply returns the array for the serial case.
+    """
+    return _get_npy_array(array)
 
 def mpi_reduce_array(array, op='sum'):
     """Reduce an array given an array and a suitable reduction operation.
@@ -46,16 +56,12 @@ def mpi_reduce_array(array, op='sum'):
      - op: str: reduction operation, one of ('sum', 'prod', 'min', 'max')
 
     """
-    value = serial_reduce_array(array, op)
+    np_array = _get_npy_array(array)
     from mpi4py import MPI
     ops = {'sum': MPI.SUM, 'prod': MPI.PROD,
            'max': MPI.MAX, 'min': MPI.MIN}
-    return MPI.COMM_WORLD.allreduce(value, op=ops[op])
+    return MPI.COMM_WORLD.allreduce(np_array, op=ops[op])
 
-
-try:
-    import mpi4py
-except ImportError:
-    reduce_array = serial_reduce_array
-else:
-    reduce_array = mpi_reduce_array
+# This is just to keep syntax highlighters happy in editors while writing
+# equations.
+parallel_reduce_array = mpi_reduce_array

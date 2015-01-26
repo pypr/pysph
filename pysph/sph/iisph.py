@@ -10,7 +10,7 @@
 from numpy import sqrt
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
-from pysph.base.reduce_array import reduce_array
+from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 
 
 class IISPHStep(IntegratorStep):
@@ -286,9 +286,11 @@ class PressureSolve(Equation):
         d_p[d_idx] = p
 
     def reduce(self, dst):
-        count = reduce_array(dst.array.compression > 0.0, 'sum')
-        if count > 0:
-            comp = reduce_array(dst.array.compression, 'sum')/count/self.rho0
+        dst.tmp_comp[0] = serial_reduce_array(dst.array.compression > 0.0, 'sum')
+        dst.tmp_comp[1] = serial_reduce_array(dst.array.compression, 'sum')
+        dst.tmp_comp.set_data(parallel_reduce_array(dst.tmp_comp, 'sum'))
+        if dst.tmp_comp[0] > 0:
+            comp = dst.tmp_comp[1]/dst.tmp_comp[0]/self.rho0
         else:
             comp = 0.0
         self.compression = comp

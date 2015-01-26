@@ -596,8 +596,10 @@ equation:
 
     class FindMaxU(Equation):
         def reduce(self, dst):
-            dst.total_mass[0] = reduce_array(dst.array.m, 'sum')
-            dst.max_u[0] = reduce_array(dst.array.u, 'max')
+            m = serial_reduce_array(dst.array.m, 'sum')
+            max_u = serial_reduce_array(dst.array.u, 'max')
+            dst.total_mass[0] = parallel_reduce_array(m, 'sum')
+            dst.max_u[0] = parallel_reduce_array(u, 'max')
 
 where:
 
@@ -605,10 +607,15 @@ where:
 
     - ``src``: refers to a the source ``ParticleArrayWrapper``.
 
-    - ``reduce_array``: is a special function provided that performs
-      reductions correctly in serial or parallel. It currently supports ``sum,
-      prod, max`` and ``min`` operations.  See
-      :py:func:`pysph.base.reduce_array.reduce_array`.
+    - ``serial_reduce_array``: is a special function provided that performs
+      reductions correctly in serial. It currently supports ``sum, prod, max``
+      and ``min`` operations.  See
+      :py:func:`pysph.base.reduce_array.serial_reduce_array`.  There is also a
+      :py:func:`pysph.base.reduce_array.parallel_reduce_array` which is to be
+      used to reduce an array across processors.  Using
+      ``parallel_reduce_array`` is expensive as it is an all-to-all
+      communication.  One can reduce these by using a single array and use
+      that to reduce the communication.
 
 The ``ParticleArrayWrapper``, wraps a ``ParticleArray`` into a
 high-performance Cython object.  It has an ``array`` attribute which is a
@@ -618,15 +625,16 @@ Cython code one may access ``dst.x`` to get the raw arrays used by the
 particle array.  This is mainly done for performance reasons.
 
 Note that in the above example,
-:py:func:`pysph.base.reduce_array.reduce_array` is passed a ``dst.array.m``,
-this is important as in parallel the ``dst.m`` will contain all particle
-properties including ghost properties.  On the other hand ``dst.array.m`` will
-be a numpy array of only the real particles.
+:py:func:`pysph.base.reduce_array.serial_reduce_array` is passed a
+``dst.array.m``, this is important as in parallel the ``dst.m`` will contain
+all particle properties including ghost properties.  On the other hand
+``dst.array.m`` will be a numpy array of only the real particles.
 
 We recommend that for any kind of reductions one always use the
-``reduce_array`` function inside a ``reduce`` method.  One should not worry
-about parallel/serial modes in this case as this is automatically taken care
-of by the code generator.
+``serial_reduce_array`` function and the ``parallel_reduce_array`` inside a
+``reduce`` method.  One should not worry about parallel/serial modes in this
+case as this is automatically taken care of by the code generator.  In serial,
+the parallel reduction does nothing.
 
 With this machinery, we are able to write complex equations to solve almost
 any SPH problem.  A user can easily define a new equation and instantiate the

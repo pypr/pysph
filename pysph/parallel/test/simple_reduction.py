@@ -26,7 +26,8 @@ class TotalMass(Equation):
         # Use the dst.array as we want to pass the real particles to do the sum
         # passing the carray will send all the particles including ghosts
         # which is incorrect.
-        dst.total_mass[0] = reduce_array(dst.array.m, op='sum')
+        m = serial_reduce_array(dst.array.m, op='sum')
+        dst.total_mass[0] = parallel_reduce_array(m, op='sum')
 
 class DummyStepper(IntegratorStep):
     def initialize(self):
