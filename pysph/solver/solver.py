@@ -9,7 +9,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
 
-from utils import FloatPBar, savez, load
+from utils import FloatPBar, savez, load, dump
 
 import logging
 logger = logging.getLogger(__name__)
@@ -517,56 +517,22 @@ class Solver(object):
         if self.disable_output:
             return
 
-        fname = self.fname + '_'
-        output_data = {"arrays":{}, "solver_data":{}}
-
-        _fname = os.path.join(self.output_directory,
-                              fname  + str(self.count) +'.npz')
-
         if self.rank == 0:
             msg = 'Writing output at time %g, iteration %d, dt = %g'%(
                 self.t, self.count, self.dt)
             logger.info(msg)
 
-        # Array data
-        for array in self.particles:
-            output_data["arrays"][array.name] = array.get_property_arrays(
-                all=self.detailed_output, only_real=self.output_only_real)
+        fname = os.path.join(self.output_directory,
+                             self.fname  + '_' + str(self.count) +'.npz')
 
-        # Add the solver data
-        output_data["solver_data"]["dt"] = self.dt
-        output_data["solver_data"]["t"] = self.t
-        output_data["solver_data"]["count"] = self.count
-
-        # Gather particle data on root
+        solver_data = {'dt': self.dt, 't': self.t, 'count': self.count}
+        comm = None
         if self.parallel_output_mode == "collected" and self.in_parallel:
             comm = self.comm
 
-            arrays = output_data["arrays"]
-            array_names = arrays.keys()
-
-            # gather the data from all processors
-            collected_data = comm.gather(arrays, root=0)
-
-            if self.rank == 0:
-                output_data["arrays"] = {}
-                size = comm.Get_size()
-
-                # concatenate the arrays
-                for array_name in array_names:
-                    output_data["arrays"][array_name] = {}
-
-                    _props = collected_data[0][array_name].keys()
-                    for prop in _props:
-                        data = [collected_data[pid][array_name][prop]
-                                        for pid in range(size)]
-                        prop_arr = numpy.concatenate(data)
-                        output_data["arrays"][array_name][prop] = prop_arr
-
-                savez(_fname, version=1, **output_data)
-
-        else:
-            savez(_fname, version=1, **output_data)
+        dump(fname, self.particles, solver_data,
+             detailed_output=self.detailed_output,
+             only_real=self.output_only_real, mpi_comm=comm)
 
     def load_output(self, count):
         """ Load particle data from dumped output file.
@@ -612,8 +578,11 @@ class Solver(object):
         # set the Particle's arrays
         self.particles = arrays
 
-        self.t = float(data["solver_data"]['t'])
-        self.count = int(data["solver_data"]['count'])
+        solver_data = data['solver_data']
+
+        self.t = float(solver_data['t'])
+        self.dt = float(solver_data['dt'])
+        self.count = int(solver_data['count'])
 
     def get_options(self, opt_parser):
         """ Implement this to add additional options for the application """

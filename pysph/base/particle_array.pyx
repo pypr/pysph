@@ -317,7 +317,9 @@ cdef class ParticleArray:
         self.output_property_arrays = list( set(self.output_property_arrays) )
 
     def get_property_arrays(self, all=True, only_real=True):
-        """Return a dictionary of arrays held by the `ParticleArray` container
+        """Return a dictionary of arrays held by the `ParticleArray` container.
+
+        This does not include the constants.
 
         Parameters:
 
@@ -335,12 +337,12 @@ cdef class ParticleArray:
         `output_property_arrays` data attribute.
 
         """
-        # the dictionary to be returned
-        ret = {}
+        # the arrays dictionary to be returned
+        arrays = {}
 
         # the list of properties
         props = self.output_property_arrays
-        if ( all or (props == []) ):
+        if all or len(props) == 0:
             props = self.properties.keys()
 
         # number of particles
@@ -349,13 +351,9 @@ cdef class ParticleArray:
         # add the property arrays
         for prop in props:
             prop_array = self.properties[ prop ].get_npy_array()[:num_particles]
-            ret[prop] = prop_array
+            arrays[prop] = prop_array
 
-        # add constants if any
-        for prop in self.constants:
-            ret[prop] = self.constants[prop]
-
-        return ret
+        return arrays
 
     cpdef set_dirty(self, bint value):
         """ Set the is_dirty variable to given value """
