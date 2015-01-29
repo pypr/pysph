@@ -32,7 +32,8 @@ def get_alpha_dot():
     syms, result = S.cse(res, symbols=S.numbered_symbols('tmp'))
     for lhs, rhs in syms:
         print "%s = %s"%(lhs, rhs)
-    print "omega_dot =", result
+    for i in range(3):
+        print "omega_dot[%d] ="%i, result[0][i]
 
 
 def get_torque():
@@ -160,6 +161,90 @@ class RigidBodyMotion(Equation):
         d_v[d_idx] = d_vc[1] + wz*rx - wx*rz
         d_w[d_idx] = d_vc[2] + wx*ry - wy*rx
 
+class BodyForce(Equation):
+    def __init__(self, dest, sources=None, gx=0.0, gy=0.0, gz=0.0):
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        super(BodyForce, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_m, d_fx, d_fy, d_fz):
+        d_fx[d_idx] = d_m[d_idx]*self.gx
+        d_fy[d_idx] = d_m[d_idx]*self.gy
+        d_fz[d_idx] = d_m[d_idx]*self.gz
+
+
+class NumberDensity(Equation):
+    def initialize(self, d_idx, d_V):
+        d_V[d_idx] = 0.0
+
+    def loop(self, d_idx, d_V, WIJ):
+        d_V[d_idx] += WIJ
+
+class SummationDensityRigidBody(Equation):
+    def __init__(self, dest, sources=None, rho0=1.0):
+        self.rho0 = rho0
+        super(SummationDensityRigidBody, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_rho, s_idx, s_V, WIJ):
+        d_rho[d_idx] += self.rho0/s_V[s_idx]*WIJ
+
+
+class ViscosityRigidBody(Equation):
+
+    """The viscous acceleration on the fluid/solid due to a boundary.
+    Implemented from Akinci et al. http://dx.doi.org/10.1145/2185520.2185558
+
+    Use this with the fluid as a destination and body as source.
+    """
+
+    def __init__(self, dest, sources=None, rho0=1.0, nu=1.0):
+        self.nu = nu
+        self.rho0 = rho0
+        super(ViscosityRigidBody, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_m, d_au, d_av, d_aw, d_rho,
+             s_idx, s_V, s_fx, s_fy, s_fz,
+             EPS, VIJ, XIJ, R2IJ, DWIJ):
+        phi_b = self.rho0/(s_V[s_idx]*d_rho[d_idx])
+        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
+
+        fac = self.nu*phi_b*vijdotxij/(R2IJ + EPS)
+        ax = fac*DWIJ[0]
+        ay = fac*DWIJ[1]
+        az = fac*DWIJ[2]
+        d_au[d_idx] += ax
+        d_av[d_idx] += ay
+        d_aw[d_idx] += az
+        s_fx[s_idx] += -d_m[d_idx]*ax
+        s_fy[s_idx] += -d_m[d_idx]*ay
+        s_fz[s_idx] += -d_m[d_idx]*az
+
+class PressureRigidBody(Equation):
+
+    """The pressure acceleration on the fluid/solid due to a boundary.
+    Implemented from Akinci et al. http://dx.doi.org/10.1145/2185520.2185558
+
+    Use this with the fluid as a destination and body as source.
+    """
+
+    def __init__(self, dest, sources=None, rho0=1.0):
+        self.rho0 = rho0
+        super(PressureRigidBody, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
+             s_idx, s_V, s_fx, s_fy, s_fz, DWIJ):
+        rho1 = 1.0/d_rho[d_idx]
+        fac = -d_p[d_idx]*rho1*rho1*self.rho0/s_V[s_idx]
+        ax = fac*DWIJ[0]
+        ay = fac*DWIJ[1]
+        az = fac*DWIJ[2]
+        d_au[d_idx] += ax
+        d_av[d_idx] += ay
+        d_aw[d_idx] += az
+        s_fx[s_idx] += -d_m[d_idx]*ax
+        s_fy[s_idx] += -d_m[d_idx]*ay
+        s_fz[s_idx] += -d_m[d_idx]*az
 
 class EulerStepRigidBody(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
