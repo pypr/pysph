@@ -58,12 +58,6 @@ def get_torque():
 
 
 class RigidBodyMoments(Equation):
-    def initialize(self):
-        pass
-
-    def loop(self):
-        pass
-
     def reduce(self, dst):
         # Find the total_mass, center of mass and second moments.
         dst.mi[0] = serial_reduce_array(dst.array.m)
@@ -165,8 +159,6 @@ class RigidBodyMotion(Equation):
         d_u[d_idx] = d_vc[0] + wy*rz - wz*ry
         d_v[d_idx] = d_vc[1] + wz*rx - wx*rz
         d_w[d_idx] = d_vc[2] + wx*ry - wy*rx
-    def loop(self):
-        pass
 
 
 class EulerStepRigidBody(IntegratorStep):

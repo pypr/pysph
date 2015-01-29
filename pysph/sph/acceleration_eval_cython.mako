@@ -33,9 +33,11 @@ for d_idx in range(NP_DEST):
 ## Handle all the equations that do not have a source.
 #######################################################################
 % if len(eqs_with_no_source.equations) > 0:
+% if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
 for d_idx in range(NP_DEST):
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
+% endif
 % endif
 #######################################################################
 ## Iterate over sources.
