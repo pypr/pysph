@@ -529,6 +529,10 @@ class VerletSymplecticWCSPHStep(IntegratorStep):
     equation.
 
     """
+
+    def initialize(self):
+        pass
+
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, dt=0.0):
 
         dtb2 = 0.5 * dt
@@ -552,3 +556,45 @@ class VerletSymplecticWCSPHStep(IntegratorStep):
         d_x[d_idx] += dtb2 * d_ax[d_idx]
         d_y[d_idx] += dtb2 * d_ay[d_idx]
         d_z[d_idx] += dtb2 * d_az[d_idx]
+
+
+###############################################################################
+# `VelocityVerletSymplecticWCSPHStep` class
+###############################################################################
+class VelocityVerletSymplecticWCSPHStep(IntegratorStep):
+    """Another symplectic second order integrator described in the
+    review paper by Monaghan:
+
+    J. Monaghan, "Smoothed Particle Hydrodynamics", Reports on
+    Progress in Physics, 2005, 68, pp 1703--1759 [JM05]
+
+    kick--drift--kick form of the verlet integrator
+
+    """
+
+    def initialize(self):
+        pass
+
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt=0.0):
+
+        dtb2 = 0.5 * dt
+
+        # Eq. (5.51) in [JM05]
+        d_u[d_idx] += dtb2 * d_au[d_idx]
+        d_v[d_idx] += dtb2 * d_av[d_idx]
+        d_w[d_idx] += dtb2 * d_aw[d_idx]
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, 
+               d_au, d_av, d_aw, dt=0.0):
+
+        dtb2 = 0.5 * dt
+
+        # Eq. (5.52) in [JM05]
+        d_x[d_idx] += dt * d_u[d_idx]
+        d_y[d_idx] += dt * d_v[d_idx]
+        d_z[d_idx] += dt * d_w[d_idx]
+
+        # Eq. (5.53) in [JM05] 
+        d_u[d_idx] += dtb2 * d_au[d_idx]
+        d_v[d_idx] += dtb2 * d_av[d_idx]
+        d_w[d_idx] += dtb2 * d_aw[d_idx]
