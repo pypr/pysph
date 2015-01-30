@@ -20,7 +20,7 @@ from pysph.sph.equation import Group
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
 from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
-    SolidWallPressureBC, SolidWallNoSlipBC, ShepardFilteredVelocity, \
+    SolidWallPressureBC, SolidWallNoSlipBC, \
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \

@@ -54,8 +54,8 @@ from pysph.sph.equation import Group
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
 from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
-    SolidWallPressureBC, SolidWallNoSlipBC, ShepardFilteredVelocity, \
-    StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
+    SolidWallPressureBC, SolidWallNoSlipBC, StateEquation,\
+    MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
     ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
@@ -133,10 +133,7 @@ def create_particles(**kwargs):
 
         # interface curvature
         'kappa',
-        
-        # filtered velocities
-        'uf', 'vf', 'wf',
-        
+
         # transport velocities
         'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 
         
