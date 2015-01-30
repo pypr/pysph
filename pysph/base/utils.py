@@ -219,7 +219,7 @@ def get_particle_array_iisph(constants=None, **props):
 
 def get_particle_array_tvf_fluid(constants=None, **props):
     "Get the fluid array for the transport velocity formulation"
-    tv_props = ['uf', 'vf', 'wf','uhat', 'vhat', 'what',
+    tv_props = ['uhat', 'vhat', 'what',
                 'auhat', 'avhat', 'awhat', 'vmag2', 'V']
 
     pa = get_particle_array(
@@ -232,7 +232,8 @@ def get_particle_array_tvf_fluid(constants=None, **props):
 
 def get_particle_array_tvf_solid(constants=None, **props):
     "Get the solid array for the transport velocity formulation"
-    tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az']
+    tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az',
+                'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
 
     return get_particle_array(
         constants=constants, additional_props=tv_props, **props
