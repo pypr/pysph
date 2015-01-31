@@ -210,11 +210,47 @@ def get_particle_array_iisph(constants=None, **props):
                  'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
                  'compression'
                  ]
+    # Used to calculate the total compression first index is count and second
+    # the compression.
+    consts = {'tmp_comp': [0.0, 0.0]}
+    if constants:
+        consts.update(constants)
+
     pa = get_particle_array(
-        constants=constants, additional_props=iisph_props, **props
+        constants=consts, additional_props=iisph_props, **props
     )
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
                            'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'] )
+    return pa
+
+def get_particle_array_rigid_body(constants=None, **props):
+    extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'x0', 'y0', 'z0']
+    consts = {'total_mass':0.0,
+              'cm': [0.0, 0.0, 0.0],
+
+              # The mi are also used to temporarily reduce mass (1), center of
+              # mass (3) and the interia components (6), total force (3), total
+              # torque (3).
+              'mi': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+              'force': [0.0, 0.0, 0.0],
+              'torque': [0.0, 0.0, 0.0],
+              # velocity, acceleration of CM.
+              'vc': [0.0, 0.0, 0.0],
+              'ac': [0.0, 0.0, 0.0],
+              'vc0': [0.0, 0.0, 0.0],
+              # angular velocity, acceleration of body.
+              'omega': [0.0, 0.0, 0.0],
+              'omega0': [0.0, 0.0, 0.0],
+              'omega_dot': [0.0, 0.0, 0.0]
+              }
+    if constants:
+        consts.update(constants)
+    pa = get_particle_array(constants=consts, additional_props=extra_props,
+                            **props)
+    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V',
+                           'fx', 'fy', 'fz'] )
     return pa
 
 def get_particle_array_tvf_fluid(constants=None, **props):
