@@ -72,6 +72,7 @@ ro = 1000.0
 
 """
 
+import numpy as np
 import sys
 import os
 # Need this to import db_geometry.
@@ -101,14 +102,15 @@ container_height = 3.0
 container_width  = 4.0
 nboundary_layers=2
 
-dt = 1e-2
+dt = 1e-3
 tf = 2.5
 
-hdx = 1.0
+hdx = 1.3
 dx = dy = 0.02
 ro = 1000.0
 nu = 8.9e-4
 beta = 0.0
+co = 10.0*np.sqrt(9.81*fluid_column_height)
 
 geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
@@ -121,8 +123,8 @@ geom = DamBreak2DGeometry(
 
 def create_particles(**kw):
     fluid, boundary = geom.create_particles(**kw)
-    boundary.x -= 0.025
-    boundary.y -= 0.025
+    boundary.x -= 0.1
+    boundary.y -= 0.1
     return [fluid, boundary]
 
 # Create the application.
@@ -177,7 +179,7 @@ equations = [
                 dest='fluid', sources=['boundary'], nu=nu, rho0=ro,
             ),
             ComputeDII(dest='fluid', sources=['fluid']),
-            ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
+            #ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
         ]
     ),
 
@@ -186,7 +188,7 @@ equations = [
             ComputeRhoAdvection(dest='fluid', sources=['fluid']),
             ComputeRhoBoundary(dest='fluid', sources=['boundary'], rho0=ro),
             ComputeAII(dest='fluid', sources=['fluid']),
-            ComputeAIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
+            #ComputeAIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
         ]
     ),
 
@@ -203,14 +205,14 @@ equations = [
                         dest='fluid', sources=['fluid'], rho0=ro,
                         tolerance=1e-3, debug=False
                     ),
-                    PressureSolveBoundary(
-                        dest='fluid', sources=['boundary'], rho0=ro,
-                    ),
+                    #PressureSolveBoundary(
+                    #    dest='fluid', sources=['boundary'], rho0=ro,
+                    #),
                   ]
             ),
         ],
         iterate=True,
-        max_iterations=20,
+        max_iterations=30,
         min_iterations=2
     ),
 
