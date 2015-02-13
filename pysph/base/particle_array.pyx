@@ -534,7 +534,7 @@ cdef class ParticleArray:
 
         return 0
 
-    cpdef int append_parray(self, ParticleArray parray):
+    cpdef int append_parray(self, ParticleArray parray) except -1:
         """ Add particles from a particle array
 
         properties that are not there in self will be added
