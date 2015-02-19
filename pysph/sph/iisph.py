@@ -10,7 +10,7 @@
 from numpy import sqrt
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
-from pysph.base.reduce_array import reduce_array
+from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 
 
 class IISPHStep(IntegratorStep):
@@ -101,11 +101,11 @@ class ViscosityAcceleration(Equation):
 
     def loop(self, d_idx, d_au, d_av, d_aw, s_idx, s_m, EPS,
              VIJ, XIJ, RHOIJ1, R2IJ, DWIJ):
-        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
-        fac = self.nu*s_m[s_idx]*RHOIJ1*vijdotxij/(R2IJ + EPS)
-        d_au[d_idx] += fac*DWIJ[0]
-        d_av[d_idx] += fac*DWIJ[1]
-        d_aw[d_idx] += fac*DWIJ[2]
+        dwijdotxij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
+        fac = 2.0*self.nu*s_m[s_idx]*RHOIJ1*dwijdotxij/(R2IJ + EPS)
+        d_au[d_idx] += fac*VIJ[0]
+        d_av[d_idx] += fac*VIJ[1]
+        d_aw[d_idx] += fac*VIJ[2]
 
 class ViscosityAccelerationBoundary(Equation):
     """The acceleration on the fluid due to a boundary.
@@ -118,12 +118,12 @@ class ViscosityAccelerationBoundary(Equation):
     def loop(self, d_idx, d_au, d_av, d_aw, d_rho, s_idx, s_V, EPS,
              VIJ, XIJ, R2IJ, DWIJ):
         phi_b = self.rho0/(s_V[s_idx]*d_rho[d_idx])
-        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
+        dwijdotxij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
 
-        fac = self.nu*phi_b*vijdotxij/(R2IJ + EPS)
-        d_au[d_idx] += fac*DWIJ[0]
-        d_av[d_idx] += fac*DWIJ[1]
-        d_aw[d_idx] += fac*DWIJ[2]
+        fac = 2.0*self.nu*phi_b*dwijdotxij/(R2IJ + EPS)
+        d_au[d_idx] += fac*VIJ[0]
+        d_av[d_idx] += fac*VIJ[1]
+        d_aw[d_idx] += fac*VIJ[2]
 
 
 class ComputeDII(Equation):
@@ -286,9 +286,11 @@ class PressureSolve(Equation):
         d_p[d_idx] = p
 
     def reduce(self, dst):
-        count = reduce_array(dst.array.compression > 0.0, 'sum')
-        if count > 0:
-            comp = reduce_array(dst.array.compression, 'sum')/count/self.rho0
+        dst.tmp_comp[0] = serial_reduce_array(dst.array.compression > 0.0, 'sum')
+        dst.tmp_comp[1] = serial_reduce_array(dst.array.compression, 'sum')
+        dst.tmp_comp.set_data(parallel_reduce_array(dst.tmp_comp, 'sum'))
+        if dst.tmp_comp[0] > 0:
+            comp = dst.tmp_comp[1]/dst.tmp_comp[0]/self.rho0
         else:
             comp = 0.0
         self.compression = comp
@@ -337,8 +339,8 @@ class PressureForce(Equation):
 
     def post_loop(self, d_idx, d_au, d_av, d_aw,
                   d_uadv, d_vadv, d_wadv, DT_ADAPT):
-        fac = sqrt(d_au[d_idx]*d_au[d_idx] + d_av[d_idx]*d_av[d_idx] +\
-                   d_aw[d_idx]*d_aw[d_idx])
+        fac = d_au[d_idx]*d_au[d_idx] + d_av[d_idx]*d_av[d_idx] +\
+                   d_aw[d_idx]*d_aw[d_idx]
         vmag = sqrt(d_uadv[d_idx]*d_uadv[d_idx] + d_vadv[d_idx]*d_vadv[d_idx] +
                     d_wadv[d_idx]*d_wadv[d_idx])
         DT_ADAPT[0] = max(2.0*vmag, DT_ADAPT[0])

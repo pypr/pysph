@@ -15,7 +15,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.sph_compiler import SPHCompiler
 
-from pysph.base.reduce_array import reduce_array
+from pysph.base.reduce_array import serial_reduce_array
 
 
 class TestEquation(Equation):
@@ -131,7 +131,7 @@ class SimpleEquation(Equation):
 
 class SimpleReduction(Equation):
     def reduce(self, dst):
-        dst.total_mass[0] = reduce_array(dst.array.m, op='sum')
+        dst.total_mass[0] = serial_reduce_array(dst.array.m, op='sum')
 
 
 class TestAccelerationEval1D(unittest.TestCase):

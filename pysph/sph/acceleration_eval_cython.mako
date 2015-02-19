@@ -33,9 +33,11 @@ for d_idx in range(NP_DEST):
 ## Handle all the equations that do not have a source.
 #######################################################################
 % if len(eqs_with_no_source.equations) > 0:
+% if eqs_with_no_source.has_loop():
 # SPH Equations with no sources.
 for d_idx in range(NP_DEST):
     ${indent(eqs_with_no_source.get_loop_code(helper.object.kernel), 1)}
+% endif
 % endif
 #######################################################################
 ## Iterate over sources.
@@ -141,10 +143,11 @@ from libc.math cimport M_PI as pi
 cimport numpy
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
+from pysph.base.reduce_array import serial_reduce_array
 % if helper.object.mode == 'serial':
-from pysph.base.reduce_array import serial_reduce_array as reduce_array
+from pysph.base.reduce_array import dummy_reduce_array as parallel_reduce_array
 % elif helper.object.mode == 'mpi':
-from pysph.base.reduce_array import mpi_reduce_array as reduce_array
+from pysph.base.reduce_array import mpi_reduce_array as parallel_reduce_array
 % endif
 
 from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray

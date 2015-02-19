@@ -22,8 +22,8 @@ from pysph.sph.equation import Group, Equation
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    ShepardFilteredVelocity
-		
+    SetWallVelocity
+
 # domain and reference values
 Lx = 10.0; Ly = 5.0
 Umax = 1.0
@@ -83,9 +83,16 @@ def _setup_particle_properties(particles, volume):
     solid.add_property('V' )
     obstacle.add_property('V' )
 
-    # Shepard filtered velocities for the fluid
+    # extrapolated velocities for the fluid
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        solid.add_property(name)
+        obstacle.add_property(name)
+
+    # dummy velocities for the solid and obstacle
+    # required for the no-slip BC
+    for name in ['ug', 'vg', 'wg']:
+        solid.add_property(name)
+        obstacle.add_property(name)
 
     # advection velocities and accelerations for fluid
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
@@ -238,7 +245,7 @@ class SPHERICBenchmarkAcceleration(Equation):
 equations = [
 
     # set the acceleration for the obstacle using the special function
-    # mimicing the accelerations provided in the test.
+    # mimicking the accelerations provided in the test.
     Group(
         equations=[
             SPHERICBenchmarkAcceleration(dest='obstacle', sources=None),
@@ -254,14 +261,14 @@ equations = [
             SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
             ], real=False),
 
-
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SetWallVelocity(dest='solid', sources=['fluid']),
+            SetWallVelocity(dest='obstacle', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can

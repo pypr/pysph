@@ -15,7 +15,7 @@ from pysph.sph.integrator_step import TransportVelocityStep
 # the eqations
 from pysph.sph.equation import Group
 from pysph.sph.wc.transport_velocity import (SummationDensity,
-    ShepardFilteredVelocity, StateEquation,
+    SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
     SolidWallPressureBC, SolidWallNoSlipBC)
@@ -26,7 +26,7 @@ import numpy as np
 # domain and reference values
 Re = 0.0125
 d = 0.5; Ly = 2*d; Lx = 0.4*Ly
-rho0 = 1.0; nu = 1.0
+rho0 = 1.0; nu = 0.01
 
 # upper wall velocity based on the Reynolds number and channel width
 Vmax = nu*Re/(2*d)
@@ -43,7 +43,7 @@ dt_cfl = 0.25 * h0/( c0 + Vmax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
-tf = 2.0
+tf = 100.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
@@ -77,7 +77,7 @@ def create_particles(**kwargs):
     # add requisite properties to the arrays:
     # particle volume
     fluid.add_property('V')
-    channel.add_property('V' )
+    channel.add_property('V')
 
     # advection velocities and accelerations
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
@@ -86,14 +86,18 @@ def create_particles(**kwargs):
     # kernel summation correction for the channel
     channel.add_property('wij')
 
-
     channel.add_property('ax')
     channel.add_property('ay')
     channel.add_property('az')
 
-    # Shepard filtered velocities for the fluid
+    # extrapolated velocities for the channel
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        channel.add_property(name)
+    
+    # dummy velocities for the channel
+    # required for the no-slip BC
+    for name in ['ug','vg','wg']:
+        channel.add_property(name)
 
     # magnitude of velocity
     fluid.add_property('vmag2')
@@ -157,12 +161,12 @@ equations = [
             ], real=False),
 
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SetWallVelocity(dest='channel', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can

@@ -37,6 +37,14 @@ class MPIReduceArrayTestCase(unittest.TestCase):
             filename='./simple_reduction.py', nprocs=4, path=path
         )
 
+class DumpLoadTestCase(unittest.TestCase):
+
+    @attr(slow=False, parallel=True)
+    def test_dump_and_load_work_in_parallel(self):
+        run_parallel_script.run(
+            filename='check_dump_load.py', nprocs=4, path=path
+        )
+
 
 if __name__ == '__main__':
     unittest.main()
