@@ -29,9 +29,9 @@ class Solver(object):
 
     - t -- the internal time step counter
 
-    - pre_step_functions -- a list of functions to be performed before stepping
+    - pre_step_callbacks -- a list of functions to be performed before stepping
 
-    - post_step_functions -- a list of functions to execute after stepping
+    - post_step_callbacks -- a list of functions to execute after stepping
 
     - pfreq -- the output print frequency
 
@@ -106,8 +106,8 @@ class Solver(object):
         self.execute_commands = None
 
         # list of functions to be called before and after an integration step
-        self.pre_step_functions = []
-        self.post_step_functions = []
+        self.pre_step_callbacks = []
+        self.post_step_callbacks = []
 
         # List of functions to be called after each stage of the integrator.
         self.post_stage_callbacks = []
@@ -228,6 +228,20 @@ class Solver(object):
         `Integrator.one_timestep` methods for examples of how this is called.
         """
         self.post_stage_callbacks.append(callback)
+
+    def add_post_step_callback(self, callback):
+        """These callbacks are called *after* each timestep is performed.
+
+        The callbacks are passed the solver instance (i.e. self).
+        """
+        self.post_step_callbacks.append(callback)
+
+    def add_pre_step_callback(self, callback):
+        """These callbacks are called *before* each timestep is performed.
+
+        The callbacks are passed the solver instance (i.e. self).
+        """
+        self.pre_step_callbacks.append(callback)
 
     def append_particle_arrrays(self, arrays):
         """ Append the particle arrays to the existing particle arrays
@@ -377,8 +391,8 @@ class Solver(object):
         while self.t < self.tf:
 
             # perform any pre step functions
-            for func in self.pre_step_functions:
-                func.eval(self)
+            for callback in self.pre_step_callbacks:
+                callback(self)
 
             if self.rank == 0:
                 logger.debug(
@@ -390,8 +404,8 @@ class Solver(object):
             self.integrator.step(self.t, self.dt)
 
             # perform any post step functions
-            for func in self.post_step_functions:
-                func.eval(self)
+            for callback in self.post_step_callbacks:
+                callback(self)
 
             # update time and iteration counters if successfully
             # integrated
