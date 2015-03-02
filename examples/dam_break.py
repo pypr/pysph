@@ -130,9 +130,9 @@ kernel = WendlandQuintic(dim=2)
 #integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
 integrator = TVDRK3Integrator(fluid=WCSPHTVDRK3Step(), boundary=WCSPHTVDRK3Step())
 
-# Create a solver. Damping time is taken as 0.1% of the final time
+# Create a solver.  The damping is performed for the first 50 iterations.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=True, tdamp=tf/1000.0,
+                dt=dt, tf=tf, adaptive_timestep=True, n_damp=50,
                 fixed_h=False)
 
 # create the equations

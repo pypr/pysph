@@ -108,10 +108,8 @@ kernel = CubicSpline(dim=2)
 # Create the Integrator.
 integrator = EulerIntegrator(fluid=IISPHStep())
 
-# Construct the solver. tdamp determines the time until which smaller
-# time-steps are used when using adaptive time-steps. Use the output_at_times
-# list to specify instants of time at which the output solution is
-# required.
+# Construct the solver. Use the output_at_times list to specify instants of
+# time at which the output solution is  required.
 dt = 2e-4;
 tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,

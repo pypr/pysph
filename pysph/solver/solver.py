@@ -9,7 +9,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
 
-from utils import FloatPBar, savez, load, dump
+from utils import FloatPBar, load, dump
 
 import logging
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class Solver(object):
     """
 
     def __init__(self, dim=2, integrator=None, kernel=None,
-                 tdamp=0.001, tf=1.0, dt=1e-3,
+                 n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times = [],
                  fixed_h=False, **kwargs):
@@ -65,8 +65,9 @@ class Solver(object):
         kernel : base.kernels.Kernel
             SPH kernel to use
 
-        tdamp : double
-            Time upto which damping of the initial solution is required
+        n_damp : int
+            Number of timesteps for which the initial damping is required.
+            Setting it to zero will disable damping the timesteps.
 
         tf, dt : double
             Final time and suggested initial time-step
@@ -77,7 +78,7 @@ class Solver(object):
         cfl : double
             CFL number for adaptive time stepping
 
-        output_at_times : list
+        output_at_times : list/array
             Optional list of output times to force output
 
         fixed_h : bint
@@ -144,14 +145,14 @@ class Solver(object):
         self.output_directory = self.fname+'_output'
 
         # solution damping to avoid impulsive starts
-        self.tdamp = tdamp
+        self.n_damp = n_damp
 
         # Use adaptive time steps and cfl number
         self.adaptive_timestep = adaptive_timestep
         self.cfl = cfl
 
         # list of output times
-        self.output_at_times = output_at_times
+        self.output_at_times = numpy.asarray(output_at_times)
         self.force_output = False
 
         # Use cell iterations or not.
@@ -168,6 +169,8 @@ class Solver(object):
         # default time step constants
         self.tf = tf
         self.dt = dt
+        self._old_dt = dt
+        self._damping_factor = 1.0
 
         # flag for constant smoothing lengths
         self.fixed_h = fixed_h
@@ -309,7 +312,7 @@ class Solver(object):
 
     def set_output_at_times(self, output_at_times):
         """ Set a list of output times """
-        self.output_at_times = output_at_times
+        self.output_at_times = numpy.asarray(output_at_times)
 
     def set_parallel_output_mode(self, mode="collected"):
         """Set the default solver dump mode in parallel.
@@ -353,9 +356,6 @@ class Solver(object):
         the stepping within the integrator.
 
         """
-        dt = self.dt
-        old_dt = self.dt
-
         if self.in_parallel:
             show = False
         else:
@@ -366,15 +366,13 @@ class Solver(object):
         self.dump_output()
         self.barrier() # everybody waits for this to complete
 
-        # initial solution damping time
-        tdamp = self.tdamp
-
         # Compute the accelerations once for the predictor corrector
         # integrator to work correctly at the first time step.
-        self.acceleration_eval.compute(self.t, dt)
+        self.acceleration_eval.compute(self.t, self.dt)
 
-        # solution output times
-        output_at_times = numpy.array( self.output_at_times )
+        # Now get a suitable adaptive (if requested) and damped timestep to
+        # integrate with.
+        self.dt = self._get_timestep()
 
         while self.t < self.tf:
 
@@ -385,11 +383,11 @@ class Solver(object):
             if self.rank == 0:
                 logger.debug(
                     "Iteration=%d, time=%f, timestep=%f" % \
-                        (self.count, self.t, dt)
+                        (self.count, self.t, self.dt)
                 )
             # perform the integration and update the time.
-            #print 'Solver Iteration', self.count, dt, self.t, tdamp
-            self.integrator.step(self.t, dt)
+            #print 'Solver Iteration', self.count, self.dt, self.t
+            self.integrator.step(self.t, self.dt)
 
             # perform any post step functions
             for func in self.post_step_functions:
@@ -397,7 +395,7 @@ class Solver(object):
 
             # update time and iteration counters if successfully
             # integrated
-            self.t += dt
+            self.t += self.dt
             self.count += 1
 
             # dump output if the iteration number is a multiple of the
@@ -415,7 +413,7 @@ class Solver(object):
 
                 # re-set the time-step to the old time step before it
                 # was adjusted
-                dt = old_dt
+                self.dt = self._old_dt
 
             # update progress bar
             bar.update(self.t)
@@ -423,47 +421,8 @@ class Solver(object):
             # update the time for all arrays
             self.update_particle_time()
 
-            # compute the new time step across all processors
-            if self.adaptive_timestep:
-
-                # locally stable time step
-                dt = self.integrator.compute_time_step(
-                    self.dt, self.cfl)
-
-                # damp the initial solution
-                if self.t < tdamp:
-                    dt *= 0.5 * (numpy.sin(numpy.pi*(-0.5+self.t/tdamp)) + 1.0)
-
-                # set the globally stable time step
-                if self.in_parallel:
-                    dt = self.pm.update_time_steps(dt)
-
-            # adjust dt to land on final time
-            if self.t + dt > self.tf:
-                dt = self.tf - self.t
-
-            # adjust dt to land on specific output times
-            if output_at_times.size > 0:
-                tdiff = output_at_times - self.t
-                condition = (tdiff > 0) & (tdiff < dt)
-
-                if numpy.any( condition ):
-                    output_time = output_at_times[ numpy.where(condition) ]
-                    if abs(output_time - self.t) > 1e-14:
-                        # It sometimes happens that the current time is just
-                        # shy of the requested output time which results in a
-                        # ridiculously small dt so we skip that case.
-
-                        # save the old time-step and compute the new
-                        # time-step to fall on the specified output time
-                        # instant
-                        old_dt = dt
-                        dt = float( output_time - self.t )
-
-                        self.force_output = True
-
-            # set the adjusted time-step for the solver
-            self.dt = dt
+            # Compute the next timestep.
+            self.dt = self._get_timestep()
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
@@ -607,8 +566,81 @@ class Solver(object):
     ##########################################################################
     # Non-public interface.
     ##########################################################################
+    def _compute_timestep(self):
+        undamped_dt = self._get_undamped_timestep()
+        if self.adaptive_timestep:
+            # locally stable time step
+            dt = self.integrator.compute_time_step(undamped_dt, self.cfl)
+
+            # set the globally stable time step across all processors
+            if self.in_parallel:
+                dt = self.pm.update_time_steps(dt)
+        else:
+            dt = undamped_dt
+
+        return dt
+
+    def _damp_timestep(self, dt):
+        """Damp the timestep initially to prevent transient errors at startup.
+
+        This basically damps the initial timesteps by the factor
+
+        0.5  (sin(pi*(-0.5 + count/n_damp)) + 1)
+
+        Where n_damp is the number of iterations to damp the timestep for and
+        count is the number of iterations.
+
+        """
+        n_damp = self.n_damp
+        if self.count < n_damp and n_damp > 0:
+            iter_fraction = (self.count+1)/float(n_damp)
+            fac = 0.5*(numpy.sin(numpy.pi*(-0.5 + iter_fraction)) + 1.0)
+            self._damping_factor = fac
+        else:
+            self._damping_factor = 1.0
+
+        return dt*self._damping_factor
+
+    def _get_timestep(self):
+
+        dt = self._compute_timestep()
+        dt = self._damp_timestep(dt)
+
+        # adjust dt to land on final time
+        if self.t + dt > self.tf:
+            dt = self.tf - self.t
+
+        # solution output times
+        output_at_times = self.output_at_times
+
+        # adjust dt to land on specific output times
+        if len(output_at_times) > 0:
+            tdiff = output_at_times - self.t
+            condition = (tdiff > 0) & (tdiff < dt)
+
+            if numpy.any( condition ):
+                output_time = output_at_times[ numpy.where(condition) ]
+                if abs(output_time - self.t) > 1e-14:
+                    # It sometimes happens that the current time is just
+                    # shy of the requested output time which results in a
+                    # ridiculously small dt so we skip that case.
+
+                    # save the old time-step and compute the new
+                    # time-step to fall on the specified output time
+                    # instant
+                    self._old_dt = dt
+                    dt = float( output_time - self.t )
+
+                    self.force_output = True
+
+        return dt
+
+    def _get_undamped_timestep(self):
+        return self.dt/self._damping_factor
+
     def _post_stage_callback(self, time, dt, stage):
         for callback in self.post_stage_callbacks:
             callback(time, dt, stage)
+
 
 ############################################################################
