@@ -40,7 +40,9 @@ def create_inlet_outlet(particle_arrays):
     inlet_pa = particle_arrays['inlet']
     outlet_pa = particle_arrays['outlet']
 
-    inlet = SimpleInlet(inlet_pa, fluid_pa, dx=0.1, n=5)
+    inlet = SimpleInlet(
+        inlet_pa, fluid_pa, dx=0.1, n=5, xmin=-0.4, xmax=0.0, ymin=0.0, ymax=1.0
+    )
     outlet = SimpleOutlet(
         outlet_pa, fluid_pa, xmin=0.5, xmax=1.0, ymin=0.0, ymax=1.0
     )

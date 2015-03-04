@@ -19,7 +19,8 @@ class SimpleInlet(object):
     and moved back to the front of the inlet.
 
     """
-    def __init__(self, inlet_pa, dest_pa, dx, n = 5):
+    def __init__(self, inlet_pa, dest_pa, dx, n=5, xmin=-1.0, xmax=1.0,
+                 ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0):
         """Constructor.
 
         Arguments
@@ -33,12 +34,16 @@ class SimpleInlet(object):
 
          n - Total number of copies of the initial particles.
 
+         xmin, xmax, ymin, ymax, zmin, zmax - Domain of the outlet.
+
         """
         self.inlet_pa = inlet_pa
         self.dest_pa = dest_pa
         self.dx = dx
         self.n = n
-        self.xmax = max(self.inlet_pa.x)
+        self.xmin, self.xmax = xmin, xmax
+        self.ymin, self.ymax = ymin, ymax
+        self.zmin, self.zmax = zmin, zmax
         self._create_inlet_particles()
 
     def _create_inlet_particles(self):
@@ -53,7 +58,6 @@ class SimpleInlet(object):
                     new_array = np.append(new_array, array)
             inlet_props[prop] = new_array
         self.inlet_pa.add_particles(**inlet_props)
-        self.xmin = min(self.inlet_pa.x)
 
     def update(self, solver=None):
         """This is called by the solver after each timestep and is passed

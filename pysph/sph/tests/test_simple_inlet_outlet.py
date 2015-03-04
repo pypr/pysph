@@ -24,8 +24,8 @@ class TestSimpleInlet1D(unittest.TestCase):
 
     def test_inlet_block_has_correct_copies(self):
         # Given
-        inlet = SimpleInlet(self.inlet_pa, self.dest_pa, dx=self.dx, n=5)
-
+        inlet = SimpleInlet(self.inlet_pa, self.dest_pa, dx=self.dx, n=5,
+                            xmin=-0.4, xmax=0.0)
         # When
         x = self.inlet_pa.x
         p = self.inlet_pa.p
@@ -40,10 +40,10 @@ class TestSimpleInlet1D(unittest.TestCase):
 
         self.assertEqual(self.dest_pa.get_number_of_particles(), 0)
 
-
     def test_update_creates_particles_in_destination(self):
         # Given
-        inlet = SimpleInlet(self.inlet_pa, self.dest_pa, dx=self.dx, n=5)
+        inlet = SimpleInlet(self.inlet_pa, self.dest_pa, dx=self.dx, n=5,
+                            xmin=-0.4, xmax=0.0)
         # Two rows of particles should move out.
         self.inlet_pa.x += 0.15
 
