@@ -77,6 +77,8 @@ class Application(object):
         self._setup_optparse()
 
         self.path = None
+        self.particles = []
+        self.inlet_outlet = []
 
     def _setup_optparse(self):
         usage = """
@@ -407,27 +409,38 @@ class Application(object):
         if stream:
             logger.addHandler(logging.StreamHandler())
 
+    def _create_inlet_outlet(self, inlet_outlet_factory):
+        """Create the inlets and outlets if needed.
+
+        This method requires that the particles be already created.
+
+        The `inlet_outlet_factory` is passed a dictionary of the particle
+        arrays.  The factory should return a list of inlets and outlets.
+        """
+        if inlet_outlet_factory is not None:
+            solver = self._solver
+            particle_arrays = dict([(p.name, p) for p in self.particles])
+            self.inlet_outlet = inlet_outlet_factory(particle_arrays)
+            # Hook up the inlet/outlet's update method to be called after
+            # each stage.
+            for obj in self.inlet_outlet:
+                solver.add_post_step_callback(obj.update)
+
     def _create_particles(self, particle_factory, *args, **kw):
 
         """ Create particles given a callable `particle_factory` and any
         arguments to it.
-
-        This will also automatically distribute the particles among
-        processors if this is a parallel run.  Returns a list of particle
-        arrays that are created.
         """
-
         solver = self._solver
-        num_procs = self.num_procs
         options = self.options
         rank = self.rank
-        comm = self.comm
 
         # particle array info that is used to create dummy particles
         # on non-root processors
         particles_info = {}
 
-        # Only master creates the particles.
+        # Only master actually calls the particle factory, the rest create
+        # dummy particle arrays.
         if rank == 0:
             if options.restart_file is not None:
                 data = load(options.restart_file)
@@ -464,7 +477,16 @@ class Application(object):
         if rank != 0:
             self.particles = utils.create_dummy_particles(particles_info)
 
+    def _do_initial_load_balancing(self):
+        """ This will automatically distribute the particles among processors
+        if this is a parallel run.
+        """
         # Instantiate the Parallel Manager here and do an initial LB
+        num_procs = self.num_procs
+        options = self.options
+        solver = self._solver
+        comm = self.comm
+
         self.pm = None
         if num_procs > 1:
             options = self.options
@@ -538,8 +560,6 @@ class Application(object):
         # set the solver's parallel manager
         solver.set_parallel_manager(self.pm)
 
-        return self.particles
-
     ######################################################################
     # Public interface.
     ######################################################################
@@ -557,8 +577,8 @@ class Application(object):
             for o in opt:
                 self.add_option(o)
 
-    def setup(self, solver, equations, nnps=None, particle_factory=None,
-              *args, **kwargs):
+    def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
+              particle_factory=None, *args, **kwargs):
         """Set the application's solver.  This will call the solver's
         `setup` method.
 
@@ -576,16 +596,27 @@ class Application(object):
 
         dir -- the output directory
 
-        integration_type -- The integration method
-
-        default_kernel -- the default kernel to use for operations
-
         Parameters
         ----------
+        solver: The solver instance.
+
+        equations: list: a list of Groups/Equations.
+
+        nnps: NNPS instance: optional NNPS instance.
+            If none is given a default NNPS is created.
+
+        inlet_outlet_factory: callable or None
+            The `inlet_outlet_factory` is passed a dictionary of the particle
+            arrays.  The factory should return a list of inlets and outlets.
+
         particle_factory : callable or None
             If supplied, particles will be created for the solver using the
             particle arrays returned by the callable. Else particles for the
             solver need to be set before calling this method
+
+        args: extra arguments passed on to the particle_factory.
+
+        kwargs: extra keyword arguments passed to the particle factory.
 
         """
         start_time = time.time()
@@ -599,6 +630,12 @@ class Application(object):
 
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
+
+        # This must be done before the initial load balancing
+        # as the inlets will create new particles.
+        self._create_inlet_outlet(inlet_outlet_factory)
+
+        self._do_initial_load_balancing()
 
         # setup the solver using any options
         self._solver.setup_solver(options.__dict__)
