@@ -588,7 +588,15 @@ class Solver(object):
 
             # set the globally stable time step across all processors
             if self.in_parallel:
+                if dt is None:
+                    # For some reason this processor does not have an adaptive
+                    # timestep constraint so we set it to a large number so the
+                    # timestep is determined by the other processors.
+                    dt = 1e20
                 dt = self.pm.update_time_steps(dt)
+            else:
+                if dt is None:
+                    dt = undamped_dt
         else:
             dt = undamped_dt
 
