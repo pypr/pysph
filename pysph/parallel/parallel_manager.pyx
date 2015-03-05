@@ -219,6 +219,7 @@ cdef class ParticleArrayExchange:
             zcomm.Comm_Do( sendbuf, recvbuf )
 
     def remove_remote_particles(self):
+        self.num_local = self.pa.get_number_of_particles(real=True)
         cdef int num_local = self.num_local
 
         # resize the particle array
@@ -419,13 +420,13 @@ cdef class ParallelManager:
         """Peform a reduction to compute the globally stable time steps"""
         cdef np.ndarray dt_sendbuf = self.dt_sendbuf
         cdef np.ndarray dt_recvbuf = np.zeros_like(dt_sendbuf)
-        
+
         comm = self.comm
 
         # set the local time step and peform the global reduction
         dt_sendbuf[0] = local_dt
         comm.Allreduce( sendbuf=dt_sendbuf, recvbuf=dt_recvbuf, op=mpi.MIN )
-        
+
         return dt_recvbuf[0]
 
     cpdef compute_cell_size(self):
@@ -1284,15 +1285,15 @@ cdef class ZoltanParallelManagerGeometric(ZoltanParallelManager):
 
     def set_zoltan_rcb_directions(self, value):
         """Option to group the cuts along a given direction
-        
+
         Legal values (refer to the Zoltan User Guide):
-        
-        '0' = don't order cuts; 
-        '1' = xyz 
-        '2' = xzy 
-        '3' = yzx 
-        '4' = yxz 
-        '5' = zxy 
+
+        '0' = don't order cuts;
+        '1' = xyz
+        '2' = xzy
+        '3' = yzx
+        '4' = yxz
+        '5' = zxy
         '6' = zyx
 
         """
