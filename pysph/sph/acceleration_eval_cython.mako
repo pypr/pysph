@@ -256,6 +256,7 @@ cdef class AccelerationEval:
         ## all_eqs is a Group of all equations having this destination.
         #######################################################################
         % for g_idx, group in enumerate(helper.object.mega_groups):
+        % if len(group.data) > 0: # No equations in this group.
         # ---------------------------------------------------------------------
         # Group ${g_idx}.
         % if group.iterate:
@@ -289,5 +290,6 @@ cdef class AccelerationEval:
 
         # Group ${g_idx} done.
         # ---------------------------------------------------------------------
+        % endif # (if len(group.data) > 0)
         % endfor
         self._set_dt_adapt(DT_ADAPT)
