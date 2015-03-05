@@ -143,10 +143,10 @@ kernel = QuinticSpline(dim=2)
 # function evaluation per time step.
 integrator = PECIntegrator(fluid=TransportVelocityStep())
 
-# Create a solver. Damping time is taken as 0.1% of the final time
+# Create a solver. Damping is performed for 100 iterations.
 solver = Solver(
     kernel=kernel, dim=2, integrator=integrator,
-    adaptive_timestep=False, tf=tf, dt=dt, tdamp=tf/1000.0)
+    adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
 
 equations = [
 
