@@ -66,6 +66,9 @@ class Integrator(object):
         self.h_minimum = hmin
 
     def compute_time_step(self, dt, cfl):
+        """If there are any adaptive timestep constraints, the appropriate
+        timestep is returned, else None is returned.
+        """
         a_eval = self.c_integrator.acceleration_eval
 
         # different time step controls
@@ -102,7 +105,7 @@ class Integrator(object):
         # return the computed time steps. If dt factors aren't
         # defined, the default dt is returned
         if dt_min <= 0.0:
-            return dt
+            return None
         else:
             return cfl*dt_min
 
