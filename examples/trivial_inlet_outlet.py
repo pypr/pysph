@@ -1,4 +1,40 @@
-"""A trivial example to demonstrate the inlet and outlet feature.
+"""A trivial example to demonstrate the inlet and outlet feature in 2D.
+
+We first create three particle arrays, an "inlet", "fluid" and "outlet" in the
+`create_particle` function. Initially there are no fluid and outlet particles.
+A single row of inlet particles are created between (0.0, 0.0) to (0.0, 1.0),
+i.e. along the y-axis with a u velocity = 0.25.
+
+The inlet and outlet are created in the `create_inlet_outlet` function.  This
+function is passed a dictionary of `{array_name:particle_array}`. An inlet
+between (-0.4, 0.0) and (0.0, 1.0) is created by instantiating a
+`SimpleInlet`.  The inlet first makes 4 copies of the inlet particle array
+data and stacks them along the negative x-axis.  The `InletOutletStep` is used
+to step all particles and simply moves the particles.  As particles leave
+the inlet they are converted to fluid particles.
+
+An outlet is also created in the region (0.5, 0.0), (1.0, 1.0) and as fluid
+particles enter the outlet region, they are converted to outlet particles.  As
+outlet particles leave the outlet they are removed from the simulation.
+
+The following figure should make this clear.
+
+               inlet       fluid       outlet
+              ---------    --------    --------
+             | * * * x |  |        |  |        |
+     u       | * * * x |  |        |  |        |
+    --->     | * * * x |  |        |  |        |
+             | * * * x |  |        |  |        |
+              --------     --------    --------
+
+In the figure above, the 'x' are the initial inlet particles.  The '*' are the
+copies of these.  The particles are moving to the right and as they do, new
+fluid particles are added and as the fluid particles flow into the outlet they
+are converted to the outlet particle array and at last as the particles leave
+the outlet they are removed from the simulation.
+
+This example can be run in parallel.
+
 """
 
 import numpy as np
@@ -40,6 +76,7 @@ def create_inlet_outlet(particle_arrays):
     inlet_pa = particle_arrays['inlet']
     outlet_pa = particle_arrays['outlet']
 
+    # Create the inlet and outlets as described in the documentation.
     inlet = SimpleInlet(
         inlet_pa, fluid_pa, spacing=0.1, n=5, axis='x', xmin=-0.4, xmax=0.0,
         ymin=0.0, ymax=1.0
@@ -57,7 +94,7 @@ integrator = PECIntegrator(
 )
 
 dt = 1e-2
-tf = 5
+tf = 6
 
 solver = Solver(
     kernel=kernel, dim=2, integrator=integrator, dt=dt, tf=tf,
