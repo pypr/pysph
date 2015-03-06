@@ -237,7 +237,7 @@ class DamBreak3DGeometry(object):
         fluid_column_height=0.55, fluid_column_width=1.0, fluid_column_length=1.228,
         obstacle_center_x=2.5, obstacle_center_y=0,
         obstacle_length=0.16, obstacle_height=0.161, obstacle_width=0.4,
-        nboundary_layers=5, dx=0.02, hdx=1.2, rho0=1000.0):
+        nboundary_layers=5, with_obstacle=True, dx=0.02, hdx=1.2, rho0=1000.0):
 
         # save the geometry details
         self.container_width = container_width
@@ -260,6 +260,7 @@ class DamBreak3DGeometry(object):
 
         self.hdx = hdx
         self.rho0 = rho0
+        self.with_obstacle = with_obstacle
 
     def get_max_speed(self, g=9.81):
         return numpy.sqrt( 2 * g * self.fluid_column_height )
@@ -336,9 +337,10 @@ class DamBreak3DGeometry(object):
         fluid = pa.extract_particles(fa)
         fluid.set_name('fluid')
 
-        oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
-        obstacle = pa.extract_particles(oa)
-        obstacle.set_name('obstacle')
+        if self.with_obstacle:
+            oa = LongArray(len(oindices)); oa.set_data(numpy.array(oindices))
+            obstacle = pa.extract_particles(oa)
+            obstacle.set_name('obstacle')
 
         indices = concatenate( (where( y <= -cw2 )[0],
                                 where( y >= cw2 )[0],
@@ -354,7 +356,10 @@ class DamBreak3DGeometry(object):
         boundary.set_name('boundary')
 
         # create the particles
-        particles = [fluid, boundary, obstacle]
+        if self.with_obstacle:
+            particles = [fluid, boundary, obstacle]
+        else:
+            particles = [fluid, boundary]
 
         # set up particle properties
         h0 = self.hdx * dx
@@ -370,9 +375,13 @@ class DamBreak3DGeometry(object):
 
         nf = fluid.num_real_particles
         nb = boundary.num_real_particles
-        no = obstacle.num_real_particles
 
-        print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
+        if self.with_obstacle:
+            no = obstacle.num_real_particles
+            print "3D dam break with %d fluid, %d boundary, %d obstacle particles"%(nf, nb, no)
+        else:
+            print "3D dam break with %d fluid, %d boundary particles"%(nf, nb)
+
 
         # load balancing props for the arrays
         #fluid.set_lb_props(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'gid',
@@ -382,11 +391,13 @@ class DamBreak3DGeometry(object):
         #boundary.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
         #obstacle.set_lb_props(['x', 'y', 'z', 'rho', 'h', 'm', 'gid', 'rho0'])
         boundary.set_lb_props( boundary.properties.keys() )
-        obstacle.set_lb_props( obstacle.properties.keys() )
 
         # boundary and obstacle particles can do with a reduced list of properties
         # to be saved to disk since they are fixed
         boundary.set_output_arrays( ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
-        obstacle.set_output_arrays( ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
+
+        if self.with_obstacle:
+            obstacle.set_lb_props( obstacle.properties.keys() )
+            obstacle.set_output_arrays( ['x', 'y', 'z', 'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
 
         return particles
