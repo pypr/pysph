@@ -31,7 +31,8 @@ In the figure above, the 'x' are the initial inlet particles.  The '*' are the
 copies of these.  The particles are moving to the right and as they do, new
 fluid particles are added and as the fluid particles flow into the outlet they
 are converted to the outlet particle array and at last as the particles leave
-the outlet they are removed from the simulation.
+the outlet they are removed from the simulation.  The `create_particles` and
+`create_inlet_outlet` functions are passed to the `app.setup` method.
 
 This example can be run in parallel.
 
