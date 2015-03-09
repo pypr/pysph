@@ -584,7 +584,7 @@ class VelocityVerletSymplecticWCSPHStep(IntegratorStep):
         d_v[d_idx] += dtb2 * d_av[d_idx]
         d_w[d_idx] += dtb2 * d_aw[d_idx]
 
-    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, 
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w,
                d_au, d_av, d_aw, dt=0.0):
 
         dtb2 = 0.5 * dt
@@ -594,7 +594,28 @@ class VelocityVerletSymplecticWCSPHStep(IntegratorStep):
         d_y[d_idx] += dt * d_v[d_idx]
         d_z[d_idx] += dt * d_w[d_idx]
 
-        # Eq. (5.53) in [JM05] 
+        # Eq. (5.53) in [JM05]
         d_u[d_idx] += dtb2 * d_au[d_idx]
         d_v[d_idx] += dtb2 * d_av[d_idx]
         d_w[d_idx] += dtb2 * d_aw[d_idx]
+
+###############################################################################
+# `InletOutletStep` class
+###############################################################################
+class InletOutletStep(IntegratorStep):
+    """A trivial integrator for the inlet/outlet particles
+    """
+    def initialize(self):
+        pass
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, dt=0.0):
+        dtb2 = 0.5*dt
+        d_x[d_idx] += dtb2 * d_u[d_idx]
+        d_y[d_idx] += dtb2 * d_v[d_idx]
+        d_z[d_idx] += dtb2 * d_w[d_idx]
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, dt=0.0):
+        dtb2 = 0.5*dt
+        d_x[d_idx] += dtb2 * d_u[d_idx]
+        d_y[d_idx] += dtb2 * d_v[d_idx]
+        d_z[d_idx] += dtb2 * d_w[d_idx]
