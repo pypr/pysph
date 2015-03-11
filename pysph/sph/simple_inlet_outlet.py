@@ -39,6 +39,12 @@ class SimpleInlet(object):
                  xmin=-1.0, xmax=1.0, ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0):
         """Constructor.
 
+        Note that the inlet must be defined such that the spacing times the
+        number of stacks of particles is equal to the length of the domain in
+        the stacked direction.  For example, if particles are stacked along
+        the 'x' axis and n=5 with spacing 0.1, then xmax - xmin should be 0.5.
+
+
         Arguments
         -----------
 
@@ -65,6 +71,20 @@ class SimpleInlet(object):
         self.ymin, self.ymax = ymin, ymax
         self.zmin, self.zmax = zmin, zmax
         self._create_inlet_particles()
+        self._check_domain_and_spacing()
+
+    def _check_domain_and_spacing(self):
+        l = dict(x=self.xmax - self.xmin,
+                 y=self.ymax - self.ymin,
+                 z=self.zmax - self.zmin)
+        l_axis = l[self.axis]
+        expected = self.spacing*self.n
+        message = "Make sure that the spacing*n is equal\n"\
+                  "to the length of the domain in the stacked axis.\n"\
+                  "expected %s, you have %s."%(expected, l_axis)
+
+        if abs(expected - l_axis) > 1e-12:
+            raise RuntimeError(message)
 
     def _create_inlet_particles(self):
         props =  self.inlet_pa.get_property_arrays()
