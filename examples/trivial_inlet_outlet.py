@@ -7,11 +7,15 @@ i.e. along the y-axis with a u velocity = 0.25.
 
 The inlet and outlet are created in the `create_inlet_outlet` function.  This
 function is passed a dictionary of `{array_name:particle_array}`. An inlet
-between (-0.4, 0.0) and (0.0, 1.0) is created by instantiating a
+between (-0.5, 0.0) and (0.0, 1.0) is created by instantiating a
 `SimpleInlet`.  The inlet first makes 4 copies of the inlet particle array
 data and stacks them along the negative x-axis.  The `InletOutletStep` is used
-to step all particles and simply moves the particles.  As particles leave
-the inlet they are converted to fluid particles.
+to step all particles and simply moves the particles.  As particles leave the
+inlet they are converted to fluid particles.  It is important to note that the
+inlet must be defined such that the spacing times the total number of stacks
+of particles is equal to the length of the domain in the stacked direction.
+For example, if particles are stacked along the 'x' axis and n=5 with spacing
+0.1, then xmax - xmin should be 0.5.
 
 An outlet is also created in the region (0.5, 0.0), (1.0, 1.0) and as fluid
 particles enter the outlet region, they are converted to outlet particles.  As
@@ -48,6 +52,8 @@ from pysph.sph.integrator import PECIntegrator
 from pysph.sph.simple_inlet_outlet import SimpleInlet, SimpleOutlet
 from pysph.sph.integrator_step import InletOutletStep
 
+from pysph.sph.basic_equations import SummationDensity
+
 def create_particles():
     # Note that you need to create the inlet and outlet arrays in this method.
 
@@ -61,7 +67,7 @@ def create_particles():
     dx = 0.1
     y = np.linspace(0, 1, 11)
     x = np.zeros_like(y)
-    m = np.ones_like(x)*dx
+    m = np.ones_like(x)*dx*dx
     h = np.ones_like(x)*dx*1.5
     rho = np.ones_like(x)
     # Remember to set u otherwise the inlet particles won't move.
@@ -79,7 +85,7 @@ def create_inlet_outlet(particle_arrays):
 
     # Create the inlet and outlets as described in the documentation.
     inlet = SimpleInlet(
-        inlet_pa, fluid_pa, spacing=0.1, n=5, axis='x', xmin=-0.4, xmax=0.0,
+        inlet_pa, fluid_pa, spacing=0.1, n=5, axis='x', xmin=-0.5, xmax=0.0,
         ymin=0.0, ymax=1.0
     )
     outlet = SimpleOutlet(
@@ -102,8 +108,14 @@ solver = Solver(
     adaptive_timestep=False
 )
 
+equations = [
+    SummationDensity(
+        dest='fluid', sources=['inlet', 'outlet', 'fluid']
+    )
+]
+
 app.setup(
-    solver=solver, equations=[], particle_factory=create_particles,
+    solver=solver, equations=equations, particle_factory=create_particles,
     inlet_outlet_factory=create_inlet_outlet
 )
 
