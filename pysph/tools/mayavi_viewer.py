@@ -13,22 +13,22 @@ import os
 import os.path
 
 try:
-    from traits.api import (Array, HasTraits, Instance, on_trait_change,
+    from traits.api import (Array, Dict, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
                             Directory, Password, Property, cached_property)
     from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-                          TitleEditor, HGroup)
+                          TitleEditor, HGroup, ShellEditor, VSplit)
     from mayavi.core.api import PipelineBase
     from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
     from pyface.timer.api import Timer, do_later
     from tvtk.api import tvtk
     from tvtk.array_handler import array2vtk
 except ImportError:
-    from enthought.traits.api import (Array, HasTraits, Instance, on_trait_change,
+    from enthought.traits.api import (Array, Dict, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
                             Directory, Password, Property, cached_property)
     from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-                          TitleEditor, HGroup)
+                          TitleEditor, HGroup, ShellEditor, VSplit)
     from enthought.mayavi.core.api import PipelineBase
     from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
     from enthought.pyface.timer.api import Timer, do_later
@@ -368,6 +368,12 @@ class ParticleArrayHelper(HasTraits):
             txt.text = 'Time = %.3e'%(value)
 
 
+class PythonShellView(HasTraits):
+    ns = Dict()
+    view = View(Item('ns', editor=ShellEditor(), show_label=False))
+
+
+
 ##############################################################################
 # `MayaviViewer` class.
 ##############################################################################
@@ -391,6 +397,8 @@ class MayaviViewer(HasTraits):
     # Traits to pull data from a live solver.
     live_mode = Bool(False, desc='if data is obtained from a running solver '\
                                  'or from saved files')
+
+    shell = Button('Launch Python Shell')
     host = Str('localhost', desc='machine to connect to')
     port = Int(8800, desc='port to use to connect to solver')
     authkey = Password('pysph', desc='authorization key')
@@ -499,10 +507,13 @@ class MayaviViewer(HasTraits):
                                show_label=False),
                           layout='tabbed'
                          ),
+                    Item(name='shell', show_label=False),
                   ),
-                  Item('scene', editor=SceneEditor(scene_class=MayaviScene),
-                         height=400, width=600, show_label=False),
-                      ),
+                  Group(
+                    Item('scene', editor=SceneEditor(scene_class=MayaviScene),
+                            height=400, width=600, show_label=False),
+                  )
+                ),
                 resizable=True,
                 title='PySPH Particle Viewer',
                 height=640,
@@ -782,6 +793,13 @@ class MayaviViewer(HasTraits):
         sort_file_list(files)
         self.files = files
         self.file_count = fc
+
+    def _shell_fired(self):
+        ns = dict(viewer=self, particle_arrays=self.particle_arrays,
+                  interpolator=self.interpolator, scene=self.scene,
+                  mlab=self.scene.mlab)
+        obj = PythonShellView(ns=ns)
+        obj.edit_traits()
 
     def _directory_changed(self, d):
         files = glob.glob(os.path.join(d, '*.npz'))
