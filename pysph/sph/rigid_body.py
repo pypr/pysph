@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Rigid body related equations.
 """
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
@@ -245,6 +246,36 @@ class PressureRigidBody(Equation):
         s_fx[s_idx] += -d_m[d_idx]*ax
         s_fy[s_idx] += -d_m[d_idx]*ay
         s_fz[s_idx] += -d_m[d_idx]*az
+
+class RigidBodyCollision(Equation):
+    """This is inspired from
+    http://http.developer.nvidia.com/GPUGems3/gpugems3_ch29.html
+    and
+
+    BK Mishra's article on DEM
+    http://dx.doi.org/10.1016/S0301-7516(03)00032-2
+
+    A review of computer simulation of tumbling mills by the discrete element
+    method: Part I - contact mechanics
+    """
+    def __init__(self, dest, sources=None, k=1.0, d=1.0, eta=1.0, kt=1.0):
+        self.k = k
+        self.d = d
+        self.eta = eta
+        self.kt = kt
+        super(RigidBodyCollision, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_fx, d_fy, d_fz, XIJ, RIJ, R2IJ, VIJ):
+        vijdotrij_r2ij = (VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2])/(R2IJ)
+        vijt_x = VIJ[0] - vijdotrij_r2ij*XIJ[0]
+        vijt_y = VIJ[1] - vijdotrij_r2ij*XIJ[1]
+        vijt_z = VIJ[2] - vijdotrij_r2ij*XIJ[2]
+
+        fac = self.k*(self.d/RIJ - 1.0)
+        d_fx[d_idx] += fac*XIJ[0] - self.eta*VIJ[0] - self.kt*vijt_x
+        d_fy[d_idx] += fac*XIJ[1] - self.eta*VIJ[1] - self.kt*vijt_y
+        d_fz[d_idx] += fac*XIJ[2] - self.eta*VIJ[2] - self.kt*vijt_z
+
 
 class EulerStepRigidBody(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
