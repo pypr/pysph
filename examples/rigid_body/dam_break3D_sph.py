@@ -64,9 +64,6 @@ def create_particles():
     boundary.add_property('fy')
     boundary.add_property('fz')
 
-    n = fluid.get_number_of_particles()
-    fluid.remove_particles(range(int(0.9*n)))
-
     return [fluid, boundary, obstacle]
 
 h0 = dx * hdx
