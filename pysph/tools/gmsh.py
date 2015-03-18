@@ -11,6 +11,7 @@ simulation.
 Copyright (c) 2015 Prabhu Ramachandran
 """
 
+import gzip
 import json
 
 import numpy as np
@@ -24,10 +25,20 @@ from os.path import exists, expanduser, join
 import sys
 
 def _read_vtk_file(fname):
-    """Given a .vtk file, read it and return the output.
+    """Given a .vtk file (or .vtk.gz), read it and return the output.
     """
-    r = tvtk.DataSetReader(file_name=fname)
+    if fname.endswith('.vtk.gz'):
+        tmpfname = tempfile.mktemp(suffix='.vtk')
+        with open(tmpfname, 'wb') as tmpf:
+            data = gzip.open(fname).read()
+            tmpf.write(data)
+        r = tvtk.DataSetReader(file_name=tmpfname)
+    else:
+        tmpfname = None
+        r = tvtk.DataSetReader(file_name=fname)
     r.update()
+    if tmpfname is not None:
+        os.remove(tmpfname)
     return r.output
 
 def _convert_to_points(dataset, vertices=True, cell_centers=True):
