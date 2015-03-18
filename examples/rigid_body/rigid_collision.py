@@ -58,6 +58,7 @@ def create_particles(**kw):
     tank = get_particle_array_rigid_body(
         name='tank', x=x, y=y, z=z, h=h, m=m,
     )
+    tank.total_mass[0] = np.sum(m)
 
 
     return [body, tank]
@@ -83,7 +84,7 @@ equations = [
     Group(equations=[
         BodyForce(dest='body', sources=None, gz=gz),
         RigidBodyCollision(
-            dest='body', sources=['tank'], k=7.0, d=7.0, eta=1.0, kt=1.0
+            dest='body', sources=['tank'], k=1.0, d=2.0, eta=0.25, kt=0.25
         )]
     ),
     Group(equations=[RigidBodyMoments(dest='body', sources=None)]),

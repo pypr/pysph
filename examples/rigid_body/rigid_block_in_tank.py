@@ -33,7 +33,7 @@ Lx = 2.0; Ly = 1.0; H = 0.5
 gy = -1.0
 Vmax = np.sqrt(abs(gy) * H)
 c0 = 10 * Vmax; rho0 = 1000.0
-rho_block = 1.5*rho0
+rho_block = rho0
 p0 = c0*c0*rho0
 gamma = 1.0
 alpha = 0.1
@@ -68,6 +68,7 @@ def create_particles(**kwargs):
     block = get_particle_array_rigid_body(
         name='block', x=x, y=y, h=h, m=m, rho=rho
     )
+    block.total_mass[0] = np.sum(m)
     block.vc[0] = 1.0
 
     # create all the particles
@@ -153,7 +154,7 @@ equations1 = [
     Group(equations=[
             TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
             TaitEOSHGCorrection(dest='solid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-            #TaitEOSHGCorrection(dest='block', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+            TaitEOSHGCorrection(dest='block', sources=None, rho0=rho0, c0=c0, gamma=gamma),
             ], ),
 
     # Main acceleration block
@@ -162,8 +163,8 @@ equations1 = [
             # Continuity equation with dissipative corrections for fluid on fluid
             ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=c0, delta=0.1),
             ContinuityEquation(dest='fluid', sources=['solid', 'block']),
-            #ContinuityEquation(dest='solid', sources=['fluid']),
-            #ContinuityEquation(dest='block', sources=['fluid']),
+            ContinuityEquation(dest='solid', sources=['fluid']),
+            ContinuityEquation(dest='block', sources=['fluid']),
 
             # Momentum equation
             MomentumEquation(dest='fluid', sources=['fluid', 'solid', 'block'],
@@ -177,7 +178,7 @@ equations1 = [
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
             RigidBodyCollision(
-                dest='block', sources=['solid'], k=7.0, d=7.0, eta=1.0, kt=1.0
+                dest='block', sources=['solid'], k=1.0, d=2.0, eta=0.25, kt=0.25
             ),
 
             ]),

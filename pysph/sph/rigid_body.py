@@ -259,22 +259,36 @@ class RigidBodyCollision(Equation):
     method: Part I - contact mechanics
     """
     def __init__(self, dest, sources=None, k=1.0, d=1.0, eta=1.0, kt=1.0):
+        """Note that d is a factor multiplied with the "h" of the particle.
+        """
         self.k = k
         self.d = d
         self.eta = eta
         self.kt = kt
         super(RigidBodyCollision, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_fx, d_fy, d_fz, XIJ, RIJ, R2IJ, VIJ):
-        vijdotrij_r2ij = (VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2])/(R2IJ)
+    def loop(self, d_idx, d_fx, d_fy, d_fz, d_h, d_total_mass, XIJ, RIJ, R2IJ, VIJ):
+        vijdotrij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        if RIJ > 1e-9:
+            vijdotrij_r2ij = vijdotrij/R2IJ
+            nij_x = XIJ[0]/RIJ
+            nij_y = XIJ[1]/RIJ
+            nij_z = XIJ[2]/RIJ
+        else:
+            vijdotrij_r2ij = 0.0
+            nij_x = 0.0
+            nij_y = 0.0
+            nij_z = 0.0
         vijt_x = VIJ[0] - vijdotrij_r2ij*XIJ[0]
         vijt_y = VIJ[1] - vijdotrij_r2ij*XIJ[1]
         vijt_z = VIJ[2] - vijdotrij_r2ij*XIJ[2]
 
-        fac = self.k*(self.d/RIJ - 1.0)
-        d_fx[d_idx] += fac*XIJ[0] - self.eta*VIJ[0] - self.kt*vijt_x
-        d_fy[d_idx] += fac*XIJ[1] - self.eta*VIJ[1] - self.kt*vijt_y
-        d_fz[d_idx] += fac*XIJ[2] - self.eta*VIJ[2] - self.kt*vijt_z
+        d = self.d*d_h[d_idx]
+        fac = self.k*d_total_mass[0]/d*max(d - RIJ, 0.0)
+
+        d_fx[d_idx] += fac*nij_x - self.eta*VIJ[0] - self.kt*vijt_x
+        d_fy[d_idx] += fac*nij_y - self.eta*VIJ[1] - self.kt*vijt_y
+        d_fz[d_idx] += fac*nij_z - self.eta*VIJ[2] - self.kt*vijt_z
 
 
 class EulerStepRigidBody(IntegratorStep):
