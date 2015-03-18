@@ -53,6 +53,7 @@ def create_particles():
 
     obstacle = get_particle_array_rigid_body(name='obstacle', x=x, y=y, z=z,
         m=m, h=h, rho=rho, rho0=rho)
+    obstacle.total_mass[0] = np.sum(m)
     obstacle.add_property('cs')
     obstacle.add_property('arho')
     obstacle.set_lb_props( obstacle.properties.keys() )
@@ -114,16 +115,16 @@ equations = [
             ContinuityEquation(dest='boundary', sources=['fluid']),
             ContinuityEquation(dest='obstacle', sources=['fluid']),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
+            MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
                              alpha=alpha, beta=beta, gz=-9.81, c0=co,
                              tensile_correction=True),
 
-            PressureRigidBody(dest='fluid', sources=['boundary', 'obstacle'], rho0=rho0),
+            PressureRigidBody(dest='fluid', sources=['obstacle'], rho0=rho0),
 
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
             RigidBodyCollision(
-                dest='obstacle', sources=['boundary'], k=1.0, d=2.0, eta=0.25, kt=0.25
+                dest='obstacle', sources=['boundary'], k=1.0, d=2.0, eta=0.1, kt=0.1
             ),
 
             ]),

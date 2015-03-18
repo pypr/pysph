@@ -178,7 +178,7 @@ equations1 = [
             XSPHCorrection(dest='fluid', sources=['fluid']),
 
             RigidBodyCollision(
-                dest='block', sources=['solid'], k=1.0, d=2.0, eta=0.25, kt=0.25
+                dest='block', sources=['solid'], k=1.0, d=2.0, eta=0.1, kt=0.1
             ),
 
             ]),

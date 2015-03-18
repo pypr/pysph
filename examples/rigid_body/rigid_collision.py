@@ -84,7 +84,7 @@ equations = [
     Group(equations=[
         BodyForce(dest='body', sources=None, gz=gz),
         RigidBodyCollision(
-            dest='body', sources=['tank'], k=1.0, d=2.0, eta=0.25, kt=0.25
+            dest='body', sources=['tank'], k=1.0, d=2.0, eta=0.1, kt=0.1
         )]
     ),
     Group(equations=[RigidBodyMoments(dest='body', sources=None)]),
