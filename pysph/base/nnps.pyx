@@ -77,9 +77,9 @@ cdef inline int get_valid_cell_index(
     cdef int cell_index = -1
 
     # basic test for valid indices. Since we bin the particles with
-    # respect to the origin, negative indices can never occur. 
+    # respect to the origin, negative indices can never occur.
     cdef bint is_valid = (cid.x > -1) and (cid.y > -1) and (cid.z > -1)
-    
+
     # additional check for 1D. This is because we search in all 26
     # neighboring cells for neighbors. In 1D this can be problematic
     # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
@@ -94,7 +94,7 @@ cdef inline int get_valid_cell_index(
 
         if not (-1 < cell_index < n_cells):
             cell_index = -1
-            
+
     return cell_index
 
 def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
@@ -321,7 +321,7 @@ cdef class DomainManager:
         # empty list of particle array wrappers for now
         self.pa_wrappers = []
         self.narrays = 0
-        
+
         # default value for the cell size
         self.cell_size = 1.0
 
@@ -764,6 +764,44 @@ cdef class Cell:
         self.boxmin = boxmin
         self.boxmax = boxmax
 
+cdef class NeighborCache:
+    def __init__(self, NNPS nnps, int dest_index):
+        self.dest_index = dest_index
+        self.nnps = nnps
+        self.particles = nnps.particles
+
+        n = self.particles[dest_index].get_number_of_particles()*2
+        self.start_stop = [UIntArray(n) for i in range(self.nnps.narrays)]
+        self.neighbors = [UIntArray() for i in range(self.nnps.narrays)]
+
+    cpdef update(self):
+        cdef size_t count, d_idx
+        cdef int i, dest_index
+        cdef UIntArray nbrs = UIntArray()
+        cdef UIntArray start_stop, neighbors
+        dest_index = self.dest_index
+        for src_idx in range(self.nnps.narrays):
+            count = 0
+            start_stop = self.start_stop[src_idx]
+            neighbors = self.neighbors[src_idx]
+            for d_idx in range(self.particles[dest_index].get_number_of_particles()):
+                self.nnps.get_nearest_particles(src_idx, dest_index, d_idx, nbrs)
+                neighbors.extend(nbrs.get_npy_array())
+                start_stop[d_idx*2] = count
+                count += nbrs.length
+                start_stop[d_idx*2+1] = count
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
+        nbrs.reset()
+        cdef size_t i, start, end
+        cdef UIntArray start_stop = self.start_stop[src_index]
+        cdef neighbors = self.neighbors[src_index]
+        start = start_stop[2*d_idx]
+        end = start_stop[2*d_idx + 1]
+        nbrs.reserve(end-start)
+        for i in range(start, end):
+            nbrs.append(neighbors[i])
+
 cdef class NNPS:
     """Nearest neighbor query class using the box-sort algorithm.
 
@@ -812,7 +850,7 @@ cdef class NNPS:
 
         # set the particle array wrappers for the domain manager
         self.domain.set_pa_wrappers(self.pa_wrappers)
-        
+
         # set the radius scale to determine the cell size
         self.domain.set_radius_scale(self.radius_scale)
 
@@ -859,7 +897,7 @@ cdef class NNPS:
         cdef int i, num_particles
         cdef ParticleArray pa
         cdef UIntArray indices
-        
+
         cdef DomainManager domain = self.domain
 
         # use cell sizes computed by the domain.

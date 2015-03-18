@@ -50,7 +50,7 @@ cdef class DomainManager:
     ############################################################################
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
-    
+
     # box-wrap particles within the physical domain
     cdef _box_wrap_periodic(self)
 
@@ -91,6 +91,20 @@ cdef class Cell:
     # the cell.
     cdef _compute_bounding_box(self, double cell_size,
                                int layers)
+
+
+cdef class NeighborCache:
+
+    cdef public int dest_index
+    cdef public NNPS nnps
+    cdef public list start_stop
+    cdef public list neighbors
+    cdef public list particles
+
+    cpdef update(self)
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+
 
 # Nearest neighbor locator
 cdef class NNPS:
