@@ -291,8 +291,12 @@ class Gmsh(object):
         gmsh: str: Path to gmsh executable.
         """
         self.config = expanduser(join('~', '.pysph', 'gmsh.json'))
-        if gmsh is None and exists(self.config):
-            self._read_config()
+        if gmsh is None:
+            if exists(self.config):
+                self._read_config()
+            else:
+                gmsh = self._ask_user_for_gmsh()
+                self._set_gmsh(gmsh)
         else:
             self._set_gmsh(gmsh)
 
@@ -359,6 +363,10 @@ class Gmsh(object):
             os.remove(tmp_vtk)
 
     #### Private Protocol #################################
+    def _ask_user_for_gmsh(self):
+        gmsh = raw_input('Please provide the path to gmsh executable: ')
+        return gmsh
+
     def _read_config(self):
         if exists(self.config):
             data = json.load(open(self.config))
