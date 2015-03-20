@@ -770,8 +770,7 @@ cdef class NeighborCache:
         self.nnps = nnps
         self.particles = nnps.particles
 
-        n = self.particles[dest_index].get_number_of_particles()*2
-        self.start_stop = [UIntArray(n) for i in range(self.nnps.narrays)]
+        self.start_stop = [UIntArray() for i in range(self.nnps.narrays)]
         self.neighbors = [UIntArray() for i in range(self.nnps.narrays)]
 
     cpdef update(self):
@@ -780,10 +779,13 @@ cdef class NeighborCache:
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, neighbors
         dest_index = self.dest_index
+        n = self.particles[dest_index].get_number_of_particles()*2
         for src_idx in range(self.nnps.narrays):
             count = 0
             start_stop = self.start_stop[src_idx]
+            start_stop.resize(n)
             neighbors = self.neighbors[src_idx]
+            neighbors.reset()
             for d_idx in range(self.particles[dest_index].get_number_of_particles()):
                 self.nnps.get_nearest_particles(src_idx, dest_index, d_idx, nbrs)
                 neighbors.extend(nbrs.get_npy_array())
@@ -811,7 +813,8 @@ cdef class NNPS:
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, bint warn=True):
+                 int ghost_layers=1, domain=None, bint warn=True,
+                 cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -832,6 +835,9 @@ cdef class NNPS:
         warn : bint
             Flag to warn when extending particle lists
 
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # store the list of particles and number of arrays
         self.particles = particles
@@ -877,6 +883,10 @@ cdef class NNPS:
         # number of particles per cell
         self.n_part_per_cell = [IntArray() for pa in particles]
 
+        # The cache.
+        self.use_cache = cache
+        self.cache = [NeighborCache(self, i) for i in range(len(particles))]
+
     def update_domain(self, *args, **kwargs):
         self.domain.update()
 
@@ -915,6 +925,12 @@ cdef class NNPS:
 
             # bin the particles
             self._bin( pa_index=i, indices=indices )
+
+            if self.use_cache:
+                # Turn off cache so the cache can find the particles!
+                self.use_cache = False
+                self.cache[i].update()
+                self.use_cache = True
 
     cdef _bin(self, int pa_index, UIntArray indices):
         raise NotImplementedError("NNPS :: _bin called")
@@ -1102,7 +1118,7 @@ cdef class BoxSortNNPS(NNPS):
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, warn=True):
+                 int ghost_layers=1, domain=None, warn=True, cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1120,10 +1136,18 @@ cdef class BoxSortNNPS(NNPS):
         domain : DomainManager, default (None)
             Optional limits for the domain
 
+        warn : bint
+            Flag to warn when extending particle lists
+
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            cache
+        )
 
         # initialize the cells dict
         self.cells = {}
@@ -1291,6 +1315,9 @@ cdef class BoxSortNNPS(NNPS):
             Neighbors for the requested particle are stored here.
 
         """
+        if self.use_cache:
+            return self.cache[dst_index].get_neighbors(src_index, d_idx, nbrs)
+
         cdef dict cells = self.cells
         cdef Cell cell
 
@@ -1394,7 +1421,7 @@ cdef class LinkedListNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None,
-                 bint fixed_h=False, bint warn=True):
+                 bint fixed_h=False, bint warn=True, bint cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1418,10 +1445,18 @@ cdef class LinkedListNNPS(NNPS):
         fixed_h : bint
             Optional flag to use constant cell sizes throughout.
 
+        warn : bint
+            Flag to warn when extending particle lists
+
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            cache
+        )
 
         # initialize the head and next for each particle array
         self.heads = [UIntArray() for i in range(self.narrays)]
@@ -1632,6 +1667,9 @@ cdef class LinkedListNNPS(NNPS):
             Neighbors for the requested particle are stored here.
 
         """
+        if self.use_cache:
+            return self.cache[dst_index].get_neighbors(src_index, d_idx, nbrs)
+
         # src and dst particle arrays
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
         cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]

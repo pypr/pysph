@@ -41,6 +41,28 @@ class TestNeighborCache(unittest.TestCase):
                     nb_c = nb_cached.get_npy_array()
                     self.assertTrue(np.all(nb_e == nb_c))
 
+    def test_cache_updates_with_changed_particles(self):
+        # Given
+        pa1 = self._make_random_parray('pa1', 5)
+        particles = [pa1]
+        nnps = LinkedListNNPS(dim=3, particles=particles)
+        cache = NeighborCache(nnps, 0)
+        cache.update()
+
+        # When
+        pa2 = self._make_random_parray('pa2', 2)
+        pa1.add_particles(x=pa2.x, y=pa2.y, z=pa2.z)
+        nnps.update()
+        cache.update()
+        nb_cached = UIntArray()
+        nb_direct = UIntArray()
+        for i in range(len(particles[0].x)):
+            nnps.get_nearest_particles(0, 0, i, nb_direct)
+            cache.get_neighbors(0, i, nb_cached)
+            nb_e = nb_direct.get_npy_array()
+            nb_c = nb_cached.get_npy_array()
+            self.assertTrue(np.all(nb_e == nb_c))
+
 
 if __name__ == '__main__':
     unittest.main()
