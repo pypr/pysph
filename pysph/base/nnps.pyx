@@ -779,19 +779,34 @@ cdef class NeighborCache:
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, neighbors
         dest_index = self.dest_index
-        n = self.particles[dest_index].get_number_of_particles()*2
+        cdef size_t n = self.particles[dest_index].get_number_of_particles()
+        cdef int nnbr = 10, max_nbr = 0
+        if self.nnps.dim == 1:
+            nnbr = 10
+        elif self.nnps.dim == 2:
+            nnbr = 60
+        elif self.nnps.dim == 3:
+            nnbr = 120
+
         for src_idx in range(self.nnps.narrays):
             count = 0
+            max_nbr = 0
             start_stop = self.start_stop[src_idx]
-            start_stop.resize(n)
+            start_stop.resize(n*2)
             neighbors = self.neighbors[src_idx]
-            neighbors.reset()
+            neighbors.resize(nnbr*n)
             for d_idx in range(self.particles[dest_index].get_number_of_particles()):
                 self.nnps.get_nearest_particles(src_idx, dest_index, d_idx, nbrs)
-                neighbors.extend(nbrs.get_npy_array())
+                nnbr = nbrs.length
+                max_nbr = max(nnbr, max_nbr)
+                if neighbors.length < count + nnbr:
+                    neighbors.resize(max_nbr*n)
+                for i in range(nnbr):
+                    neighbors[count + i] = nbrs[i]
                 start_stop[d_idx*2] = count
-                count += nbrs.length
+                count += nnbr
                 start_stop[d_idx*2+1] = count
+            neighbors.squeeze()
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
         nbrs.reset()
@@ -800,9 +815,9 @@ cdef class NeighborCache:
         cdef neighbors = self.neighbors[src_index]
         start = start_stop[2*d_idx]
         end = start_stop[2*d_idx + 1]
-        nbrs.reserve(end-start)
-        for i in range(start, end):
-            nbrs.append(neighbors[i])
+        nbrs.resize(end-start)
+        for i in range(end - start):
+            nbrs[i] = neighbors[i + start]
 
 cdef class NNPS:
     """Nearest neighbor query class using the box-sort algorithm.
