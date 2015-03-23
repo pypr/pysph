@@ -774,7 +774,8 @@ cdef class NeighborCache:
         self.neighbors = [UIntArray() for i in range(self.nnps.narrays)]
 
     cpdef update(self):
-        cdef size_t count, d_idx
+
+        cdef size_t count, d_idx, src_idx
         cdef int i, dest_index
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, neighbors
@@ -802,22 +803,19 @@ cdef class NeighborCache:
                 if neighbors.length < count + nnbr:
                     neighbors.resize(max_nbr*n)
                 for i in range(nnbr):
-                    neighbors[count + i] = nbrs[i]
-                start_stop[d_idx*2] = count
+                    neighbors.data[count + i] = nbrs.data[i]
+                start_stop.data[d_idx*2] = count
                 count += nnbr
-                start_stop[d_idx*2+1] = count
+                start_stop.data[d_idx*2+1] = count
             neighbors.squeeze()
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        nbrs.reset()
         cdef size_t i, start, end
         cdef UIntArray start_stop = self.start_stop[src_index]
-        cdef neighbors = self.neighbors[src_index]
-        start = start_stop[2*d_idx]
-        end = start_stop[2*d_idx + 1]
-        nbrs.resize(end-start)
-        for i in range(end - start):
-            nbrs[i] = neighbors[i + start]
+        cdef UIntArray neighbors = self.neighbors[src_index]
+        start = start_stop.data[2*d_idx]
+        end = start_stop.data[2*d_idx + 1] -1
+        nbrs.set_view(neighbors, start, end)
 
 cdef class NNPS:
     """Nearest neighbor query class using the box-sort algorithm.

@@ -272,7 +272,52 @@ class TestLongArray(unittest.TestCase):
         l1_load = pickle.loads(l1_dump)
         self.assertEqual((l1_load.get_npy_array() == l1.get_npy_array()).all(), True)
 
+    def test_set_view(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When.
+        view = LongArray()
+        view.set_view(src, 1, 3)
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = range(1, 4)
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_set_view_stores_reference_to_parent(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When
+        view = LongArray()
+        view.set_view(src, 1, 3)
+        del src
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = range(1, 4)
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_reset_works_after_set_view(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+        view = LongArray()
+        view.set_view(src, 1, 3)
+
+        # When.
+        view.reset()
+        view.extend(numpy.arange(3)*10)
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = (numpy.arange(3)*10).tolist()
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+
+
 if __name__ == '__main__':
     unittest.main()
-
-
