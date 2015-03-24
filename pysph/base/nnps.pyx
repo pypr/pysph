@@ -769,19 +769,7 @@ cdef class NeighborCache:
         self.dest_index = dest_index
         self.nnps = nnps
         self.particles = nnps.particles
-
-        self.start_stop = [UIntArray() for i in range(self.nnps.narrays)]
-        self.neighbors = [UIntArray() for i in range(self.nnps.narrays)]
-
-    cpdef update(self):
-
-        cdef size_t count, d_idx, src_idx
-        cdef int i, dest_index
-        cdef UIntArray nbrs = UIntArray()
-        cdef UIntArray start_stop, neighbors
-        dest_index = self.dest_index
-        cdef size_t n = self.particles[dest_index].get_number_of_particles()
-        cdef int nnbr = 10, max_nbr = 0
+        cdef int nnbr = 10
         if self.nnps.dim == 1:
             nnbr = 10
         elif self.nnps.dim == 2:
@@ -789,28 +777,41 @@ cdef class NeighborCache:
         elif self.nnps.dim == 3:
             nnbr = 120
 
+        self.last_avg_nbr_size = [nnbr for i in range(self.nnps.narrays)]
+        self.start_stop = [UIntArray() for i in range(self.nnps.narrays)]
+        self.neighbors = [UIntArray() for i in range(self.nnps.narrays)]
+
+    cpdef update(self):
+
+        cdef size_t count, d_idx, src_idx, nnbr, avg_nnbr
+        cdef int i, dest_index
+        cdef UIntArray nbrs = UIntArray()
+        cdef UIntArray start_stop, neighbors
+        dest_index = self.dest_index
+        cdef size_t np = self.particles[dest_index].get_number_of_particles()
+
         for src_idx in range(self.nnps.narrays):
             count = 0
-            max_nbr = 0
             start_stop = self.start_stop[src_idx]
-            start_stop.resize(n*2)
+            start_stop.resize(np*2)
             neighbors = self.neighbors[src_idx]
-            neighbors.resize(nnbr*n)
-            for d_idx in range(self.particles[dest_index].get_number_of_particles()):
+            neighbors.resize(self.last_avg_nbr_size[src_idx]*np)
+            for d_idx in range(np):
                 self.nnps.get_nearest_particles(src_idx, dest_index, d_idx, nbrs)
                 nnbr = nbrs.length
-                max_nbr = max(nnbr, max_nbr)
                 if neighbors.length < count + nnbr:
-                    neighbors.resize(max_nbr*n)
+                    avg_nnbr = int(count/neighbors.length) + 1
+                    neighbors.resize(int(avg_nnbr*np*1.1))
                 for i in range(nnbr):
                     neighbors.data[count + i] = nbrs.data[i]
                 start_stop.data[d_idx*2] = count
                 count += nnbr
                 start_stop.data[d_idx*2+1] = count
             neighbors.squeeze()
+            self.last_avg_nbr_size[src_idx] = int(neighbors.length/np) + 1
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        cdef size_t i, start, end
+        cdef size_t start, end
         cdef UIntArray start_stop = self.start_stop[src_index]
         cdef UIntArray neighbors = self.neighbors[src_index]
         start = start_stop.data[2*d_idx]

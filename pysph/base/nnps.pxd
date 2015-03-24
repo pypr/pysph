@@ -100,6 +100,7 @@ cdef class NeighborCache:
     cdef public list start_stop
     cdef public list neighbors
     cdef public list particles
+    cdef public list last_avg_nbr_size
 
     cpdef update(self)
 
