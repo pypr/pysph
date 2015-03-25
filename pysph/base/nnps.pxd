@@ -95,12 +95,15 @@ cdef class Cell:
 
 cdef class NeighborCache:
 
-    cdef public int dest_index
-    cdef public NNPS nnps
-    cdef public list start_stop
-    cdef public list neighbors
-    cdef public list particles
-    cdef public list last_avg_nbr_size
+    cdef int _dest_index
+    cdef NNPS _nnps
+    cdef list _start_stop
+    cdef list _neighbors
+    cdef list _particles
+    cdef list _last_avg_nbr_size
+    cdef np.ndarray _dirty
+
+    cdef _find_all_neighbors(self, int src_idx)
 
     cpdef update(self)
 
@@ -152,6 +155,15 @@ cdef class NNPS:
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
+
+    # Neighbor query function. Returns the list of neighbors for a
+    # requested particle. The returned list is assumed to be of type
+    # unsigned int to follow the type of the local and global ids.
+    # This method will never use the cached values.  If prealloc is set
+    # to True it will assume that the neighbor array has enough space for
+    # all the new neighbors and directly set the values in the array.
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc)
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type
