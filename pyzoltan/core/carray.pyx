@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Wed Mar 25 18:45:06 2015
+# Wed Mar 25 22:38:29 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -340,7 +340,8 @@ cdef class IntArray(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <int*>realloc(self.data, self.length*sizeof(int))
+        cdef size_t size = max(self.length, 16)
+        data = <int*>realloc(self.data, size*sizeof(int))
 
         if data == NULL:
             # free original data
@@ -348,7 +349,7 @@ cdef class IntArray(BaseArray):
             raise MemoryError
 
         self.data = <int*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
@@ -714,7 +715,8 @@ cdef class DoubleArray(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <double*>realloc(self.data, self.length*sizeof(double))
+        cdef size_t size = max(self.length, 16)
+        data = <double*>realloc(self.data, size*sizeof(double))
 
         if data == NULL:
             # free original data
@@ -722,7 +724,7 @@ cdef class DoubleArray(BaseArray):
             raise MemoryError
 
         self.data = <double*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
@@ -1088,7 +1090,8 @@ cdef class FloatArray(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <float*>realloc(self.data, self.length*sizeof(float))
+        cdef size_t size = max(self.length, 16)
+        data = <float*>realloc(self.data, size*sizeof(float))
 
         if data == NULL:
             # free original data
@@ -1096,7 +1099,7 @@ cdef class FloatArray(BaseArray):
             raise MemoryError
 
         self.data = <float*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
@@ -1462,7 +1465,8 @@ cdef class LongArray(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <long*>realloc(self.data, self.length*sizeof(long))
+        cdef size_t size = max(self.length, 16)
+        data = <long*>realloc(self.data, size*sizeof(long))
 
         if data == NULL:
             # free original data
@@ -1470,7 +1474,7 @@ cdef class LongArray(BaseArray):
             raise MemoryError
 
         self.data = <long*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
@@ -1836,7 +1840,8 @@ cdef class UIntArray(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <unsigned int*>realloc(self.data, self.length*sizeof(unsigned int))
+        cdef size_t size = max(self.length, 16)
+        data = <unsigned int*>realloc(self.data, size*sizeof(unsigned int))
 
         if data == NULL:
             # free original data
@@ -1844,7 +1849,7 @@ cdef class UIntArray(BaseArray):
             raise MemoryError
 
         self.data = <unsigned int*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):

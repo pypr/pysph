@@ -359,7 +359,8 @@ cdef class CLASSNAME(BaseArray):
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <ARRAY_TYPE*>realloc(self.data, self.length*sizeof(ARRAY_TYPE))
+        cdef size_t size = max(self.length, 16)
+        data = <ARRAY_TYPE*>realloc(self.data, size*sizeof(ARRAY_TYPE))
 
         if data == NULL:
             # free original data
@@ -367,7 +368,7 @@ cdef class CLASSNAME(BaseArray):
             raise MemoryError
 
         self.data = <ARRAY_TYPE*>data
-        self.alloc = self.length
+        self.alloc = size
         arr.data = <char *>self.data
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):

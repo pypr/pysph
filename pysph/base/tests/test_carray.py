@@ -128,8 +128,21 @@ class TestLongArray(unittest.TestCase):
         l.squeeze()
 
         self.assertEqual(l.length, 6)
-        self.assertEqual(l.alloc == l.length, True)
+        self.assertEqual(l.alloc >= l.length, True)
         self.assertEqual(len(l.get_npy_array()), 6)
+
+    def test_squeeze_for_zero_length_array(self):
+        # Given.
+        l = LongArray()
+
+        # When
+        l.squeeze()
+
+        # Then
+        self.assertEqual(l.length, 0)
+        self.assertEqual(len(l.get_npy_array()), 0)
+        self.assertEqual(l.alloc >= l.length, True)
+        del l # This should work and not segfault.
 
     def test_reset(self):
         """
