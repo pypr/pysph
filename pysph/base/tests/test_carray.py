@@ -279,11 +279,25 @@ class TestLongArray(unittest.TestCase):
 
         # When.
         view = LongArray()
-        view.set_view(src, 1, 3)
+        view.set_view(src, 1, 4)
 
         # Then.
         self.assertEqual(view.length, 3)
         expect = range(1, 4)
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_set_view_for_empty_array(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When.
+        view = LongArray()
+        view.set_view(src, 1, 1)
+
+        # Then.
+        self.assertEqual(view.length, 0)
+        expect = []
         self.assertListEqual(view.get_npy_array().tolist(), expect)
 
     def test_set_view_stores_reference_to_parent(self):
@@ -293,7 +307,7 @@ class TestLongArray(unittest.TestCase):
 
         # When
         view = LongArray()
-        view.set_view(src, 1, 3)
+        view.set_view(src, 1, 4)
         del src
 
         # Then.

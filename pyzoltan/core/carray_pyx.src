@@ -340,13 +340,14 @@ cdef class CLASSNAME(BaseArray):
 
     cpdef set_view(self, CLASSNAME parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length

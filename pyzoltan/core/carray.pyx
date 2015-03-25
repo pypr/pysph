@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Mon Mar 23 22:41:09 2015
+# Wed Mar 25 18:45:06 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -321,13 +321,14 @@ cdef class IntArray(BaseArray):
 
     cpdef set_view(self, IntArray parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
@@ -694,13 +695,14 @@ cdef class DoubleArray(BaseArray):
 
     cpdef set_view(self, DoubleArray parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
@@ -1067,13 +1069,14 @@ cdef class FloatArray(BaseArray):
 
     cpdef set_view(self, FloatArray parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
@@ -1440,13 +1443,14 @@ cdef class LongArray(BaseArray):
 
     cpdef set_view(self, LongArray parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
@@ -1813,13 +1817,14 @@ cdef class UIntArray(BaseArray):
 
     cpdef set_view(self, UIntArray parent, long start, long end):
         """Create a view of a given a parent array starting at the
-        given start and ending at end.
+        given start index and ending at the end index (this does not
+        include the end index).
         """
         if self._parent is None:
             self._old_data = self.data
         self._parent = parent
         self.data = parent.data + start
-        self.length = end - start + 1
+        self.length = end - start
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length

@@ -95,7 +95,7 @@ cdef class Cell:
 
 cdef class NeighborCache:
 
-    cdef int _dest_index
+    cdef int _dst_index
     cdef NNPS _nnps
     cdef list _start_stop
     cdef list _neighbors

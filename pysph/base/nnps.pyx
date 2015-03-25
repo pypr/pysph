@@ -765,8 +765,8 @@ cdef class Cell:
         self.boxmax = boxmax
 
 cdef class NeighborCache:
-    def __init__(self, NNPS nnps, int dest_index):
-        self._dest_index = dest_index
+    def __init__(self, NNPS nnps, int dst_index):
+        self._dst_index = dst_index
         self._nnps = nnps
         self._particles = nnps.particles
         cdef int nnbr = 10
@@ -789,11 +789,11 @@ cdef class NeighborCache:
         cdef size_t count, d_idx, avg_nnbr
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, neighbors
-        cdef int dest_index = self._dest_index
+        cdef int dst_index = self._dst_index
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
-        cdef size_t np = self._particles[dest_index].get_number_of_particles()
+        cdef size_t np = self._particles[dst_index].get_number_of_particles()
 
         count = 0
         start_stop = self._start_stop[src_idx]
@@ -807,10 +807,10 @@ cdef class NeighborCache:
                 avg_nnbr = int(count/d_idx) + 1
                 neighbors.resize(int(avg_nnbr*np*1.1) + safety)
 
-            nbrs.set_view(neighbors, count, neighbors.length - 1)
+            nbrs.set_view(neighbors, count, neighbors.length)
 
             self._nnps.get_nearest_particles_no_cache(
-                src_idx, dest_index, d_idx, nbrs, True
+                src_idx, dst_index, d_idx, nbrs, True
             )
             start_stop.data[d_idx*2] = count
             count += nbrs.length
@@ -829,7 +829,7 @@ cdef class NeighborCache:
         cdef UIntArray start_stop = self._start_stop[src_index]
         cdef UIntArray neighbors = self._neighbors[src_index]
         start = start_stop.data[2*d_idx]
-        end = start_stop.data[2*d_idx + 1] -1
+        end = start_stop.data[2*d_idx + 1]
         nbrs.set_view(neighbors, start, end)
 
 cdef class NNPS:

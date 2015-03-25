@@ -35,11 +35,38 @@ class TestNeighborCache(unittest.TestCase):
             # Then.
             for src_idx in (0, 1):
                 for i in range(len(particles[dest_index].x)):
-                    nnps.get_nearest_particles(src_idx, dest_index, i, nb_direct)
+                    nnps.get_nearest_particles_no_cache(
+                        src_idx, dest_index, i, nb_direct, False
+                    )
                     cache.get_neighbors(src_idx, i, nb_cached)
                     nb_e = nb_direct.get_npy_array()
                     nb_c = nb_cached.get_npy_array()
                     self.assertTrue(np.all(nb_e == nb_c))
+
+    def test_empty_neigbors_works_correctly(self):
+        # Given
+        pa1 = self._make_random_parray('pa1', 5)
+        pa2 = self._make_random_parray('pa2', 2)
+        pa2.x += 10.0
+        particles = [pa1, pa2]
+
+        # When
+        nnps = LinkedListNNPS(dim=3, particles=particles)
+        # Cache for neighbors of destination 0.
+        cache = NeighborCache(nnps, dst_index=0)
+        cache.update()
+
+        # Then
+        nb_cached = UIntArray()
+        nb_direct = UIntArray()
+        for i in range(len(particles[0].x)):
+            nnps.get_nearest_particles_no_cache(1, 0, i,nb_direct, False)
+            # Get neighbors from source 1 on destination 0.
+            cache.get_neighbors(src_index=1, d_idx=i, nbrs=nb_cached)
+            nb_e = nb_direct.get_npy_array()
+            nb_c = nb_cached.get_npy_array()
+            self.assertEqual(len(nb_e), 0)
+            self.assertTrue(np.all(nb_e == nb_c))
 
     def test_cache_updates_with_changed_particles(self):
         # Given
@@ -57,7 +84,7 @@ class TestNeighborCache(unittest.TestCase):
         nb_cached = UIntArray()
         nb_direct = UIntArray()
         for i in range(len(particles[0].x)):
-            nnps.get_nearest_particles(0, 0, i, nb_direct)
+            nnps.get_nearest_particles_no_cache(0, 0, i, nb_direct, False)
             cache.get_neighbors(0, i, nb_cached)
             nb_e = nb_direct.get_npy_array()
             nb_c = nb_cached.get_npy_array()
