@@ -447,6 +447,9 @@ def load(fname):
             array = ParticleArray(name=array_name,
                                   constants=array_info["constants"],
                                   **array_info["arrays"])
+            array.set_output_arrays(
+                array_info.get('output_property_arrays', [])
+            )
             for prop, prop_info in array_info["properties"].iteritems():
                 if prop not in array_info["arrays"]:
                     array.add_property(**prop_info)

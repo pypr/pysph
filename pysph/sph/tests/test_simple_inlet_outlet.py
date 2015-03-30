@@ -25,7 +25,7 @@ class TestSimpleInlet1D(unittest.TestCase):
     def test_inlet_block_has_correct_copies(self):
         # Given
         inlet = SimpleInlet(self.inlet_pa, self.dest_pa, spacing=self.dx, n=5,
-                            xmin=-0.4, xmax=0.0)
+                            xmin=-0.5, xmax=0.0)
         # When
         x = self.inlet_pa.x
         p = self.inlet_pa.p
@@ -40,10 +40,22 @@ class TestSimpleInlet1D(unittest.TestCase):
 
         self.assertEqual(self.dest_pa.get_number_of_particles(), 0)
 
+    def test_inlet_raises_error_on_incorrect_domain(self):
+        # Given
+
+        # When
+        n = 5
+        xmin = -0.4
+
+        # Then
+        self.assertRaises(RuntimeError, SimpleInlet,
+                          self.inlet_pa, self.dest_pa,
+                          spacing=self.dx, n=n, xmin=xmin, xmax=0.0)
+
     def test_update_creates_particles_in_destination(self):
         # Given
         inlet = SimpleInlet(self.inlet_pa, self.dest_pa, spacing=self.dx, n=5,
-                            xmin=-0.4, xmax=0.0)
+                            xmin=-0.5, xmax=0.0)
         # Two rows of particles should move out.
         self.inlet_pa.x += 0.15
 
@@ -56,7 +68,7 @@ class TestSimpleInlet1D(unittest.TestCase):
         h = self.inlet_pa.h
         self.assertEqual(len(x), 5)
         x_expect = (-np.arange(0, 5)*self.dx + 0.15)
-        x_expect[x_expect > 0.0] -= 0.4
+        x_expect[x_expect > 0.0] -= 0.5
         self.assertListEqual(list(x), list(x_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
         self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
@@ -89,12 +101,14 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         inlet_pa = self.inlet_pa
         dest_pa = self.dest_pa
         inlet = SimpleInlet(inlet_pa, dest_pa, spacing=self.dx, n=5,
-                            xmin=-0.4, xmax=0.0, ymin=0.0, ymax=0.4)
+                            xmin=-0.5, xmax=0.0, ymin=0.0, ymax=0.5)
         x0 = inlet_pa.x.copy()
         y0 = inlet_pa.y.copy()
         # One row and one column of particles should move out.
-        inlet_pa.x -= 0.05
-        inlet_pa.y -= 0.05
+        dx = 0.15
+        dy = 0.1
+        inlet_pa.x -= dx
+        inlet_pa.y -= dy
 
         # When
         inlet.update()
@@ -107,12 +121,12 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
 
         # The number of particles should be the same in the inlet.
         self.assertEqual(len(x), 25)
-        x_expect = (x0 - 0.05)
-        x_expect[x_expect < -0.4] += 0.4
+        x_expect = (x0 - dx)
+        x_expect[x_expect < -0.5] += 0.5
         self.assertListEqual(list(x), list(x_expect))
 
-        y_expect = (y0 - 0.05)
-        y_expect[y_expect < 0.0] += 0.4
+        y_expect = (y0 - dy)
+        y_expect[y_expect < 0.0] += 0.5
         self.assertListEqual(list(y), list(y_expect))
 
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
@@ -123,12 +137,13 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         y = dest_pa.y
         p = dest_pa.p
         h = dest_pa.h
+        print x, y
         self.assertEqual(self.dest_pa.get_number_of_particles(), 9)
 
         # Calculate the expected positions.
-        x_new = (x0 - 0.05)
-        y_new = (y0 - 0.05)
-        idx = np.where((x_new < -0.4) | (y_new < 0.0))[0]
+        x_new = (x0 - dx)
+        y_new = (y0 - dy)
+        idx = np.where((x_new < -0.5) | (y_new < 0.0))[0]
         x_expect = x_new[idx]
         y_expect = y_new[idx]
 
