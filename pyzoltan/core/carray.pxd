@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sun Sep  1 22:44:22 2013
+# Mon Mar 23 22:41:56 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -48,7 +48,9 @@ cdef class BaseArray:
 cdef class IntArray(BaseArray):
     """This class defines a managed array of ints. """
     cdef int *data
+    cdef int *_old_data
     cdef public int minimum, maximum
+    cdef IntArray _parent
 
     cdef _setup_npy_array(self)
     cdef int* get_data_ptr(self)
@@ -60,6 +62,7 @@ cdef class IntArray(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, IntArray, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -75,7 +78,9 @@ cdef class IntArray(BaseArray):
 cdef class DoubleArray(BaseArray):
     """This class defines a managed array of doubles. """
     cdef double *data
+    cdef double *_old_data
     cdef public double minimum, maximum
+    cdef DoubleArray _parent
 
     cdef _setup_npy_array(self)
     cdef double* get_data_ptr(self)
@@ -87,6 +92,7 @@ cdef class DoubleArray(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, DoubleArray, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -102,7 +108,9 @@ cdef class DoubleArray(BaseArray):
 cdef class FloatArray(BaseArray):
     """This class defines a managed array of floats. """
     cdef float *data
+    cdef float *_old_data
     cdef public float minimum, maximum
+    cdef FloatArray _parent
 
     cdef _setup_npy_array(self)
     cdef float* get_data_ptr(self)
@@ -114,6 +122,7 @@ cdef class FloatArray(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, FloatArray, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -129,7 +138,9 @@ cdef class FloatArray(BaseArray):
 cdef class LongArray(BaseArray):
     """This class defines a managed array of longs. """
     cdef long *data
+    cdef long *_old_data
     cdef public long minimum, maximum
+    cdef LongArray _parent
 
     cdef _setup_npy_array(self)
     cdef long* get_data_ptr(self)
@@ -141,6 +152,7 @@ cdef class LongArray(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, LongArray, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -156,7 +168,9 @@ cdef class LongArray(BaseArray):
 cdef class UIntArray(BaseArray):
     """This class defines a managed array of unsigned ints. """
     cdef unsigned int *data
+    cdef unsigned int *_old_data
     cdef public unsigned int minimum, maximum
+    cdef UIntArray _parent
 
     cdef _setup_npy_array(self)
     cdef unsigned int* get_data_ptr(self)
@@ -168,6 +182,7 @@ cdef class UIntArray(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, UIntArray, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)

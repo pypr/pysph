@@ -77,9 +77,9 @@ cdef inline int get_valid_cell_index(
     cdef int cell_index = -1
 
     # basic test for valid indices. Since we bin the particles with
-    # respect to the origin, negative indices can never occur. 
+    # respect to the origin, negative indices can never occur.
     cdef bint is_valid = (cid.x > -1) and (cid.y > -1) and (cid.z > -1)
-    
+
     # additional check for 1D. This is because we search in all 26
     # neighboring cells for neighbors. In 1D this can be problematic
     # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
@@ -94,7 +94,7 @@ cdef inline int get_valid_cell_index(
 
         if not (-1 < cell_index < n_cells):
             cell_index = -1
-            
+
     return cell_index
 
 def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
@@ -321,7 +321,7 @@ cdef class DomainManager:
         # empty list of particle array wrappers for now
         self.pa_wrappers = []
         self.narrays = 0
-        
+
         # default value for the cell size
         self.cell_size = 1.0
 
@@ -764,6 +764,74 @@ cdef class Cell:
         self.boxmin = boxmin
         self.boxmax = boxmax
 
+cdef class NeighborCache:
+    def __init__(self, NNPS nnps, int dst_index):
+        self._dst_index = dst_index
+        self._nnps = nnps
+        self._particles = nnps.particles
+        cdef int nnbr = 10
+        if self._nnps.dim == 1:
+            nnbr = 10
+        elif self._nnps.dim == 2:
+            nnbr = 60
+        elif self._nnps.dim == 3:
+            nnbr = 120
+
+        self._dirty = np.ones(nnps.narrays, dtype=bool)
+        self._last_avg_nbr_size = [nnbr for i in range(nnps.narrays)]
+        self._start_stop = [UIntArray() for i in range(nnps.narrays)]
+        self._neighbors = [UIntArray() for i in range(nnps.narrays)]
+
+    cpdef update(self):
+        self._dirty = np.ones(self._nnps.narrays, dtype=bool)
+
+    cdef _find_all_neighbors(self, int src_idx):
+        cdef size_t count, d_idx, avg_nnbr
+        cdef UIntArray nbrs = UIntArray()
+        cdef UIntArray start_stop, neighbors
+        cdef int dst_index = self._dst_index
+        # This is an upper limit for the number of neighbors in a worst
+        # case scenario.
+        cdef size_t safety = 1024
+        cdef size_t np = self._particles[dst_index].get_number_of_particles()
+
+        count = 0
+        start_stop = self._start_stop[src_idx]
+        start_stop.resize(np*2)
+        neighbors = self._neighbors[src_idx]
+        neighbors.resize(self._last_avg_nbr_size[src_idx]*np + safety)
+
+        for d_idx in range(np):
+
+            if neighbors.length < count + safety:
+                avg_nnbr = int(count/d_idx) + 1
+                neighbors.resize(int(avg_nnbr*np*1.1) + safety)
+
+            nbrs.set_view(neighbors, count, neighbors.length)
+
+            self._nnps.get_nearest_particles_no_cache(
+                src_idx, dst_index, d_idx, nbrs, True
+            )
+            start_stop.data[d_idx*2] = count
+            count += nbrs.length
+            start_stop.data[d_idx*2+1] = count
+
+        neighbors.length = count
+        neighbors.squeeze()
+
+        self._last_avg_nbr_size[src_idx] = int(neighbors.length/np) + 1
+        self._dirty[src_idx] = False
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
+        if self._dirty[src_index]:
+            self._find_all_neighbors(src_index)
+        cdef size_t start, end
+        cdef UIntArray start_stop = self._start_stop[src_index]
+        cdef UIntArray neighbors = self._neighbors[src_index]
+        start = start_stop.data[2*d_idx]
+        end = start_stop.data[2*d_idx + 1]
+        nbrs.set_view(neighbors, start, end)
+
 cdef class NNPS:
     """Nearest neighbor query class using the box-sort algorithm.
 
@@ -773,7 +841,8 @@ cdef class NNPS:
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, bint warn=True):
+                 int ghost_layers=1, domain=None, bint warn=True,
+                 cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -794,6 +863,9 @@ cdef class NNPS:
         warn : bint
             Flag to warn when extending particle lists
 
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # store the list of particles and number of arrays
         self.particles = particles
@@ -812,7 +884,7 @@ cdef class NNPS:
 
         # set the particle array wrappers for the domain manager
         self.domain.set_pa_wrappers(self.pa_wrappers)
-        
+
         # set the radius scale to determine the cell size
         self.domain.set_radius_scale(self.radius_scale)
 
@@ -839,6 +911,10 @@ cdef class NNPS:
         # number of particles per cell
         self.n_part_per_cell = [IntArray() for pa in particles]
 
+        # The cache.
+        self.use_cache = cache
+        self.cache = [NeighborCache(self, i) for i in range(len(particles))]
+
     def update_domain(self, *args, **kwargs):
         self.domain.update()
 
@@ -859,7 +935,7 @@ cdef class NNPS:
         cdef int i, num_particles
         cdef ParticleArray pa
         cdef UIntArray indices
-        
+
         cdef DomainManager domain = self.domain
 
         # use cell sizes computed by the domain.
@@ -877,6 +953,8 @@ cdef class NNPS:
 
             # bin the particles
             self._bin( pa_index=i, indices=indices )
+
+            self.cache[i].update()
 
     cdef _bin(self, int pa_index, UIntArray indices):
         raise NotImplementedError("NNPS :: _bin called")
@@ -938,7 +1016,16 @@ cdef class NNPS:
     ######################################################################
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
-        raise NotImplementedError("NNPS :: get_nearest_particles called")
+        if self.use_cache:
+            return self.cache[dst_index].get_neighbors(src_index, d_idx, nbrs)
+        else:
+            return self.get_nearest_particles_no_cache(
+                src_index, dst_index, d_idx, nbrs, False
+            )
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc):
+        raise NotImplementedError("NNPS :: get_nearest_particles_no_cache called")
 
     cpdef get_nearest_particles_filtered(
         self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
@@ -1064,7 +1151,7 @@ cdef class BoxSortNNPS(NNPS):
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, warn=True):
+                 int ghost_layers=1, domain=None, warn=True, cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1082,10 +1169,18 @@ cdef class BoxSortNNPS(NNPS):
         domain : DomainManager, default (None)
             Optional limits for the domain
 
+        warn : bint
+            Flag to warn when extending particle lists
+
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            cache
+        )
 
         # initialize the cells dict
         self.cells = {}
@@ -1233,8 +1328,8 @@ cdef class BoxSortNNPS(NNPS):
                         for local_index in range(num_indices):
                             nbrs.append( cell_indices.data[local_index] )
 
-    cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1252,6 +1347,11 @@ cdef class BoxSortNNPS(NNPS):
         nbrs : UIntArray (output)
             Neighbors for the requested particle are stored here.
 
+        prealloc : bool
+            Specifies if the neighbor array already has pre-allocated space
+            for the neighbor list.  In this case the neighbors are directly set
+            in the given array without resetting or appending to the array.
+            This improves performance when the neighbors are cached.
         """
         cdef dict cells = self.cells
         cdef Cell cell
@@ -1276,7 +1376,7 @@ cdef class BoxSortNNPS(NNPS):
         cdef double radius_scale = self.radius_scale
         cdef double cell_size = self.cell_size
         cdef UIntArray lindices
-        cdef size_t indexj
+        cdef size_t indexj, count
         cdef ZOLTAN_ID_TYPE j
 
         cdef cPoint xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx], d_z.data[d_idx])
@@ -1294,7 +1394,11 @@ cdef class BoxSortNNPS(NNPS):
         cdef int ierr
 
         # reset the nbr array length. This should avoid a realloc
-        nbrs.reset()
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.reset()
+        count = 0
 
         cdef int ix, iy, iz
         for ix in [cid.data.x -1, cid.data.x, cid.data.x + 1]:
@@ -1320,7 +1424,13 @@ cdef class BoxSortNNPS(NNPS):
 
                             # select neighbor
                             if ( (xij2 < hi2) or (xij2 < hj2) ):
-                                nbrs.append( j )
+                                if prealloc:
+                                    nbrs.data[count] = j
+                                    count += 1
+                                else:
+                                    nbrs.append( j )
+        if prealloc:
+            nbrs.length = count
 
     cpdef count_n_part_per_cell(self):
         """Count the number of particles in each cell"""
@@ -1356,7 +1466,7 @@ cdef class LinkedListNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None,
-                 bint fixed_h=False, bint warn=True):
+                 bint fixed_h=False, bint warn=True, bint cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1380,10 +1490,18 @@ cdef class LinkedListNNPS(NNPS):
         fixed_h : bint
             Optional flag to use constant cell sizes throughout.
 
+        warn : bint
+            Flag to warn when extending particle lists
+
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn)
+            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            cache
+        )
 
         # initialize the head and next for each particle array
         self.heads = [UIntArray() for i in range(self.narrays)]
@@ -1574,8 +1692,8 @@ cdef class LinkedListNNPS(NNPS):
     ######################################################################
     # Neighbor location routines
     ######################################################################
-    cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc):
         """Utility function to get near-neighbors for a particle.
 
         Parameters:
@@ -1593,6 +1711,11 @@ cdef class LinkedListNNPS(NNPS):
         nbrs : UIntArray (output)
             Neighbors for the requested particle are stored here.
 
+        prealloc : bool
+            Specifies if the neighbor array already has pre-allocated space
+            for the neighbor list.  In this case the neighbors are directly set
+            in the given array without resetting or appending to the array.
+            This improves performance when the neighbors are cached.
         """
         # src and dst particle arrays
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
@@ -1637,7 +1760,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef double xij2
         cdef double hi2, hj2
         cdef int ierr, nnbrs
-        cdef unsigned int _next
+        cdef unsigned int _next, count
         cdef int ix, iy, iz
 
         # get the un-flattened index for the destination particle with
@@ -1661,8 +1784,12 @@ cdef class LinkedListNNPS(NNPS):
         hi2 *= hi2
 
         # reset the length of the nbr array
-        nbrs.reset()
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.reset()
 
+        count = 0
         # Begin search through neighboring cells
         for ix in range(3):
             for iy in range(3):
@@ -1687,10 +1814,16 @@ cdef class LinkedListNNPS(NNPS):
 
                             # select neighbor
                             if ( (xij2 < hi2) or (xij2 < hj2) ):
-                                nbrs.append( _next )
+                                if prealloc:
+                                    nbrs.data[count] = _next
+                                    count += 1
+                                else:
+                                    nbrs.append( _next )
 
                             # get the 'next' particle in this cell
                             _next = next.data[_next]
+        if prealloc:
+            nbrs.length = count
 
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs):

@@ -50,7 +50,7 @@ cdef class DomainManager:
     ############################################################################
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
-    
+
     # box-wrap particles within the physical domain
     cdef _box_wrap_periodic(self)
 
@@ -92,6 +92,24 @@ cdef class Cell:
     cdef _compute_bounding_box(self, double cell_size,
                                int layers)
 
+
+cdef class NeighborCache:
+
+    cdef int _dst_index
+    cdef NNPS _nnps
+    cdef list _start_stop
+    cdef list _neighbors
+    cdef list _particles
+    cdef list _last_avg_nbr_size
+    cdef np.ndarray _dirty
+
+    cdef _find_all_neighbors(self, int src_idx)
+
+    cpdef update(self)
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+
+
 # Nearest neighbor locator
 cdef class NNPS:
     ############################################################################
@@ -102,6 +120,8 @@ cdef class NNPS:
     cdef public list particles           # list of particle arrays
     cdef public list pa_wrappers         # list of particle array wrappers
     cdef public int narrays              # Number of particle arrays
+    cdef public bint use_cache           # Use cache or not.
+    cdef public list cache               # The neighbor cache.
 
     cdef public object comm              # MPI communicator object
     cdef public int rank                 # MPI rank
@@ -135,6 +155,15 @@ cdef class NNPS:
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
+
+    # Neighbor query function. Returns the list of neighbors for a
+    # requested particle. The returned list is assumed to be of type
+    # unsigned int to follow the type of the local and global ids.
+    # This method will never use the cached values.  If prealloc is set
+    # to True it will assume that the neighbor array has enough space for
+    # all the new neighbors and directly set the values in the array.
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc)
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type

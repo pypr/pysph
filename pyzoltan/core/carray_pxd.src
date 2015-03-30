@@ -60,7 +60,9 @@ pxd_code_str = '''
 cdef class CLASSNAME(BaseArray):
     """This class defines a managed array of ARRAY_TYPEs. """
     cdef ARRAY_TYPE *data
+    cdef ARRAY_TYPE *_old_data
     cdef public ARRAY_TYPE minimum, maximum
+    cdef CLASSNAME _parent
 
     cdef _setup_npy_array(self)
     cdef ARRAY_TYPE* get_data_ptr(self)
@@ -72,6 +74,7 @@ cdef class CLASSNAME(BaseArray):
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, CLASSNAME, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
