@@ -11,6 +11,7 @@ simulation.
 Copyright (c) 2015 Prabhu Ramachandran
 """
 
+import gzip
 import json
 
 import numpy as np
@@ -24,10 +25,20 @@ from os.path import exists, expanduser, join
 import sys
 
 def _read_vtk_file(fname):
-    """Given a .vtk file, read it and return the output.
+    """Given a .vtk file (or .vtk.gz), read it and return the output.
     """
-    r = tvtk.DataSetReader(file_name=fname)
+    if fname.endswith('.vtk.gz'):
+        tmpfname = tempfile.mktemp(suffix='.vtk')
+        with open(tmpfname, 'wb') as tmpf:
+            data = gzip.open(fname).read()
+            tmpf.write(data)
+        r = tvtk.DataSetReader(file_name=tmpfname)
+    else:
+        tmpfname = None
+        r = tvtk.DataSetReader(file_name=fname)
     r.update()
+    if tmpfname is not None:
+        os.remove(tmpfname)
     return r.output
 
 def _convert_to_points(dataset, vertices=True, cell_centers=True):
@@ -291,8 +302,12 @@ class Gmsh(object):
         gmsh: str: Path to gmsh executable.
         """
         self.config = expanduser(join('~', '.pysph', 'gmsh.json'))
-        if gmsh is None and exists(self.config):
-            self._read_config()
+        if gmsh is None:
+            if exists(self.config):
+                self._read_config()
+            else:
+                gmsh = self._ask_user_for_gmsh()
+                self._set_gmsh(gmsh)
         else:
             self._set_gmsh(gmsh)
 
@@ -359,6 +374,10 @@ class Gmsh(object):
             os.remove(tmp_vtk)
 
     #### Private Protocol #################################
+    def _ask_user_for_gmsh(self):
+        gmsh = raw_input('Please provide the path to gmsh executable: ')
+        return gmsh
+
     def _read_config(self):
         if exists(self.config):
             data = json.load(open(self.config))

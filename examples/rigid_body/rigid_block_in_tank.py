@@ -1,21 +1,5 @@
-"""Hydrostatic tank example (Section 6.0) of Adami et. al. JCP 231, 7057-7075
-
-Different boundary formulations can be used to check for this behaviour:
-
- - Adami et al. "A generalized wall boundary condition for smoothed
-   particle hydrodynamics", 2012, JCP, 231, pp 7057--7075 (REF1)
-
- - Monaghan and Kajtar, "SPH particle boundary forces for arbitrary
-   boundaries", 2009, 180, pp 1811--1820 (REF2)
-
- - Gesteria et al. "State-of-the-art of classical SPH for free-surface
-   flows", 2010, JHR, pp 6--27 (REF3)
-
-Of these, the first and third are ghost particle methods while the
-second is the classical Monaghan style, repulsive particle approach.
-
-We have a block of rigid solid falling on this tank.
-
+""" We have a block of rigid solid falling on a tank of water.  We also
+deonstrate that rigid-rigid collisions work as well.
 
 """
 # NumPy
@@ -24,40 +8,36 @@ import numpy as np
 # PySPH imports
 from pysph.base.utils import get_particle_array_wcsph as gpa
 from pysph.base.utils import get_particle_array_rigid_body
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
+from pysph.base.kernels import WendlandQuintic
+
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
+
+from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 # the eqations
 from pysph.sph.equation import Group
 
-# Equations for REF1
-from pysph.sph.wc.transport_velocity import VolumeFromMassDensity,\
-    ContinuityEquation,\
-    MomentumEquationPressureGradient, \
-    MomentumEquationArtificialViscosity,\
-    SolidWallPressureBC, SummationDensity
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
+    ContinuityEquationDeltaSPH
 
-# Equations for the standard WCSPH formulation and dynamic boundary
-# conditions defined in REF3
-from pysph.sph.wc.basic import TaitEOS
-from pysph.sph.basic_equations import XSPHCorrection
 
-from pysph.sph.rigid_body import (BodyForce, NumberDensity,
+from pysph.sph.rigid_body import (BodyForce, NumberDensity, RigidBodyCollision,
     RigidBodyMoments, RigidBodyMotion,
-    RK2StepRigidBody, ViscosityRigidBody, PressureRigidBody,
-    SummationDensityRigidBody)
+    RK2StepRigidBody, ViscosityRigidBody, PressureRigidBody)
 
 # domain and reference values
-Lx = 2.0; Ly = 1.0; H = 0.7
+Lx = 2.0; Ly = 1.0; H = 0.5
 gy = -1.0
 Vmax = np.sqrt(abs(gy) * H)
 c0 = 10 * Vmax; rho0 = 1000.0
+rho_block = rho0
 p0 = c0*c0*rho0
 gamma = 1.0
-
+alpha = 0.1
+beta = 0.0
 # Reynolds number and kinematic viscosity
 Re = 100; nu = Vmax * Ly/Re
 
@@ -72,7 +52,7 @@ dt_cfl = 0.25 * h0/( c0 + Vmax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(gy))
 
-tf = 3.0
+tf = 6.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 def create_particles(**kwargs):
@@ -81,13 +61,15 @@ def create_particles(**kwargs):
     _x = np.arange(Lx*0.5-side , Lx*0.5 + side, dx )
     _y = np.arange( 0.8, 0.8+side*2, dx )
     x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
-    rho_block = rho0*0.5
+    x += 0.25
     m = np.ones_like(x)*dx*dx*rho_block
     h = np.ones_like(x)*hdx*dx
     rho = np.ones_like(x)*rho_block
     block = get_particle_array_rigid_body(
-        name='block', x=x, y=y, h=h, m=m,
+        name='block', x=x, y=y, h=h, m=m, rho=rho
     )
+    block.total_mass[0] = np.sum(m)
+    block.vc[0] = 1.0
 
     # create all the particles
     _x = np.arange( -ghost_extent, Lx + ghost_extent, dx )
@@ -120,18 +102,11 @@ def create_particles(**kwargs):
         fluid.get_number_of_particles(),
         solid.get_number_of_particles(), dt)
 
-    ###### ADD PARTICLE PROPS FOR MULTI-PHASE SPH ######
+    ###### ADD PARTICLE PROPS SPH ######
 
-    # particle volume
-    fluid.add_property('V')
-    solid.add_property('V' )
-
-    # kernel sum term for boundary particles
-    solid.add_property('wij')
-
-    # advection velocities and accelerations
-    for name in ('auhat', 'avhat', 'awhat'):
-        fluid.add_property(name)
+    for prop in ('arho', 'cs', 'V', 'fx', 'fy', 'fz'):
+        solid.add_property(prop )
+        block.add_property(prop )
 
     ##### INITIALIZE PARTICLE PROPS #####
     fluid.rho[:] = rho0
@@ -142,10 +117,6 @@ def create_particles(**kwargs):
 
     # mass is set to get the reference density of rho0
     volume = dx * dx
-
-    # volume is set as dx^2
-    fluid.V[:] = 1./volume
-    solid.V[:] = 1./volume
 
     fluid.m[:] = volume * rho0
     solid.m[:] = volume * rho0
@@ -161,10 +132,9 @@ def create_particles(**kwargs):
 app = Application()
 
 # Create the kernel
-#kernel = Gaussian(dim=2)
-kernel = QuinticSpline(dim=2)
+kernel = WendlandQuintic(dim=2)
 
-integrator = PECIntegrator(fluid=WCSPHStep(), block=RK2StepRigidBody())
+integrator = EPECIntegrator(fluid=WCSPHStep(), block=RK2StepRigidBody())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
@@ -173,49 +143,43 @@ solver = Solver(kernel=kernel, dim=2, integrator=integrator,
 
 # Formulation for REF1
 equations1 = [
-    # For the multi-phase formulation, we require an estimate of the
-    # particle volume. This can be either defined from the particle
-    # number density or simply as the ratio of mass to density.
     Group(equations=[
             BodyForce(dest='block', sources=None, gy=gy),
-            SummationDensity(dest='fluid', sources=['fluid', 'solid']),
             NumberDensity(dest='block', sources=['block']),
+            NumberDensity(dest='solid', sources=['solid']),
             ], ),
-
-    Group(equations=[
-        SummationDensityRigidBody(dest='fluid', sources=['block'], rho0=rho0)
-        ]),
 
     # Equation of state is typically the Tait EOS with a suitable
     # exponent gamma
     Group(equations=[
             TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-            ], ),
-
-    # The boundary conditions are imposed by extrapolating the fluid
-    # pressure, taking into considering the bounday acceleration
-    Group(equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, gy=gy,
-                                rho0=rho0, p0=p0),
+            TaitEOSHGCorrection(dest='solid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+            TaitEOSHGCorrection(dest='block', sources=None, rho0=rho0, c0=c0, gamma=gamma),
             ], ),
 
     # Main acceleration block
     Group(equations=[
 
-            # Pressure gradient with acceleration damping.
-            MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                tdamp=1.0),
+            # Continuity equation with dissipative corrections for fluid on fluid
+            ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=c0, delta=0.1),
+            ContinuityEquation(dest='fluid', sources=['solid', 'block']),
+            ContinuityEquation(dest='solid', sources=['fluid']),
+            ContinuityEquation(dest='block', sources=['fluid']),
 
-            # artificial viscosity for stability
-            MomentumEquationArtificialViscosity(
-                dest='fluid', sources=['fluid', 'solid'], alpha=0.25, c0=c0),
+            # Momentum equation
+            MomentumEquation(dest='fluid', sources=['fluid', 'solid', 'block'],
+                             alpha=alpha, beta=beta, gy=-9.81, c0=c0,
+                             tensile_correction=True),
 
-            PressureRigidBody(dest='fluid', sources=['block'], rho0=rho0),
-            ViscosityRigidBody(dest='fluid', sources=['block'], rho0=rho0, nu=nu),
+            PressureRigidBody(dest='fluid', sources=['block', 'solid'], rho0=rho0),
+            ViscosityRigidBody(dest='fluid', sources=['block', 'solid'], rho0=rho0, nu=nu),
 
             # Position step with XSPH
-            XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
+            XSPHCorrection(dest='fluid', sources=['fluid']),
+
+            RigidBodyCollision(
+                dest='block', sources=['solid'], k=1.0, d=2.0, eta=0.1, kt=0.1
+            ),
 
             ]),
     Group(equations=[RigidBodyMoments(dest='block', sources=None)]),
