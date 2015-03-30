@@ -231,6 +231,10 @@ class Application(object):
                                 action="store_true", default=False,
                                 help="Option for fixed smoothing lengths")
 
+        nnps_options.add_option("--no-cache-nnps", dest="no_cache_nnps",
+                                action="store_true", default=False,
+                        help="Option to disable the use of neighbor caching.")
+
         parser.add_option_group( nnps_options )
 
         # Zoltan Options
@@ -645,18 +649,20 @@ class Application(object):
 
         if nnps is None:
             kernel = self._solver.kernel
+            cache = not options.no_cache_nnps
 
             # create the NNPS object
             if options.nnps == 'box':
                 nnps = BoxSortNNPS(
                     dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain)
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    cache=cache)
 
             elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h)
+                    fixed_h=fixed_h, cache=cache)
 
         # once the NNPS has been set-up, we set the default Solver
         # post-stage callback to the DomainManager.setup_domain
