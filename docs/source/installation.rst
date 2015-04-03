@@ -120,12 +120,22 @@ Running the tests
 
 To test PySPH from the source distribution you can do::
 
-   $ nosetests -A slow==False pysph
+   $ python -m nose.core pysph
 
-This should run all the tests.  This will not run some of the tests that take
-a long while.  To run all the tests you can run::
+This should run all the tests that do not take a long while to complete. This
+will not run some of the parallel tests that take a long while.  To run all
+the tests you can run::
 
-   $ nosetests pysph
+   $ python -m nose.core -A slow pysph
+
+
+.. note::
+
+    We use ``python -m nose.core`` instead of ``nosetests`` as this ensures
+    that the right Python executable is used.  ``nostests`` is sometimes
+    installed in the system in ``/usr/bin/nosetests`` and running that would
+    pick up the system Python instead of the one in the virtualenv.  This
+    results in incorrect test errors leading to confusion.
 
 
 ---------------------------------------------------------
@@ -165,7 +175,7 @@ Open Command Prompt and change your directory to where PySPH is located.
 Moving into the directory, you will see a file named setup.py To install
 PySPH, one simply needs to::
 
-    > python setup.py install
+    $ python setup.py install
 
 This should install the package PySPH. A common error message you may
 encounter is "unable to find vcvarsall.bat". Please follow this post_ to sort
@@ -240,6 +250,18 @@ If for whatever reason you wish to delete ``myenv`` just remove the entire
 directory::
 
     $ rm -rf myenv
+
+.. note::
+
+    With a virtualenv, one should be careful while running things like
+    ``ipython`` or ``nosetests`` as these are sometimes also installed on the
+    system in ``/usr/bin``.  If you suspect that you are not running the
+    correct Python, you could simply run (on *nix/OS X)::
+
+        $ python `which ipython`
+
+    to be absolutely sure.
+
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Using Virtualenv on Canopy
