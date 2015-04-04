@@ -39,45 +39,9 @@ compressible (WCSPH) approach. The features of the implementation are:
 Installation
 =============
 
-To install PySPH, you need a working Python environment. We recommend
-[Enthought Canopy](https://www.enthought.com/products/canopy/) if you
-are new to Python. Additional dependencies to compile the code are:
-
-  - Cython (ideally version 0.19 and above)
-  - Mako
-
-These can be installed from the command line using `easy_install Cython mako`
-
-Optional dependencies:
------------------------
-
-If you want to use PySPH in parallel, you will need
-[mpi4py](http://mpi4py.scipy.org/) and the
-[Zoltan](http://www.cs.sandia.gov/zoltan/) data management library.
-
-To use the `pysph_viewer` you will need to have
-[Mayavi](http://code.enthought.com/projects/mayavi) installed.
-
-Building and linking PyZoltan
--------------------------------
-
-We've provided a simple Zoltan build script in the repository.  This can
-be used as so:
-
-    $ ./build_zoltan.sh  INSTALL_PREFIX
-
-where the `INSTALL_PREFIX` is where the library and includes will be
-installed.  You may edit and tweak the build to suit your installation.
-However, this script  what we use to build Zoltan on our continuous
-integration servers on drone and shippable.
-
-Declare the environment variables `ZOLTAN_INCLUDE` and `ZOLTAN_LIBRARY`. If
-you used the above script, this would be:
-
-    $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
-    $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
-
-Install PySPH. The PyZoltan wrappers will be compiled and available.
+Up-to-date details on how to install PySPH on Linux/OS X and Windows are
+available from
+[here](http://pysph.readthedocs.org/en/latest/installation.html).
 
 If you wish to see a working build/test script please see our
 [shippable.yml](https://bitbucket.org/pysph/pysph/src/master/shippable.yml).
