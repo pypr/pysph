@@ -70,11 +70,24 @@ if Have_MPI:
     mpi_compile_args.append(compile_args)
     mpi_inc_dirs.append(mpi4py.get_include())
 
-    inc = get_zoltan_directory('ZOLTAN_INCLUDE')
-    lib = get_zoltan_directory('ZOLTAN_LIBRARY')
+    # First try with the environment variable 'ZOLTAN'
+    zoltan_base = get_zoltan_directory('ZOLTAN')
+    if len(zoltan_base) > 0:
+        inc = path.join(zoltan_base, 'include')
+        lib = path.join(zoltan_base, 'lib')
+        if not path.exists(inc) or not path.exists(lib):
+            inc = lib = ''
+
+    if len(inc) == 0 or len(lib) == 0:
+        inc = get_zoltan_directory('ZOLTAN_INCLUDE')
+        lib = get_zoltan_directory('ZOLTAN_LIBRARY')
+
     if len(inc) == 0 or len(lib) == 0:
         Have_MPI = False
     else:
+        print '-'*70
+        print "Using Zoltan from:\n%s\n%s"%(inc, lib)
+        print '-'*70
         zoltan_include_dirs = [ inc ]
         zoltan_library_dirs = [ lib ]
 

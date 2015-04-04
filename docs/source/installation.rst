@@ -4,9 +4,12 @@
 Installation and getting started
 =================================
 
-To install PySPH, you need a working Python environment. We recommend
-`Enthought Canopy`_ if you are new to Python or any other Python distribution
-of your choice.
+To install PySPH, you need a working Python environment with the required
+dependencies installed. You may use any of the available Python distributions.
+If you are new to Python we recommend `Enthought Canopy`_. PySPH will also
+work fine with Anaconda_ or other environments like WinPython_.  The following
+instructions should help you get started.
+
 
 ------------------
 Dependencies
@@ -19,17 +22,17 @@ Core dependencies
 The core dependencies are:
 
   - NumPy_
-  - Cython_ (ideally version 0.19 and above)
+  - Cython_ (version 0.19 and above)
   - Mako_
   - nose_ for running the unit tests.
 
-Cython_ and Mako_ can be installed from the command line using::
-
-    $ easy_install Cython mako
-
-or using pip_::
+Cython_ and Mako_ can be installed from the command line using pip_::
 
     $ pip install Cython mako
+
+or using ``easy_install`` (if you do not have ``pip``)::
+
+    $ easy_install Cython mako
 
 .. _NumPy: http://numpy.scipy.org
 .. _Enthought Canopy: https://www.enthought.com/products/canopy/
@@ -37,6 +40,7 @@ or using pip_::
 .. _nose: https://pypi.python.org/pypi/nose
 .. _Mako: https://pypi.python.org/pypi/Mako
 .. _pip: http://www.pip-installer.org
+.. _Anaconda: http://continuum.io/downloads
 
 ^^^^^^^^^^^^^^^^^^^^^^
 Optional dependencies
@@ -45,7 +49,7 @@ Optional dependencies
 PySPH provides a convenient viewer to view the output of results.  This viewer
 is called ``pysph_viewer`` and requires Mayavi_ to be installed.  Since this
 is only a viewer it is optional for use, however, it is highly recommended
-that you have Mayavi installed.
+that you have it installed as the viewer is very convenient.
 
 If you want to use PySPH in parallel, you will need mpi4py_ and the Zoltan_
 data management library.
@@ -54,12 +58,11 @@ data management library.
 .. _mpi4py: http://mpi4py.scipy.org/
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
--------------------------------
 Building and linking PyZoltan
 -------------------------------
 
 We've provided a simple Zoltan build script in the repository.  This works on
-Linux and OS X but not on Windows.  It can be used as so::
+Linux and OS X but not on Windows.  It can be used as::
 
     $ ./build_zoltan.sh  INSTALL_PREFIX
 
@@ -68,13 +71,23 @@ installed.  You may edit and tweak the build to suit your installation.
 However, this script  what we use to build Zoltan on our continuous
 integration servers on Drone_ and Shippable_.
 
-Declare the environment variables ``ZOLTAN_INCLUDE`` and ``ZOLTAN_LIBRARY``.
-If you used the above script, this would be::
+Set the environment variable ``ZOLTAN`` to point to the ``INSTALL_PREFIX``::
 
-    $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
-    $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
+    $ export ZOLTAN=$INSTALL_PREFIX
 
-Install PySPH. The PyZoltan wrappers will be compiled and available.
+After this, follow the instructions to build PySPH. The PyZoltan wrappers will
+be compiled and available.
+
+.. note::
+
+    The installation will use ``$ZOLTAN/include`` and ``$ZOLTAN/lib`` to find
+    the actual directories, if these do not work for your particular
+    installation for whatever reason, set the environment variables
+    ``ZOLTAN_INCLUDE`` and ``ZOLTAN_LIBRARY`` explicitly without setting up
+    ``ZOLTAN``. If you used the above script, this would be::
+
+        $ export ZOLTAN_INCLUDE=$INSTALL_PREFIX/include
+        $ export ZOLTAN_LIBRARY=$INSTALL_PREFIX/lib
 
 If you wish to see a working build/test script please see our
 `shippable.yml <https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`_.
@@ -99,8 +112,8 @@ The best way to currently get PySPH is via git_ ::
 
 If you do not have git or do not wish to bother with it (a bad idea), you can
 get a ZIP or tarball from the `pysph site
-<https://bitbucket.org/pysph/pysph>`_. You can unzip/untar this and use the
-sources.
+<https://bitbucket.org/pysph/pysph/downloads>`_. You can unzip/untar this and
+use the sources.
 
 .. _git: http://git-scm.com/
 
@@ -203,11 +216,11 @@ related packages.  This is useful in a variety of situations.
 You can either install virtualenv_ (or ask your system administrator to) or
 just download the `virtualenv.py
 <http://github.com/pypa/virtualenv/tree/master/virtualenv.py>`_ script and use
-it.
+it (run ``python virtualenv.py`` after you download the script).
 
 .. _virtualenv: http://www.virtualenv.org
 
-Create a virtualenv like so::
+Create a bare virtualenv like so::
 
     $ virtualenv pysph_env
 
