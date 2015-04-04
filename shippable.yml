@@ -12,7 +12,7 @@ virtualenv:
     system_site_packages: true
 
 env:
-    - ZOLTAN_INCLUDE=$HOME/zoltan/include ZOLTAN_LIBRARY=$HOME/zoltan/lib
+    - ZOLTAN=$HOME/zoltan
 
 before_install:
     # System dependencies via apt.
@@ -35,4 +35,4 @@ before_script:
     - mkdir -p shippable/testresults
 
 script:
-    - nosetests -v -A"slow==False" --with-xunit --xunit-file=shippable/testresults/nosetests.xml
+    - nosetests -v --with-xunit --xunit-file=shippable/testresults/nosetests.xml
