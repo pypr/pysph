@@ -2,6 +2,7 @@ from distutils.sysconfig import get_config_var
 import os
 from os.path import join, exists
 import shutil
+import sys
 import tempfile
 from textwrap import dedent
 from unittest import TestCase, main
@@ -26,7 +27,14 @@ class TestExtModule(TestCase):
         ''')
 
     def tearDown(self):
-        shutil.rmtree(self.root)
+        if sys.platform.startswith('win'):
+            from exceptions import WindowsError
+            try:
+                shutil.rmtree(self.root)
+            except WindowsError:
+                pass
+        else:
+            shutil.rmtree(self.root)
 
     def test_constructor(self):
         data = self.data
