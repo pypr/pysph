@@ -29,6 +29,8 @@ try:
 except ImportError:
     Have_MPI = False
 
+USE_ZOLTAN=True
+
 compiler = 'gcc'
 #compiler = 'intel'
 if compiler == 'intel':
@@ -43,16 +45,14 @@ mpi_link_args = []
 
 def get_zoltan_directory(varname):
     d = os.environ.get(varname, '')
-    if len(d) == 0:
-        print "*"*80
-        print "Environment variable", varname, \
-              "not set, not using ZOLTAN!"
-        print "*"*80
+    if ( len(d) == 0 ):
+        USE_ZOLTAN=False
         return ''
     if not path.exists(d):
         print "*"*80
         print "%s incorrectly set to %s, not using ZOLTAN!"%(varname, d)
         print "*"*80
+        USE_ZOLTAN=False
         return ''
     return d
 
@@ -72,17 +72,23 @@ if Have_MPI:
 
     # First try with the environment variable 'ZOLTAN'
     zoltan_base = get_zoltan_directory('ZOLTAN')
+    inc = lib = ''
     if len(zoltan_base) > 0:
         inc = path.join(zoltan_base, 'include')
         lib = path.join(zoltan_base, 'lib')
         if not path.exists(inc) or not path.exists(lib):
             inc = lib = ''
 
+    # try with the older ZOLTAN include directories
     if len(inc) == 0 or len(lib) == 0:
         inc = get_zoltan_directory('ZOLTAN_INCLUDE')
         lib = get_zoltan_directory('ZOLTAN_LIBRARY')
 
-    if len(inc) == 0 or len(lib) == 0:
+    if (not USE_ZOLTAN):
+        print "*"*80
+        print "Zoltan Environment variable" \
+              "not set, not using ZOLTAN!"
+        print "*"*80
         Have_MPI = False
     else:
         print '-'*70
