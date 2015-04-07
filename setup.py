@@ -44,6 +44,7 @@ mpi_compile_args = []
 mpi_link_args = []
 
 def get_zoltan_directory(varname):
+    global USE_ZOLTAN
     d = os.environ.get(varname, '')
     if ( len(d) == 0 ):
         USE_ZOLTAN=False
