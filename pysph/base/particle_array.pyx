@@ -158,7 +158,7 @@ cdef class ParticleArray:
                 self.add_constant(name=const, data=data)
 
         # default lb_props are all the arrays
-        self.lb_props = self.properties.keys()
+        self.lb_props = None
 
         # list of output property arrays
         self.output_property_arrays = []
@@ -388,6 +388,15 @@ cdef class ParticleArray:
 
     def set_lb_props(self, list lb_props):
         self.lb_props = lb_props
+
+    cpdef get_lb_props(self):
+        """Return the properties that are to be load balanced.  If none are
+        explicitly set by the user, return all of the properties.
+        """
+        if self.lb_props is None:
+            return self.properties.keys()
+        else:
+            return self.lb_props
 
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
