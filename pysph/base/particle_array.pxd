@@ -60,7 +60,7 @@ cdef class ParticleArray:
     cdef public long num_real_particles
 
     # a list of props to be used for load balancing
-    cdef public list lb_props
+    cdef list lb_props
 
     ########################################
     # OpenCL related attributes.
@@ -86,6 +86,8 @@ cdef class ParticleArray:
     cpdef double get_time(self)
 
     cpdef set_name(self, str name)
+
+    cpdef get_lb_props(self)
 
     cpdef set_dirty(self, bint val)
     cpdef set_indices_invalid(self, bint val)
