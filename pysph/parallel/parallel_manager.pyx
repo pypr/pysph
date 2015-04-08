@@ -72,7 +72,7 @@ cdef class ParticleArrayExchange:
         self.numParticleImport = 0
 
         # load balancing props are taken from the particle array
-        lb_props = pa.lb_props
+        lb_props = pa.get_lb_props()
         lb_props.sort()
 
         self.lb_props = lb_props
