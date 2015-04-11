@@ -138,7 +138,8 @@ class ExtModule(object):
                 extension = Extension(name=self.name, sources=[self.src_path],
                                     include_dirs=inc_dirs)
                 mod = pyxbuild.pyx_to_dll(self.src_path, extension,
-                                        pyxbuild_dir=self.build_dir)
+                    pyxbuild_dir=self.build_dir, force_rebuild=True
+                )
                 shutil.copy(mod, self.ext_path)
             else:
                 self._message("Precompiled code from:", self.src_path)
