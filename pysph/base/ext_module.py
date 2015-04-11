@@ -2,6 +2,7 @@ from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 import hashlib
 import imp
+import importlib
 import numpy
 import pysph
 import os
@@ -23,7 +24,8 @@ def get_md5(data):
 class ExtModule(object):
     """Encapsulates the generated code, extension module etc.
     """
-    def __init__(self, src, extension='pyx', root=None, verbose=False):
+    def __init__(self, src, extension='pyx', root=None, verbose=False,
+                 depends=None):
         """Initialize ExtModule.
 
         Parameters
@@ -38,6 +40,11 @@ class ExtModule(object):
             If not set it defaults to "~/.pysph/source".
 
         verbose : Bool : Print messages for convenience.
+
+        depends : list : a list of modules that this extension depends on
+            if any of these have an m_time greater than the compiled extension
+            module, the extension will be recompiled.
+
         """
         self._setup_root(root)
         self.code = src
@@ -46,6 +53,7 @@ class ExtModule(object):
         self.name = 'm_{0}'.format(self.hash)
         self._setup_filenames()
         self.verbose = verbose
+        self.depends = depends
 
         if MPI is not None:
             self.comm = MPI.COMM_WORLD
@@ -95,13 +103,36 @@ class ExtModule(object):
         if not isdir(self.build_dir):
             os.makedirs(self.build_dir)
 
+    def _dependencies_have_changed(self):
+        depends = self.depends
+        if not depends:
+            return False
+        else:
+            ext_mtime = os.stat(self.ext_path).st_mtime
+            for name in depends:
+                try:
+                    mod = importlib.import_module(name)
+                    mod_mtime = os.stat(mod.__file__).st_mtime
+                    if ext_mtime < mod_mtime:
+                        return True
+                except ImportError:
+                    pass
+            return False
+
+    def should_recompile(self):
+        if not exists(self.ext_path):
+            return True
+        elif self._dependencies_have_changed():
+            return True
+        else:
+            return False
 
     def build(self, force=False):
         """Build source into an extension module.  If force is False
         previously compiled module is returned.
         """
         if not self.shared_filesystem or self.rank == 0:
-            if not exists(self.ext_path) or force:
+            if force or self.should_recompile():
                 self._message("Compiling code at:", self.src_path)
                 inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include()]
                 extension = Extension(name=self.name, sources=[self.src_path],
