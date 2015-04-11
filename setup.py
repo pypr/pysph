@@ -43,6 +43,18 @@ mpi_inc_dirs = []
 mpi_compile_args = []
 mpi_link_args = []
 
+def get_deps(*args):
+    """Given a list of basenames, this checks if a .pyx or .pxd exists
+    and returns the list.
+    """
+    result = []
+    for basename in args:
+        for ext in ('.pyx', '.pxd'):
+            f = basename + ext
+            if path.exists(f):
+                result.append(f)
+    return result
+
 def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
@@ -114,6 +126,7 @@ ext_modules = [
 
     Extension( name="pysph.base.particle_array",
                sources=["pysph/base/particle_array.pyx"],
+               depends=get_deps("pyzoltan/core/carray"),
                extra_compile_args=extra_compile_args),
 
     Extension( name="pysph.base.point",
@@ -122,6 +135,9 @@ ext_modules = [
 
     Extension( name="pysph.base.nnps",
                sources=["pysph/base/nnps.pyx"],
+               depends=get_deps("pyzoltan/core/carray", "pysph/base/point",
+                    "pysph/base/particle_array",
+               ),
                extra_compile_args=extra_compile_args),
 
     # kernels used for tests
@@ -146,6 +162,10 @@ if Have_MPI:
     zoltan_modules = [
         Extension( name="pyzoltan.core.zoltan",
                    sources=["pyzoltan/core/zoltan.pyx"],
+                   depends=get_deps("pyzoltan/core/carray",
+                        "pyzoltan/czoltan/czoltan",
+                        "pyzoltan/czoltan/czoltan_types",
+                    ),
                    include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
@@ -154,6 +174,9 @@ if Have_MPI:
 
         Extension( name="pyzoltan.core.zoltan_dd",
                    sources=["pyzoltan/core/zoltan_dd.pyx"],
+                   depends=get_deps("pyzoltan/czoltan/czoltan_dd",
+                        "pyzoltan/czoltan/czoltan_types"
+                    ),
                    include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
@@ -162,6 +185,7 @@ if Have_MPI:
 
         Extension( name="pyzoltan.core.zoltan_comm",
                    sources=["pyzoltan/core/zoltan_comm.pyx"],
+                   depends=get_deps("pyzoltan/czoltan/zoltan_comm"),
                    include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
                    library_dirs = zoltan_library_dirs,
                    libraries=['zoltan', 'mpi'],
@@ -173,6 +197,11 @@ if Have_MPI:
 
         Extension( name="pysph.parallel.parallel_manager",
                    sources=["pysph/parallel/parallel_manager.pyx"],
+                   depends=get_deps("pyzoltan/core/carray",
+                        "pyzoltan/core/zoltan", "pyzoltan/core/zoltan_comm",
+                        "pysph/base/point", "pysph/base/particle_array",
+                        "pysph/base/nnps"
+                    ),
                    include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
                    library_dirs = zoltan_library_dirs,
                    libraries = ['zoltan', 'mpi'],
