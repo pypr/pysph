@@ -162,11 +162,10 @@ class PeriodicBox3DTestCase(PeriodicBox2DTestCase):
         # create the particle arrays
         L = 1.0; n = 5; dx = L/n; hdx = 1.5
         self.L = L
-        _x = np.arange(dx/2, L, dx)
         self.vol = vol = dx*dx*dx
 
         # fluid particles
-        xx, yy, zz = np.meshgrid(_x, _x, _x)
+        xx, yy, zz = np.mgrid[dx/2:L:dx,dx/2:L:dx,dx/2:L:dx]
 
         x = xx.ravel(); y = yy.ravel(); z = zz.ravel() # particle positions
         p = self._get_pressure(x, y, z)
