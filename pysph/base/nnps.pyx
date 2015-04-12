@@ -294,11 +294,11 @@ cdef class DomainManager:
     computed from the particle arrays. The domain could be periodic.
 
     """
-    def __init__(self, int dim=1, double xmin=-1000, double xmax=1000, double ymin=0,
+    def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
         """Constructor"""
-        self._check_limits(dim, xmin, xmax, ymin, ymax, zmin, zmax)
+        self._check_limits(xmin, xmax, ymin, ymax, zmin, zmax)
 
         self.xmin = xmin; self.xmax = xmax
         self.ymin = ymin; self.ymax = ymax
@@ -315,9 +315,6 @@ cdef class DomainManager:
         self.ytranslate = ymax - ymin
         self.ztranslate = zmax - zmin
 
-        # store the dimension
-        self.dim = dim
-
         # empty list of particle array wrappers for now
         self.pa_wrappers = []
         self.narrays = 0
@@ -328,7 +325,7 @@ cdef class DomainManager:
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
 
-    def _check_limits(self, dim, xmin, xmax, ymin, ymax, zmin, zmax):
+    def _check_limits(self, xmin, xmax, ymin, ymax, zmin, zmax):
         """Sanity check on the limits"""
         if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
             raise ValueError("Invalid domain limits!")
@@ -436,20 +433,22 @@ cdef class DomainManager:
             # iterate over particles and box-wrap
             for i in range(np):
 
-                if ( (periodic_in_x and not periodic_in_y) ):
+                if periodic_in_x:
                     if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
                     if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
 
-                if ( (periodic_in_y and not periodic_in_x) ):
+                if periodic_in_y:
                     if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
                     if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
 
-                if ( periodic_in_x and periodic_in_y ):
-                    if x.data[i] < xmin : x.data[i] = x.data[i] + xtranslate
-                    if x.data[i] > xmax : x.data[i] = x.data[i] - xtranslate
+                if periodic_in_z:
+                    if z.data[i] < zmin : z.data[i] = z.data[i] + ztranslate
+                    if z.data[i] > zmax : z.data[i] = z.data[i] - ztranslate
 
-                    if y.data[i] < ymin : y.data[i] = y.data[i] + ytranslate
-                    if y.data[i] > ymax : y.data[i] = y.data[i] - ytranslate
+    cdef _add_to_array(self, DoubleArray arr, double disp):
+        cdef int i
+        for i in range(arr.length):
+            arr.data[i] += disp
 
     cdef _create_ghosts_periodic(self):
         """Identify boundary particles and create images.
@@ -486,18 +485,18 @@ cdef class DomainManager:
 
         # locals
         cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef ParticleArray pa
-        cdef DoubleArray x, y, z
+        cdef ParticleArray pa, added
+        cdef DoubleArray x, y, z, xt, yt, zt
         cdef double xi, yi, zi
         cdef int array_index, i, np
 
         # temporary indices for particles to be replicated
-        cdef LongArray left, right, top, bottom, lt, rt, lb, rb
+        cdef LongArray x_low, x_high, y_high, y_low, z_high, z_low, low, high
 
-        left = LongArray(); right = LongArray()
-        top = LongArray(); bottom = LongArray()
-        lt = LongArray(); rt = LongArray()
-        lb = LongArray(); rb = LongArray()
+        x_low = LongArray(); x_high = LongArray()
+        y_high = LongArray(); y_low = LongArray()
+        z_high = LongArray(); z_low = LongArray()
+        low = LongArray(); high = LongArray()
 
         for array_index in range(narrays):
             pa_wrapper = pa_wrappers[ array_index ]
@@ -505,110 +504,100 @@ cdef class DomainManager:
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
 
             # reset the length of the arrays
-            left.reset(); right.reset(); top.reset(); bottom.reset()
-            lt.reset(); rt.reset(); lb.reset(); rb.reset()
+            x_low.reset(); x_high.reset(); y_high.reset(); y_low.reset()
 
             np = x.length
             for i in range(np):
                 xi = x.data[i]; yi = y.data[i]; zi = z.data[i]
 
-                # X-Periodic
-                if periodic_in_x and not periodic_in_y:
-                    if ( (xi - xmin) <= cell_size ): left.append(i)
-                    if ( (xmax - xi) <= cell_size ): right.append(i)
+                if periodic_in_x:
+                    if ( (xi - xmin) <= cell_size ): x_low.append(i)
+                    if ( (xmax - xi) <= cell_size ): x_high.append(i)
 
-                # Y-Periodic
-                if periodic_in_y and not periodic_in_x:
-                    if ( (yi - ymin) <= cell_size ): bottom.append(i)
-                    if ( (ymax - yi) <= cell_size ): top.append(i)
+                if periodic_in_y:
+                    if ( (yi - ymin) <= cell_size ): y_low.append(i)
+                    if ( (ymax - yi) <= cell_size ): y_high.append(i)
 
-                # X&Y-Periodic
-                if periodic_in_x and periodic_in_y:
-                    # particle near the left end
-                    if ( (xi - xmin) <= cell_size ):
-                        left.append(i)
+                if periodic_in_z:
+                    if ( (zi - zmin) <= cell_size ): z_low.append(i)
+                    if ( (zmax - zi) <= cell_size ): z_high.append(i)
 
-                        # left bottom corner
-                        if ( (yi - ymin) <= cell_size ):
-                            lb.append(i)
-
-                        # left top corner
-                        if ( (ymax - yi) < cell_size ):
-                            lt.append( i )
-
-                    # particle near the right
-                    if ( (xmax - xi) <= cell_size ):
-                        right.append(i)
-
-                        # right bottom corner
-                        if ( (yi - ymin) <= cell_size ):
-                            rb.append(i)
-
-                        # right top corner
-                        if ( (ymax - yi) < cell_size ):
-                            rt.append( i )
-
-                    # particle near the top
-                    if ( (ymax - yi) < cell_size ):
-                        top.append(i)
-
-                    # particle near the bottom
-                    if ( (yi - ymin) < cell_size ):
-                        bottom.append(i)
 
             # now treat each case separately and append to the main array
+            added = ParticleArray(x=None, y=None, z=None)
+            x = added.get_carray('x')
+            y = added.get_carray('y')
+            z = added.get_carray('z')
+            if periodic_in_x:
+                # x_low
+                copy = pa.extract_particles( x_low )
+                self._add_to_array(copy.get_carray('x'), xtranslate)
+                added.append_parray(copy)
 
-            # left
-            copy = pa.extract_particles( left )
-            copy.x += xtranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                # x_high
+                copy = pa.extract_particles( x_high )
+                self._add_to_array(copy.get_carray('x'), -xtranslate)
+                added.append_parray(copy)
 
-            # right
-            copy = pa.extract_particles( right )
-            copy.x -= xtranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+            if periodic_in_y:
+                # Now do the corners from the previous.
+                low.reset(); high.reset()
+                np = x.length
+                for i in range(np):
+                    yi = y.data[i]
+                    if ( (yi - ymin) <= cell_size ): low.append(i)
+                    if ( (ymax - yi) <= cell_size ): high.append(i)
 
-            # top
-            copy = pa.extract_particles( top )
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                copy = added.extract_particles(low)
+                self._add_to_array(copy.get_carray('y'), ytranslate)
+                added.append_parray(copy)
 
-            # bottom
-            copy = pa.extract_particles( bottom )
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                copy = added.extract_particles(high)
+                self._add_to_array(copy.get_carray('y'), -ytranslate)
+                added.append_parray(copy)
 
-            # left top
-            copy = pa.extract_particles( lt )
-            copy.x += xtranslate
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                # Add the actual y_high and y_low now.
+                # y_high
+                copy = pa.extract_particles( y_high )
+                self._add_to_array(copy.get_carray('y'), -ytranslate)
+                added.append_parray(copy)
 
-            # left bottom
-            copy = pa.extract_particles( lb )
-            copy.x += xtranslate
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                # y_low
+                copy = pa.extract_particles( y_low )
+                self._add_to_array(copy.get_carray('y'), ytranslate)
+                added.append_parray(copy)
 
-            # right top
-            copy = pa.extract_particles( rt )
-            copy.x -= xtranslate
-            copy.y -= ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+            if periodic_in_z:
+                # Now do the corners from the previous.
+                low.reset(); high.reset()
+                np = x.length
+                for i in range(np):
+                    zi = z.data[i]
+                    if ( (zi - zmin) <= cell_size ): low.append(i)
+                    if ( (zmax - zi) <= cell_size ): high.append(i)
 
-            # right bottom
-            copy = pa.extract_particles( rb )
-            copy.x -= xtranslate
-            copy.y += ytranslate
-            copy.tag[:] = Ghost
-            pa.append_parray(copy)
+                copy = added.extract_particles(low)
+                self._add_to_array(copy.get_carray('z'), ztranslate)
+                added.append_parray(copy)
+
+                copy = added.extract_particles(high)
+                self._add_to_array(copy.get_carray('z'), -ztranslate)
+                added.append_parray(copy)
+
+                # Add the actual z_high and z_low now.
+                # z_high
+                copy = pa.extract_particles( z_high )
+                self._add_to_array(copy.get_carray('z'), -ztranslate)
+                added.append_parray(copy)
+
+                # z_low
+                copy = pa.extract_particles( z_low )
+                self._add_to_array(copy.get_carray('z'), ztranslate)
+                added.append_parray(copy)
+
+
+            added.tag[:] = Ghost
+            pa.append_parray(added)
 
     cdef _compute_cell_size_for_binning(self):
         """Compute the cell size for the binning.
@@ -880,7 +869,7 @@ cdef class NNPS:
 
         self.domain = domain
         if domain is None:
-            self.domain = DomainManager(dim)
+            self.domain = DomainManager()
 
         # set the particle array wrappers for the domain manager
         self.domain.set_pa_wrappers(self.pa_wrappers)
