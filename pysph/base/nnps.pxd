@@ -8,7 +8,7 @@ from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from particle_array cimport ParticleArray
 from point cimport *
 
-cdef inline int real_to_int(double val, double step)
+cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
@@ -45,9 +45,6 @@ cdef class DomainManager:
     cdef bint in_parallel               # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
 
-    ############################################################################
-    # Functions for Periodicity
-    ############################################################################
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
 
@@ -63,6 +60,7 @@ cdef class DomainManager:
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
     cdef _compute_cell_size_for_binning(self)
+
 
 # Cell to hold particle indices
 cdef class Cell:
@@ -198,6 +196,7 @@ cdef class NNPS:
     # count the number of particles in each cell
     cpdef count_n_part_per_cell(self)
 
+
 # NNPS using the original gridding algorithm
 cdef class BoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells
@@ -214,7 +213,3 @@ cdef class LinkedListNNPS(NNPS):
     cdef public bint fixed_h             # Constant cell sizes
     cdef public list heads               # Head arrays for the cells
     cdef public list nexts               # Next arrays for the particles
-
-    ############################################################################
-    # Member functions
-    ############################################################################

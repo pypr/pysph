@@ -1,8 +1,8 @@
 cimport numpy
 
 cdef extern from "math.h":
-    double sqrt(double)
-    double ceil(double)
+    double sqrt(double) nogil
+    double ceil(double) nogil
 
 cdef extern from 'limits.h':
     cdef int INT_MAX
