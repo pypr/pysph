@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Wed Mar 25 22:38:29 2015
+# Thu Apr 16 00:20:20 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -195,6 +195,7 @@ cdef class IntArray(BaseArray):
         self.length = n
         self._length = 0
         self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
@@ -204,7 +205,7 @@ cdef class IntArray(BaseArray):
 
     def __dealloc__(self):
         """ Frees the array. """
-        if self._parent is None:
+        if self._old_data == NULL:
             free(<void*>self.data)
         else:
             free(<void*>self._old_data)
@@ -297,8 +298,9 @@ cdef class IntArray(BaseArray):
     cpdef reset(self):
         """ Reset the length of the array to 0. """
         BaseArray.reset(self)
-        if self._parent is not None:
+        if self._old_data != NULL:
             self.data = self._old_data
+            self._old_data = NULL
             self._npy_array.data = <char *>self.data
             self._parent = None
 
@@ -308,7 +310,7 @@ cdef class IntArray(BaseArray):
         length to the new size.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot reize array which is a view.')
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -333,9 +335,22 @@ cdef class IntArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
+    cdef set_view_raw(self, int *array, long length):
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+
     cpdef squeeze(self):
         """ Release any unused memory. """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
@@ -370,7 +385,7 @@ cdef class IntArray(BaseArray):
          the length of the array.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
@@ -407,7 +422,7 @@ cdef class IntArray(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
@@ -443,8 +458,6 @@ cdef class IntArray(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef IntArray dest_array = <IntArray>dest
         cdef long i, num_values
         num_values = indices.length
@@ -465,8 +478,6 @@ cdef class IntArray(BaseArray):
             is not copied
 
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef long si, ei, s_length, d_length, i, j
         cdef IntArray src = <IntArray>source
         s_length = src.length
@@ -570,6 +581,7 @@ cdef class DoubleArray(BaseArray):
         self.length = n
         self._length = 0
         self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
@@ -579,7 +591,7 @@ cdef class DoubleArray(BaseArray):
 
     def __dealloc__(self):
         """ Frees the array. """
-        if self._parent is None:
+        if self._old_data == NULL:
             free(<void*>self.data)
         else:
             free(<void*>self._old_data)
@@ -672,8 +684,9 @@ cdef class DoubleArray(BaseArray):
     cpdef reset(self):
         """ Reset the length of the array to 0. """
         BaseArray.reset(self)
-        if self._parent is not None:
+        if self._old_data != NULL:
             self.data = self._old_data
+            self._old_data = NULL
             self._npy_array.data = <char *>self.data
             self._parent = None
 
@@ -683,7 +696,7 @@ cdef class DoubleArray(BaseArray):
         length to the new size.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot reize array which is a view.')
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -708,9 +721,22 @@ cdef class DoubleArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
+    cdef set_view_raw(self, double *array, long length):
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+
     cpdef squeeze(self):
         """ Release any unused memory. """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
@@ -745,7 +771,7 @@ cdef class DoubleArray(BaseArray):
          the length of the array.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
@@ -782,7 +808,7 @@ cdef class DoubleArray(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
@@ -818,8 +844,6 @@ cdef class DoubleArray(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef DoubleArray dest_array = <DoubleArray>dest
         cdef long i, num_values
         num_values = indices.length
@@ -840,8 +864,6 @@ cdef class DoubleArray(BaseArray):
             is not copied
 
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef long si, ei, s_length, d_length, i, j
         cdef DoubleArray src = <DoubleArray>source
         s_length = src.length
@@ -945,6 +967,7 @@ cdef class FloatArray(BaseArray):
         self.length = n
         self._length = 0
         self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
@@ -954,7 +977,7 @@ cdef class FloatArray(BaseArray):
 
     def __dealloc__(self):
         """ Frees the array. """
-        if self._parent is None:
+        if self._old_data == NULL:
             free(<void*>self.data)
         else:
             free(<void*>self._old_data)
@@ -1047,8 +1070,9 @@ cdef class FloatArray(BaseArray):
     cpdef reset(self):
         """ Reset the length of the array to 0. """
         BaseArray.reset(self)
-        if self._parent is not None:
+        if self._old_data != NULL:
             self.data = self._old_data
+            self._old_data = NULL
             self._npy_array.data = <char *>self.data
             self._parent = None
 
@@ -1058,7 +1082,7 @@ cdef class FloatArray(BaseArray):
         length to the new size.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot reize array which is a view.')
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -1083,9 +1107,22 @@ cdef class FloatArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
+    cdef set_view_raw(self, float *array, long length):
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+
     cpdef squeeze(self):
         """ Release any unused memory. """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
@@ -1120,7 +1157,7 @@ cdef class FloatArray(BaseArray):
          the length of the array.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
@@ -1157,7 +1194,7 @@ cdef class FloatArray(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
@@ -1193,8 +1230,6 @@ cdef class FloatArray(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef FloatArray dest_array = <FloatArray>dest
         cdef long i, num_values
         num_values = indices.length
@@ -1215,8 +1250,6 @@ cdef class FloatArray(BaseArray):
             is not copied
 
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef long si, ei, s_length, d_length, i, j
         cdef FloatArray src = <FloatArray>source
         s_length = src.length
@@ -1320,6 +1353,7 @@ cdef class LongArray(BaseArray):
         self.length = n
         self._length = 0
         self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
@@ -1329,7 +1363,7 @@ cdef class LongArray(BaseArray):
 
     def __dealloc__(self):
         """ Frees the array. """
-        if self._parent is None:
+        if self._old_data == NULL:
             free(<void*>self.data)
         else:
             free(<void*>self._old_data)
@@ -1422,8 +1456,9 @@ cdef class LongArray(BaseArray):
     cpdef reset(self):
         """ Reset the length of the array to 0. """
         BaseArray.reset(self)
-        if self._parent is not None:
+        if self._old_data != NULL:
             self.data = self._old_data
+            self._old_data = NULL
             self._npy_array.data = <char *>self.data
             self._parent = None
 
@@ -1433,7 +1468,7 @@ cdef class LongArray(BaseArray):
         length to the new size.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot reize array which is a view.')
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -1458,9 +1493,22 @@ cdef class LongArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
+    cdef set_view_raw(self, long *array, long length):
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+
     cpdef squeeze(self):
         """ Release any unused memory. """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
@@ -1495,7 +1543,7 @@ cdef class LongArray(BaseArray):
          the length of the array.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
@@ -1532,7 +1580,7 @@ cdef class LongArray(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
@@ -1568,8 +1616,6 @@ cdef class LongArray(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef LongArray dest_array = <LongArray>dest
         cdef long i, num_values
         num_values = indices.length
@@ -1590,8 +1636,6 @@ cdef class LongArray(BaseArray):
             is not copied
 
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef long si, ei, s_length, d_length, i, j
         cdef LongArray src = <LongArray>source
         s_length = src.length
@@ -1695,6 +1739,7 @@ cdef class UIntArray(BaseArray):
         self.length = n
         self._length = 0
         self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
@@ -1704,7 +1749,7 @@ cdef class UIntArray(BaseArray):
 
     def __dealloc__(self):
         """ Frees the array. """
-        if self._parent is None:
+        if self._old_data == NULL:
             free(<void*>self.data)
         else:
             free(<void*>self._old_data)
@@ -1797,8 +1842,9 @@ cdef class UIntArray(BaseArray):
     cpdef reset(self):
         """ Reset the length of the array to 0. """
         BaseArray.reset(self)
-        if self._parent is not None:
+        if self._old_data != NULL:
             self.data = self._old_data
+            self._old_data = NULL
             self._npy_array.data = <char *>self.data
             self._parent = None
 
@@ -1808,7 +1854,7 @@ cdef class UIntArray(BaseArray):
         length to the new size.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot reize array which is a view.')
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -1833,9 +1879,22 @@ cdef class UIntArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
+    cdef set_view_raw(self, unsigned int *array, long length):
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+
     cpdef squeeze(self):
         """ Release any unused memory. """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
@@ -1870,7 +1929,7 @@ cdef class UIntArray(BaseArray):
          the length of the array.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
@@ -1907,7 +1966,7 @@ cdef class UIntArray(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
-        if self._parent is not None:
+        if self._old_data != NULL:
             raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
@@ -1943,8 +2002,6 @@ cdef class UIntArray(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef UIntArray dest_array = <UIntArray>dest
         cdef long i, num_values
         num_values = indices.length
@@ -1965,8 +2022,6 @@ cdef class UIntArray(BaseArray):
             is not copied
 
         """
-        if self._parent is not None:
-            raise RuntimeError('Cannot extend array which is a view.')
         cdef long si, ei, s_length, d_length, i, j
         cdef UIntArray src = <UIntArray>source
         s_length = src.length

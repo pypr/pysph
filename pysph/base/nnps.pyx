@@ -763,11 +763,14 @@ cdef class Cell:
 
 ###############################################################################
 cdef class NeighborCache:
-    def __init__(self, NNPS nnps, int dst_index):
+    def __init__(self, NNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
+        self._src_index = src_index
         self._nnps = nnps
         self._particles = nnps.particles
+        self._narrays = nnps.narrays
         cdef int nnbr = 10
+        cdef size_t i
         if self._nnps.dim == 1:
             nnbr = 10
         elif self._nnps.dim == 2:
@@ -775,32 +778,31 @@ cdef class NeighborCache:
         elif self._nnps.dim == 3:
             nnbr = 120
 
-        self._dirty = np.ones(nnps.narrays, dtype=bool)
-        self._last_avg_nbr_size = [nnbr for i in range(nnps.narrays)]
-        self._start_stop = [UIntArray() for i in range(nnps.narrays)]
-        self._neighbors = [UIntArray() for i in range(nnps.narrays)]
+        self._dirty = True
+        self._last_avg_nbr_size = nnbr
+        self._start_stop = UIntArray()
+        self._neighbors = UIntArray()
 
     #### Public protocol ################################################
 
     cpdef update(self):
-        self._dirty = np.ones(self._nnps.narrays, dtype=bool)
+        self._dirty = True
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        if self._dirty[src_index]:
-            self._find_all_neighbors(src_index)
+        if self._dirty:
+            self._find_all_neighbors()
         cdef size_t start, end
-        cdef UIntArray start_stop = self._start_stop[src_index]
-        cdef UIntArray neighbors = self._neighbors[src_index]
-        start = start_stop.data[2*d_idx]
-        end = start_stop.data[2*d_idx + 1]
-        nbrs.set_view(neighbors, start, end)
+        start = self._start_stop.data[2*d_idx]
+        end = self._start_stop.data[2*d_idx + 1]
+        nbrs.set_view(self._neighbors, start, end)
 
     #### Private protocol ################################################
 
-    cdef _find_all_neighbors(self, int src_idx):
+    cdef _find_all_neighbors(self):
         cdef size_t count, d_idx, avg_nnbr
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, neighbors
+        cdef int src_index = self._src_index
         cdef int dst_index = self._dst_index
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
@@ -808,10 +810,10 @@ cdef class NeighborCache:
         cdef size_t np = self._particles[dst_index].get_number_of_particles()
 
         count = 0
-        start_stop = self._start_stop[src_idx]
+        start_stop = self._start_stop
         start_stop.resize(np*2)
-        neighbors = self._neighbors[src_idx]
-        neighbors.resize(self._last_avg_nbr_size[src_idx]*np + safety)
+        neighbors = self._neighbors
+        neighbors.resize(self._last_avg_nbr_size*np + safety)
 
         for d_idx in range(np):
 
@@ -822,7 +824,7 @@ cdef class NeighborCache:
             nbrs.set_view(neighbors, count, neighbors.length)
 
             self._nnps.get_nearest_particles_no_cache(
-                src_idx, dst_index, d_idx, nbrs, True
+                src_index, dst_index, d_idx, nbrs, True
             )
             start_stop.data[d_idx*2] = count
             count += nbrs.length
@@ -831,8 +833,8 @@ cdef class NeighborCache:
         neighbors.length = count
         neighbors.squeeze()
 
-        self._last_avg_nbr_size[src_idx] = int(neighbors.length/np) + 1
-        self._dirty[src_idx] = False
+        self._last_avg_nbr_size = int(neighbors.length/np) + 1
+        self._dirty = False
 
 
 ##############################################################################
@@ -917,7 +919,11 @@ cdef class NNPS:
 
         # The cache.
         self.use_cache = cache
-        self.cache = [NeighborCache(self, i) for i in range(len(particles))]
+        cache = []
+        for d_idx in range(len(particles)):
+            for s_idx in range(len(particles)):
+                cache.append(NeighborCache(self, d_idx, s_idx))
+        self.cache = cache
 
     #### Public protocol #################################################
 
@@ -970,8 +976,9 @@ cdef class NNPS:
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
+        cdef int idx = dst_index*self.narrays + src_index
         if self.use_cache:
-            return self.cache[dst_index].get_neighbors(src_index, d_idx, nbrs)
+            return self.cache[idx].get_neighbors(src_index, d_idx, nbrs)
         else:
             return self.get_nearest_particles_no_cache(
                 src_index, dst_index, d_idx, nbrs, False
@@ -1108,7 +1115,8 @@ cdef class NNPS:
             # bin the particles
             self._bin( pa_index=i, indices=indices )
 
-            self.cache[i].update()
+        for cache in self.cache:
+            cache.update()
 
     #### Private protocol ################################################
 

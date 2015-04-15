@@ -75,6 +75,7 @@ cdef class CLASSNAME(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, CLASSNAME, long start, long end)
+    cdef set_view_raw(self, ARRAY_TYPE *array, long length)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)

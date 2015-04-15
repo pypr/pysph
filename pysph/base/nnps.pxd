@@ -97,14 +97,16 @@ cdef class Cell:
 cdef class NeighborCache:
 
     cdef int _dst_index
+    cdef int _src_index
     cdef NNPS _nnps
-    cdef list _start_stop
-    cdef list _neighbors
+    cdef UIntArray _start_stop
+    cdef UIntArray _neighbors
+    cdef int _narrays
     cdef list _particles
-    cdef list _last_avg_nbr_size
-    cdef np.ndarray _dirty
+    cdef int _last_avg_nbr_size
+    cdef bint _dirty
 
-    cdef _find_all_neighbors(self, int src_idx)
+    cdef _find_all_neighbors(self)
 
     cpdef update(self)
 
