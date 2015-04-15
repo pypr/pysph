@@ -3,7 +3,7 @@ import numpy as np
 cimport numpy as np
 
 # malloc and friends
-from libc.stdlib cimport malloc, free
+from libc.stdlib cimport malloc, realloc, free
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
@@ -778,10 +778,24 @@ cdef class NeighborCache:
         elif self._nnps.dim == 3:
             nnbr = 120
 
+        self._n_threads = 1
         self._dirty = True
         self._last_avg_nbr_size = nnbr
         self._start_stop = UIntArray()
-        self._neighbors = UIntArray()
+        self._neighbors = <unsigned int**>malloc(
+            sizeof(unsigned int *)*self._n_threads
+        )
+        self._array_size = UIntArray(self._n_threads)
+
+        for i in range(self._n_threads):
+            self._neighbors[i] = NULL
+
+    def __dealloc__(self):
+        cdef int i
+        for i in range(self._n_threads):
+            if self._array_size[i] > 0:
+                free(self._neighbors[i])
+        free(self._neighbors)
 
     #### Public protocol ################################################
 
@@ -794,34 +808,52 @@ cdef class NeighborCache:
         cdef size_t start, end
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
-        nbrs.set_view(self._neighbors, start, end)
+        nbrs.set_view_raw(&self._neighbors[0][start], end - start)
 
     #### Private protocol ################################################
+
+    cdef _resize(self, int thread_id, size_t size, bint squeeze):
+        cdef unsigned int *data
+        if (size > self._array_size.data[thread_id]) or squeeze:
+            data = <unsigned int *>realloc(
+                self._neighbors[thread_id], size*sizeof(unsigned int)
+            )
+            if data == NULL:
+                free(data)
+                raise MemoryError("Unable to resize cache")
+
+            self._array_size.data[thread_id] = size
+            self._neighbors[thread_id] = data
 
     cdef _find_all_neighbors(self):
         cdef size_t count, d_idx, avg_nnbr
         cdef UIntArray nbrs = UIntArray()
-        cdef UIntArray start_stop, neighbors
+        cdef UIntArray start_stop, array_size
         cdef int src_index = self._src_index
         cdef int dst_index = self._dst_index
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
         cdef size_t np = self._particles[dst_index].get_number_of_particles()
+        cdef int thread_id
 
         count = 0
+        thread_id = 0
+        array_size = self._array_size
         start_stop = self._start_stop
         start_stop.resize(np*2)
-        neighbors = self._neighbors
-        neighbors.resize(self._last_avg_nbr_size*np + safety)
+        self._resize(thread_id, self._last_avg_nbr_size*np + safety, False)
 
         for d_idx in range(np):
 
-            if neighbors.length < count + safety:
+            if array_size.data[thread_id] < count + safety:
                 avg_nnbr = int(count/d_idx) + 1
-                neighbors.resize(int(avg_nnbr*np*1.1) + safety)
+                self._resize(thread_id, int(avg_nnbr*np*1.1) + safety, False)
 
-            nbrs.set_view(neighbors, count, neighbors.length)
+            nbrs.set_view_raw(
+                &self._neighbors[thread_id][count],
+                array_size.data[thread_id] - count
+            )
 
             self._nnps.get_nearest_particles_no_cache(
                 src_index, dst_index, d_idx, nbrs, True
@@ -830,10 +862,9 @@ cdef class NeighborCache:
             count += nbrs.length
             start_stop.data[d_idx*2+1] = count
 
-        neighbors.length = count
-        neighbors.squeeze()
+        self._resize(thread_id, count, True)
 
-        self._last_avg_nbr_size = int(neighbors.length/np) + 1
+        self._last_avg_nbr_size = int(array_size.data[thread_id]/np) + 1
         self._dirty = False
 
 

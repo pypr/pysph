@@ -98,15 +98,18 @@ cdef class NeighborCache:
 
     cdef int _dst_index
     cdef int _src_index
+    cdef int _n_threads
     cdef NNPS _nnps
     cdef UIntArray _start_stop
-    cdef UIntArray _neighbors
+    cdef unsigned int **_neighbors
+    cdef UIntArray _array_size   # The size of the neighbors[idx] array.
     cdef int _narrays
     cdef list _particles
     cdef int _last_avg_nbr_size
     cdef bint _dirty
 
     cdef _find_all_neighbors(self)
+    cdef _resize(self, int thread_id, size_t size, bint squeeze)
 
     cpdef update(self)
 
