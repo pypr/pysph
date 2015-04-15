@@ -1,9 +1,10 @@
 # numpy import
 import numpy as np
 cimport numpy as np
+from cython.parallel import parallel, prange, threadid
 
 # malloc and friends
-from libc.stdlib cimport malloc, realloc, free
+from libc.stdlib cimport malloc, realloc, free, abort
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
@@ -41,6 +42,21 @@ from utils import ParticleTAGS
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
+
+cpdef int get_number_of_threads():
+    cdef int i, _tid
+    cdef IntArray x
+    cdef int max_threads = 256
+    x = IntArray(max_threads)
+
+    with nogil, parallel():
+        for i in prange(max_threads):
+            x.data[i] = threadid()
+
+    return np.max(x.get_npy_array()) + 1
+
+cdef int N_THREADS = get_number_of_threads()
+
 
 cdef inline double norm2(double x, double y, double z) nogil:
     return x*x + y*y + z*z
@@ -812,7 +828,7 @@ cdef class NeighborCache:
 
     #### Private protocol ################################################
 
-    cdef _resize(self, int thread_id, size_t size, bint squeeze):
+    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil:
         cdef unsigned int *data
         if (size > self._array_size.data[thread_id]) or squeeze:
             data = <unsigned int *>realloc(
@@ -820,12 +836,12 @@ cdef class NeighborCache:
             )
             if data == NULL:
                 free(data)
-                raise MemoryError("Unable to resize cache")
+                abort()
 
             self._array_size.data[thread_id] = size
             self._neighbors[thread_id] = data
 
-    cdef _find_all_neighbors(self):
+    cdef void _find_all_neighbors(self):
         cdef size_t count, d_idx, avg_nnbr
         cdef UIntArray nbrs = UIntArray()
         cdef UIntArray start_stop, array_size

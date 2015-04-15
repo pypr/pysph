@@ -108,8 +108,8 @@ cdef class NeighborCache:
     cdef int _last_avg_nbr_size
     cdef bint _dirty
 
-    cdef _find_all_neighbors(self)
-    cdef _resize(self, int thread_id, size_t size, bint squeeze)
+    cdef void _find_all_neighbors(self)
+    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil
 
     cpdef update(self)
 
