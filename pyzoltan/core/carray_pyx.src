@@ -354,7 +354,7 @@ cdef class CLASSNAME(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, ARRAY_TYPE *array, long length):
+    cdef void set_view_raw(self, ARRAY_TYPE *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:

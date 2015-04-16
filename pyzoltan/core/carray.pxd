@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Thu Apr 16 00:20:42 2015
+# Fri Apr 17 00:19:57 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -63,7 +63,7 @@ cdef class IntArray(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, IntArray, long start, long end)
-    cdef set_view_raw(self, int *array, long length)
+    cdef void set_view_raw(self, int *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -94,7 +94,7 @@ cdef class DoubleArray(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, DoubleArray, long start, long end)
-    cdef set_view_raw(self, double *array, long length)
+    cdef void set_view_raw(self, double *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -125,7 +125,7 @@ cdef class FloatArray(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, FloatArray, long start, long end)
-    cdef set_view_raw(self, float *array, long length)
+    cdef void set_view_raw(self, float *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -156,7 +156,7 @@ cdef class LongArray(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, LongArray, long start, long end)
-    cdef set_view_raw(self, long *array, long length)
+    cdef void set_view_raw(self, long *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
@@ -187,7 +187,7 @@ cdef class UIntArray(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, UIntArray, long start, long end)
-    cdef set_view_raw(self, unsigned int *array, long length)
+    cdef void set_view_raw(self, unsigned int *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)

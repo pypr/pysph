@@ -138,7 +138,9 @@ ext_modules = [
                depends=get_deps("pyzoltan/core/carray", "pysph/base/point",
                     "pysph/base/particle_array",
                ),
-               extra_compile_args=extra_compile_args),
+               extra_compile_args=extra_compile_args + ['-fopenmp'],
+               extra_link_args=['-fopenmp']
+            ),
 
     # kernels used for tests
     Extension( name="pysph.base.c_kernels",

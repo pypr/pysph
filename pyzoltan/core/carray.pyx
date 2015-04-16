@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Thu Apr 16 00:20:20 2015
+# Fri Apr 17 00:19:57 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -335,7 +335,7 @@ cdef class IntArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, int *array, long length):
+    cdef void set_view_raw(self, int *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:
@@ -721,7 +721,7 @@ cdef class DoubleArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, double *array, long length):
+    cdef void set_view_raw(self, double *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:
@@ -1107,7 +1107,7 @@ cdef class FloatArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, float *array, long length):
+    cdef void set_view_raw(self, float *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:
@@ -1493,7 +1493,7 @@ cdef class LongArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, long *array, long length):
+    cdef void set_view_raw(self, long *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:
@@ -1879,7 +1879,7 @@ cdef class UIntArray(BaseArray):
         arr.data = <char *>self.data
         arr.dimensions[0] = self.length
 
-    cdef set_view_raw(self, unsigned int *array, long length):
+    cdef void set_view_raw(self, unsigned int *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:

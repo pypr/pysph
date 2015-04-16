@@ -100,6 +100,7 @@ cdef class NeighborCache:
     cdef int _src_index
     cdef int _n_threads
     cdef NNPS _nnps
+    cdef UIntArray _pid_to_tid
     cdef UIntArray _start_stop
     cdef unsigned int **_neighbors
     cdef UIntArray _array_size   # The size of the neighbors[idx] array.
@@ -118,36 +119,38 @@ cdef class NeighborCache:
 
 # Nearest neighbor locator
 cdef class NNPS:
-    ############################################################################
+    ##########################################################################
     # Data Attributes
-    ############################################################################
-    cdef public bint warn                # Flag to warn when extending lists
-    cdef public bint trace               # Flag for timing and debugging
-    cdef public list particles           # list of particle arrays
-    cdef public list pa_wrappers         # list of particle array wrappers
-    cdef public int narrays              # Number of particle arrays
-    cdef public bint use_cache           # Use cache or not.
-    cdef public list cache               # The neighbor cache.
+    ##########################################################################
+    cdef public bint warn             # Flag to warn when extending lists
+    cdef public bint trace            # Flag for timing and debugging
+    cdef public list particles        # list of particle arrays
+    cdef public list pa_wrappers      # list of particle array wrappers
+    cdef public int narrays           # Number of particle arrays
+    cdef public bint use_cache        # Use cache or not.
+    cdef public list cache            # The neighbor cache.
+    cdef NeighborCache current_cache  # The current cache
+    cdef int src_index, dst_index     # The current source and dest indices
 
-    cdef public object comm              # MPI communicator object
-    cdef public int rank                 # MPI rank
-    cdef public int size                 # MPI size
+    cdef public object comm           # MPI communicator object
+    cdef public int rank              # MPI rank
+    cdef public int size              # MPI size
 
-    cdef public DomainManager domain     # Domain manager
-    cdef public bint is_periodic         # flag for periodicity
+    cdef public DomainManager domain  # Domain manager
+    cdef public bint is_periodic      # flag for periodicity
 
-    cdef public int dim                  # Dimensionality of the problem
-    cdef public DoubleArray xmin         # co-ordinate min values
-    cdef public DoubleArray xmax         # co-ordinate max values
-    cdef public double cell_size         # Cell size for binning
-    cdef public double radius_scale      # Radius scale for kernel
-    cdef IntArray cell_shifts            # cell shifts
-    cdef public int n_cells              # number of cells
-    cdef public list n_part_per_cell     # number of particles per cell
+    cdef public int dim               # Dimensionality of the problem
+    cdef public DoubleArray xmin      # co-ordinate min values
+    cdef public DoubleArray xmax      # co-ordinate max values
+    cdef public double cell_size      # Cell size for binning
+    cdef public double radius_scale   # Radius scale for kernel
+    cdef IntArray cell_shifts         # cell shifts
+    cdef public int n_cells           # number of cells
+    cdef public list n_part_per_cell  # number of particles per cell
 
-    ############################################################################
+    ##########################################################################
     # Member functions
-    ############################################################################
+    ##########################################################################
     # Main binning routine for NNPS for local particles. This clears
     # the current cell data, re-computes the cell size and bins all
     # particles locally.
@@ -161,6 +164,8 @@ cdef class NNPS:
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
+
+    cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type
@@ -195,6 +200,8 @@ cdef class NNPS:
     cpdef get_particles_in_neighboring_cells(
         self, int cell_index, int pa_index, UIntArray nbrs)
 
+    cpdef set_context(self, int src_index, int dst_index)
+
     # refresh any data structures needed for binning
     cpdef _refresh(self)
 
@@ -218,3 +225,8 @@ cdef class LinkedListNNPS(NNPS):
     cdef public bint fixed_h             # Constant cell sizes
     cdef public list heads               # Head arrays for the cells
     cdef public list nexts               # Next arrays for the particles
+
+    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+    cdef UIntArray next, head              # Current next and head arrays.
+
+    cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
