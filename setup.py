@@ -55,6 +55,52 @@ def get_deps(*args):
                 result.append(f)
     return result
 
+def check_openmp():
+    """Returns True if OpenMP is avaiable on the system.
+    """
+    from textwrap import dedent
+    from pyximport import pyxbuild
+    from distutils.errors import CompileError, LinkError
+    import shutil
+    import tempfile
+    test_code = dedent("""
+    from cython.parallel import parallel, prange, threadid
+    cimport openmp
+    def n_threads():
+        with nogil, parallel():
+            openmp.omp_get_num_threads()
+    """)
+    tmp_dir = tempfile.mkdtemp()
+    fname = path.join(tmp_dir, 'check_omp.pyx')
+    with open(fname, 'w') as fp:
+        fp.write(test_code)
+    extension = Extension(
+        name='check_omp', sources=[fname],
+        extra_compile_args=["-fopenmp"],
+        extra_link_args=["-fopenmp"],
+    )
+    result = True
+    try:
+        mod = pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
+        print("-"*70)
+        print("Using OpenMP.")
+        print("-"*70)
+    except CompileError:
+        print("*"*70)
+        print("Unable to compile OpenMP code. Not using OpenMP.")
+        print("*"*70)
+        result = False
+    except LinkError:
+        print("*"*70)
+        print("Unable to link OpenMP code. Not using OpenMP.")
+        print("*"*70)
+        result = False
+    finally:
+        shutil.rmtree(tmp_dir)
+
+    return result
+
+
 def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
@@ -68,6 +114,15 @@ def get_zoltan_directory(varname):
         USE_ZOLTAN=False
         return ''
     return d
+
+
+if check_openmp():
+    openmp_compile_args = ["-fopenmp"]
+    openmp_link_args = ["-fopenmp"]
+else:
+    openmp_compile_args = []
+    openmp_link_args = []
+
 
 if Have_MPI:
     mpic = 'mpicc'
@@ -138,8 +193,8 @@ ext_modules = [
                depends=get_deps("pyzoltan/core/carray", "pysph/base/point",
                     "pysph/base/particle_array",
                ),
-               extra_compile_args=extra_compile_args + ['-fopenmp'],
-               extra_link_args=['-fopenmp']
+               extra_compile_args=extra_compile_args + openmp_compile_args,
+               extra_link_args=openmp_link_args
             ),
 
     # kernels used for tests
