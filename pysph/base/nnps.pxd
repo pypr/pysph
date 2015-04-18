@@ -111,7 +111,7 @@ cdef class NeighborCache:
 
     cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil
 
-    cdef unsigned int* get_neighbors_raw(self, size_t d_idx, size_t *length) nogil
+    cdef size_t get_neighbors_raw(self, size_t d_idx, unsigned int** nbrs) nogil
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
     cdef void find_all_neighbors(self)
     cpdef update(self)
@@ -167,8 +167,8 @@ cdef class NNPS:
 
     cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
 
-    cdef unsigned int* get_nearest_neighbors_raw(self, size_t d_idx, 
-                                          size_t *length) nogil
+    cdef size_t get_nearest_neighbors_raw(self, size_t d_idx, 
+                                          unsigned int **nbrs) nogil
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type

@@ -95,11 +95,15 @@ with nogil, parallel():
     DT_ADAPT = &_DT_ADAPT.data[threadid()*3]
     ${indent(eq_group.get_variable_array_setup(), 1)}
     for d_idx in prange(NP_DEST):
-        n_neighbors = 0
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
-        nbrs = nnps.get_nearest_neighbors_raw(d_idx, &n_neighbors)
+        nbrs = NULL
+        if nnps.use_cache:
+            n_neighbors = nnps.get_nearest_neighbors_raw(d_idx, &nbrs)
+        else:
+            nbrs = &self.nbrs.data[4096*threadid()]
+            n_neighbors = nnps.get_nearest_neighbors_raw(d_idx, &nbrs)
         for nbr_idx in range(n_neighbors):
             s_idx = <int>nbrs[nbr_idx]
             ###########################################################
@@ -210,7 +214,9 @@ cdef class AccelerationEval:
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
 
-        self.nbrs = UIntArray()
+        # FIXME: Assuming that there will never be more than 4096 neighbors
+        # per particle.
+        self.nbrs = UIntArray(4096*self.n_threads)
         ${indent(helper.get_kernel_init(), 2)}
         ${indent(helper.get_equation_init(), 2)}
 
