@@ -109,13 +109,12 @@ cdef class NeighborCache:
     cdef int _last_avg_nbr_size
     cdef bint _dirty
 
-    cdef void _find_all_neighbors(self)
     cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil
+
     cdef unsigned int* get_neighbors_raw(self, size_t d_idx, size_t *length) nogil
-
-    cpdef update(self)
-
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+    cdef void find_all_neighbors(self)
+    cpdef update(self)
 
 
 # Nearest neighbor locator

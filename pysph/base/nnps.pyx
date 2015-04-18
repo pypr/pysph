@@ -859,12 +859,10 @@ cdef class NeighborCache:
 
     #### Public protocol ################################################
 
-    cpdef update(self):
-        self._dirty = True
-
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
         if self._dirty:
-            self._find_all_neighbors()
+            self._nnps.set_context(self._src_index, self._dst_index)
+            self.find_all_neighbors()
         cdef size_t start, end, tid
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
@@ -879,22 +877,10 @@ cdef class NeighborCache:
         length[0] = end - start
         return &self._neighbors[tid][start]
 
-    #### Private protocol ################################################
+    cdef void find_all_neighbors(self):
+        if not self._dirty:
+            return
 
-    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil:
-        cdef unsigned int *data
-        if (size > self._array_size.data[thread_id]) or squeeze:
-            data = <unsigned int *>realloc(
-                self._neighbors[thread_id], size*sizeof(unsigned int)
-            )
-            if data == NULL:
-                free(data)
-                abort()
-
-            self._array_size.data[thread_id] = size
-            self._neighbors[thread_id] = data
-
-    cdef void _find_all_neighbors(self):
         cdef size_t d_idx, avg_nnbr
         cdef int i, length
         cdef UIntArray start_stop, array_size, pid_to_tid
@@ -921,8 +907,6 @@ cdef class NeighborCache:
             self._resize(i, self._last_avg_nbr_size*np/n_threads + safety, False)
             n_done.data[i] = 0
             count.data[i] = 0
-
-        self._nnps.set_context(src_index, dst_index)
 
         with nogil, parallel():
             thread_id = threadid()
@@ -953,6 +937,24 @@ cdef class NeighborCache:
             total += array_size.data[i]
         self._last_avg_nbr_size = int(total/np) + 1
         self._dirty = False
+
+    cpdef update(self):
+        self._dirty = True
+
+    #### Private protocol ################################################
+
+    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil:
+        cdef unsigned int *data
+        if (size > self._array_size.data[thread_id]) or squeeze:
+            data = <unsigned int *>realloc(
+                self._neighbors[thread_id], size*sizeof(unsigned int)
+            )
+            if data == NULL:
+                free(data)
+                abort()
+
+            self._array_size.data[thread_id] = size
+            self._neighbors[thread_id] = data
 
 
 ##############################################################################
@@ -1957,7 +1959,7 @@ cdef class LinkedListNNPS(NNPS):
                                 _next = next.data[_next]
 
     cpdef set_context(self, int src_index, int dst_index):
-        """Setup the context before asing for neighbors.  The `dst_index`
+        """Setup the context before asking for neighbors.  The `dst_index`
         represents the particles for whom the neighbors are to be determined
         from the particle array with index `src_index`.
 
@@ -1976,6 +1978,9 @@ cdef class LinkedListNNPS(NNPS):
         # next and head linked lists
         self.next = self.nexts[ src_index ]
         self.head = self.heads[ src_index ]
+
+        if self.use_cache:
+            self.current_cache.find_all_neighbors()
 
     #### Private protocol ################################################
 

@@ -90,9 +90,6 @@ for cell_index in range(ncells):
 ## Iterate over destination particles.
 #######################################################################
 nnps.set_context(src_array_index, dst_array_index)
-if NP_DEST > 0:
-    nnps.get_nearest_particles(src_array_index, dst_array_index, 0, self.nbrs)
-
 
 with nogil, parallel():
     DT_ADAPT = &_DT_ADAPT.data[threadid()*3]
