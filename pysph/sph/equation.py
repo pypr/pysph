@@ -423,7 +423,12 @@ class Group(object):
                                                               value=value))
             elif isinstance(value, (list, tuple)):
                 if mode == 'declare':
-                    decl.append('cdef double[{size}] {var}'\
+                    decl.append('cdef DoubleArray _{var} = '\
+                        'DoubleArray({size}*self.n_threads)'.format(
+                            var=var, size=len(value)
+                        )
+                    )
+                    decl.append('cdef double* {var} = _{var}.data'\
                             .format(size=len(value), var=var))
                 else:
                     pass
@@ -570,6 +575,17 @@ class Group(object):
 
     def get_variable_declarations(self, context):
         return self._get_variable_decl(context, mode='declare')
+
+    def get_variable_array_setup(self):
+        names = self.context.keys()
+        names.sort()
+        code = []
+        for var in names:
+            value = self.context[var]
+            if isinstance(value, (list, tuple)):
+                code.append('{var} = &_{var}.data[threadid()*{size}]'\
+                        .format(size=len(value), var=var))
+        return '\n'.join(code)
 
     def has_initialize(self):
         return self._has_code('initialize')

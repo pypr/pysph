@@ -868,8 +868,16 @@ cdef class NeighborCache:
         cdef size_t start, end, tid
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
-        tid = self._pid_to_tid[d_idx]
+        tid = self._pid_to_tid.data[d_idx]
         nbrs.set_view_raw(&self._neighbors[tid][start], end - start)
+
+    cdef unsigned int* get_neighbors_raw(self, size_t d_idx, size_t *length) nogil:
+        cdef size_t start, end, tid
+        start = self._start_stop.data[2*d_idx]
+        end = self._start_stop.data[2*d_idx + 1]
+        tid = self._pid_to_tid.data[d_idx]
+        length[0] = end - start
+        return &self._neighbors[tid][start]
 
     #### Private protocol ################################################
 
@@ -1088,6 +1096,10 @@ cdef class NNPS:
     cpdef count_n_part_per_cell(self):
         """Count the number of particles in each cell"""
         raise NotImplementedError("NNPS :: count_n_part_per_cell called")
+
+    cdef unsigned int* get_nearest_neighbors_raw(self, size_t d_idx,
+                                          size_t* length) nogil:
+        return self.current_cache.get_neighbors_raw(d_idx, length)
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):

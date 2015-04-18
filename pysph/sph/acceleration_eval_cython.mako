@@ -89,19 +89,27 @@ for cell_index in range(ncells):
 #######################################################################
 ## Iterate over destination particles.
 #######################################################################
-for d_idx in range(NP_DEST):
-    ###################################################################
-    ## Find and iterate over neighbors.
-    ###################################################################
-    nnps.get_nearest_particles(
-        src_array_index, dst_array_index, d_idx, nbrs)
+nnps.set_context(src_array_index, dst_array_index)
+if NP_DEST > 0:
+    nnps.get_nearest_particles(src_array_index, dst_array_index, 0, self.nbrs)
 
-    for nbr_idx in range(nbrs.length):
-        s_idx = <int>nbrs.data[nbr_idx]
+
+with nogil, parallel():
+    DT_ADAPT = &_DT_ADAPT.data[threadid()*3]
+    ${indent(eq_group.get_variable_array_setup(), 1)}
+    for d_idx in prange(NP_DEST):
+        n_neighbors = 0
         ###############################################################
-        ## Iterate over the equations for the same set of neighbors.
+        ## Find and iterate over neighbors.
         ###############################################################
-        ${indent(eq_group.get_loop_code(helper.object.kernel), 2)}
+        nbrs = nnps.get_nearest_neighbors_raw(d_idx, &n_neighbors)
+        for nbr_idx in range(n_neighbors):
+            s_idx = <int>nbrs[nbr_idx]
+            ###########################################################
+            ## Iterate over the equations for the same set of neighbors.
+            ###########################################################
+            ${indent(eq_group.get_loop_code(helper.object.kernel), 3)}
+
 % endif
 % endif ## if eq_group.has_loop():
 # Source ${source} done.
@@ -112,6 +120,7 @@ for d_idx in range(NP_DEST):
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
+DT_ADAPT = _DT_ADAPT.data
 for d_idx in range(NP_DEST):
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
@@ -139,7 +148,9 @@ nnps.update()
 </%def>
 
 from libc.math cimport *
+from libc.math cimport fabs as abs
 from libc.math cimport M_PI as pi
+from cython.parallel import parallel, prange, threadid
 cimport numpy
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
@@ -150,6 +161,7 @@ from pysph.base.reduce_array import dummy_reduce_array as parallel_reduce_array
 from pysph.base.reduce_array import mpi_reduce_array as parallel_reduce_array
 % endif
 
+from pysph.base.nnps import get_number_of_threads
 from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray
 
 ${header}
@@ -187,6 +199,7 @@ cdef class AccelerationEval:
     cdef public tuple particle_arrays
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
+    cdef public int n_threads
     cdef UIntArray nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
@@ -195,6 +208,7 @@ cdef class AccelerationEval:
 
     def __init__(self, kernel, equations, particle_arrays):
         self.particle_arrays = tuple(particle_arrays)
+        self.n_threads = get_number_of_threads()
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
@@ -205,14 +219,26 @@ cdef class AccelerationEval:
 
     cdef _initialize_dt_adapt(self, double* DT_ADAPT):
         self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
-        DT_ADAPT[0] = self.dt_cfl
-        DT_ADAPT[1] = self.dt_force
-        DT_ADAPT[2] = self.dt_viscous
+        cdef int i, _idx
+        cdef double* dta = DT_ADAPT
+        for i in range(self.n_threads):
+            _idx = i*3
+            dta[_idx + 0] = self.dt_cfl
+            dta[_idx + 1] = self.dt_force
+            dta[_idx + 2] = self.dt_viscous
 
     cdef _set_dt_adapt(self, double* DT_ADAPT):
-        self.dt_cfl = DT_ADAPT[0]
-        self.dt_force = DT_ADAPT[1]
-        self.dt_viscous = DT_ADAPT[2]
+        cdef int i, _idx
+        cdef double* dta = DT_ADAPT
+        for i in range(self.n_threads):
+            _idx = i*3
+            dta[0] = max(dta[0], dta[_idx + 0])
+            dta[1] = max(dta[1], dta[_idx + 1])
+            dta[2] = max(dta[2], dta[_idx + 2])
+
+        self.dt_cfl = dta[0]
+        self.dt_force = dta[1]
+        self.dt_viscous = dta[2]
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -225,14 +251,16 @@ cdef class AccelerationEval:
     cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
         cdef int s_idx, d_idx
-        cdef UIntArray nbrs = self.nbrs
+        cdef unsigned int* nbrs
         cdef UIntArray particle_indices = UIntArray(1000)
         cdef UIntArray potential_nbrs = UIntArray(1000)
         cdef int cell_index, ncells, _index
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
-        cdef double[3] DT_ADAPT
-        self._initialize_dt_adapt(DT_ADAPT)
+        cdef size_t n_neighbors
+        cdef DoubleArray _DT_ADAPT = DoubleArray(3*self.n_threads)
+        self._initialize_dt_adapt(_DT_ADAPT.data)
+        cdef double* DT_ADAPT = _DT_ADAPT.data
 
         cdef int max_iterations, min_iterations, _iteration_count
 
@@ -292,4 +320,4 @@ cdef class AccelerationEval:
         # ---------------------------------------------------------------------
         % endif # (if len(group.data) > 0)
         % endfor
-        self._set_dt_adapt(DT_ADAPT)
+        self._set_dt_adapt(_DT_ADAPT.data)

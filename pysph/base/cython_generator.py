@@ -201,8 +201,10 @@ class CythonGenerator(object):
 
         c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
-        cdefn = 'cdef inline {ret} {name}({arg_def}):'\
-                     .format(ret=c_ret, name=name, arg_def=c_arg_def)
+        gil = " nogil" if name != "reduce" else ""
+        cdefn = 'cdef inline {ret} {name}({arg_def}){gil}:'.format(
+            ret=c_ret, name=name, arg_def=c_arg_def, gil=gil
+        )
 
         return cdefn
 

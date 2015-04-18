@@ -81,8 +81,8 @@ class ExtModule(object):
                 # Not a shared filesystem so append rank to filename.
                 # This is needed since there may be other nodes using the same
                 # filesystem (multi-core CPUs) whose rank is non-zero.
-	        self.name = 'm_{0}_{1}'.format(self.hash, self.rank)
-	        self._setup_filenames()
+                self.name = 'm_{0}_{1}'.format(self.hash, self.rank)
+                self._setup_filenames()
                 self._write_source(self.src_path)
             else:
                 self.shared_filesystem = True
@@ -134,9 +134,18 @@ class ExtModule(object):
         if not self.shared_filesystem or self.rank == 0:
             if force or self.should_recompile():
                 self._message("Compiling code at:", self.src_path)
-                inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include()]
-                extension = Extension(name=self.name, sources=[self.src_path],
-                                    include_dirs=inc_dirs)
+                inc_dirs = [
+                    dirname(dirname(pysph.__file__)), 
+                    numpy.get_include()
+                ]
+                extra_compile_args, extra_link_args = self._get_extra_args()
+
+                extension = Extension(
+                    name=self.name, sources=[self.src_path],
+                    include_dirs=inc_dirs, 
+                    extra_compile_args=extra_compile_args,
+                    extra_link_args=extra_link_args
+                )
                 mod = pyxbuild.pyx_to_dll(self.src_path, extension,
                     pyxbuild_dir=self.build_dir, force_rebuild=True
                 )
@@ -154,6 +163,10 @@ class ExtModule(object):
         self.build()
         file, path, desc = imp.find_module(self.name, [dirname(self.ext_path)])
         return imp.load_module(self.name, file, path, desc)
+
+    def _get_extra_args(self):
+        # return [], []
+        return ['-fopenmp'], ['-fopenmp']
 
     def _message(self, *args):
         if self.verbose:
