@@ -188,11 +188,13 @@ class TestGroup(TestBase):
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=[1., 2.])
-        expect = 'cdef double[2] x'
+        expect = ('cdef DoubleArray _x = DoubleArray(2*self.n_threads)\n'
+                  'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=(0, 1., 2.))
-        expect = 'cdef double[3] x'
+        expect = ('cdef DoubleArray _x = DoubleArray(3*self.n_threads)\n'
+                  'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
     def test_loop_code(self):

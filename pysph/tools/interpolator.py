@@ -201,7 +201,8 @@ class Interpolator(object):
     def _create_nnps(self, arrays):
         # create the neighbor locator object
         self.nnps = NNPS(dim=self.kernel.dim, particles=arrays,
-                         radius_scale=self.kernel.radius_scale)
+                         radius_scale=self.kernel.radius_scale,
+                         cache=True)
         self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
 

@@ -153,7 +153,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
-        nnps = NNPS(dim=kernel.dim, particles=arrays)
+        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=True)
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval
