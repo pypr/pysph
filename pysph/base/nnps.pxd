@@ -146,7 +146,6 @@ cdef class NNPS:
     cdef public double radius_scale   # Radius scale for kernel
     cdef IntArray cell_shifts         # cell shifts
     cdef public int n_cells           # number of cells
-    cdef public list n_part_per_cell  # number of particles per cell
 
     ##########################################################################
     # Member functions
@@ -155,8 +154,6 @@ cdef class NNPS:
     # the current cell data, re-computes the cell size and bins all
     # particles locally.
     cpdef update(self)
-
-    cpdef get_number_of_cells(self)
 
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
@@ -190,26 +187,10 @@ cdef class NNPS:
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
 
-    # filter and return the true nearest neighbors for a particle
-    cpdef get_nearest_particles_filtered(
-        self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs)
-
-    # return the particle indices contained within a cell
-    cpdef get_particles_in_cell(
-        self, int cell_index, int pa_index, UIntArray indices)
-
-    # return the indices for the particles in neighboring cells
-    cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs)
-
     cpdef set_context(self, int src_index, int dst_index)
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
-
-    # count the number of particles in each cell
-    cpdef count_n_part_per_cell(self)
 
 
 # NNPS using the original gridding algorithm

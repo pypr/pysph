@@ -175,13 +175,6 @@ class Application(object):
                          dest="output_dir", default=self.fname+'_output',
                          help="Dump output in the specified directory.")
 
-        # --cell-iteration
-        parser.add_option("--cell-iteration", action="store_true",
-                          dest="cell_iteration",
-                          default=False,
-                          help="Use cell based iteration instead of "\
-                          "particle based iteration")
-
         # --openmp
         parser.add_option("--openmp", action="store_true", dest="with_openmp",
                           default=None, help="Use OpenMP to run the "\
@@ -695,9 +688,6 @@ class Application(object):
 
         # disable_output
         solver.set_disable_output(options.disable_output)
-
-        # Cell iteration.
-        solver.set_cell_iteration(options.cell_iteration)
 
         # output print frequency
         if options.freq is not None:
