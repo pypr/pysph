@@ -945,15 +945,16 @@ cdef class NeighborCache:
 
     cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil:
         cdef unsigned int *data
-        if (size > self._array_size.data[thread_id]) or squeeze:
+        cdef size_t safe_size = max(16, size)
+        if (safe_size > self._array_size.data[thread_id]) or squeeze:
             data = <unsigned int *>realloc(
-                self._neighbors[thread_id], size*sizeof(unsigned int)
+                self._neighbors[thread_id], safe_size*sizeof(unsigned int)
             )
             if data == NULL:
                 free(data)
                 abort()
 
-            self._array_size.data[thread_id] = size
+            self._array_size.data[thread_id] = safe_size
             self._neighbors[thread_id] = data
 
 
