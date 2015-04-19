@@ -4,6 +4,7 @@ import unittest
 from textwrap import dedent
 from math import pi, sin
 
+from pysph.base.config import get_config, set_config
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
     KnownType, all_numeric)
 
@@ -99,6 +100,12 @@ class TestMiscUtils(TestBase):
 
 
 class TestCythonCodeGenerator(TestBase):
+    def setUp(self):
+        get_config().use_openmp = False
+
+    def tearDown(self):
+        set_config(None)
+
     def test_simple_constructor(self):
         cg = CythonGenerator()
         cg.parse(BasicEq())
@@ -114,6 +121,28 @@ class TestCythonCodeGenerator(TestBase):
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
     def test_simple_method(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithMethod())
+        expect = dedent("""
+        cdef class EqWithMethod:
+            cdef public double c
+            cdef public list _hidden
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef double tmp
+                tmp = abs(self.rho*self.c)*sin(pi*self.c)
+                d_x[d_idx] = d_x[d_idx]*tmp
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_honors_use_openmp_setting(self):
+        # When
+        get_config().use_openmp = True
+        # Then
         cg = CythonGenerator()
         cg.parse(EqWithMethod())
         expect = dedent("""
@@ -144,7 +173,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline void func(self, long d_idx, double* d_x) nogil:
+            cdef inline void func(self, long d_idx, double* d_x):
                 cdef double tmp
                 tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
@@ -164,7 +193,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline double func(self, long d_idx, double* d_x) nogil:
+            cdef inline double func(self, long d_idx, double* d_x):
                 return d_x[d_idx]
 
             cpdef double py_func(self, long d_idx, double[:] d_x):
@@ -174,7 +203,7 @@ class TestCythonCodeGenerator(TestBase):
 
         cg.parse(func_with_return)
         expect = dedent("""
-        cdef inline double func_with_return(long d_idx, double* d_x, double x) nogil:
+        cdef inline double func_with_return(long d_idx, double* d_x, double x):
             x += 1
             return d_x[d_idx] + x
 
@@ -196,7 +225,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline double func(self, long d_idx, double* d_x) nogil:
+            cdef inline double func(self, long d_idx, double* d_x):
                 return d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -210,7 +239,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline void func(self, long d_idx, double* d_x) nogil:
+            cdef inline void func(self, long d_idx, double* d_x):
                 cdef double mat[2][2]
                 mat[0][0] = d_x[d_idx]
                 cdef double vec[3]
@@ -230,7 +259,7 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.iteritems():
                     setattr(self, key, value)
 
-            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ, ndarray user) nogil:
+            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ, ndarray user):
                 d_p[d_idx] = WIJ*DWIJ[0]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -239,7 +268,7 @@ class TestCythonCodeGenerator(TestBase):
         cg = CythonGenerator()
         cg.parse(func_with_return)
         expect = dedent("""
-        cdef inline double func_with_return(long d_idx, double* d_x, double x) nogil:
+        cdef inline double func_with_return(long d_idx, double* d_x, double x):
             x += 1
             return d_x[d_idx] + x
         """)
@@ -247,7 +276,7 @@ class TestCythonCodeGenerator(TestBase):
 
         cg.parse(simple_func)
         expect = dedent("""
-        cdef inline void simple_func(long d_idx, double* d_x, double x) nogil:
+        cdef inline void simple_func(long d_idx, double* d_x, double x):
             d_x[d_idx] += x
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())

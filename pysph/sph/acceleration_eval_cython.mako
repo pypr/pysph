@@ -91,7 +91,7 @@ for cell_index in range(ncells):
 #######################################################################
 nnps.set_context(src_array_index, dst_array_index)
 
-with nogil, parallel():
+${helper.get_parallel_block()}
     DT_ADAPT = &_DT_ADAPT.data[threadid()*3]
     ${indent(eq_group.get_variable_array_setup(), 1)}
     for d_idx in prange(NP_DEST):
@@ -151,8 +151,14 @@ nnps.update()
 from libc.math cimport *
 from libc.math cimport fabs as abs
 from libc.math cimport M_PI as pi
-from cython.parallel import parallel, prange, threadid
 cimport numpy
+% if not helper.config.use_openmp:
+from cython.parallel import threadid
+prange = range
+% else:
+from cython.parallel import parallel, prange, threadid
+% endif
+
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.nnps cimport NNPS
 from pysph.base.reduce_array import serial_reduce_array

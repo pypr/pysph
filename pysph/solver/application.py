@@ -7,6 +7,7 @@ import sys
 import time
 
 # PySPH imports.
+from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
@@ -18,8 +19,6 @@ if (Has_MPI and Has_Zoltan):
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
 
-integration_methods = ['RK2']
-kernel_names = ['CubicSpline']
 
 def list_option_callback(option, opt, value, parser):
     val = value.split(',')
@@ -176,19 +175,6 @@ class Application(object):
                          dest="output_dir", default=self.fname+'_output',
                          help="Dump output in the specified directory.")
 
-        # --kernel
-        parser.add_option("--kernel", action="store",
-                          dest="kernel", type="int",
-                          help="%-55s"%"The kernel function to use:"+
-                          ''.join(['%d - %-51s'%(d,s) for d,s in
-                                     enumerate(kernel_names)]))
-
-        # --integration
-        parser.add_option("--integration", action="store",
-                          dest="integration", type="int",
-                          help="%-55s"%"The integration method to use:"+
-                          ''.join(['%d - %-51s'%(d,s) for d,s in
-                                     enumerate(integration_methods)]))
         # --cell-iteration
         parser.add_option("--cell-iteration", action="store_true",
                           dest="cell_iteration",
@@ -196,10 +182,13 @@ class Application(object):
                           help="Use cell based iteration instead of "\
                           "particle based iteration")
 
-        # --cl
-        parser.add_option("--cl", action="store_true", dest="with_cl",
-                          default=False, help=""" Use OpenCL to run the
-                          simulation on an appropriate device """)
+        # --openmp
+        parser.add_option("--openmp", action="store_true", dest="with_openmp",
+                          default=None, help="Use OpenMP to run the "\
+                            "simulation using multiple cores.")
+        parser.add_option("--no-openmp", action="store_false", dest="with_openmp",
+                          default=None, help="Do not use OpenMP to run the "\
+                            "simulation using multiple cores.")
 
         # Restart options
         restart = OptionGroup(parser, "Restart options",
@@ -300,11 +289,6 @@ class Application(object):
         parallel_options.add_option("--parallel-scale-factor", action="store",
                                     dest="parallel_scale_factor", default=2.0, type='float',
                                     help=("""Kernel scale factor for the parallel update"""))
-
-        # --parallel-mode
-        parallel_options.add_option("--parallel-mode", action="store",
-                            dest="parallel_mode", default="auto",
-                            help = """Use specified parallel mode.""")
 
         # --parallel-output-mode
         parallel_options.add_option("--parallel-output-mode", action="store",
@@ -632,6 +616,10 @@ class Application(object):
 
         options = self.options
 
+        # Setup configuration options.
+        if options.with_openmp is not None:
+            get_config().use_openmp = options.with_openmp
+
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
 
@@ -736,11 +724,6 @@ class Application(object):
 
             # set solver cfl number
             solver.set_cfl(options.cfl)
-
-        if options.integration is not None:
-            # FIXME, this is bogus
-            #solver.integrator_type = integration_methods[options.integration]
-            pass
 
         # setup the solver. This is where the code is compiled
         solver.setup(particles=self.particles, equations=equations, nnps=nnps, fixed_h=fixed_h)

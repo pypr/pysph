@@ -1,19 +1,25 @@
+# Standard library imports
 from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 import hashlib
 import imp
 import importlib
 import numpy
-import pysph
 import os
 from os.path import expanduser, join, isdir, exists, dirname
 from pyximport import pyxbuild
 import shutil
 
+# Optional imports.
 try:
     from mpi4py import MPI
 except ImportError:
     MPI = None
+
+# Package imports.
+import pysph
+from pysph.base.config import get_config
+
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
@@ -165,9 +171,12 @@ class ExtModule(object):
         return imp.load_module(self.name, file, path, desc)
 
     def _get_extra_args(self):
-        # return [], []
-        return ['-fopenmp'], ['-fopenmp']
+        if get_config().use_openmp:
+           return ['-fopenmp'], ['-fopenmp']
+        else:
+            return [], []
 
     def _message(self, *args):
         if self.verbose:
             print ' '.join(args)
+

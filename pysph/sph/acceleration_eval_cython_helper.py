@@ -1,6 +1,7 @@
 from mako.template import Template
 from os.path import dirname, join
 
+from pysph.base.config import get_config
 from pysph.base.cython_generator import CythonGenerator
 
 
@@ -40,6 +41,7 @@ def get_array_names(particle_arrays):
 class AccelerationEvalCythonHelper(object):
     def __init__(self, acceleration_eval):
         self.object = acceleration_eval
+        self.config = get_config()
 
     ##########################################################################
     # Public interface.
@@ -127,3 +129,10 @@ class AccelerationEvalCythonHelper(object):
         lines += ['%s = src.%s.data'%(n, n[2:])
                  for n in src_arrays]
         return '\n'.join(lines)
+
+    def get_parallel_block(self):
+        if self.config.use_openmp:
+            return "with nogil, parallel():"
+        else:
+            return "if True: # Placeholder used for OpenMP."
+

@@ -58,6 +58,17 @@ def get_deps(*args):
 def check_openmp():
     """Returns True if OpenMP is avaiable on the system.
     """
+    if sys.platform == 'win32':
+        print("-"*70)
+        print("OpenMP disabled on Windows currently.")
+        return False
+
+    env_var = os.environ.get('USE_OPENMP', '')
+    if env_var.lower() in ("0", 'false', 'n'):
+        print("-"*70)
+        print("OpenMP disabled by environment variable (USE_OPENMP).")
+        return False
+
     from textwrap import dedent
     from pyximport import pyxbuild
     from distutils.errors import CompileError, LinkError
