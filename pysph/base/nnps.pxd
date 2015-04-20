@@ -212,7 +212,7 @@ cdef class LinkedListNNPS(NNPS):
     cdef UIntArray next, head              # Current next and head arrays.
 
     cpdef long _count_occupied_cells(self, long n_cells) except -1
-    cpdef long _get_number_of_cells(self)
+    cpdef long _get_number_of_cells(self) except -1
     cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
     cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
             int* ncells_per_dim, int dim, int n_cells) nogil

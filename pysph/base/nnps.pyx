@@ -1880,7 +1880,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
         return cell_index
 
-    cpdef long _count_occupied_cells(self, long n_cells):
+    cpdef long _count_occupied_cells(self, long n_cells) except -1:
         cdef list pa_wrappers = self.pa_wrappers
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int np
