@@ -1870,10 +1870,13 @@ cdef class BoxSortNNPS(LinkedListNNPS):
                 is_valid = False
 
         # Given the validity of the cells, return the flattened cell index
+        cdef map[long, int].iterator it
         if is_valid:
             cell_id = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
-            if cell_id > -1 and self.cell_to_index.count(cell_id) > 0:
-                cell_index = self.cell_to_index[cell_id]
+            if cell_id > -1:
+                it = self.cell_to_index.find(cell_id)
+                if it != self.cell_to_index.end():
+                    cell_index = deref(it).second
 
         return cell_index
 
