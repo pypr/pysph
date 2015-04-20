@@ -26,7 +26,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
     """
     def setUp(self):
         """Default set-up used by all the tests
-        
+
         Particles with the following coordinates (x, y, z) are placed in a box
 
         0 : -1.5 , 0.25 , 0.5
@@ -61,9 +61,13 @@ class SimpleNNPSTestCase(unittest.TestCase):
 
         # using a degenrate (h=0) array will set cell size to 1 for NNPS
         h = numpy.zeros_like(x)
-        
+
         pa = get_particle_array(x=x, y=y, z=z, h=h)
-        
+
+        self.dict_box_sort_nnps = nnps.DictBoxSortNNPS(
+            dim=3, particles=[pa,], radius_scale=1.0, warn=False
+        )
+
         self.box_sort_nnps = nnps.BoxSortNNPS(
             dim=3, particles=[pa,], radius_scale=1.0, warn=False)
 
@@ -81,27 +85,31 @@ class SimpleNNPSTestCase(unittest.TestCase):
 
     def test_cell_size(self):
         "SimpleNNPS :: test cell_size"
+        nnps = self.dict_box_sort_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
         nnps = self.box_sort_nnps
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
-        
+
         nnps = self.ll_nnps
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
     def test_cells(self):
         "SimpleNNPS :: test cells"
-        nnps = self.box_sort_nnps
+        nnps = self.dict_box_sort_nnps
         cells = self.expected_cells
 
         # check each cell for it's contents
         for key in cells:
             self.assertTrue( nnps.cells.has_key(key) )
-            
+
             cell = nnps.cells.get(key)
 
             cell_indices = list( cell.lindices[0].get_npy_array() )
             expected_indices = cells.get(key)
-            
+
             self.assertTrue( cell_indices == expected_indices )
+
 
 class NNPSTestCase(unittest.TestCase):
     """Standard nearest neighbor queries and comparison with the brute
@@ -174,30 +182,36 @@ class NNPSTestCase(unittest.TestCase):
             # ensure that the neighbor lists are the same
             self._assert_neighbors(nbrs1, nbrs2)
 
-class BoxSortNNPSTestCase(NNPSTestCase):
+
+class DictBoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.BoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
+        self.nps = nnps.DictBoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
 
     def test_neighbors_aa(self):
-        """NNPS :: neighbor test src = a, dst = a """
         self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_ab(self):
-        """NNPS :: neighbor test src = a, dst = b """
         self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
 
     def test_neighbors_ba(self):
-        """NNPS :: neighbor test src = b, dst = a """
         self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
 
     def test_neighbors_bb(self):
-        """NNPS :: neighbor test src = b, dst = b """
         self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
 
 
-class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
+class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for the original box-sort algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.BoxSortNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, warn=False
+        )
+
+
+class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
@@ -205,8 +219,7 @@ class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0, warn=False
         )
 
-    def test_cell_indices(self):
-        """LinkedListNNPS :: test positivity for cell indices"""
+    def test_cell_index_positivity(self):
         nps = self.nps
         ncells_tot = nps.ncells_tot
         ncells_per_dim = nps.ncells_per_dim
@@ -222,8 +235,47 @@ class LinkedListNNPSTestCase(BoxSortNNPSTestCase):
             self.assertTrue( cid.y > -1 )
             self.assertTrue( cid.z > -1 )
 
+
+class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
+    def _make_particles(self, nx=20):
+        x, y, z = numpy.random.random((3, nx, nx, nx))
+        x = numpy.ravel(x)
+        y = numpy.ravel(y)
+        z = numpy.ravel(z)
+        h = numpy.ones_like(x)*1.3/nx
+
+        pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
+        # Place one particle far far away
+        sz = 100000.0
+        pa.add_particles(x=[sz], y=[sz], z=[sz])
+        return pa
+
+    def test_linked_list_nnps_raises_exception_for_large_domain(self):
+        # Given/When
+        pa = self._make_particles(20)
+        # Then
+        self.assertRaises(
+            RuntimeError, nnps.LinkedListNNPS, dim=3, particles=[pa], cache=True
+        )
+
+    def test_box_sort_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.BoxSortNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+
 def test_flatten_unflatten():
-    """Test the flattening and un-flattening functions"""
     # first consider the 2D case where we assume a 4 X 5 grid of cells
     dim = 2
     ncells_per_dim = IntArray(3)
@@ -254,6 +306,7 @@ def test_flatten_unflatten():
         # the unflattened index should match with cid
         assert( cid == unflattened )
 
+
 def test_1D_get_valid_cell_index():
     dim = 1
 
@@ -268,7 +321,7 @@ def test_1D_get_valid_cell_index():
 
     # target cell
     cx = 1; cy = cz = 0
-    
+
     # as long as cy and cz are 0, the function should return the valid
     # flattened cell index for the cell
     for i in [-1, 0, 1]:
@@ -283,10 +336,9 @@ def test_1D_get_valid_cell_index():
             index = nnps.py_get_valid_cell_index(
                 IntPoint(cx,cy+j,cz+k), ncells_per_dim, dim, n_cells)
             assert index == -1
-    
+
 
 def test_get_centroid():
-    """Test 'get_centroid'"""
     cell = nnps.Cell(IntPoint(0, 0, 0), cell_size=0.1, narrays=1)
     centroid = Point()
     cell.get_centroid(centroid)
@@ -303,7 +355,6 @@ def test_get_centroid():
     assert(abs(centroid.z - 1.75) < 1e-10)
 
 def test_get_bbox():
-    """Test 'get_bounding_box'"""
     cell_size = 0.1
     cell = nnps.Cell(IntPoint(0, 0, 0), cell_size=cell_size, narrays=1)
     centroid = Point()

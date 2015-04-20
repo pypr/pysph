@@ -1,10 +1,13 @@
 # numpy import
 import numpy as np
 cimport numpy as np
+from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel import parallel, prange, threadid
 
 # malloc and friends
 from libc.stdlib cimport malloc, realloc, free, abort
+from libcpp.map cimport map
+from libcpp.pair cimport pair
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
@@ -64,7 +67,7 @@ cdef inline double norm2(double x, double y, double z) nogil:
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int flatten_raw(int x, int y, int z, int* ncells_per_dim,
+cdef inline long flatten_raw(int x, int y, int z, int* ncells_per_dim,
         int dim) nogil:
     """Return a flattened index for a cell
 
@@ -73,15 +76,15 @@ cdef inline int flatten_raw(int x, int y, int z, int* ncells_per_dim,
     based on alternate orderings.
 
     """
-    cdef int ncx = ncells_per_dim[0]
-    cdef int ncy = ncells_per_dim[1]
+    cdef long ncx = ncells_per_dim[0]
+    cdef long ncy = ncells_per_dim[1]
 
-    return <int>( x + ncx * y + ncx*ncy * z )
+    return <long>( x + ncx * y + ncx*ncy * z )
 
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
+cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
     """Return a flattened index for a cell
 
     The flattening is determined using the row-order indexing commonly
@@ -100,13 +103,13 @@ def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int get_valid_cell_index(int cid_x, int cid_y, int cid_z,
+cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
         int* ncells_per_dim, int dim, int n_cells) nogil:
     """Return the flattened index for a valid cell"""
-    cdef int ncy = ncells_per_dim[1]
-    cdef int ncz = ncells_per_dim[2]
+    cdef long ncy = ncells_per_dim[1]
+    cdef long ncz = ncells_per_dim[2]
 
-    cdef int cell_index = -1
+    cdef long cell_index = -1
 
     # basic test for valid indices. Since we bin the particles with
     # respect to the origin, negative indices can never occur.
@@ -138,7 +141,7 @@ def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim,
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim,
+cdef inline cIntPoint unflatten(long cell_index, IntArray ncells_per_dim,
                                 int dim):
     """Un-flatten a linear cell index"""
     cdef int ncx = ncells_per_dim.data[0]
@@ -165,7 +168,7 @@ cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim,
     cid = cIntPoint_new( ix, iy, iz )
     return cid
 
-def py_unflatten(int cell_index, IntArray ncells_per_dim, int dim):
+def py_unflatten(long cell_index, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
     cdef cIntPoint _cid = unflatten( cell_index, ncells_per_dim, dim )
     cdef IntPoint cid = IntPoint_from_cIntPoint(_cid)
@@ -820,6 +823,7 @@ cdef class Cell:
 
 
 ###############################################################################
+@cython.no_gc_clear
 cdef class NeighborCache:
     def __init__(self, NNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
@@ -1177,7 +1181,7 @@ cdef class NNPS:
 
     #### Private protocol ################################################
 
-    cdef _bin(self, int pa_index, UIntArray indices):
+    cpdef _bin(self, int pa_index, UIntArray indices):
         raise NotImplementedError("NNPS :: _bin called")
 
     cpdef _refresh(self):
@@ -1215,8 +1219,9 @@ cdef class NNPS:
 
 
 ##############################################################################
-cdef class BoxSortNNPS(NNPS):
-    """Nearest neighbor query class using the box-sort algorithm.
+cdef class DictBoxSortNNPS(NNPS):
+    """Nearest neighbor query class using the box-sort algorithm using a
+    dictionary.
 
     NNPS bins all local particles using the box sort algorithm in
     Cells. The cells are stored in a dictionary 'cells' which is keyed
@@ -1264,14 +1269,12 @@ cdef class BoxSortNNPS(NNPS):
         self.domain.update()
         self.update()
 
-        # XXX FIXME:
-
         msg = """WARNING: The cache will currently work only if
         find_nearest_neighbors works and can be used without requiring
-        the GIL.  The BoxSort does not work with OpenMP since it uses
+        the GIL.  The DictBoxSort does not work with OpenMP since it uses
         Python objects and cannot release the GIL.  Until this is fixed,
         we cannot use caching, or parallel neighbor finding using this
-        BoxSortNNPS, use the more efficient LinkedListNNPS instead.
+        DictBoxSortNNPS, use the more efficient LinkedListNNPS instead.
         Disabling caching for now.
         """
         print msg
@@ -1387,11 +1390,11 @@ cdef class BoxSortNNPS(NNPS):
     #### Private protocol ################################################
 
     cpdef _refresh(self):
-        "Clear the cells dict"
+        """Clear the cells dict"""
         cdef dict cells = self.cells
         PyDict_Clear( cells )
 
-    cdef _bin(self, int pa_index, UIntArray indices):
+    cpdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
         Parameters:
@@ -1569,7 +1572,7 @@ cdef class LinkedListNNPS(NNPS):
         )
 
         cdef int cid_x, cid_y, cid_z
-        cdef int cell_index
+        cdef long cell_index
         cid_x = cid_y = cid_z = 0
 
         # gather search radius
@@ -1586,7 +1589,7 @@ cdef class LinkedListNNPS(NNPS):
                     cid_z = _cid_z + shifts[iz]
 
                     # Only consider valid cell indices
-                    cell_index = get_valid_cell_index(
+                    cell_index = self._get_valid_cell_index(
                         cid_x, cid_y, cid_z,
                         self.ncells_per_dim.data, dim, n_cells
                     )
@@ -1679,7 +1682,7 @@ cdef class LinkedListNNPS(NNPS):
 
     #### Private protocol ################################################
 
-    cdef _bin(self, int pa_index, UIntArray indices):
+    cpdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
         Parameters:
@@ -1714,9 +1717,6 @@ cdef class LinkedListNNPS(NNPS):
         cdef cPoint pnt = cPoint_new(0, 0, 0)
         cdef int _cid
 
-        # flattened cell index
-        cdef int cell_index
-
         # now bin the particles
         num_particles = indices.length
         for indexi in range(num_particles):
@@ -1729,30 +1729,25 @@ cdef class LinkedListNNPS(NNPS):
             pnt.z = z.data[i] - xmin.data[2]
 
             # flattened cell index
-            _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
+            _cid = self._get_flattened_cell_index(pnt, cell_size)
 
             # insert this particle
             next.data[ i ] = head.data[ _cid ]
             head.data[_cid] = i
 
-    cpdef _refresh(self):
-        """Refresh the head and next arrays locally"""
-        cdef DomainManager domain = self.domain
-        cdef int narrays = self.narrays
-        cdef DoubleArray xmin = self.xmin
-        cdef DoubleArray xmax = self.xmax
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size):
+        return flatten(
+            find_cell_id(pnt, cell_size), self.ncells_per_dim, self.dim
+        )
+
+    cpdef long _get_number_of_cells(self) except -1:
         cdef double cell_size = self.cell_size
         cdef double cell_size1 = 1./cell_size
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef list heads = self.heads
-        cdef list nexts = self.nexts
+        cdef DoubleArray xmin = self.xmin
+        cdef DoubleArray xmax = self.xmax
+        cdef int ncx, ncy, ncz
+        cdef long _ncells
         cdef int dim = self.dim
-
-        # locals
-        cdef int i, j, np
-        cdef int ncx, ncy, ncz, _ncells
-        cdef UIntArray head, next
 
         # calculate the number of cells.
         ncx = <int>ceil( cell_size1*(xmax.data[0] - xmin.data[0]) )
@@ -1763,6 +1758,7 @@ cdef class LinkedListNNPS(NNPS):
             msg = 'LinkedListNNPS: Number of cells is negative '\
                    '(%s, %s, %s).'%(ncx, ncy, ncz)
             raise RuntimeError(msg)
+            return -1
 
         # number of cells along each coordinate direction
         self.ncells_per_dim.data[0] = ncx
@@ -1773,12 +1769,44 @@ cdef class LinkedListNNPS(NNPS):
         _ncells = ncx
         if dim == 2: _ncells = ncx * ncy
         if dim == 3: _ncells = ncx * ncy * ncz
-        self.n_cells = <int>_ncells
+        return _ncells
 
-        if _ncells < 0 or _ncells > 2**28:
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil:
+        return get_valid_cell_index(
+            cid_x, cid_y, cid_z, ncells_per_dim, dim, n_cells
+        )
+
+    cpdef long _count_occupied_cells(self, long n_cells) except -1:
+        if n_cells < 0 or n_cells > 2**28:
             # unsigned ints are 4 bytes, which means 2**28 cells requires 1GB.
-            msg = "ERROR: LinkedListNNPS requires too many cells (%s)."%_ncells
+            msg = "ERROR: LinkedListNNPS requires too many cells (%s)."%n_cells
             raise RuntimeError(msg)
+            return -1
+
+        return n_cells
+
+    cpdef _refresh(self):
+        """Refresh the head and next arrays locally"""
+        cdef DomainManager domain = self.domain
+        cdef int narrays = self.narrays
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef list heads = self.heads
+        cdef list nexts = self.nexts
+
+        # locals
+        cdef int i, j, np
+        cdef long _ncells
+        cdef UIntArray head, next
+
+        _ncells = self._get_number_of_cells()
+
+        _ncells = self._count_occupied_cells(_ncells)
+
+        self.n_cells = <int>_ncells
 
         # initialize the head and next arrays
         for i in range(narrays):
@@ -1798,3 +1826,106 @@ cdef class LinkedListNNPS(NNPS):
 
             for j in range(np):
                 next.data[j] = UINT_MAX
+
+
+#############################################################################
+cdef class BoxSortNNPS(LinkedListNNPS):
+
+    """Nearest neighbor query class using the box sort method but which
+    uses the LinkedList algorithm.  This makes this very fast but
+    perhaps not as safe as the DictBoxSortNNPS.  All this class does 
+    is to use a std::map to obtain a linear cell index from the actual 
+    flattened cell index.
+    """
+
+    #### Private protocol ################################################
+
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size):
+        cdef long cell_id = flatten(
+            find_cell_id(pnt, cell_size), self.ncells_per_dim, self.dim
+        )
+        return self.cell_to_index[cell_id]
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef inline long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil:
+        """Return the flattened index for a valid cell"""
+        cdef long ncy = ncells_per_dim[1]
+        cdef long ncz = ncells_per_dim[2]
+
+        cdef long cell_id
+        cdef long cell_index = -1
+
+        # basic test for valid indices. Since we bin the particles with
+        # respect to the origin, negative indices can never occur.
+        cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
+
+        # additional check for 1D. This is because we search in all 26
+        # neighboring cells for neighbors. In 1D this can be problematic
+        # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
+        # result in a valid cell with a flattened index < ncells
+        if dim == 1:
+            if ( (cid_y > ncy) or (cid_z > ncz) ):
+                is_valid = False
+
+        # Given the validity of the cells, return the flattened cell index
+        if is_valid:
+            cell_id = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
+            if cell_id > -1 and self.cell_to_index.count(cell_id) > 0:
+                cell_index = self.cell_to_index[cell_id]
+
+        return cell_index
+
+    cpdef long _count_occupied_cells(self, long n_cells):
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int np
+        cdef DoubleArray x, y, z
+        cdef DoubleArray xmin = self.xmin
+        cdef DoubleArray xmax = self.xmax
+        cdef IntArray ncells_per_dim = self.ncells_per_dim
+        cdef int narrays = self.narrays
+        cdef int dim = self.dim
+        cdef double cell_size = self.cell_size
+
+        cdef cPoint pnt = cPoint_new(0, 0, 0)
+        cdef long _cid
+        cdef map[long, int] _cid_to_index
+        cdef pair[long, int] _entry
+
+        # flattened cell index
+        cdef int i, j
+        cdef long cell_index
+
+        for j in range(narrays):
+            pa_wrapper = pa_wrappers[j]
+            np = pa_wrapper.get_number_of_particles()
+            x = pa_wrapper.x
+            y = pa_wrapper.y
+            z = pa_wrapper.z
+
+            for i in range(np):
+                # the flattened index is considered relative to the
+                # minimum along each co-ordinate direction
+                pnt.x = x.data[i] - xmin.data[0]
+                pnt.y = y.data[i] - xmin.data[1]
+                pnt.z = z.data[i] - xmin.data[2]
+
+                # flattened cell index
+                _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
+                _entry.first = _cid
+                _entry.second = 1
+                _cid_to_index.insert(_entry)
+
+        cdef map[long, int].iterator it = _cid_to_index.begin()
+        cdef int count = 0
+        while it != _cid_to_index.end():
+            _entry = deref(it)
+            _cid_to_index[_entry.first] = count
+            count += 1
+            inc(it)
+
+        self.cell_to_index = _cid_to_index
+        return count
+

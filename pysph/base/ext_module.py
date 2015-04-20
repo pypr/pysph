@@ -150,7 +150,8 @@ class ExtModule(object):
                     name=self.name, sources=[self.src_path],
                     include_dirs=inc_dirs, 
                     extra_compile_args=extra_compile_args,
-                    extra_link_args=extra_link_args
+                    extra_link_args=extra_link_args,
+                    language="c++"
                 )
                 mod = pyxbuild.pyx_to_dll(self.src_path, extension,
                     pyxbuild_dir=self.build_dir, force_rebuild=True

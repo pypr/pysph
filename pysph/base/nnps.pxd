@@ -1,6 +1,8 @@
 # numpy
 cimport numpy as np
 
+from libcpp.map cimport map
+
 # PyZoltan CArrays
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
@@ -132,10 +134,6 @@ cdef class NNPS:
     cdef NeighborCache current_cache  # The current cache
     cdef int src_index, dst_index     # The current source and dest indices
 
-    cdef public object comm           # MPI communicator object
-    cdef public int rank              # MPI rank
-    cdef public int size              # MPI size
-
     cdef public DomainManager domain  # Domain manager
     cdef public bint is_periodic      # flag for periodicity
 
@@ -157,7 +155,7 @@ cdef class NNPS:
 
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
-    cdef _bin(self, int pa_index, UIntArray indices)
+    cpdef _bin(self, int pa_index, UIntArray indices)
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
@@ -194,7 +192,7 @@ cdef class NNPS:
 
 
 # NNPS using the original gridding algorithm
-cdef class BoxSortNNPS(NNPS):
+cdef class DictBoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells
     cdef list _cell_keys
 
@@ -213,4 +211,18 @@ cdef class LinkedListNNPS(NNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
     cdef UIntArray next, head              # Current next and head arrays.
 
+    cpdef long _count_occupied_cells(self, long n_cells) except -1
+    cpdef long _get_number_of_cells(self)
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
+    cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil
     cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
+
+
+# NNPS using the linked list approach
+cdef class BoxSortNNPS(LinkedListNNPS):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef public map[long, int] cell_to_index  # Maps cell ID to an index
+
