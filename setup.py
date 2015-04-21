@@ -55,19 +55,19 @@ def get_deps(*args):
                 result.append(f)
     return result
 
-def check_openmp():
-    """Returns True if OpenMP is avaiable on the system.
+def get_openmp_flags():
+    """Returns any OpenMP related flags if OpenMP is avaiable on the system.
     """
     if sys.platform == 'win32':
-        print("-"*70)
-        print("OpenMP disabled on Windows currently.")
-        return False
+        omp_flags = ['/openmp']
+    else:
+        omp_flags = ['-fopenmp']
 
     env_var = os.environ.get('USE_OPENMP', '')
     if env_var.lower() in ("0", 'false', 'n'):
         print("-"*70)
         print("OpenMP disabled by environment variable (USE_OPENMP).")
-        return False
+        return [], []
 
     from textwrap import dedent
     from pyximport import pyxbuild
@@ -87,10 +87,10 @@ def check_openmp():
         fp.write(test_code)
     extension = Extension(
         name='check_omp', sources=[fname],
-        extra_compile_args=["-fopenmp"],
-        extra_link_args=["-fopenmp"],
+        extra_compile_args=omp_flags,
+        extra_link_args=omp_flags,
     )
-    result = True
+    has_omp = True
     try:
         mod = pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
         print("-"*70)
@@ -100,16 +100,19 @@ def check_openmp():
         print("*"*70)
         print("Unable to compile OpenMP code. Not using OpenMP.")
         print("*"*70)
-        result = False
+        has_omp = False
     except LinkError:
         print("*"*70)
         print("Unable to link OpenMP code. Not using OpenMP.")
         print("*"*70)
-        result = False
+        has_omp = False
     finally:
         shutil.rmtree(tmp_dir)
 
-    return result
+    if has_omp:
+        return omp_flags, omp_flags
+    else:
+        return [], []
 
 
 def get_zoltan_directory(varname):
@@ -127,13 +130,7 @@ def get_zoltan_directory(varname):
     return d
 
 
-if check_openmp():
-    openmp_compile_args = ["-fopenmp"]
-    openmp_link_args = ["-fopenmp"]
-else:
-    openmp_compile_args = []
-    openmp_link_args = []
-
+openmp_compile_args, openmp_link_args = get_openmp_flags()
 
 if Have_MPI:
     mpic = 'mpic++'

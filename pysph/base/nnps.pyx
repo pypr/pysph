@@ -885,7 +885,7 @@ cdef class NeighborCache:
         if not self._dirty:
             return
 
-        cdef size_t d_idx, avg_nnbr
+        cdef long d_idx, avg_nnbr
         cdef int i, length
         cdef UIntArray start_stop, array_size, pid_to_tid
         cdef int src_index = self._src_index
@@ -893,7 +893,7 @@ cdef class NeighborCache:
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
-        cdef size_t np = self._particles[dst_index].get_number_of_particles()
+        cdef long np = self._particles[dst_index].get_number_of_particles()
         cdef int thread_id
         cdef int n_threads = self._n_threads
 

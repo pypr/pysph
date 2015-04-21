@@ -9,6 +9,7 @@ import os
 from os.path import expanduser, join, isdir, exists, dirname
 from pyximport import pyxbuild
 import shutil
+import sys
 
 # Optional imports.
 try:
@@ -173,7 +174,10 @@ class ExtModule(object):
 
     def _get_extra_args(self):
         if get_config().use_openmp:
-           return ['-fopenmp'], ['-fopenmp']
+            if sys.platform == 'win32':
+                return ['/openmp'], ['/openmp']
+            else:
+                return ['-fopenmp'], ['-fopenmp']
         else:
             return [], []
 

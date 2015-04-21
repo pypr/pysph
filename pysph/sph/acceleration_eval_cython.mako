@@ -230,7 +230,7 @@ cdef class AccelerationEval:
         cdef unsigned int* nbrs
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
-        cdef size_t n_neighbors
+        cdef long n_neighbors
         cdef DoubleArray _DT_ADAPT = DoubleArray(3*self.n_threads)
         self._initialize_dt_adapt(_DT_ADAPT.data)
         cdef double* DT_ADAPT = _DT_ADAPT.data
