@@ -213,9 +213,9 @@ class Application(object):
                                 action="store_true", default=False,
                                 help="Option for fixed smoothing lengths")
 
-        nnps_options.add_option("--no-cache-nnps", dest="no_cache_nnps",
+        nnps_options.add_option("--cache-nnps", dest="cache_nnps",
                                 action="store_true", default=False,
-                        help="Option to disable the use of neighbor caching.")
+                        help="Option to enable the use of neighbor caching.")
 
         parser.add_option_group( nnps_options )
 
@@ -630,7 +630,7 @@ class Application(object):
 
         if nnps is None:
             kernel = self._solver.kernel
-            cache = not options.no_cache_nnps
+            cache = options.cache_nnps
 
             # create the NNPS object
             if options.nnps == 'box':
