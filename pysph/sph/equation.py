@@ -424,7 +424,7 @@ class Group(object):
             elif isinstance(value, (list, tuple)):
                 if mode == 'declare':
                     decl.append('cdef DoubleArray _{var} = '\
-                        'DoubleArray({size}*self.n_threads)'.format(
+                        'DoubleArray(self._aligned({size})*self.n_threads)'.format(
                             var=var, size=len(value)
                         )
                     )
@@ -583,8 +583,10 @@ class Group(object):
         for var in names:
             value = self.context[var]
             if isinstance(value, (list, tuple)):
-                code.append('{var} = &_{var}.data[threadid()*{size}]'\
-                        .format(size=len(value), var=var))
+                code.append(
+                    '{var} = &_{var}.data[threadid()*self._aligned({size})]'\
+                        .format(size=len(value), var=var)
+                )
         return '\n'.join(code)
 
     def has_initialize(self):

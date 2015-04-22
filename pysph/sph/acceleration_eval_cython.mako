@@ -60,7 +60,7 @@ src_array_index = src.index
 nnps.set_context(src_array_index, dst_array_index)
 
 ${helper.get_parallel_block()}
-    DT_ADAPT = &_DT_ADAPT.data[threadid()*3]
+    DT_ADAPT = &_DT_ADAPT.data[threadid()*self._aligned(3)]
     ${indent(eq_group.get_variable_array_setup(), 1)}
     for d_idx in prange(NP_DEST):
         ###############################################################
@@ -195,19 +195,21 @@ cdef class AccelerationEval:
 
     cdef _initialize_dt_adapt(self, double* DT_ADAPT):
         self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
-        cdef int i, _idx
+        cdef int i, _idx, offset
         cdef double* dta = DT_ADAPT
+        offset = self._aligned(3)
         for i in range(self.n_threads):
-            _idx = i*3
+            _idx = i*offset
             dta[_idx + 0] = self.dt_cfl
             dta[_idx + 1] = self.dt_force
             dta[_idx + 2] = self.dt_viscous
 
     cdef _set_dt_adapt(self, double* DT_ADAPT):
-        cdef int i, _idx
+        cdef int i, _idx, offset
         cdef double* dta = DT_ADAPT
+        offset = self._aligned(3)
         for i in range(self.n_threads):
-            _idx = i*3
+            _idx = i*offset
             dta[0] = max(dta[0], dta[_idx + 0])
             dta[1] = max(dta[1], dta[_idx + 1])
             dta[2] = max(dta[2], dta[_idx + 2])
@@ -215,6 +217,16 @@ cdef class AccelerationEval:
         self.dt_cfl = dta[0]
         self.dt_force = dta[1]
         self.dt_viscous = dta[2]
+
+    cdef inline int _aligned(self, int size) nogil:
+        """Predefined for a double, this aligns the memory to 64 byte
+        cache lines.  Size is the number of double values that are 
+        required.
+        """
+        if size%8 == 0:
+            return size
+        else:
+            return (8*size/64 + 1)*8
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -231,7 +243,7 @@ cdef class AccelerationEval:
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
         cdef long n_neighbors
-        cdef DoubleArray _DT_ADAPT = DoubleArray(3*self.n_threads)
+        cdef DoubleArray _DT_ADAPT = DoubleArray(self._aligned(3)*self.n_threads)
         self._initialize_dt_adapt(_DT_ADAPT.data)
         cdef double* DT_ADAPT = _DT_ADAPT.data
 
