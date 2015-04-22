@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Fri Apr 17 00:19:57 2015
+# Thu Apr 23 00:48:19 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -58,7 +58,7 @@ cdef extern from "numpy/arrayobject.h":
 
 # memcpy
 cdef extern from "stdlib.h":
-     void *memcpy(void *dst, void *src, long n)
+     void *memcpy(void *dst, void *src, long n) nogil
 
 # numpy module initialization call
 import_array()
@@ -117,11 +117,13 @@ cdef class BaseArray:
 
     cpdef align_array(self, LongArray new_indices):
         """ Rearrange the array contents according to the new indices. """
-        self._align_array(new_indices)
+        if new_indices.length != self.length:
+            raise ValueError, 'Unequal array lengths'
+        self.align_array_raw(new_indices)
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        raise NotImplementedError, 'BaseArray::_align_array'
+        pass
 
     cpdef reset(self):
         """ Reset the length of the array to 0. """
@@ -429,10 +431,8 @@ cdef class IntArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
 
         cdef long i
         cdef long length = self.length
@@ -815,10 +815,8 @@ cdef class DoubleArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
 
         cdef long i
         cdef long length = self.length
@@ -1201,10 +1199,8 @@ cdef class FloatArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
 
         cdef long i
         cdef long length = self.length
@@ -1587,10 +1583,8 @@ cdef class LongArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
 
         cdef long i
         cdef long length = self.length
@@ -1973,10 +1967,8 @@ cdef class UIntArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cdef void _align_array(self, LongArray new_indices):
+    cdef void align_array_raw(self, LongArray new_indices) nogil:
         """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
 
         cdef long i
         cdef long length = self.length

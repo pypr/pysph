@@ -46,7 +46,7 @@ cdef class BaseArray:
     cpdef reset(self)
 
     cpdef align_array(self, LongArray new_indices)
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
     cpdef str get_c_type(self)
     cpdef copy_values(self, LongArray indices, BaseArray dest)
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
@@ -82,7 +82,7 @@ cdef class CLASSNAME(BaseArray):
     cpdef reset(self)
     cpdef long index(self, ARRAY_TYPE value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 '''
 

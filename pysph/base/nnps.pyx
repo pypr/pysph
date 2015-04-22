@@ -40,6 +40,7 @@ ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
 
 # Particle Tag information
+from pyzoltan.core.carray cimport BaseArray
 from utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
@@ -1118,6 +1119,9 @@ cdef class NNPS:
                             size_t d_idx, UIntArray nbrs, bint prealloc):
         raise NotImplementedError("NNPS :: get_nearest_particles_no_cache called")
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")
+
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asing for neighbors.  The `dst_index`
         represents the particles for whom the neighbors are to be determined
@@ -1136,6 +1140,18 @@ cdef class NNPS:
 
     def set_in_parallel(self, bint in_parallel):
         self.domain.in_parallel = in_parallel
+
+    cpdef spatially_order_particles(self, int pa_index):
+        """Spatially order particles such that nearby particles have indices
+        nearer each other.  This may improve pre-fetching on the CPU.
+        """
+        cdef LongArray indices = LongArray()
+        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
+        self.get_spatially_ordered_indices(pa_index, indices)
+        cdef BaseArray arr
+
+        for arr in pa.properties.values():
+            arr.align_array_raw(indices)
 
     def update_domain(self, *args, **kwargs):
         self.domain.update()
@@ -1655,6 +1671,19 @@ cdef class LinkedListNNPS(NNPS):
         nbrs.length = count
         if not prealloc:
             nbrs.resize(count)
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        cdef UIntArray head = self.heads[pa_index]
+        cdef UIntArray next = self.nexts[pa_index]
+        cdef ZOLTAN_ID_TYPE _next
+        indices.reset()
+        cdef long i
+
+        for i in range(self.n_cells):
+            _next = head.data[i]
+            while (_next != UINT_MAX):
+                indices.append(<long>_next)
+                _next = next.data[_next]
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`

@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Fri Apr 17 00:19:57 2015
+# Thu Apr 23 00:48:19 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -35,7 +35,7 @@ cdef class BaseArray:
     cpdef reset(self)
 
     cpdef align_array(self, LongArray new_indices)
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
     cpdef str get_c_type(self)
     cpdef copy_values(self, LongArray indices, BaseArray dest)
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
@@ -70,7 +70,7 @@ cdef class IntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, int value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 
 ################################################################################
@@ -101,7 +101,7 @@ cdef class DoubleArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, double value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 
 ################################################################################
@@ -132,7 +132,7 @@ cdef class FloatArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, float value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 
 ################################################################################
@@ -163,7 +163,7 @@ cdef class LongArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, long value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 
 ################################################################################
@@ -194,6 +194,6 @@ cdef class UIntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, unsigned int value)
 
-    cdef void _align_array(self, LongArray new_indices)
+    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 

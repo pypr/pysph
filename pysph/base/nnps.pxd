@@ -180,12 +180,16 @@ cdef class NNPS:
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+
     # Testing function for brute force neighbor search. The return
     # list is of the same type of the local and global ids (uint)
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
 
     cpdef set_context(self, int src_index, int dst_index)
+
+    cpdef spatially_order_particles(self, int pa_index)
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
