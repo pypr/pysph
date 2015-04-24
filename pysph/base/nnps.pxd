@@ -54,6 +54,9 @@ cdef class DomainManager:
     # box-wrap particles within the physical domain
     cdef _box_wrap_periodic(self)
 
+    # Convenience function to add a value to a carray
+    cdef _add_to_array(self, DoubleArray arr, double disp)
+
     # create new ghosts
     cdef _create_ghosts_periodic(self)
 
