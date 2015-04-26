@@ -24,6 +24,18 @@ cdef extern from 'math.h':
     double fmax(double, double) nogil
     double fmin(double, double) nogil
 
+IF OPENMP:
+    cimport openmp
+    cpdef int get_number_of_threads():
+        cdef int i, n
+        with nogil, parallel():
+            for i in prange(1):
+                n = openmp.omp_get_num_threads()
+        return n
+ELSE:
+    cpdef int get_number_of_threads():
+        return 1
+
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
@@ -46,20 +58,6 @@ from utils import ParticleTAGS
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
-
-cpdef int get_number_of_threads():
-    cdef int i, _tid
-    cdef IntArray x
-    cdef int max_threads = 256
-    x = IntArray(max_threads)
-
-    with nogil, parallel():
-        for i in prange(max_threads):
-            x.data[i] = threadid()
-
-    return np.max(x.get_npy_array()) + 1
-
-cdef int N_THREADS = get_number_of_threads()
 
 
 cdef inline double norm2(double x, double y, double z) nogil:
@@ -841,7 +839,7 @@ cdef class NeighborCache:
         elif self._nnps.dim == 3:
             nnbr = 120
 
-        self._n_threads = N_THREADS
+        self._n_threads = get_number_of_threads()
         self._dirty = True
         self._last_avg_nbr_size = nnbr
         self._start_stop = UIntArray()

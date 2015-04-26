@@ -20,8 +20,7 @@ import sys
 from os import path
 
 from setuptools import find_packages, setup
-from numpy.distutils.extension import Extension
-from Cython.Distutils import build_ext
+from Cython.Distutils import build_ext, Extension
 
 Have_MPI = True
 try:
@@ -110,9 +109,9 @@ def get_openmp_flags():
         shutil.rmtree(tmp_dir)
 
     if has_omp:
-        return omp_flags, omp_flags
+        return omp_flags, omp_flags, True
     else:
-        return [], []
+        return [], [], False
 
 
 def get_zoltan_directory(varname):
@@ -130,7 +129,7 @@ def get_zoltan_directory(varname):
     return d
 
 
-openmp_compile_args, openmp_link_args = get_openmp_flags()
+openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
 if Have_MPI:
     mpic = 'mpic++'
@@ -214,6 +213,7 @@ ext_modules = [
         ),
         extra_compile_args=extra_compile_args + openmp_compile_args,
         extra_link_args=openmp_link_args,
+        cython_compile_time_env={'OPENMP': openmp_env},
         language="c++"
     ),
 
