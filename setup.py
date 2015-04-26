@@ -141,8 +141,8 @@ if Have_MPI:
     else:
         link_args = commands.getoutput(mpic + ' --showme:link')
         compile_args = commands.getoutput(mpic +' --showme:compile')
-    mpi_link_args.append(link_args)
-    mpi_compile_args.append(compile_args)
+    mpi_link_args.extend(link_args.split())
+    mpi_compile_args.extend(compile_args.split())
     mpi_inc_dirs.append(mpi4py.get_include())
 
     # First try with the environment variable 'ZOLTAN'

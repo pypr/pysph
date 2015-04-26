@@ -36,6 +36,12 @@ cdef class BaseArray:
     cdef public long length, alloc, _length
     cdef np.ndarray _npy_array
 
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_reserve(self, long size) nogil
+    cdef void c_reset(self) nogil
+    cdef void c_resize(self, long size) nogil
+    cdef void c_squeeze(self) nogil
+
     cpdef reserve(self, long size)
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
@@ -46,7 +52,6 @@ cdef class BaseArray:
     cpdef reset(self)
 
     cpdef align_array(self, LongArray new_indices)
-    cdef void align_array_raw(self, LongArray new_indices) nogil
     cpdef str get_c_type(self)
     cpdef copy_values(self, LongArray indices, BaseArray dest)
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
@@ -65,6 +70,9 @@ cdef class CLASSNAME(BaseArray):
     cdef CLASSNAME _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, ARRAY_TYPE value) nogil
+    cdef void c_set_view(self, ARRAY_TYPE *array, long length) nogil
     cdef ARRAY_TYPE* get_data_ptr(self)
 
     cpdef ARRAY_TYPE get(self, long idx)
@@ -75,14 +83,12 @@ cdef class CLASSNAME(BaseArray):
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, CLASSNAME, long start, long end)
-    cdef void set_view_raw(self, ARRAY_TYPE *array, long length) nogil
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
     cpdef reset(self)
     cpdef long index(self, ARRAY_TYPE value)
 
-    cdef void align_array_raw(self, LongArray new_indices) nogil
 
 '''
 

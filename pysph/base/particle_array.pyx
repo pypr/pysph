@@ -1052,7 +1052,7 @@ cdef class ParticleArray:
 
         for i in range(num_arrays):
             arr = arrays[i]
-            arr.align_array_raw(index_array)
+            arr.c_align_array(index_array)
 
         if num_moves > 0:
             self.is_dirty = True

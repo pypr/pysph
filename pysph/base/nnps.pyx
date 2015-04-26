@@ -870,7 +870,7 @@ cdef class NeighborCache:
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
         tid = self._pid_to_tid.data[d_idx]
-        nbrs.set_view_raw(&self._neighbors[tid][start], end - start)
+        nbrs.c_set_view(&self._neighbors[tid][start], end - start)
 
     cdef size_t get_neighbors_raw(self, size_t d_idx, unsigned int** nbrs) nogil:
         cdef size_t start, end, tid
@@ -1149,7 +1149,7 @@ cdef class NNPS:
         cdef BaseArray arr
 
         for arr in pa.properties.values():
-            arr.align_array_raw(indices)
+            arr.c_align_array(indices)
 
     def update_domain(self, *args, **kwargs):
         self.domain.update()
