@@ -675,7 +675,20 @@ If you have OpenMP available run any of the examples as follows::
 
     $ python elliptical_drop.py --openmp
 
-This should run faster if you have multiple cores on your machine.
+This should run faster if you have multiple cores on your machine.  If
+you wish to change the number of threads to run simultaneously, you can
+try the following::
+
+    $ OMP_NUM_THREADS=8 python elliptical_drop.py --openmp
+
+You may need to set the number of threads to about 4 times the number of
+physical cores on your machine to obtain the most scale-up.  If you wish
+to time the actual scale up of the code with and without OpenMP you may
+want to disable any output (which will be serial), you can do this
+like::
+
+    $ python elliptical_drop.py --disable-output --openmp
+
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Running the examples with MPI
