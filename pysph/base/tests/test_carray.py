@@ -11,12 +11,42 @@ import unittest
 import numpy
 
 # local imports
-from pyzoltan.core.carray import LongArray
+from pyzoltan.core.carray import LongArray, py_aligned
+
+
+class TestAligned(unittest.TestCase):
+
+    def test_aligned_to_64_bits(self):
+        self.assertEqual(py_aligned(12, 1), 64)
+        self.assertEqual(py_aligned(1, 1), 64)
+        self.assertEqual(py_aligned(64, 1), 64)
+        self.assertEqual(py_aligned(120, 1), 128)
+
+        self.assertEqual(py_aligned(1, 2), 32)
+        self.assertEqual(py_aligned(12, 2), 32)
+        self.assertEqual(py_aligned(32, 2), 32)
+        self.assertEqual(py_aligned(33, 2), 64)
+
+        self.assertEqual(py_aligned(1, 3), 64)
+        self.assertEqual(py_aligned(65, 3), 256)
+
+        self.assertEqual(py_aligned(1, 4), 16)
+        self.assertEqual(py_aligned(16, 4), 16)
+        self.assertEqual(py_aligned(21, 4), 32)
+
+        self.assertEqual(py_aligned(1, 5), 64)
+        self.assertEqual(py_aligned(13, 5), 128)
+
+        self.assertEqual(py_aligned(1, 8), 8)
+        self.assertEqual(py_aligned(8, 8), 8)
+        self.assertEqual(py_aligned(11, 8), 16)
+
 
 class TestLongArray(unittest.TestCase):
     """
     Tests for the LongArray class.
     """
+
     def test_constructor(self):
         """
         Test the constructor.

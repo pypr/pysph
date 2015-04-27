@@ -23,6 +23,11 @@ Declaration File.
 # numpy import
 cimport numpy as np
 
+cdef long aligned(long n, int item_size) nogil
+cdef void* aligned_malloc(size_t bytes) nogil
+cdef void* aligned_realloc(void* existing, size_t bytes, size_t old_size) nogil
+cdef void aligned_free(void* p) nogil
+
 # forward declaration
 cdef class BaseArray
 cdef class LongArray(BaseArray)

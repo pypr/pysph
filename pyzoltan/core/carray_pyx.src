@@ -43,6 +43,7 @@ The numpy array may however be copied and used in any manner.
 """
 # For malloc etc.
 from libc.stdlib cimport *
+from libc.stdint cimport uintptr_t
 
 cimport numpy as np
 
@@ -76,6 +77,76 @@ cdef extern from "stdlib.h":
 
 # numpy module initialization call
 import_array()
+
+cdef inline long aligned(long n, int item_size) nogil:
+    """Align `n` items each having size (in bytes) `item_size` to
+    64 bytes and return the appropriate number of items that would
+    be aligned to 64 bytes.
+    """
+    if n*item_size%64 == 0:
+        return n
+    else:
+        if 64%item_size == 0:
+            return (n*item_size/64 + 1)*64/item_size
+        else:
+            return (n*item_size/64 + 1)*64
+
+cpdef long py_aligned(long n, int item_size):
+    """Align `n` items each having size (in bytes) `item_size` to
+    64 bits and return the appropriate number of items that would
+    be aligned to 64 bytes.
+    """
+    return aligned(n, item_size)
+
+cdef void* _aligned_malloc(size_t bytes) nogil:
+    """Allocates block of memory starting on a cache line.
+
+    Algorithm from:
+    http://www.drdobbs.com/parallel/understanding-and-avoiding-memory-issues/212400410
+    """
+    cdef size_t cache_size = 64
+    cdef char* base = <char*>malloc(cache_size + bytes)
+
+    # Round pointer up to next line
+    cdef char* result = <char*>(<uintptr_t>(base+cache_size)&-(cache_size))
+
+    # Record where block actually starts.
+    (<char**>result)[-1] = base
+
+    return <void*>result
+
+cdef void* _aligned_realloc(void *existing, size_t bytes, size_t old_size) nogil:
+    """Allocates block of memory starting on a cache line.
+
+    """
+    cdef void* result = _aligned_malloc(bytes)
+
+    # Copy everything from the old to the new and free the old.
+    memcpy(<void*>result, <void*>existing, old_size)
+    aligned_free(<void*>existing)
+
+    return result
+
+cdef void* _deref_base(void* ptr) nogil:
+    cdef size_t cache_size = 64
+    # Recover where block actually starts
+    cdef char* base = (<char**>ptr)[-1]
+    if <void*>(<uintptr_t>(base+cache_size)&-(cache_size)) != ptr:
+        with gil:
+            raise MemoryError("Passed pointer is not aligned.")
+    return <void*>base
+
+cdef void* aligned_malloc(size_t bytes) nogil:
+    return _aligned_malloc(bytes)
+
+cdef void* aligned_realloc(void* p, size_t bytes, size_t old_size) nogil:
+    return _aligned_realloc(p, bytes, old_size)
+
+cdef void aligned_free(void* p) nogil:
+    """Free block allocated by alligned_malloc.
+    """
+    free(<void*>_deref_base(p))
+
 
 cdef class BaseArray:
     """ Base class for managed C-arrays. """
@@ -234,16 +305,16 @@ cdef class CLASSNAME(BaseArray):
         if n == 0:
             n = 16
         self.alloc = n
-        self.data = <ARRAY_TYPE*>malloc(n*sizeof(ARRAY_TYPE))
+        self.data = <ARRAY_TYPE*>aligned_malloc(n*sizeof(ARRAY_TYPE))
 
         self._setup_npy_array()
 
     def __dealloc__(self):
         """ Frees the array. """
         if self._old_data == NULL:
-            free(<void*>self.data)
+            aligned_free(<void*>self.data)
         else:
-            free(<void*>self._old_data)
+            aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
         """ Get item at position idx. """
@@ -297,7 +368,7 @@ cdef class CLASSNAME(BaseArray):
         cdef ARRAY_TYPE *temp
 
         n_bytes = sizeof(ARRAY_TYPE)*length
-        temp = <ARRAY_TYPE*>malloc(n_bytes)
+        temp = <ARRAY_TYPE*>aligned_malloc(n_bytes)
 
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
@@ -306,7 +377,7 @@ cdef class CLASSNAME(BaseArray):
             if i != new_indices.data[i]:
                 self.data[i] = temp[new_indices.data[i]]
 
-        free(<void*>temp)
+        aligned_free(<void*>temp)
 
     cdef void c_append(self, ARRAY_TYPE value) nogil:
         cdef long l = self.length
@@ -324,10 +395,13 @@ cdef class CLASSNAME(BaseArray):
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
         if size > self.alloc:
-            data = <ARRAY_TYPE*>realloc(self.data, size*sizeof(ARRAY_TYPE))
+            data = <ARRAY_TYPE*>aligned_realloc(
+                self.data, size*sizeof(ARRAY_TYPE),
+                self.alloc*sizeof(ARRAY_TYPE)
+            )
 
             if data == NULL:
-                free(<void*>self.data)
+                aligned_free(<void*>self.data)
                 with gil:
                     raise MemoryError
 
@@ -368,11 +442,14 @@ cdef class CLASSNAME(BaseArray):
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
-        data = <ARRAY_TYPE*>realloc(self.data, size*sizeof(ARRAY_TYPE))
+        data = <ARRAY_TYPE*>aligned_realloc(
+            self.data, size*sizeof(ARRAY_TYPE),
+            self.alloc*sizeof(ARRAY_TYPE)
+        )
 
         if data == NULL:
             # free original data
-            free(<void*>self.data)
+            aligned_free(<void*>self.data)
             with gil:
                 raise MemoryError
 

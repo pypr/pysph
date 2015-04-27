@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sun Apr 26 19:53:05 2015
+# Mon Apr 27 18:40:58 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -11,6 +11,11 @@ Declaration File.
 
 # numpy import
 cimport numpy as np
+
+cdef long aligned(long n, int item_size) nogil
+cdef void* aligned_malloc(size_t bytes) nogil
+cdef void* aligned_realloc(void* existing, size_t bytes, size_t old_size) nogil
+cdef void aligned_free(void* p) nogil
 
 # forward declaration
 cdef class BaseArray
