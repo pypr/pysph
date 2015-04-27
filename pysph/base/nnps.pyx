@@ -1614,14 +1614,12 @@ cdef class LinkedListNNPS(NNPS):
             This improves performance when the neighbors are cached.
         """
         self.set_context(src_index, dst_index)
-        cdef int count
 
         # reset the length of the nbr array
         if prealloc:
             nbrs.length = 0
         else:
             nbrs.reset()
-            nbrs.reserve(1024)
 
         self.find_nearest_neighbors(d_idx, nbrs)
 

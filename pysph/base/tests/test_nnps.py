@@ -275,6 +275,20 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
             assert numpy.all(x == y)
 
 
+def test_large_number_of_neighbors():
+    x = numpy.random.random(1 << 14)*0.1
+    y = x.copy()
+    z = x.copy()
+    h = numpy.ones_like(x)
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
+
+    nps = nnps.LinkedListNNPS(dim=3, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    print nbrs.length
+    assert nbrs.length == len(x)
+
+
 def test_flatten_unflatten():
     # first consider the 2D case where we assume a 4 X 5 grid of cells
     dim = 2
