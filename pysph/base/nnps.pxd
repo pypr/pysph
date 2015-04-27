@@ -104,16 +104,14 @@ cdef class NeighborCache:
     cdef NNPS _nnps
     cdef UIntArray _pid_to_tid
     cdef UIntArray _start_stop
-    cdef unsigned int **_neighbors
-    cdef UIntArray _array_size   # The size of the neighbors[idx] array.
+    cdef void **_neighbors
+    cdef list _neighbor_arrays
     cdef int _narrays
     cdef list _particles
     cdef int _last_avg_nbr_size
     cdef bint _dirty
 
-    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil
-
-    cdef size_t get_neighbors_raw(self, size_t d_idx, unsigned int** nbrs) nogil
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
     cdef void find_all_neighbors(self)
     cpdef update(self)
@@ -160,10 +158,10 @@ cdef class NNPS:
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
 
-    cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cdef size_t get_nearest_neighbors_raw(self, size_t d_idx, 
-                                          unsigned int **nbrs) nogil
+    cdef void get_nearest_neighbors(self, size_t d_idx, 
+                                      UIntArray nbrs) nogil
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type
@@ -220,7 +218,7 @@ cdef class LinkedListNNPS(NNPS):
     cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
     cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
             int* ncells_per_dim, int dim, int n_cells) nogil
-    cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
 
 # NNPS using the linked list approach

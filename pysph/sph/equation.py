@@ -424,7 +424,7 @@ class Group(object):
             elif isinstance(value, (list, tuple)):
                 if mode == 'declare':
                     decl.append('cdef DoubleArray _{var} = '\
-                        'DoubleArray(self._aligned({size})*self.n_threads)'.format(
+                        'DoubleArray(aligned({size}, 8)*self.n_threads)'.format(
                             var=var, size=len(value)
                         )
                     )
@@ -584,7 +584,7 @@ class Group(object):
             value = self.context[var]
             if isinstance(value, (list, tuple)):
                 code.append(
-                    '{var} = &_{var}.data[threadid()*self._aligned({size})]'\
+                    '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'\
                         .format(size=len(value), var=var)
                 )
         return '\n'.join(code)

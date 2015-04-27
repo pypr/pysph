@@ -60,20 +60,17 @@ src_array_index = src.index
 nnps.set_context(src_array_index, dst_array_index)
 
 ${helper.get_parallel_block()}
-    DT_ADAPT = &_DT_ADAPT.data[threadid()*self._aligned(3)]
+    thread_id = threadid()
+    DT_ADAPT = &_DT_ADAPT.data[thread_id*aligned(3, 8)]
     ${indent(eq_group.get_variable_array_setup(), 1)}
     for d_idx in prange(NP_DEST):
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
         nbrs = NULL
-        if nnps.use_cache:
-            n_neighbors = nnps.get_nearest_neighbors_raw(d_idx, &nbrs)
-        else:
-            nbrs = &self.nbrs.data[4096*threadid()]
-            n_neighbors = nnps.get_nearest_neighbors_raw(d_idx, &nbrs)
-        for nbr_idx in range(n_neighbors):
-            s_idx = <int>nbrs[nbr_idx]
+        nnps.get_nearest_neighbors(d_idx, <UIntArray>self.nbrs[thread_id])
+        for nbr_idx in range((<UIntArray>self.nbrs[thread_id]).length):
+            s_idx = <int>((<UIntArray>self.nbrs[thread_id]).data[nbr_idx])
             ###########################################################
             ## Iterate over the equations for the same set of neighbors.
             ###########################################################
@@ -136,7 +133,8 @@ from pysph.base.reduce_array import mpi_reduce_array as parallel_reduce_array
 % endif
 
 from pysph.base.nnps import get_number_of_threads
-from pyzoltan.core.carray cimport DoubleArray, IntArray, UIntArray
+from pyzoltan.core.carray cimport (DoubleArray, IntArray, UIntArray,
+    aligned, aligned_free, aligned_malloc)
 
 ${header}
 
@@ -174,7 +172,8 @@ cdef class AccelerationEval:
     cdef public ParticleArrayWrapper ${pa_names}
     cdef public NNPS nnps
     cdef public int n_threads
-    cdef UIntArray nbrs
+    cdef public list _nbr_refs
+    cdef void **nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
     ${indent(helper.get_kernel_defs(), 1)}
@@ -183,21 +182,31 @@ cdef class AccelerationEval:
     def __init__(self, kernel, equations, particle_arrays):
         self.particle_arrays = tuple(particle_arrays)
         self.n_threads = get_number_of_threads()
+        cdef int i
         for i, pa in enumerate(particle_arrays):
             name = pa.name
             setattr(self, name, ParticleArrayWrapper(pa, i))
 
-        # FIXME: Assuming that there will never be more than 4096 neighbors
-        # per particle.
-        self.nbrs = UIntArray(4096*self.n_threads)
+        self.nbrs = <void**>aligned_malloc(sizeof(void*)*self.n_threads)
+        cdef UIntArray _arr
+        self._nbr_refs = []
+        for i in range(self.n_threads):
+            _arr = UIntArray()
+            _arr.reserve(1024)
+            self.nbrs[i] = <void*>_arr
+            self._nbr_refs.append(_arr)
+
         ${indent(helper.get_kernel_init(), 2)}
         ${indent(helper.get_equation_init(), 2)}
+
+    def __dealloc__(self):
+        aligned_free(self.nbrs)
 
     cdef _initialize_dt_adapt(self, double* DT_ADAPT):
         self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
         cdef int i, _idx, offset
         cdef double* dta = DT_ADAPT
-        offset = self._aligned(3)
+        offset = aligned(3, sizeof(double))
         for i in range(self.n_threads):
             _idx = i*offset
             dta[_idx + 0] = self.dt_cfl
@@ -207,7 +216,7 @@ cdef class AccelerationEval:
     cdef _set_dt_adapt(self, double* DT_ADAPT):
         cdef int i, _idx, offset
         cdef double* dta = DT_ADAPT
-        offset = self._aligned(3)
+        offset = aligned(3, sizeof(double))
         for i in range(self.n_threads):
             _idx = i*offset
             dta[0] = max(dta[0], dta[_idx + 0])
@@ -217,16 +226,6 @@ cdef class AccelerationEval:
         self.dt_cfl = dta[0]
         self.dt_force = dta[1]
         self.dt_viscous = dta[2]
-
-    cdef inline int _aligned(self, int size) nogil:
-        """Predefined for a double, this aligns the memory to 64 byte
-        cache lines.  Size is the number of double values that are 
-        required.
-        """
-        if size%8 == 0:
-            return size
-        else:
-            return (8*size/64 + 1)*8
 
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
@@ -238,12 +237,10 @@ cdef class AccelerationEval:
 
     cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
-        cdef int s_idx, d_idx
-        cdef unsigned int* nbrs
+        cdef int s_idx, d_idx, thread_id
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
-        cdef long n_neighbors
-        cdef DoubleArray _DT_ADAPT = DoubleArray(self._aligned(3)*self.n_threads)
+        cdef DoubleArray _DT_ADAPT = DoubleArray(aligned(3, 8)*self.n_threads)
         self._initialize_dt_adapt(_DT_ADAPT.data)
         cdef double* DT_ADAPT = _DT_ADAPT.data
 

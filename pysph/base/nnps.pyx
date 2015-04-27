@@ -5,7 +5,6 @@ from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel import parallel, prange, threadid
 
 # malloc and friends
-from libc.stdlib cimport malloc, realloc, free, abort
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
@@ -52,7 +51,7 @@ ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray
+from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
@@ -822,7 +821,6 @@ cdef class Cell:
 
 
 ###############################################################################
-@cython.no_gc_clear
 cdef class NeighborCache:
     def __init__(self, NNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
@@ -844,21 +842,19 @@ cdef class NeighborCache:
         self._last_avg_nbr_size = nnbr
         self._start_stop = UIntArray()
         self._pid_to_tid = UIntArray()
-        self._neighbors = <unsigned int**>malloc(
-            sizeof(unsigned int *)*self._n_threads
+        self._neighbor_arrays = []
+        self._neighbors = <void**>aligned_malloc(
+            sizeof(void*)*self._n_threads
         )
-        self._array_size = UIntArray(self._n_threads)
 
+        cdef UIntArray _arr
         for i in range(self._n_threads):
-            self._neighbors[i] = NULL
-            self._array_size[i] = 0
+            _arr = UIntArray()
+            self._neighbor_arrays.append(_arr)
+            self._neighbors[i] = <void*>_arr
 
     def __dealloc__(self):
-        cdef int i
-        for i in range(self._n_threads):
-            if self._array_size.data[i] > 0:
-                free(self._neighbors[i])
-        free(self._neighbors)
+        aligned_free(self._neighbors)
 
     #### Public protocol ################################################
 
@@ -866,19 +862,17 @@ cdef class NeighborCache:
         if self._dirty:
             self._nnps.set_context(self._src_index, self._dst_index)
             self.find_all_neighbors()
-        cdef size_t start, end, tid
-        start = self._start_stop.data[2*d_idx]
-        end = self._start_stop.data[2*d_idx + 1]
-        tid = self._pid_to_tid.data[d_idx]
-        nbrs.c_set_view(&self._neighbors[tid][start], end - start)
+        self.get_neighbors_raw(d_idx, nbrs)
 
-    cdef size_t get_neighbors_raw(self, size_t d_idx, unsigned int** nbrs) nogil:
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
         cdef size_t start, end, tid
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
         tid = self._pid_to_tid.data[d_idx]
-        nbrs[0] = (&self._neighbors[tid][start])
-        return end - start
+        nbrs.c_set_view(
+            &(<UIntArray>self._neighbors[tid]).data[start], 
+            end - start
+        )
 
     cdef void find_all_neighbors(self):
         if not self._dirty:
@@ -897,68 +891,37 @@ cdef class NeighborCache:
         cdef int n_threads = self._n_threads
 
         thread_id = 0
-        array_size = self._array_size
         start_stop = self._start_stop
         pid_to_tid = self._pid_to_tid
         start_stop.resize(np*2)
         pid_to_tid.resize(np)
         cdef UIntArray n_done = UIntArray(n_threads)
-        cdef UIntArray count = UIntArray(n_threads)
-        cdef unsigned int _count = 0
 
         for i in range(n_threads):
-            self._resize(i, self._last_avg_nbr_size*np/n_threads + safety, False)
-            n_done.data[i] = 0
-            count.data[i] = 0
+            (<UIntArray>self._neighbors[i]).c_reserve(
+                self._last_avg_nbr_size*np/n_threads + safety
+            )
 
         with nogil, parallel():
             thread_id = threadid()
             for d_idx in prange(np):
-                _count = count.data[thread_id]
                 pid_to_tid.data[d_idx] = thread_id
-
-                if array_size.data[thread_id] < _count + safety:
-                    avg_nnbr = <int>(_count/n_done.data[thread_id]) + 1
-                    self._resize(
-                        thread_id, <int>(avg_nnbr*np*1.1/n_threads) + safety, False
-                    )
-
-                length = self._nnps.find_nearest_neighbors(
-                    d_idx,
-                    &self._neighbors[thread_id][_count]
+                start_stop.data[d_idx*2] = \
+                    (<UIntArray>self._neighbors[thread_id]).length
+                self._nnps.find_nearest_neighbors(
+                    d_idx, <UIntArray>self._neighbors[thread_id]
                 )
-                start_stop.data[d_idx*2] = _count
-                _count = _count + length
-                count.data[thread_id] = _count
-                start_stop.data[d_idx*2+1] = _count
-                n_done.data[thread_id] += 1
-
-            self._resize(thread_id, count.data[thread_id], True)
+                start_stop.data[d_idx*2+1] = \
+                    (<UIntArray>self._neighbors[thread_id]).length
 
         cdef size_t total = 0
         for i in range(n_threads):
-            total += array_size.data[i]
+            total += (<UIntArray>self._neighbors[i]).length
         self._last_avg_nbr_size = int(total/np) + 1
         self._dirty = False
 
     cpdef update(self):
         self._dirty = True
-
-    #### Private protocol ################################################
-
-    cdef void _resize(self, int thread_id, size_t size, bint squeeze) nogil:
-        cdef unsigned int *data
-        cdef size_t safe_size = max(16, size)
-        if (safe_size > self._array_size.data[thread_id]) or squeeze:
-            data = <unsigned int *>realloc(
-                self._neighbors[thread_id], safe_size*sizeof(unsigned int)
-            )
-            if data == NULL:
-                free(data)
-                abort()
-
-            self._array_size.data[thread_id] = safe_size
-            self._neighbors[thread_id] = data
 
 
 ##############################################################################
@@ -1091,17 +1054,16 @@ cdef class NNPS:
             if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
-    cdef int find_nearest_neighbors(self, size_t d_idx,
-                                    unsigned int* nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
         # Implement this in the subclass to actually do something useful.
-        return 0
+        pass
 
-    cdef size_t get_nearest_neighbors_raw(self, size_t d_idx,
-                                          unsigned int** nbrs) nogil:
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
         if self.use_cache:
-            return self.current_cache.get_neighbors_raw(d_idx, nbrs)
+            self.current_cache.get_neighbors_raw(d_idx, nbrs)
         else:
-            return self.find_nearest_neighbors(d_idx, nbrs[0])
+            nbrs.c_reset()
+            self.find_nearest_neighbors(d_idx, nbrs)
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -1526,11 +1488,12 @@ cdef class LinkedListNNPS(NNPS):
 
     #### Public protocol ################################################
 
-    cdef int find_nearest_neighbors(self, size_t d_idx, unsigned int* nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
         """Low level, high-performance non-gil method to find neighbors.
-        This requires that `set_context()` be called beforehand.
+        This requires that `set_context()` be called beforehand.  This method
+        does not reset the neighbors array before it appends the
+        neighbors to it.
 
-        Returns an integer of the number of neighbors it found.
         """
         # Number of cells
         cdef int n_cells = self.n_cells
@@ -1568,7 +1531,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef double xij2
         cdef double hi2, hj2
         cdef int ierr, nnbrs
-        cdef unsigned int _next, count
+        cdef unsigned int _next
         cdef int ix, iy, iz
 
         # this is the physica position of the particle that will be
@@ -1593,7 +1556,6 @@ cdef class LinkedListNNPS(NNPS):
         hi2 = radius_scale * d_h[d_idx]
         hi2 *= hi2
 
-        count = 0
         # Begin search through neighboring cells
         for ix in range(3):
             for iy in range(3):
@@ -1621,13 +1583,10 @@ cdef class LinkedListNNPS(NNPS):
 
                             # select neighbor
                             if ( (xij2 < hi2) or (xij2 < hj2) ):
-                                nbrs[count] = _next
-                                count += 1
+                                nbrs.c_append(_next)
 
                             # get the 'next' particle in this cell
                             _next = next[_next]
-
-        return count
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
                             size_t d_idx, UIntArray nbrs, bint prealloc):
@@ -1662,13 +1621,9 @@ cdef class LinkedListNNPS(NNPS):
             nbrs.length = 0
         else:
             nbrs.reset()
-            nbrs.reserve(4096)
+            nbrs.reserve(1024)
 
-        count = self.find_nearest_neighbors(d_idx, nbrs.data)
-
-        nbrs.length = count
-        if not prealloc:
-            nbrs.resize(count)
+        self.find_nearest_neighbors(d_idx, nbrs)
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
         cdef UIntArray head = self.heads[pa_index]

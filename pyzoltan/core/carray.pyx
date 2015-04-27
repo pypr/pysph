@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Mon Apr 27 18:56:44 2015
+# Mon Apr 27 20:33:57 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -424,7 +424,7 @@ cdef class IntArray(BaseArray):
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
         data = <int*>aligned_realloc(
-            self.data, size*sizeof(int), 
+            self.data, size*sizeof(int),
             self.alloc*sizeof(int)
         )
 
@@ -836,7 +836,7 @@ cdef class DoubleArray(BaseArray):
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
         data = <double*>aligned_realloc(
-            self.data, size*sizeof(double), 
+            self.data, size*sizeof(double),
             self.alloc*sizeof(double)
         )
 
@@ -1248,7 +1248,7 @@ cdef class FloatArray(BaseArray):
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
         data = <float*>aligned_realloc(
-            self.data, size*sizeof(float), 
+            self.data, size*sizeof(float),
             self.alloc*sizeof(float)
         )
 
@@ -1660,7 +1660,7 @@ cdef class LongArray(BaseArray):
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
         data = <long*>aligned_realloc(
-            self.data, size*sizeof(long), 
+            self.data, size*sizeof(long),
             self.alloc*sizeof(long)
         )
 
@@ -2072,7 +2072,7 @@ cdef class UIntArray(BaseArray):
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
         data = <unsigned int*>aligned_realloc(
-            self.data, size*sizeof(unsigned int), 
+            self.data, size*sizeof(unsigned int),
             self.alloc*sizeof(unsigned int)
         )
 
