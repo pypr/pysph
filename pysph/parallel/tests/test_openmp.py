@@ -28,7 +28,7 @@ class TestOpenMPExamples(ExampleTestCase):
     @attr(slow=True)
     def test_3Ddam_break_example(self):
         dt = 1e-5; tf = 25*dt
-        serial_kwargs = dict(timestep=dt, tf=tf)
+        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=100)
         extra_parallel_kwargs = dict(openmp=None)
         # Note that we set nprocs=1 here since we do not want
         # to run this with mpirun.
@@ -52,7 +52,7 @@ class TestOpenMPExamples(ExampleTestCase):
 
     def test_ldcavity_example(self):
         dt=1e-4; tf=200*dt
-        serial_kwargs = dict(timestep=dt, tf=tf)
+        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=500)
         extra_parallel_kwargs = dict(openmp=None)
         # Note that we set nprocs=1 here since we do not want
         # to run this with mpirun.

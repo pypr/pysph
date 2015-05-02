@@ -19,7 +19,7 @@ class ParallelTests(ExampleTestCase):
     @attr(slow=True, parallel=True)
     def test_3Ddam_break_example(self):
         dt = 1e-5; tf = 100*dt
-        serial_kwargs = dict(timestep=dt, tf=tf)
+        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=200)
         extra_parallel_kwargs = dict(ghost_layers=1, lb_freq=5)
         self.run_example(
             'dambreak3D.py', nprocs=4, atol=1e-4,
@@ -42,7 +42,7 @@ class ParallelTests(ExampleTestCase):
     @attr(parallel=True)
     def test_ldcavity_example(self):
         dt=1e-4; tf=200*dt
-        serial_kwargs = dict(timestep=dt, tf=tf)
+        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=500)
         extra_parallel_kwargs = dict(ghost_layers=3, lb_freq=5)
         self.run_example(
             'cavity.py', nprocs=4, atol=1e-4, serial_kwargs=serial_kwargs,
