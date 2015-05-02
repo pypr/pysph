@@ -140,7 +140,7 @@ example if the total mass or total force on a particle array needs to be
 calculated, a fixed size constant can be added.  This can be done by adding a
 ``constant`` to the array as illustrated below:
 
-.. code-block::python
+.. code-block:: python
 
     >>> pa.add_constant('total_mass', 0.0)
     >>> pa.add_constant('total_force', [0.0, 0.0, 0.0])
@@ -156,7 +156,7 @@ The constants can also set in the constructor of the :py:class:`ParticleArray`
 by passing a dictionary of constants as a ``constants`` keyword argument.  For
 example:
 
-.. code-block::python
+.. code-block:: python
 
     >>> pa = ParticleArray(
     ...     name='test', x=x,
@@ -259,7 +259,7 @@ construct a :py:class:`DomainManager` object like so
    >>> from pysph.base.nnps import DomainManager
    >>> from pysph.base.point import Point
    >>> domain = DomainManager(xmin, xmax, ymin, ymax, zmin, zmax,
-                              periodic_in_x=True, periodic_in_y=True, 
+                              periodic_in_x=True, periodic_in_y=True,
                               periodic_in_z=False)
 
 where `xmin ... zmax` are floating point arguments delimiting the
