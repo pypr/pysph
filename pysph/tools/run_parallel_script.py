@@ -10,9 +10,9 @@ def skip_if_no_mpi4py():
     try:
         import mpi4py.MPI as mpi
     except ImportError:
-        import nose.plugins.skip as skip
+        from nose.plugins.skip import SkipTest
         reason = "mpi4py not installed"
-        raise skip.SkipTest(reason)
+        raise SkipTest(reason)
 
 def get_directory(file):
     return dirname(abspath(file))
