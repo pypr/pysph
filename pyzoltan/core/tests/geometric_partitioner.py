@@ -1,5 +1,7 @@
 """Clone of the Zoltan tests for the geometric partitioners (RCB, RIB
 and HSFC)"""
+
+from os.path import abspath, dirname, join
 import sys
 
 import mpi4py.MPI as mpi
@@ -7,6 +9,8 @@ comm = mpi.COMM_WORLD
 
 from pyzoltan.core.carray import UIntArray, DoubleArray
 from pyzoltan.core import zoltan
+
+MY_DIR = dirname(abspath(__file__))
 
 ack_tag = 5
 count_tag = 10
@@ -18,7 +22,7 @@ ack = 0
 import numpy as np
 from numpy import loadtxt
 
-def read_input_file(fname='mesh.txt'):
+def read_input_file(fname=join(MY_DIR, 'mesh.txt')):
     rank = comm.Get_rank()
     size = comm.Get_size()
 

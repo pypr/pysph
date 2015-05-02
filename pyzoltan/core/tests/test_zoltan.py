@@ -11,19 +11,22 @@ path = run_parallel_script.get_directory(__file__)
 class PyZoltanTests(unittest.TestCase):
 
     @attr(slow=False, parallel=True)
-    def _test_zoltan_geometric_partitioner(self):
+    def test_zoltan_geometric_partitioner(self):
         run_parallel_script.run(
-            path=path, filename='geometric_partitioner.py', nprocs=4, args=['>mesh.out'])
+            filename='geometric_partitioner.py', nprocs=4, path=path
+        )
 
     @attr(slow=True, parallel=True)
     def test_zoltan_partition(self):
         run_parallel_script.run(
-            path=path, filename='3d_partition.py', nprocs=4, timeout=40.0)
+            filename='3d_partition.py', nprocs=4, timeout=40.0, path=path
+        )
 
     @attr(slow=False, parallel=True)
     def test_zoltan_zcomm(self):
         run_parallel_script.run(
-            path=path, filename='zcomm.py', nprocs=4)
+            filename='zcomm.py', nprocs=4, path=path
+        )
 
 if __name__ == '__main__':
     unittest.main()
