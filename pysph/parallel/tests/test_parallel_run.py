@@ -6,24 +6,17 @@ This is done till better strategy for parallel testing is implemented
 
 """
 
-try:
-    import mpi4py.MPI as mpi
-except ImportError:
-    import nose.plugins.skip as skip
-    reason = "mpi4py not installed"
-    raise skip.SkipTest(reason)
-
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
 import unittest
-import numpy
 
 from nose.plugins.attrib import attr
 
 from pysph.solver.utils import load, get_files
 from pysph.tools import run_parallel_script
 
+run_parallel_script.skip_if_no_mpi4py()
 
 path = run_parallel_script.get_directory(__file__)
 

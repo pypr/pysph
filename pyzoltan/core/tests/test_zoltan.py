@@ -1,11 +1,12 @@
 """Running script for Zoltan"""
-from pysph.tools import run_parallel_script
 
 import unittest
 from nose.plugins.attrib import attr
 
+from pysph.tools import run_parallel_script
+
+run_parallel_script.skip_if_no_mpi4py()
 path = run_parallel_script.get_directory(__file__)
-print path
 
 class PyZoltanTests(unittest.TestCase):
 

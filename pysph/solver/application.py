@@ -2,7 +2,7 @@
 import os
 import logging
 from optparse import OptionParser, OptionGroup, Option
-from os.path import basename, splitext, abspath
+from os.path import abspath, basename, splitext
 import sys
 import time
 
@@ -51,7 +51,7 @@ class Application(object):
         self._parallel_manager = None
 
         if fname == None:
-            fname = sys.argv[0].split('.')[0]
+            fname = splitext(basename(abspath(sys.argv[0])))[0]
 
         self.fname = fname
 
