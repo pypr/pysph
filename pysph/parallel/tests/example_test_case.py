@@ -40,11 +40,14 @@ class ExampleTestCase(unittest.TestCase):
         cmd_line = []
         for key, value in kwargs.iteritems():
             option = _key_to_option(key)
-            cmd_line.append(
-                "--{option}={value}".format(
+            if value is None:
+                arg = "--{option}".format(option=option)
+            else:
+                arg = "--{option}={value}".format(
                     option=option, value=str(value)
                 )
-            )
+
+            cmd_line.append(arg)
         return cmd_line
 
     def run_example(self, filename, nprocs=2, timeout=300, atol=1e-14,
@@ -67,7 +70,9 @@ class ExampleTestCase(unittest.TestCase):
             Absolute tolerance for differences between the runs.
 
         serial_kwargs : dict
-            The options to pass for a serial run.
+            The options to pass for a serial run.  Note that if the value of a
+            particular key is None, the option is simply set and no value
+            passed.  For example if `openmp=None`, then `--openmp` is used.
 
         extra_parallel_kwargs: dict
             The extra options to pass for the parallel run.
@@ -125,15 +130,19 @@ class ExampleTestCase(unittest.TestCase):
             shutil.rmtree(dir2, True)
 
         # test
-        self._test(serial, parallel, atol)
+        self._test(serial, parallel, atol, nprocs)
 
-    def _test(self, serial, parallel, atol):
+    def _test(self, serial, parallel, atol, nprocs):
         # make sure the arrays are at the same time
         self.assertAlmostEqual( serial.time, parallel.time, 12)
 
         # test the results.
         xs, ys, zs, rhos  = serial.get("x","y", "z", "rho")
         xp, yp, zp, rhop, gid = parallel.get("x", "y", "z", "rho", 'gid')
+
+        if nprocs == 1:
+            # Not really a parallel run (used for openmp support).
+            gid = np.arange(xs.size)
 
         self.assertTrue( xs.size, xp.size )
 
