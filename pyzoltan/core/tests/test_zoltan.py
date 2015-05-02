@@ -2,10 +2,16 @@
 
 import unittest
 from nose.plugins.attrib import attr
+from nose.plugins.skip import SkipTest
 
 from pysph.tools import run_parallel_script
 
 run_parallel_script.skip_if_no_mpi4py()
+try:
+    from pyzoltan.core import zoltan
+except ImportError:
+    raise SkipTest('Build does not support Zoltan.')
+
 path = run_parallel_script.get_directory(__file__)
 
 class PyZoltanTests(unittest.TestCase):
