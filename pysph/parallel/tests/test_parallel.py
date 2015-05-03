@@ -14,11 +14,11 @@ path = run_parallel_script.get_directory(__file__)
 
 class ParticleArrayExchangeTestCase(unittest.TestCase):
 
-    @attr(slow=False, parallel=True)
+    @attr(parallel=True)
     def test_lb_exchange(self):
         run_parallel_script.run(filename='lb_exchange.py', nprocs=4, path=path)
 
-    @attr(slow=False, parallel=True)
+    @attr(parallel=True)
     def test_remote_exchange(self):
         run_parallel_script.run(filename='remote_exchange.py', nprocs=4, path=path)
 
@@ -39,13 +39,13 @@ class MPIReduceArrayTestCase(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.root)
 
-    @attr(slow=False, parallel=True)
+    @attr(parallel=True)
     def test_mpi_reduce_array(self):
         run_parallel_script.run(
             filename='reduce_array.py', nprocs=4, path=path
         )
 
-    @attr(slow=False, parallel=True)
+    @attr(parallel=True)
     def test_parallel_reduce(self):
         args = ['--directory=%s'%self.root]
         run_parallel_script.run(
@@ -55,7 +55,7 @@ class MPIReduceArrayTestCase(unittest.TestCase):
 
 class DumpLoadTestCase(unittest.TestCase):
 
-    @attr(slow=False, parallel=True)
+    @attr(parallel=True)
     def test_dump_and_load_work_in_parallel(self):
         run_parallel_script.run(
             filename='check_dump_load.py', nprocs=4, path=path
