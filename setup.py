@@ -1,18 +1,3 @@
-"""
-PySPH
-=====
-
-A general purpose Smoothed Particle Hydrodynamics framework.
-
-This package provides a general purpose framework for SPH simulations
-in Python.  The framework emphasizes flexibility and efficiency while
-allowing most of the user code to be written in pure Python.  See here:
-
-    http://pysph.googlecode.com
-
-for more information.
-"""
-
 import numpy
 import commands
 import os
@@ -322,7 +307,7 @@ setup(name='PySPH',
       author = 'PySPH Developers',
       author_email = 'pysph-dev@googlegroups.com',
       description = "A general purpose Smoothed Particle Hydrodynamics framework",
-      long_description = __doc__,
+      long_description = open('README.rst').read(),
       url = 'http://pysph.googlecode.com',
       license = "BSD",
       keywords = "SPH simulation computational fluid dynamics",
@@ -330,7 +315,7 @@ setup(name='PySPH',
       packages = find_packages(),
       # exclude package data in installation.
       exclude_package_data={
-          '' : ['Makefile', '*.bat', '*.cfg','*.md', '*.sh', '*.yml'],
+          '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
         },
 
       ext_modules = ext_modules,
