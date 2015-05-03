@@ -326,16 +326,15 @@ setup(name='PySPH',
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
       packages = find_packages(),
-      # include Cython headers in the install directory
-      package_data={'' : ['*.pxd', '*.mako']},
+      # exclude package data in installation.
+      exclude_package_data={
+          '' : ['Makefile', '*.bat', '*.cfg','*.md', '*.sh', '*.yml'],
+        },
 
       ext_modules = ext_modules,
 
       include_package_data = True,
       cmdclass=cmdclass,
-      #install_requires=['mpi4py>=1.2', 'numpy>=1.0.3', 'Cython>=0.14'],
-      #setup_requires=['Cython>=0.14', 'setuptools>=0.6c1'],
-      #extras_require={'3D': 'Mayavi>=3.0'},
       zip_safe = False,
       entry_points = """
           [console_scripts]
