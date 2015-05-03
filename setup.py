@@ -247,6 +247,7 @@ if Have_MPI:
             name="pyzoltan.core.zoltan_dd",
             sources=["pyzoltan/core/zoltan_dd.pyx"],
             depends=get_deps(
+                "pyzoltan/core/carray",
                 "pyzoltan/czoltan/czoltan_dd",
                 "pyzoltan/czoltan/czoltan_types"
             ),
@@ -261,7 +262,10 @@ if Have_MPI:
         Extension(
             name="pyzoltan.core.zoltan_comm",
             sources=["pyzoltan/core/zoltan_comm.pyx"],
-            depends=get_deps("pyzoltan/czoltan/zoltan_comm"),
+            depends=get_deps(
+                "pyzoltan/core/carray",
+                "pyzoltan/czoltan/zoltan_comm"
+            ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
             libraries=['zoltan', 'mpi'],

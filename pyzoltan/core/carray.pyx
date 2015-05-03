@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Mon Apr 27 20:33:57 2015
+# Sun May  3 16:19:12 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -280,7 +280,6 @@ cdef class IntArray(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:
@@ -692,7 +691,6 @@ cdef class DoubleArray(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:
@@ -1104,7 +1102,6 @@ cdef class FloatArray(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:
@@ -1516,7 +1513,6 @@ cdef class LongArray(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:
@@ -1928,7 +1924,6 @@ cdef class UIntArray(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:

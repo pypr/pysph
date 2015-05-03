@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Mon Apr 27 18:40:58 2015
+# Sun May  3 16:19:12 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -27,7 +27,7 @@ cdef class BaseArrayIter:
 
 cdef class BaseArray:
     """Base class for managed C-arrays."""
-    cdef public long length, alloc, _length
+    cdef public long length, alloc
     cdef np.ndarray _npy_array
 
     cdef void c_align_array(self, LongArray new_indices) nogil
