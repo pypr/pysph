@@ -314,9 +314,11 @@ if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
         execfile(generator, d)
         d['main'](None)
 
+info = {}
+execfile(path.join('pysph', '__init__.py'), info)
 
 setup(name='PySPH',
-      version = '1.0alpha',
+      version = info['__version__'],
       author = 'PySPH Developers',
       author_email = 'pysph-dev@googlegroups.com',
       description = "A general purpose Smoothed Particle Hydrodynamics framework",
