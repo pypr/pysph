@@ -66,7 +66,7 @@ cdef int Ghost = ParticleTAGS.Ghost
 ctypedef pair[unsigned int, unsigned int] id_gid_pair_t
 
 
-cdef inline bint _compare_gids(id_gid_pair_t &x, id_gid_pair_t &y) nogil:
+cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) nogil:
     return y.second > x.second
 
 cdef inline double norm2(double x, double y, double z) nogil:
