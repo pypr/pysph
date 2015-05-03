@@ -934,8 +934,7 @@ cdef class NNPS:
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, bint warn=True,
-                 cache=False):
+                 int ghost_layers=1, domain=None, cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -952,9 +951,6 @@ cdef class NNPS:
 
         domain : DomainManager, default (None)
             Optional limits for the domain
-
-        warn : bint
-            Flag to warn when extending particle lists
 
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
@@ -983,9 +979,6 @@ cdef class NNPS:
 
         # periodicity
         self.is_periodic = self.domain.is_periodic
-
-        # warn
-        self.warn = warn
 
         # The total number of cells.
         self.n_cells = 0
@@ -1205,7 +1198,7 @@ cdef class DictBoxSortNNPS(NNPS):
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, warn=True, cache=False):
+                 int ghost_layers=1, domain=None, cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1223,16 +1216,13 @@ cdef class DictBoxSortNNPS(NNPS):
         domain : DomainManager, default (None)
             Optional limits for the domain
 
-        warn : bint
-            Flag to warn when extending particle lists
-
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
             storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            self, dim, particles, radius_scale, ghost_layers, domain,
             cache
         )
 
@@ -1253,7 +1243,8 @@ cdef class DictBoxSortNNPS(NNPS):
         DictBoxSortNNPS, use the more efficient LinkedListNNPS instead.
         Disabling caching for now.
         """
-        print msg
+        if cache:
+            print(msg)
         self.use_cache = False
 
 
@@ -1432,7 +1423,7 @@ cdef class LinkedListNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None,
-                 bint fixed_h=False, bint warn=True, bint cache=False):
+                 bint fixed_h=False, bint cache=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1456,16 +1447,13 @@ cdef class LinkedListNNPS(NNPS):
         fixed_h : bint
             Optional flag to use constant cell sizes throughout.
 
-        warn : bint
-            Flag to warn when extending particle lists
-
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
             storage but speeds up neighbor calculations.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn,
+            self, dim, particles, radius_scale, ghost_layers, domain,
             cache
         )
 

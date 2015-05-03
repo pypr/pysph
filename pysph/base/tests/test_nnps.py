@@ -65,14 +65,16 @@ class SimpleNNPSTestCase(unittest.TestCase):
         pa = get_particle_array(x=x, y=y, z=z, h=h)
 
         self.dict_box_sort_nnps = nnps.DictBoxSortNNPS(
-            dim=3, particles=[pa,], radius_scale=1.0, warn=False
+            dim=3, particles=[pa,], radius_scale=1.0
         )
 
         self.box_sort_nnps = nnps.BoxSortNNPS(
-            dim=3, particles=[pa,], radius_scale=1.0, warn=False)
+            dim=3, particles=[pa,], radius_scale=1.0
+        )
 
         self.ll_nnps = nnps.LinkedListNNPS(
-            dim=3, particles=[pa,], radius_scale=1.0, warn=False)
+            dim=3, particles=[pa,], radius_scale=1.0
+        )
 
         # these are the expected cells
         self.expected_cells = {
@@ -187,7 +189,9 @@ class DictBoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.DictBoxSortNNPS(dim=3, particles=self.particles, radius_scale=2.0, warn=False)
+        self.nps = nnps.DictBoxSortNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
 
     def test_neighbors_aa(self):
         self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
@@ -207,7 +211,7 @@ class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.BoxSortNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0, warn=False
+            dim=3, particles=self.particles, radius_scale=2.0
         )
 
 
@@ -216,7 +220,7 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.LinkedListNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0, warn=False
+            dim=3, particles=self.particles, radius_scale=2.0
         )
 
     def test_cell_index_positivity(self):

@@ -122,7 +122,6 @@ cdef class NNPS:
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef public bint warn             # Flag to warn when extending lists
     cdef public bint trace            # Flag for timing and debugging
     cdef public list particles        # list of particle arrays
     cdef public list pa_wrappers      # list of particle array wrappers
