@@ -122,7 +122,6 @@ cdef class NNPS:
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef public bint trace            # Flag for timing and debugging
     cdef public list particles        # list of particle arrays
     cdef public list pa_wrappers      # list of particle array wrappers
     cdef public int narrays           # Number of particle arrays
@@ -141,6 +140,7 @@ cdef class NNPS:
     cdef public double radius_scale   # Radius scale for kernel
     cdef IntArray cell_shifts         # cell shifts
     cdef public int n_cells           # number of cells
+    cdef public bint sort_gids        # Sort neighbors by their gids.
 
     ##########################################################################
     # Member functions
@@ -153,6 +153,9 @@ cdef class NNPS:
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
     cpdef _bin(self, int pa_index, UIntArray indices)
+
+    cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
+                              unsigned int *gids) nogil
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)

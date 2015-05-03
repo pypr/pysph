@@ -217,6 +217,12 @@ class Application(object):
                                 action="store_true", default=False,
                         help="Option to enable the use of neighbor caching.")
 
+        nnps_options.add_option(
+            "--sort-gids", dest="sort_gids", action="store_true",
+            default=False, help="Sort neighbors by the GIDs to get "\
+            "consistent results in serial and parallel (slows down a bit)."
+        )
+
         parser.add_option_group( nnps_options )
 
         # Zoltan Options
@@ -637,13 +643,16 @@ class Application(object):
                 nnps = BoxSortNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    cache=cache)
+                    cache=cache, sort_gids=options.sort_gids
+                )
 
             elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache)
+                    fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
+                )
 
         # once the NNPS has been set-up, we set the default Solver
         # post-stage callback to the DomainManager.setup_domain

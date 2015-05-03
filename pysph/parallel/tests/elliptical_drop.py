@@ -119,7 +119,7 @@ equations = [
     Group( equations=[
 
             UpdateSmoothingLengthFerrari(dest='fluid', sources=None, dim=2, hdx=hdx),
-            ], real=True ),
+            ], real=False),
 
 
     ]

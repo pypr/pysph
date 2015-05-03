@@ -278,6 +278,55 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
             x.sort(); y.sort()
             assert numpy.all(x == y)
 
+class TestNNPSWithSorting(unittest.TestCase):
+    def _make_particles(self, nx=20):
+        x = numpy.linspace(0, 1, nx)
+        h = numpy.ones_like(x)/(nx-1)
+
+        pa = get_particle_array(name='fluid', x=x, h=h)
+        nps = nnps.LinkedListNNPS(dim=1, particles=[pa], sort_gids=True)
+        return pa, nps
+
+    def test_nnps_sorts_without_gids(self):
+        # Given
+        pa, nps = self._make_particles(10)
+
+        # When
+        nps.set_context(0, 0)
+        # Test the that gids are actually huge and invalid.
+        self.assertEqual(numpy.max(pa.gid), numpy.min(pa.gid))
+        self.assertTrue(numpy.max(pa.gid) > pa.gid.size)
+
+        # Then
+        nbrs = UIntArray()
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nb = nbrs.get_npy_array()
+            sorted_nbrs = nb.copy()
+            sorted_nbrs.sort()
+            self.assertTrue(numpy.all(nb == sorted_nbrs))
+
+    def test_nnps_sorts_with_valid_gids(self):
+        # Given
+        pa, nps = self._make_particles(10)
+        pa.gid[:] = numpy.arange(pa.x.size)
+        nps.update()
+
+        # When
+        nps.set_context(0, 0)
+        # Test the that gids are actually valid.
+        self.assertEqual(numpy.max(pa.gid), pa.gid.size-1)
+        self.assertEqual(numpy.min(pa.gid), 0)
+
+        # Then
+        nbrs = UIntArray()
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nb = nbrs.get_npy_array()
+            sorted_nbrs = nb.copy()
+            sorted_nbrs.sort()
+            self.assertTrue(numpy.all(nb == sorted_nbrs))
+
 
 def test_large_number_of_neighbors():
     x = numpy.random.random(1 << 14)*0.1

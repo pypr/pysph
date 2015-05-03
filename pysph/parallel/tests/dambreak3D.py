@@ -102,7 +102,7 @@ equations = [
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
             TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-            ]),
+            ], real=False),
 
     # Continuity Momentum and XSPH equations
     Group(equations=[
