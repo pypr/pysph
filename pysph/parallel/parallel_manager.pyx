@@ -24,9 +24,9 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 
 cdef extern from 'math.h':
-    cdef double ceil(double)
-    cdef double floor(double)
-    cdef double fabs(double)
+    cdef double ceil(double) nogil
+    cdef double floor(double) nogil
+    cdef double fabs(double) nogil
 
 cdef extern from 'limits.h':
     cdef int INT_MAX

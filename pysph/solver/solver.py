@@ -39,8 +39,6 @@ class Solver(object):
 
     - pid -- the processor id if running in parallel
 
-    - cell_iteration :bool: -- should we use cell or particle iteration.
-
     """
 
     def __init__(self, dim=2, integrator=None, kernel=None,
@@ -155,9 +153,6 @@ class Solver(object):
         self.output_at_times = numpy.asarray(output_at_times)
         self.force_output = False
 
-        # Use cell iterations or not.
-        self.cell_iteration = False
-
         # Set all extra keyword arguments
         for attr, value in kwargs.iteritems():
             if hasattr(self, attr):
@@ -197,7 +192,7 @@ class Solver(object):
 
         mode = 'mpi' if self.in_parallel else 'serial'
         self.acceleration_eval = AccelerationEval(
-            particles, equations, self.kernel, self.cell_iteration, mode
+            particles, equations, self.kernel, mode
         )
 
         sph_compiler = SPHCompiler(
@@ -266,11 +261,6 @@ class Solver(object):
     def set_cfl(self, value):
         'Set the CFL number for adaptive time stepping'
         self.cfl = value
-
-    def set_cell_iteration(self, value):
-        """Set if we should use cell_iteration or not.
-        """
-        self.cell_iteration = value
 
     def set_final_time(self, tf):
         """ Set the final time for the simulation """

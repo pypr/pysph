@@ -24,19 +24,18 @@ class TestNeighborCache(unittest.TestCase):
         particles = [pa1, pa2]
         nnps = LinkedListNNPS(dim=3, particles=particles)
 
-        for dest_index in (0, 1):
-
-            # When
-            cache = NeighborCache(nnps, dest_index)
-            cache.update()
-            nb_cached = UIntArray()
-            nb_direct = UIntArray()
-
-            # Then.
+        for dst_index in (0, 1):
             for src_idx in (0, 1):
-                for i in range(len(particles[dest_index].x)):
+                # When
+                cache = NeighborCache(nnps, dst_index, src_idx)
+                cache.update()
+                nb_cached = UIntArray()
+                nb_direct = UIntArray()
+
+                # Then.
+                for i in range(len(particles[dst_index].x)):
                     nnps.get_nearest_particles_no_cache(
-                        src_idx, dest_index, i, nb_direct, False
+                        src_idx, dst_index, i, nb_direct, False
                     )
                     cache.get_neighbors(src_idx, i, nb_cached)
                     nb_e = nb_direct.get_npy_array()
@@ -53,7 +52,7 @@ class TestNeighborCache(unittest.TestCase):
         # When
         nnps = LinkedListNNPS(dim=3, particles=particles)
         # Cache for neighbors of destination 0.
-        cache = NeighborCache(nnps, dst_index=0)
+        cache = NeighborCache(nnps, dst_index=0, src_index=1)
         cache.update()
 
         # Then
@@ -73,7 +72,7 @@ class TestNeighborCache(unittest.TestCase):
         pa1 = self._make_random_parray('pa1', 5)
         particles = [pa1]
         nnps = LinkedListNNPS(dim=3, particles=particles)
-        cache = NeighborCache(nnps, 0)
+        cache = NeighborCache(nnps, dst_index=0, src_index=0)
         cache.update()
 
         # When

@@ -1,9 +1,12 @@
 # numpy import
 import numpy as np
 cimport numpy as np
+from cython.operator cimport dereference as deref, preincrement as inc
+from cython.parallel import parallel, prange, threadid
 
 # malloc and friends
-from libc.stdlib cimport malloc, free
+from libcpp.map cimport map
+from libcpp.pair cimport pair
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
@@ -13,17 +16,29 @@ from cpython.list cimport PyList_GetItem
 cimport cython
 
 cdef extern from 'math.h':
-    int abs(int)
-    double ceil(double)
-    double floor(double)
-    double fabs(double)
-    double fmax(double, double)
-    double fmin(double, double)
+    int abs(int) nogil
+    double ceil(double) nogil
+    double floor(double) nogil
+    double fabs(double) nogil
+    double fmax(double, double) nogil
+    double fmin(double, double) nogil
+
+IF OPENMP:
+    cimport openmp
+    cpdef int get_number_of_threads():
+        cdef int i, n
+        with nogil, parallel():
+            for i in prange(1):
+                n = openmp.omp_get_num_threads()
+        return n
+ELSE:
+    cpdef int get_number_of_threads():
+        return 1
 
 IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y):
+    cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
-    cdef inline double fmax(double x, double y):
+    cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
 
 
@@ -36,18 +51,22 @@ ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
 
 # Particle Tag information
+from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
 
-cdef inline double norm2(double x, double y, double z):
+
+cdef inline double norm2(double x, double y, double z) nogil:
     return x*x + y*y + z*z
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
+cdef inline long flatten_raw(int x, int y, int z, int* ncells_per_dim,
+        int dim) nogil:
     """Return a flattened index for a cell
 
     The flattening is determined using the row-order indexing commonly
@@ -55,10 +74,23 @@ cdef inline int flatten(cIntPoint cid, IntArray ncells_per_dim, int dim):
     based on alternate orderings.
 
     """
-    cdef int ncx = ncells_per_dim.data[0]
-    cdef int ncy = ncells_per_dim.data[1]
+    cdef long ncx = ncells_per_dim[0]
+    cdef long ncy = ncells_per_dim[1]
 
-    return <int>( cid.x + ncx * cid.y + ncx*ncy * cid.z )
+    return <long>( x + ncx * y + ncx*ncy * z )
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
+    """Return a flattened index for a cell
+
+    The flattening is determined using the row-order indexing commonly
+    employed in SPH. This would need to be changed for hash functions
+    based on alternate orderings.
+
+    """
+    return flatten_raw(cid.x, cid.y, cid.z, ncells_per_dim.data, dim)
 
 def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
@@ -66,45 +98,49 @@ def py_flatten(IntPoint cid, IntArray ncells_per_dim, int dim):
     cdef int flattened_index = flatten( _cid, ncells_per_dim, dim )
     return flattened_index
 
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef inline int get_valid_cell_index(
-    cIntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
+cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
+        int* ncells_per_dim, int dim, int n_cells) nogil:
     """Return the flattened index for a valid cell"""
-    cdef int ncy = ncells_per_dim.data[1]
-    cdef int ncz = ncells_per_dim.data[2]
+    cdef long ncy = ncells_per_dim[1]
+    cdef long ncz = ncells_per_dim[2]
 
-    cdef int cell_index = -1
+    cdef long cell_index = -1
 
     # basic test for valid indices. Since we bin the particles with
     # respect to the origin, negative indices can never occur.
-    cdef bint is_valid = (cid.x > -1) and (cid.y > -1) and (cid.z > -1)
+    cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
 
     # additional check for 1D. This is because we search in all 26
     # neighboring cells for neighbors. In 1D this can be problematic
     # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
     # result in a valid cell with a flattened index < ncells
     if dim == 1:
-        if ( (cid.y > ncy) or (cid.z > ncz) ):
+        if ( (cid_y > ncy) or (cid_z > ncz) ):
             is_valid = False
 
     # Given the validity of the cells, return the flattened cell index
     if is_valid:
-        cell_index = flatten(cid, ncells_per_dim, dim)
+        cell_index = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
 
         if not (-1 < cell_index < n_cells):
             cell_index = -1
 
     return cell_index
 
-def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim, int n_cells):
+def py_get_valid_cell_index(IntPoint cid, IntArray ncells_per_dim, int dim,
+                            int n_cells):
     """Return the flattened cell index for a valid cell"""
-    return get_valid_cell_index(cid.data, ncells_per_dim, dim, n_cells)
+    return get_valid_cell_index(cid.data.x, cid.data.y, cid.data.z,
+            ncells_per_dim.data, dim, n_cells)
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim, int dim):
+cdef inline cIntPoint unflatten(long cell_index, IntArray ncells_per_dim,
+                                int dim):
     """Un-flatten a linear cell index"""
     cdef int ncx = ncells_per_dim.data[0]
     cdef int ncy = ncells_per_dim.data[1]
@@ -130,14 +166,14 @@ cdef inline cIntPoint unflatten(int cell_index, IntArray ncells_per_dim, int dim
     cid = cIntPoint_new( ix, iy, iz )
     return cid
 
-def py_unflatten(int cell_index, IntArray ncells_per_dim, int dim):
+def py_unflatten(long cell_index, IntArray ncells_per_dim, int dim):
     """Python wrapper"""
     cdef cIntPoint _cid = unflatten( cell_index, ncells_per_dim, dim )
     cdef IntPoint cid = IntPoint_from_cIntPoint(_cid)
     return cid
 
 @cython.cdivision(True)
-cdef inline int real_to_int(double real_val, double step):
+cdef inline int real_to_int(double real_val, double step) nogil:
     """ Return the bin index to which the given position belongs.
 
     Parameters:
@@ -155,6 +191,31 @@ cdef inline int real_to_int(double real_val, double step):
     cdef int ret_val = <int>floor( real_val/step )
 
     return ret_val
+
+
+cdef void find_cell_id_raw(double x, double y, double z, double
+                           cell_size, int *ix, int *iy, int *iz) nogil:
+    """ Find the cell index for the corresponding point
+
+    Parameters:
+    -----------
+    x, y, z -- the point for which the index is sought
+    cell_size -- the cell size to use
+    ix, iy, iz -- output parameter holding the cell index
+
+    Algorithm:
+    ----------
+    performs a box sort based on the point and cell size
+
+    Notes:
+    ------
+    Uses the function  `real_to_int`
+
+    """
+    ix[0] = real_to_int(x, cell_size)
+    iy[0] = real_to_int(y, cell_size)
+    iz[0] = real_to_int(z, cell_size)
+
 
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size):
     """ Find the cell index for the corresponding point
@@ -256,9 +317,8 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
     return arange
 
-#################################################################
-# NNPS extension classes
-#################################################################
+
+##############################################################################
 cdef class NNPSParticleArrayWrapper:
     def __init__(self, ParticleArray pa):
         self.pa = pa
@@ -282,6 +342,8 @@ cdef class NNPSParticleArrayWrapper:
         cdef ParticleArray pa = self.pa
         pa.remove_tagged_particles(tag)
 
+
+##############################################################################
 cdef class DomainManager:
     """This class determines the limits of the solution domain.
 
@@ -325,11 +387,7 @@ cdef class DomainManager:
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
 
-    def _check_limits(self, xmin, xmax, ymin, ymax, zmin, zmax):
-        """Sanity check on the limits"""
-        if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
-            raise ValueError("Invalid domain limits!")
-
+    #### Public protocol ################################################
     def set_pa_wrappers(self, wrappers):
         self.pa_wrappers = wrappers
         self.narrays = len(wrappers)
@@ -371,27 +429,11 @@ cdef class DomainManager:
             # create new periodic ghosts
             self._create_ghosts_periodic()
 
-    ####################################################################
-    # Functions for periodicity
-    ####################################################################
-    cdef _remove_ghosts(self):
-        """Remove all ghost particles from a previous step
-
-        While creating periodic neighbors, we create new particles and
-        give them the tag utils.ParticleTAGS.Ghost. Before repeating
-        this step in the next iteration, all current particles with
-        this tag are removed.
-
-        """
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef int narrays = self.narrays
-
-        cdef int array_index
-        cdef NNPSParticleArrayWrapper pa_wrapper
-
-        for array_index in range( narrays ):
-            pa_wrapper = <NNPSParticleArrayWrapper>PyList_GetItem( pa_wrappers, array_index )
-            pa_wrapper.remove_tagged_particles(Ghost)
+    #### Private protocol ###############################################
+    cdef _add_to_array(self, DoubleArray arr, double disp):
+        cdef int i
+        for i in range(arr.length):
+            arr.data[i] += disp
 
     cdef _box_wrap_periodic(self):
         """Box-wrap particles for periodicity
@@ -445,10 +487,10 @@ cdef class DomainManager:
                     if z.data[i] < zmin : z.data[i] = z.data[i] + ztranslate
                     if z.data[i] > zmax : z.data[i] = z.data[i] - ztranslate
 
-    cdef _add_to_array(self, DoubleArray arr, double disp):
-        cdef int i
-        for i in range(arr.length):
-            arr.data[i] += disp
+    def _check_limits(self, xmin, xmax, ymin, ymax, zmin, zmax):
+        """Sanity check on the limits"""
+        if ( (xmax < xmin) or (ymax < ymin) or (zmax < zmin) ):
+            raise ValueError("Invalid domain limits!")
 
     cdef _create_ghosts_periodic(self):
         """Identify boundary particles and create images.
@@ -632,6 +674,27 @@ cdef class DomainManager:
         # set the cell size for the DomainManager
         self.set_cell_size(cell_size)
 
+    cdef _remove_ghosts(self):
+        """Remove all ghost particles from a previous step
+
+        While creating periodic neighbors, we create new particles and
+        give them the tag utils.ParticleTAGS.Ghost. Before repeating
+        this step in the next iteration, all current particles with
+        this tag are removed.
+
+        """
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef int narrays = self.narrays
+
+        cdef int array_index
+        cdef NNPSParticleArrayWrapper pa_wrapper
+
+        for array_index in range( narrays ):
+            pa_wrapper = <NNPSParticleArrayWrapper>PyList_GetItem( pa_wrappers, array_index )
+            pa_wrapper.remove_tagged_particles(Ghost)
+
+
+##############################################################################
 cdef class Cell:
     """Basic indexing structure for the box-sort NNPS.
 
@@ -684,12 +747,7 @@ cdef class Cell:
         # current size of the cell
         self.size = 0
 
-    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices):
-        """Set the global and local indices for the cell"""
-        self.lindices[index] = lindices
-        self.gindices[index] = gindices
-        self.nparticles[index] = lindices.length
-
+    #### Public protocol ################################################
     def get_centroid(self, Point pnt):
         """Utility function to get the centroid of the cell.
 
@@ -734,6 +792,14 @@ cdef class Cell:
         boxmin.data = self.boxmin
         boxmax.data = self.boxmax
 
+    cpdef set_indices(self, int index, UIntArray lindices, UIntArray gindices):
+        """Set the global and local indices for the cell"""
+        self.lindices[index] = lindices
+        self.gindices[index] = gindices
+        self.nparticles[index] = lindices.length
+
+    #### Private protocol ###############################################
+
     cdef _compute_bounding_box(self, double cell_size,
                                int layers):
         self.layers = layers
@@ -753,12 +819,17 @@ cdef class Cell:
         self.boxmin = boxmin
         self.boxmax = boxmax
 
+
+###############################################################################
 cdef class NeighborCache:
-    def __init__(self, NNPS nnps, int dst_index):
+    def __init__(self, NNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
+        self._src_index = src_index
         self._nnps = nnps
         self._particles = nnps.particles
+        self._narrays = nnps.narrays
         cdef int nnbr = 10
+        cdef size_t i
         if self._nnps.dim == 1:
             nnbr = 10
         elif self._nnps.dim == 2:
@@ -766,61 +837,94 @@ cdef class NeighborCache:
         elif self._nnps.dim == 3:
             nnbr = 120
 
-        self._dirty = np.ones(nnps.narrays, dtype=bool)
-        self._last_avg_nbr_size = [nnbr for i in range(nnps.narrays)]
-        self._start_stop = [UIntArray() for i in range(nnps.narrays)]
-        self._neighbors = [UIntArray() for i in range(nnps.narrays)]
+        self._n_threads = get_number_of_threads()
+        self._dirty = True
+        self._last_avg_nbr_size = nnbr
+        self._start_stop = UIntArray()
+        self._pid_to_tid = UIntArray()
+        self._neighbor_arrays = []
+        self._neighbors = <void**>aligned_malloc(
+            sizeof(void*)*self._n_threads
+        )
 
-    cpdef update(self):
-        self._dirty = np.ones(self._nnps.narrays, dtype=bool)
+        cdef UIntArray _arr
+        for i in range(self._n_threads):
+            _arr = UIntArray()
+            self._neighbor_arrays.append(_arr)
+            self._neighbors[i] = <void*>_arr
 
-    cdef _find_all_neighbors(self, int src_idx):
-        cdef size_t count, d_idx, avg_nnbr
-        cdef UIntArray nbrs = UIntArray()
-        cdef UIntArray start_stop, neighbors
+    def __dealloc__(self):
+        aligned_free(self._neighbors)
+
+    #### Public protocol ################################################
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
+        if self._dirty:
+            self._nnps.set_context(self._src_index, self._dst_index)
+            self.find_all_neighbors()
+        self.get_neighbors_raw(d_idx, nbrs)
+
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
+        cdef size_t start, end, tid
+        start = self._start_stop.data[2*d_idx]
+        end = self._start_stop.data[2*d_idx + 1]
+        tid = self._pid_to_tid.data[d_idx]
+        nbrs.c_set_view(
+            &(<UIntArray>self._neighbors[tid]).data[start], 
+            end - start
+        )
+
+    cdef void find_all_neighbors(self):
+        if not self._dirty:
+            return
+
+        cdef long d_idx, avg_nnbr
+        cdef int i, length
+        cdef UIntArray start_stop, array_size, pid_to_tid
+        cdef int src_index = self._src_index
         cdef int dst_index = self._dst_index
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
-        cdef size_t np = self._particles[dst_index].get_number_of_particles()
+        cdef long np = self._particles[dst_index].get_number_of_particles()
+        cdef int thread_id
+        cdef int n_threads = self._n_threads
 
-        count = 0
-        start_stop = self._start_stop[src_idx]
+        thread_id = 0
+        start_stop = self._start_stop
+        pid_to_tid = self._pid_to_tid
         start_stop.resize(np*2)
-        neighbors = self._neighbors[src_idx]
-        neighbors.resize(self._last_avg_nbr_size[src_idx]*np + safety)
+        pid_to_tid.resize(np)
+        cdef UIntArray n_done = UIntArray(n_threads)
 
-        for d_idx in range(np):
-
-            if neighbors.length < count + safety:
-                avg_nnbr = int(count/d_idx) + 1
-                neighbors.resize(int(avg_nnbr*np*1.1) + safety)
-
-            nbrs.set_view(neighbors, count, neighbors.length)
-
-            self._nnps.get_nearest_particles_no_cache(
-                src_idx, dst_index, d_idx, nbrs, True
+        for i in range(n_threads):
+            (<UIntArray>self._neighbors[i]).c_reserve(
+                self._last_avg_nbr_size*np/n_threads + safety
             )
-            start_stop.data[d_idx*2] = count
-            count += nbrs.length
-            start_stop.data[d_idx*2+1] = count
 
-        neighbors.length = count
-        neighbors.squeeze()
+        with nogil, parallel():
+            thread_id = threadid()
+            for d_idx in prange(np):
+                pid_to_tid.data[d_idx] = thread_id
+                start_stop.data[d_idx*2] = \
+                    (<UIntArray>self._neighbors[thread_id]).length
+                self._nnps.find_nearest_neighbors(
+                    d_idx, <UIntArray>self._neighbors[thread_id]
+                )
+                start_stop.data[d_idx*2+1] = \
+                    (<UIntArray>self._neighbors[thread_id]).length
 
-        self._last_avg_nbr_size[src_idx] = int(neighbors.length/np) + 1
-        self._dirty[src_idx] = False
+        cdef size_t total = 0
+        for i in range(n_threads):
+            total += (<UIntArray>self._neighbors[i]).length
+        self._last_avg_nbr_size = int(total/np) + 1
+        self._dirty = False
 
-    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        if self._dirty[src_index]:
-            self._find_all_neighbors(src_index)
-        cdef size_t start, end
-        cdef UIntArray start_stop = self._start_stop[src_index]
-        cdef UIntArray neighbors = self._neighbors[src_index]
-        start = start_stop.data[2*d_idx]
-        end = start_stop.data[2*d_idx + 1]
-        nbrs.set_view(neighbors, start, end)
+    cpdef update(self):
+        self._dirty = True
 
+
+##############################################################################
 cdef class NNPS:
     """Nearest neighbor query class using the box-sort algorithm.
 
@@ -897,196 +1001,15 @@ cdef class NNPS:
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
 
-        # number of particles per cell
-        self.n_part_per_cell = [IntArray() for pa in particles]
-
         # The cache.
         self.use_cache = cache
-        self.cache = [NeighborCache(self, i) for i in range(len(particles))]
+        cache = []
+        for d_idx in range(len(particles)):
+            for s_idx in range(len(particles)):
+                cache.append(NeighborCache(self, d_idx, s_idx))
+        self.cache = cache
 
-    def update_domain(self, *args, **kwargs):
-        self.domain.update()
-
-    cpdef update(self):
-        """Update the local data after particles have moved.
-
-        For parallel runs, we want the NNPS to be independent of the
-        ParallelManager which is solely responsible for distributing
-        particles across available processors. We assume therefore
-        that after a parallel update, each processor has all the local
-        particle information it needs and this operation is carried
-        out locally.
-
-        For serial runs, this method should be called when the
-        particles have moved.
-
-        """
-        cdef int i, num_particles
-        cdef ParticleArray pa
-        cdef UIntArray indices
-
-        cdef DomainManager domain = self.domain
-
-        # use cell sizes computed by the domain.
-        self.cell_size = domain.cell_size
-
-        # compute bounds and refresh the data structure
-        self._compute_bounds()
-        self._refresh()
-
-        # indices on which to bin. We bin all local particles
-        for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
-            # bin the particles
-            self._bin( pa_index=i, indices=indices )
-
-            self.cache[i].update()
-
-    cdef _bin(self, int pa_index, UIntArray indices):
-        raise NotImplementedError("NNPS :: _bin called")
-
-    cpdef _refresh(self):
-        raise NotImplementedError("NNPS :: _refresh called")
-
-    cpdef get_number_of_cells(self):
-        return self.n_cells
-
-    cpdef get_particles_in_cell(self, int cell_index, int pa_index,
-                                UIntArray indices):
-        raise NotImplementedError()
-
-    # return the indices for the particles in neighboring cells
-    cpdef get_particles_in_neighboring_cells(self, int cell_index,
-        int pa_index, UIntArray nbrs):
-        raise NotImplementedError()
-
-    cdef _compute_bounds(self):
-        """Compute coordinate bounds for the particles"""
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef DoubleArray x, y, z
-        cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
-        cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
-
-        for pa_wrapper in pa_wrappers:
-            x = pa_wrapper.x
-            y = pa_wrapper.y
-            z = pa_wrapper.z
-
-            # find min and max of variables
-            x.update_min_max()
-            y.update_min_max()
-            z.update_min_max()
-
-            xmax = fmax(x.maximum, xmax)
-            ymax = fmax(y.maximum, ymax)
-            zmax = fmax(z.maximum, zmax)
-
-            xmin = fmin(x.minimum, xmin)
-            ymin = fmin(y.minimum, ymin)
-            zmin = fmin(z.minimum, zmin)
-
-        # store the minimum and maximum of physical coordinates
-        self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
-        self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
-
-    cpdef count_n_part_per_cell(self):
-        """Count the number of particles in each cell"""
-        raise NotImplementedError("NNPS :: count_n_part_per_cell called")
-
-    def set_in_parallel(self, bint in_parallel):
-        self.domain.in_parallel = in_parallel
-
-    ######################################################################
-    # Neighbor location routines
-    ######################################################################
-    cpdef get_nearest_particles(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
-        if self.use_cache:
-            return self.cache[dst_index].get_neighbors(src_index, d_idx, nbrs)
-        else:
-            return self.get_nearest_particles_no_cache(
-                src_index, dst_index, d_idx, nbrs, False
-            )
-
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-                            size_t d_idx, UIntArray nbrs, bint prealloc):
-        raise NotImplementedError("NNPS :: get_nearest_particles_no_cache called")
-
-    cpdef get_nearest_particles_filtered(
-        self,int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs):
-        """Filter the nearest neighbors from a list of potential neighbors
-
-        For cell based iteration, the nearest neighbors for a given
-        particle, using the cell iteration (which is faster) is
-        obtained in the following way:
-
-        (a) For each cell (cell_index), we first get the indices for
-        the destination particle array within that cell using
-        'nnps.get_particles_in_cell(cell_index, ...)
-
-        (b) The list of potential neighbors from the source array,
-        with respect to this cell is then sought using
-        'nnps.get_particles_in_neighboring_cells(cell_index, ...)'
-
-        (c) Now we iterate over each destination particle (obtained
-        from step (a) above) and filter the neighbors based on a
-        gather and scatter approach using
-        'nnps.get_nearest_particles_filtered(...)'
-
-        """
-        # src and dst particle arrays
-        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
-        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
-
-        # Source data arrays
-        cdef DoubleArray s_x = src.x
-        cdef DoubleArray s_y = src.y
-        cdef DoubleArray s_z = src.z
-        cdef DoubleArray s_h = src.h
-        cdef UIntArray s_gid = src.gid
-
-        # Destination data arrays
-        cdef DoubleArray d_x = dst.x
-        cdef DoubleArray d_y = dst.y
-        cdef DoubleArray d_z = dst.z
-        cdef DoubleArray d_h = dst.h
-        cdef UIntArray d_gid = dst.gid
-
-        # cell size and radius_scale
-        cdef double cell_size = self.cell_size
-        cdef double radius_scale = self.radius_scale
-
-        # locals
-        cdef cPoint xi, xj
-        cdef double hi, hj, xij
-        cdef int npotential_nbrs = potential_nbrs.length
-        cdef int indexj, j
-        cdef int nnbrs
-
-        # gather search radius for particle 'i'
-        xi = cPoint_new(d_x.data[d_idx], d_y.data[d_idx],  d_z.data[d_idx])
-        hi = radius_scale * d_h.data[d_idx]
-
-        # reset the nbr array length
-        nbrs.reset()
-
-        # search for true neighbors
-        for indexj in range( npotential_nbrs ):
-            j = potential_nbrs.data[indexj]
-
-            xj = cPoint_new( s_x.data[j], s_y.data[j], s_z.data[j] )
-            hj = radius_scale * s_h.data[j]
-
-            xij = cPoint_distance(xi, xj)
-
-            # select neighbor
-            if ( (xij < hi) or (xij < hj) ):
-                nbrs.append( j )
+    #### Public protocol #################################################
 
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -1131,8 +1054,150 @@ cdef class NNPS:
             if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
-cdef class BoxSortNNPS(NNPS):
-    """Nearest neighbor query class using the box-sort algorithm.
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        # Implement this in the subclass to actually do something useful.
+        pass
+
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        if self.use_cache:
+            self.current_cache.get_neighbors_raw(d_idx, nbrs)
+        else:
+            nbrs.c_reset()
+            self.find_nearest_neighbors(d_idx, nbrs)
+
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs):
+        cdef int idx = dst_index*self.narrays + src_index
+        if self.use_cache:
+            return self.cache[idx].get_neighbors(src_index, d_idx, nbrs)
+        else:
+            return self.get_nearest_particles_no_cache(
+                src_index, dst_index, d_idx, nbrs, False
+            )
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc):
+        raise NotImplementedError("NNPS :: get_nearest_particles_no_cache called")
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Setup the context before asing for neighbors.  The `dst_index`
+        represents the particles for whom the neighbors are to be determined
+        from the particle array with index `src_index`.
+
+        Parameters
+        ----------
+
+         src_index: int: the source index of the particle array.
+         dst_index: int: the destination index of the particle array.
+        """
+        cdef int idx = dst_index*self.narrays + src_index
+        self.src_index = src_index
+        self.dst_index = dst_index
+        self.current_cache = self.cache[idx]
+
+    def set_in_parallel(self, bint in_parallel):
+        self.domain.in_parallel = in_parallel
+
+    cpdef spatially_order_particles(self, int pa_index):
+        """Spatially order particles such that nearby particles have indices
+        nearer each other.  This may improve pre-fetching on the CPU.
+        """
+        cdef LongArray indices = LongArray()
+        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
+        self.get_spatially_ordered_indices(pa_index, indices)
+        cdef BaseArray arr
+
+        for arr in pa.properties.values():
+            arr.c_align_array(indices)
+
+    def update_domain(self, *args, **kwargs):
+        self.domain.update()
+
+    cpdef update(self):
+        """Update the local data after particles have moved.
+
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
+
+        """
+        cdef int i, num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        cdef DomainManager domain = self.domain
+
+        # use cell sizes computed by the domain.
+        self.cell_size = domain.cell_size
+
+        # compute bounds and refresh the data structure
+        self._compute_bounds()
+        self._refresh()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa_index=i, indices=indices )
+
+        for cache in self.cache:
+            cache.update()
+
+    #### Private protocol ################################################
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        raise NotImplementedError("NNPS :: _bin called")
+
+    cpdef _refresh(self):
+        raise NotImplementedError("NNPS :: _refresh called")
+
+    cdef _compute_bounds(self):
+        """Compute coordinate bounds for the particles"""
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef DoubleArray x, y, z
+        cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
+        cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
+
+        for pa_wrapper in pa_wrappers:
+            x = pa_wrapper.x
+            y = pa_wrapper.y
+            z = pa_wrapper.z
+
+            # find min and max of variables
+            x.update_min_max()
+            y.update_min_max()
+            z.update_min_max()
+
+            xmax = fmax(x.maximum, xmax)
+            ymax = fmax(y.maximum, ymax)
+            zmax = fmax(z.maximum, zmax)
+
+            xmin = fmin(x.minimum, xmin)
+            ymin = fmin(y.minimum, ymin)
+            zmin = fmin(z.minimum, zmin)
+
+        # store the minimum and maximum of physical coordinates
+        self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
+        self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
+
+
+##############################################################################
+cdef class DictBoxSortNNPS(NNPS):
+    """Nearest neighbor query class using the box-sort algorithm using a
+    dictionary.
 
     NNPS bins all local particles using the box sort algorithm in
     Cells. The cells are stored in a dictionary 'cells' which is keyed
@@ -1180,142 +1245,19 @@ cdef class BoxSortNNPS(NNPS):
         self.domain.update()
         self.update()
 
-    cpdef _refresh(self):
-        "Clear the cells dict"
-        cdef dict cells = self.cells
-        PyDict_Clear( cells )
-
-    cdef _bin(self, int pa_index, UIntArray indices):
-        """Bin a given particle array with indices.
-
-        Parameters:
-        -----------
-
-        pa_index : int
-            Index of the particle array corresponding to the particles list
-
-        indices : UIntArray
-            Subset of particles to bin
-
+        msg = """WARNING: The cache will currently work only if
+        find_nearest_neighbors works and can be used without requiring
+        the GIL.  The DictBoxSort does not work with OpenMP since it uses
+        Python objects and cannot release the GIL.  Until this is fixed,
+        we cannot use caching, or parallel neighbor finding using this
+        DictBoxSortNNPS, use the more efficient LinkedListNNPS instead.
+        Disabling caching for now.
         """
-        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[ pa_index ]
-        cdef DoubleArray x = pa_wrapper.x
-        cdef DoubleArray y = pa_wrapper.y
-        cdef DoubleArray z = pa_wrapper.z
+        print msg
+        self.use_cache = False
 
-        cdef dict cells = self.cells
-        cdef double cell_size = self.cell_size
 
-        cdef UIntArray lindices, gindices
-        cdef size_t num_particles, indexi, i
-
-        cdef cIntPoint _cid
-        cdef IntPoint cid
-
-        cdef Cell cell
-        cdef int ierr, narrays = self.narrays
-
-        # now begin binning the particles
-        num_particles = indices.length
-        for indexi in range(num_particles):
-            i = indices.data[indexi]
-
-            pnt = cPoint_new( x.data[i], y.data[i], z.data[i] )
-            _cid = find_cell_id( pnt, cell_size )
-
-            cid = IntPoint_from_cIntPoint(_cid)
-
-            ierr = PyDict_Contains(cells, cid)
-            if ierr == 0:
-                cell = Cell(cid, cell_size, narrays)
-                cells[ cid ] = cell
-
-            # add this particle to the list of indicies
-            cell = <Cell>PyDict_GetItem( cells, cid )
-            lindices = <UIntArray>PyList_GetItem( cell.lindices, pa_index )
-
-            lindices.append( <ZOLTAN_ID_TYPE> i )
-            #gindices.append( gid.data[i] )
-
-        self.n_cells = <int>len(cells)
-        self._cell_keys = cells.keys()
-
-    ######################################################################
-    # Neighbor location routines
-    ######################################################################
-    cpdef get_particles_in_cell(
-        self, int cell_index, int pa_index, UIntArray indices):
-        """Return the indices for the particles within this cell"""
-        cdef dict cells = self.cells
-
-        # locals
-        cdef int i
-        cdef Cell cell = <Cell>PyDict_GetItem(cells,
-                                              self._cell_keys[cell_index])
-        cdef UIntArray cell_indices = cell.lindices[ pa_index ]
-        cdef int nindices = cell_indices.length
-
-        # reset the indices to 0
-        indices.reset()
-
-        # now add indices from this cell
-        for i in range( nindices ):
-            indices.append( cell_indices.data[i] )
-
-    cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs):
-        """Return indices for particles in neighboring cells.
-
-        Parameters:
-        -----------
-
-        cell_index : int
-            Cell index in the range [0,ncells_tot]
-
-        pa_index : int
-            Index of the particle array in the particles list
-
-        nbrs : UIntArray (output)
-            Neighbors for the requested particle are stored here.
-
-        """
-        cdef dict cells = self.cells
-        cdef IntArray shifts = self.cell_shifts
-
-        # locals
-        cdef int ierr, i, j, k
-        cdef Cell cell
-        cdef IntPoint _cid = IntPoint_new(0, 0, 0)
-        cdef UIntArray cell_indices
-        cdef int num_indices, local_index
-
-        cdef IntPoint cell_id = <IntPoint>self._cell_keys[cell_index]
-        cdef int cx = cell_id.data.x
-        cdef int cy = cell_id.data.y
-        cdef int cz = cell_id.data.z
-
-        # reset the nbr array length to 0
-        nbrs.reset()
-
-        # search for potential neighbors
-        for i in range(3):
-            for j in range(3):
-                for k in range(3):
-                    _cid.data.x = cx + shifts.data[i]
-                    _cid.data.y = cy + shifts.data[j]
-                    _cid.data.z = cz + shifts.data[k]
-
-                    # see if the cell exists
-                    ierr = PyDict_Contains( cells, _cid )
-
-                    if ierr == 1:
-                        cell  = <Cell>PyDict_GetItem(cells, _cid)
-                        cell_indices = <UIntArray>PyList_GetItem(cell.lindices, pa_index)
-                        num_indices = cell_indices.length
-
-                        # add the potential neighbors
-                        for local_index in range(num_indices):
-                            nbrs.append( cell_indices.data[local_index] )
+    #### Public protocol ################################################
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
                             size_t d_idx, UIntArray nbrs, bint prealloc):
@@ -1421,35 +1363,70 @@ cdef class BoxSortNNPS(NNPS):
         if prealloc:
             nbrs.length = count
 
-    cpdef count_n_part_per_cell(self):
-        """Count the number of particles in each cell"""
-        cdef int n_arrays = self.narrays
-        cdef int n_cells = self.n_cells
-        cdef list cell_keys = self._cell_keys
+    #### Private protocol ################################################
+
+    cpdef _refresh(self):
+        """Clear the cells dict"""
         cdef dict cells = self.cells
-        cdef list n_part_per_cell = self.n_part_per_cell
+        PyDict_Clear( cells )
 
-        # Locals
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        """Bin a given particle array with indices.
+
+        Parameters:
+        -----------
+
+        pa_index : int
+            Index of the particle array corresponding to the particles list
+
+        indices : UIntArray
+            Subset of particles to bin
+
+        """
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[ pa_index ]
+        cdef DoubleArray x = pa_wrapper.x
+        cdef DoubleArray y = pa_wrapper.y
+        cdef DoubleArray z = pa_wrapper.z
+
+        cdef dict cells = self.cells
+        cdef double cell_size = self.cell_size
+
+        cdef UIntArray lindices, gindices
+        cdef size_t num_particles, indexi, i
+
+        cdef cIntPoint _cid
+        cdef IntPoint cid
+
         cdef Cell cell
-        cdef int i, j
-        cdef IntArray n_part_per_cell_indices
-        cdef UIntArray cell_indices
-        cdef IntPoint cell_key
+        cdef int ierr, narrays = self.narrays
 
-        # iterate over all cells and count the number of particles
-        for i in range( n_arrays ):
-            n_part_per_cell_indices = <IntArray>PyList_GetItem(n_part_per_cell, i)
-            n_part_per_cell_indices.resize(n_cells)
+        # now begin binning the particles
+        num_particles = indices.length
+        for indexi in range(num_particles):
+            i = indices.data[indexi]
 
-            for j in range( n_cells ):
-                cell_key = <IntPoint>PyList_GetItem(cell_keys, j)
-                cell = <Cell>PyDict_GetItem(cells, cell_key)
-                cell_indices = <UIntArray>PyList_GetItem(cell.lindices, i)
+            pnt = cPoint_new( x.data[i], y.data[i], z.data[i] )
+            _cid = find_cell_id( pnt, cell_size )
 
-                # store the number of particles in this cell
-                n_part_per_cell_indices.data[j] = cell_indices.length
+            cid = IntPoint_from_cIntPoint(_cid)
+
+            ierr = PyDict_Contains(cells, cid)
+            if ierr == 0:
+                cell = Cell(cid, cell_size, narrays)
+                cells[ cid ] = cell
+
+            # add this particle to the list of indicies
+            cell = <Cell>PyDict_GetItem( cells, cid )
+            lindices = <UIntArray>PyList_GetItem( cell.lindices, pa_index )
+
+            lindices.append( <ZOLTAN_ID_TYPE> i )
+            #gindices.append( gid.data[i] )
+
+        self.n_cells = <int>len(cells)
+        self._cell_keys = cells.keys()
 
 
+#############################################################################
 cdef class LinkedListNNPS(NNPS):
     """Nearest neighbor query class using the linked list method.
     """
@@ -1509,7 +1486,183 @@ cdef class LinkedListNNPS(NNPS):
         self.domain.update()
         self.update()
 
-    cdef _bin(self, int pa_index, UIntArray indices):
+    #### Public protocol ################################################
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        """Low level, high-performance non-gil method to find neighbors.
+        This requires that `set_context()` be called beforehand.  This method
+        does not reset the neighbors array before it appends the
+        neighbors to it.
+
+        """
+        # Number of cells
+        cdef int n_cells = self.n_cells
+        cdef int dim = self.dim
+
+        # cell shifts
+        cdef int* shifts = self.cell_shifts.data
+
+        # Source data arrays
+        cdef double* s_x = self.src.x.data
+        cdef double* s_y = self.src.y.data
+        cdef double* s_z = self.src.z.data
+        cdef double* s_h = self.src.h.data
+        cdef unsigned int* s_gid = self.src.gid.data
+
+        # Destination particle arrays
+        cdef double* d_x = self.dst.x.data
+        cdef double* d_y = self.dst.y.data
+        cdef double* d_z = self.dst.z.data
+        cdef double* d_h = self.dst.h.data
+        cdef unsigned int* d_gid = self.dst.gid.data
+
+        cdef unsigned int* head = self.head.data
+        cdef unsigned int* next = self.next.data
+
+        # minimum values for the particle distribution
+        cdef double* xmin = self.xmin.data
+
+        # cell size and radius
+        cdef double radius_scale = self.radius_scale
+        cdef double cell_size = self.cell_size
+
+        # locals
+        cdef size_t indexj
+        cdef double xij2
+        cdef double hi2, hj2
+        cdef int ierr, nnbrs
+        cdef unsigned int _next
+        cdef int ix, iy, iz
+
+        # this is the physica position of the particle that will be
+        # used in pairwise searching
+        cdef double x = d_x[d_idx]
+        cdef double y = d_y[d_idx]
+        cdef double z = d_z[d_idx]
+
+        # get the un-flattened index for the destination particle with
+        # respect to the minimum
+        cdef int _cid_x, _cid_y, _cid_z
+        find_cell_id_raw(
+            x - xmin[0], y - xmin[1], z - xmin[2],
+            cell_size, &_cid_x, &_cid_y, &_cid_z
+        )
+
+        cdef int cid_x, cid_y, cid_z
+        cdef long cell_index
+        cid_x = cid_y = cid_z = 0
+
+        # gather search radius
+        hi2 = radius_scale * d_h[d_idx]
+        hi2 *= hi2
+
+        # Begin search through neighboring cells
+        for ix in range(3):
+            for iy in range(3):
+                for iz in range(3):
+                    cid_x = _cid_x + shifts[ix]
+                    cid_y = _cid_y + shifts[iy]
+                    cid_z = _cid_z + shifts[iz]
+
+                    # Only consider valid cell indices
+                    cell_index = self._get_valid_cell_index(
+                        cid_x, cid_y, cid_z,
+                        self.ncells_per_dim.data, dim, n_cells
+                    )
+                    if cell_index > -1:
+
+                        # get the first particle and begin iteration
+                        _next = head[ cell_index ]
+                        while( _next != UINT_MAX ):
+                            hj2 = radius_scale * s_h[_next]
+                            hj2 *= hj2
+
+                            xij2 = norm2( s_x[_next]-x,
+                                          s_y[_next]-y,
+                                          s_z[_next]-z )
+
+                            # select neighbor
+                            if ( (xij2 < hi2) or (xij2 < hj2) ):
+                                nbrs.c_append(_next)
+
+                            # get the 'next' particle in this cell
+                            _next = next[_next]
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+                            size_t d_idx, UIntArray nbrs, bint prealloc):
+        """Utility function to get near-neighbors for a particle.
+
+        Parameters:
+        -----------
+
+        src_index : int
+            Index of the source particle array in the particles list
+
+        dst_index : int
+            Index of the destination particle array in the particles list
+
+        d_idx : int (input)
+            Destination particle for which neighbors are sought.
+
+        nbrs : UIntArray (output)
+            Neighbors for the requested particle are stored here.
+
+        prealloc : bool
+            Specifies if the neighbor array already has pre-allocated space
+            for the neighbor list.  In this case the neighbors are directly set
+            in the given array without resetting or appending to the array.
+            This improves performance when the neighbors are cached.
+        """
+        self.set_context(src_index, dst_index)
+
+        # reset the length of the nbr array
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.reset()
+
+        self.find_nearest_neighbors(d_idx, nbrs)
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        cdef UIntArray head = self.heads[pa_index]
+        cdef UIntArray next = self.nexts[pa_index]
+        cdef ZOLTAN_ID_TYPE _next
+        indices.reset()
+        cdef long i
+
+        for i in range(self.n_cells):
+            _next = head.data[i]
+            while (_next != UINT_MAX):
+                indices.append(<long>_next)
+                _next = next.data[_next]
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Setup the context before asking for neighbors.  The `dst_index`
+        represents the particles for whom the neighbors are to be determined
+        from the particle array with index `src_index`.
+
+        Parameters
+        ----------
+
+         src_index: int: the source index of the particle array.
+         dst_index: int: the destination index of the particle array.
+        """
+        NNPS.set_context(self, src_index, dst_index)
+
+        # Set the current context.
+        self.src = self.pa_wrappers[ src_index ]
+        self.dst = self.pa_wrappers[ dst_index ]
+
+        # next and head linked lists
+        self.next = self.nexts[ src_index ]
+        self.head = self.heads[ src_index ]
+
+        if self.use_cache:
+            self.current_cache.find_all_neighbors()
+
+    #### Private protocol ################################################
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
         Parameters:
@@ -1544,9 +1697,6 @@ cdef class LinkedListNNPS(NNPS):
         cdef cPoint pnt = cPoint_new(0, 0, 0)
         cdef int _cid
 
-        # flattened cell index
-        cdef int cell_index
-
         # now bin the particles
         num_particles = indices.length
         for indexi in range(num_particles):
@@ -1559,30 +1709,25 @@ cdef class LinkedListNNPS(NNPS):
             pnt.z = z.data[i] - xmin.data[2]
 
             # flattened cell index
-            _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
+            _cid = self._get_flattened_cell_index(pnt, cell_size)
 
             # insert this particle
             next.data[ i ] = head.data[ _cid ]
             head.data[_cid] = i
 
-    cpdef _refresh(self):
-        """Refresh the head and next arrays locally"""
-        cdef DomainManager domain = self.domain
-        cdef int narrays = self.narrays
-        cdef DoubleArray xmin = self.xmin
-        cdef DoubleArray xmax = self.xmax
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size):
+        return flatten(
+            find_cell_id(pnt, cell_size), self.ncells_per_dim, self.dim
+        )
+
+    cpdef long _get_number_of_cells(self) except -1:
         cdef double cell_size = self.cell_size
         cdef double cell_size1 = 1./cell_size
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef list heads = self.heads
-        cdef list nexts = self.nexts
+        cdef DoubleArray xmin = self.xmin
+        cdef DoubleArray xmax = self.xmax
+        cdef int ncx, ncy, ncz
+        cdef long _ncells
         cdef int dim = self.dim
-
-        # locals
-        cdef int i, j, np
-        cdef int ncx, ncy, ncz, _ncells
-        cdef UIntArray head, next
 
         # calculate the number of cells.
         ncx = <int>ceil( cell_size1*(xmax.data[0] - xmin.data[0]) )
@@ -1593,6 +1738,7 @@ cdef class LinkedListNNPS(NNPS):
             msg = 'LinkedListNNPS: Number of cells is negative '\
                    '(%s, %s, %s).'%(ncx, ncy, ncz)
             raise RuntimeError(msg)
+            return -1
 
         # number of cells along each coordinate direction
         self.ncells_per_dim.data[0] = ncx
@@ -1603,12 +1749,44 @@ cdef class LinkedListNNPS(NNPS):
         _ncells = ncx
         if dim == 2: _ncells = ncx * ncy
         if dim == 3: _ncells = ncx * ncy * ncz
-        self.n_cells = <int>_ncells
+        return _ncells
 
-        if _ncells < 0 or _ncells > 2**28:
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil:
+        return get_valid_cell_index(
+            cid_x, cid_y, cid_z, ncells_per_dim, dim, n_cells
+        )
+
+    cpdef long _count_occupied_cells(self, long n_cells) except -1:
+        if n_cells < 0 or n_cells > 2**28:
             # unsigned ints are 4 bytes, which means 2**28 cells requires 1GB.
-            msg = "ERROR: LinkedListNNPS requires too many cells (%s)."%_ncells
+            msg = "ERROR: LinkedListNNPS requires too many cells (%s)."%n_cells
             raise RuntimeError(msg)
+            return -1
+
+        return n_cells
+
+    cpdef _refresh(self):
+        """Refresh the head and next arrays locally"""
+        cdef DomainManager domain = self.domain
+        cdef int narrays = self.narrays
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef list heads = self.heads
+        cdef list nexts = self.nexts
+
+        # locals
+        cdef int i, j, np
+        cdef long _ncells
+        cdef UIntArray head, next
+
+        _ncells = self._get_number_of_cells()
+
+        _ncells = self._count_occupied_cells(_ncells)
+
+        self.n_cells = <int>_ncells
 
         # initialize the head and next arrays
         for i in range(narrays):
@@ -1629,250 +1807,108 @@ cdef class LinkedListNNPS(NNPS):
             for j in range(np):
                 next.data[j] = UINT_MAX
 
-    cpdef get_particles_in_cell(
-        self, int cell_index, int pa_index, UIntArray indices):
-        """Return the indices for the particles within this cell"""
-        cdef UIntArray head = self.heads[ pa_index ]
-        cdef UIntArray next = self.nexts[ pa_index ]
 
-        cdef ZOLTAN_ID_TYPE _next
+#############################################################################
+cdef class BoxSortNNPS(LinkedListNNPS):
 
-        # reset the indices length
-        indices.reset()
+    """Nearest neighbor query class using the box sort method but which
+    uses the LinkedList algorithm.  This makes this very fast but
+    perhaps not as safe as the DictBoxSortNNPS.  All this class does 
+    is to use a std::map to obtain a linear cell index from the actual 
+    flattened cell index.
+    """
 
-        # get the first particle in this cell
-        _next = head.data[ cell_index ]
-        while( _next != UINT_MAX ):
-            # add to the list of particle indices and find next
-            indices.append( _next )
-            _next = next.data[ _next ]
+    #### Private protocol ################################################
 
-    cpdef count_n_part_per_cell(self):
-        "Count the number of particles in the cell"
-        cdef int narrays = self.narrays
-        cdef int n_cells = self.n_cells
-        cdef list heads = self.heads
-        cdef list nexts = self.nexts
-        cdef list n_part_per_cell = self.n_part_per_cell
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size):
+        cdef long cell_id = flatten(
+            find_cell_id(pnt, cell_size), self.ncells_per_dim, self.dim
+        )
+        return self.cell_to_index[cell_id]
 
-        # Locals
-        cdef unsigned int _next
-        cdef IntArray n_part_per_cell_indices
-        cdef UIntArray head, next
-        cdef int i, j, count
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef inline long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil:
+        """Return the flattened index for a valid cell"""
+        cdef long ncy = ncells_per_dim[1]
+        cdef long ncz = ncells_per_dim[2]
 
-        for i in range(narrays):
-            head = <UIntArray>PyList_GetItem( heads, i )
-            next = <UIntArray>PyList_GetItem( nexts, i )
+        cdef long cell_id
+        cdef long cell_index = -1
 
-            n_part_per_cell_indices = <IntArray>PyList_GetItem(
-                n_part_per_cell, i)
-            n_part_per_cell_indices.resize(n_cells)
+        # basic test for valid indices. Since we bin the particles with
+        # respect to the origin, negative indices can never occur.
+        cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
 
-            for j in range(n_cells):
-                count = 0
-                _next = head.data[ j ]
-                while (_next != UINT_MAX):
-                    count = count + 1
-                    _next = next.data[_next]
+        # additional check for 1D. This is because we search in all 26
+        # neighboring cells for neighbors. In 1D this can be problematic
+        # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
+        # result in a valid cell with a flattened index < ncells
+        if dim == 1:
+            if ( (cid_y > ncy) or (cid_z > ncz) ):
+                is_valid = False
 
-                n_part_per_cell_indices.data[j] = count
+        # Given the validity of the cells, return the flattened cell index
+        cdef map[long, int].iterator it
+        if is_valid:
+            cell_id = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
+            if cell_id > -1:
+                it = self.cell_to_index.find(cell_id)
+                if it != self.cell_to_index.end():
+                    cell_index = deref(it).second
 
-    ######################################################################
-    # Neighbor location routines
-    ######################################################################
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-                            size_t d_idx, UIntArray nbrs, bint prealloc):
-        """Utility function to get near-neighbors for a particle.
+        return cell_index
 
-        Parameters:
-        -----------
-
-        src_index : int
-            Index of the source particle array in the particles list
-
-        dst_index : int
-            Index of the destination particle array in the particles list
-
-        d_idx : int (input)
-            Destination particle for which neighbors are sought.
-
-        nbrs : UIntArray (output)
-            Neighbors for the requested particle are stored here.
-
-        prealloc : bool
-            Specifies if the neighbor array already has pre-allocated space
-            for the neighbor list.  In this case the neighbors are directly set
-            in the given array without resetting or appending to the array.
-            This improves performance when the neighbors are cached.
-        """
-        # src and dst particle arrays
-        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[ src_index ]
-        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[ dst_index ]
-
-        # src and dst linked lists
-        cdef UIntArray next = self.nexts[ src_index ]
-        cdef UIntArray head = self.heads[ src_index ]
-
-        # Number of cells
-        cdef IntArray ncells_per_dim = self.ncells_per_dim
-        cdef int n_cells = self.n_cells
-        cdef int dim = self.dim
-
-        # cell shifts
-        cdef IntArray shifts = self.cell_shifts
-
-        # Source data arrays
-        cdef DoubleArray s_x = src.x
-        cdef DoubleArray s_y = src.y
-        cdef DoubleArray s_z = src.z
-        cdef DoubleArray s_h = src.h
-        cdef UIntArray s_gid = src.gid
-
-        # Destination particle arrays
-        cdef DoubleArray d_x = dst.x
-        cdef DoubleArray d_y = dst.y
-        cdef DoubleArray d_z = dst.z
-        cdef DoubleArray d_h = dst.h
-        cdef UIntArray d_gid = dst.gid
-
-        # minimum values for the particle distribution
+    cpdef long _count_occupied_cells(self, long n_cells) except -1:
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int np
+        cdef DoubleArray x, y, z
         cdef DoubleArray xmin = self.xmin
-
-        # cell size and radius
-        cdef double radius_scale = self.radius_scale
+        cdef DoubleArray xmax = self.xmax
+        cdef IntArray ncells_per_dim = self.ncells_per_dim
+        cdef int narrays = self.narrays
+        cdef int dim = self.dim
         cdef double cell_size = self.cell_size
 
-        # locals
-        cdef UIntArray lindices
-        cdef size_t indexj
-        cdef double xij2
-        cdef double hi2, hj2
-        cdef int ierr, nnbrs
-        cdef unsigned int _next, count
-        cdef int ix, iy, iz
+        cdef cPoint pnt = cPoint_new(0, 0, 0)
+        cdef long _cid
+        cdef map[long, int] _cid_to_index
+        cdef pair[long, int] _entry
 
-        # get the un-flattened index for the destination particle with
-        # respect to the minimum
-        cdef cPoint xi = cPoint_new(d_x.data[d_idx] - xmin.data[0],
-                                    d_y.data[d_idx] - xmin.data[1],
-                                    d_z.data[d_idx] - xmin.data[2])
+        # flattened cell index
+        cdef int i, j
+        cdef long cell_index
 
-        cdef cIntPoint _cid = find_cell_id( xi, cell_size )
-        cdef cIntPoint cid = cIntPoint_new(0, 0, 0)
-        cdef int cell_index
+        for j in range(narrays):
+            pa_wrapper = pa_wrappers[j]
+            np = pa_wrapper.get_number_of_particles()
+            x = pa_wrapper.x
+            y = pa_wrapper.y
+            z = pa_wrapper.z
 
-        # this is the physica position of the particle that will be
-        # used in pairwise searching
-        xi.x = xi.x + xmin.data[0]
-        xi.y = xi.y + xmin.data[1]
-        xi.z = xi.z + xmin.data[2]
+            for i in range(np):
+                # the flattened index is considered relative to the
+                # minimum along each co-ordinate direction
+                pnt.x = x.data[i] - xmin.data[0]
+                pnt.y = y.data[i] - xmin.data[1]
+                pnt.z = z.data[i] - xmin.data[2]
 
-        # gather search radius
-        hi2 = radius_scale * d_h.data[d_idx]
-        hi2 *= hi2
+                # flattened cell index
+                _cid = flatten( find_cell_id( pnt, cell_size ), ncells_per_dim, dim )
+                _entry.first = _cid
+                _entry.second = 1
+                _cid_to_index.insert(_entry)
 
-        # reset the length of the nbr array
-        if prealloc:
-            nbrs.length = 0
-        else:
-            nbrs.reset()
+        cdef map[long, int].iterator it = _cid_to_index.begin()
+        cdef int count = 0
+        while it != _cid_to_index.end():
+            _entry = deref(it)
+            _cid_to_index[_entry.first] = count
+            count += 1
+            inc(it)
 
-        count = 0
-        # Begin search through neighboring cells
-        for ix in range(3):
-            for iy in range(3):
-                for iz in range(3):
-                    cid.x = _cid.x + shifts.data[ix]
-                    cid.y = _cid.y + shifts.data[iy]
-                    cid.z = _cid.z + shifts.data[iz]
+        self.cell_to_index = _cid_to_index
+        return count
 
-                    # Only consider valid cell indices
-                    cell_index = get_valid_cell_index(cid, ncells_per_dim, dim, n_cells)
-                    if cell_index > -1:
-
-                        # get the first particle and begin iteration
-                        _next = head.data[ cell_index ]
-                        while( _next != UINT_MAX ):
-                            hj2 = radius_scale * s_h.data[_next]
-                            hj2 *= hj2
-
-                            xij2 = norm2( s_x.data[_next]-xi.x,
-                                          s_y.data[_next]-xi.y,
-                                          s_z.data[_next]-xi.z )
-
-                            # select neighbor
-                            if ( (xij2 < hi2) or (xij2 < hj2) ):
-                                if prealloc:
-                                    nbrs.data[count] = _next
-                                    count += 1
-                                else:
-                                    nbrs.append( _next )
-
-                            # get the 'next' particle in this cell
-                            _next = next.data[_next]
-        if prealloc:
-            nbrs.length = count
-
-    cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs):
-        """Return indices for particles in neighboring cells.
-
-        Parameters:
-        -----------
-
-        cell_index : int
-            Cell index in the range [0,ncells_tot]
-
-        pa_index : int
-            Index of the particle array in the particles list
-
-        nbrs : UIntArray (output)
-            Neighbors for the requested particle are stored here.
-
-        """
-        # src linked lists
-        cdef UIntArray next = self.nexts[ pa_index ]
-        cdef UIntArray head = self.heads[ pa_index ]
-
-        # Number of cells in each dimension and the total ncells
-        cdef IntArray ncells_per_dim = self.ncells_per_dim
-        cdef int n_cells = self.n_cells
-        cdef int dim = self.dim
-
-        # cell shifts
-        cdef IntArray shifts = self.cell_shifts
-
-        # locals
-        cdef size_t indexj
-        cdef unsigned int _next
-        cdef int nnbrs, ix, iy, iz
-
-        # get the un-flattened index for this cell
-        cdef cIntPoint _cid = unflatten( cell_index, ncells_per_dim, dim )
-        cdef cIntPoint cid
-        cdef int _cell_index
-
-        # rest the nbr array length
-        nbrs.reset()
-
-        # Begin search through neighboring cells
-        for ix in range(3):
-            for iy in range(3):
-                for iz in range(3):
-                    cid.x = _cid.x + shifts.data[ix]
-                    cid.y = _cid.y + shifts.data[iy]
-                    cid.z = _cid.z + shifts.data[iz]
-
-                    # only use a valid cell index
-                    if ( (cid.x > -1) and (cid.y > -1) and (cid.z > -1) ):
-                        _cell_index = flatten( cid, ncells_per_dim, dim )
-                        if -1 < _cell_index < n_cells:
-
-                            # get the first particle and begin iteration
-                            _next = head.data[ _cell_index ]
-                            while( _next != UINT_MAX ):
-                                nbrs.append( _next )
-
-                                # get the 'next' particle in this cell
-                                _next = next.data[_next]

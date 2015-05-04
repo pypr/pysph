@@ -145,7 +145,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
-    def _make_accel_eval(self, equations):
+    def _make_accel_eval(self, equations, cache_nnps=False):
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
@@ -153,7 +153,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
-        nnps = NNPS(dim=kernel.dim, particles=arrays)
+        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval
@@ -176,6 +176,19 @@ class TestAccelerationEval1D(unittest.TestCase):
         pa = self.pa
         equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
         a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_work_with_cached_nnps(self):
+        # Given
+        pa = self.pa
+        equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations, cache_nnps=True)
 
         # When
         a_eval.compute(0.1, 0.1)

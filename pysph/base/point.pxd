@@ -1,8 +1,8 @@
 cimport numpy
 
 cdef extern from "math.h":
-    double sqrt(double)
-    double ceil(double)
+    double sqrt(double) nogil
+    double ceil(double) nogil
 
 cdef extern from 'limits.h':
     cdef int INT_MAX
@@ -114,7 +114,7 @@ cdef inline long cIntPoint_norm(cIntPoint p):
     return p.x*p.x + p.y*p.y + p.z*p.z
 
 cdef inline double cIntPoint_length(cIntPoint pa):
-    return sqrt(cIntPoint_norm(pa))
+    return sqrt(<double>cIntPoint_norm(pa))
 
 cdef inline long cIntPoint_distance2(cIntPoint pa, cIntPoint pb):
     return ((pa.x-pb.x)*(pa.x-pb.x) +
@@ -122,7 +122,7 @@ cdef inline long cIntPoint_distance2(cIntPoint pa, cIntPoint pb):
             (pa.z-pb.z)*(pa.z-pb.z))
 
 cdef inline double cIntPoint_distance(cIntPoint pa, cIntPoint pb):
-    return sqrt(cIntPoint_distance2(pa, pb))
+    return sqrt(<double>cIntPoint_distance2(pa, pb))
 
 cdef inline cIntPoint cIntPoint_scale(cIntPoint p, int k):
     return cIntPoint_new(p.x*k, p.y*k, p.z*k)

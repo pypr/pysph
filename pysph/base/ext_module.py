@@ -1,19 +1,26 @@
+# Standard library imports
 from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 import hashlib
 import imp
 import importlib
 import numpy
-import pysph
 import os
 from os.path import expanduser, join, isdir, exists, dirname
 from pyximport import pyxbuild
 import shutil
+import sys
 
+# Optional imports.
 try:
     from mpi4py import MPI
 except ImportError:
     MPI = None
+
+# Package imports.
+import pysph
+from pysph.base.config import get_config
+
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
@@ -81,8 +88,8 @@ class ExtModule(object):
                 # Not a shared filesystem so append rank to filename.
                 # This is needed since there may be other nodes using the same
                 # filesystem (multi-core CPUs) whose rank is non-zero.
-	        self.name = 'm_{0}_{1}'.format(self.hash, self.rank)
-	        self._setup_filenames()
+                self.name = 'm_{0}_{1}'.format(self.hash, self.rank)
+                self._setup_filenames()
                 self._write_source(self.src_path)
             else:
                 self.shared_filesystem = True
@@ -134,9 +141,19 @@ class ExtModule(object):
         if not self.shared_filesystem or self.rank == 0:
             if force or self.should_recompile():
                 self._message("Compiling code at:", self.src_path)
-                inc_dirs = [dirname(dirname(pysph.__file__)), numpy.get_include()]
-                extension = Extension(name=self.name, sources=[self.src_path],
-                                    include_dirs=inc_dirs)
+                inc_dirs = [
+                    dirname(dirname(pysph.__file__)), 
+                    numpy.get_include()
+                ]
+                extra_compile_args, extra_link_args = self._get_extra_args()
+
+                extension = Extension(
+                    name=self.name, sources=[self.src_path],
+                    include_dirs=inc_dirs, 
+                    extra_compile_args=extra_compile_args,
+                    extra_link_args=extra_link_args,
+                    language="c++"
+                )
                 mod = pyxbuild.pyx_to_dll(self.src_path, extension,
                     pyxbuild_dir=self.build_dir, force_rebuild=True
                 )
@@ -155,6 +172,16 @@ class ExtModule(object):
         file, path, desc = imp.find_module(self.name, [dirname(self.ext_path)])
         return imp.load_module(self.name, file, path, desc)
 
+    def _get_extra_args(self):
+        if get_config().use_openmp:
+            if sys.platform == 'win32':
+                return ['/openmp'], ['/openmp']
+            else:
+                return ['-fopenmp'], ['-fopenmp']
+        else:
+            return [], []
+
     def _message(self, *args):
         if self.verbose:
             print ' '.join(args)
+

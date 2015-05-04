@@ -140,7 +140,7 @@ example if the total mass or total force on a particle array needs to be
 calculated, a fixed size constant can be added.  This can be done by adding a
 ``constant`` to the array as illustrated below:
 
-.. code-block::python
+.. code-block:: python
 
     >>> pa.add_constant('total_mass', 0.0)
     >>> pa.add_constant('total_force', [0.0, 0.0, 0.0])
@@ -156,7 +156,7 @@ The constants can also set in the constructor of the :py:class:`ParticleArray`
 by passing a dictionary of constants as a ``constants`` keyword argument.  For
 example:
 
-.. code-block::python
+.. code-block:: python
 
     >>> pa = ParticleArray(
     ...     name='test', x=x,
@@ -192,6 +192,13 @@ cells have a length of :math:`\text{radius_scale} \times h_{\text{max}}`,
 where :math:`h_{\text{max}}` is the maximum smoothing length of *all*
 particles assigned to the local processor.
 
+Note that the ``NNPS`` classes also support caching the neighbors
+computed.  This is useful if one needs to reuse the same set of
+neighbors.  To enable this, simply pass ``cache=True`` to the
+constructor::
+
+    >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, cache=True)
+
 Since we allow a list of particle arrays, we need to distinguish
 between *source* and *destination* particle arrays in the neighbor
 queries.
@@ -214,7 +221,19 @@ With these definitions, we can query for nearest neighbors like so:
 where `src_index`, `dst_index` and `d_idx` are integers. This will
 return, for the *d_idx* particle of the *dst_index* particle array
 (species), nearest neighbors from the *src_index* particle array
-(species).
+(species).  Passing the `src_index` and `dst_index` every time is
+repetitive so an alternative API is to call ``set_context`` as done
+below::
+
+    >>> nps.set_context(src_index=0, dst_index=0)
+
+If the ``NNPS`` instance is configured to use caching, then it will also
+pre-compute the neighbors very efficiently.  Once the context is set one
+can get the neighbors as::
+
+    >>> nps.get_nearest_neighbors(d_idx, nbrs)
+
+Where `d_idx` and `nbrs` are as discussed above.
 
 If we want to re-compute the data structure for a new distribution of
 particles, we can call the :py:meth:`NNPS.update` method:
@@ -230,24 +249,25 @@ Periodic domains
 ^^^^^^^^^^^^^^^^^^^^^^
 
 The constructor for the :py:class:`NNPS` accepts an optional argument
-(:py:class:`DomainLimits`) that is used to delimit the maximum
+(:py:class:`DomainManager`) that is used to delimit the maximum
 spatial extent of the simulation domain. Additionally, this argument
 is also used to indicate the extents for a periodic domain. We
-construct a :py:class:`DomainLimits` object like so
+construct a :py:class:`DomainManager` object like so
 
 .. code-block:: python
 
-   >>> from pysph.base.nnps import DomainLimits
+   >>> from pysph.base.nnps import DomainManager
    >>> from pysph.base.point import Point
-   >>> domain = DomainLimits(xmin, xmax, ymin, ymax, zmin, zmax,
-                             periodic_in_x, periodic_in_y, periodic_in_z)
+   >>> domain = DomainManager(xmin, xmax, ymin, ymax, zmin, zmax,
+                              periodic_in_x=True, periodic_in_y=True,
+                              periodic_in_z=False)
 
 where `xmin ... zmax` are floating point arguments delimiting the
 simulation domain and `periodic_in_x,y,z` are bools defining the
 periodic axes.
 
 When the :py:class:`NNPS` object is constructed with this
-:py:class:`DomainLimits`, care is taken to create periodic ghosts for
+:py:class:`DomainManager`, care is taken to create periodic ghosts for
 particles in the vicinity of the periodic boundaries. These *ghost*
 particles are given a special **tag** defined by
 :py:class:`ParticleTAGS`
@@ -407,7 +427,7 @@ distribution is given below
    from pyzoltan.core.carray import UIntArray
    from pysph.base.utils import utils
    from pysph.base.kernels import CubicSpline
-   from pysph.base.nnps import DomainLimits, LinkedListNNPS
+   from pysph.base.nnps import DomainManager, LinkedListNNPS
 
    # NumPy
    import numpy
@@ -423,8 +443,8 @@ distribution is given below
    # Create the particle array
    pa = utils.get_particle_array(x=x,y=y,h=h,m=m)
 
-   # Create the periodic DomainLimits object and NNPS
-   domain = DomainLimits(xmin=0., xmax=1., ymin=0., ymax=1., periodic_in_x=True, periodic_in_y=True)
+   # Create the periodic DomainManager object and NNPS
+   domain = DomainManager(xmin=0., xmax=1., ymin=0., ymax=1., periodic_in_x=True, periodic_in_y=True)
    nps = LinkedListNNPS(dim=2, particles=[pa,], radius_scale=2.0, domain=domain)
 
    # The SPH kernel. The dimension argument is needed for the correct normalization constant
@@ -536,4 +556,4 @@ eaxmples, check out the tutorials: :ref:`tutorials`.
 .. _RIB: http://www.cs.sandia.gov/Zoltan/ug_html/ug_alg_rib.html
 .. _HSFC: http://www.cs.sandia.gov/Zoltan/ug_html/ug_alg_hsfc.html
 
-..  LocalWords:  DomainLimits maximum
+..  LocalWords:  DomainManager maximum

@@ -11,7 +11,9 @@ from mako.template import Template
 from textwrap import dedent
 import types
 
-from ast_utils import get_assigned, has_return
+from pysph.base.ast_utils import get_assigned, has_return
+from pysph.base.config import get_config
+
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,7 @@ class CythonGenerator(object):
         # Methods to not wrap.
         self.ignore_methods = ['_cython_code_']
         self.known_types = known_types if known_types is not None else {}
+        self._config = get_config()
 
     ##### Public protocol #####################################################
 
@@ -201,8 +204,13 @@ class CythonGenerator(object):
 
         c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
-        cdefn = 'cdef inline {ret} {name}({arg_def}):'\
-                     .format(ret=c_ret, name=name, arg_def=c_arg_def)
+        if self._config.use_openmp:
+            gil = " nogil" if name != "reduce" else ""
+        else:
+            gil = ""
+        cdefn = 'cdef inline {ret} {name}({arg_def}){gil}:'.format(
+            ret=c_ret, name=name, arg_def=c_arg_def, gil=gil
+        )
 
         return cdefn
 

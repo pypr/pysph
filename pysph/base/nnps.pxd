@@ -1,6 +1,8 @@
 # numpy
 cimport numpy as np
 
+from libcpp.map cimport map
+
 # PyZoltan CArrays
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
@@ -8,7 +10,7 @@ from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from particle_array cimport ParticleArray
 from point cimport *
 
-cdef inline int real_to_int(double val, double step)
+cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
@@ -45,9 +47,6 @@ cdef class DomainManager:
     cdef bint in_parallel               # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
 
-    ############################################################################
-    # Functions for Periodicity
-    ############################################################################
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
 
@@ -63,6 +62,7 @@ cdef class DomainManager:
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale
     cdef _compute_cell_size_for_binning(self)
+
 
 # Cell to hold particle indices
 cdef class Cell:
@@ -99,65 +99,69 @@ cdef class Cell:
 cdef class NeighborCache:
 
     cdef int _dst_index
+    cdef int _src_index
+    cdef int _n_threads
     cdef NNPS _nnps
-    cdef list _start_stop
-    cdef list _neighbors
+    cdef UIntArray _pid_to_tid
+    cdef UIntArray _start_stop
+    cdef void **_neighbors
+    cdef list _neighbor_arrays
+    cdef int _narrays
     cdef list _particles
-    cdef list _last_avg_nbr_size
-    cdef np.ndarray _dirty
+    cdef int _last_avg_nbr_size
+    cdef bint _dirty
 
-    cdef _find_all_neighbors(self, int src_idx)
-
-    cpdef update(self)
-
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+    cdef void find_all_neighbors(self)
+    cpdef update(self)
 
 
 # Nearest neighbor locator
 cdef class NNPS:
-    ############################################################################
+    ##########################################################################
     # Data Attributes
-    ############################################################################
-    cdef public bint warn                # Flag to warn when extending lists
-    cdef public bint trace               # Flag for timing and debugging
-    cdef public list particles           # list of particle arrays
-    cdef public list pa_wrappers         # list of particle array wrappers
-    cdef public int narrays              # Number of particle arrays
-    cdef public bint use_cache           # Use cache or not.
-    cdef public list cache               # The neighbor cache.
+    ##########################################################################
+    cdef public bint warn             # Flag to warn when extending lists
+    cdef public bint trace            # Flag for timing and debugging
+    cdef public list particles        # list of particle arrays
+    cdef public list pa_wrappers      # list of particle array wrappers
+    cdef public int narrays           # Number of particle arrays
+    cdef public bint use_cache        # Use cache or not.
+    cdef public list cache            # The neighbor cache.
+    cdef NeighborCache current_cache  # The current cache
+    cdef int src_index, dst_index     # The current source and dest indices
 
-    cdef public object comm              # MPI communicator object
-    cdef public int rank                 # MPI rank
-    cdef public int size                 # MPI size
+    cdef public DomainManager domain  # Domain manager
+    cdef public bint is_periodic      # flag for periodicity
 
-    cdef public DomainManager domain     # Domain manager
-    cdef public bint is_periodic         # flag for periodicity
+    cdef public int dim               # Dimensionality of the problem
+    cdef public DoubleArray xmin      # co-ordinate min values
+    cdef public DoubleArray xmax      # co-ordinate max values
+    cdef public double cell_size      # Cell size for binning
+    cdef public double radius_scale   # Radius scale for kernel
+    cdef IntArray cell_shifts         # cell shifts
+    cdef public int n_cells           # number of cells
 
-    cdef public int dim                  # Dimensionality of the problem
-    cdef public DoubleArray xmin         # co-ordinate min values
-    cdef public DoubleArray xmax         # co-ordinate max values
-    cdef public double cell_size         # Cell size for binning
-    cdef public double radius_scale      # Radius scale for kernel
-    cdef IntArray cell_shifts            # cell shifts
-    cdef public int n_cells              # number of cells
-    cdef public list n_part_per_cell     # number of particles per cell
-
-    ############################################################################
+    ##########################################################################
     # Member functions
-    ############################################################################
+    ##########################################################################
     # Main binning routine for NNPS for local particles. This clears
     # the current cell data, re-computes the cell size and bins all
     # particles locally.
     cpdef update(self)
 
-    cpdef get_number_of_cells(self)
-
     # Index particles given by a list of indices. The indices are
     # assumed to be of type unsigned int and local to the NNPS object
-    cdef _bin(self, int pa_index, UIntArray indices)
+    cpdef _bin(self, int pa_index, UIntArray indices)
 
     # compute the min and max for the particle coordinates
     cdef _compute_bounds(self)
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+    cdef void get_nearest_neighbors(self, size_t d_idx, 
+                                      UIntArray nbrs) nogil
 
     # Neighbor query function. Returns the list of neighbors for a
     # requested particle. The returned list is assumed to be of type
@@ -174,32 +178,23 @@ cdef class NNPS:
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+
     # Testing function for brute force neighbor search. The return
     # list is of the same type of the local and global ids (uint)
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
 
-    # filter and return the true nearest neighbors for a particle
-    cpdef get_nearest_particles_filtered(
-        self, int src_index, int dst_index, int d_idx, UIntArray potential_nbrs,
-        UIntArray nbrs)
+    cpdef set_context(self, int src_index, int dst_index)
 
-    # return the particle indices contained within a cell
-    cpdef get_particles_in_cell(
-        self, int cell_index, int pa_index, UIntArray indices)
-
-    # return the indices for the particles in neighboring cells
-    cpdef get_particles_in_neighboring_cells(
-        self, int cell_index, int pa_index, UIntArray nbrs)
+    cpdef spatially_order_particles(self, int pa_index)
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
 
-    # count the number of particles in each cell
-    cpdef count_n_part_per_cell(self)
 
 # NNPS using the original gridding algorithm
-cdef class BoxSortNNPS(NNPS):
+cdef class DictBoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells
     cdef list _cell_keys
 
@@ -215,6 +210,21 @@ cdef class LinkedListNNPS(NNPS):
     cdef public list heads               # Head arrays for the cells
     cdef public list nexts               # Next arrays for the particles
 
+    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+    cdef UIntArray next, head              # Current next and head arrays.
+
+    cpdef long _count_occupied_cells(self, long n_cells) except -1
+    cpdef long _get_number_of_cells(self) except -1
+    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
+    cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
+            int* ncells_per_dim, int dim, int n_cells) nogil
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+
+# NNPS using the linked list approach
+cdef class BoxSortNNPS(LinkedListNNPS):
     ############################################################################
-    # Member functions
+    # Data Attributes
     ############################################################################
+    cdef public map[long, int] cell_to_index  # Maps cell ID to an index
+

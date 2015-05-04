@@ -23,6 +23,11 @@ Declaration File.
 # numpy import
 cimport numpy as np
 
+cdef long aligned(long n, int item_size) nogil
+cdef void* aligned_malloc(size_t bytes) nogil
+cdef void* aligned_realloc(void* existing, size_t bytes, size_t old_size) nogil
+cdef void aligned_free(void* p) nogil
+
 # forward declaration
 cdef class BaseArray
 cdef class LongArray(BaseArray)
@@ -36,6 +41,12 @@ cdef class BaseArray:
     cdef public long length, alloc, _length
     cdef np.ndarray _npy_array
 
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_reserve(self, long size) nogil
+    cdef void c_reset(self) nogil
+    cdef void c_resize(self, long size) nogil
+    cdef void c_squeeze(self) nogil
+
     cpdef reserve(self, long size)
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
@@ -46,7 +57,6 @@ cdef class BaseArray:
     cpdef reset(self)
 
     cpdef align_array(self, LongArray new_indices)
-    cdef void _align_array(self, LongArray new_indices)
     cpdef str get_c_type(self)
     cpdef copy_values(self, LongArray indices, BaseArray dest)
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
@@ -65,6 +75,9 @@ cdef class CLASSNAME(BaseArray):
     cdef CLASSNAME _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, ARRAY_TYPE value) nogil
+    cdef void c_set_view(self, ARRAY_TYPE *array, long length) nogil
     cdef ARRAY_TYPE* get_data_ptr(self)
 
     cpdef ARRAY_TYPE get(self, long idx)
@@ -81,7 +94,6 @@ cdef class CLASSNAME(BaseArray):
     cpdef reset(self)
     cpdef long index(self, ARRAY_TYPE value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 '''
 

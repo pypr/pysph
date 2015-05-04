@@ -20,8 +20,7 @@ import sys
 from os import path
 
 from setuptools import find_packages, setup
-from numpy.distutils.extension import Extension
-from Cython.Distutils import build_ext
+from Cython.Distutils import build_ext, Extension
 
 Have_MPI = True
 try:
@@ -55,6 +54,66 @@ def get_deps(*args):
                 result.append(f)
     return result
 
+def get_openmp_flags():
+    """Returns any OpenMP related flags if OpenMP is avaiable on the system.
+    """
+    if sys.platform == 'win32':
+        omp_flags = ['/openmp']
+    else:
+        omp_flags = ['-fopenmp']
+
+    env_var = os.environ.get('USE_OPENMP', '')
+    if env_var.lower() in ("0", 'false', 'n'):
+        print("-"*70)
+        print("OpenMP disabled by environment variable (USE_OPENMP).")
+        return [], []
+
+    from textwrap import dedent
+    from pyximport import pyxbuild
+    from distutils.errors import CompileError, LinkError
+    import shutil
+    import tempfile
+    test_code = dedent("""
+    from cython.parallel import parallel, prange, threadid
+    cimport openmp
+    def n_threads():
+        with nogil, parallel():
+            openmp.omp_get_num_threads()
+    """)
+    tmp_dir = tempfile.mkdtemp()
+    fname = path.join(tmp_dir, 'check_omp.pyx')
+    with open(fname, 'w') as fp:
+        fp.write(test_code)
+    extension = Extension(
+        name='check_omp', sources=[fname],
+        extra_compile_args=omp_flags,
+        extra_link_args=omp_flags,
+    )
+    has_omp = True
+    try:
+        mod = pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
+        print("-"*70)
+        print("Using OpenMP.")
+        print("-"*70)
+    except CompileError:
+        print("*"*70)
+        print("Unable to compile OpenMP code. Not using OpenMP.")
+        print("*"*70)
+        has_omp = False
+    except LinkError:
+        print("*"*70)
+        print("Unable to link OpenMP code. Not using OpenMP.")
+        print("*"*70)
+        has_omp = False
+    finally:
+        shutil.rmtree(tmp_dir)
+
+    if has_omp:
+        return omp_flags, omp_flags, True
+    else:
+        return [], [], False
+
+
 def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
@@ -62,15 +121,18 @@ def get_zoltan_directory(varname):
         USE_ZOLTAN=False
         return ''
     if not path.exists(d):
-        print "*"*80
-        print "%s incorrectly set to %s, not using ZOLTAN!"%(varname, d)
-        print "*"*80
+        print("*"*80)
+        print("%s incorrectly set to %s, not using ZOLTAN!"%(varname, d))
+        print("*"*80)
         USE_ZOLTAN=False
         return ''
     return d
 
+
+openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
+
 if Have_MPI:
-    mpic = 'mpicc'
+    mpic = 'mpic++'
     if compiler == 'intel':
         link_args = commands.getoutput(mpic + ' -cc=icc -link_info')
         link_args = link_args[3:]
@@ -79,8 +141,8 @@ if Have_MPI:
     else:
         link_args = commands.getoutput(mpic + ' --showme:link')
         compile_args = commands.getoutput(mpic +' --showme:compile')
-    mpi_link_args.append(link_args)
-    mpi_compile_args.append(compile_args)
+    mpi_link_args.extend(link_args.split())
+    mpi_compile_args.extend(compile_args.split())
     mpi_inc_dirs.append(mpi4py.get_include())
 
     # First try with the environment variable 'ZOLTAN'
@@ -98,15 +160,15 @@ if Have_MPI:
         lib = get_zoltan_directory('ZOLTAN_LIBRARY')
 
     if (not USE_ZOLTAN):
-        print "*"*80
-        print "Zoltan Environment variable" \
-              "not set, not using ZOLTAN!"
-        print "*"*80
+        print("*"*80)
+        print("Zoltan Environment variable" \
+              "not set, not using ZOLTAN!")
+        print("*"*80)
         Have_MPI = False
     else:
-        print '-'*70
-        print "Using Zoltan from:\n%s\n%s"%(inc, lib)
-        print '-'*70
+        print('-'*70)
+        print("Using Zoltan from:\n%s\n%s"%(inc, lib))
+        print('-'*70)
         zoltan_include_dirs = [ inc ]
         zoltan_library_dirs = [ lib ]
 
@@ -119,40 +181,60 @@ include_dirs = [numpy.get_include()]
 cmdclass = {'build_ext': build_ext}
 
 ext_modules = [
-    Extension( name="pyzoltan.core.carray",
-               sources=["pyzoltan/core/carray.pyx"],
-               include_dirs = include_dirs,
-               extra_compile_args=extra_compile_args),
+    Extension(
+        name="pyzoltan.core.carray",
+        sources=["pyzoltan/core/carray.pyx"],
+        include_dirs = include_dirs,
+        extra_compile_args=extra_compile_args,
+        language="c++"
+    ),
 
-    Extension( name="pysph.base.particle_array",
-               sources=["pysph/base/particle_array.pyx"],
-               depends=get_deps("pyzoltan/core/carray"),
-               extra_compile_args=extra_compile_args),
+    Extension(
+        name="pysph.base.particle_array",
+        sources=["pysph/base/particle_array.pyx"],
+        depends=get_deps("pyzoltan/core/carray"),
+        extra_compile_args=extra_compile_args,
+        language="c++"
+    ),
 
-    Extension( name="pysph.base.point",
-               sources=["pysph/base/point.pyx"],
-               extra_compile_args=extra_compile_args),
+    Extension(
+        name="pysph.base.point",
+        sources=["pysph/base/point.pyx"],
+        extra_compile_args=extra_compile_args,
+        language="c++"
+    ),
 
-    Extension( name="pysph.base.nnps",
-               sources=["pysph/base/nnps.pyx"],
-               depends=get_deps("pyzoltan/core/carray", "pysph/base/point",
-                    "pysph/base/particle_array",
-               ),
-               extra_compile_args=extra_compile_args),
+    Extension(
+        name="pysph.base.nnps",
+        sources=["pysph/base/nnps.pyx"],
+        depends=get_deps(
+            "pyzoltan/core/carray", "pysph/base/point",
+            "pysph/base/particle_array",
+        ),
+        extra_compile_args=extra_compile_args + openmp_compile_args,
+        extra_link_args=openmp_link_args,
+        cython_compile_time_env={'OPENMP': openmp_env},
+        language="c++"
+    ),
 
     # kernels used for tests
-    Extension( name="pysph.base.c_kernels",
-               sources=["pysph/base/c_kernels.pyx"],
-               include_dirs=include_dirs,
-               extra_compile_args=extra_compile_args),
+    Extension(
+        name="pysph.base.c_kernels",
+        sources=["pysph/base/c_kernels.pyx"],
+        include_dirs=include_dirs,
+        extra_compile_args=extra_compile_args,
+        language="c++"
+    ),
 
     # Eigen decomposition code
-    Extension( name="pysph.sph.solid_mech.linalg",
-               sources=["pysph/sph/solid_mech/linalg.pyx"],
-               include_dirs=include_dirs,
-               extra_compile_args=extra_compile_args,
-               ),
-    ]
+    Extension(
+        name="pysph.sph.solid_mech.linalg",
+        sources=["pysph/sph/solid_mech/linalg.pyx"],
+        include_dirs=include_dirs,
+        extra_compile_args=extra_compile_args,
+        language="c++"
+    ),
+]
 
 # add the include dirs for the extension modules
 for ext in ext_modules:
@@ -160,54 +242,68 @@ for ext in ext_modules:
 
 if Have_MPI:
     zoltan_modules = [
-        Extension( name="pyzoltan.core.zoltan",
-                   sources=["pyzoltan/core/zoltan.pyx"],
-                   depends=get_deps("pyzoltan/core/carray",
-                        "pyzoltan/czoltan/czoltan",
-                        "pyzoltan/czoltan/czoltan_types",
-                    ),
-                   include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
-                   library_dirs = zoltan_library_dirs,
-                   libraries=['zoltan', 'mpi'],
-                   extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args+extra_compile_args),
+        Extension(
+            name="pyzoltan.core.zoltan",
+            sources=["pyzoltan/core/zoltan.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray",
+                "pyzoltan/czoltan/czoltan",
+                "pyzoltan/czoltan/czoltan_types",
+            ),
+            include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
+            library_dirs = zoltan_library_dirs,
+            libraries=['zoltan', 'mpi'],
+            extra_link_args=mpi_link_args,
+            extra_compile_args=mpi_compile_args+extra_compile_args,
+            language="c++"
+        ),
 
-        Extension( name="pyzoltan.core.zoltan_dd",
-                   sources=["pyzoltan/core/zoltan_dd.pyx"],
-                   depends=get_deps("pyzoltan/czoltan/czoltan_dd",
-                        "pyzoltan/czoltan/czoltan_types"
-                    ),
-                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-                   library_dirs = zoltan_library_dirs,
-                   libraries=['zoltan', 'mpi'],
-                   extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args+extra_compile_args),
+        Extension(
+            name="pyzoltan.core.zoltan_dd",
+            sources=["pyzoltan/core/zoltan_dd.pyx"],
+            depends=get_deps(
+                "pyzoltan/czoltan/czoltan_dd",
+                "pyzoltan/czoltan/czoltan_types"
+            ),
+            include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+            library_dirs = zoltan_library_dirs,
+            libraries=['zoltan', 'mpi'],
+            extra_link_args=mpi_link_args,
+            extra_compile_args=mpi_compile_args+extra_compile_args,
+            language="c++"
+        ),
 
-        Extension( name="pyzoltan.core.zoltan_comm",
-                   sources=["pyzoltan/core/zoltan_comm.pyx"],
-                   depends=get_deps("pyzoltan/czoltan/zoltan_comm"),
-                   include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-                   library_dirs = zoltan_library_dirs,
-                   libraries=['zoltan', 'mpi'],
-                   extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args+extra_compile_args),
-        ]
+        Extension(
+            name="pyzoltan.core.zoltan_comm",
+            sources=["pyzoltan/core/zoltan_comm.pyx"],
+            depends=get_deps("pyzoltan/czoltan/zoltan_comm"),
+            include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+            library_dirs = zoltan_library_dirs,
+            libraries=['zoltan', 'mpi'],
+            extra_link_args=mpi_link_args,
+            extra_compile_args=mpi_compile_args+extra_compile_args,
+            language="c++"
+        ),
+    ]
 
     parallel_modules = [
 
-        Extension( name="pysph.parallel.parallel_manager",
-                   sources=["pysph/parallel/parallel_manager.pyx"],
-                   depends=get_deps("pyzoltan/core/carray",
-                        "pyzoltan/core/zoltan", "pyzoltan/core/zoltan_comm",
-                        "pysph/base/point", "pysph/base/particle_array",
-                        "pysph/base/nnps"
-                    ),
-                   include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
-                   library_dirs = zoltan_library_dirs,
-                   libraries = ['zoltan', 'mpi'],
-                   extra_link_args=mpi_link_args,
-                   extra_compile_args=mpi_compile_args+extra_compile_args),
-        ]
+        Extension(
+            name="pysph.parallel.parallel_manager",
+            sources=["pysph/parallel/parallel_manager.pyx"],
+            depends=get_deps("pyzoltan/core/carray",
+                "pyzoltan/core/zoltan", "pyzoltan/core/zoltan_comm",
+                "pysph/base/point", "pysph/base/particle_array",
+                "pysph/base/nnps"
+            ),
+            include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
+            library_dirs = zoltan_library_dirs,
+            libraries = ['zoltan', 'mpi'],
+            extra_link_args=mpi_link_args,
+            extra_compile_args=mpi_compile_args+extra_compile_args,
+            language="c++"
+        ),
+    ]
 
     ext_modules += zoltan_modules + parallel_modules
 

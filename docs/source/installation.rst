@@ -6,8 +6,9 @@ Installation and getting started
 
 To install PySPH, you need a working Python environment with the required
 dependencies installed. You may use any of the available Python distributions.
-If you are new to Python we recommend `Enthought Canopy`_. PySPH will also
-work fine with Anaconda_ or other environments like WinPython_.  The following
+Note that PySPH is currently tested with Python-2.x and not with 3.x (yet).  If
+you are new to Python we recommend `Enthought Canopy`_. PySPH will work
+fine with Anaconda_ or other environments like WinPython_.  The following
 instructions should help you get started.
 
 Since there is a lot of information here, we suggest that you skim the section
@@ -43,7 +44,7 @@ manager, or using pip_ or ``easy_install``.  For more detailed instructions on
 how to do this for different distributions, see below.
 
 Running PySPH requires a working C/C++ compiler on your machine.  On Linux/OS X
-the gcc toolchain will work well on Windows, you will need to have `Microsoft
+the gcc toolchain will work well.  On Windows, you will need to have `Microsoft
 Visual C++ Compiler for Python 2.7
 <http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_ or an
 equivalent compiler.  More details are available below.
@@ -68,6 +69,9 @@ Optional dependencies
 
 The optional dependencies are:
 
+ - OpenMP_: PySPH can use OpenMP if it is available.  Installation instructions
+   are available below.
+
  - Mayavi_: PySPH provides a convenient viewer to visualize the output of
    simulations. This viewer is called ``pysph_viewer`` and requires Mayavi_ to
    be installed.  Since this is only a viewer it is optional for use, however,
@@ -85,7 +89,7 @@ Zoltan_ is very unlikely to be already packaged and will need to be compiled.
 .. _Mayavi: http://code.enthought.com/projects/mayavi
 .. _mpi4py: http://mpi4py.scipy.org/
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
-
+.. _OpenMP: http://openmp.org/
 
 Building and linking PyZoltan on OSX/Linux
 -------------------------------------------
@@ -130,6 +134,10 @@ install the dependencies using::
 
     $ sudo apt-get install build-essential python-dev python-numpy \
         python-mako cython python-nose mayavi2 python-qt4 python-virtualenv
+
+OpenMP_ is typically available but can be installed with::
+
+    $ sudo apt-get install libgomp1
 
 If you need parallel support::
 
@@ -176,7 +184,30 @@ On OS X, your best bet is to install `Enthought Canopy`_ or Anaconda_ or some
 other Python distribution.  Ensure that you have gcc or clang installed by
 installing XCode.  See `this
 <http://stackoverflow.com/questions/12228382/after-install-xcode-where-is-clang>`_
-if you installed XCode but can't find clang or gcc.
+if you installed XCode but can't find clang or gcc.  
+
+^^^^^^^^^^^^^
+OpenMP on OSX
+^^^^^^^^^^^^^
+
+If you need to use OpenMP_, the default clang compiler on OSX does not support
+it.  There are some experimental versions available.  One easy to install
+option is to use brew to install gcc.  For example you can try::
+
+    $ sudo brew install gcc
+
+The build may not see ``omp.h`` and you can work around this by manually
+linking to it like so (modify this to suit your installation)::
+
+    $ cd /usr/local/include
+    $ sudo ln -s ../Cellar/gcc/4.9.2_1/lib/gcc/4.9/gcc/x86_64-apple-darwin12.6.0/4.9.2/include/omp.h .
+
+Once this is done, you need to use this as your default compiler, you can tell
+the Python to use this by setting::
+
+    $ export CC=gcc-4.9
+    $ export CXX=g++-4.9
+
 
 
 ^^^^^^^^^^^^^
@@ -345,7 +376,13 @@ build PySPH with `Microsoft's Visual C++ for Python 2.7
 <http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_.  We
 recommend that you download and install the ``VCForPython27.msi`` available
 from the `link
-<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_.
+<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_.  **Make sure
+you install the system requirements specified on that page**.  For example, on
+Windows 7 you will need to install the Microsoft Visual C++ 2008 SP1
+Redistributable Package for your platform (x86 for 32 bit or x64 for 64 bit)
+and on Windows 8 you will need to install the .NET framework 3.5.  Please look
+at the link given above, it should be fairly straightforward.  Note that doing
+this will also get OpenMP_ working for you.
 
 After you do this, you will find a "Microsoft Visual C++ Compiler Package for
 Python 2.7" in your Start menu.  Choose a suitable command prompt from this
@@ -457,7 +494,7 @@ directory::
     With a virtualenv, one should be careful while running things like
     ``ipython`` or ``nosetests`` as these are sometimes also installed on the
     system in ``/usr/bin``.  If you suspect that you are not running the
-    correct Python, you could simply run (on *nix/OS X)::
+    correct Python, you could simply run (on Linux/OS X)::
 
         $ python `which ipython`
 
@@ -539,9 +576,20 @@ You should be all set now and should next consider :ref:`running-the-tests`.
 Running the tests
 ------------------
 
-To test PySPH you can run::
+If you installed PySPH using ``python setup.py develop`` you can run the tests as::
 
    $ python -m nose.core pysph
+
+If you installed PySPH using ``python setup.py install`` you should run the
+tests as::
+
+   $ python -m nose.core -w docs pysph
+
+This is because nosetests will incorrectly  will pick up the local pysph
+packages instead of the installed version.  The ``-w`` option just changes the
+active directory to ``docs``.  Alternatively, change directory to some other
+directory that does not contain the directory ``pysph`` in it and run the first
+command above.
 
 If you see errors you might want more verbose reporting which you can get
 with::
@@ -618,6 +666,43 @@ Which runs the problem of the collision of two elastic rings:
 
 The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint hearted.
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Running the examples with OpenMP
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you have OpenMP available run any of the examples as follows::
+
+    $ python elliptical_drop.py --openmp
+
+This should run faster if you have multiple cores on your machine.  If
+you wish to change the number of threads to run simultaneously, you can
+try the following::
+
+    $ OMP_NUM_THREADS=8 python elliptical_drop.py --openmp
+
+You may need to set the number of threads to about 4 times the number of
+physical cores on your machine to obtain the most scale-up.  If you wish
+to time the actual scale up of the code with and without OpenMP you may
+want to disable any output (which will be serial), you can do this
+like::
+
+    $ python elliptical_drop.py --disable-output --openmp
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Running the examples with MPI
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you compiled PySPH with Zoltan_ and have mpi4py_ installed you may run any
+of the examples with MPI as follows::
+
+    $ mpirun -np 4 python dam_break3D.py
+
+This may not give you significant speedup if the problem is too small.  You can
+also combine OpenMP and MPI if you wish.  You should take care to setup the MPI
+host information suitably to utilize the processors effectively.
+
 
 --------------------------------------
 Organization of the ``pysph`` package

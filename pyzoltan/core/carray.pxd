@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Mon Mar 23 22:41:56 2015
+# Mon Apr 27 18:40:58 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -11,6 +11,11 @@ Declaration File.
 
 # numpy import
 cimport numpy as np
+
+cdef long aligned(long n, int item_size) nogil
+cdef void* aligned_malloc(size_t bytes) nogil
+cdef void* aligned_realloc(void* existing, size_t bytes, size_t old_size) nogil
+cdef void aligned_free(void* p) nogil
 
 # forward declaration
 cdef class BaseArray
@@ -25,6 +30,12 @@ cdef class BaseArray:
     cdef public long length, alloc, _length
     cdef np.ndarray _npy_array
 
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_reserve(self, long size) nogil
+    cdef void c_reset(self) nogil
+    cdef void c_resize(self, long size) nogil
+    cdef void c_squeeze(self) nogil
+
     cpdef reserve(self, long size)
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
@@ -35,7 +46,6 @@ cdef class BaseArray:
     cpdef reset(self)
 
     cpdef align_array(self, LongArray new_indices)
-    cdef void _align_array(self, LongArray new_indices)
     cpdef str get_c_type(self)
     cpdef copy_values(self, LongArray indices, BaseArray dest)
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
@@ -53,6 +63,9 @@ cdef class IntArray(BaseArray):
     cdef IntArray _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, int value) nogil
+    cdef void c_set_view(self, int *array, long length) nogil
     cdef int* get_data_ptr(self)
 
     cpdef int get(self, long idx)
@@ -69,7 +82,6 @@ cdef class IntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, int value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 
 ################################################################################
@@ -83,6 +95,9 @@ cdef class DoubleArray(BaseArray):
     cdef DoubleArray _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, double value) nogil
+    cdef void c_set_view(self, double *array, long length) nogil
     cdef double* get_data_ptr(self)
 
     cpdef double get(self, long idx)
@@ -99,7 +114,6 @@ cdef class DoubleArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, double value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 
 ################################################################################
@@ -113,6 +127,9 @@ cdef class FloatArray(BaseArray):
     cdef FloatArray _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, float value) nogil
+    cdef void c_set_view(self, float *array, long length) nogil
     cdef float* get_data_ptr(self)
 
     cpdef float get(self, long idx)
@@ -129,7 +146,6 @@ cdef class FloatArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, float value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 
 ################################################################################
@@ -143,6 +159,9 @@ cdef class LongArray(BaseArray):
     cdef LongArray _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, long value) nogil
+    cdef void c_set_view(self, long *array, long length) nogil
     cdef long* get_data_ptr(self)
 
     cpdef long get(self, long idx)
@@ -159,7 +178,6 @@ cdef class LongArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, long value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 
 ################################################################################
@@ -173,6 +191,9 @@ cdef class UIntArray(BaseArray):
     cdef UIntArray _parent
 
     cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, unsigned int value) nogil
+    cdef void c_set_view(self, unsigned int *array, long length) nogil
     cdef unsigned int* get_data_ptr(self)
 
     cpdef unsigned int get(self, long idx)
@@ -189,6 +210,5 @@ cdef class UIntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, unsigned int value)
 
-    cdef void _align_array(self, LongArray new_indices)
 
 
