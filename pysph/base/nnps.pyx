@@ -7,6 +7,11 @@ from cython.parallel import parallel, prange, threadid
 # malloc and friends
 from libcpp.map cimport map
 from libcpp.pair cimport pair
+from libcpp.vector cimport vector
+
+cdef extern from "<algorithm>" namespace "std" nogil:
+    void sort[Iter, Compare](Iter first, Iter last, Compare comp)
+    void sort[Iter](Iter first, Iter last)
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
@@ -58,6 +63,11 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 cdef int Ghost = ParticleTAGS.Ghost
 
+ctypedef pair[unsigned int, unsigned int] id_gid_pair_t
+
+
+cdef inline bint _compare_gids(id_gid_pair_t x, id_gid_pair_t y) nogil:
+    return y.second > x.second
 
 cdef inline double norm2(double x, double y, double z) nogil:
     return x*x + y*y + z*z
@@ -934,8 +944,8 @@ cdef class NNPS:
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, bint warn=True,
-                 cache=False):
+                 int ghost_layers=1, domain=None, bint cache=False,
+                 bint sort_gids=False):
         """Constructor for NNPS
 
         Parameters:
@@ -953,12 +963,14 @@ cdef class NNPS:
         domain : DomainManager, default (None)
             Optional limits for the domain
 
-        warn : bint
-            Flag to warn when extending particle lists
-
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
             storage but speeds up neighbor calculations.
+
+        sort_gids : bint, default (False)
+            Flag to sort neighbors using gids (if they are available). 
+            This is useful when comparing parallel results with those
+            from a serial run.
         """
         # store the list of particles and number of arrays
         self.particles = particles
@@ -984,9 +996,6 @@ cdef class NNPS:
         # periodicity
         self.is_periodic = self.domain.is_periodic
 
-        # warn
-        self.warn = warn
-
         # The total number of cells.
         self.n_cells = 0
 
@@ -1003,11 +1012,11 @@ cdef class NNPS:
 
         # The cache.
         self.use_cache = cache
-        cache = []
+        _cache = []
         for d_idx in range(len(particles)):
             for s_idx in range(len(particles)):
-                cache.append(NeighborCache(self, d_idx, s_idx))
-        self.cache = cache
+                _cache.append(NeighborCache(self, d_idx, s_idx))
+        self.cache = _cache
 
     #### Public protocol #################################################
 
@@ -1163,6 +1172,38 @@ cdef class NNPS:
     cpdef _refresh(self):
         raise NotImplementedError("NNPS :: _refresh called")
 
+    cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
+                              unsigned int *gids) nogil:
+        if length == 0:
+            return
+        cdef id_gid_pair_t _entry
+        cdef vector[id_gid_pair_t] _data
+        cdef vector[unsigned int] _ids
+        cdef int i
+        cdef unsigned int _id
+
+        if gids[0] == UINT_MAX:
+            # Serial runs will have invalid gids so just compare the ids.
+            _ids.resize(length)
+            for i in range(length):
+                _ids[i] = nbrs[i]
+            sort(_ids.begin(), _ids.end())
+            for i in range(length):
+                nbrs[i] = _ids[i]
+        else:
+            # Copy the neighbor id and gid data.
+            _data.resize(length)
+            for i in range(length):
+                _id = nbrs[i]
+                _entry.first = _id
+                _entry.second = gids[_id]
+                _data[i] = _entry
+            # Sort it.
+            sort(_data.begin(), _data.end(), _compare_gids)
+            # Set the sorted neighbors.
+            for i in range(length):
+                nbrs[i] = _data[i].first
+
     cdef _compute_bounds(self):
         """Compute coordinate bounds for the particles"""
         cdef list pa_wrappers = self.pa_wrappers
@@ -1205,7 +1246,8 @@ cdef class DictBoxSortNNPS(NNPS):
 
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, warn=True, cache=False):
+                 int ghost_layers=1, domain=None, cache=False,
+                 sort_gids=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1223,17 +1265,19 @@ cdef class DictBoxSortNNPS(NNPS):
         domain : DomainManager, default (None)
             Optional limits for the domain
 
-        warn : bint
-            Flag to warn when extending particle lists
-
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
             storage but speeds up neighbor calculations.
+
+        sort_gids : bint, default (False)
+            Flag to sort neighbors using gids (if they are available).
+            This is useful when comparing parallel results with those
+            from a serial run.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn,
-            cache
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
         )
 
         # initialize the cells dict
@@ -1253,7 +1297,8 @@ cdef class DictBoxSortNNPS(NNPS):
         DictBoxSortNNPS, use the more efficient LinkedListNNPS instead.
         Disabling caching for now.
         """
-        print msg
+        if cache:
+            print(msg)
         self.use_cache = False
 
 
@@ -1363,6 +1408,9 @@ cdef class DictBoxSortNNPS(NNPS):
         if prealloc:
             nbrs.length = count
 
+        if self.sort_gids:
+            self._sort_neighbors(nbrs.data, count, s_gid.data)
+
     #### Private protocol ################################################
 
     cpdef _refresh(self):
@@ -1432,7 +1480,7 @@ cdef class LinkedListNNPS(NNPS):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None,
-                 bint fixed_h=False, bint warn=True, bint cache=False):
+                 bint fixed_h=False, bint cache=False, bint sort_gids=False):
         """Constructor for NNPS
 
         Parameters:
@@ -1456,17 +1504,19 @@ cdef class LinkedListNNPS(NNPS):
         fixed_h : bint
             Optional flag to use constant cell sizes throughout.
 
-        warn : bint
-            Flag to warn when extending particle lists
-
         cache : bint
             Flag to set if we want to cache neighbor calls. This costs
             storage but speeds up neighbor calculations.
+
+        sort_gids : bint, default (False)
+            Flag to sort neighbors using gids (if they are available). 
+            This is useful when comparing parallel results with those
+            from a serial run.
         """
         # initialize the base class
         NNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain, warn,
-            cache
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
         )
 
         # initialize the head and next for each particle array
@@ -1479,6 +1529,7 @@ cdef class LinkedListNNPS(NNPS):
         # defaults
         self.ncells_per_dim = IntArray(3)
         self.n_cells = 0
+        self.sort_gids = sort_gids
 
         # compute the intial box sort for all local particles. The
         # DomainManager.setup_domain method is called to compute the
@@ -1549,12 +1600,14 @@ cdef class LinkedListNNPS(NNPS):
         )
 
         cdef int cid_x, cid_y, cid_z
-        cdef long cell_index
+        cdef long cell_index, orig_length
         cid_x = cid_y = cid_z = 0
 
         # gather search radius
         hi2 = radius_scale * d_h[d_idx]
         hi2 *= hi2
+
+        orig_length = nbrs.length
 
         # Begin search through neighboring cells
         for ix in range(3):
@@ -1587,6 +1640,10 @@ cdef class LinkedListNNPS(NNPS):
 
                             # get the 'next' particle in this cell
                             _next = next[_next]
+        if self.sort_gids:
+            self._sort_neighbors(
+                &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
+            )
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
                             size_t d_idx, UIntArray nbrs, bint prealloc):

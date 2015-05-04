@@ -41,7 +41,7 @@ def sd_evaluate(nnps, pm, mass, src_index, dst_index):
         nnps.get_nearest_particles(
             src_index, dst_index, i, neighbors)
 
-        nnbrs = neighbors._length
+        nnbrs = neighbors.length
 
         rho_sum = 0.0
         for indexj in range(nnbrs):

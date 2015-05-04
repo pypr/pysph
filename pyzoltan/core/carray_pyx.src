@@ -299,7 +299,6 @@ cdef class CLASSNAME(BaseArray):
 
         """
         self.length = n
-        self._length = 0
         self._parent = None
         self._old_data = NULL
         if n == 0:

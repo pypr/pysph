@@ -1,18 +1,3 @@
-"""
-PySPH
-=====
-
-A general purpose Smoothed Particle Hydrodynamics framework.
-
-This package provides a general purpose framework for SPH simulations
-in Python.  The framework emphasizes flexibility and efficiency while
-allowing most of the user code to be written in pure Python.  See here:
-
-    http://pysph.googlecode.com
-
-for more information.
-"""
-
 import numpy
 import commands
 import os
@@ -262,6 +247,7 @@ if Have_MPI:
             name="pyzoltan.core.zoltan_dd",
             sources=["pyzoltan/core/zoltan_dd.pyx"],
             depends=get_deps(
+                "pyzoltan/core/carray",
                 "pyzoltan/czoltan/czoltan_dd",
                 "pyzoltan/czoltan/czoltan_types"
             ),
@@ -276,7 +262,10 @@ if Have_MPI:
         Extension(
             name="pyzoltan.core.zoltan_comm",
             sources=["pyzoltan/core/zoltan_comm.pyx"],
-            depends=get_deps("pyzoltan/czoltan/zoltan_comm"),
+            depends=get_deps(
+                "pyzoltan/core/carray",
+                "pyzoltan/czoltan/zoltan_comm"
+            ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
             libraries=['zoltan', 'mpi'],
@@ -314,28 +303,29 @@ if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
         execfile(generator, d)
         d['main'](None)
 
+info = {}
+execfile(path.join('pysph', '__init__.py'), info)
 
 setup(name='PySPH',
-      version = '1.0alpha',
+      version = info['__version__'],
       author = 'PySPH Developers',
       author_email = 'pysph-dev@googlegroups.com',
       description = "A general purpose Smoothed Particle Hydrodynamics framework",
-      long_description = __doc__,
+      long_description = open('README.rst').read(),
       url = 'http://pysph.googlecode.com',
       license = "BSD",
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
       packages = find_packages(),
-      # include Cython headers in the install directory
-      package_data={'' : ['*.pxd', '*.mako']},
+      # exclude package data in installation.
+      exclude_package_data={
+          '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
+        },
 
       ext_modules = ext_modules,
 
       include_package_data = True,
       cmdclass=cmdclass,
-      #install_requires=['mpi4py>=1.2', 'numpy>=1.0.3', 'Cython>=0.14'],
-      #setup_requires=['Cython>=0.14', 'setuptools>=0.6c1'],
-      #extras_require={'3D': 'Mayavi>=3.0'},
       zip_safe = False,
       entry_points = """
           [console_scripts]

@@ -990,8 +990,8 @@ cdef class ParallelManager:
                                 nbrs.data[ nnbrs ] = j
                                 nnbrs = nnbrs + 1
 
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
+        # update the length for nbrs to indicate the number of neighbors
+        nbrs.length = nnbrs
 
 cdef class ZoltanParallelManager(ParallelManager):
     """Base class for Zoltan enabled parallel cell managers.
