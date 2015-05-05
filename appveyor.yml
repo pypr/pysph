@@ -14,7 +14,7 @@ install:
   - ps: Start-FileDownload 'https://bootstrap.pypa.io/get-pip.py'
   - ps: python get-pip.py
   - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
-  - ps: python bootstrap.py
+  - ps: python bootstrap.py 2> $null
   - cmd /v:on /e:on /c pip install cython
   - ps: cython -V
 
