@@ -3,16 +3,15 @@ environment:
 
   global:
     distutils_use_sdk: 1
-    sdkver: "C:/Program Files/Microsoft SDKs/Windows/v7.0/Setup/WindowsSdkVer.exe"
+    MSSdk: 1
     python: "C:/Python27-x64"
 
 init:
-  - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin;" + $Env:path
+  - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path
+  - "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat" amd64
 
 install:
   - ps: python -c "import sys; print(sys.executable)"
-  - ps: Start-FileDownload 'https://bootstrap.pypa.io/get-pip.py'
-  - ps: python get-pip.py
   - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
   - cmd /v:on /e:on /c python bootstrap.py
   - ECHO EPD_auth = 'dGVzdC5mcmVlQGZha2UuZG9tYWluOnRlc3Q9MTIzNA==' > %HOMEPATH%\.enstaller4rc
