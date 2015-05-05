@@ -13,8 +13,12 @@ install:
   - ps: python -c "import sys; print(sys.executable)"
   - ps: Start-FileDownload 'https://bootstrap.pypa.io/get-pip.py'
   - ps: python get-pip.py
-#  - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
-#  - ps: python bootstrap.py 2> $null
+  - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
+  - cmd /v:on /e:on /c python bootstrap.py
+  - ECHO "EPD_auth = 'dGVzdC5mcmVlQGZha2UuZG9tYWluOnRlc3Q9MTIzNA=='" > %HOMEPATH%\.enstaller4rc
+  - cmd /v:on /e:on /c enpkg numpy
   - cmd /v:on /e:on /c pip install -r pip_requirements.txt
-  - ps: cython -V
+  - cmd /v:on /e:on /c python setup.py develop
+test_script:
+  - cmd /v:on /e:on /c nosetests
 
