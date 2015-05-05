@@ -1,0 +1,20 @@
+build: false
+environment:
+
+  global:
+    distutils_use_sdk: 1
+    sdkver: "C:/Program Files/Microsoft SDKs/Windows/v7.0/Setup/WindowsSdkVer.exe"
+    python: "C:/Python27-x64"
+
+init:
+  - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files\Microsoft SDKs\Windows\v7.0\Bin;" + $Env:path
+
+install:
+  - ps: python -c "import sys; print(sys.executable)"
+  - ps: Start-FileDownload 'https://bootstrap.pypa.io/get-pip.py'
+  - ps: python get-pip.py
+  - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
+  - ps: python bootstrap.py
+  - cmd /v:on /e:on /c pip install cython
+  - ps: cython -V
+
