@@ -21,7 +21,7 @@ def kill_process(process):
     print 'KILLING PROCESS ON TIMEOUT'
     process.kill()
 
-def run(filename, args=None, nprocs=2, timeout=20.0, path=None):
+def run(filename, args=None, nprocs=2, timeout=60.0, path=None):
     """Run a python script with MPI or in serial (if nprocs=1).  Kill process
     if it takes longer than the specified timeout.
 

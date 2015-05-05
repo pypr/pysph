@@ -35,4 +35,4 @@ before_script:
     - mkdir -p shippable/testresults
 
 script:
-    - nosetests -v --with-xunit --xunit-file=shippable/testresults/nosetests.xml
+    - nosetests -v -A slow --with-xunit --xunit-file=shippable/testresults/nosetests.xml
