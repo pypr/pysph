@@ -5,19 +5,20 @@ environment:
     distutils_use_sdk: 1
     MSSdk: 1
     python: "C:/Python27-x64"
+    CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\appveyor-run-env.cmd"
 
 init:
   - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path
-  - C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat amd64
 
 install:
   - ps: python -c "import sys; print(sys.executable)"
   - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
-  - cmd /v:on /e:on /c python bootstrap.py
+  - "%CMD_IN_ENV% python bootstrap.py"
   - ECHO EPD_auth = 'dGVzdC5mcmVlQGZha2UuZG9tYWluOnRlc3Q9MTIzNA==' > %HOMEPATH%\.enstaller4rc
   - cmd /v:on /e:on /c enpkg numpy
-  - cmd /v:on /e:on /c pip install -r pip_requirements.txt
-  - cmd /v:on /e:on /c python setup.py develop
+  - "%CMD_IN_ENV% pip install -r pip_requirements.txt"
+  - "%CMD_IN_ENV% python setup.py develop"
+
 test_script:
-  - cmd /v:on /e:on /c nosetests
+  - "%CMD_IN_ENV% nosetests"
 
