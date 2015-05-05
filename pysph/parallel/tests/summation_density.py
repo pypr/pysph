@@ -92,19 +92,19 @@ X1 = numpy.zeros( numGlobalPoints ); Y1 = numpy.zeros( numGlobalPoints )
 Z1 = numpy.zeros( numGlobalPoints ); H1 = numpy.ones_like(X1) * hdx * dx
 RHO1 = numpy.zeros_like(X1)
 
-comm.Gatherv( sendbuf=x1, recvbuf=X1 )
-comm.Gatherv( sendbuf=y1, recvbuf=Y1 )
-comm.Gatherv( sendbuf=z1, recvbuf=Z1 )
-comm.Gatherv( sendbuf=rho1, recvbuf=RHO1)
+comm.Gatherv( sendbuf=[x1, mpi.DOUBLE], recvbuf=[X1, mpi.DOUBLE] )
+comm.Gatherv( sendbuf=[y1, mpi.DOUBLE], recvbuf=[Y1, mpi.DOUBLE] )
+comm.Gatherv( sendbuf=[z1, mpi.DOUBLE], recvbuf=[Z1, mpi.DOUBLE] )
+comm.Gatherv( sendbuf=[rho1, mpi.DOUBLE], recvbuf=[RHO1, mpi.DOUBLE])
 
 X2 = numpy.zeros( numGlobalPoints ); Y2 = numpy.zeros( numGlobalPoints )
 Z2 = numpy.zeros( numGlobalPoints ); H2 = numpy.ones_like(X2) * hdx * dx
 RHO2 = numpy.zeros_like(X2)
 
-comm.Gatherv( sendbuf=x2, recvbuf=X2 )
-comm.Gatherv( sendbuf=y2, recvbuf=Y2 )
-comm.Gatherv( sendbuf=z2, recvbuf=Z2 )
-comm.Gatherv( sendbuf=rho2, recvbuf=RHO2)
+comm.Gatherv( sendbuf=[x2, mpi.DOUBLE], recvbuf=[X2, mpi.DOUBLE])
+comm.Gatherv( sendbuf=[y2, mpi.DOUBLE], recvbuf=[Y2, mpi.DOUBLE])
+comm.Gatherv( sendbuf=[z2, mpi.DOUBLE], recvbuf=[Z2, mpi.DOUBLE])
+comm.Gatherv( sendbuf=[rho2, mpi.DOUBLE], recvbuf=[RHO2, mpi.DOUBLE])
 
 # create the particle arrays and PM
 PA1 = get_particle_array_wcsph(x=X1, y=Y1, z=Z1, h=H1, rho=RHO1)
