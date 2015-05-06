@@ -1,6 +1,5 @@
 numpy
 setuptools
-Cython>=0.17
-ordereddict
+Cython>=0.19
 mako
-numpydoc
+nose

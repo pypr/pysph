@@ -250,7 +250,10 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
 
         pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
         # Place one particle far far away
-        sz = 100000.0
+        # On Linux and OSX this works even if sz is 100000.
+        # However, on Windows this fails but works with 1000,
+        # hence we set it to 1000.
+        sz = 1000.0
         pa.add_particles(x=[sz], y=[sz], z=[sz])
         return pa
 

@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sun May  3 16:19:12 2015
+# Wed May  6 08:55:42 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -29,7 +29,11 @@ The numpy array may however be copied and used in any manner.
 """
 # For malloc etc.
 from libc.stdlib cimport *
-from libc.stdint cimport uintptr_t
+IF UNAME_SYSNAME == "Windows":
+    cdef extern from "msstdint.h" nogil:
+        ctypedef unsigned int uintptr_t
+ELSE:
+    from libc.stdint cimport uintptr_t
 
 cimport numpy as np
 
