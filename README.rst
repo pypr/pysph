@@ -1,7 +1,7 @@
 PySPH: a Python-based SPH framework
 -----------------------------------
 
-|Shippable Status| |Drone Status|
+|Shippable Status| |Drone Status| |Appveyor Status|
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in
@@ -20,6 +20,8 @@ The latest documentation for PySPH is available at
    :target: https://app.shippable.com/projects/540e849c3479c5ea8f9f030e/builds/latest
 .. |Drone Status| image:: https://drone.io/bitbucket.org/pysph/pysph/status.png
    :target: https://drone.io/bitbucket.org/pysph/pysph/latest
+.. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/emqifa4xg2b837qj
+   :target: https://ci.appveyor.com/project/prabhuramachandran/pysph
 
 Features
 --------
@@ -59,11 +61,11 @@ Up-to-date details on how to install PySPH on Linux/OS X and Windows are
 available from
 `here <http://pysph.readthedocs.org/en/latest/installation.html>`__.
 
-If you wish to see a working build/test script please see our
-`shippable.yml <https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`__.
-Or you could see the `build
-script <https://drone.io/bitbucket.org/pysph/pysph/admin>`__ hosted at
-`drone.io <http://drone.io>`__.
+If you wish to see a working build/test script please see our `shippable.yml
+<https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`__.  Or you could
+see the `build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`__
+hosted at `drone.io <http://drone.io>`__ or for Windows platforms see the
+`appveyor.yml <https://bitbucket.org/pysph/pysph/src/master/appveyor.yml>`__.
 
 Running the examples
 --------------------
@@ -93,7 +95,7 @@ This runs the 3D dam-break problem which is also a SPHERIC benchmark
 `Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`__
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/db3d.png
-   :alt: IMAGE
+   :alt: Three-dimensional dam-break example
 
 PySPH is more than a tool for wave-body interactions:::
 
@@ -107,7 +109,7 @@ using the helper script
 the streamlines:
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/ldc-streamlines.png
-   :alt: IMAGE
+   :alt: Lid-driven-cavity example
 
 If you want to use PySPH for elastic dynamics, you can try some of the
 examples from the directory ``examples/solid_mech``::
@@ -118,7 +120,7 @@ examples from the directory ``examples/solid_mech``::
 Which runs the problem of the collision of two elastic rings:
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/rings-collision.png
-   :alt: IMAGE
+   :alt: Collision of two steel rings
 
 The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint

@@ -43,9 +43,9 @@ def get_openmp_flags():
     """Returns any OpenMP related flags if OpenMP is avaiable on the system.
     """
     if sys.platform == 'win32':
-        omp_flags = ['/openmp']
+        omp_compile_flags, omp_link_flags = ['/openmp'], []
     else:
-        omp_flags = ['-fopenmp']
+        omp_compile_flags, omp_link_flags = ['-fopenmp'], ['-fopenmp']
 
     env_var = os.environ.get('USE_OPENMP', '')
     if env_var.lower() in ("0", 'false', 'n'):
@@ -71,8 +71,8 @@ def get_openmp_flags():
         fp.write(test_code)
     extension = Extension(
         name='check_omp', sources=[fname],
-        extra_compile_args=omp_flags,
-        extra_link_args=omp_flags,
+        extra_compile_args=omp_compile_flags,
+        extra_link_args=omp_link_flags,
     )
     has_omp = True
     try:
@@ -94,7 +94,7 @@ def get_openmp_flags():
         shutil.rmtree(tmp_dir)
 
     if has_omp:
-        return omp_flags, omp_flags, True
+        return omp_compile_flags, omp_link_flags, True
     else:
         return [], [], False
 

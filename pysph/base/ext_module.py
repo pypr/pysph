@@ -175,7 +175,7 @@ class ExtModule(object):
     def _get_extra_args(self):
         if get_config().use_openmp:
             if sys.platform == 'win32':
-                return ['/openmp'], ['/openmp']
+                return ['/openmp'], []
             else:
                 return ['-fopenmp'], ['-fopenmp']
         else:
