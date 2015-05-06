@@ -1,5 +1,5 @@
 # This file (carray.pxd) has been generated automatically on
-# Sun May  3 16:19:12 2015
+# Wed May  6 08:55:42 2015
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
