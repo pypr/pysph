@@ -1,5 +1,5 @@
 PySPH: a Python-based SPH framework
------------------------------------
+------------------------------------
 
 |Shippable Status| |Drone Status| |Appveyor Status|
 
@@ -8,10 +8,10 @@ PySPH is an open source framework for Smoothed Particle Hydrodynamics
 `Python <http://www.python.org>`__ and the performance critical parts
 are implemented in `Cython <http://www.cython.org>`__.
 
-PySPH allows users to write their high-level code in pure Python.  This Python
-code is automatically converted to high-performance Cython which is compiled
-and executed.  PySPH can also work with OpenMP and MPI for larger scale
-computing.
+PySPH allows users to write their high-level code in pure Python.  This
+Python code is automatically converted to high-performance Cython which
+is compiled and executed.  PySPH can also be configured to work
+seamlessly with OpenMP and MPI.
 
 The latest documentation for PySPH is available at
 `pysph.readthedocs.org <http://pysph.readthedocs.org>`__.
@@ -23,23 +23,34 @@ The latest documentation for PySPH is available at
 .. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/emqifa4xg2b837qj
    :target: https://ci.appveyor.com/project/prabhuramachandran/pysph
 
+Here are videos of some example problems solved using PySPH.
+
+.. raw:: html
+
+    <div align="left">
+    <iframe width="560" height="315"
+        src="https://www.youtube.com/embed/videoseries?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr"
+        frameborder="0" allowfullscreen>
+    </iframe>
+    </div>
+
 Features
 --------
 
--  Solver framework to add arbitrary collection of particles.
--  Flexibility to define arbitrary SPH equations operating on particles
-   in pure Python.
--  Any kind of user-defined multi-step integrator.
--  Seamless parallel integration using
-   `Zoltan <http://www.cs.sandia.gov/zoltan/>`__.
--  High-performance: our performance is comparable to hand-written
-   solvers implemented in FORTRAN.
+- Flexibility to define arbitrary SPH equations operating on particles
+  in pure Python.
+- Define your own multi-step integrators in pure Python.
+- High-performance: our performance is comparable to hand-written
+  solvers implemented in FORTRAN.
+- Seamless multi-core support with OpenMP.
+- Seamless parallel support using
+  `Zoltan <http://www.cs.sandia.gov/zoltan/>`__.
 
-Solvers
--------
+SPH formulations
+-----------------
 
-Currently, PySPH has numerous examples to solve a variety of problems.  The
-features of the implementation are:
+PySPH ships with a variety of standard SPH formulations along with
+basic examples.  Some of the formulations available are:
 
 -  `Weakly Compressible SPH
    (WCSPH) <http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250>`__
@@ -55,7 +66,7 @@ features of the implementation are:
    (Puri et al. 2014, JCP, Vol. 256, pp 308--333)
 
 Installation
-============
+-------------
 
 Up-to-date details on how to install PySPH on Linux/OS X and Windows are
 available from
@@ -95,6 +106,7 @@ This runs the 3D dam-break problem which is also a SPHERIC benchmark
 `Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`__
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/db3d.png
+   :width: 550px
    :alt: Three-dimensional dam-break example
 
 PySPH is more than a tool for wave-body interactions:::
@@ -106,9 +118,10 @@ This runs the driven cavity problem using the transport velocity
 formulation of Adami et al. You can verify the results for this problem
 using the helper script
 ``examples/transport_velocity/ldcavity_results.py`` to plot, for example
-the streamlines:
+the streamlines look like the following image:
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/ldc-streamlines.png
+   :width: 550px
    :alt: Lid-driven-cavity example
 
 If you want to use PySPH for elastic dynamics, you can try some of the
@@ -120,9 +133,29 @@ examples from the directory ``examples/solid_mech``::
 Which runs the problem of the collision of two elastic rings:
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/rings-collision.png
+   :width: 550px
    :alt: Collision of two steel rings
 
 The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint
 hearted.
+
+Credits
+--------
+
+PySPH is primarily developed at the `Department of Aerospace
+Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`__. We are grateful
+to IIT Bombay for their support.  Our primary goal is to build a
+powerful SPH based tool for both application and research. We hope that
+this makes it easy to perform reproducible computational research.
+
+Lead developers:
+
+- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`__
+- Kunal Puri
+
+Earlier developers:
+
+- Pankaj Pandey (stress solver and improved load balancing, 2011)
+- Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
 
