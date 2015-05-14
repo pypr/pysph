@@ -140,3 +140,22 @@ The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint
 hearted.
 
+Credits
+--------
+
+PySPH is primarily developed at the `Department of Aerospace
+Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`__. We are grateful
+to IIT Bombay for their support.  Our primary goal is to build a
+powerful SPH based tool for both application and research. We hope that
+this makes it easy to perform reproducible computational research.
+
+Lead developers:
+
+- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`__
+- Kunal Puri
+
+Earlier developers:
+
+- Pankaj Pandey (stress solver and improved load balancing, 2011)
+- Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
+

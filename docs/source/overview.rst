@@ -85,3 +85,59 @@ following formulations are currently implemented:
 .. _`Compressible SPH`: http://dx.doi.org/10.1016/j.jcp.2013.08.060
 
 .. _`Test 2`: https://wiki.manchester.ac.uk/spheric/index.php/Test2
+
+
+Credits
+--------
+
+PySPH is primarily developed at the `Department of Aerospace
+Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`__. We are grateful
+to IIT Bombay for their support.  Our primary goal is to build a
+powerful SPH based tool for both application and research. We hope that
+this makes it easy to perform reproducible computational research.
+
+Lead developers:
+
+- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`__
+- Kunal Puri
+
+Earlier developers:
+
+- Pankaj Pandey (stress solver and improved load balancing, 2011)
+- Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
+
+History
+--------
+
+- 2009: PySPH started with a simple Cython based 1D implementation written by
+  Prabhu.
+
+- 2009-2010: Chandrashekhar Kaushik worked on a full 3D SPH implementation with
+  a more general purpose design.  The implementation was in a mix of Cython and
+  Python.
+
+- 2010-2012: The previous implementation was a little too complex and was
+  largely overhauled by Kunal and Pankaj.  This became the PySPH 0.9beta
+  release.  The difficulty with this version was that it was almost entirely
+  written in Cython, making it hard to extend or add new formulations without
+  writing more Cython code.  Doing this was difficult and not too pleasant.  In
+  addition it was not as fast as we would have liked it. It ended up feeling
+  like we might as well have implemented it all in C++ and exposed a Python
+  interface to that.
+
+- 2011-2012: Kunal also implemented SPH2D_ and another internal version called
+  ZSPH in Cython which included Zoltan_ based parallelization using PyZoltan_.
+  This was specific to his PhD research and again required writing Cython
+  making it difficult for the average user to extend.
+
+- 2013-present In early 2013, Prabhu reimplemented the core of PySPH to be
+  almost entirely auto-generated from pure Python.  The resulting code was
+  faster than previous implementations and very easy to extend entirely from
+  pure Python.  Kunal and Prabhu integrated PyZoltan into PySPH and the current
+  version of PySPH was born.  Subsequently, OpenMP support was also added in
+  2015.
+
+
+.. _SPH2D: https://bitbucket.org/kunalp/sph2d
+.. _PyZoltan: https://bitbucket.org/pysph/pyzoltan
+.. _Zoltan: http://www.cs.sandia.gov/zoltan/
