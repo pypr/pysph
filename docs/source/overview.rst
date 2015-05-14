@@ -8,9 +8,21 @@ are implemented in Cython_.
 
 PySPH is implemented in a way that allows a user to specify the entire SPH
 simulation in pure Python. High-performance code is generated from this
-high-level Python code, compiled on the fly and executed.  PySPH also features
-optional automatic parallelization using mpi4py_ and Zoltan_.  If you wish to
-use the parallel capabilities you will need to have these installed.
+high-level Python code, compiled on the fly and executed.  PySPH can use OpenMP
+to utilize multi-core CPUs effectively.  PySPH also features optional automatic
+parallelization (multi-CPU) using mpi4py_ and Zoltan_.  If you wish to use the
+parallel capabilities you will need to have these installed.
+
+Here are videos of simulations made with PySPH.
+
+.. raw:: html
+
+    <div align="center">
+    <iframe width="560" height="315"
+        src="https://www.youtube.com/embed/videoseries?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr"
+        frameborder="0" allowfullscreen>
+    </iframe>
+    </div>
 
 
 .. _Python: http://www.python.org
@@ -24,13 +36,14 @@ Features
 
   - User scripts and equations are written in pure Python.
   - Flexibility to define arbitrary SPH equations operating on particles.
-  - Solver framework to add arbitrary collection of particles.
+  - Ability to define your own multi-step integrators in pure Python.
   - High-performance: our performance is comparable to hand-written solvers
     implemented in FORTRAN.
+  - Seamless multi-core support with OpenMP.
   - Seamless parallel integration using Zoltan_.
 
-Solvers
---------
+SPH formulations
+-----------------
 
 Currently, PySPH has numerous examples to solve the viscous, incompressible
 Navier-Stokes equations using the weakly compressible (WCSPH) approach. The
@@ -39,6 +52,7 @@ following formulations are currently implemented:
 - `Weakly Compressible SPH (WCSPH)`_ for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic Research, 48, pp. 6--27)
 
 .. figure:: ../Images/db3d.png
+   :width: 500 px
    :align: center
 
    3D dam-break past an obstacle SPHERIC benchmark `Test 2`_
@@ -46,6 +60,7 @@ following formulations are currently implemented:
 - `Transport Velocity Formulation`_ for incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307).
 
 .. figure:: ../Images/ldc-streamlines.png
+   :width: 500 px
    :align: center
 
    Streamlines for a driven cavity
@@ -53,6 +68,7 @@ following formulations are currently implemented:
 - `SPH for elastic dynamics`_ (Gray et al. 2001, CMAME, Vol. 190, pp 6641--6662)
 
 .. figure:: ../Images/rings-collision.png
+   :width: 500 px
    :align: center
 
    Collision of two elastic rings.

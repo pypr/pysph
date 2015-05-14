@@ -6,6 +6,34 @@
 Welcome to the PySPH documentation!
 ====================================
 
+PySPH is an open source framework for Smoothed Particle Hydrodynamics (SPH)
+simulations.  Users can implement an SPH formulation in pure Python_ and still
+obtain excellent performance.  PySPH can make use of multiple cores via OpenMP
+or be run seamlessly in parallel using MPI.
+
+Here are some videos of simulations made with PySPH.
+
+.. raw:: html
+
+    <div align="center">
+    <iframe width="560" height="315"
+        src="https://www.youtube.com/embed/videoseries?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr"
+        frameborder="0" allowfullscreen>
+    </iframe>
+    </div>
+
+.. _Python: http://www.python.org
+
+
+**********
+Overview
+**********
+
+.. toctree::
+   :maxdepth: 2
+
+   overview.rst
+
 *********************************
 Installation and getting started
 *********************************
@@ -13,7 +41,6 @@ Installation and getting started
 .. toctree::
    :maxdepth: 2
 
-   overview.rst
    installation.rst
    tutorial/circular_patch.rst
 
