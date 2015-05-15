@@ -1,18 +1,17 @@
-<?py
+<%
 import datetime
 now = datetime.datetime.now()
-template_strs = ['CLASSNAME','ARRAY_TYPE','NUMPY_TYPENAME']
-template_type_str = 'ARRAY_TYPE'
-c_types_info = {'int':['IntArray', "int_array", "NPY_INT",[]],
-                'unsigned int':['UIntArray',"uint_array", "NPY_UINT", []],
-                'double':['DoubleArray', "double_array", "NPY_DOUBLE",[]],
-                'long':['LongArray', "long_array", "NPY_LONG",[]],
-                'float':['FloatArray', "float_array", "NPY_FLOAT",[]]#
-                }
-?># This file (carray.pxd) has been generated automatically on
-# <?py= now.strftime('%c') ?>
+type_info = [
+    ('int', 'IntArray', 'NPY_INT'),
+    ('unsigned int', 'UIntArray', 'NPY_UINT'),
+    ('long', 'LongArray', 'NPY_LONG'),
+    ('float', 'FloatArray', 'NPY_FLOAT'),
+    ('double', 'DoubleArray', 'NPY_DOUBLE'),
+]
+%># This file (carray.pxd) has been generated automatically on
+# ${now.strftime('%c')}
 # DO NOT modify this file
-# To make changes modify the source templates (carray_pxd.src) and regenerate
+# To make changes modify the source templates (carray.pxd.mako) and regenerate
 """
 Implementation of arrays of different types in Cython.
 
@@ -62,46 +61,36 @@ cdef class BaseArray:
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
     cpdef update_min_max(self)
 
-<?py
-pxd_code_str = '''
-################################################################################
-# `CLASSNAME` class.
-################################################################################
-cdef class CLASSNAME(BaseArray):
-    """This class defines a managed array of ARRAY_TYPEs. """
-    cdef ARRAY_TYPE *data
-    cdef ARRAY_TYPE *_old_data
-    cdef public ARRAY_TYPE minimum, maximum
-    cdef CLASSNAME _parent
+% for ARRAY_TYPE, CLASSNAME, NUMPY_TYPENAME in type_info:
+# ###########################################################################
+# `${CLASSNAME}` class.
+# ###########################################################################
+cdef class ${CLASSNAME}(BaseArray):
+    """This class defines a managed array of ${ARRAY_TYPE}s. """
+    cdef ${ARRAY_TYPE} *data
+    cdef ${ARRAY_TYPE} *_old_data
+    cdef public ${ARRAY_TYPE} minimum, maximum
+    cdef ${CLASSNAME} _parent
 
     cdef _setup_npy_array(self)
     cdef void c_align_array(self, LongArray new_indices) nogil
-    cdef void c_append(self, ARRAY_TYPE value) nogil
-    cdef void c_set_view(self, ARRAY_TYPE *array, long length) nogil
-    cdef ARRAY_TYPE* get_data_ptr(self)
+    cdef void c_append(self, ${ARRAY_TYPE} value) nogil
+    cdef void c_set_view(self, ${ARRAY_TYPE} *array, long length) nogil
+    cdef ${ARRAY_TYPE}* get_data_ptr(self)
 
-    cpdef ARRAY_TYPE get(self, long idx)
-    cpdef set(self, long idx, ARRAY_TYPE value)
-    cpdef append(self, ARRAY_TYPE value)
+    cpdef ${ARRAY_TYPE} get(self, long idx)
+    cpdef set(self, long idx, ${ARRAY_TYPE} value)
+    cpdef append(self, ${ARRAY_TYPE} value)
     cpdef reserve(self, long size)
     cpdef resize(self, long size)
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
-    cpdef set_view(self, CLASSNAME, long start, long end)
+    cpdef set_view(self, ${CLASSNAME}, long start, long end)
     cpdef squeeze(self)
     cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
     cpdef extend(self, np.ndarray in_array)
     cpdef reset(self)
-    cpdef long index(self, ARRAY_TYPE value)
+    cpdef long index(self, ${ARRAY_TYPE} value)
 
+% endfor
 
-'''
-
-for ctype,info in c_types_info.items():
-    code = pxd_code_str
-    code = code.replace(template_strs[0], info[0])
-    code = code.replace(template_type_str, ctype)
-    code = code.replace(template_strs[2], info[2])
-    out.write(code)
-
-?>

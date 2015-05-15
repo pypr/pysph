@@ -1,19 +1,17 @@
-<?py
+<%
 import datetime
 now = datetime.datetime.now()
-template_strs = ['CLASSNAME','ARRAY_TYPE','NUMPY_TYPENAME']
-template_type_str = 'ARRAY_TYPE'
-c_types_info = {'int':['IntArray', "int_array", "NPY_INT",[]],
-                'unsigned int':['UIntArray',"uint_array", "NPY_UINT", []],
-                'double':['DoubleArray', "double_array", "NPY_DOUBLE",[]],
-                'long':['LongArray', "long_array", "NPY_LONG",[]],#
-                'float':['FloatArray', "float_array", "NPY_FLOAT",[]]#
-                }
-?># This file (carray.pxd) has been generated automatically on
-# <?py= now.strftime('%c') ?><?py
-# The section below is the header section which is copied unmodified into
-# the generated file
-?>
+type_info = [
+    ('int', 'IntArray', 'NPY_INT'),
+    ('unsigned int', 'UIntArray', 'NPY_UINT'),
+    ('long', 'LongArray', 'NPY_LONG'),
+    ('float', 'FloatArray', 'NPY_FLOAT'),
+    ('double', 'DoubleArray', 'NPY_DOUBLE'),
+]
+%># This file (carray.pxd) has been generated automatically on
+# ${now.strftime('%c')}
+## The section below is the header section which is copied unmodified into
+## the generated file
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -270,26 +268,22 @@ cdef class BaseArrayIter:
     def __iter__(self):
         return self
 
-<?py
 
-# The `pxd_code_str` string defined below is the code template for each class
-# of array to be defined
-
-pxd_code_str = '''
-###############################################################################
-# `CLASSNAME` class.
-###############################################################################
-cdef class CLASSNAME(BaseArray):
-    """ Represents an array of `ARRAY_TYPE`s """
+% for ARRAY_TYPE, CLASSNAME, NUMPY_TYPENAME in type_info:
+# ###########################################################################
+# `${CLASSNAME}` class.
+# ###########################################################################
+cdef class ${CLASSNAME}(BaseArray):
+    """ Represents an array of `${ARRAY_TYPE}`s """
 
     #cdef public long length, alloc
-    #cdef ARRAY_TYPE *data
+    #cdef ${ARRAY_TYPE} *data
     #cdef np.ndarray _npy_array
 
     def __cinit__(self, long n=0, *args, **kwargs):
         """ Constructor for the class.
 
-        Mallocs a memory buffer of size (n*sizeof(ARRAY_TYPE)) and sets up
+        Mallocs a memory buffer of size (n*sizeof(${ARRAY_TYPE})) and sets up
         the numpy array.
 
         Parameters:
@@ -308,7 +302,7 @@ cdef class CLASSNAME(BaseArray):
         if n == 0:
             n = 16
         self.alloc = n
-        self.data = <ARRAY_TYPE*>aligned_malloc(n*sizeof(ARRAY_TYPE))
+        self.data = <${ARRAY_TYPE}*>aligned_malloc(n*sizeof(${ARRAY_TYPE}))
 
         self._setup_npy_array()
 
@@ -323,11 +317,11 @@ cdef class CLASSNAME(BaseArray):
         """ Get item at position idx. """
         return self.data[idx]
 
-    def __setitem__(self, long idx, ARRAY_TYPE value):
+    def __setitem__(self, long idx, ${ARRAY_TYPE} value):
         """ Set location idx to value. """
         self.data[idx] = value
 
-    cpdef long index(self, ARRAY_TYPE value):
+    cpdef long index(self, ${ARRAY_TYPE} value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
         for i in range(self.length):
@@ -335,7 +329,7 @@ cdef class CLASSNAME(BaseArray):
                 return i
         return -1
 
-    def __contains__(self, ARRAY_TYPE value):
+    def __contains__(self, ${ARRAY_TYPE} value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
 
@@ -344,7 +338,7 @@ cdef class CLASSNAME(BaseArray):
         d = {}
         d['data'] = self.get_npy_array()
 
-        return (CLASSNAME, (), d)
+        return (${CLASSNAME}, (), d)
 
     def __setstate__(self, d):
         """ Load the carray from the dictionary d. """
@@ -357,8 +351,9 @@ cdef class CLASSNAME(BaseArray):
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
-        self._npy_array = PyArray_SimpleNewFromData(nd, &dims,
-                                    NUMPY_TYPENAME, self.data)
+        self._npy_array = PyArray_SimpleNewFromData(
+            nd, &dims, ${NUMPY_TYPENAME}, self.data
+        )
 
     ##### Cython protocol ######################################
 
@@ -368,10 +363,10 @@ cdef class CLASSNAME(BaseArray):
         cdef long i
         cdef long length = self.length
         cdef long n_bytes
-        cdef ARRAY_TYPE *temp
+        cdef ${ARRAY_TYPE} *temp
 
-        n_bytes = sizeof(ARRAY_TYPE)*length
-        temp = <ARRAY_TYPE*>aligned_malloc(n_bytes)
+        n_bytes = sizeof(${ARRAY_TYPE})*length
+        temp = <${ARRAY_TYPE}*>aligned_malloc(n_bytes)
 
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
@@ -382,7 +377,7 @@ cdef class CLASSNAME(BaseArray):
 
         aligned_free(<void*>temp)
 
-    cdef void c_append(self, ARRAY_TYPE value) nogil:
+    cdef void c_append(self, ${ARRAY_TYPE} value) nogil:
         cdef long l = self.length
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
@@ -398,9 +393,9 @@ cdef class CLASSNAME(BaseArray):
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
         if size > self.alloc:
-            data = <ARRAY_TYPE*>aligned_realloc(
-                self.data, size*sizeof(ARRAY_TYPE),
-                self.alloc*sizeof(ARRAY_TYPE)
+            data = <${ARRAY_TYPE}*>aligned_realloc(
+                self.data, size*sizeof(${ARRAY_TYPE}),
+                self.alloc*sizeof(${ARRAY_TYPE})
             )
 
             if data == NULL:
@@ -408,7 +403,7 @@ cdef class CLASSNAME(BaseArray):
                 with gil:
                     raise MemoryError
 
-            self.data = <ARRAY_TYPE*>data
+            self.data = <${ARRAY_TYPE}*>data
             self.alloc = size
             arr.data = <char *>self.data
 
@@ -429,7 +424,7 @@ cdef class CLASSNAME(BaseArray):
         self.length = size
         arr.dimensions[0] = self.length
 
-    cdef void c_set_view(self, ARRAY_TYPE *array, long length) nogil:
+    cdef void c_set_view(self, ${ARRAY_TYPE} *array, long length) nogil:
         """Create a view of a given raw data pointer with given length.
         """
         if self._old_data == NULL:
@@ -445,9 +440,9 @@ cdef class CLASSNAME(BaseArray):
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
         cdef size_t size = max(self.length, 16)
-        data = <ARRAY_TYPE*>aligned_realloc(
-            self.data, size*sizeof(ARRAY_TYPE),
-            self.alloc*sizeof(ARRAY_TYPE)
+        data = <${ARRAY_TYPE}*>aligned_realloc(
+            self.data, size*sizeof(${ARRAY_TYPE}),
+            self.alloc*sizeof(${ARRAY_TYPE})
         )
 
         if data == NULL:
@@ -456,7 +451,7 @@ cdef class CLASSNAME(BaseArray):
             with gil:
                 raise MemoryError
 
-        self.data = <ARRAY_TYPE*>data
+        self.data = <${ARRAY_TYPE}*>data
         self.alloc = size
         arr.data = <char *>self.data
 
@@ -464,26 +459,26 @@ cdef class CLASSNAME(BaseArray):
 
     cpdef str get_c_type(self):
         """ Return the c data type for this array. """
-        return 'ARRAY_TYPE'
+        return '${ARRAY_TYPE}'
 
-    cdef ARRAY_TYPE* get_data_ptr(self):
+    cdef ${ARRAY_TYPE}* get_data_ptr(self):
         """ Return the internal data pointer. """
         return self.data
 
-    cpdef ARRAY_TYPE get(self, long idx):
+    cpdef ${ARRAY_TYPE} get(self, long idx):
         """ Gets value stored at position idx. """
         return self.data[idx]
 
-    cpdef set(self, long idx, ARRAY_TYPE value):
+    cpdef set(self, long idx, ${ARRAY_TYPE} value):
         """ Sets location idx to value. """
         self.data[idx] = value
 
-    cpdef append(self, ARRAY_TYPE value):
+    cpdef append(self, ${ARRAY_TYPE} value):
         """ Appends value to the end of the array. """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(ARRAY_TYPE) bytes. """
+        """ Resizes the internal data to size*sizeof(${ARRAY_TYPE}) bytes. """
         self.c_reserve(size)
 
     cpdef reset(self):
@@ -494,7 +489,7 @@ cdef class CLASSNAME(BaseArray):
 
     cpdef resize(self, long size):
         """
-         Resizes internal data to size*sizeof(ARRAY_TYPE) bytes and sets the
+         Resizes internal data to size*sizeof(${ARRAY_TYPE}) bytes and sets the
         length to the new size.
 
         """
@@ -503,7 +498,7 @@ cdef class CLASSNAME(BaseArray):
 
         self.c_resize(size)
 
-    cpdef set_view(self, CLASSNAME parent, long start, long end):
+    cpdef set_view(self, ${CLASSNAME} parent, long start, long end):
         """Create a view of a given a parent array starting at the
         given start index and ending at the end index (this does not
         include the end index).
@@ -593,7 +588,7 @@ cdef class CLASSNAME(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        cdef CLASSNAME dest_array = <CLASSNAME>dest
+        cdef ${CLASSNAME} dest_array = <${CLASSNAME}>dest
         cdef long i, num_values
         num_values = indices.length
 
@@ -614,7 +609,7 @@ cdef class CLASSNAME(BaseArray):
 
         """
         cdef long si, ei, s_length, d_length, i, j
-        cdef CLASSNAME src = <CLASSNAME>source
+        cdef ${CLASSNAME} src = <${CLASSNAME}>source
         s_length = src.length
         d_length = self.length
 
@@ -667,11 +662,11 @@ cdef class CLASSNAME(BaseArray):
     cpdef update_min_max(self):
         """ Updates the min and max values of the array. """
         cdef long i = 0
-        cdef ARRAY_TYPE min_val, max_val
+        cdef ${ARRAY_TYPE} min_val, max_val
 
         if self.length == 0:
-            self.minimum = <ARRAY_TYPE>0
-            self.maximum = <ARRAY_TYPE>0
+            self.minimum = <${ARRAY_TYPE}>0
+            self.maximum = <${ARRAY_TYPE}>0
             return
 
         min_val = self.data[0]
@@ -686,16 +681,5 @@ cdef class CLASSNAME(BaseArray):
         self.minimum = min_val
         self.maximum = max_val
 
-'''
+% endfor
 
-# The code template defined above is instantiated into different types of
-# array classes based on the variables defined at the top of this file
-
-for ctype,info in c_types_info.items():
-    code = pxd_code_str
-    code = code.replace(template_strs[0], info[0])
-    code = code.replace(template_type_str, ctype)
-    code = code.replace(template_strs[2], info[2])
-    out.write(code)
-
-?>

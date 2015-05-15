@@ -1,7 +1,7 @@
 # This file (carray.pxd) has been generated automatically on
-# Sun May  3 16:19:12 2015
+# Sat May 16 00:36:51 2015
 # DO NOT modify this file
-# To make changes modify the source templates (carray_pxd.src) and regenerate
+# To make changes modify the source templates (carray.pxd.mako) and regenerate
 """
 Implementation of arrays of different types in Cython.
 
@@ -51,10 +51,9 @@ cdef class BaseArray:
     cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
     cpdef update_min_max(self)
 
-
-################################################################################
+# ###########################################################################
 # `IntArray` class.
-################################################################################
+# ###########################################################################
 cdef class IntArray(BaseArray):
     """This class defines a managed array of ints. """
     cdef int *data
@@ -82,107 +81,9 @@ cdef class IntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, int value)
 
-
-
-################################################################################
-# `DoubleArray` class.
-################################################################################
-cdef class DoubleArray(BaseArray):
-    """This class defines a managed array of doubles. """
-    cdef double *data
-    cdef double *_old_data
-    cdef public double minimum, maximum
-    cdef DoubleArray _parent
-
-    cdef _setup_npy_array(self)
-    cdef void c_align_array(self, LongArray new_indices) nogil
-    cdef void c_append(self, double value) nogil
-    cdef void c_set_view(self, double *array, long length) nogil
-    cdef double* get_data_ptr(self)
-
-    cpdef double get(self, long idx)
-    cpdef set(self, long idx, double value)
-    cpdef append(self, double value)
-    cpdef reserve(self, long size)
-    cpdef resize(self, long size)
-    cpdef np.ndarray get_npy_array(self)
-    cpdef set_data(self, np.ndarray)
-    cpdef set_view(self, DoubleArray, long start, long end)
-    cpdef squeeze(self)
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
-    cpdef extend(self, np.ndarray in_array)
-    cpdef reset(self)
-    cpdef long index(self, double value)
-
-
-
-################################################################################
-# `FloatArray` class.
-################################################################################
-cdef class FloatArray(BaseArray):
-    """This class defines a managed array of floats. """
-    cdef float *data
-    cdef float *_old_data
-    cdef public float minimum, maximum
-    cdef FloatArray _parent
-
-    cdef _setup_npy_array(self)
-    cdef void c_align_array(self, LongArray new_indices) nogil
-    cdef void c_append(self, float value) nogil
-    cdef void c_set_view(self, float *array, long length) nogil
-    cdef float* get_data_ptr(self)
-
-    cpdef float get(self, long idx)
-    cpdef set(self, long idx, float value)
-    cpdef append(self, float value)
-    cpdef reserve(self, long size)
-    cpdef resize(self, long size)
-    cpdef np.ndarray get_npy_array(self)
-    cpdef set_data(self, np.ndarray)
-    cpdef set_view(self, FloatArray, long start, long end)
-    cpdef squeeze(self)
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
-    cpdef extend(self, np.ndarray in_array)
-    cpdef reset(self)
-    cpdef long index(self, float value)
-
-
-
-################################################################################
-# `LongArray` class.
-################################################################################
-cdef class LongArray(BaseArray):
-    """This class defines a managed array of longs. """
-    cdef long *data
-    cdef long *_old_data
-    cdef public long minimum, maximum
-    cdef LongArray _parent
-
-    cdef _setup_npy_array(self)
-    cdef void c_align_array(self, LongArray new_indices) nogil
-    cdef void c_append(self, long value) nogil
-    cdef void c_set_view(self, long *array, long length) nogil
-    cdef long* get_data_ptr(self)
-
-    cpdef long get(self, long idx)
-    cpdef set(self, long idx, long value)
-    cpdef append(self, long value)
-    cpdef reserve(self, long size)
-    cpdef resize(self, long size)
-    cpdef np.ndarray get_npy_array(self)
-    cpdef set_data(self, np.ndarray)
-    cpdef set_view(self, LongArray, long start, long end)
-    cpdef squeeze(self)
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
-    cpdef extend(self, np.ndarray in_array)
-    cpdef reset(self)
-    cpdef long index(self, long value)
-
-
-
-################################################################################
+# ###########################################################################
 # `UIntArray` class.
-################################################################################
+# ###########################################################################
 cdef class UIntArray(BaseArray):
     """This class defines a managed array of unsigned ints. """
     cdef unsigned int *data
@@ -210,5 +111,94 @@ cdef class UIntArray(BaseArray):
     cpdef reset(self)
     cpdef long index(self, unsigned int value)
 
+# ###########################################################################
+# `LongArray` class.
+# ###########################################################################
+cdef class LongArray(BaseArray):
+    """This class defines a managed array of longs. """
+    cdef long *data
+    cdef long *_old_data
+    cdef public long minimum, maximum
+    cdef LongArray _parent
+
+    cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, long value) nogil
+    cdef void c_set_view(self, long *array, long length) nogil
+    cdef long* get_data_ptr(self)
+
+    cpdef long get(self, long idx)
+    cpdef set(self, long idx, long value)
+    cpdef append(self, long value)
+    cpdef reserve(self, long size)
+    cpdef resize(self, long size)
+    cpdef np.ndarray get_npy_array(self)
+    cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, LongArray, long start, long end)
+    cpdef squeeze(self)
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
+    cpdef extend(self, np.ndarray in_array)
+    cpdef reset(self)
+    cpdef long index(self, long value)
+
+# ###########################################################################
+# `FloatArray` class.
+# ###########################################################################
+cdef class FloatArray(BaseArray):
+    """This class defines a managed array of floats. """
+    cdef float *data
+    cdef float *_old_data
+    cdef public float minimum, maximum
+    cdef FloatArray _parent
+
+    cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, float value) nogil
+    cdef void c_set_view(self, float *array, long length) nogil
+    cdef float* get_data_ptr(self)
+
+    cpdef float get(self, long idx)
+    cpdef set(self, long idx, float value)
+    cpdef append(self, float value)
+    cpdef reserve(self, long size)
+    cpdef resize(self, long size)
+    cpdef np.ndarray get_npy_array(self)
+    cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, FloatArray, long start, long end)
+    cpdef squeeze(self)
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
+    cpdef extend(self, np.ndarray in_array)
+    cpdef reset(self)
+    cpdef long index(self, float value)
+
+# ###########################################################################
+# `DoubleArray` class.
+# ###########################################################################
+cdef class DoubleArray(BaseArray):
+    """This class defines a managed array of doubles. """
+    cdef double *data
+    cdef double *_old_data
+    cdef public double minimum, maximum
+    cdef DoubleArray _parent
+
+    cdef _setup_npy_array(self)
+    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_append(self, double value) nogil
+    cdef void c_set_view(self, double *array, long length) nogil
+    cdef double* get_data_ptr(self)
+
+    cpdef double get(self, long idx)
+    cpdef set(self, long idx, double value)
+    cpdef append(self, double value)
+    cpdef reserve(self, long size)
+    cpdef resize(self, long size)
+    cpdef np.ndarray get_npy_array(self)
+    cpdef set_data(self, np.ndarray)
+    cpdef set_view(self, DoubleArray, long start, long end)
+    cpdef squeeze(self)
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
+    cpdef extend(self, np.ndarray in_array)
+    cpdef reset(self)
+    cpdef long index(self, double value)
 
 
