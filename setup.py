@@ -317,10 +317,13 @@ setup(name='PySPH',
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
       packages = find_packages(),
+      package_data = {
+          '': ['*.pxd', '*.mako', '*.src', '*.txt.gz', '*.txt']
+      },
       # exclude package data in installation.
       exclude_package_data={
           '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
-        },
+      },
 
       ext_modules = ext_modules,
 
