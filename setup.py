@@ -297,11 +297,13 @@ if Have_MPI:
     ext_modules += zoltan_modules + parallel_modules
 
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
+    generator = path.join('pyzoltan', 'core', 'generator.py')
     for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-        generator = path.join( path.abspath('.'), path.join(pth, 'generator.py'))
-        d = {'__file__': generator }
-        execfile(generator, d)
-        d['main'](None)
+        print commands.getoutput(
+            '{py} {generator} {pth}'.format(
+                py=sys.executable, generator=generator, pth=pth
+            )
+        )
 
 info = {}
 execfile(path.join('pysph', '__init__.py'), info)
@@ -317,10 +319,13 @@ setup(name='PySPH',
       keywords = "SPH simulation computational fluid dynamics",
       test_suite = "nose.collector",
       packages = find_packages(),
+      package_data = {
+          '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt']
+      },
       # exclude package data in installation.
       exclude_package_data={
           '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
-        },
+      },
 
       ext_modules = ext_modules,
 
