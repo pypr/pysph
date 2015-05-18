@@ -1,6 +1,6 @@
 import numpy
-import commands
 import os
+from subprocess import check_output
 import sys
 from os import path
 
@@ -119,13 +119,15 @@ openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 if Have_MPI:
     mpic = 'mpic++'
     if compiler == 'intel':
-        link_args = commands.getoutput(mpic + ' -cc=icc -link_info')
+        link_args = check_output([mpic, '-cc=icc', '-link_info']).strip()
         link_args = link_args[3:]
-        compile_args = commands.getoutput(mpic +' -cc=icc -compile_info')
+        compile_args = check_output(
+            [mpic, '-cc=icc', '-compile_info']
+        ).strip()
         compile_args = compile_args[3:]
     else:
-        link_args = commands.getoutput(mpic + ' --showme:link')
-        compile_args = commands.getoutput(mpic +' --showme:compile')
+        link_args = check_output([mpic, '--showme:link']).strip()
+        compile_args = check_output([mpic, '--showme:compile']).strip()
     mpi_link_args.extend(link_args.split())
     mpi_compile_args.extend(compile_args.split())
     mpi_inc_dirs.append(mpi4py.get_include())
@@ -299,11 +301,7 @@ if Have_MPI:
 if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
     generator = path.join('pyzoltan', 'core', 'generator.py')
     for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-        print commands.getoutput(
-            '{py} {generator} {pth}'.format(
-                py=sys.executable, generator=generator, pth=pth
-            )
-        )
+        print check_output([sys.executable, generator, pth])
 
 info = {}
 execfile(path.join('pysph', '__init__.py'), info)
