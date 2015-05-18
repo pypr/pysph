@@ -306,6 +306,17 @@ if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
 info = {}
 execfile(path.join('pysph', '__init__.py'), info)
 
+extras_require = dict(
+    mpi=['mpi4py>=1.2'],
+    ui=['mayavi>=4.0', 'nose'],
+    test=['nose']
+)
+
+everything = set()
+for dep in extras_require.values(): everything.update(dep)
+extras_require['all'] = everything
+
+
 setup(name='PySPH',
       version = info['__version__'],
       author = 'PySPH Developers',
@@ -324,11 +335,11 @@ setup(name='PySPH',
       exclude_package_data={
           '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
       },
-
       ext_modules = ext_modules,
-
       include_package_data = True,
       cmdclass=cmdclass,
+      install_requires = ['numpy', 'mako', 'Cython>=0.19'],
+      extras_require = extras_require,
       zip_safe = False,
       entry_points = """
           [console_scripts]
