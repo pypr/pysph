@@ -19,7 +19,7 @@ install:
   - cmd /v:on /e:on /c enpkg numpy
 
   # Install pysph related dependencies.
-  - "%CMD_IN_ENV% pip install -r pip_requirements.txt"
+  - "%CMD_IN_ENV% pip install -r requirements.txt"
 
   # Build pysph.
   - "%CMD_IN_ENV% python setup.py develop"
