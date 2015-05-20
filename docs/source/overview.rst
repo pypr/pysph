@@ -106,6 +106,18 @@ Earlier developers:
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
 
+Citing PySPH
+-------------
+
+We are in the process of writing up an article on the new PySPH
+framework as it stands today.  In the meanwhile, if you use PySPH and
+wish to cite it you may use this:
+
+ - Prabhu Ramachandran and Kunal Puri, *PySPH: A framework for parallel
+   particle simulations*, In proceedings of the 3rd International
+   Conference on Particle-Based Methods (Particles 2013), Stuttgart,
+   Germany, 18th September 2013.
+
 History
 --------
 
