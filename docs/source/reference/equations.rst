@@ -45,4 +45,5 @@ Group of equations
 -------------------
 
 .. autoclass:: pysph.sph.equation.Group
-   :members:
+   :special-members:
+
