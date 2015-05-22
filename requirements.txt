@@ -1,0 +1,5 @@
+numpy
+setuptools
+Cython>=0.19
+mako
+nose

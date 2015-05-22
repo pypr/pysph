@@ -1,16 +1,25 @@
 from libc.math cimport *
 import numpy as np
 
-<?py
+<%
 from pysph.base.cython_generator import CythonGenerator
 from pysph.base.kernels import (CubicSpline, WendlandQuintic, Gaussian,
     QuinticSpline)
-code = '''
-cdef class {cls}Wrapper:
+generator = CythonGenerator(python_methods=True)
+%>
+
+% for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
+<%
+generator.parse(cls())
+classname = cls.__name__
+%>
+${generator.get_code()}
+
+cdef class ${classname}Wrapper:
     """Reasonably high-performance convenience wrapper for Kernels.
     """
 
-    cdef public {cls} kern
+    cdef public ${classname} kern
     cdef double[3] xij, grad
     cdef public double radius_scale
     cdef public double fac
@@ -37,14 +46,6 @@ cdef class {cls}Wrapper:
         cdef double* grad = self.grad
         self.kern.gradient(xij, rij, h, grad)
         return grad[0], grad[1], grad[2]
-'''
 
-g = CythonGenerator(python_methods=True)
-for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
-    k = cls()
-    g.parse(k)
-    out.write('\n' + '#'*75)
-    out.write(g.get_code())
-    name = cls.__name__
-    out.write(code.format(cls=name))
-?>
+% endfor
+

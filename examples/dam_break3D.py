@@ -120,7 +120,7 @@ integrator = EPECIntegrator(fluid=WCSPHStep(),
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt,
-                adaptive_timestep=True, tdamp=tf/1000.0)
+                adaptive_timestep=True, n_damp=50)
 
 # create the equations
 equations = [

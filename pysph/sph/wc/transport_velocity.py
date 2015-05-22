@@ -63,16 +63,13 @@ class VolumeFromMassDensity(Equation):
     def loop(self, d_idx, d_V, d_rho, d_m):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
 
-class ShepardFilteredVelocity(Equation):
-    r"""Shepard filtered smooth velocity Eq. (22) in REF2:
+class SetWallVelocity(Equation):
+    r"""Extrapolating the fluid velocity on to the wall Eq. (22) in REF1:
     
     .. math::
 
-        \tilde{\boldsymbol{v}}_a = \frac{1}{V_a}\sum_b
-        \boldsymbol{v}_b W_{ab},
-
-    where :math:`V` is the particle volume computed through either
-    `VolumeSummation` or `SummationDensity`.
+        \tilde{\boldsymbol{v}}_a = \frac{\sum_b\boldsymbol{v}_b W_{ab}}
+        {\sum_b W_{ab}}
 
     Notes:
 
@@ -80,21 +77,41 @@ class ShepardFilteredVelocity(Equation):
     *filtered* velocity variables :math:`uf, vf, wf`.
 
     """
-    def initialize(self, d_idx, d_uf, d_vf, d_wf):
+    def initialize(self, d_idx, d_uf, d_vf, d_wf, d_wij):
         d_uf[d_idx] = 0.0
         d_vf[d_idx] = 0.0
         d_wf[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_uf, d_vf, d_wf,
-             s_u, s_v, s_w, d_V, WIJ):
+             s_u, s_v, s_w, d_wij, WIJ):
 
-        # normalized kernel WIJ
-        wij = 1./d_V[d_idx] * WIJ
-        
-        # sum in Eq. (22)
-        d_uf[d_idx] += s_u[s_idx] * wij
-        d_vf[d_idx] += s_v[s_idx] * wij
-        d_wf[d_idx] += s_w[s_idx] * wij
+        # normalisation factor is different from 'V' as the particles 
+        # near the boundary do not have full kernel support
+        d_wij[d_idx] += WIJ
+
+        # sum in Eq. (22) 
+        # this will be normalized in post loop
+        d_uf[d_idx] += s_u[s_idx] * WIJ
+        d_vf[d_idx] += s_v[s_idx] * WIJ
+        d_wf[d_idx] += s_w[s_idx] * WIJ
+
+    def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx,
+            d_ug, d_vg, d_wg, d_u, d_v, d_w):
+
+        # calculation is done only for the relevant boundary particles.
+        # d_wij (and d_uf) is 0 for particles sufficiently away from the
+        # solid-fluid interface
+        if d_wij[d_idx] > 1e-12:
+            d_uf[d_idx] /= d_wij[d_idx]
+            d_vf[d_idx] /= d_wij[d_idx]
+            d_wf[d_idx] /= d_wij[d_idx]
+
+        # Dummy velocities at the ghost points using Eq. (23),
+        # d_u, d_v, d_w are the prescribed wall velocities.
+        d_ug[d_idx] = 2*d_u[d_idx] - d_uf[d_idx]
+        d_vg[d_idx] = 2*d_v[d_idx] - d_vf[d_idx]
+        d_wg[d_idx] = 2*d_w[d_idx] - d_wf[d_idx]
 
 class ContinuityEquation(Equation):
     r"""Conservation of mass equation Eq (6) in REF1
@@ -388,17 +405,16 @@ class SolidWallNoSlipBC(Equation):
     No-slip:
     
     Extrapolation is used to set the `dummy` velocity of the ghost
-    particles for viscous interaction. First, a Shepard filtered
-    velocity is computed for fluid particles in the vicinity of the
-    wall:
-
+    particles for viscous interaction. First, the smoothed velocity 
+    field of the fluid phase is extrapolated to the wall particles:
+    
     .. math::
     
         \tilde{v}_a = \frac{\sum_b v_b W_{ab}}{\sum_b W_{ab}}
 
     In the second step, for the viscous interaction in Eqs. (10) in
     REF1 and Eq. (8) in REF2, the velocity of the ghost particles is
-    temorarily assigned as:
+    assigned as:
 
     .. math::
 
@@ -425,17 +441,12 @@ class SolidWallNoSlipBC(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, d_V, s_V,
-             d_u, d_v, d_w, d_uf, d_vf, d_wf,
+             d_u, d_v, d_w, s_uf, s_vf, s_wf,
              s_u, s_v, s_w, 
              d_au, d_av, d_aw,
+             s_ug, s_vg, s_wg,
              DWIJ, R2IJ, EPS, XIJ):
 
-        # Extrapolated velocities at the ghost points using Eq. (23),
-        # s_u, s_v, s_w are the prescribed wall velocities.
-        ug = 2*s_u[s_idx] - d_uf[d_idx]
-        vg = 2*s_v[s_idx] - d_vf[d_idx]
-        wg = 2*s_w[s_idx] - d_wf[d_idx]
-        
         # averaged shear viscosity Eq. (6).
         etai = self.nu * d_rho[d_idx]
         etaj = self.nu * s_rho[s_idx]
@@ -453,9 +464,9 @@ class SolidWallNoSlipBC(Equation):
         # defined appropriately using the ghost values
         tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * (etaij * Fij/(R2IJ + EPS))
 
-        d_au[d_idx] += tmp * (d_u[d_idx] - ug)
-        d_av[d_idx] += tmp * (d_v[d_idx] - vg)
-        d_aw[d_idx] += tmp * (d_w[d_idx] - wg)
+        d_au[d_idx] += tmp * (d_u[d_idx] - s_ug[s_idx])
+        d_av[d_idx] += tmp * (d_v[d_idx] - s_vg[s_idx])
+        d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
 
 class SolidWallPressureBC(Equation):
     r"""Solid wall pressure boundary condition described in REF1

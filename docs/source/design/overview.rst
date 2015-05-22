@@ -419,6 +419,24 @@ PySPH framework allows the user to write these equations in pure Python. These
 pure Python equations are then used to generate high-performance code and then
 called appropriately to perform the simulations.
 
+There are two types of particle computations in SPH simulations:
+
+ 1. The most common type of interaction is to change the property of one
+    particle (the destination) using the properties of a source particle.
+
+ 2. A less common type of interaction is to calculate say a sum (or product or
+    maximum or minimum) of values of a particular property.  This is commonly
+    called a "reduce" operation in the context of Map-reduce_ programming
+    models.
+
+Computations of the first kind are inherently parallel and easy to perform
+correctly both in serial and parallel.  Computations of the second kind
+(reductions) can be tricky in parallel.  As a result, in PySPH we distinguish
+between the two.  This will be elaborated in more detail in the following.
+
+
+.. _Map-reduce: http://en.wikipedia.org/wiki/MapReduce
+
 In general an SPH algorithm proceeds as the following pseudo-code
 illustrates:
 
@@ -430,13 +448,17 @@ illustrates:
 
     # This is where bulk of the computation happens.
     for destination in particles:
-        for source in particle.neighbors:
+        for source in destination.neighbors:
             for equation in equations:
                 equation.loop(source, destination)
 
     for destination in particles:
         for equation in equations:
             equation.post_loop(destination)
+
+    # Reduce any properties if needed.
+    total_mass = reduce_array(particles.m, 'sum')
+    max_u = reduce_array(particles.u, 'max')
 
 The neighbors of a given particle are identified using a nearest neighbor
 algorithm.  PySPH does this automatically for the user and internally uses a
@@ -505,7 +527,7 @@ Notice that the ``initialize`` method merely sets the value to zero.  The
 ``loop`` method also accepts a few new quantities like ``DWIJ``, ``VIJ`` etc.
 These are precomputed quantities and are automatically provided depending on
 the equations needed for a particular source/destination pair.  The following
-precomputed quantites are available:
+precomputed quantites are available and may be passed into any equation:
 
     - ``HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])``.
 
@@ -541,23 +563,85 @@ precomputed quantites are available:
       See :py:class:`pysph.sph.wc.basic.MomentumEquation` for an example of
       how this is used.
 
+
+In addition if one requires the current time or the timestep in an equation,
+the following may be passed into any of the methods of an equation:
+
+    - ``t``: is the current time.
+
+    - ``dt``: the current time step.
+
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
 one may declare a temporary variable to be a ``matrix`` or a ``cPoint`` by
-writing::
+writing:
+
+.. code-block:: python
 
     mat = declare("matrix((3,3))")
     point = declare("cPoint")
 
-When the Cython code is generated, this gets translated to::
+When the Cython code is generated, this gets translated to:
+
+.. code-block:: cython
 
     cdef double[3][3] mat
     cdef cPoint point
 
-With this machinery, we are able to write complex equations.
+One may also perform any reductions on properties.  Consider a trivial example
+of calculating the total mass and the maximum ``u`` velocity in the following
+equation:
 
-If one wishes to write a new equation, one may simply do as above and
-instantiate the equation in the list of equations.
+.. code-block:: python
+
+    class FindMaxU(Equation):
+        def reduce(self, dst):
+            m = serial_reduce_array(dst.array.m, 'sum')
+            max_u = serial_reduce_array(dst.array.u, 'max')
+            dst.total_mass[0] = parallel_reduce_array(m, 'sum')
+            dst.max_u[0] = parallel_reduce_array(u, 'max')
+
+where:
+
+    - ``dst``: refers to a destination ``ParticleArrayWrapper``.
+
+    - ``src``: refers to a the source ``ParticleArrayWrapper``.
+
+    - ``serial_reduce_array``: is a special function provided that performs
+      reductions correctly in serial. It currently supports ``sum, prod, max``
+      and ``min`` operations.  See
+      :py:func:`pysph.base.reduce_array.serial_reduce_array`.  There is also a
+      :py:func:`pysph.base.reduce_array.parallel_reduce_array` which is to be
+      used to reduce an array across processors.  Using
+      ``parallel_reduce_array`` is expensive as it is an all-to-all
+      communication.  One can reduce these by using a single array and use
+      that to reduce the communication.
+
+The ``ParticleArrayWrapper``, wraps a ``ParticleArray`` into a
+high-performance Cython object.  It has an ``array`` attribute which is a
+reference the the underlying ``ParticleArray`` and also attributes
+corresponding to each property that are ``DoubleArrays``.  For example in the
+Cython code one may access ``dst.x`` to get the raw arrays used by the
+particle array.  This is mainly done for performance reasons.
+
+Note that in the above example,
+:py:func:`pysph.base.reduce_array.serial_reduce_array` is passed a
+``dst.array.m``, this is important as in parallel the ``dst.m`` will contain
+all particle properties including ghost properties.  On the other hand
+``dst.array.m`` will be a numpy array of only the real particles.
+
+We recommend that for any kind of reductions one always use the
+``serial_reduce_array`` function and the ``parallel_reduce_array`` inside a
+``reduce`` method.  One should not worry about parallel/serial modes in this
+case as this is automatically taken care of by the code generator.  In serial,
+the parallel reduction does nothing.
+
+With this machinery, we are able to write complex equations to solve almost
+any SPH problem.  A user can easily define a new equation and instantiate the
+equation in the list of equations to be passed to the application.  It is
+often easiest to look at the many existing equations in PySPH and learn the
+general patterns.
+
 
 Writing the Integrator
 ^^^^^^^^^^^^^^^^^^^^^^

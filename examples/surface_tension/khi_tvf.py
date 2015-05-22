@@ -12,7 +12,7 @@ from pysph.sph.equation import Group
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
 from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
-    SolidWallPressureBC, SolidWallNoSlipBC, ShepardFilteredVelocity, \
+    SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity, \
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import ColorGradientUsingNumberDensity, \
@@ -95,10 +95,7 @@ def create_particles(**kwargs):
 
         # interface curvature
         'kappa',
-        
-        # filtered velocities
-        'uf', 'vf', 'wf',
-        
+
         # transport velocities
         'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 
         
@@ -153,7 +150,16 @@ def create_particles(**kwargs):
     # set additional output arrays for the fluid
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
                              'kappa', 'N', 'p', 'rho'])
+
+    # extrapolated velocities for the wall
+    for name in ['uf', 'vf', 'wf']:
+        wall.add_property(name)
     
+    # dummy velocities for the wall
+    # required for the no-slip BC
+    for name in ['ug','vg','wg']:
+        wall.add_property(name)
+
     print "2D KHI with %d fluid particles and %d wall particles"%(
             fluid.get_number_of_particles(), wall.get_number_of_particles())
 
@@ -186,13 +192,13 @@ tvf_equations = [
             ] ),
     
     # Given the updated number density for the fluid, we can update
-    # the fluid pressure. Additionally, we can compute the Shepard
-    # Filtered velocity required for the no-penetration boundary
+    # the fluid pressure. Additionally, we can extrapolate the fluid
+    # velocity to the wall for the no-slip boundary
     # condition. Also compute the smoothed color based on the color
     # index for a particle.
     Group(equations=[
             StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SetWallVelocity(dest='wall', sources=['fluid']),
             SmoothedColor( dest='fluid', sources=['fluid'] ),
             ] ),
 

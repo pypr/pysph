@@ -1,19 +1,17 @@
-<?py
+<%
 import datetime
 now = datetime.datetime.now()
-template_strs = ['CLASSNAME','ARRAY_TYPE','NUMPY_TYPENAME']
-template_type_str = 'ARRAY_TYPE'
-c_types_info = {'int':['IntArray', "int_array", "NPY_INT",[]],
-                'unsigned int':['UIntArray',"uint_array", "NPY_UINT", []],
-                'double':['DoubleArray', "double_array", "NPY_DOUBLE",[]],
-                'long':['LongArray', "long_array", "NPY_LONG",[]],#
-                'float':['FloatArray', "float_array", "NPY_FLOAT",[]]#
-                }
-?># This file (carray.pxd) has been generated automatically on
-# <?py= now.strftime('%c') ?><?py
-# The section below is the header section which is copied unmodified into
-# the generated file
-?>
+type_info = [
+    ('int', 'IntArray', 'NPY_INT'),
+    ('unsigned int', 'UIntArray', 'NPY_UINT'),
+    ('long', 'LongArray', 'NPY_LONG'),
+    ('float', 'FloatArray', 'NPY_FLOAT'),
+    ('double', 'DoubleArray', 'NPY_DOUBLE'),
+]
+%># This file (carray.pxd) has been generated automatically on
+# ${now.strftime('%c')}
+## The section below is the header section which is copied unmodified into
+## the generated file
 # DO NOT modify this file
 # To make changes modify the source templates (carray_pxd.src) and regenerate
 """
@@ -43,6 +41,11 @@ The numpy array may however be copied and used in any manner.
 """
 # For malloc etc.
 from libc.stdlib cimport *
+IF UNAME_SYSNAME == "Windows":
+    cdef extern from "msstdint.h" nogil:
+        ctypedef unsigned int uintptr_t
+ELSE:
+    from libc.stdint cimport uintptr_t
 
 cimport numpy as np
 
@@ -72,16 +75,106 @@ cdef extern from "numpy/arrayobject.h":
 
 # memcpy
 cdef extern from "stdlib.h":
-     void *memcpy(void *dst, void *src, long n)
+     void *memcpy(void *dst, void *src, long n) nogil
 
 # numpy module initialization call
 import_array()
 
+cdef inline long aligned(long n, int item_size) nogil:
+    """Align `n` items each having size (in bytes) `item_size` to
+    64 bytes and return the appropriate number of items that would
+    be aligned to 64 bytes.
+    """
+    if n*item_size%64 == 0:
+        return n
+    else:
+        if 64%item_size == 0:
+            return (n*item_size/64 + 1)*64/item_size
+        else:
+            return (n*item_size/64 + 1)*64
+
+cpdef long py_aligned(long n, int item_size):
+    """Align `n` items each having size (in bytes) `item_size` to
+    64 bits and return the appropriate number of items that would
+    be aligned to 64 bytes.
+    """
+    return aligned(n, item_size)
+
+cdef void* _aligned_malloc(size_t bytes) nogil:
+    """Allocates block of memory starting on a cache line.
+
+    Algorithm from:
+    http://www.drdobbs.com/parallel/understanding-and-avoiding-memory-issues/212400410
+    """
+    cdef size_t cache_size = 64
+    cdef char* base = <char*>malloc(cache_size + bytes)
+
+    # Round pointer up to next line
+    cdef char* result = <char*>(<uintptr_t>(base+cache_size)&-(cache_size))
+
+    # Record where block actually starts.
+    (<char**>result)[-1] = base
+
+    return <void*>result
+
+cdef void* _aligned_realloc(void *existing, size_t bytes, size_t old_size) nogil:
+    """Allocates block of memory starting on a cache line.
+
+    """
+    cdef void* result = _aligned_malloc(bytes)
+
+    # Copy everything from the old to the new and free the old.
+    memcpy(<void*>result, <void*>existing, old_size)
+    aligned_free(<void*>existing)
+
+    return result
+
+cdef void* _deref_base(void* ptr) nogil:
+    cdef size_t cache_size = 64
+    # Recover where block actually starts
+    cdef char* base = (<char**>ptr)[-1]
+    if <void*>(<uintptr_t>(base+cache_size)&-(cache_size)) != ptr:
+        with gil:
+            raise MemoryError("Passed pointer is not aligned.")
+    return <void*>base
+
+cdef void* aligned_malloc(size_t bytes) nogil:
+    return _aligned_malloc(bytes)
+
+cdef void* aligned_realloc(void* p, size_t bytes, size_t old_size) nogil:
+    return _aligned_realloc(p, bytes, old_size)
+
+cdef void aligned_free(void* p) nogil:
+    """Free block allocated by alligned_malloc.
+    """
+    free(<void*>_deref_base(p))
+
+
 cdef class BaseArray:
     """ Base class for managed C-arrays. """
-    ########################################################################
-    #Public interface
-    ########################################################################
+
+    #### Cython interface  #################################################
+
+    cdef void c_align_array(self, LongArray new_indices) nogil:
+        """ Rearrange the array contents according to the new indices. """
+        pass
+
+    cdef void c_reserve(self, long size) nogil:
+        pass
+
+    cdef void c_reset(self) nogil:
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        self.length = 0
+        arr.dimensions[0] = self.length
+
+    cdef void c_resize(self, long size) nogil:
+        pass
+
+    cdef void c_squeeze(self) nogil:
+        pass
+
+    #### Python interface  #################################################
+
     cpdef str get_c_type(self):
         """ Return the c data type of this array. """
         raise NotImplementedError, 'BaseArray::get_c_type'
@@ -131,17 +224,13 @@ cdef class BaseArray:
 
     cpdef align_array(self, LongArray new_indices):
         """ Rearrange the array contents according to the new indices. """
-        self._align_array(new_indices)
-
-    cdef void _align_array(self, LongArray new_indices):
-        """ Rearrange the array contents according to the new indices. """
-        raise NotImplementedError, 'BaseArray::_align_array'
+        if new_indices.length != self.length:
+            raise ValueError, 'Unequal array lengths'
+        self.c_align_array(new_indices)
 
     cpdef reset(self):
         """ Reset the length of the array to 0. """
-        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
-        self.length = 0
-        arr.dimensions[0] = self.length
+        raise NotImplementedError, 'BaseArray::reset'
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
         """ Copy values of indexed particles from self to dest. """
@@ -179,26 +268,22 @@ cdef class BaseArrayIter:
     def __iter__(self):
         return self
 
-<?py
 
-# The `pxd_code_str` string defined below is the code template for each class
-# of array to be defined
-
-pxd_code_str = '''
-###############################################################################
-# `CLASSNAME` class.
-###############################################################################
-cdef class CLASSNAME(BaseArray):
-    """ Represents an array of `ARRAY_TYPE`s """
+% for ARRAY_TYPE, CLASSNAME, NUMPY_TYPENAME in type_info:
+# ###########################################################################
+# `${CLASSNAME}` class.
+# ###########################################################################
+cdef class ${CLASSNAME}(BaseArray):
+    """ Represents an array of `${ARRAY_TYPE}`s """
 
     #cdef public long length, alloc
-    #cdef ARRAY_TYPE *data
+    #cdef ${ARRAY_TYPE} *data
     #cdef np.ndarray _npy_array
 
     def __cinit__(self, long n=0, *args, **kwargs):
         """ Constructor for the class.
 
-        Mallocs a memory buffer of size (n*sizeof(ARRAY_TYPE)) and sets up
+        Mallocs a memory buffer of size (n*sizeof(${ARRAY_TYPE})) and sets up
         the numpy array.
 
         Parameters:
@@ -212,27 +297,31 @@ cdef class CLASSNAME(BaseArray):
 
         """
         self.length = n
-        self._length = 0
+        self._parent = None
+        self._old_data = NULL
         if n == 0:
             n = 16
         self.alloc = n
-        self.data = <ARRAY_TYPE*>malloc(n*sizeof(ARRAY_TYPE))
+        self.data = <${ARRAY_TYPE}*>aligned_malloc(n*sizeof(${ARRAY_TYPE}))
 
         self._setup_npy_array()
 
     def __dealloc__(self):
         """ Frees the array. """
-        free(<void*>self.data)
+        if self._old_data == NULL:
+            aligned_free(<void*>self.data)
+        else:
+            aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
         """ Get item at position idx. """
         return self.data[idx]
 
-    def __setitem__(self, long idx, ARRAY_TYPE value):
+    def __setitem__(self, long idx, ${ARRAY_TYPE} value):
         """ Set location idx to value. """
         self.data[idx] = value
 
-    cpdef long index(self, ARRAY_TYPE value):
+    cpdef long index(self, ${ARRAY_TYPE} value):
         """ Returns the index at which value is in self, else -1. """
         cdef long i
         for i in range(self.length):
@@ -240,7 +329,7 @@ cdef class CLASSNAME(BaseArray):
                 return i
         return -1
 
-    def __contains__(self, ARRAY_TYPE value):
+    def __contains__(self, ${ARRAY_TYPE} value):
         """ Returns True if value is in self. """
         return (self.index(value) >= 0)
 
@@ -249,7 +338,7 @@ cdef class CLASSNAME(BaseArray):
         d = {}
         d['data'] = self.get_npy_array()
 
-        return (CLASSNAME, (), d)
+        return (${CLASSNAME}, (), d)
 
     def __setstate__(self, d):
         """ Load the carray from the dictionary d. """
@@ -262,82 +351,173 @@ cdef class CLASSNAME(BaseArray):
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
-        self._npy_array = PyArray_SimpleNewFromData(nd, &dims,
-                                    NUMPY_TYPENAME, self.data)
+        self._npy_array = PyArray_SimpleNewFromData(
+            nd, &dims, ${NUMPY_TYPENAME}, self.data
+        )
 
-    cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
-        return 'ARRAY_TYPE'
+    ##### Cython protocol ######################################
 
-    cdef ARRAY_TYPE* get_data_ptr(self):
-        """ Return the internal data pointer. """
-        return self.data
+    cdef void c_align_array(self, LongArray new_indices) nogil:
+        """ Rearrange the array contents according to the new indices. """
 
-    cpdef ARRAY_TYPE get(self, long idx):
-        """ Gets value stored at position idx. """
-        return self.data[idx]
+        cdef long i
+        cdef long length = self.length
+        cdef long n_bytes
+        cdef ${ARRAY_TYPE} *temp
 
-    cpdef set(self, long idx, ARRAY_TYPE value):
-        """ Sets location idx to value. """
-        self.data[idx] = value
+        n_bytes = sizeof(${ARRAY_TYPE})*length
+        temp = <${ARRAY_TYPE}*>aligned_malloc(n_bytes)
 
-    cpdef append(self, ARRAY_TYPE value):
-        """ Appends value to the end of the array. """
+        memcpy(<void*>temp, <void*>self.data, n_bytes)
+
+        # copy the data from the resized portion to the actual positions.
+        for i in range(length):
+            if i != new_indices.data[i]:
+                self.data[i] = temp[new_indices.data[i]]
+
+        aligned_free(<void*>temp)
+
+    cdef void c_append(self, ${ARRAY_TYPE} value) nogil:
         cdef long l = self.length
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
         if l >= self.alloc:
-            self.reserve(l*2)
+            self.c_reserve(l*2)
         self.data[l] = value
         self.length += 1
 
         # update the numpy arrays length
         arr.dimensions[0] = self.length
 
-    cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(ARRAY_TYPE) bytes. """
+    cdef void c_reserve(self, long size) nogil:
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
         if size > self.alloc:
-            data = <ARRAY_TYPE*>realloc(self.data, size*sizeof(ARRAY_TYPE))
+            data = <${ARRAY_TYPE}*>aligned_realloc(
+                self.data, size*sizeof(${ARRAY_TYPE}),
+                self.alloc*sizeof(${ARRAY_TYPE})
+            )
 
             if data == NULL:
-                free(<void*>self.data)
-                raise MemoryError
+                aligned_free(<void*>self.data)
+                with gil:
+                    raise MemoryError
 
-            self.data = <ARRAY_TYPE*>data
+            self.data = <${ARRAY_TYPE}*>data
             self.alloc = size
             arr.data = <char *>self.data
 
-    cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(ARRAY_TYPE) bytes and sets the
-        length to the new size.
+    cdef void c_reset(self) nogil:
+        BaseArray.c_reset(self)
+        if self._old_data != NULL:
+            self.data = self._old_data
+            self._old_data = NULL
+            self._npy_array.data = <char *>self.data
 
-        """
+    cdef void c_resize(self, long size) nogil:
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
 
         # reserve memory
-        self.reserve(size)
+        self.c_reserve(size)
 
         # update the lengths
         self.length = size
         arr.dimensions[0] = self.length
 
-    cpdef squeeze(self):
-        """ Release any unused memory. """
+    cdef void c_set_view(self, ${ARRAY_TYPE} *array, long length) nogil:
+        """Create a view of a given raw data pointer with given length.
+        """
+        if self._old_data == NULL:
+            self._old_data = self.data
+
+        self.data = array
+        self.length = length
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+    cdef void c_squeeze(self) nogil:
         cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
         cdef void* data = NULL
-        data = <ARRAY_TYPE*>realloc(self.data, self.length*sizeof(ARRAY_TYPE))
+        cdef size_t size = max(self.length, 16)
+        data = <${ARRAY_TYPE}*>aligned_realloc(
+            self.data, size*sizeof(${ARRAY_TYPE}),
+            self.alloc*sizeof(${ARRAY_TYPE})
+        )
 
         if data == NULL:
             # free original data
-            free(<void*>self.data)
-            raise MemoryError
+            aligned_free(<void*>self.data)
+            with gil:
+                raise MemoryError
 
-        self.data = <ARRAY_TYPE*>data
-        self.alloc = self.length
+        self.data = <${ARRAY_TYPE}*>data
+        self.alloc = size
         arr.data = <char *>self.data
+
+    ##### Python protocol ######################################
+
+    cpdef str get_c_type(self):
+        """ Return the c data type for this array. """
+        return '${ARRAY_TYPE}'
+
+    cdef ${ARRAY_TYPE}* get_data_ptr(self):
+        """ Return the internal data pointer. """
+        return self.data
+
+    cpdef ${ARRAY_TYPE} get(self, long idx):
+        """ Gets value stored at position idx. """
+        return self.data[idx]
+
+    cpdef set(self, long idx, ${ARRAY_TYPE} value):
+        """ Sets location idx to value. """
+        self.data[idx] = value
+
+    cpdef append(self, ${ARRAY_TYPE} value):
+        """ Appends value to the end of the array. """
+        self.c_append(value)
+
+    cpdef reserve(self, long size):
+        """ Resizes the internal data to size*sizeof(${ARRAY_TYPE}) bytes. """
+        self.c_reserve(size)
+
+    cpdef reset(self):
+        """ Reset the length of the array to 0. """
+        self.c_reset()
+        if self._old_data != NULL:
+            self._parent = None
+
+    cpdef resize(self, long size):
+        """
+         Resizes internal data to size*sizeof(${ARRAY_TYPE}) bytes and sets the
+        length to the new size.
+
+        """
+        if self._old_data != NULL:
+            raise RuntimeError('Cannot reize array which is a view.')
+
+        self.c_resize(size)
+
+    cpdef set_view(self, ${CLASSNAME} parent, long start, long end):
+        """Create a view of a given a parent array starting at the
+        given start index and ending at the end index (this does not
+        include the end index).
+        """
+        if self._parent is None:
+            self._old_data = self.data
+        self._parent = parent
+        self.data = parent.data + start
+        self.length = end - start
+        cdef PyArrayObject* arr = <PyArrayObject*>self._npy_array
+        arr.data = <char *>self.data
+        arr.dimensions[0] = self.length
+
+    cpdef squeeze(self):
+        """ Release any unused memory. """
+        if self._old_data != NULL:
+            raise RuntimeError('Cannot squeeze array which is a view.')
+
+        self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
         """
@@ -357,6 +537,8 @@ cdef class CLASSNAME(BaseArray):
          the length of the array.
 
         """
+        if self._old_data != NULL:
+            raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
@@ -392,32 +574,12 @@ cdef class CLASSNAME(BaseArray):
            costly. Look at the annotated cython html file.
 
         """
+        if self._old_data != NULL:
+            raise RuntimeError('Cannot extend array which is a view.')
         cdef long len = in_array.size
         cdef long i
         for i in range(len):
             self.append(in_array[i])
-
-    cdef void _align_array(self, LongArray new_indices):
-        """ Rearrange the array contents according to the new indices. """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
-
-        cdef long i
-        cdef long length = self.length
-        cdef long n_bytes
-        cdef ARRAY_TYPE *temp
-
-        n_bytes = sizeof(ARRAY_TYPE)*length
-        temp = <ARRAY_TYPE*>malloc(n_bytes)
-
-        memcpy(<void*>temp, <void*>self.data, n_bytes)
-
-        # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
-
-        free(<void*>temp)
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
         """
@@ -426,7 +588,7 @@ cdef class CLASSNAME(BaseArray):
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
         """
-        cdef CLASSNAME dest_array = <CLASSNAME>dest
+        cdef ${CLASSNAME} dest_array = <${CLASSNAME}>dest
         cdef long i, num_values
         num_values = indices.length
 
@@ -447,7 +609,7 @@ cdef class CLASSNAME(BaseArray):
 
         """
         cdef long si, ei, s_length, d_length, i, j
-        cdef CLASSNAME src = <CLASSNAME>source
+        cdef ${CLASSNAME} src = <${CLASSNAME}>source
         s_length = src.length
         d_length = self.length
 
@@ -500,11 +662,11 @@ cdef class CLASSNAME(BaseArray):
     cpdef update_min_max(self):
         """ Updates the min and max values of the array. """
         cdef long i = 0
-        cdef ARRAY_TYPE min_val, max_val
+        cdef ${ARRAY_TYPE} min_val, max_val
 
         if self.length == 0:
-            self.minimum = <ARRAY_TYPE>0
-            self.maximum = <ARRAY_TYPE>0
+            self.minimum = <${ARRAY_TYPE}>0
+            self.maximum = <${ARRAY_TYPE}>0
             return
 
         min_val = self.data[0]
@@ -519,16 +681,5 @@ cdef class CLASSNAME(BaseArray):
         self.minimum = min_val
         self.maximum = max_val
 
-'''
+% endfor
 
-# The code template defined above is instantiated into different types of
-# array classes based on the variables defined at the top of this file
-
-for ctype,info in c_types_info.items():
-    code = pxd_code_str
-    code = code.replace(template_strs[0], info[0])
-    code = code.replace(template_type_str, ctype)
-    code = code.replace(template_strs[2], info[2])
-    out.write(code)
-
-?>

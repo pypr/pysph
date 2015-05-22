@@ -9,6 +9,7 @@ import numpy
 # local imports
 import pysph
 from pysph.base import particle_array
+from pysph.base import utils
 
 from pyzoltan.core import carray
 from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
@@ -113,6 +114,22 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.z, [0, 0]), True)
         self.assertEqual(check_array(p.h, [0.1, 0.1]), True)
 
+    def test_constructor_works_with_simple_props(self):
+        x = [1, 2, 3, 4.]
+        y = [0., 1., 2., 3.]
+        p = particle_array.ParticleArray(x=x, y=y, name='fluid')
+        self.assertEqual(p.name, 'fluid')
+
+        self.assertEqual(p.properties.has_key('x'), True)
+        self.assertEqual(p.properties.has_key('y'), True)
+        self.assertEqual(p.properties.has_key('tag'), True)
+        self.assertEqual(p.properties.has_key('pid'), True)
+        self.assertEqual(p.properties.has_key('gid'), True)
+
+        # get the properties are check if they are the same
+        self.assertEqual(check_array(p.x, x), True)
+        self.assertEqual(check_array(p.y, y), True)
+
     def test_get_number_of_particles(self):
         """
         Tests the get_number_of_particles of particles.
@@ -194,12 +211,15 @@ class ParticleArrayTest(unittest.TestCase):
 
         p.clear()
 
-        self.assertEqual(len(p.properties), 2)
+        self.assertEqual(len(p.properties), 3)
         self.assertEqual(p.properties.has_key('tag'), True)
         self.assertEqual(p.properties['tag'].length, 0)
 
         self.assertEqual(p.properties.has_key('pid'), True)
         self.assertEqual(p.properties['pid'].length, 0)
+
+        self.assertEqual(p.properties.has_key('gid'), True)
+        self.assertEqual(p.properties['gid'].length, 0)
 
         self.assertEqual(p.is_dirty, True)
 
@@ -522,13 +542,12 @@ class ParticleArrayTest(unittest.TestCase):
 
     def test_pickle(self):
         """
-        Tests the pickle and unpicle functions
+        Tests the pickle and unpickle functions
         """
         p1 = particle_array.ParticleArray()
-        x = range(10)
-        p1.add_property(**{'name':'x', 'data':[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
-        p1.add_property(**{'name':'y'})
-        p1.add_property(**{'name':'t'})
+        p1.add_property('x', data=numpy.arange(10))
+        p1.add_property('y', data=numpy.arange(10))
+        p1.add_constant('c', [0.0, 1.0])
         p1.align_particles()
 
         s = pickle.dumps(p1)
@@ -536,6 +555,110 @@ class ParticleArrayTest(unittest.TestCase):
 
         self.assertEqual(len(p1.x), len(p2.x))
         check_array(p1.x, p2.x)
+        self.assertEqual(len(p1.y), len(p2.y))
+        check_array(p1.y, p2.y)
+        self.assertEqual(len(p1.c), len(p2.c))
+        check_array(p1.c, p2.c)
+
+    def test_that_constants_can_be_added(self):
+        # Given
+        p = particle_array.ParticleArray()
+        nprop = len(p.properties)
+        self.assertEqual(len(p.constants), 0)
+
+        # When
+        p.add_constant('s', 0.0)
+        p.add_constant('v', [0.0, 1.0, 2.0])
+
+        # Then
+        self.assertEqual(len(p.constants), 2)
+        self.assertEqual(len(p.properties), nprop)
+        self.assertEqual(p.s[0], 0.0)
+        self.assertTrue(check_array(p.v, [0.0, 1.0, 2.0]))
+
+    def test_that_constants_can_be_set_in_constructor(self):
+        # Given
+        # When
+        p = particle_array.ParticleArray(
+            constants=dict(s=0.0, v=[0.0, 1.0, 2.0])
+        )
+        nprop = len(p.properties)
+
+        # Then
+        self.assertEqual(len(p.constants), 2)
+        self.assertEqual(len(p.properties), nprop)
+        self.assertEqual(p.s[0], 0.0)
+        self.assertTrue(check_array(p.v, [0.0, 1.0, 2.0]))
+
+    def test_that_get_works_on_constants(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1,2,3])
+
+        # When
+        p.add_constant('s', 0.0)
+        p.add_constant('v', [0.0, 1.0, 2.0])
+
+        # Then
+        self.assertTrue(check_array(p.get('s'), [0.0]))
+        self.assertTrue(check_array(p.get('v'), [0.0, 1.0, 2.0]))
+
+    def test_that_constants_are_not_resized_when_particles_are_added(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1.0])
+
+        # When
+        p.add_constant('v', [0.0, 1.0])
+        p.add_particles(x=[2.0, 3.0])
+
+        # Then
+        self.assertTrue(check_array(p.v, [0.0, 1.0]))
+        self.assertTrue(check_array(p.x, [1.0, 2.0, 3.0]))
+
+    def test_that_set_works_on_constants(self):
+        # Given
+        constants = dict(v=[0.0, 0.0, 0.0], c=[0.0, 0.0, 0.0])
+        p = particle_array.ParticleArray(name='f', constants=constants)
+
+        # When
+        p.set(v=[0.0, 1.0, 2.0])
+        p.c = [0.0, 1.0, 2.0]
+
+        # Then
+        self.assertEqual(len(p.constants), 2)
+        self.assertTrue(check_array(p.get('v'), [0.0, 1.0, 2.0]))
+        self.assertTrue(check_array(p.get('c'), [0.0, 1.0, 2.0]))
+
+    def test_that_get_carray_works_with_constants(self):
+        # Given
+        p = particle_array.ParticleArray()
+        v = [0.0, 1.0, 2.0]
+
+        # When
+        p.add_constant('v', v)
+        a = p.get_carray('v')
+
+        # Then
+        self.assertEqual(a.get_c_type(), 'double')
+        self.assertTrue(check_array(a.get_npy_array(), v))
+
+
+class ParticleArrayUtils(unittest.TestCase):
+    def test_that_get_particles_info_works(self):
+        # Given.
+        p = particle_array.ParticleArray(name='f', x=[1,2,3])
+        c = [1.0, 2.0]
+        p.add_constant('c', c)
+
+        # When.
+        info = utils.get_particles_info([p])
+        pas = utils.create_dummy_particles(info)
+        dummy = pas[0]
+
+        # Then.
+        self.assertTrue(check_array(dummy.c, c))
+        self.assertEqual(dummy.name, 'f')
+        self.assertTrue(dummy.properties.has_key('x'))
+
 
 if __name__ == '__main__':
     import logging

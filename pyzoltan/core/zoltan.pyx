@@ -66,6 +66,27 @@ cdef _check_error(int ierr):
     if ierr == ZOLTAN_MEMERR:
         raise MemoryError("Zoltan MEMERR error!")
 
+def Zoltan_Initialize(argc=0, args=''):
+    """Initialize Zoltan"""
+    cdef float version
+    cdef char **c_argv
+
+    args = [ bytes(x) for x in args ]
+    c_argv = <char**>malloc( sizeof(char*) *len(args) )
+    if c_argv is NULL:
+        raise MemoryError()
+    try:
+        for idx, s in enumerate( args ):
+            c_argv[idx] = s
+    finally:
+        free( c_argv )
+
+    # call the Zoltan Init function
+    error_code = cython.declare(cython.int)
+    error_code = czoltan.Zoltan_Initialize(len(args), c_argv, &version)
+    _check_error(error_code)
+    return version
+
 ###############################################################
 # ZOLTAN QUERY FUNCTIONS FOR GEOMETRIC PARTITIONING
 ###############################################################
@@ -205,8 +226,8 @@ cdef class PyZoltan:
         self.rank = comm.Get_rank()
         self.size = comm.Get_size()
 
-        # initialize Zoltan
-        self.version = self.Zoltan_Initialize()
+        # initialize the Zoltan library
+        self.version = Zoltan_Initialize()
 
         # Create the Zoltan struct
         self.Zoltan_Create(comm)
@@ -231,27 +252,6 @@ cdef class PyZoltan:
     def set_num_global_objects(self, int num_global_objects):
         """Set the number of global objects"""
         self.num_global_objects = num_global_objects
-
-    def Zoltan_Initialize(self, int argc=0, args=''):
-        """Initialize Zoltan"""
-        cdef float version
-        cdef char **c_argv
-
-        args = [ bytes(x) for x in args ]
-        c_argv = <char**>malloc( sizeof(char*) *len(args) )
-        if c_argv is NULL:
-            raise MemoryError()
-        try:
-            for idx, s in enumerate( args ):
-                c_argv[idx] = s
-        finally:
-            free( c_argv )
-
-        # call the Zoltan Init function
-        error_code = cython.declare(cython.int)
-        error_code = czoltan.Zoltan_Initialize(len(args), c_argv, &version)
-        _check_error(error_code)
-        return version
 
     def Zoltan_Create(self, mpi.Comm comm):
         """Create the Zoltan struct"""

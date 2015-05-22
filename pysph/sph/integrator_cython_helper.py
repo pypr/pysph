@@ -110,9 +110,9 @@ class IntegratorCythonHelper(object):
         """Returns the names of the methods we should wrap.  For a 2 stage
         method this will return ('initialize', 'stage1', 'stage2')
         """
-        methods = set(['initialize'])
+        methods = set()
         for stepper in self.object.steppers.values():
-            stages = [x for x in dir(stepper) if x.startswith('stage')]
+            stages = [x for x in dir(stepper) if x.startswith('stage') or x == 'initialize']
             methods.update(stages)
         return list(sorted(methods))
 

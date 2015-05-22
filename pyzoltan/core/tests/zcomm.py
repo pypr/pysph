@@ -12,6 +12,9 @@ comm = mpi.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+# Initialize the Zoltan library
+zoltan_version = zoltan.Zoltan_Initialize()
+
 # each processor creates some random data
 numObjectsTotal = 1<<10
 

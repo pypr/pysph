@@ -1,5 +1,12 @@
 """3 dimensional tests for the Zoltan partitioner. The test follows
-the same pattern as the 2D test."""
+the same pattern as the 2D test.
+
+To see the output from the script try the following::
+
+    $ mpirun -np 4 python 3d_partition.py --plot
+
+"""
+import sys
 
 import mpi4py.MPI as mpi
 comm = mpi.COMM_WORLD
@@ -12,10 +19,31 @@ from pyzoltan.core import zoltan
 from numpy import random
 import numpy as np
 
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.pyplot as plt
 
 colors = ['r', 'g', 'b', 'y', 'm', 'k', 'c', 'burlywood']
+
+def plot_points(x, y, z, slice_data, title, filename):
+    if '--plot' not in sys.argv:
+        return
+
+    from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    s1 = fig.add_subplot(111)
+    s1.axes = Axes3D(fig)
+    for i in range(size):
+        s1.axes.plot3D(
+            x[slice_data[i]], y[slice_data[i]], z[slice_data[i]],
+            c=colors[i], marker='o', linestyle='None', alpha=0.5
+        )
+
+    s1.axes.set_xlabel( 'X' )
+    s1.axes.set_ylabel( 'Y' )
+    s1.axes.set_zlabel( 'Z' )
+
+    plt.title(title)
+    plt.savefig(filename)
+
 
 numPoints = 1<<12
 
@@ -34,23 +62,11 @@ comm.Gather( sendbuf=y, recvbuf=Y, root=0 )
 comm.Gather( sendbuf=z, recvbuf=Z, root=0 )
 
 if rank == 0:
-    fig = plt.figure()
-    s1 = fig.add_subplot(111)
-    s1.axes = Axes3D(fig)
-    for i in range(size):
-        s1.axes.plot3D( X[i*numPoints:(i+1)*numPoints],
-                        Y[i*numPoints:(i+1)*numPoints],
-                        Z[i*numPoints:(i+1)*numPoints],
-                        c=colors[i], marker='o', linestyle='None',
-                        alpha=0.5)
-
-    s1.axes.set_xlabel( 'X' )
-    s1.axes.set_ylabel( 'Y' )
-    s1.axes.set_zlabel( 'Z' )
-
-    plt.title('Initital Distribution')
-    plt.savefig( 'initial.pdf' )
-
+    slice_data = [slice(i*numPoints, (i+1)*numPoints) for i in range(size)]
+    plot_points(
+        X, Y, Z, slice_data, title="Initial Distribution",
+        filename="initial.pdf"
+    )
 # partition the points using PyZoltan
 xa = DoubleArray(numPoints); xa.set_data(x)
 ya = DoubleArray(numPoints); ya.set_data(y)
@@ -84,20 +100,8 @@ NEW_GIDS = comm.gather( new_gids, root=0 )
 
 # save the new partition
 if rank == 0:
-    fig = plt.figure()
-    s1 = fig.add_subplot(111)
-    s1.axes = Axes3D(fig)
-    for i in range(size):
-        s1.axes.plot3D( X[ NEW_GIDS[i] ],
-                        Y[ NEW_GIDS[i] ],
-                        Z[ NEW_GIDS[i] ],
-                        c=colors[i], marker='o', linestyle='None',
-                        alpha=0.5 )
-
-    s1.axes.set_xlabel( 'X' )
-    s1.axes.set_ylabel( 'Y' )
-    s1.axes.set_zlabel( 'Z' )
-
-    plt.title('Final Distribution')
-    plt.savefig( 'final.pdf' )
-    #plt.show()
+    plot_points(
+        X, Y, Z, NEW_GIDS,
+        title='Final Distribution', filename='final.pdf'
+    )
+comm.barrier()

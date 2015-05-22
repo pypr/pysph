@@ -115,18 +115,18 @@ kernel = Gaussian(dim=2)
 # Create the Integrator. Currently, PySPH supports multi-stage,
 # predictor corrector and a TVD-RK3 integrators.
 
-#integrator = PECIntegrator(fluid=WCSPHStep()) 
+#integrator = PECIntegrator(fluid=WCSPHStep())
 #integrator = EPECIntegrator(fluid=WCSPHStep())
 integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
 
-# Construct the solver. tdamp determines the time until which smaller
-# time-steps are used when using adaptive time-steps. Use the tdamp
+# Construct the solver. n_damp determines the iterations until which smaller
+# time-steps are used when using adaptive time-steps. Use the output_at_times
 # list to specify instants of time at which the output solution is
 # required.
 dt = 5e-6; tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=True,
-                cfl=0.05, tdamp=tf/1000.0,
+                cfl=0.05, n_damp=50,
                 output_at_times=[0.0033, 0.0052])
 
 # select True if you want to dump out remote particle properties in

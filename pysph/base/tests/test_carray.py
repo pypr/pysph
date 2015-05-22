@@ -11,12 +11,42 @@ import unittest
 import numpy
 
 # local imports
-from pyzoltan.core.carray import LongArray
+from pyzoltan.core.carray import LongArray, py_aligned
+
+
+class TestAligned(unittest.TestCase):
+
+    def test_aligned_to_64_bits(self):
+        self.assertEqual(py_aligned(12, 1), 64)
+        self.assertEqual(py_aligned(1, 1), 64)
+        self.assertEqual(py_aligned(64, 1), 64)
+        self.assertEqual(py_aligned(120, 1), 128)
+
+        self.assertEqual(py_aligned(1, 2), 32)
+        self.assertEqual(py_aligned(12, 2), 32)
+        self.assertEqual(py_aligned(32, 2), 32)
+        self.assertEqual(py_aligned(33, 2), 64)
+
+        self.assertEqual(py_aligned(1, 3), 64)
+        self.assertEqual(py_aligned(65, 3), 256)
+
+        self.assertEqual(py_aligned(1, 4), 16)
+        self.assertEqual(py_aligned(16, 4), 16)
+        self.assertEqual(py_aligned(21, 4), 32)
+
+        self.assertEqual(py_aligned(1, 5), 64)
+        self.assertEqual(py_aligned(13, 5), 128)
+
+        self.assertEqual(py_aligned(1, 8), 8)
+        self.assertEqual(py_aligned(8, 8), 8)
+        self.assertEqual(py_aligned(11, 8), 16)
+
 
 class TestLongArray(unittest.TestCase):
     """
     Tests for the LongArray class.
     """
+
     def test_constructor(self):
         """
         Test the constructor.
@@ -128,8 +158,21 @@ class TestLongArray(unittest.TestCase):
         l.squeeze()
 
         self.assertEqual(l.length, 6)
-        self.assertEqual(l.alloc == l.length, True)
+        self.assertEqual(l.alloc >= l.length, True)
         self.assertEqual(len(l.get_npy_array()), 6)
+
+    def test_squeeze_for_zero_length_array(self):
+        # Given.
+        l = LongArray()
+
+        # When
+        l.squeeze()
+
+        # Then
+        self.assertEqual(l.length, 0)
+        self.assertEqual(len(l.get_npy_array()), 0)
+        self.assertEqual(l.alloc >= l.length, True)
+        del l # This should work and not segfault.
 
     def test_reset(self):
         """
@@ -272,7 +315,66 @@ class TestLongArray(unittest.TestCase):
         l1_load = pickle.loads(l1_dump)
         self.assertEqual((l1_load.get_npy_array() == l1.get_npy_array()).all(), True)
 
+    def test_set_view(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When.
+        view = LongArray()
+        view.set_view(src, 1, 4)
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = range(1, 4)
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_set_view_for_empty_array(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When.
+        view = LongArray()
+        view.set_view(src, 1, 1)
+
+        # Then.
+        self.assertEqual(view.length, 0)
+        expect = []
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_set_view_stores_reference_to_parent(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+
+        # When
+        view = LongArray()
+        view.set_view(src, 1, 4)
+        del src
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = range(1, 4)
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+    def test_reset_works_after_set_view(self):
+        # Given
+        src = LongArray()
+        src.extend(numpy.arange(5))
+        view = LongArray()
+        view.set_view(src, 1, 3)
+
+        # When.
+        view.reset()
+        view.extend(numpy.arange(3)*10)
+
+        # Then.
+        self.assertEqual(view.length, 3)
+        expect = (numpy.arange(3)*10).tolist()
+        self.assertListEqual(view.get_npy_array().tolist(), expect)
+
+
+
 if __name__ == '__main__':
     unittest.main()
-
-

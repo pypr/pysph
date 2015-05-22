@@ -1,3 +1,7 @@
+# See PEP 440 for more on suitable version numbers.
+__version__ = '1.0a1.dev'
+
+
 # Conditional Imports for Parallel stuff
 
 # Check for MPI

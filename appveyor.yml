@@ -1,0 +1,32 @@
+build: false
+environment:
+
+  global:
+    python: "C:/Python27-x64"
+    CMD_IN_ENV: "cmd /E:ON /V:ON /C .\\appveyor-run-env.cmd"
+
+init:
+  - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path
+
+install:
+  # Just test to see if we have a reasonable Python.
+  - ps: python -c "import sys; print(sys.executable)"
+
+  # Install enstaller, needed so we can quickly install numpy.
+  - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
+  - "%CMD_IN_ENV% python bootstrap.py"
+  - ECHO EPD_auth = 'dGVzdC5mcmVlQGZha2UuZG9tYWluOnRlc3Q9MTIzNA==' > %HOMEPATH%\.enstaller4rc
+  - cmd /v:on /e:on /c enpkg numpy
+
+  # Install pysph related dependencies.
+  - "%CMD_IN_ENV% pip install -r requirements.txt"
+
+  # Build pysph.
+  - "%CMD_IN_ENV% python setup.py develop"
+
+test_script:
+    # Run the tests.
+    - "%CMD_IN_ENV% nosetests -v -A slow --with-xunit --xunit-file=nosetests.xml"
+    # Upload results to appveyor.
+    - ps: (new-object System.Net.WebClient).UploadFile("https://ci.appveyor.com/api/testresults/xunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\nosetests.xml))
+

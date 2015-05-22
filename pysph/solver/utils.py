@@ -13,6 +13,9 @@ import tempfile
 import zipfile
 from numpy.lib import format
 
+from pysph.base.particle_array import ParticleArray
+from pysph.base.utils import get_particle_array, get_particles_info
+
 HAS_PBAR = True
 try:
     import progressbar
@@ -305,6 +308,102 @@ def get_pysph_root():
 ##############################################################################
 # Load an output file
 ##############################################################################
+
+def _gather_array_data(all_array_data, comm):
+    """Given array_data from the current processor and an MPI communicator,
+    return a joined array_data from all processors on rank 0 and the same
+    array_data on the other machines.
+    """
+    array_names = all_array_data.keys()
+
+    # gather the data from all processors
+    collected_data = comm.gather(all_array_data, root=0)
+
+    if comm.Get_rank() == 0:
+        all_array_data = {}
+        size = comm.Get_size()
+
+        # concatenate the arrays
+        for array_name in array_names:
+            array_data = {}
+            all_array_data[array_name] = array_data
+
+            _props = collected_data[0][array_name].keys()
+            for prop in _props:
+                data = [collected_data[pid][array_name][prop]
+                            for pid in range(size)]
+                prop_arr = numpy.concatenate(data)
+                array_data[prop] = prop_arr
+
+    return all_array_data
+
+def dump(filename, particles, solver_data, detailed_output=False,
+         only_real=True, mpi_comm=None):
+    """Dump the given particles and solver data to the given filename.
+
+    **Parameters**
+
+     - filename: str: Filename to dump to.
+
+     - particles: sequence(ParticleArray): Sequence of particle arrays to dump.
+
+     - solver_data: dict: Additional information to dump about solver state.
+
+     - detailed_output: bool: Specifies if all arrays should be dumped.
+
+     - only_real: bool: Only dump the real particles.
+
+     - mpi_comm: An MPI communicator to use for parallel commmunications.
+
+    If `mpi_comm` is not passed or is set to None the local particles alone
+    are dumped, otherwise only rank 0 dumps the output.
+
+    """
+
+    particle_data = get_particles_info(particles)
+    output_data = {"particles":particle_data, "solver_data":solver_data}
+
+    all_array_data = {}
+    for array in particles:
+        all_array_data[array.name] = array.get_property_arrays(
+            all=detailed_output, only_real=only_real
+        )
+
+    # Gather particle data on root if this is in parallel.
+    if mpi_comm is not None:
+        all_array_data = _gather_array_data(all_array_data, mpi_comm)
+
+    for name, arrays in all_array_data.iteritems():
+        particle_data[name]["arrays"] = arrays
+
+    if mpi_comm is None or mpi_comm.Get_rank() == 0:
+        savez(filename, version=2, **output_data)
+
+
+def dump_v1(filename, particles, solver_data, detailed_output=False,
+         only_real=True, mpi_comm=None):
+    """Dump the given particles and solver data to the given filename using
+    version 1.  This is mainly used only for testing that we can continue
+    to load older versions of the data files.
+    """
+
+    all_array_data = {}
+    output_data = {"arrays":all_array_data, "solver_data":solver_data}
+
+    for array in particles:
+        all_array_data[array.name] = array.get_property_arrays(
+            all=detailed_output, only_real=only_real)
+
+    # Gather particle data on root
+    if mpi_comm is not None:
+        all_array_data = _gather_array_data(all_array_data, mpi_comm)
+
+    output_data['arrays'] = all_array_data
+
+    if mpi_comm is None or mpi_comm.Get_rank() == 0:
+        savez(filename, version=1, **output_data)
+
+
 def load(fname):
     """ Load and return data from an  output (.npz) file dumped by PySPH.
 
@@ -318,33 +417,43 @@ def load(fname):
     object as value.
 
     """
-    from pysph.base.utils import get_particle_array
+    def _get_dict_from_arrays(arrays):
+        arrays.shape = (1,)
+        return arrays[0]
+
     data = numpy.load(fname)
 
     ret = {"arrays":{}}
 
     if not 'version' in data.files:
-        msg = "Wrong file type! No version nnumber recorded."
+        msg = "Wrong file type! No version number recorded."
         raise RuntimeError(msg)
 
     version = data['version']
+    solver_data = _get_dict_from_arrays(data["solver_data"])
+    ret["solver_data"] = solver_data
 
     if version == 1:
-
-        arrays = data["arrays"]
-        arrays.shape = (1,)
-        arrays = arrays[0]
-
-        solver_data = data["solver_data"]
-        solver_data.shape = (1,)
-        solver_data = solver_data[0]
-
+        arrays = _get_dict_from_arrays(data["arrays"])
         for array_name in arrays:
             array = get_particle_array(name=array_name,
                                        **arrays[array_name])
             ret["arrays"][array_name] = array
 
-        ret["solver_data"] = solver_data
+    elif version == 2:
+        particles = _get_dict_from_arrays(data["particles"])
+
+        for array_name, array_info in particles.iteritems():
+            array = ParticleArray(name=array_name,
+                                  constants=array_info["constants"],
+                                  **array_info["arrays"])
+            array.set_output_arrays(
+                array_info.get('output_property_arrays', [])
+            )
+            for prop, prop_info in array_info["properties"].iteritems():
+                if prop not in array_info["arrays"]:
+                    array.add_property(**prop_info)
+            ret["arrays"][array_name] = array
 
     else:
         raise RuntimeError("Version not understood!")

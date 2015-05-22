@@ -15,7 +15,7 @@ from pysph.sph.integrator_step import TransportVelocityStep
 # the eqations
 from pysph.sph.equation import Group
 from pysph.sph.wc.transport_velocity import (SummationDensity,
-    ShepardFilteredVelocity, StateEquation,
+    SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
     SolidWallPressureBC, SolidWallNoSlipBC)
@@ -79,9 +79,9 @@ def create_particles(**kwargs):
     fluid.add_property('V')
     solid.add_property('V' )
 
-    # Shepard filtered velocities for the fluid
+    # extrapolated velocities for the solid
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        solid.add_property(name)
 
     # advection velocities and accelerations for the fluid
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat'):
@@ -89,6 +89,11 @@ def create_particles(**kwargs):
 
     # kernel summation correction for the solid
     solid.add_property('wij')
+
+    # dummy velocities for the solid walls
+    # required for the no-slip BC
+    for name in ['ug', 'vg', 'wg']:
+        solid.add_property(name)
 
     # imposed accelerations on the solid
     solid.add_property('ax')
@@ -138,10 +143,10 @@ kernel = QuinticSpline(dim=2)
 # function evaluation per time step.
 integrator = PECIntegrator(fluid=TransportVelocityStep())
 
-# Create a solver. Damping time is taken as 0.1% of the final time
+# Create a solver. Damping is performed for 100 iterations.
 solver = Solver(
     kernel=kernel, dim=2, integrator=integrator,
-    adaptive_timestep=False, tf=tf, dt=dt, tdamp=tf/1000.0)
+    adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
 
 equations = [
 
@@ -156,12 +161,12 @@ equations = [
             ], real=False),
 
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SetWallVelocity(dest='solid', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can

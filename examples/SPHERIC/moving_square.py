@@ -22,8 +22,8 @@ from pysph.sph.equation import Group, Equation
 from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    ShepardFilteredVelocity
-		
+    SetWallVelocity
+
 # domain and reference values
 Lx = 10.0; Ly = 5.0
 Umax = 1.0
@@ -35,7 +35,7 @@ obstacle_width = 1.0
 obstacle_height = 1.0
 
 # Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * obstacle_width/Re
+Re = 150; nu = Umax * obstacle_width/Re
 
 # Numerical setup
 nx = 50; dx = 0.20* Lx/nx
@@ -62,7 +62,7 @@ def _get_interior(x, y):
         if ( (x[i] > 0.0) and (x[i] < Lx) ):
             if ( (y[i] > 0.0) and (y[i] < Ly) ):
                 indices.append(i)
-                
+
     return indices
 
 def _get_obstacle(x, y):
@@ -70,7 +70,7 @@ def _get_obstacle(x, y):
     for i in range(x.size):
         if ( (1.0 <= x[i] <= 2.0) and (2.0 <= y[i] <= 3.0) ):
             indices.append(i)
-            
+
     return indices
 
 def _setup_particle_properties(particles, volume):
@@ -83,9 +83,16 @@ def _setup_particle_properties(particles, volume):
     solid.add_property('V' )
     obstacle.add_property('V' )
 
-    # Shepard filtered velocities for the fluid
+    # extrapolated velocities for the fluid
     for name in ['uf', 'vf', 'wf']:
-        fluid.add_property(name)
+        solid.add_property(name)
+        obstacle.add_property(name)
+
+    # dummy velocities for the solid and obstacle
+    # required for the no-slip BC
+    for name in ['ug', 'vg', 'wg']:
+        solid.add_property(name)
+        obstacle.add_property(name)
 
     # advection velocities and accelerations for fluid
     for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
@@ -123,7 +130,7 @@ def _setup_particle_properties(particles, volume):
     fluid.m[:] = volume * rho0
     solid.m[:] = volume * rho0
     obstacle.m[:] = volume * rho0
-    
+
     # volume is set as dx^2
     fluid.V[:] = 1./volume
     solid.V[:] = 1./volume
@@ -140,9 +147,9 @@ def _setup_particle_properties(particles, volume):
 
     solid.set_output_arrays( ['x', 'y', 'rho', 'p'] )
     obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
-            
+
     particles = [fluid, solid, obstacle]
-    return particles    
+    return particles
 
 def create_particles(hcp=False, **kwargs):
     "Initial distribution using Hexagonal close packing of particles"
@@ -150,18 +157,18 @@ def create_particles(hcp=False, **kwargs):
     global dx
     if hcp:
         x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution.uniform_distribution_hcp2D(
-            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent, 
+            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent,
             ymin=-ghost_extent, ymax=Ly+ghost_extent)
     else:
         x, y, dx, dy, xmin, xmax, ymin, ymax = uniform_distribution.uniform_distribution_cubic2D(
-            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent, 
+            dx=dx, xmin=-ghost_extent, xmax=Lx+ghost_extent,
             ymin=-ghost_extent, ymax=Ly+ghost_extent)
 
     x = x.ravel(); y = y.ravel()
-    
+
     # create the basic particle array
     solid = get_particle_array(name='solid', x=x, y=y)
-    
+
     # now sort out the interior from all particles
     indices = _get_interior(solid.x, solid.y)
     fluid = solid.extract_particles( indices )
@@ -211,7 +218,7 @@ class SPHERICBenchmarkAcceleration(Equation):
     We use scipy.optimize to fit the Gaussian:
 
     .. math::
-    
+
         a \exp( -\frac{(t-b)^2}{2c^2} ) + d
 
     to the SPHERIC Motion.dat file. The values for the parameters are
@@ -231,14 +238,14 @@ class SPHERICBenchmarkAcceleration(Equation):
         b = 0.525652151
         c = 0.14142151
         d = -2.55580905e-08
-        
+
         # compute the acceleration and set it for the destination
         d_ax[d_idx] = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
 
 equations = [
 
     # set the acceleration for the obstacle using the special function
-    # mimicing the accelerations provided in the test.
+    # mimicking the accelerations provided in the test.
     Group(
         equations=[
             SPHERICBenchmarkAcceleration(dest='obstacle', sources=None),
@@ -248,20 +255,20 @@ equations = [
     # phase. This is done for all local and remote particles. At the
     # end of this group, the fluid phase has the correct density
     # taking into consideration the fluid and solid
-    # particles. 
+    # particles.
     Group(
         equations=[
             SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
             ], real=False),
 
-
     # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
+    # the fluid pressure. Additionally, the dummy velocity for the
+    # channel is set, which is later used in the no-slip wall BC.
     Group(
         equations=[
             StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ShepardFilteredVelocity(dest='fluid', sources=['fluid']),
+            SetWallVelocity(dest='solid', sources=['fluid']),
+            SetWallVelocity(dest='obstacle', sources=['fluid']),
             ], real=False),
 
     # Once the pressure for the fluid phase has been updated, we can
@@ -281,17 +288,17 @@ equations = [
             # Pressure gradient terms
             MomentumEquationPressureGradient(
                 dest='fluid', sources=['fluid', 'solid','obstacle'], pb=p0),
-            
+
             # fluid viscosity
             MomentumEquationViscosity(
                 dest='fluid', sources=['fluid'], nu=nu),
-            
+
             # No-slip boundary condition. This is effectively a
             # viscous interaction of the fluid with the ghost
             # particles.
             SolidWallNoSlipBC(
                 dest='fluid', sources=['solid','obstacle'], nu=nu),
-            
+
             # Artificial stress for the fluid phase
             MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
