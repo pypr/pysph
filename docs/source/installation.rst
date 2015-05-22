@@ -35,7 +35,7 @@ Core dependencies
 The core dependencies are:
 
   - NumPy_
-  - Cython_ (version 0.19 and above)
+  - Cython_ (version 0.20 and above)
   - Mako_
   - nose_ for running the unit tests.
 
@@ -184,7 +184,7 @@ On OS X, your best bet is to install `Enthought Canopy`_ or Anaconda_ or some
 other Python distribution.  Ensure that you have gcc or clang installed by
 installing XCode.  See `this
 <http://stackoverflow.com/questions/12228382/after-install-xcode-where-is-clang>`_
-if you installed XCode but can't find clang or gcc.  
+if you installed XCode but can't find clang or gcc.
 
 ^^^^^^^^^^^^^
 OpenMP on OSX

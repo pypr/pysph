@@ -364,7 +364,7 @@ setup(name='PySPH',
       ext_modules = ext_modules,
       include_package_data = True,
       cmdclass=cmdclass,
-      install_requires = ['numpy', 'mako', 'Cython>=0.19'],
+      install_requires = ['numpy', 'mako', 'Cython>=0.20'],
       extras_require = extras_require,
       zip_safe = False,
       entry_points = """
