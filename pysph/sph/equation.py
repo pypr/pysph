@@ -53,7 +53,12 @@ class Context(dict):
         >>> c.keys()
         ['a', 'x', 'b']
     """
-    __getattr__ = dict.__getitem__
+    def __getattr__(self, key):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            raise AttributeError('Context has no attribute %s'%key)
+
     def __setattr__(self, key, value):
         self[key] = value
 
