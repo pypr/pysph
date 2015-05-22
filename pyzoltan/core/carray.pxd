@@ -1,9 +1,8 @@
-# This file (carray.pxd) has been generated automatically on
-# Sat May 16 00:36:51 2015
+# This file (carray.pxd) has been generated automatically.
 # DO NOT modify this file
 # To make changes modify the source templates (carray.pxd.mako) and regenerate
 """
-Implementation of arrays of different types in Cython.
+Implementation of resizeable arrays of different types in Cython.
 
 Declaration File.
 
@@ -200,5 +199,4 @@ cdef class DoubleArray(BaseArray):
     cpdef extend(self, np.ndarray in_array)
     cpdef reset(self)
     cpdef long index(self, double value)
-
 
