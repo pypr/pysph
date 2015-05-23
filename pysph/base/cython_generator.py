@@ -208,7 +208,8 @@ class CythonGenerator(object):
         c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
         if self._config.use_openmp:
-            gil = " nogil" if name != "reduce" else ""
+            ignore = ['reduce', 'converged']
+            gil = " nogil" if name not in ignore else ""
         else:
             gil = ""
         cdefn = 'cdef inline {ret} {name}({arg_def}){gil}:'.format(
@@ -312,11 +313,9 @@ class CythonGenerator(object):
             sz = matrix(eval(code[7:-1]))
             defn = 'cdef double %s%s'%(name, sz)
             return defn
-        elif code.startswith('cPoint'):
-            defn = 'cdef cPoint %s'%name
-            return defn
         else:
-            raise RuntimeError('Unknown declaration %s'%declare)
+            defn = 'cdef {type} {name}'.format(type=code, name=name)
+            return defn
 
     def _parse_function(self, obj):
         c_code, py_code = self._get_method_wrapper(obj, indent=' '*4)

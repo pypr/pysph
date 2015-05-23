@@ -294,6 +294,8 @@ def get_predefined_types(precomp):
     the precomputed symbols.
     """
     result = {'DT_ADAPT':[0.0, 0.0, 0.0],
+              'dt': 0.0,
+              't': 0.0,
               'dst': KnownType('ParticleArrayWrapper'),
               'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.iteritems():
@@ -324,7 +326,7 @@ class Equation(object):
     ##########################################################################
     # `object` interface.
     ##########################################################################
-    def __init__(self, dest, sources=None, name=None):
+    def __init__(self, dest, sources=None):
         r"""
         Parameters
         ----------
@@ -338,8 +340,8 @@ class Equation(object):
                                                                 else None
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
-        self.name = self.__class__.__name__ if name is None else name
-        # The name of the variable used in the compliled AccelerationEval
+        self.name = self.__class__.__name__
+        # The name of the variable used in the compiled AccelerationEval
         # instance.
         self.var_name = ''
 

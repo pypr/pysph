@@ -21,7 +21,7 @@ class IISPHStep(IntegratorStep):
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w,
                d_uadv, d_vadv, d_wadv, d_au, d_av, d_aw,
-               d_ax, d_ay, d_az, dt=0.0):
+               d_ax, d_ay, d_az, dt):
         d_u[d_idx] = d_uadv[d_idx] + dt * d_au[d_idx]
         d_v[d_idx] = d_vadv[d_idx] + dt * d_av[d_idx]
         d_w[d_idx] = d_wadv[d_idx] + dt * d_aw[d_idx]
