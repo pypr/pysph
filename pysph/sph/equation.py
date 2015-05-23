@@ -53,7 +53,12 @@ class Context(dict):
         >>> c.keys()
         ['a', 'x', 'b']
     """
-    __getattr__ = dict.__getitem__
+    def __getattr__(self, key):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            raise AttributeError('Context has no attribute %s'%key)
+
     def __setattr__(self, key, value):
         self[key] = value
 
@@ -354,25 +359,33 @@ class Group(object):
         Parameters
         -----------
 
-        - equations: list: a list of equation objects.
+        equations: list
+            a list of equation objects.
 
-        - real: bool: specifies if only non-remote/non-ghost particles should
-                      be operated on.
+        real: bool
+            specifies if only non-remote/non-ghost particles should be 
+            operated on.
 
-        - update_nnps: bool: specifies if the neighbors should be re-computed
-                       locally after this group
+        update_nnps: bool
+            specifies if the neighbors should be re-computed locally after 
+            this group
 
-        - iterate: bool: specifies if the group should continue iterating
-                         until each equation's "converged()" methods returns
-                         with a positive value.
+        iterate: bool
+            specifies if the group should continue iterating until each
+            equation's "converged()" methods returns with a positive value.
 
-        - max_iterations: int: specifies the maximum number of times this
-                          group should be iterated.
+        max_iterations: int
+            specifies the maximum number of times this group should be
+            iterated.
 
-        - min_iterations: int: specifies the minimum number of times this
-                          group should be iterated.
+        min_iterations: int
+            specifies the minimum number of times this group should be
+            iterated.
 
-        Note that when running simulations in parallel, one should typically
+        Notes
+        -----
+
+        When running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
         in each processor.  This is because we must update the
         pressure/density of the remote neighbors in the current processor.

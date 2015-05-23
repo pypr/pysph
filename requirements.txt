@@ -1,5 +1,5 @@
 numpy
 setuptools
-Cython>=0.19
+Cython>=0.20
 mako
 nose
