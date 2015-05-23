@@ -5,6 +5,7 @@ from textwrap import dedent
 import unittest
 
 # Local imports.
+from pysph.base.cython_generator import KnownType
 from pysph.sph.equation import (BasicCodeBlock, Context, Equation,
     Group, sort_precomputed)
 
@@ -177,6 +178,16 @@ class TestGroup(TestBase):
         g = self.group
         expect = 'cdef double* d_x'
         self.assertEqual(g.get_array_declarations(['d_x']), expect)
+
+    def test_array_declarations_with_known_types(self):
+        # Given
+        g = self.group
+        known_types = {'d_x': KnownType('float*')}
+        # When
+        result = g.get_array_declarations(['d_x'], known_types)
+        # Then.
+        expect = 'cdef float* d_x'
+        self.assertEqual(result, expect)
 
     def test_variable_declarations(self):
         g = self.group
