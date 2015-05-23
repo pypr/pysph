@@ -325,6 +325,14 @@ class Equation(object):
     # `object` interface.
     ##########################################################################
     def __init__(self, dest, sources=None, name=None):
+        r"""
+        Parameters
+        ----------
+        dest : str
+            name of the destination particle array
+        sources : list of str
+            names of the source particle arrays
+        """
         self.dest = dest
         self.sources = sources if sources is not None and len(sources) > 0 \
                                                                 else None
