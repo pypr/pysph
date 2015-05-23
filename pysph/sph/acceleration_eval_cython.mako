@@ -136,15 +136,13 @@ from pysph.base.nnps import get_number_of_threads
 from pyzoltan.core.carray cimport (DoubleArray, IntArray, UIntArray,
     aligned, aligned_free, aligned_malloc)
 
-${header}
+${helper.get_header()}
 
 # #############################################################################
 cdef class ParticleArrayWrapper:
     cdef public int index
     cdef public ParticleArray array
-    cdef public IntArray tag, pid
-    cdef public UIntArray gid
-    cdef public DoubleArray ${array_names}
+    ${indent(helper.get_array_decl_for_wrapper(), 1)}
     cdef public str name
 
     def __init__(self, pa, index):
@@ -169,7 +167,7 @@ cdef class ParticleArrayWrapper:
 # #############################################################################
 cdef class AccelerationEval:
     cdef public tuple particle_arrays
-    cdef public ParticleArrayWrapper ${pa_names}
+    cdef public ParticleArrayWrapper ${helper.get_particle_array_names()}
     cdef public NNPS nnps
     cdef public int n_threads
     cdef public list _nbr_refs

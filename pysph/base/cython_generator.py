@@ -79,6 +79,9 @@ class KnownType(object):
     def __init__(self, type_str):
         self.type = type_str
 
+    def __repr__(self):
+        return 'KnownType("%s")'%self.type
+
 
 class CythonGenerator(object):
     def __init__(self, known_types=None, python_methods=False):
@@ -112,12 +115,12 @@ class CythonGenerator(object):
     def detect_type(self, name, value):
         """Given the variable name and value, detect its type.
         """
+        if isinstance(value, KnownType):
+            return value.type
         if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
             return 'double*'
         if name in ['s_idx', 'd_idx']:
             return 'long'
-        if isinstance(value, KnownType):
-            return value.type
         if value is Undefined or isinstance(value, Undefined):
             raise CodeGenerationError('Unknown type, for %s'%name)
 
