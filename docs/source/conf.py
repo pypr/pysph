@@ -31,6 +31,8 @@ from os.path import join
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax',
 'sphinx.ext.viewcode', 'sphinx.ext.napoleon']
 
+autodoc_default_flags = ['show-inheritance']
+autoclass_content = "both"
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 napoleon_include_private_with_doc = False
