@@ -208,7 +208,8 @@ class CythonGenerator(object):
         c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
         if self._config.use_openmp:
-            gil = " nogil" if name != "reduce" else ""
+            ignore = ['reduce', 'converged']
+            gil = " nogil" if name not in ignore else ""
         else:
             gil = ""
         cdefn = 'cdef inline {ret} {name}({arg_def}){gil}:'.format(
