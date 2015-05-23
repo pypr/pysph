@@ -197,12 +197,17 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
 
 class XSPHCorrection(Equation):
-    r"""Position stepping with XSPH correction
+    r"""Position stepping with XSPH correction [2]_
     
     .. math::
     
         \frac{d\mathbf{r}_{a}}{dt}=\mathbf{\hat{v}}_{a}=\mathbf{v}_{a}-
         \epsilon\sum_{b}m_{b}\frac{\mathbf{v}_{ab}}{\bar{\rho}_{ab}}W_{ab}
+        
+    References
+    ----------
+    .. [2] J. MONAGHAN, Smoothed Particle Hydrodynamics, "Annual Review of 
+        Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
     def __init__(self, dest, sources=None, eps=0.5):
         r"""
