@@ -37,6 +37,14 @@ class EqWithMatrix:
         vec = declare('matrix((3,))')
         vec[0] = d_x[d_idx]
 
+class EqWithDeclare:
+    def func(self, d_idx, d_x=[0.0, 0.0]):
+        val = declare('float')
+        val = d_x[d_idx]
+        index = declare('unsigned int')
+        index = d_idx
+
+
 def func_with_return(d_idx, d_x, x=0.0):
     x += 1
     return d_x[d_idx] + x
@@ -244,6 +252,23 @@ class TestCythonCodeGenerator(TestBase):
                 mat[0][0] = d_x[d_idx]
                 cdef double vec[3]
                 vec[0] = d_x[d_idx]
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_method_with_declare(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithDeclare())
+        expect = dedent("""
+        cdef class EqWithDeclare:
+            def __init__(self, **kwargs):
+                for key, value in kwargs.iteritems():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef float val
+                val = d_x[d_idx]
+                cdef unsigned int index
+                index = d_idx
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
