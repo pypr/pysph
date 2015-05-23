@@ -89,8 +89,8 @@ class TestEquations(TestBase):
         self.assertFalse(hasattr(eq, 'post_loop'))
         self.assertFalse(hasattr(eq, 'initialize'))
 
-        eq = Equation('fluid', sources=['fluid'], name='Test')
-        self.assertEqual(eq.name, 'Test')
+        eq = Equation('fluid', sources=['fluid'])
+        self.assertEqual(eq.name, 'Equation')
         self.assertEqual(eq.no_source, False)
         self.assertEqual(eq.dest, 'fluid')
         self.assertEqual(eq.sources, ['fluid'])
