@@ -1,7 +1,6 @@
-# This file (carray.pxd) has been generated automatically on
-# Sat May 16 01:28:08 2015
+# This file (carray.pxd) has been generated automatically.
 # DO NOT modify this file
-# To make changes modify the source templates (carray_pxd.src) and regenerate
+# To make changes modify the source templates (carray.pxd.mako) and regenerate
 """
 Implementation of resizeable arrays of different types in Cython.
 
@@ -2299,5 +2298,4 @@ cdef class DoubleArray(BaseArray):
 
         self.minimum = min_val
         self.maximum = max_val
-
 

@@ -7,11 +7,11 @@ from os import path
 from setuptools import find_packages, setup
 from Cython.Distutils import build_ext, Extension
 
-Have_MPI = True
+HAVE_MPI = True
 try:
     import mpi4py
 except ImportError:
-    Have_MPI = False
+    HAVE_MPI = False
 
 USE_ZOLTAN=True
 
@@ -22,10 +22,6 @@ if compiler == 'intel':
 else:
     extra_compile_args = []
 
-
-mpi_inc_dirs = []
-mpi_compile_args = []
-mpi_link_args = []
 
 def get_deps(*args):
     """Given a list of basenames, this checks if a .pyx or .pxd exists
@@ -114,24 +110,47 @@ def get_zoltan_directory(varname):
     return d
 
 
-openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
-
-if Have_MPI:
-    mpic = 'mpic++'
-    if compiler == 'intel':
-        link_args = check_output([mpic, '-cc=icc', '-link_info']).strip()
-        link_args = link_args[3:]
-        compile_args = check_output(
-            [mpic, '-cc=icc', '-compile_info']
-        ).strip()
-        compile_args = compile_args[3:]
+def get_mpi_flags():
+    """Returns mpi_inc_dirs, mpi_compile_args, mpi_link_args.
+    """
+    global HAVE_MPI
+    mpi_inc_dirs = []
+    mpi_compile_args = []
+    mpi_link_args = []
+    if not HAVE_MPI:
+        return mpi_inc_dirs, mpi_compile_args, mpi_link_args
+    try:
+        mpic = 'mpic++'
+        if compiler == 'intel':
+            link_args = check_output([mpic, '-cc=icc', '-link_info']).strip()
+            link_args = link_args[3:]
+            compile_args = check_output(
+                [mpic, '-cc=icc', '-compile_info']
+            ).strip()
+            compile_args = compile_args[3:]
+        else:
+            link_args = check_output([mpic, '--showme:link']).strip()
+            compile_args = check_output([mpic, '--showme:compile']).strip()
+    except:
+        print '-'*80
+        print "Unable to run mpic++ correctly, skipping parallel build"
+        print '-'*80
+        HAVE_MPI = False
     else:
-        link_args = check_output([mpic, '--showme:link']).strip()
-        compile_args = check_output([mpic, '--showme:compile']).strip()
-    mpi_link_args.extend(link_args.split())
-    mpi_compile_args.extend(compile_args.split())
-    mpi_inc_dirs.append(mpi4py.get_include())
+        mpi_link_args.extend(link_args.split())
+        mpi_compile_args.extend(compile_args.split())
+        mpi_inc_dirs.append(mpi4py.get_include())
 
+    return mpi_inc_dirs, mpi_compile_args, mpi_link_args
+
+
+def get_zoltan_args():
+    """Returns zoltan_include_dirs, zoltan_library_dirs
+    """
+    global HAVE_MPI
+    zoltan_include_dirs, zoltan_library_dirs = [], []
+    if not HAVE_MPI:
+        return zoltan_include_dirs, zoltan_library_dirs
     # First try with the environment variable 'ZOLTAN'
     zoltan_base = get_zoltan_directory('ZOLTAN')
     inc = lib = ''
@@ -148,10 +167,9 @@ if Have_MPI:
 
     if (not USE_ZOLTAN):
         print("*"*80)
-        print("Zoltan Environment variable" \
-              "not set, not using ZOLTAN!")
+        print("Zoltan Environment variable not set, not using ZOLTAN!")
         print("*"*80)
-        Have_MPI = False
+        HAVE_MPI = False
     else:
         print('-'*70)
         print("Using Zoltan from:\n%s\n%s"%(inc, lib))
@@ -162,6 +180,14 @@ if Have_MPI:
         # PyZoltan includes
         zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
         zoltan_include_dirs += zoltan_cython_include
+
+    return zoltan_include_dirs, zoltan_library_dirs
+
+
+openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
+mpi_inc_dirs, mpi_compile_args, mpi_link_args = get_mpi_flags()
+zoltan_include_dirs, zoltan_library_dirs = get_zoltan_args()
+
 
 include_dirs = [numpy.get_include()]
 
@@ -227,7 +253,7 @@ ext_modules = [
 for ext in ext_modules:
     ext.include_dirs = include_dirs
 
-if Have_MPI:
+if HAVE_MPI:
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -338,7 +364,7 @@ setup(name='PySPH',
       ext_modules = ext_modules,
       include_package_data = True,
       cmdclass=cmdclass,
-      install_requires = ['numpy', 'mako', 'Cython>=0.19'],
+      install_requires = ['numpy', 'mako', 'Cython>=0.20'],
       extras_require = extras_require,
       zip_safe = False,
       entry_points = """

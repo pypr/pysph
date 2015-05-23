@@ -29,14 +29,18 @@ def generate_files(dirname, if_modified=True):
         message = 'generating file {outfile} from {filename}'.format(
             outfile=outfile, filename=filename
         )
-        if if_modified and not is_modified_later(filename, outfile):
-            print('not ' + message)
-        else:
+        if not os.path.exists(outfile) or \
+            not if_modified and is_modified_later(filename, outfile):
+            # Inject the directory of the output file into the path,
+            # so that local imports will work.
+            sys.path.insert(0, os.path.dirname(outfile))
             from mako.template import Template
             print(message)
             template = Template(filename=filename)
             with open(outfile, 'w') as fp:
                 fp.write(template.render())
+        else:
+            print('Not ' + message)
 
 def main(paths=None):
     '''Generates source files using mako template files.

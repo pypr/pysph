@@ -2,9 +2,8 @@ from libc.math cimport *
 import numpy as np
 
 <%
-from pysph.base.cython_generator import CythonGenerator
-from pysph.base.kernels import (CubicSpline, WendlandQuintic, Gaussian,
-    QuinticSpline)
+from cython_generator import CythonGenerator
+from kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
 generator = CythonGenerator(python_methods=True)
 %>
 

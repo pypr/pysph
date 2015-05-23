@@ -1,6 +1,4 @@
 <%
-import datetime
-now = datetime.datetime.now()
 type_info = [
     ('int', 'IntArray', 'NPY_INT'),
     ('unsigned int', 'UIntArray', 'NPY_UINT'),
@@ -8,12 +6,11 @@ type_info = [
     ('float', 'FloatArray', 'NPY_FLOAT'),
     ('double', 'DoubleArray', 'NPY_DOUBLE'),
 ]
-%># This file (carray.pxd) has been generated automatically on
-# ${now.strftime('%c')}
+%># This file (carray.pxd) has been generated automatically.
 # DO NOT modify this file
 # To make changes modify the source templates (carray.pxd.mako) and regenerate
 """
-Implementation of arrays of different types in Cython.
+Implementation of resizeable arrays of different types in Cython.
 
 Declaration File.
 
@@ -93,4 +90,3 @@ cdef class ${CLASSNAME}(BaseArray):
     cpdef long index(self, ${ARRAY_TYPE} value)
 
 % endfor
-
