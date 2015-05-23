@@ -11,7 +11,9 @@ class SPHCompiler(object):
             self.acceleration_eval
         )
         self.integrator = integrator
-        self.integrator_helper = IntegratorCythonHelper(integrator)
+        self.integrator_helper = IntegratorCythonHelper(
+            integrator, self.acceleration_eval_helper
+        )
         self.ext_mod = None
         self.module = None
 

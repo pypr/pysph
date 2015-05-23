@@ -38,6 +38,7 @@ class FindTotalMass(Equation):
     def post_loop(self, d_idx, d_m, d_total_mass):
         d_total_mass[0] += d_m[d_idx]
 
+
 class TestCheckEquationArrayProps(unittest.TestCase):
 
     def test_should_pass_when_properties_exist(self):
@@ -104,6 +105,7 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         # Then.
         check_equation_array_properties(eq, [f])
 
+
 class SimpleEquation(Equation):
     def __init__(self, dest, sources):
         super(SimpleEquation, self).__init__(dest, sources)
@@ -127,6 +129,18 @@ class SimpleEquation(Equation):
             # Reset the count for the next loop.
             self.count = 0
         return result
+
+class MixedTypeEquation(Equation):
+    def initialize(self, d_idx, d_u, d_au, d_pid, d_tag):
+        d_u[d_idx] = 0.0 + d_pid[d_idx]
+        d_au[d_idx] = 0.0 + d_tag[d_idx]
+
+    def loop(self, d_idx, d_au, s_idx, s_m, s_pid, s_tag):
+        #print d_idx, s_idx
+        d_au[d_idx] += s_m[s_idx] + s_pid[s_idx] + s_tag[s_idx]
+
+    def post_loop(self, d_idx, d_u, d_au, d_pid):
+        d_u[d_idx] = d_au[d_idx] + d_pid[d_idx]
 
 
 class SimpleReduction(Equation):
@@ -250,3 +264,17 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.sum(pa.m)
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_should_work_with_non_double_arrays(self):
+        # Given
+        pa = self.pa
+        equations = [MixedTypeEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        self.assertListEqual(list(pa.u), list(expect))
+

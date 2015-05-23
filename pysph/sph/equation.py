@@ -580,10 +580,15 @@ class Group(object):
 
         return filtered_vars
 
-    def get_array_declarations(self, names):
+    def get_array_declarations(self, names, known_types={}):
         decl = []
         for arr in sorted(names):
-            decl.append('cdef double* %s'%arr)
+            if arr in known_types:
+                decl.append('cdef {type} {arr}'.format(
+                    type=known_types[arr].type, arr=arr
+                ))
+            else:
+                decl.append('cdef double* %s'%arr)
         return '\n'.join(decl)
 
     def get_variable_declarations(self, context):
@@ -641,7 +646,7 @@ class Group(object):
             # and not be short-circuited by the first one that returns False.
             return ' & '.join(code)
 
-    def get_equation_wrappers(self):
+    def get_equation_wrappers(self, known_types={}):
         classes = defaultdict(lambda: 0)
         eqs = {}
         for equation in self.equations:
@@ -651,7 +656,8 @@ class Group(object):
             classes[cls] += 1
             eqs[cls] = equation
         wrappers = []
-        predefined = get_predefined_types(self.pre_comp)
+        predefined = dict(get_predefined_types(self.pre_comp))
+        predefined.update(known_types)
         code_gen = CythonGenerator(known_types=predefined)
         for cls in sorted(classes.keys()):
             code_gen.parse(eqs[cls])

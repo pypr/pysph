@@ -79,6 +79,9 @@ class KnownType(object):
     def __init__(self, type_str):
         self.type = type_str
 
+    def __repr__(self):
+        return 'KnownType("%s")'%self.type
+
 
 class CythonGenerator(object):
     def __init__(self, known_types=None, python_methods=False):
