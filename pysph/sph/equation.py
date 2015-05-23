@@ -294,6 +294,8 @@ def get_predefined_types(precomp):
     the precomputed symbols.
     """
     result = {'DT_ADAPT':[0.0, 0.0, 0.0],
+              'dt': 0.0,
+              't': 0.0,
               'dst': KnownType('ParticleArrayWrapper'),
               'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.iteritems():

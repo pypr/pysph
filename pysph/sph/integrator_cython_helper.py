@@ -51,10 +51,11 @@ class IntegratorCythonHelper(object):
             cls = stepper.__class__.__name__
             classes[cls] = stepper
 
+        known_types = dict(self.acceleration_eval_helper.known_types)
+        known_types.update(dict(t=0.0, dt=0.0))
+        code_gen = CythonGenerator(known_types=known_types)
+
         wrappers = []
-        code_gen = CythonGenerator(
-            known_types=self.acceleration_eval_helper.known_types
-        )
         for cls in sorted(classes.keys()):
             code_gen.parse(classes[cls])
             wrappers.append(code_gen.get_code())

@@ -86,6 +86,7 @@ cdef class Integrator:
         cdef long d_idx
         cdef ParticleArrayWrapper dst
         cdef double dt = self.dt
+        cdef double t = self.t
         ${indent(helper.get_array_declarations(method), 2)}
 
         % for dest in sorted(helper.object.steppers.keys()):
