@@ -15,29 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class Solver(object):
-    """ Base class for all PySPH Solvers
-
-    **Attributes**
-
-    - particles -- the particle arrays to operate on
-
-    - integrator_type -- the class of the integrator. This may be one of any
-      defined in solver/integrator.py
-
-    - kernel -- the kernel to be used throughout the calculations. This may
-      need to be modified to handle several kernels.
-
-    - t -- the internal time step counter
-
-    - pre_step_callbacks -- a list of functions to be performed before stepping
-
-    - post_step_callbacks -- a list of functions to execute after stepping
-
-    - pfreq -- the output print frequency
-
-    - dim -- the dimension of the problem
-
-    - pid -- the processor id if running in parallel
+    """Base class for all PySPH Solvers
 
     """
 
@@ -46,41 +24,58 @@ class Solver(object):
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times = [],
                  fixed_h=False, **kwargs):
-        """Constructor
+        """**Constructor**
 
         Any additional keyword args are used to set the values of any
         of the attributes.
 
         Parameters
-        -----------
+        ----------
 
         dim : int
-            Problem dimensionality
+            Dimension of the problem
 
-        integrator_type : integrator.Integrator
-            The integrator to use
+        integrator : pysph.sph.integrator.Integrator
+            Integrator to use
 
-        kernel : base.kernels.Kernel
+        kernel : pysph.base.kernels.Kernel
             SPH kernel to use
 
         n_damp : int
             Number of timesteps for which the initial damping is required.
-            Setting it to zero will disable damping the timesteps.
+            This is used to improve stability for problems with strong 
+            discontinuity in initial condition.
+            Setting it to zero will disable damping of the timesteps.
 
-        tf, dt : double
-            Final time and suggested initial time-step
+        dt : double
+            Suggested initial time step for integration
+
+        tf : double
+            Final time for integration
 
         adaptive_timestep : bint
-            Flag to use adaptive time-steps
+            Flag to use adaptive time steps
 
         cfl : double
             CFL number for adaptive time stepping
 
+        pfreq : int
+            Output files dumping frequency.
+
         output_at_times : list/array
-            Optional list of output times to force output
+            Optional list of output times to force dump the output file
 
         fixed_h : bint
-            Flag for constant smoothing lengths
+            Flag for constant smoothing lengths `h`
+
+        Example
+        -------
+
+        >>> integrator = PECIntegrator(fluid=WCSPHStep())
+        >>> kernel = CubicSpline(dim=2)
+        >>> solver = Solver(dim=2, integrator=integrator, kernel=kernel,
+        ...                 n_damp=50, tf=1.0, dt=1e-3, adaptive_timestep=True,
+        ...                 pfreq=100, cfl=0.5, output_at_times=[1e-1, 1.0])
 
         """
 
@@ -217,10 +212,19 @@ class Solver(object):
         logger.debug("Solver setup complete.")
 
     def add_post_stage_callback(self, callback):
-        """These callbacks are called after each integrator stage.
+        """These callbacks are called *after* each integrator stage.
 
         The callbacks are passed (current_time, dt, stage).  See the the
         `Integrator.one_timestep` methods for examples of how this is called.
+
+        Example
+        -------
+
+        >>> def post_stage_callback_function(t, dt, stage):
+        >>>     # This function is called after every stage of integrator.
+        >>>     print t, dt, stage
+        >>>     # Do something
+        >>> solver.add_post_stage_callback(post_stage_callback_function)
         """
         self.post_stage_callbacks.append(callback)
 
@@ -228,6 +232,15 @@ class Solver(object):
         """These callbacks are called *after* each timestep is performed.
 
         The callbacks are passed the solver instance (i.e. self).
+
+        Example
+        -------
+
+        >>> def post_step_callback_function(solver):
+        >>>     # This function is called after every time step.
+        >>>     print solver.t, solver.dt
+        >>>     # Do something
+        >>> solver.add_post_step_callback(post_step_callback_function)
         """
         self.post_step_callbacks.append(callback)
 
@@ -235,6 +248,15 @@ class Solver(object):
         """These callbacks are called *before* each timestep is performed.
 
         The callbacks are passed the solver instance (i.e. self).
+
+        Example
+        -------
+
+        >>> def pre_step_callback_function(solver):
+        >>>     # This function is called before every time step.
+        >>>     print solver.t, solver.dt
+        >>>     # Do something
+        >>> solver.add_pre_step_callback(pre_step_callback_function)
         """
         self.pre_step_callbacks.append(callback)
 
@@ -254,7 +276,10 @@ class Solver(object):
         self.setup(self.particles)
 
     def set_adaptive_timestep(self, value):
-        """Set if we should use adaptive timesteps or not.
+        """Set it to True to use adaptive timestepping based on 
+        cfl, viscous and force factor.
+
+        Look at pysph.sph.integrator.compute_time_step for more details.  
         """
         self.adaptive_timestep = value
 
