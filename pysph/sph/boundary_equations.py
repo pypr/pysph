@@ -1,3 +1,8 @@
+"""
+SPH Boundary Equations
+######################
+"""
+
 from pysph.sph.equation import Equation
 
 def wendland_quintic(rij=1.0, h=1.0):
