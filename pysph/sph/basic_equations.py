@@ -1,4 +1,7 @@
-"""**Basic SPH Equations**"""
+"""
+Basic SPH Equations
+###################
+"""
 
 from pysph.sph.equation import Equation
 
@@ -126,7 +129,7 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
 
 class MonaghanArtificialViscosity(Equation):
-    r"""Classical Monaghan style artificial viscosity [1]_
+    r"""Classical Monaghan style artificial viscosity [Monaghan2005]_
     
     .. math::
     
@@ -154,8 +157,8 @@ class MonaghanArtificialViscosity(Equation):
     
     References
     ----------
-    .. [1] J. Monaghan, "Smoothed particle hydrodynamics", Reports on Progress 
-        in Physics, 68 (2005), pp. 1703-1759.    
+    .. [Monaghan2005] J. Monaghan, "Smoothed particle hydrodynamics", 
+        Reports on Progress in Physics, 68 (2005), pp. 1703-1759.    
     """
     def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
         r"""
@@ -197,7 +200,7 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
 
 class XSPHCorrection(Equation):
-    r"""Position stepping with XSPH correction [2]_
+    r"""Position stepping with XSPH correction [Monaghan1992]_
     
     .. math::
     
@@ -206,8 +209,8 @@ class XSPHCorrection(Equation):
         
     References
     ----------
-    .. [2] J. MONAGHAN, Smoothed Particle Hydrodynamics, "Annual Review of 
-        Astronomy and Astrophysics", 30 (1992), pp. 543-574.
+    .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual 
+        Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
     def __init__(self, dest, sources=None, eps=0.5):
         r"""
