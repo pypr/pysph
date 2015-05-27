@@ -72,6 +72,8 @@ class TaitEOSHGCorrection(Equation):
         p_a = \frac{c_{0}^2\rho_0}{\gamma}\left(
         \left(\frac{\rho_a}{\rho_0}\right)^{\gamma} -1\right)
     
+    where
+    
     .. math::
     
         \rho_{a}=\begin{cases}\rho_{a} & \rho_{a}\geq\rho_{0}\\
