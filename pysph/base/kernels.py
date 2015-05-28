@@ -23,10 +23,9 @@ def get_compiled_kernel(kernel):
 # `CubicSpline` class.
 ###############################################################################
 class CubicSpline(object):
-    r"""Cubic Spline Kernel: [1]_
+    r"""Cubic Spline Kernel: [Monaghan1992]_
 
     .. math::
-
              W(q) = \ &\sigma_3\left[ (2-q)^3 - 4(1-q)^3\right], \ & \textrm{for} \ 0 \leq q \leq 1,\\
                   = \ &\sigma_3(2-q)^3, & \textrm{for}\ 1 \leq q \leq 2,\\
                   = \ &0, & \textrm{for}\ q>2, \\
@@ -41,7 +40,7 @@ class CubicSpline(object):
 
     References
     ----------
-    .. [1] `Monaghan, J. J. (1992). Smoothed particle hydrodynamics.
+    .. [Monaghan1992] `Monaghan, J. J. (1992). Smoothed particle hydrodynamics.
         Annual review of astronomy and astrophysics, 30, 543-574
         <http://adsabs.harvard.edu/abs/1992ARA&A..30..543M>`_.
     """
@@ -217,10 +216,9 @@ class WendlandQuintic(object):
         return -fac * h1 * ( dw*q + w*self.dim )
 
 class Gaussian(object):
-    r"""Gaussian Kernel: [2]_
+    r"""Gaussian Kernel: [Liu2010]_
 
     .. math::
-
              W(q) = \ &\sigma_g e^{-q^2}, \ & \textrm{for} \ 0\leq q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
@@ -234,7 +232,7 @@ class Gaussian(object):
 
     References
     ----------
-    .. [2] `Liu, M. B., & Liu, G. R. (2010). Smoothed particle
+    .. [Liu2010] `Liu, M. B., & Liu, G. R. (2010). Smoothed particle
         hydrodynamics (SPH): an overview and recent developments.
         Archives of computational methods in engineering, 17(1), 25-76
         <http://link.springer.com/article/10.1007/s11831-010-9040-7>`_.
@@ -317,10 +315,9 @@ class Gaussian(object):
         return -fac * h1 * ( dw*q + w*self.dim )
 
 class QuinticSpline(object):
-    r"""Quintic Spline SPH kernel: [2]_
+    r"""Quintic Spline SPH kernel: [Liu2010]_
 
     .. math::
-
              W(q) = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 + 15(1-q)^5 \right], \ & \textrm{for} \ 0\leq q \leq 1,\\
                   = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 \right], & \textrm{for} \ 1 \leq q \leq 2,\\
                   = \ &\sigma_5 \ (3-5)^5 , & \textrm{for} \ 2 \leq q \leq 3,\\
