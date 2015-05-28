@@ -326,7 +326,7 @@ class QuinticSpline(object):
                   = \ &\sigma_5 \ (3-5)^5 , & \textrm{for} \ 2 \leq q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
-    where :math:`\sigma_3` is a dimensional normalizing factor for the
+    where :math:`\sigma_5` is a dimensional normalizing factor for the
     quintic spline function given by:
 
     .. math::
