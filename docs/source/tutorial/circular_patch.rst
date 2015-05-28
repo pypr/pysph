@@ -365,3 +365,30 @@ If you have Mayavi_ installed this should show a UI that looks like:
     :alt: PySPH viewer
 
 .. _Mayavi: http://code.enthought.com/projects/mayavi
+
+The simulation data is dumped out in .npz files. You may use the ``load``
+method from the ``pysph.solver.utils`` module to access the raw data.
+
+
+::
+
+    from pysph.solver.utils import load
+    data = load('elliptical_drop_100.npz')
+
+When opening the saved ``.npz`` file with ``load`` an `NpzFile` object is
+returned. This is a dictionary-like object which can be queried for
+its list of arrays.
+
+::
+
+    particle_arrays = data['arrays']
+    solver_data = data['solver_data']
+
+``particle_arrays`` is a dictionary of all the PySPH particle arrays.
+You may obtain the PySPH particle array, `fluid`, like so:
+::
+
+    fluid = particle_arrays['fluid']
+    pressure_values = fluid.p
+
+``pressure_values`` is a numpy array containing the pressure values.
