@@ -40,9 +40,9 @@ class CubicSpline(object):
 
     References
     ----------
-    .. [Monaghan1992] `Monaghan, J. J. (1992). Smoothed particle hydrodynamics.
-        Annual review of astronomy and astrophysics, 30, 543-574
-        <http://adsabs.harvard.edu/abs/1992ARA&A..30..543M>`_.
+    .. [Monaghan1992] `J. Monaghan, Smoothed Particle Hydrodynamics, "Annual
+        Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
+        <http://adsabs.harvard.edu/abs/1992ARA&A..30..543M>`_
     """
     def __init__(self, dim=1):
         self.radius_scale = 2.0
@@ -232,10 +232,10 @@ class Gaussian(object):
 
     References
     ----------
-    .. [Liu2010] `Liu, M. B., & Liu, G. R. (2010). Smoothed particle
-        hydrodynamics (SPH): an overview and recent developments.
-        Archives of computational methods in engineering, 17(1), 25-76
-        <http://link.springer.com/article/10.1007/s11831-010-9040-7>`_.
+    .. [Liu2010] `M. Liu, & G. Liu, Smoothed particle hydrodynamics (SPH):
+        an overview and recent developments, "Archives of computational
+        methods in engineering", 17.1 (2010), pp. 25-76.
+        <http://link.springer.com/article/10.1007/s11831-010-9040-7>`_
     """
     def __init__(self, dim=2):
         self.radius_scale = 3.0
