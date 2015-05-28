@@ -1,16 +1,71 @@
-"""Basic equations for solid mechanics"""
+"""
+Basic Equations for Solid Mechanics
+###################################
+
+References
+----------
+.. [Gray2001] J. P. Gray et al., "SPH elastic dynamics", Computer Methods 
+    in Applied Mechanics and Engineering, 190 (2001), pp 6641 - 6662.
+"""
 
 from pysph.sph.equation import Equation
 from textwrap import dedent
 
 class MonaghanArtificialStress(Equation):
-    r"""
-    Artificial stress to remove the tension instability is added to 
-    the momentum equation as described in "SPH elastic dynamics" by J.P.Gray 
-    and J.J. Moaghan and R.P. Swift, Computer Methods in Applied Mechanical 
-    Engineering. vol 190 (2001) pp 6641 - 6662
+    r"""**Artificial stress to remove tensile instability**
+    
+    The dispersion relations in [Gray2001] are used to determine the 
+    different components of :math:`R`.
+    
+    Angle of rotation for particle :math:`a`
+    
+    .. math::
+    
+        \tan{2 \theta_a} = \frac{2\sigma_a^{xy}}{\sigma_a^{xx} - \sigma_a^{yy}}
+        
+    In rotated frame, the new components of the stress tensor are
+    
+    .. math::
+    
+        \bar{\sigma}_a^{xx} = \cos^2{\theta_a} \sigma_a^{xx} + 2\sin{\theta_a}
+        \cos{\theta_a}\sigma_a^{xy} + \sin^2{\theta_a}\sigma_a^{yy}\\
+        
+        \bar{\sigma}_a^{yy} = \sin^2{\theta_a} \sigma_a^{xx} + 2\sin{\theta_a}
+        \cos{\theta_a}\sigma_a^{xy} + \cos^2{\theta_a}\sigma_a^{yy}
+        
+    Components of :math:`R` in rotated frame:
+    
+    .. math::
+        
+        \bar{R}_{a}^{xx}=\begin{cases}-\epsilon\frac{\bar{\sigma}_{a}^{xx}}
+        {\rho^{2}} & \bar{\sigma}_{a}^{xx}>0\\0 & \bar{\sigma}_{a}^{xx}\leq0
+        \end{cases}\\
+        
+        \bar{R}_{a}^{yy}=\begin{cases}-\epsilon\frac{\bar{\sigma}_{a}^{yy}}
+        {\rho^{2}} & \bar{\sigma}_{a}^{yy}>0\\0 & \bar{\sigma}_{a}^{yy}\leq0
+        \end{cases}
+    
+    Components of :math:`R` in original frame:
+    
+    .. math::
+    
+        R_a^{xx} = \cos^2{\theta_a} \bar{R}_a^{xx} + 
+        \sin^2{\theta_a} \bar{R}_a^{yy}\\
+        
+        R_a^{yy} = \sin^2{\theta_a} \bar{R}_a^{xx} + 
+        \cos^2{\theta_a} \bar{R}_a^{yy}\\
+
+        R_a^{xy} = \sin{\theta_a} \cos{\theta_a}\left(\bar{R}_a^{xx} - 
+        \bar{R}_a^{yy}\right)
     """
+    
     def __init__(self, dest, sources=None, eps=0.3):
+        r"""
+        Parameters
+        ----------
+        eps : float
+            constant
+        """
         self.eps = eps
         super(MonaghanArtificialStress, self).__init__(dest, sources)
 
@@ -28,15 +83,13 @@ class MonaghanArtificialStress(Equation):
              d_r00, d_r01, d_r02, d_r11, d_r12, d_r22):
         r"""Compute the stress terms
 
-        Parameters:
-        -----------
-
+        Parameters
+        ----------
         d_sxx : DoubleArray
             Stress Tensor Deviatoric components (Symmetric)
 
         d_rxx : DoubleArray
             Artificial stress components (Symmetric)
-
         """
         # 1/rho_a^2
         rhoi = d_rho[d_idx]
@@ -90,18 +143,33 @@ class MonaghanArtificialStress(Equation):
         d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
 
 class MomentumEquationWithStress2D(Equation):
-    r""" Evaluate the momentum equation:
-
-     :math:`\frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} 
-     +\frac{\sigma_b^{ij}}{\rho_b^2} \right)\nabla_a\,W_{ab}`
-
-    Artificial stress to remove the tension instability is added to
-    the momentum equation as described in "SPH elastic dynamics" by
-    J.P. Gray and J.J. Moaghan and R.P. Swift, Computer Methods in
-     Applied Mechanical Engineering. vol 190 (2001) pp 6641 - 6662
-
+    r"""**Momentum Equation with Artificial Stress**
+    
+    .. math::
+    
+        \frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} 
+        +\frac{\sigma_b^{ij}}{\rho_b^2} + R_{ab}^{ij}f^n \right)\nabla_a W_{ab}
+    
+    where
+    
+    .. math::
+    
+        f_{ab} = \frac{W(r_{ab})}{W(\Delta p)}\\
+        
+        R_{ab}^{ij} = R_{a}^{ij} + R_{b}^{ij}
     """
     def __init__(self, dest, sources=None, wdeltap=-1, n=1):
+        r"""
+        Parameters
+        ----------
+        wdeltap : float
+            evaluated value of :math:`W(\Delta p)`
+        n : float
+            constant
+        with_correction : bool
+            switch for using tensile instability correction
+        """
+        
         self.wdeltap = wdeltap
         self.n = n
         self.with_correction = True
@@ -177,30 +245,31 @@ class MomentumEquationWithStress2D(Equation):
             mb * (s11a*rhoa21 + s11b*rhob21 + art_stress11) * DWIJ[1]
 
 class HookesDeviatoricStressRate2D(Equation):
-    r""" Compute the RHS for the rate of change of stress equation (2D)
+    r""" **Rate of change of stress (2D)**
 
     .. math:: 
-      
-           \left[	
-           \frac{dS^{ij}}{dt} = 2\mu\left(\epsilon^{ij} -
-           \frac{1}{3}\delta^{ij}\epsilon^{ij}\right) + S^{ik}\Omega^{jk} +
-           \Omega^{ik}S^{kj}
-           \right]
+        \frac{dS^{ij}}{dt} = 2\mu\left(\epsilon^{ij} - \frac{1}{3}\delta^{ij}
+        \epsilon^{ij}\right) + S^{ik}\Omega^{jk} + \Omega^{ik}S^{kj}
 
-    where,
+    where
 
-    .. math:: \epsilon^{ij} = \frac{1}{2}\left( 
-           \frac{\partial v^i}{\partial x^j} +
-           {\partial v^j}{\partial x^i}\right)
-
-    and
-
-    .. math:: \Omega^{ij} = \frac{1}{2}\left( 
-       	   \frac{\partial v^i}{\partial x^j} - 
-           {\partial v^j}{\partial x^i} \right)
+    .. math:: 
+    
+        \epsilon^{ij} = \frac{1}{2}\left(\frac{\partial v^i}{\partial x^j} +
+        \frac{\partial v^j}{\partial x^i}\right)\\
+        
+        \Omega^{ij} = \frac{1}{2}\left(\frac{\partial v^i}{\partial x^j} - 
+           \frac{\partial v^j}{\partial x^i} \right)
 
     """
     def __init__(self, dest, sources=None, shear_mod=1.0):
+        r"""
+        Parameters
+        ----------
+        shear_mod : float
+            shear modulus (:math:`\mu`)
+        """
+        
         self.shear_mod = shear_mod
         super(HookesDeviatoricStressRate2D, self).__init__(dest, sources)
 

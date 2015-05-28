@@ -1,13 +1,16 @@
-"""Implementation of the Transport Velocity Formulation with
-generalized wall boundary conditions of Adami et. al
+"""
+Transport Velocity Formulation
+##############################
 
-The references are
+References
+----------
+    .. [Adami2012] S. Adami et. al "A generalized wall boundary condition for 
+        smoothed particle hydrodynamics", Journal of Computational Physics 
+        (2012), pp. 7057--7075.
 
- - Adami et. al "A generalized wall boundary condition for smoothed
-   particle hydrodynamics", 2012, JCP, 7057--7075 (REF1)
-
- - Adami et. al "A transport-velocity formulation for smoothed
-   particle hydrodynamics", 2013, JCP, 292--307 (REF2)
+    .. [Adami2013] S. Adami et. al "A transport-velocity formulation for 
+        smoothed particle hydrodynamics", Journal of Computational Physics 
+        (2013), pp. 292--307.
 
 """
 
@@ -18,26 +21,25 @@ from math import sin, cos, pi
 M_PI = pi
 
 class SummationDensity(Equation):
-    r"""Summation density with volume summation
+    r"""**Summation density with volume summation**
 
     In addition to the standard summation density, the number density
     for the particle is also computed. The number density is important
     for multi-phase flows to define a local particle volume
     independent of the material density.
 
-    Notes:
-    
-    The volume for the particle, computed from the number density is
-    given as:
-
     .. math::
+        
+        \rho_a = \sum_b m_b W_{ab}\\
+        
+        \mathcal{V}_a = \frac{1}{\sum_b W_{ab}}
 
-              \mathcal{V}_a = \frac{1}{\sum_b W_{ab}}
-
+    Notes
+    -----    
     For this equation, the destination particle array must define the
     variable `V` for particle volume.
-
     """
+    
     def initialize(self, d_idx, d_V, d_rho):
         d_V[d_idx] = 0.0
         d_rho[d_idx] = 0.0
@@ -47,11 +49,11 @@ class SummationDensity(Equation):
         d_rho[d_idx] += d_m[d_idx]*WIJ
 
 class VolumeSummation(Equation):
-    """Number density for volume computation.
+    """**Number density for volume computation**
 
     See `SummationDensity`
-
     """
+    
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0
 
@@ -59,20 +61,22 @@ class VolumeSummation(Equation):
         d_V[d_idx] += WIJ
 
 class VolumeFromMassDensity(Equation):
-    """Set the inverse volume using mass density"""
+    """**Set the inverse volume using mass density**"""
     def loop(self, d_idx, d_V, d_rho, d_m):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
 
 class SetWallVelocity(Equation):
-    r"""Extrapolating the fluid velocity on to the wall Eq. (22) in REF1:
+    r"""**Extrapolating the fluid velocity on to the wall**
+    
+    Eq. (22) in [Adami2012]:
     
     .. math::
 
         \tilde{\boldsymbol{v}}_a = \frac{\sum_b\boldsymbol{v}_b W_{ab}}
         {\sum_b W_{ab}}
 
-    Notes:
-
+    Notes
+    -----
     The destination particle array for this equation should define the
     *filtered* velocity variables :math:`uf, vf, wf`.
 
@@ -114,7 +118,9 @@ class SetWallVelocity(Equation):
         d_wg[d_idx] = 2*d_w[d_idx] - d_wf[d_idx]
 
 class ContinuityEquation(Equation):
-    r"""Conservation of mass equation Eq (6) in REF1
+    r"""**Conservation of mass equation**
+    
+    Eq (6) in [Adami2012]:
 
     .. math::
 
@@ -131,28 +137,39 @@ class ContinuityEquation(Equation):
         d_arho[d_idx] += d_rho[d_idx] * s_m[s_idx]/s_rho[s_idx] * vijdotdwij
 
 class StateEquation(Equation):
-    r"""Generalized weakly compressible EOS:
+    r"""**Generalized Weakly Compressible Equation of State**
 
     .. math::
 
         p_a = p_0\left[ \left(\frac{\rho}{\rho_0}\right)^\gamma - b
         \right] + \mathcal{X}
 
-Notes:
- 
-     This is the generalized Tait's equation of state and the
-     suggested values in REF2 are :math:`\mathcal{X} = 0`,
-     :math:`\gamma=1` and :math:`b = 1`
+    Notes
+    -----
+    This is the generalized Tait's equation of state and the suggested values 
+    in [Adami2013] are :math:`\mathcal{X} = 0`, :math:`\gamma=1` and 
+    :math:`b = 1`.
 
-The reference pressure :math:`p_0` is calculated from the
-     artificial sound speed and reference density:
-     
-     .. math::
-      
-         p_0 = \frac{c^2\rho_0}{\gamma}
-
+    The reference pressure :math:`p_0` is calculated from the artificial 
+    sound speed and reference density:
+    
+    .. math::
+    
+        p_0 = \frac{c^2\rho_0}{\gamma}
     """
+    
     def __init__(self, dest, sources=None, p0=1.0, rho0=1.0, b=1.0):
+        r"""
+        Parameters
+        ----------
+        p0 : float
+            reference pressure
+        rho0 : float
+            reference density
+        b : float
+            constant
+        """
+        
         self.b=b
         self.p0 = p0
         self.rho0 = rho0
@@ -162,28 +179,51 @@ The reference pressure :math:`p_0` is calculated from the
         d_p[d_idx] = self.p0 * ( d_rho[d_idx]/self.rho0 - self.b )
 
 class MomentumEquationPressureGradient(Equation):
-    r"""Momentum equation for the Transport Velocity formulation
-    Eq. (8) in REF2:
+    r"""**Momentum equation for the Transport Velocity Formulation: Pressure**
+    
+    Eq. (8) in [Adami2013]:
 
     .. math::
 
         \frac{d \boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
         V_b^2)\left[-\bar{p}_{ab}\nabla_a W_{ab} \right]
-
-    Notes:
+        
+    where
     
-    This equation should have the destination as fluid and sources as
-    fluid and boundary particles.
-
-    This function also computes the contribution to the background
-    pressure and accelerations due to a body force or gravity.
-
-    The body forces are damped according to Eq. (13) in REF1 to avoid
-    instantaneous accelerations. By default, damping is neglected.
-
+    .. math::
+        
+        \bar{p}_{ab} = \frac{\rho_b p_a + \rho_a p_b}{\rho_a + \rho_b}
     """
+    
     def __init__(self, dest, sources=None, pb=0.0, gx=0., gy=0., gz=0.,
                  tdamp=0.0):
+                     
+        r"""
+        Parameters
+        ----------
+        pb : float
+            background pressure
+        gx : float
+            Body force per unit mass along the x-axis
+        gy : float
+            Body force per unit mass along the y-axis
+        gz : float
+            Body force per unit mass along the z-axis
+        tdamp : float
+            damping time
+            
+        Notes
+        -----
+        This equation should have the destination as fluid and sources as
+        fluid and boundary particles.
+    
+        This function also computes the contribution to the background
+        pressure and accelerations due to a body force or gravity.
+    
+        The body forces are damped according to Eq. (13) in [Adami2012] to avoid
+        instantaneous accelerations. By default, damping is neglected.
+        """
+        
         self.pb = 0.0
         self.gx = gx
         self.gy = gy
@@ -243,17 +283,31 @@ class MomentumEquationPressureGradient(Equation):
         d_aw[d_idx] += self.gz * damping_factor
 
 class MomentumEquationViscosity(Equation):
-    r"""Momentum equation for the Transport Velocity formulation
-    Eq. (8) in REF2:
+    r"""**Momentum equation for the Transport Velocity Formulation: Viscosity**
+    
+    Eq. (8) in [Adami2013]:
 
     .. math::
 
            \frac{d \boldsymbol{v}_a}{dt} = \frac{1}{m_a}\sum_b (V_a^2 +
            V_b^2)\left[ \bar{\eta}_{ab}\hat{r}_{ab}\cdot \nabla_a W_{ab}
            \frac{\boldsymbol{v}_{ab}}{|\boldsymbol{r}_{ab}|}\right]
-
+           
+    where
+    
+    .. math::
+        
+        \bar{\eta}_{ab} = \frac{2\eta_a \eta_b}{\eta_a + \eta_b}
     """
+    
     def __init__(self, dest, sources=None, nu=0.01):
+        r"""
+        Parameters
+        ----------
+        nu : float
+            kinematic viscosity
+        """
+        
         self.nu = nu
         super(MomentumEquationViscosity, self).__init__(dest, sources)
 
@@ -287,7 +341,9 @@ class MomentumEquationViscosity(Equation):
         d_aw[d_idx] += tmp * VIJ[2]
 
 class MomentumEquationArtificialViscosity(Equation):
-    r"""Artificial viscosity for the Momentum equation Eq. (11) in REF1
+    r"""**Artificial viscosity for the momentum equation**
+    
+    Eq. (11) in [Adami2012]:
 
     .. math::
 
@@ -296,8 +352,26 @@ class MomentumEquationArtificialViscosity(Equation):
         \boldsymbol{r}_{ab}}{\rho_{ab}\left(|r_{ab}|^2 + \epsilon
         \right)}\nabla_a W_{ab}
 
+    where
+    
+    .. math::
+        
+        \rho_{ab} = \frac{\rho_a + \rho_b}{2}\\
+        
+        c_{ab} = \frac{c_a + c_b}{2}\\
+        
+        h_{ab} = \frac{h_a + h_b}{2}
     """
     def __init__(self, dest, sources=None, alpha=0.1, c0=1.0):
+        r"""
+        Parameters
+        ----------
+        alpha : float
+            constant
+        c0 : float
+            speed of sound
+        """
+        
         self.alpha = alpha
         self.c0 = c0
         super(MomentumEquationArtificialViscosity, self).__init__(dest, sources)
@@ -326,7 +400,7 @@ class MomentumEquationArtificialViscosity(Equation):
         d_aw[d_idx] += -piij * DWIJ[2]
 
 class MomentumEquationArtificialStress(Equation):
-    r"""Artificial stress contribution to the Momentum Equation
+    r"""**Artificial stress contribution to the Momentum Equation**
 
     .. math::
 
@@ -334,7 +408,7 @@ class MomentumEquationArtificialStress(Equation):
           V_b^2)\left[ \frac{1}{2}(\boldsymbol{A}_a +
           \boldsymbol{A}_b) : \nabla_a W_{ab}\right]
 
-where the artificial stress terms are given by:
+    where the artificial stress terms are given by:
 
     .. math::
 
@@ -385,7 +459,7 @@ where the artificial stress terms are given by:
         d_aw[d_idx] += tmp * Az
 
 class SolidWallNoSlipBC(Equation):
-    r"""Solid wall boundary condition described in REF1
+    r"""**Solid wall boundary condition** [Adami2012]_
     
     This boundary condition is to be used with fixed ghost particles
     in SPH simulations and is formulated for the general case of
@@ -412,8 +486,8 @@ class SolidWallNoSlipBC(Equation):
     
         \tilde{v}_a = \frac{\sum_b v_b W_{ab}}{\sum_b W_{ab}}
 
-    In the second step, for the viscous interaction in Eqs. (10) in
-    REF1 and Eq. (8) in REF2, the velocity of the ghost particles is
+    In the second step, for the viscous interaction in Eqs. (10) in [Adami2012] 
+    and Eq. (8) in [Adami2013], the velocity of the ghost particles is
     assigned as:
 
     .. math::
@@ -422,16 +496,23 @@ class SolidWallNoSlipBC(Equation):
 
     where :math:`v_w` is the prescribed wall velocity and :math:`v_b`
     is the ghost particle in the interaction.
-
-    Notes:
-    
-    For this equation the destination particle array should be the
-    fluid and the source should be ghost or boundary particles. The
-    boundary particles must define a prescribed velocity :math:`u_0,
-    v_0, w_0`
-    
     """
+    
     def __init__(self, dest, sources=None, nu=0.01):
+        r"""        
+        Parameters
+        ----------
+        nu : float
+            kinematic viscosity
+        
+        Notes
+        -----
+        For this equation the destination particle array should be the
+        fluid and the source should be ghost or boundary particles. The
+        boundary particles must define a prescribed velocity :math:`u_0,
+        v_0, w_0`
+        """
+        
         self.nu = nu
         super(SolidWallNoSlipBC, self).__init__(dest, sources)
 
@@ -469,9 +550,8 @@ class SolidWallNoSlipBC(Equation):
         d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
 
 class SolidWallPressureBC(Equation):
-    r"""Solid wall pressure boundary condition described in REF1
-    Eq. (27)
-    
+    r"""**Solid wall pressure boundary condition** [Adami2012]_
+
     This boundary condition is to be used with fixed ghost particles
     in SPH simulations and is formulated for the general case of
     moving boundaries.
@@ -492,21 +572,45 @@ class SolidWallPressureBC(Equation):
 
     where the subscripts `g` and `f` relate to the ghost and fluid
     particles respectively.
-
-    Notes:
     
-    For a two fluid system (boundary, fluid), this equation must be
-    instantiated with boundary as the destination and fluid as the
-    source.
-
-    The boundary particle array must additionally define a property
-    :math:`wij` for the denominator in Eq. (27) from REF1. This array
-    sums the kernel terms from the ghost particle to the fluid
-    particle.
+    Density of the wall particle is then set using this pressure
     
+    .. math::
+    
+        \rho_w=\rho_0\left(\frac{p_w - \mathcal{X}}{p_0} + 
+        1\right)^{\frac{1}{\gamma}}
     """
+    
     def __init__(self, dest, sources=None, rho0=1.0, p0=100.0,
                  gx=0.0, gy=0.0, gz=0.0, b=1.0):
+        r"""
+        Parameters
+        ----------
+        rho0 : float
+            reference density
+        p0 : float
+            reference pressure
+        b : float
+            constant
+        gx : float
+            Body force per unit mass along the x-axis
+        gy : float
+            Body force per unit mass along the y-axis
+        gz : float
+            Body force per unit mass along the z-axis
+            
+        Notes
+        -----
+        For a two fluid system (boundary, fluid), this equation must be
+        instantiated with boundary as the destination and fluid as the
+        source.
+    
+        The boundary particle array must additionally define a property
+        :math:`wij` for the denominator in Eq. (27) from [Adami2012]. This array
+        sums the kernel terms from the ghost particle to the fluid
+        particle.
+        """
+        
         self.rho0 = rho0
         self.p0 = p0
         self.b=b
