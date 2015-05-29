@@ -30,7 +30,7 @@ def generate_files(dirname, if_modified=True):
             outfile=outfile, filename=filename
         )
         if not os.path.exists(outfile) or \
-            not if_modified and is_modified_later(filename, outfile):
+            (if_modified and is_modified_later(filename, outfile)):
             # Inject the directory of the output file into the path,
             # so that local imports will work.
             sys.path.insert(0, os.path.dirname(outfile))
