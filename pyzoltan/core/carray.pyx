@@ -273,7 +273,7 @@ cdef class BaseArrayIter:
 # `IntArray` class.
 # ###########################################################################
 cdef class IntArray(BaseArray):
-    """Represents an array of `int`s
+    """Represents an array of `ints`
 
     Mallocs a memory buffer of size (n*sizeof(int)) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.
@@ -738,7 +738,7 @@ cdef class IntArray(BaseArray):
 # `UIntArray` class.
 # ###########################################################################
 cdef class UIntArray(BaseArray):
-    """Represents an array of `unsigned int`s
+    """Represents an array of `unsigned ints`
 
     Mallocs a memory buffer of size (n*sizeof(unsigned int)) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.
@@ -1203,7 +1203,7 @@ cdef class UIntArray(BaseArray):
 # `LongArray` class.
 # ###########################################################################
 cdef class LongArray(BaseArray):
-    """Represents an array of `long`s
+    """Represents an array of `longs`
 
     Mallocs a memory buffer of size (n*sizeof(long)) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.
@@ -1668,7 +1668,7 @@ cdef class LongArray(BaseArray):
 # `FloatArray` class.
 # ###########################################################################
 cdef class FloatArray(BaseArray):
-    """Represents an array of `float`s
+    """Represents an array of `floats`
 
     Mallocs a memory buffer of size (n*sizeof(float)) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.
@@ -2133,7 +2133,7 @@ cdef class FloatArray(BaseArray):
 # `DoubleArray` class.
 # ###########################################################################
 cdef class DoubleArray(BaseArray):
-    """Represents an array of `double`s
+    """Represents an array of `doubles`
 
     Mallocs a memory buffer of size (n*sizeof(double)) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.

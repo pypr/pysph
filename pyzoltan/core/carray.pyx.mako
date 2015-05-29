@@ -284,7 +284,7 @@ cdef class BaseArrayIter:
 # `${CLASSNAME}` class.
 # ###########################################################################
 cdef class ${CLASSNAME}(BaseArray):
-    """Represents an array of `${ARRAY_TYPE}`s
+    """Represents an array of `${ARRAY_TYPE}s`
 
     Mallocs a memory buffer of size (n*sizeof(${ARRAY_TYPE})) and sets up
     the numpy array.  The memory is aligned to 64 byte boundaries.

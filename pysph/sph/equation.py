@@ -367,7 +367,7 @@ class Group(object):
         """Constructor.
 
         Parameters
-        -----------
+        ----------
 
         equations: list
             a list of equation objects.

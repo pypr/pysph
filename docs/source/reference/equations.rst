@@ -32,14 +32,10 @@ SPH equations
    :members:
    :undoc-members:
 
-
-.. automodule:: pysph.base.serial_reduce_array
+.. automodule:: pysph.base.reduce_array
    :members:
    :undoc-members:
 
-.. automodule:: pysph.base.parallel_reduce_array
-   :members:
-   :undoc-members:
 
 Group of equations
 -------------------
