@@ -1232,13 +1232,12 @@ cdef class NNPS:
             ymin = fmin(y.minimum, ymin)
             zmin = fmin(z.minimum, zmin)
 
-        # If any of the dimensions has very small extent, give it a unit size.
+        # If all of the dimensions have very small extent give it a unit size.
         cdef double _eps = 1e-12
-        if fabs(xmax - xmin) < _eps:
+        if (fabs(xmax - xmin) < _eps) and (fabs(ymax - ymin) < _eps) \
+            and (fabs(zmax - zmin) < _eps):
             xmin -= 0.5; xmax += 0.5
-        if fabs(ymax - ymin) < _eps:
             ymin -= 0.5; ymax += 0.5
-        if fabs(zmax - zmin) < _eps:
             zmin -= 0.5; zmax += 0.5
 
         # store the minimum and maximum of physical coordinates
