@@ -1,6 +1,8 @@
-# numpy import
+# Library imports.
 import numpy as np
 cimport numpy as np
+
+# Cython imports
 from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel import parallel, prange, threadid
 
@@ -1230,9 +1232,18 @@ cdef class NNPS:
             ymin = fmin(y.minimum, ymin)
             zmin = fmin(z.minimum, zmin)
 
+        # If any of the dimensions has very small extent, give it a unit size.
+        cdef double _eps = 1e-12
+        if fabs(xmax - xmin) < _eps:
+            xmin -= 0.5; xmax += 0.5
+        if fabs(ymax - ymin) < _eps:
+            ymin -= 0.5; ymax += 0.5
+        if fabs(zmax - zmin) < _eps:
+            zmin -= 0.5; zmax += 0.5
+
         # store the minimum and maximum of physical coordinates
-        self.xmin.data[0]=xmin; self.xmin.data[1]=ymin; self.xmin.data[2]=zmin
-        self.xmax.data[0]=xmax; self.xmax.data[1]=ymax; self.xmax.data[2]=zmax
+        self.xmin.set_data(np.asarray([xmin, ymin, zmin]))
+        self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
 
 
 ##############################################################################
