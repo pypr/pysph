@@ -19,8 +19,6 @@ class IntegratorStep(object):
 ###############################################################################
 class EulerStep(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
-    def initialize(self):
-        pass
     def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y,
                   d_z, d_rho, d_arho, dt):
         d_u[d_idx] += dt*d_au[d_idx]
@@ -619,3 +617,133 @@ class InletOutletStep(IntegratorStep):
         d_x[d_idx] += dtb2 * d_u[d_idx]
         d_y[d_idx] += dtb2 * d_v[d_idx]
         d_z[d_idx] += dtb2 * d_w[d_idx]
+
+
+
+###############################################################################
+class LeapFrogStep(IntegratorStep):
+
+    r"""Using this stepper with XSPH as implemented in
+    `pysph.base.basic_equations.XSPHCorrection` is not directly possible and
+    requires a nicer implementation where the correction alone is added to ``ax,
+    ay, az``.
+    """
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_ax, d_ay, d_az,
+               dt):
+        d_x[d_idx] += 0.5 * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += 0.5 * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += 0.5 * dt * (d_w[d_idx] + d_az[d_idx])
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_au, d_v, d_av,
+               d_w, d_aw, d_ax, d_ay, d_az,
+               d_rho, d_arho, d_e, d_ae, dt):
+        d_u[d_idx] += dt * d_au[d_idx]
+        d_v[d_idx] += dt * d_av[d_idx]
+        d_w[d_idx] += dt * d_aw[d_idx]
+
+        d_rho[d_idx] += dt * d_arho[d_idx]
+        d_e[d_idx] += dt * d_ae[d_idx]
+
+        d_x[d_idx] += 0.5 * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += 0.5 * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += 0.5 * dt * (d_w[d_idx] + d_az[d_idx])
+
+
+###############################################################################
+class PEFRLStep(IntegratorStep):
+
+    r"""Using this stepper with XSPH as implemented in
+    `pysph.base.basic_equations.XSPHCorrection` is not directly possible and
+    requires a nicer implementation where the correction alone is added to ``ax,
+    ay, az``.
+    """
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_ax, d_ay,
+               d_az, dt):
+
+        xi = 0.1786178958448091
+
+        d_x[d_idx] += xi * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += xi * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += xi * dt * (d_w[d_idx] + d_az[d_idx])
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_au, d_v, d_av,
+               d_w, d_aw, d_ax, d_ay, d_az,
+               d_rho, d_arho, d_e, d_ae, dt=0.0):
+
+        lamda = -0.2123418310626054
+        fac = (1. - 2.*lamda) / 2.
+
+        d_u[d_idx] += fac * dt * d_au[d_idx]
+        d_v[d_idx] += fac * dt * d_av[d_idx]
+        d_w[d_idx] += fac * dt * d_aw[d_idx]
+
+        d_rho[d_idx] += fac * dt * d_arho[d_idx]
+        d_e[d_idx] += fac * dt * d_ae[d_idx]
+
+        chi = -0.06626458266981849
+
+        d_x[d_idx] += chi * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += chi * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += chi * dt * (d_w[d_idx] + d_az[d_idx])
+
+    def stage3(self, d_idx, d_x, d_y, d_z, d_u, d_au, d_v, d_av,
+               d_w, d_aw, d_ax, d_ay, d_az,
+               d_rho, d_arho, d_e, d_ae, dt=0.0):
+
+        lamda = -0.2123418310626054
+
+        d_u[d_idx] += lamda * dt * d_au[d_idx]
+        d_v[d_idx] += lamda * dt * d_av[d_idx]
+        d_w[d_idx] += lamda * dt * d_aw[d_idx]
+
+        d_rho[d_idx] += lamda * dt * d_arho[d_idx]
+        d_e[d_idx] += lamda * dt * d_ae[d_idx]
+
+        xi = +0.1786178958448091
+        chi = -0.06626458266981849
+        fac = 1. - 2.*(xi + chi)
+
+        d_x[d_idx] += fac * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += fac * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += fac * dt * (d_w[d_idx] + d_az[d_idx])
+
+    def stage4(self, d_idx, d_x, d_y, d_z, d_u, d_au, d_v, d_av,
+               d_w, d_aw, d_ax, d_ay, d_az,
+               d_rho, d_arho, d_e, d_ae, dt=0.0):
+
+        lamda = -0.2123418310626054
+
+        d_u[d_idx] += lamda * dt * d_au[d_idx]
+        d_v[d_idx] += lamda * dt * d_av[d_idx]
+        d_w[d_idx] += lamda * dt * d_aw[d_idx]
+
+        d_rho[d_idx] += lamda * dt * d_arho[d_idx]
+        d_e[d_idx] += lamda * dt * d_ae[d_idx]
+
+        chi = -0.06626458266981849
+
+        d_x[d_idx] += chi * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += chi * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += chi * dt * (d_w[d_idx] + d_az[d_idx])
+
+    def stage5(self, d_idx, d_x, d_y, d_z, d_u, d_au, d_v, d_av,
+               d_w, d_aw, d_ax, d_ay, d_az,
+               d_rho, d_arho, d_e, d_ae, dt=0.0):
+
+        lamda = -0.2123418310626054
+        fac = (1. - 2.*lamda) / 2.
+
+        d_u[d_idx] += fac * dt * d_au[d_idx]
+        d_v[d_idx] += fac * dt * d_av[d_idx]
+        d_w[d_idx] += fac * dt * d_aw[d_idx]
+
+        d_rho[d_idx] += fac * dt * d_arho[d_idx]
+        d_e[d_idx] += fac * dt * d_ae[d_idx]
+
+        xi = +0.1786178958448091
+
+        d_x[d_idx] += xi * dt * (d_u[d_idx] + d_ax[d_idx])
+        d_y[d_idx] += xi * dt * (d_v[d_idx] + d_ay[d_idx])
+        d_z[d_idx] += xi * dt * (d_w[d_idx] + d_az[d_idx])
