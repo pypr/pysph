@@ -1,6 +1,7 @@
 # This file (carray.pxd) has been generated automatically.
 # DO NOT modify this file
 # To make changes modify the source templates (carray.pxd.mako) and regenerate
+#cython: embedsignature=True
 """
 Implementation of resizeable arrays of different types in Cython.
 
@@ -12,20 +13,19 @@ All arrays provide for the following operations:
  - reserving space for future appends.
  - access to internal data through a numpy array.
 
-** Numpy array access **
-Each array also provides an interface to its data through a numpy array. This
-is done through the get_npy_array function. The returned numpy array can be
-used just like any other numpy array but for the following restrictions:
+
+Each array also provides an interface to its data through a numpy array.
+This is done through the ``get_npy_array`` function. The returned numpy
+array can be used just like any other numpy array but for the following
+restrictions:
 
  - the array may not be resized.
  - references of this array should not be kept.
  - slices of this array may not be made.
 
 The numpy array may however be copied and used in any manner.
-
-** Examples **
-
 """
+
 # For malloc etc.
 from libc.stdlib cimport *
 IF UNAME_SYSNAME == "Windows":
@@ -138,11 +138,13 @@ cdef void aligned_free(void* p) nogil:
 
 
 cdef class BaseArray:
-    """ Base class for managed C-arrays. """
+    """Base class for managed C-arrays.
+    """
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
         pass
 
     cdef void c_reserve(self, long size) nogil:
@@ -161,23 +163,27 @@ cdef class BaseArray:
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type of this array. """
+        """Return the c data type of this array.
+        """
         raise NotImplementedError, 'BaseArray::get_c_type'
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to required size """
+        """Resizes the internal data to required size.
+        """
         raise NotImplementedError, 'BaseArray::reserve'
 
     cpdef resize(self, long size):
-        """ reserve()s and sets the length to the new size. """
+        """Resizes the array to the new size.
+        """
         raise NotImplementedError, 'BaseArray::resize'
 
     cpdef np.ndarray get_npy_array(self):
-        """ returns a numpy array of the data: do not keep its reference """
+        """Returns a numpy array of the data: do not keep its reference.
+        """
         return self._npy_array
 
     cpdef set_data(self, np.ndarray nparr):
-        """ Set data from the given numpy array.
+        """Set data from the given numpy array.
 
         If the numpy array is a reference to the numpy array maintained
         internally by this class, nothing is done.
@@ -196,38 +202,46 @@ cdef class BaseArray:
             raise ValueError, 'array size mismatch'
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         raise NotImplementedError, 'BaseArray::squeeze'
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """ Remove the particles with indices in index_list. """
+        """Remove the particles with indices in index_list.
+        """
         raise NotImplementedError, 'BaseArray::remove'
 
     cpdef extend(self, np.ndarray in_array):
-        """ Extend the array with data from in_array. """
+        """Extend the array with data from in_array.
+        """
         raise NotImplementedError, 'BaseArray::extend'
 
     cpdef align_array(self, LongArray new_indices):
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
         if new_indices.length != self.length:
             raise ValueError, 'Unequal array lengths'
         self.c_align_array(new_indices)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         raise NotImplementedError, 'BaseArray::reset'
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """ Copy values of indexed particles from self to dest. """
+        """Copy values of indexed particles from self to dest.
+        """
         raise NotImplementedError, 'BaseArray::copy_values'
 
     cpdef copy_subset(self, BaseArray source,
-                          long start_index=-1, long end_index=-1):
-        """ Copy subset of values from source to self. """
+                      long start_index=-1, long end_index=-1):
+        """Copy subset of values from source to self.
+        """
         raise NotImplementedError, 'BaseArray::copy_subset'
 
     cpdef update_min_max(self):
-        """ Update the min and max values of the array. """
+        """Update the min and max values of the array.
+        """
         raise NotImplementedError, 'BaseArray::update_min_max'
 
     def __len__(self):
@@ -236,6 +250,7 @@ cdef class BaseArray:
     def __iter__(self):
         """ Support the iteration protocol"""
         return BaseArrayIter(self)
+
 
 cdef class BaseArrayIter:
     """ Iteration object to support iteration over BaseArray. """
@@ -258,27 +273,49 @@ cdef class BaseArrayIter:
 # `IntArray` class.
 # ###########################################################################
 cdef class IntArray(BaseArray):
-    """ Represents an array of `int`s """
+    """Represents an array of `int`s
+
+    Mallocs a memory buffer of size (n*sizeof(int)) and sets up
+    the numpy array.  The memory is aligned to 64 byte boundaries.
+
+    Parameters
+    ----------
+
+    n : long
+        Length of the array.
+
+    Attributes
+    ----------
+    data: pointer
+        Pointer to an integer array.
+    length: long
+        Size of the array itself.
+    alloc: long
+        Size of the data buffer allocated.
+
+    Examples
+    --------
+
+    >>> x = IntArray()
+    >>> x.resize(5)
+    >>> x.set_data(np.arange(5))
+    >>> x[0]
+    0
+
+    >>> x = IntArray(5)
+    >>> xnp = x.get_npy_array()
+    >>> xnp[:] = np.arange(5)
+    >>> x[0], x[4]
+    (0.0, 4.0)
+
+    """
 
     #cdef public long length, alloc
     #cdef int *data
     #cdef np.ndarray _npy_array
 
-    def __cinit__(self, long n=0, *args, **kwargs):
-        """ Constructor for the class.
-
-        Mallocs a memory buffer of size (n*sizeof(int)) and sets up
-        the numpy array.
-
-        Parameters:
-        -----------
-        n -- Length of the array.
-
-        Data attributes:
-        ----------------
-        data -- Pointer to an integer array.
-        alloc -- Size of the data buffer allocated.
-
+    def __cinit__(self, long n=0):
+        """Constructor for the class.
         """
         self.length = n
         self._parent = None
@@ -291,22 +328,26 @@ cdef class IntArray(BaseArray):
         self._setup_npy_array()
 
     def __dealloc__(self):
-        """ Frees the array. """
+        """Frees the array.
+        """
         if self._old_data == NULL:
             aligned_free(<void*>self.data)
         else:
             aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
-        """ Get item at position idx. """
+        """Get item at position idx.
+        """
         return self.data[idx]
 
     def __setitem__(self, long idx, int value):
-        """ Set location idx to value. """
+        """Set location idx to value.
+        """
         self.data[idx] = value
 
     cpdef long index(self, int value):
-        """ Returns the index at which value is in self, else -1. """
+        """Returns the index at which value is in self, else -1.
+        """
         cdef long i
         for i in range(self.length):
             if self.data[i] == value:
@@ -314,24 +355,28 @@ cdef class IntArray(BaseArray):
         return -1
 
     def __contains__(self, int value):
-        """ Returns True if value is in self. """
+        """Returns True if value is in self.
+        """
         return (self.index(value) >= 0)
 
     def __reduce__(self):
-        """ Implemented to facilitate pickling. """
+        """Implemented to facilitate pickling.
+        """
         d = {}
         d['data'] = self.get_npy_array()
 
         return (IntArray, (), d)
 
     def __setstate__(self, d):
-        """ Load the carray from the dictionary d. """
+        """Load the carray from the dictionary d.
+        """
         cdef np.ndarray arr = d['data']
         self.resize(arr.size)
         self.set_data(arr)
 
     cdef _setup_npy_array(self):
-        """ Create the numpy array. """
+        """Create the numpy array.
+        """
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
@@ -341,7 +386,8 @@ cdef class IntArray(BaseArray):
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
 
         cdef long i
         cdef long length = self.length
@@ -440,39 +486,45 @@ cdef class IntArray(BaseArray):
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
+        """Return the c data type for this array as a string.
+        """
         return 'int'
 
     cdef int* get_data_ptr(self):
-        """ Return the internal data pointer. """
+        """Return the internal data pointer.
+        """
         return self.data
 
     cpdef int get(self, long idx):
-        """ Gets value stored at position idx. """
+        """Gets value stored at position `idx`.
+        """
         return self.data[idx]
 
     cpdef set(self, long idx, int value):
-        """ Sets location idx to value. """
+        """Sets location `idx` to `value`.
+        """
         self.data[idx] = value
 
     cpdef append(self, int value):
-        """ Appends value to the end of the array. """
+        """Appends `value` to the end of the array.
+        """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(int) bytes. """
+        """Resizes the internal data to ``size*sizeof(int)`` bytes.
+        """
         self.c_reserve(size)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         self.c_reset()
         if self._old_data != NULL:
             self._parent = None
 
     cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(int) bytes and sets the
-        length to the new size.
+        """Resizes internal data to ``size*sizeof(int)`` bytes
+        and sets the length to the new size.
 
         """
         if self._old_data != NULL:
@@ -481,9 +533,21 @@ cdef class IntArray(BaseArray):
         self.c_resize(size)
 
     cpdef set_view(self, IntArray parent, long start, long end):
-        """Create a view of a given a parent array starting at the
-        given start index and ending at the end index (this does not
-        include the end index).
+        """Create a view of a given a `parent` array from start to end.
+
+        Note that this excludes the end index.
+
+        Parameters
+        ----------
+
+        parent : IntArray
+            The parent array of which this is a view.
+        start : long
+            The starting index to start the view from.
+        end : long
+            The ending index to end the view at, excludes the end
+            itself.
+
         """
         if self._parent is None:
             self._old_data = self.data
@@ -495,23 +559,27 @@ cdef class IntArray(BaseArray):
         arr.dimensions[0] = self.length
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """
-        Remove the particles with indices in index_list.
+        """Remove the particles with indices in index_list.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - index_list - a list of indices which should be removed.
-         - input_sorted - indicates if the input is sorted in ascending order.
-           if not, the array will be sorted internally.
+        index_list : ndarray
+            a list of indices which should be removed.
+        input_sorted : bool
+            indicates if the input is sorted in ascending order.  if
+            not, the array will be sorted internally.
 
-        **Algorithm**
+        Notes
+        -----
 
          If the input indices are not sorted, sort them in ascending order.
          Starting with the last element in the index list, start replacing the
@@ -543,14 +611,16 @@ cdef class IntArray(BaseArray):
                 arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
-        """
-        Extend the array with data from in_array.
+        """Extend the array with data from in_array.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - in_array - a numpy array with data to be added to the current array.
+        in_array : ndarray
+            a numpy array with data to be added to the current array.
 
-        **Issues**
+        Notes
+        -----
 
          - accessing the in_array using the indexing operation seems to be
            costly. Look at the annotated cython html file.
@@ -564,8 +634,7 @@ cdef class IntArray(BaseArray):
             self.append(in_array[i])
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """
-        Copies values of indices in indices from self to dest.
+        """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
@@ -579,16 +648,17 @@ cdef class IntArray(BaseArray):
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
                       long end_index=-1):
-        """
-        Copy a subset of values from src to self.
+        """Copy a subset of values from src to self.
 
-        **Parameters**
+        Parameters
+        ----------
 
-            - start_index - the first index in dest that corresponds to the 0th
+        start_index : long
+            the first index in dest that corresponds to the 0th
             index in source
-            - end_index   - the first index in dest from start_index that
-            is not copied
 
+        end_index : long
+            the first index in dest from start_index that is not copied
         """
         cdef long si, ei, s_length, d_length, i, j
         cdef IntArray src = <IntArray>source
@@ -642,7 +712,8 @@ cdef class IntArray(BaseArray):
             j += 1
 
     cpdef update_min_max(self):
-        """ Updates the min and max values of the array. """
+        """Updates the min and max values of the array.
+        """
         cdef long i = 0
         cdef int min_val, max_val
 
@@ -667,27 +738,49 @@ cdef class IntArray(BaseArray):
 # `UIntArray` class.
 # ###########################################################################
 cdef class UIntArray(BaseArray):
-    """ Represents an array of `unsigned int`s """
+    """Represents an array of `unsigned int`s
+
+    Mallocs a memory buffer of size (n*sizeof(unsigned int)) and sets up
+    the numpy array.  The memory is aligned to 64 byte boundaries.
+
+    Parameters
+    ----------
+
+    n : long
+        Length of the array.
+
+    Attributes
+    ----------
+    data: pointer
+        Pointer to an integer array.
+    length: long
+        Size of the array itself.
+    alloc: long
+        Size of the data buffer allocated.
+
+    Examples
+    --------
+
+    >>> x = UIntArray()
+    >>> x.resize(5)
+    >>> x.set_data(np.arange(5))
+    >>> x[0]
+    0
+
+    >>> x = UIntArray(5)
+    >>> xnp = x.get_npy_array()
+    >>> xnp[:] = np.arange(5)
+    >>> x[0], x[4]
+    (0.0, 4.0)
+
+    """
 
     #cdef public long length, alloc
     #cdef unsigned int *data
     #cdef np.ndarray _npy_array
 
-    def __cinit__(self, long n=0, *args, **kwargs):
-        """ Constructor for the class.
-
-        Mallocs a memory buffer of size (n*sizeof(unsigned int)) and sets up
-        the numpy array.
-
-        Parameters:
-        -----------
-        n -- Length of the array.
-
-        Data attributes:
-        ----------------
-        data -- Pointer to an integer array.
-        alloc -- Size of the data buffer allocated.
-
+    def __cinit__(self, long n=0):
+        """Constructor for the class.
         """
         self.length = n
         self._parent = None
@@ -700,22 +793,26 @@ cdef class UIntArray(BaseArray):
         self._setup_npy_array()
 
     def __dealloc__(self):
-        """ Frees the array. """
+        """Frees the array.
+        """
         if self._old_data == NULL:
             aligned_free(<void*>self.data)
         else:
             aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
-        """ Get item at position idx. """
+        """Get item at position idx.
+        """
         return self.data[idx]
 
     def __setitem__(self, long idx, unsigned int value):
-        """ Set location idx to value. """
+        """Set location idx to value.
+        """
         self.data[idx] = value
 
     cpdef long index(self, unsigned int value):
-        """ Returns the index at which value is in self, else -1. """
+        """Returns the index at which value is in self, else -1.
+        """
         cdef long i
         for i in range(self.length):
             if self.data[i] == value:
@@ -723,24 +820,28 @@ cdef class UIntArray(BaseArray):
         return -1
 
     def __contains__(self, unsigned int value):
-        """ Returns True if value is in self. """
+        """Returns True if value is in self.
+        """
         return (self.index(value) >= 0)
 
     def __reduce__(self):
-        """ Implemented to facilitate pickling. """
+        """Implemented to facilitate pickling.
+        """
         d = {}
         d['data'] = self.get_npy_array()
 
         return (UIntArray, (), d)
 
     def __setstate__(self, d):
-        """ Load the carray from the dictionary d. """
+        """Load the carray from the dictionary d.
+        """
         cdef np.ndarray arr = d['data']
         self.resize(arr.size)
         self.set_data(arr)
 
     cdef _setup_npy_array(self):
-        """ Create the numpy array. """
+        """Create the numpy array.
+        """
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
@@ -750,7 +851,8 @@ cdef class UIntArray(BaseArray):
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
 
         cdef long i
         cdef long length = self.length
@@ -849,39 +951,45 @@ cdef class UIntArray(BaseArray):
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
+        """Return the c data type for this array as a string.
+        """
         return 'unsigned int'
 
     cdef unsigned int* get_data_ptr(self):
-        """ Return the internal data pointer. """
+        """Return the internal data pointer.
+        """
         return self.data
 
     cpdef unsigned int get(self, long idx):
-        """ Gets value stored at position idx. """
+        """Gets value stored at position `idx`.
+        """
         return self.data[idx]
 
     cpdef set(self, long idx, unsigned int value):
-        """ Sets location idx to value. """
+        """Sets location `idx` to `value`.
+        """
         self.data[idx] = value
 
     cpdef append(self, unsigned int value):
-        """ Appends value to the end of the array. """
+        """Appends `value` to the end of the array.
+        """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(unsigned int) bytes. """
+        """Resizes the internal data to ``size*sizeof(unsigned int)`` bytes.
+        """
         self.c_reserve(size)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         self.c_reset()
         if self._old_data != NULL:
             self._parent = None
 
     cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(unsigned int) bytes and sets the
-        length to the new size.
+        """Resizes internal data to ``size*sizeof(unsigned int)`` bytes
+        and sets the length to the new size.
 
         """
         if self._old_data != NULL:
@@ -890,9 +998,21 @@ cdef class UIntArray(BaseArray):
         self.c_resize(size)
 
     cpdef set_view(self, UIntArray parent, long start, long end):
-        """Create a view of a given a parent array starting at the
-        given start index and ending at the end index (this does not
-        include the end index).
+        """Create a view of a given a `parent` array from start to end.
+
+        Note that this excludes the end index.
+
+        Parameters
+        ----------
+
+        parent : UIntArray
+            The parent array of which this is a view.
+        start : long
+            The starting index to start the view from.
+        end : long
+            The ending index to end the view at, excludes the end
+            itself.
+
         """
         if self._parent is None:
             self._old_data = self.data
@@ -904,23 +1024,27 @@ cdef class UIntArray(BaseArray):
         arr.dimensions[0] = self.length
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """
-        Remove the particles with indices in index_list.
+        """Remove the particles with indices in index_list.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - index_list - a list of indices which should be removed.
-         - input_sorted - indicates if the input is sorted in ascending order.
-           if not, the array will be sorted internally.
+        index_list : ndarray
+            a list of indices which should be removed.
+        input_sorted : bool
+            indicates if the input is sorted in ascending order.  if
+            not, the array will be sorted internally.
 
-        **Algorithm**
+        Notes
+        -----
 
          If the input indices are not sorted, sort them in ascending order.
          Starting with the last element in the index list, start replacing the
@@ -952,14 +1076,16 @@ cdef class UIntArray(BaseArray):
                 arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
-        """
-        Extend the array with data from in_array.
+        """Extend the array with data from in_array.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - in_array - a numpy array with data to be added to the current array.
+        in_array : ndarray
+            a numpy array with data to be added to the current array.
 
-        **Issues**
+        Notes
+        -----
 
          - accessing the in_array using the indexing operation seems to be
            costly. Look at the annotated cython html file.
@@ -973,8 +1099,7 @@ cdef class UIntArray(BaseArray):
             self.append(in_array[i])
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """
-        Copies values of indices in indices from self to dest.
+        """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
@@ -988,16 +1113,17 @@ cdef class UIntArray(BaseArray):
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
                       long end_index=-1):
-        """
-        Copy a subset of values from src to self.
+        """Copy a subset of values from src to self.
 
-        **Parameters**
+        Parameters
+        ----------
 
-            - start_index - the first index in dest that corresponds to the 0th
+        start_index : long
+            the first index in dest that corresponds to the 0th
             index in source
-            - end_index   - the first index in dest from start_index that
-            is not copied
 
+        end_index : long
+            the first index in dest from start_index that is not copied
         """
         cdef long si, ei, s_length, d_length, i, j
         cdef UIntArray src = <UIntArray>source
@@ -1051,7 +1177,8 @@ cdef class UIntArray(BaseArray):
             j += 1
 
     cpdef update_min_max(self):
-        """ Updates the min and max values of the array. """
+        """Updates the min and max values of the array.
+        """
         cdef long i = 0
         cdef unsigned int min_val, max_val
 
@@ -1076,27 +1203,49 @@ cdef class UIntArray(BaseArray):
 # `LongArray` class.
 # ###########################################################################
 cdef class LongArray(BaseArray):
-    """ Represents an array of `long`s """
+    """Represents an array of `long`s
+
+    Mallocs a memory buffer of size (n*sizeof(long)) and sets up
+    the numpy array.  The memory is aligned to 64 byte boundaries.
+
+    Parameters
+    ----------
+
+    n : long
+        Length of the array.
+
+    Attributes
+    ----------
+    data: pointer
+        Pointer to an integer array.
+    length: long
+        Size of the array itself.
+    alloc: long
+        Size of the data buffer allocated.
+
+    Examples
+    --------
+
+    >>> x = LongArray()
+    >>> x.resize(5)
+    >>> x.set_data(np.arange(5))
+    >>> x[0]
+    0
+
+    >>> x = LongArray(5)
+    >>> xnp = x.get_npy_array()
+    >>> xnp[:] = np.arange(5)
+    >>> x[0], x[4]
+    (0.0, 4.0)
+
+    """
 
     #cdef public long length, alloc
     #cdef long *data
     #cdef np.ndarray _npy_array
 
-    def __cinit__(self, long n=0, *args, **kwargs):
-        """ Constructor for the class.
-
-        Mallocs a memory buffer of size (n*sizeof(long)) and sets up
-        the numpy array.
-
-        Parameters:
-        -----------
-        n -- Length of the array.
-
-        Data attributes:
-        ----------------
-        data -- Pointer to an integer array.
-        alloc -- Size of the data buffer allocated.
-
+    def __cinit__(self, long n=0):
+        """Constructor for the class.
         """
         self.length = n
         self._parent = None
@@ -1109,22 +1258,26 @@ cdef class LongArray(BaseArray):
         self._setup_npy_array()
 
     def __dealloc__(self):
-        """ Frees the array. """
+        """Frees the array.
+        """
         if self._old_data == NULL:
             aligned_free(<void*>self.data)
         else:
             aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
-        """ Get item at position idx. """
+        """Get item at position idx.
+        """
         return self.data[idx]
 
     def __setitem__(self, long idx, long value):
-        """ Set location idx to value. """
+        """Set location idx to value.
+        """
         self.data[idx] = value
 
     cpdef long index(self, long value):
-        """ Returns the index at which value is in self, else -1. """
+        """Returns the index at which value is in self, else -1.
+        """
         cdef long i
         for i in range(self.length):
             if self.data[i] == value:
@@ -1132,24 +1285,28 @@ cdef class LongArray(BaseArray):
         return -1
 
     def __contains__(self, long value):
-        """ Returns True if value is in self. """
+        """Returns True if value is in self.
+        """
         return (self.index(value) >= 0)
 
     def __reduce__(self):
-        """ Implemented to facilitate pickling. """
+        """Implemented to facilitate pickling.
+        """
         d = {}
         d['data'] = self.get_npy_array()
 
         return (LongArray, (), d)
 
     def __setstate__(self, d):
-        """ Load the carray from the dictionary d. """
+        """Load the carray from the dictionary d.
+        """
         cdef np.ndarray arr = d['data']
         self.resize(arr.size)
         self.set_data(arr)
 
     cdef _setup_npy_array(self):
-        """ Create the numpy array. """
+        """Create the numpy array.
+        """
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
@@ -1159,7 +1316,8 @@ cdef class LongArray(BaseArray):
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
 
         cdef long i
         cdef long length = self.length
@@ -1258,39 +1416,45 @@ cdef class LongArray(BaseArray):
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
+        """Return the c data type for this array as a string.
+        """
         return 'long'
 
     cdef long* get_data_ptr(self):
-        """ Return the internal data pointer. """
+        """Return the internal data pointer.
+        """
         return self.data
 
     cpdef long get(self, long idx):
-        """ Gets value stored at position idx. """
+        """Gets value stored at position `idx`.
+        """
         return self.data[idx]
 
     cpdef set(self, long idx, long value):
-        """ Sets location idx to value. """
+        """Sets location `idx` to `value`.
+        """
         self.data[idx] = value
 
     cpdef append(self, long value):
-        """ Appends value to the end of the array. """
+        """Appends `value` to the end of the array.
+        """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(long) bytes. """
+        """Resizes the internal data to ``size*sizeof(long)`` bytes.
+        """
         self.c_reserve(size)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         self.c_reset()
         if self._old_data != NULL:
             self._parent = None
 
     cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(long) bytes and sets the
-        length to the new size.
+        """Resizes internal data to ``size*sizeof(long)`` bytes
+        and sets the length to the new size.
 
         """
         if self._old_data != NULL:
@@ -1299,9 +1463,21 @@ cdef class LongArray(BaseArray):
         self.c_resize(size)
 
     cpdef set_view(self, LongArray parent, long start, long end):
-        """Create a view of a given a parent array starting at the
-        given start index and ending at the end index (this does not
-        include the end index).
+        """Create a view of a given a `parent` array from start to end.
+
+        Note that this excludes the end index.
+
+        Parameters
+        ----------
+
+        parent : LongArray
+            The parent array of which this is a view.
+        start : long
+            The starting index to start the view from.
+        end : long
+            The ending index to end the view at, excludes the end
+            itself.
+
         """
         if self._parent is None:
             self._old_data = self.data
@@ -1313,23 +1489,27 @@ cdef class LongArray(BaseArray):
         arr.dimensions[0] = self.length
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """
-        Remove the particles with indices in index_list.
+        """Remove the particles with indices in index_list.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - index_list - a list of indices which should be removed.
-         - input_sorted - indicates if the input is sorted in ascending order.
-           if not, the array will be sorted internally.
+        index_list : ndarray
+            a list of indices which should be removed.
+        input_sorted : bool
+            indicates if the input is sorted in ascending order.  if
+            not, the array will be sorted internally.
 
-        **Algorithm**
+        Notes
+        -----
 
          If the input indices are not sorted, sort them in ascending order.
          Starting with the last element in the index list, start replacing the
@@ -1361,14 +1541,16 @@ cdef class LongArray(BaseArray):
                 arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
-        """
-        Extend the array with data from in_array.
+        """Extend the array with data from in_array.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - in_array - a numpy array with data to be added to the current array.
+        in_array : ndarray
+            a numpy array with data to be added to the current array.
 
-        **Issues**
+        Notes
+        -----
 
          - accessing the in_array using the indexing operation seems to be
            costly. Look at the annotated cython html file.
@@ -1382,8 +1564,7 @@ cdef class LongArray(BaseArray):
             self.append(in_array[i])
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """
-        Copies values of indices in indices from self to dest.
+        """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
@@ -1397,16 +1578,17 @@ cdef class LongArray(BaseArray):
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
                       long end_index=-1):
-        """
-        Copy a subset of values from src to self.
+        """Copy a subset of values from src to self.
 
-        **Parameters**
+        Parameters
+        ----------
 
-            - start_index - the first index in dest that corresponds to the 0th
+        start_index : long
+            the first index in dest that corresponds to the 0th
             index in source
-            - end_index   - the first index in dest from start_index that
-            is not copied
 
+        end_index : long
+            the first index in dest from start_index that is not copied
         """
         cdef long si, ei, s_length, d_length, i, j
         cdef LongArray src = <LongArray>source
@@ -1460,7 +1642,8 @@ cdef class LongArray(BaseArray):
             j += 1
 
     cpdef update_min_max(self):
-        """ Updates the min and max values of the array. """
+        """Updates the min and max values of the array.
+        """
         cdef long i = 0
         cdef long min_val, max_val
 
@@ -1485,27 +1668,49 @@ cdef class LongArray(BaseArray):
 # `FloatArray` class.
 # ###########################################################################
 cdef class FloatArray(BaseArray):
-    """ Represents an array of `float`s """
+    """Represents an array of `float`s
+
+    Mallocs a memory buffer of size (n*sizeof(float)) and sets up
+    the numpy array.  The memory is aligned to 64 byte boundaries.
+
+    Parameters
+    ----------
+
+    n : long
+        Length of the array.
+
+    Attributes
+    ----------
+    data: pointer
+        Pointer to an integer array.
+    length: long
+        Size of the array itself.
+    alloc: long
+        Size of the data buffer allocated.
+
+    Examples
+    --------
+
+    >>> x = FloatArray()
+    >>> x.resize(5)
+    >>> x.set_data(np.arange(5))
+    >>> x[0]
+    0
+
+    >>> x = FloatArray(5)
+    >>> xnp = x.get_npy_array()
+    >>> xnp[:] = np.arange(5)
+    >>> x[0], x[4]
+    (0.0, 4.0)
+
+    """
 
     #cdef public long length, alloc
     #cdef float *data
     #cdef np.ndarray _npy_array
 
-    def __cinit__(self, long n=0, *args, **kwargs):
-        """ Constructor for the class.
-
-        Mallocs a memory buffer of size (n*sizeof(float)) and sets up
-        the numpy array.
-
-        Parameters:
-        -----------
-        n -- Length of the array.
-
-        Data attributes:
-        ----------------
-        data -- Pointer to an integer array.
-        alloc -- Size of the data buffer allocated.
-
+    def __cinit__(self, long n=0):
+        """Constructor for the class.
         """
         self.length = n
         self._parent = None
@@ -1518,22 +1723,26 @@ cdef class FloatArray(BaseArray):
         self._setup_npy_array()
 
     def __dealloc__(self):
-        """ Frees the array. """
+        """Frees the array.
+        """
         if self._old_data == NULL:
             aligned_free(<void*>self.data)
         else:
             aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
-        """ Get item at position idx. """
+        """Get item at position idx.
+        """
         return self.data[idx]
 
     def __setitem__(self, long idx, float value):
-        """ Set location idx to value. """
+        """Set location idx to value.
+        """
         self.data[idx] = value
 
     cpdef long index(self, float value):
-        """ Returns the index at which value is in self, else -1. """
+        """Returns the index at which value is in self, else -1.
+        """
         cdef long i
         for i in range(self.length):
             if self.data[i] == value:
@@ -1541,24 +1750,28 @@ cdef class FloatArray(BaseArray):
         return -1
 
     def __contains__(self, float value):
-        """ Returns True if value is in self. """
+        """Returns True if value is in self.
+        """
         return (self.index(value) >= 0)
 
     def __reduce__(self):
-        """ Implemented to facilitate pickling. """
+        """Implemented to facilitate pickling.
+        """
         d = {}
         d['data'] = self.get_npy_array()
 
         return (FloatArray, (), d)
 
     def __setstate__(self, d):
-        """ Load the carray from the dictionary d. """
+        """Load the carray from the dictionary d.
+        """
         cdef np.ndarray arr = d['data']
         self.resize(arr.size)
         self.set_data(arr)
 
     cdef _setup_npy_array(self):
-        """ Create the numpy array. """
+        """Create the numpy array.
+        """
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
@@ -1568,7 +1781,8 @@ cdef class FloatArray(BaseArray):
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
 
         cdef long i
         cdef long length = self.length
@@ -1667,39 +1881,45 @@ cdef class FloatArray(BaseArray):
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
+        """Return the c data type for this array as a string.
+        """
         return 'float'
 
     cdef float* get_data_ptr(self):
-        """ Return the internal data pointer. """
+        """Return the internal data pointer.
+        """
         return self.data
 
     cpdef float get(self, long idx):
-        """ Gets value stored at position idx. """
+        """Gets value stored at position `idx`.
+        """
         return self.data[idx]
 
     cpdef set(self, long idx, float value):
-        """ Sets location idx to value. """
+        """Sets location `idx` to `value`.
+        """
         self.data[idx] = value
 
     cpdef append(self, float value):
-        """ Appends value to the end of the array. """
+        """Appends `value` to the end of the array.
+        """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(float) bytes. """
+        """Resizes the internal data to ``size*sizeof(float)`` bytes.
+        """
         self.c_reserve(size)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         self.c_reset()
         if self._old_data != NULL:
             self._parent = None
 
     cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(float) bytes and sets the
-        length to the new size.
+        """Resizes internal data to ``size*sizeof(float)`` bytes
+        and sets the length to the new size.
 
         """
         if self._old_data != NULL:
@@ -1708,9 +1928,21 @@ cdef class FloatArray(BaseArray):
         self.c_resize(size)
 
     cpdef set_view(self, FloatArray parent, long start, long end):
-        """Create a view of a given a parent array starting at the
-        given start index and ending at the end index (this does not
-        include the end index).
+        """Create a view of a given a `parent` array from start to end.
+
+        Note that this excludes the end index.
+
+        Parameters
+        ----------
+
+        parent : FloatArray
+            The parent array of which this is a view.
+        start : long
+            The starting index to start the view from.
+        end : long
+            The ending index to end the view at, excludes the end
+            itself.
+
         """
         if self._parent is None:
             self._old_data = self.data
@@ -1722,23 +1954,27 @@ cdef class FloatArray(BaseArray):
         arr.dimensions[0] = self.length
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """
-        Remove the particles with indices in index_list.
+        """Remove the particles with indices in index_list.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - index_list - a list of indices which should be removed.
-         - input_sorted - indicates if the input is sorted in ascending order.
-           if not, the array will be sorted internally.
+        index_list : ndarray
+            a list of indices which should be removed.
+        input_sorted : bool
+            indicates if the input is sorted in ascending order.  if
+            not, the array will be sorted internally.
 
-        **Algorithm**
+        Notes
+        -----
 
          If the input indices are not sorted, sort them in ascending order.
          Starting with the last element in the index list, start replacing the
@@ -1770,14 +2006,16 @@ cdef class FloatArray(BaseArray):
                 arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
-        """
-        Extend the array with data from in_array.
+        """Extend the array with data from in_array.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - in_array - a numpy array with data to be added to the current array.
+        in_array : ndarray
+            a numpy array with data to be added to the current array.
 
-        **Issues**
+        Notes
+        -----
 
          - accessing the in_array using the indexing operation seems to be
            costly. Look at the annotated cython html file.
@@ -1791,8 +2029,7 @@ cdef class FloatArray(BaseArray):
             self.append(in_array[i])
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """
-        Copies values of indices in indices from self to dest.
+        """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
@@ -1806,16 +2043,17 @@ cdef class FloatArray(BaseArray):
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
                       long end_index=-1):
-        """
-        Copy a subset of values from src to self.
+        """Copy a subset of values from src to self.
 
-        **Parameters**
+        Parameters
+        ----------
 
-            - start_index - the first index in dest that corresponds to the 0th
+        start_index : long
+            the first index in dest that corresponds to the 0th
             index in source
-            - end_index   - the first index in dest from start_index that
-            is not copied
 
+        end_index : long
+            the first index in dest from start_index that is not copied
         """
         cdef long si, ei, s_length, d_length, i, j
         cdef FloatArray src = <FloatArray>source
@@ -1869,7 +2107,8 @@ cdef class FloatArray(BaseArray):
             j += 1
 
     cpdef update_min_max(self):
-        """ Updates the min and max values of the array. """
+        """Updates the min and max values of the array.
+        """
         cdef long i = 0
         cdef float min_val, max_val
 
@@ -1894,27 +2133,49 @@ cdef class FloatArray(BaseArray):
 # `DoubleArray` class.
 # ###########################################################################
 cdef class DoubleArray(BaseArray):
-    """ Represents an array of `double`s """
+    """Represents an array of `double`s
+
+    Mallocs a memory buffer of size (n*sizeof(double)) and sets up
+    the numpy array.  The memory is aligned to 64 byte boundaries.
+
+    Parameters
+    ----------
+
+    n : long
+        Length of the array.
+
+    Attributes
+    ----------
+    data: pointer
+        Pointer to an integer array.
+    length: long
+        Size of the array itself.
+    alloc: long
+        Size of the data buffer allocated.
+
+    Examples
+    --------
+
+    >>> x = DoubleArray()
+    >>> x.resize(5)
+    >>> x.set_data(np.arange(5))
+    >>> x[0]
+    0
+
+    >>> x = DoubleArray(5)
+    >>> xnp = x.get_npy_array()
+    >>> xnp[:] = np.arange(5)
+    >>> x[0], x[4]
+    (0.0, 4.0)
+
+    """
 
     #cdef public long length, alloc
     #cdef double *data
     #cdef np.ndarray _npy_array
 
-    def __cinit__(self, long n=0, *args, **kwargs):
-        """ Constructor for the class.
-
-        Mallocs a memory buffer of size (n*sizeof(double)) and sets up
-        the numpy array.
-
-        Parameters:
-        -----------
-        n -- Length of the array.
-
-        Data attributes:
-        ----------------
-        data -- Pointer to an integer array.
-        alloc -- Size of the data buffer allocated.
-
+    def __cinit__(self, long n=0):
+        """Constructor for the class.
         """
         self.length = n
         self._parent = None
@@ -1927,22 +2188,26 @@ cdef class DoubleArray(BaseArray):
         self._setup_npy_array()
 
     def __dealloc__(self):
-        """ Frees the array. """
+        """Frees the array.
+        """
         if self._old_data == NULL:
             aligned_free(<void*>self.data)
         else:
             aligned_free(<void*>self._old_data)
 
     def __getitem__(self, long idx):
-        """ Get item at position idx. """
+        """Get item at position idx.
+        """
         return self.data[idx]
 
     def __setitem__(self, long idx, double value):
-        """ Set location idx to value. """
+        """Set location idx to value.
+        """
         self.data[idx] = value
 
     cpdef long index(self, double value):
-        """ Returns the index at which value is in self, else -1. """
+        """Returns the index at which value is in self, else -1.
+        """
         cdef long i
         for i in range(self.length):
             if self.data[i] == value:
@@ -1950,24 +2215,28 @@ cdef class DoubleArray(BaseArray):
         return -1
 
     def __contains__(self, double value):
-        """ Returns True if value is in self. """
+        """Returns True if value is in self.
+        """
         return (self.index(value) >= 0)
 
     def __reduce__(self):
-        """ Implemented to facilitate pickling. """
+        """Implemented to facilitate pickling.
+        """
         d = {}
         d['data'] = self.get_npy_array()
 
         return (DoubleArray, (), d)
 
     def __setstate__(self, d):
-        """ Load the carray from the dictionary d. """
+        """Load the carray from the dictionary d.
+        """
         cdef np.ndarray arr = d['data']
         self.resize(arr.size)
         self.set_data(arr)
 
     cdef _setup_npy_array(self):
-        """ Create the numpy array. """
+        """Create the numpy array.
+        """
         cdef int nd = 1
         cdef np.npy_intp dims = self.length
 
@@ -1977,7 +2246,8 @@ cdef class DoubleArray(BaseArray):
 
 
     cdef void c_align_array(self, LongArray new_indices) nogil:
-        """ Rearrange the array contents according to the new indices. """
+        """Rearrange the array contents according to the new indices.
+        """
 
         cdef long i
         cdef long length = self.length
@@ -2076,39 +2346,45 @@ cdef class DoubleArray(BaseArray):
 
 
     cpdef str get_c_type(self):
-        """ Return the c data type for this array. """
+        """Return the c data type for this array as a string.
+        """
         return 'double'
 
     cdef double* get_data_ptr(self):
-        """ Return the internal data pointer. """
+        """Return the internal data pointer.
+        """
         return self.data
 
     cpdef double get(self, long idx):
-        """ Gets value stored at position idx. """
+        """Gets value stored at position `idx`.
+        """
         return self.data[idx]
 
     cpdef set(self, long idx, double value):
-        """ Sets location idx to value. """
+        """Sets location `idx` to `value`.
+        """
         self.data[idx] = value
 
     cpdef append(self, double value):
-        """ Appends value to the end of the array. """
+        """Appends `value` to the end of the array.
+        """
         self.c_append(value)
 
     cpdef reserve(self, long size):
-        """ Resizes the internal data to size*sizeof(double) bytes. """
+        """Resizes the internal data to ``size*sizeof(double)`` bytes.
+        """
         self.c_reserve(size)
 
     cpdef reset(self):
-        """ Reset the length of the array to 0. """
+        """Reset the length of the array to 0.
+        """
         self.c_reset()
         if self._old_data != NULL:
             self._parent = None
 
     cpdef resize(self, long size):
-        """
-         Resizes internal data to size*sizeof(double) bytes and sets the
-        length to the new size.
+        """Resizes internal data to ``size*sizeof(double)`` bytes
+        and sets the length to the new size.
 
         """
         if self._old_data != NULL:
@@ -2117,9 +2393,21 @@ cdef class DoubleArray(BaseArray):
         self.c_resize(size)
 
     cpdef set_view(self, DoubleArray parent, long start, long end):
-        """Create a view of a given a parent array starting at the
-        given start index and ending at the end index (this does not
-        include the end index).
+        """Create a view of a given a `parent` array from start to end.
+
+        Note that this excludes the end index.
+
+        Parameters
+        ----------
+
+        parent : DoubleArray
+            The parent array of which this is a view.
+        start : long
+            The starting index to start the view from.
+        end : long
+            The ending index to end the view at, excludes the end
+            itself.
+
         """
         if self._parent is None:
             self._old_data = self.data
@@ -2131,23 +2419,27 @@ cdef class DoubleArray(BaseArray):
         arr.dimensions[0] = self.length
 
     cpdef squeeze(self):
-        """ Release any unused memory. """
+        """Release any unused memory.
+        """
         if self._old_data != NULL:
             raise RuntimeError('Cannot squeeze array which is a view.')
 
         self.c_squeeze()
 
     cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
-        """
-        Remove the particles with indices in index_list.
+        """Remove the particles with indices in index_list.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - index_list - a list of indices which should be removed.
-         - input_sorted - indicates if the input is sorted in ascending order.
-           if not, the array will be sorted internally.
+        index_list : ndarray
+            a list of indices which should be removed.
+        input_sorted : bool
+            indicates if the input is sorted in ascending order.  if
+            not, the array will be sorted internally.
 
-        **Algorithm**
+        Notes
+        -----
 
          If the input indices are not sorted, sort them in ascending order.
          Starting with the last element in the index list, start replacing the
@@ -2179,14 +2471,16 @@ cdef class DoubleArray(BaseArray):
                 arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
-        """
-        Extend the array with data from in_array.
+        """Extend the array with data from in_array.
 
-        **Parameters**
+        Parameters
+        ----------
 
-         - in_array - a numpy array with data to be added to the current array.
+        in_array : ndarray
+            a numpy array with data to be added to the current array.
 
-        **Issues**
+        Notes
+        -----
 
          - accessing the in_array using the indexing operation seems to be
            costly. Look at the annotated cython html file.
@@ -2200,8 +2494,7 @@ cdef class DoubleArray(BaseArray):
             self.append(in_array[i])
 
     cpdef copy_values(self, LongArray indices, BaseArray dest):
-        """
-        Copies values of indices in indices from self to dest.
+        """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
         i.e. atleast as long as indices.
@@ -2215,16 +2508,17 @@ cdef class DoubleArray(BaseArray):
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
                       long end_index=-1):
-        """
-        Copy a subset of values from src to self.
+        """Copy a subset of values from src to self.
 
-        **Parameters**
+        Parameters
+        ----------
 
-            - start_index - the first index in dest that corresponds to the 0th
+        start_index : long
+            the first index in dest that corresponds to the 0th
             index in source
-            - end_index   - the first index in dest from start_index that
-            is not copied
 
+        end_index : long
+            the first index in dest from start_index that is not copied
         """
         cdef long si, ei, s_length, d_length, i, j
         cdef DoubleArray src = <DoubleArray>source
@@ -2278,7 +2572,8 @@ cdef class DoubleArray(BaseArray):
             j += 1
 
     cpdef update_min_max(self):
-        """ Updates the min and max values of the array. """
+        """Updates the min and max values of the array.
+        """
         cdef long i = 0
         cdef double min_val, max_val
 

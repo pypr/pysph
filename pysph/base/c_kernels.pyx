@@ -1,7 +1,8 @@
+#cython: embedsignature=True
+
+
 from libc.math cimport *
 import numpy as np
-
-
 
 
 

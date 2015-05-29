@@ -1,3 +1,4 @@
+#cython: embedsignature=True
 """
 Represents a collection of particles.
 
