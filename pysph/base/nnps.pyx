@@ -39,9 +39,14 @@ IF OPENMP:
             for i in prange(1):
                 n = openmp.omp_get_num_threads()
         return n
+    cpdef set_number_of_threads(int n):
+        openmp.omp_set_num_threads(n)
 ELSE:
     cpdef int get_number_of_threads():
         return 1
+    cpdef set_number_of_threads(int n):
+        print "OpenMP not available, cannot set number of threads."
+
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
