@@ -25,6 +25,10 @@ Here are videos of simulations made with PySPH.
     </div>
 
 
+PySPH is hosted on `bitbucket <http://bitbucket.org/pysph/pysph>`_.  Please see
+the `bitbucket <http://bitbucket.org/pysph/pysph>`_ site for development
+details.
+
 .. _Python: http://www.python.org
 .. _Cython: http://www.cython.org
 .. _mpi4py: http://mpi4py.scipy.org
@@ -41,6 +45,7 @@ Features
     implemented in FORTRAN.
   - Seamless multi-core support with OpenMP.
   - Seamless parallel integration using Zoltan_.
+  - `BSD license <https://bitbucket.org/pysph/pysph/src/master/LICENSE.txt>`_.
 
 SPH formulations
 -----------------
@@ -92,8 +97,8 @@ Credits
 
 PySPH is primarily developed at the `Department of Aerospace
 Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`__. We are grateful
-to IIT Bombay for their support.  Our primary goal is to build a
-powerful SPH based tool for both application and research. We hope that
+to IIT Bombay for the support.  Our primary goal is to build a
+powerful SPH-based tool for both application and research. We hope that
 this makes it easy to perform reproducible computational research.
 
 Lead developers:
@@ -105,6 +110,10 @@ Earlier developers:
 
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
+
+The following have contributed bug-fixes, features, documentation etc.
+
+- Arkopal Dutt, Arpit Agarwal, Sarang Minhas, S Saravanan, Vishnu Sivadasan
 
 Citing PySPH
 -------------
