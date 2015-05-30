@@ -1,11 +1,12 @@
-from libc.math cimport *
-import numpy as np
-
+#cython: embedsignature=True
 <%
 from cython_generator import CythonGenerator
 from kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
 generator = CythonGenerator(python_methods=True)
 %>
+
+from libc.math cimport *
+import numpy as np
 
 % for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
 <%

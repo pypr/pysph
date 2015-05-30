@@ -69,12 +69,12 @@ represent particles and can be created from NumPy arrays like so:
    >>> x = x.ravel(); y = y.ravel()                     # flatten the arrays
    >>> pa = get_particle_array(name='array', x=x, y=y)  # create the particle array
 
-In the above, the helper function :py:func:`get_particle_array` will
-instantiate and return a :py:class:`ParticleArray` with properties `x` and `y`
-set from given NumPy arrays. In general, a :py:class:`ParticleArray` can be
-instantiated with an arbitrary number of properties. Each property is stored
-internally as a :py:class:`pyzoltan.core.carray.BaseArray` of the appropriate
-type.
+In the above, the helper function
+:py:func:`pysph.base.utils.get_particle_array` will instantiate and return a
+:py:class:`ParticleArray` with properties `x` and `y` set from given NumPy
+arrays. In general, a :py:class:`ParticleArray` can be instantiated with an
+arbitrary number of properties. Each property is stored internally as a
+:py:class:`pyzoltan.core.carray.BaseArray` of the appropriate type.
 
 By default, every :py:class:`ParticleArray` returned using the helper
 function will have the following properties:

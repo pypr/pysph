@@ -1,3 +1,4 @@
+#cython: embedsignature=True
 # Library imports.
 import numpy as np
 cimport numpy as np
@@ -188,17 +189,17 @@ def py_unflatten(long cell_index, IntArray ncells_per_dim, int dim):
 cdef inline int real_to_int(double real_val, double step) nogil:
     """ Return the bin index to which the given position belongs.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     val -- The coordinate location to bin
     step -- the bin size
 
-    Example:
+    Examples
     --------
-    real_val = 1.5, step = 1.0 --> ret_val = 1
-
-    real_val = -0.5, step = 1.0 --> real_val = -1
-
+    >>> real_to_int(1.5, 1.0)
+    1
+    >>> real_to_int(-0.5, 1.0)
+    -1
     """
     cdef int ret_val = <int>floor( real_val/step )
 
@@ -209,18 +210,19 @@ cdef void find_cell_id_raw(double x, double y, double z, double
                            cell_size, int *ix, int *iy, int *iz) nogil:
     """ Find the cell index for the corresponding point
 
-    Parameters:
-    -----------
-    x, y, z -- the point for which the index is sought
-    cell_size -- the cell size to use
-    ix, iy, iz -- output parameter holding the cell index
-
-    Algorithm:
+    Parameters
     ----------
-    performs a box sort based on the point and cell size
+    x, y, z: double
+        the point for which the index is sought
+    cell_size : double
+        the cell size to use
+    ix, iy, iz : int*
+        output parameter holding the cell index
 
-    Notes:
+    Notes
     ------
+    Performs a box sort based on the point and cell size
+
     Uses the function  `real_to_int`
 
     """
@@ -232,18 +234,17 @@ cdef void find_cell_id_raw(double x, double y, double z, double
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size):
     """ Find the cell index for the corresponding point
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     pnt -- the point for which the index is sought
     cell_size -- the cell size to use
     id -- output parameter holding the cell index
 
-    Algorithm:
-    ----------
-    performs a box sort based on the point and cell size
 
-    Notes:
-    ------
+    Notes
+    -----
+    Performs a box sort based on the point and cell size
+
     Uses the function  `real_to_int`
 
     """
@@ -255,8 +256,8 @@ cdef cIntPoint find_cell_id(cPoint pnt, double cell_size):
 cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
     """ Get the centroid of the cell.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
     cell_size : double (input)
     Cell size used for binning
@@ -264,13 +265,13 @@ cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
     cid : cPoint (input)
     Spatial index for a cell
 
-    Returns:
-    ---------
+    Returns
+    -------
 
     centroid : cPoint
 
-    Notes:
-    ------
+    Notes
+    -----
     The centroid in any coordinate direction is defined to be the
     origin plus half the cell size in that direction
 
@@ -285,8 +286,8 @@ cdef inline cPoint _get_centroid(double cell_size, cIntPoint cid):
 def get_centroid(double cell_size, IntPoint cid):
     """ Get the centroid of the cell.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
     cell_size : double (input)
         Cell size used for binning
@@ -294,13 +295,13 @@ def get_centroid(double cell_size, IntPoint cid):
     cid : IntPoint (input)
         Spatial index for a cell
 
-    Returns:
-    ---------
+    Returns
+    -------
 
     centroid : Point
 
-    Notes:
-    ------
+    Notes
+    -----
     The centroid in any coordinate direction is defined to be the
     origin plus half the cell size in that direction
 
@@ -719,8 +720,8 @@ cdef class Cell:
                  int layers=2):
         """Constructor
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         cid : IntPoint
             Spatial index (unflattened) for the cell
@@ -763,8 +764,8 @@ cdef class Cell:
     def get_centroid(self, Point pnt):
         """Utility function to get the centroid of the cell.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         pnt : Point (input/output)
             The centroid is cmoputed and stored in this object.
@@ -780,8 +781,8 @@ cdef class Cell:
                          cell_size=None):
         """Compute the bounding box for the cell.
 
-        Parameters:
-        ------------
+        Parameters
+        ----------
 
         boxmin : Point (output)
             The bounding box min coordinates are stored here
@@ -950,8 +951,8 @@ cdef class NNPS:
                  bint sort_gids=False):
         """Constructor for NNPS
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Dimension (fixme: Not sure if this is really needed)
@@ -1260,8 +1261,8 @@ cdef class DictBoxSortNNPS(NNPS):
                  sort_gids=False):
         """Constructor for NNPS
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Number of dimensions.
@@ -1318,8 +1319,8 @@ cdef class DictBoxSortNNPS(NNPS):
                             size_t d_idx, UIntArray nbrs, bint prealloc):
         """Utility function to get near-neighbors for a particle.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         src_index : int
             Index of the source particle array in the particles list
@@ -1431,8 +1432,8 @@ cdef class DictBoxSortNNPS(NNPS):
     cpdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         pa_index : int
             Index of the particle array corresponding to the particles list
@@ -1493,8 +1494,8 @@ cdef class LinkedListNNPS(NNPS):
                  bint fixed_h=False, bint cache=False, bint sort_gids=False):
         """Constructor for NNPS
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Number of dimension.
@@ -1659,8 +1660,8 @@ cdef class LinkedListNNPS(NNPS):
                             size_t d_idx, UIntArray nbrs, bint prealloc):
         """Utility function to get near-neighbors for a particle.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         src_index : int
             Index of the source particle array in the particles list
@@ -1732,8 +1733,8 @@ cdef class LinkedListNNPS(NNPS):
     cpdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         pa_index : int
             Index of the particle array corresponding to the particles list

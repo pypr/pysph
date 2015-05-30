@@ -7,9 +7,8 @@ There is also a function to read VTK dataset and produce points from them.
 This is very useful as Gmsh can generate VTK datasets from its meshes and thus
 the meshes can be imported as point clouds that may be used in an SPH
 simulation.
-
-Copyright (c) 2015 Prabhu Ramachandran
 """
+# Copyright (c) 2015 Prabhu Ramachandran
 
 import gzip
 import json
@@ -48,9 +47,11 @@ def _convert_to_points(dataset, vertices=True, cell_centers=True):
     Parameters
     ----------
 
-     - dataset : tvtk.DataSet
-     - vertices: bool: if True, it converts the vertices to points.
-     - cell_centers: bool: if True, converts the cell centers to points.
+    dataset : tvtk.DataSet
+    vertices: bool
+        If True, it converts the vertices to points.
+    cell_centers: bool
+        If True, converts the cell centers to points.
 
     Returns
     -------
@@ -77,9 +78,12 @@ def vtk_file_to_points(fname, vertices=True, cell_centers=True):
     Parameters
     ----------
 
-     - fname : str: file name,
-     - vertices: bool: if True, it converts the vertices to points.
-     - cell_centers: bool: if True, converts the cell centers to points.
+    fname : str
+        File name.
+    vertices: bool
+        If True, it converts the vertices to points.
+    cell_centers: bool
+        If True, converts the cell centers to points.
 
     Returns
     -------
@@ -105,7 +109,12 @@ class Loop(object):
     approach.
 
     Use this to create a 2D closed surface.  The surface is always in the x-y
-    plane.  Here is a simple example::
+    plane.
+
+    Examples
+    --------
+
+    Here is a simple example::
 
       >>> l1 = Loop((0.0, 0.0), mesh_size=0.1)
       >>> l1.move(1.0).turn(90).move(1.0).turn(90).move(1.0).turn(90).move(1.0)
@@ -162,6 +171,8 @@ class Loop(object):
         return self
 
     def write(self, fp, point_id_base=0, elem_id_base=0):
+        """Write data to given file object `fp`.
+        """
         points = self.points
         for i in range(len(points)):
             idx = point_id_base + i + 1
@@ -225,13 +236,16 @@ class Loop(object):
         )
         fp.write(s)
 
+
 class Surface(object):
     def __init__(self, *loops):
-        """
-        Parameters
-        -----------
+        """Constructor.
 
-        loops : arguments
+        Parameters
+        ----------
+
+        loops : tuple(Loop)
+            Any additional positional arguments are treated as loop objects.
         """
         self.loops = list(loops)
         self.idx = 0
@@ -252,6 +266,7 @@ class Surface(object):
         self.idx = idx
         return pid_base, eid_base
 
+
 class Extrude(object):
     def __init__(self, dx=0.0, dy=0.0, dz=1.0, surfaces=None):
         """Extrude a given set of surfaces by the displacements given
@@ -260,10 +275,14 @@ class Extrude(object):
         Parameters
         ----------
 
-        dx : float : extrusion along x.
-        dy : float : extrusion along y.
-        dz : float : extrusion along z.
-        surfaces: list : list of surfaces to extrude.
+        dx : float
+            Extrusion along x.
+        dy : float
+            Extrusion along y.
+        dz : float
+            Extrusion along z.
+        surfaces: list
+            List of surfaces to extrude.
 
         """
         self.dx, self.dy, self.dz = dx, dy, dz
@@ -299,7 +318,8 @@ class Gmsh(object):
         Parameters
         ----------
 
-        gmsh: str: Path to gmsh executable.
+        gmsh: str
+            Path to gmsh executable.
         """
         self.config = expanduser(join('~', '.pysph', 'gmsh.json'))
         if gmsh is None:
@@ -337,9 +357,12 @@ class Gmsh(object):
         Parameters
         ----------
 
-        - entities : list: list of entities.
-        - vertices: bool: if True, it converts the vertices to points.
-        - cell_centers: bool: if True, converts the cell centers to points.
+        entities : list
+            List of entities.
+        vertices: bool
+            If True, it converts the vertices to points.
+        cell_centers: bool
+            If True, converts the cell centers to points.
 
         """
         tmp_vtk = tempfile.mktemp(suffix='.vtk')
@@ -359,9 +382,12 @@ class Gmsh(object):
         Parameters
         ----------
 
-        - geo_file_name: str: filename of the .geo file.
-        - vertices: bool: if True, it converts the vertices to points.
-        - cell_centers: bool: if True, converts the cell centers to points.
+        geo_file_name: str
+            Filename of the .geo file.
+        vertices: bool
+            If True, it converts the vertices to points.
+        cell_centers: bool
+            If True, converts the cell centers to points.
 
         """
         tmp_vtk = tempfile.mktemp(suffix='.vtk')

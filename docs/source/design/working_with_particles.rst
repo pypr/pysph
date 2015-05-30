@@ -59,19 +59,6 @@ Important ParticleArray attributes
   use of a unique name identifier to distinguish between different
   particle arrays.
 
-**particle_type**: A :class:`ParticleArray` represents a homogeneous
-  collection of particles in that they correspond to a particular
-  *type*. The available types are an enumerated list:
-
- * Fluid     : Used for fluids
- * Solid     : Used for moving solids
- * Boundary  : Used for fixed boundaries
- * Ghost     : Particles added for periodic boundary conditions.
-
-The type of a particle array plays an important role in setting up a
-simulation involving multiple arrays with different types. Refer to
-:doc:`particle_types` for a detailed description.
-
 **constants**: Properties that are constant in space and time for all
   particles of a given type are stored in the *constants* attribute.
 
@@ -85,12 +72,11 @@ simulation involving multiple arrays with different types. Refer to
   re-compute neighbors for that array.
 
 **num_real_particles**: Every :class:`ParticleArray` object is given a
-  set of deault properties (see
-  :doc:`particle_array_default_properties`), one of which is the *tag*
-  property. The *tag* of a particle is an integer which is used by
-  PySPH to determine if a particle belongs to a remote processor (0
-  local, else remote). The *num_real_particles* attributes counts the
-  number of properties that have the tag value 0.
+  set of deault properties, one of which is the *tag* property. The *tag* of a
+  particle is an integer which is used by PySPH to determine if a particle
+  belongs to a remote processor (0 local, else remote). The
+  *num_real_particles* attributes counts the number of properties that have the
+  tag value 0.
 
 ---------------------------
 Data buffers and the carray
@@ -170,10 +156,10 @@ Specifying an indexing scheme
 
 Upon creation of a :class:`Particles` instance, we can pass arguments
 to indicate the kind of spatial indexing scheme to use. The default is
-a box sort algorithm (see :doc:`nnps`). Currently, this is the only
+a box sort algorithm (see :doc:`../reference/nnps`). Currently, this is the only
 indexing scheme implemented.
 
-See the reference documentation :doc:`../reference/particles` for a
+See the reference documentation :doc:`../reference/particle_array` for a
 further description.
 
 ------------

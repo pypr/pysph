@@ -523,21 +523,21 @@ class Solver(object):
              only_real=self.output_only_real, mpi_comm=comm)
 
     def load_output(self, count):
-        """ Load particle data from dumped output file.
+        """Load particle data from dumped output file.
 
         Parameters
         ----------
-        count : string
-            The iteration time from which to load the data. If time is
-            '?' then list of available data files is returned else
-             the latest available data file is used
+        count : str
+            The iteration time from which to load the data. If time is '?' then
+            list of available data files is returned else the latest available
+            data file is used
 
         Notes
         -----
         Data is loaded from the :py:attr:`output_directory` using the same format
         as stored by the :py:meth:`dump_output` method.
         Proper functioning required that all the relevant properties of arrays be
-        dumped
+        dumped.
 
         """
         # get the list of available files
