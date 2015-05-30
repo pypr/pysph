@@ -22,6 +22,27 @@ class SHM(Equation):
         d_au[d_idx] = -d_x[d_idx]
 
 
+class TestIntegrator(unittest.TestCase):
+    def test_detection_of_missing_arrays_for_integrator(self):
+        # Given.
+        x = np.asarray([1.0])
+        u = np.asarray([0.0])
+        h = np.ones_like(x)
+        pa = get_particle_array(name='fluid', x=x, u=u, h=h, m=h)
+        arrays = [pa]
+
+        # When
+        integrator = LeapFrogIntegrator(fluid=LeapFrogStep())
+        equations = [SHM(dest="fluid", sources=None)]
+        kernel = CubicSpline(dim=1)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel
+        )
+        comp = SPHCompiler(a_eval, integrator=integrator)
+
+        # Then
+        self.assertRaises(RuntimeError, comp.compile)
+
 
 class TestIntegratorBase(unittest.TestCase):
     def setUp(self):

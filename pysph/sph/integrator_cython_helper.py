@@ -93,13 +93,28 @@ class IntegratorCythonHelper(object):
 
         known_types = self.acceleration_eval_helper.known_types
         decl = []
+        unknown = set()
         for arr in sorted(arrays):
             if arr in known_types:
                 decl.append('cdef {type} {arr}'.format(
                     type=known_types[arr].type, arr=arr
                 ))
             else:
+                unknown.add(arr)
                 decl.append('cdef double* %s'%arr)
+
+        if len(unknown) > 0:
+            props = ', '.join([x[2:] for x in unknown])
+            msg = "ERROR: Integrator requires the following properties:"\
+                  "\n\t{props}\n"\
+                  "Please add them to the particle arrays.".format(
+                props=props
+            )
+            print('*'*70)
+            print(msg)
+            print('*'*70)
+            raise RuntimeError(msg)
+
         return '\n'.join(decl)
 
     def get_array_setup(self, dest, method):
