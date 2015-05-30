@@ -341,19 +341,26 @@ def dump(filename, particles, solver_data, detailed_output=False,
          only_real=True, mpi_comm=None):
     """Dump the given particles and solver data to the given filename.
 
-    **Parameters**
+    Parameters
+    ----------
 
-     - filename: str: Filename to dump to.
+    filename: str
+        Filename to dump to.
 
-     - particles: sequence(ParticleArray): Sequence of particle arrays to dump.
+    particles: sequence(ParticleArray)
+        Sequence of particle arrays to dump.
 
-     - solver_data: dict: Additional information to dump about solver state.
+    solver_data: dict
+        Additional information to dump about solver state.
 
-     - detailed_output: bool: Specifies if all arrays should be dumped.
+    detailed_output: bool
+        Specifies if all arrays should be dumped.
 
-     - only_real: bool: Only dump the real particles.
+    only_real: bool
+        Only dump the real particles.
 
-     - mpi_comm: An MPI communicator to use for parallel commmunications.
+    mpi_comm: mpi4pi.MPI.Intracomm
+        An MPI communicator to use for parallel commmunications.
 
     If `mpi_comm` is not passed or is set to None the local particles alone
     are dumped, otherwise only rank 0 dumps the output.
@@ -405,16 +412,37 @@ def dump_v1(filename, particles, solver_data, detailed_output=False,
 
 
 def load(fname):
-    """ Load and return data from an  output (.npz) file dumped by PySPH.
+    """Load and return data from an  output (.npz) file dumped by PySPH.
 
     For output file version 1, the function returns a dictionary with
     the keys:
 
-    solver_data : Solver constants at the time of output like time,
+    ``"solver_data"`` : Solver constants at the time of output like time,
     time step and iteration count.
 
-    arrays : ParticleArrays keyed on names with the ParticleArray
-    object as value.
+    ``"arrays"`` : ParticleArrays keyed on names with the ParticleArray object
+    as value.
+
+    Parameters
+    ----------
+
+    fname : str
+        Name of the file.
+
+    Examples
+    --------
+
+    >>> data = load('elliptical_drop_100.npz')
+    >>> data.keys()
+    ['arrays', 'solver_data']
+    >>> arrays = data['arrays']
+    >>> arrays.keys()
+    ['fluid']
+    >>> fluid = arrays['fluid']
+    >>> type(fluid)
+    pysph.base.particle_array.ParticleArray
+    >>> data['solver_data']
+    {'count': 100, 'dt': 4.6416394784204199e-05, 't': 0.0039955855395528766}
 
     """
     def _get_dict_from_arrays(arrays):
@@ -466,8 +494,8 @@ def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
     Given a filename prefix and the number of processors, return a
     concatenated version of the dictionary returned via load.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
     prefix : str
         A filename prefix for the output file.
@@ -648,10 +676,20 @@ class SPHInterpolate(object):
 
         return resultx, resulty, resultz
 
-################################################################################
-# Get all solution files in a given directory
-###############################################################################
 def get_files(dirname=None, fname=None, endswith=".npz"):
+    """Get all solution files in a given directory, `dirname`.
+
+    Parameters
+    ----------
+
+    dirname: str
+        Name of directory.
+    fname: str
+        An initial part of the filename, if not specified use the first
+        part of the dirname.
+    endswith: str
+        The extension of the file to load.
+    """
 
     if dirname is None:
         return []

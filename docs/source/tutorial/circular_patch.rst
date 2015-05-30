@@ -367,15 +367,40 @@ If you have Mayavi_ installed this should show a UI that looks like:
 
 .. _Mayavi: http://code.enthought.com/projects/mayavi
 
-The simulation data is dumped out in .npz files. You may use the ``load``
-method from the ``pysph.solver.utils`` module to access the raw data::
+On the user interface, the right side shows the visualized data.  On top of it
+there are several toolbar icons.  The left most is the Mayavi logo and clicking
+on it will present the full Mayavi user interface that can be used to configure
+any additional details of the visualization.
+
+On the bottom left of the main visualization UI there is a button which has the
+text "Launch Python Shell".  If one clicks on this, one obtains a full Python
+interpreter with a few useful objects available.  These are::
+
+    >>> dir()
+    ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab', 
+     'particle_arrays', 'scene', 'self', 'viewer']
+    >>> len(particle_arrays)
+    1
+    >>> particle_arrays[0].name
+    'fluid'
+
+The ``particle_arrays`` object is a list of **ParticleArrays**.  The
+``interpolator`` is an instance of
+:py:class:`pysph.tools.interpolator.Interpolator` that is used by the viewer.
+The other objects can be used to script the user interface if desired.
+
+Loading output data files
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The simulation data is dumped out in ``*.npz`` files. You may use the
+:py:func:`pysph.solver.utils.load` function to access the raw data::
 
     from pysph.solver.utils import load
     data = load('elliptical_drop_100.npz')
 
-When opening the saved ``.npz`` file with ``load`` a dictionary object is
-returned.  The particle arrays and other information can be obtained from
-this dictionary::
+When opening the saved ``.npz`` file with ``load``, a dictionary object is
+returned.  The particle arrays and other information can be obtained from this
+dictionary::
 
     particle_arrays = data['arrays']
     solver_data = data['solver_data']
@@ -391,4 +416,52 @@ array properties can thus be obtained and used for any post-processing task.
 The ``solver_data`` provides information about the iteration count, timestep
 and the current time.
 
+Interpolating properties
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Data from the solver can also be interpolated using the
+:py:class:`pysph.tools.interpolator.Interpolator` class.  Here is the simplest
+example of interpolating data from the results of a simulation onto a fixed
+grid that is automatically computed from the known particle arrays::
+
+    from pysph.solver.utils import load
+    data = load('elliptical_drop_output/elliptical_drop_100.npz')
+    from pysph.tools.interpolator import Interpolator
+    parrays = data['arrays']
+    interp = Interpolator(parrays.values(), num_points=10000)
+    p = interp.interpolate('p')
+
+``p`` is now a numpy array of size 10000 elements shaped such that it
+interpolates all the data in the particle arrays loaded.  ``interp.x`` and
+``interp.y`` are numpy arrays of the chosen ``x`` and ``y`` coordinates
+corresponding to ``p``.  To visualize this we may simply do::
+
+    from matplotlib import pyplot as plt
+    plt.contourf(interp.x, interp.y, p)
+
+It is easy to interpolate any other property too.  If one wishes to explicitly
+set the domain on which the interpolation is required one may do::
+
+    xmin, xmax, ymin, ymax, zmin, zmax = 0., 1., -1., 1., 0, 1
+    interp.set_domain((xmin, xmax, ymin, ymax, zmin, zmax), (40, 50, 1))
+    p = interp.interpolate('p')
+
+This will create a meshgrid in the specified region with the specified number
+of points.
+
+One could also explicitly set the points on which one wishes to interpolate the
+data as::
+
+    interp.set_interpolation_points(x, y, z)
+
+Where ``x, y, z`` are numpy arrays of the coordinates of the points on which
+the interpolation is desired.  This can also be done with the constructor as::
+
+    interp = Interpolator(parrays.values(), x=x, y=y, z=z)
+
+For more details on the class and the available methods, see
+:py:class:`pysph.tools.interpolator.Interpolator`.
+
+In addition to this there are other useful pre and post-processing utilities
+described in :doc:`../reference/tools`.
 

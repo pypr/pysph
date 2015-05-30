@@ -1091,10 +1091,10 @@ cdef class ParticleArray:
             the list of properties to extract, if None all properties
             are extracted.
 
-         Notes
-         -----
+        Notes
+        -----
 
-         The algorithm is as follows:
+        The algorithm is as follows:
 
              - create a new particle array with the required properties.
              - resize the new array to the desired length (index_array.length)

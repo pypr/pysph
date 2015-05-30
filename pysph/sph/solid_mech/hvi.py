@@ -1,5 +1,5 @@
 """
-Functions for the High Velocity Impact Problems
+Equations for the High Velocity Impact Problems
 ###############################################
 """
 
