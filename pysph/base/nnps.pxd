@@ -104,18 +104,20 @@ cdef class NeighborCache:
     cdef NNPS _nnps
     cdef UIntArray _pid_to_tid
     cdef UIntArray _start_stop
+    cdef IntArray _cached
     cdef void **_neighbors
     cdef list _neighbor_arrays
     cdef int _narrays
     cdef list _particles
     cdef int _last_avg_nbr_size
-    cdef bint _dirty
 
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
-    cdef void find_all_neighbors(self)
+    cpdef find_all_neighbors(self)
     cpdef update(self)
 
+    cdef void _update_last_avg_nbr_size(self)
+    cdef void _find_neighbors(self, long d_idx) nogil
 
 # Nearest neighbor locator
 cdef class NNPS:
@@ -126,8 +128,8 @@ cdef class NNPS:
     cdef public list pa_wrappers      # list of particle array wrappers
     cdef public int narrays           # Number of particle arrays
     cdef public bint use_cache        # Use cache or not.
-    cdef public list cache            # The neighbor cache.
-    cdef NeighborCache current_cache  # The current cache
+    cdef list cache                   # The neighbor cache.
+    cdef public NeighborCache current_cache  # The current cache
     cdef int src_index, dst_index     # The current source and dest indices
 
     cdef public DomainManager domain  # Domain manager

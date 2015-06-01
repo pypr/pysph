@@ -846,6 +846,7 @@ cdef class NeighborCache:
         self._nnps = nnps
         self._particles = nnps.particles
         self._narrays = nnps.narrays
+        cdef long n_p = self._particles[dst_index].get_number_of_particles()
         cdef int nnbr = 10
         cdef size_t i
         if self._nnps.dim == 1:
@@ -856,7 +857,11 @@ cdef class NeighborCache:
             nnbr = 120
 
         self._n_threads = get_number_of_threads()
-        self._dirty = True
+
+        self._cached = IntArray(n_p)
+        for i in range(n_p):
+            self._cached.data[i] = 0
+
         self._last_avg_nbr_size = nnbr
         self._start_stop = UIntArray()
         self._pid_to_tid = UIntArray()
@@ -877,69 +882,73 @@ cdef class NeighborCache:
     #### Public protocol ################################################
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        if self._dirty:
-            self._nnps.set_context(self._src_index, self._dst_index)
-            self.find_all_neighbors()
         self.get_neighbors_raw(d_idx, nbrs)
 
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
+        if self._cached.data[d_idx] == 0:
+            self._find_neighbors(d_idx)
         cdef size_t start, end, tid
         start = self._start_stop.data[2*d_idx]
         end = self._start_stop.data[2*d_idx + 1]
         tid = self._pid_to_tid.data[d_idx]
         nbrs.c_set_view(
-            &(<UIntArray>self._neighbors[tid]).data[start], 
-            end - start
+            &(<UIntArray>self._neighbors[tid]).data[start], end - start
         )
 
-    cdef void find_all_neighbors(self):
-        if not self._dirty:
-            return
+    cpdef find_all_neighbors(self):
+        cdef long d_idx
+        cdef long np = \
+                self._particles[self._dst_index].get_number_of_particles()
 
-        cdef long d_idx, avg_nnbr
-        cdef int i, length
-        cdef UIntArray start_stop, array_size, pid_to_tid
-        cdef int src_index = self._src_index
+        with nogil, parallel():
+            for d_idx in prange(np):
+                if self._cached.data[d_idx] == 0:
+                    self._find_neighbors(d_idx)
+
+    cpdef update(self):
+        self._update_last_avg_nbr_size()
+        cdef int n_threads = self._n_threads
         cdef int dst_index = self._dst_index
+        cdef size_t i
+        cdef long np = self._particles[dst_index].get_number_of_particles()
+        self._start_stop.resize(np*2)
+        self._pid_to_tid.resize(np)
+        self._cached.resize(np)
+        for i in range(np):
+            self._cached.data[i] = 0
+            self._start_stop.data[2*i] = 0
+            self._start_stop.data[2*i+1] = 0
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
-        cdef long np = self._particles[dst_index].get_number_of_particles()
-        cdef int thread_id
-        cdef int n_threads = self._n_threads
-
-        thread_id = 0
-        start_stop = self._start_stop
-        pid_to_tid = self._pid_to_tid
-        start_stop.resize(np*2)
-        pid_to_tid.resize(np)
-        cdef UIntArray n_done = UIntArray(n_threads)
-
         for i in range(n_threads):
             (<UIntArray>self._neighbors[i]).c_reserve(
                 self._last_avg_nbr_size*np/n_threads + safety
             )
 
-        with nogil, parallel():
-            thread_id = threadid()
-            for d_idx in prange(np):
-                pid_to_tid.data[d_idx] = thread_id
-                start_stop.data[d_idx*2] = \
-                    (<UIntArray>self._neighbors[thread_id]).length
-                self._nnps.find_nearest_neighbors(
-                    d_idx, <UIntArray>self._neighbors[thread_id]
-                )
-                start_stop.data[d_idx*2+1] = \
-                    (<UIntArray>self._neighbors[thread_id]).length
+    #### Private protocol ################################################
 
-        cdef size_t total = 0
-        for i in range(n_threads):
-            total += (<UIntArray>self._neighbors[i]).length
-        self._last_avg_nbr_size = int(total/np) + 1
-        self._dirty = False
+    cdef void _update_last_avg_nbr_size(self):
+        cdef size_t i
+        cdef size_t np = self._pid_to_tid.length
+        cdef UIntArray start_stop = self._start_stop
+        cdef long total = 0
+        for i in range(np):
+            total += start_stop.data[2*i + 1] - start_stop.data[2*i]
+        if total > 0 and np > 0:
+            self._last_avg_nbr_size = int(total/np) + 1
 
-    cpdef update(self):
-        self._dirty = True
+    cdef void _find_neighbors(self, long d_idx) nogil:
+        cdef int thread_id = threadid()
+        self._pid_to_tid.data[d_idx] = thread_id
+        self._start_stop.data[d_idx*2] = \
+            (<UIntArray>self._neighbors[thread_id]).length
+        self._nnps.find_nearest_neighbors(
+            d_idx, <UIntArray>self._neighbors[thread_id]
+        )
+        self._start_stop.data[d_idx*2+1] = \
+            (<UIntArray>self._neighbors[thread_id]).length
+        self._cached.data[d_idx] = 1
 
 
 ##############################################################################
@@ -1086,6 +1095,9 @@ cdef class NNPS:
                                 size_t d_idx, UIntArray nbrs):
         cdef int idx = dst_index*self.narrays + src_index
         if self.use_cache:
+            if self.src_index != src_index \
+                and self.dst_index != dst_index:
+                self.set_context(src_index, dst_index)
             return self.cache[idx].get_neighbors(src_index, d_idx, nbrs)
         else:
             return self.get_nearest_particles_no_cache(
@@ -1169,8 +1181,9 @@ cdef class NNPS:
             # bin the particles
             self._bin( pa_index=i, indices=indices )
 
-        for cache in self.cache:
-            cache.update()
+        if self.use_cache:
+            for cache in self.cache:
+                cache.update()
 
     #### Private protocol ################################################
 
@@ -1730,8 +1743,6 @@ cdef class LinkedListNNPS(NNPS):
         self.next = self.nexts[ src_index ]
         self.head = self.heads[ src_index ]
 
-        if self.use_cache:
-            self.current_cache.find_all_neighbors()
 
     #### Private protocol ################################################
 
