@@ -276,7 +276,7 @@ class XSPHCorrectionForLeapFrog(Equation):
         """
 
         self.eps = eps
-        super(XSPHCorrection, self).__init__(dest, sources)
+        super(XSPHCorrectionForLeapFrog, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_ax, d_ay, d_az):
         d_ax[d_idx] = 0.0
