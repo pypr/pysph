@@ -39,8 +39,10 @@ class Application(object):
 
         Parameters
         ----------
-        fname : file name to use.
-
+        fname : str
+            file name to use.
+        domain : pysph.nnps.DomainManager
+            A domain manager to use. This is used for periodic domains etc.
         """
         self.is_periodic = False
         self.domain = domain
@@ -566,31 +568,22 @@ class Application(object):
 
     def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
               particle_factory=None, *args, **kwargs):
-        """Set the application's solver.  This will call the solver's
-        `setup` method.
+        """Setup the application's solver.
 
-        The following solver options are set:
-
-        dt -- the time step for the solver
-
-        tf -- the final time for the simulationl
-
-        fname -- the file name for output file printing
-
-        freq -- the output print frequency
-
-        level -- the output detail level
-
-        dir -- the output directory
+        This will parse the command line arguments (if this is not called from
+        within an IPython notebook or shell) and then using those parameters
+        and any additional parameters and call the solver's setup method.
 
         Parameters
         ----------
-        solver: The solver instance.
+        solver: pysph.solver.solver.Solver
+            The solver instance.
 
-        equations: list: a list of Groups/Equations.
+        equations: list
+            A list of Groups/Equations.
 
-        nnps: NNPS instance: optional NNPS instance.
-            If none is given a default NNPS is created.
+        nnps: pysph.base.nnps.NNPS
+            Optional NNPS instance. If None is given a default NNPS is created.
 
         inlet_outlet_factory: callable or None
             The `inlet_outlet_factory` is passed a dictionary of the particle
@@ -601,10 +594,25 @@ class Application(object):
             particle arrays returned by the callable. Else particles for the
             solver need to be set before calling this method
 
-        args: extra arguments passed on to the particle_factory.
+        args:
+            extra positional arguments passed on to the `particle_factory`.
 
-        kwargs: extra keyword arguments passed to the particle factory.
+        kwargs:
+            extra keyword arguments passed to the `particle_factory`.
 
+
+        Examples
+        --------
+
+        >>> def create_particles():
+        ...    ...
+        ...
+        >>> solver = Solver(...)
+        >>> equations = [...]
+        >>> app = Application()
+        >>> app.setup(solver=solver, equations=equations,
+        ...           particle_factory=create_particles)
+        >>> app.run()
         """
         start_time = time.time()
         self._solver = solver

@@ -521,11 +521,20 @@ The rest of the steps are the same as above.
 Downloading PySPH
 ------------------
 
-The best way to currently get PySPH is via git_ ::
+One way to install PySPH is to use pip_ ::
+
+    $ pip install PySPH
+
+This will install PySPH, and you should be able to import it and use the
+modules with your Python scripts that use PySPH.  This will not give you
+access to the examples.  The best way to get those is to get PySPH from
+git or download a tarball or ZIP as described below.
+
+To get PySPH using git_ type the following ::
 
     $ git clone https://bitbucket.org/pysph/pysph.git
 
-If you do not have git or do not wish to bother with it, you can get a ZIP or
+If you do not have git_ or do not wish to bother with it, you can get a ZIP or
 tarball from the `pysph site <https://bitbucket.org/pysph/pysph/downloads>`_.
 You can unzip/untar this and use the sources.
 
@@ -553,6 +562,10 @@ Building and Installing PySPH
 -------------------------------
 
 Once you have the dependencies installed you can install PySPH with::
+
+    $ pip install PySPH
+
+If you downloaded PySPH using git or used a tarball you can do::
 
     $ python setup.py install
 
@@ -609,7 +622,7 @@ Once you run the tests, you should see the section on
     We use ``python -m nose.core`` instead of ``nosetests`` as this ensures
     that the right Python executable is used.  ``nostests`` is sometimes
     installed in the system in ``/usr/bin/nosetests`` and running that would
-    pick up the system Python instead of the one in the virtualenv.  This
+    pick up the system Python instead of the one in a virtualenv.  This
     results in incorrect test errors leading to confusion.
 
 

@@ -161,3 +161,14 @@ Earlier developers:
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
 
+
+Support
+-------
+
+If you have any questions or are running into any difficulties with PySPH,
+please email or post your questions on the pysph-users mailing list here:
+https://groups.google.com/d/forum/pysph-users
+
+Please also take a look at the `PySPH issue tracker
+<https://bitbucket.org/pysph/pysph/issues>`_.
+
