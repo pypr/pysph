@@ -162,3 +162,15 @@ History
 .. _SPH2D: https://bitbucket.org/kunalp/sph2d
 .. _PyZoltan: https://bitbucket.org/pysph/pyzoltan
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
+
+
+Support
+-------
+
+If you have any questions or are running into any difficulties with PySPH,
+please email or post your questions on the pysph-users mailing list here:
+https://groups.google.com/d/forum/pysph-users
+
+Please also take a look at the `PySPH issue tracker
+<https://bitbucket.org/pysph/pysph/issues>`_.
+
