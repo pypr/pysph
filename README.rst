@@ -5,8 +5,8 @@ PySPH: a Python-based SPH framework
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in
-`Python <http://www.python.org>`__ and the performance critical parts
-are implemented in `Cython <http://www.cython.org>`__.
+`Python <http://www.python.org>`_ and the performance critical parts
+are implemented in `Cython <http://www.cython.org>`_.
 
 PySPH allows users to write their high-level code in pure Python.  This
 Python code is automatically converted to high-performance Cython which
@@ -14,7 +14,7 @@ is compiled and executed.  PySPH can also be configured to work
 seamlessly with OpenMP and MPI.
 
 The latest documentation for PySPH is available at
-`pysph.readthedocs.org <http://pysph.readthedocs.org>`__.
+`pysph.readthedocs.org <http://pysph.readthedocs.org>`_.
 
 .. |Shippable Status| image:: https://api.shippable.com/projects/540e849c3479c5ea8f9f030e/badge?branchName=master
    :target: https://app.shippable.com/projects/540e849c3479c5ea8f9f030e/builds/latest
@@ -24,17 +24,9 @@ The latest documentation for PySPH is available at
    :target: https://ci.appveyor.com/project/prabhuramachandran/pysph
 
 Here are `videos
-<https://www.youtube.com/playlist?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr>`__
+<https://www.youtube.com/playlist?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr>`_
 of some example problems solved using PySPH.
 
-.. raw:: html
-
-    <div align="left">
-    <iframe width="560" height="315"
-        src="https://www.youtube.com/embed/videoseries?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr"
-        frameborder="0" allowfullscreen>
-    </iframe>
-    </div>
 
 Features
 --------
@@ -46,7 +38,7 @@ Features
   solvers implemented in FORTRAN.
 - Seamless multi-core support with OpenMP.
 - Seamless parallel support using
-  `Zoltan <http://www.cs.sandia.gov/zoltan/>`__.
+  `Zoltan <http://www.cs.sandia.gov/zoltan/>`_.
 
 SPH formulations
 -----------------
@@ -55,16 +47,16 @@ PySPH ships with a variety of standard SPH formulations along with
 basic examples.  Some of the formulations available are:
 
 -  `Weakly Compressible SPH
-   (WCSPH) <http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250>`__
+   (WCSPH) <http://www.tandfonline.com/doi/abs/10.1080/00221686.2010.9641250>`_
    for free-surface flows (Gesteira et al. 2010, Journal of Hydraulic
    Research, 48, pp. 6--27)
 -  `Transport Velocity
-   Formulation <http://dx.doi.org/10.1016/j.jcp.2013.01.043>`__ for
+   Formulation <http://dx.doi.org/10.1016/j.jcp.2013.01.043>`_ for
    incompressilbe fluids (Adami et al. 2013, JCP, 241, pp. 292--307)
 -  `SPH for elastic
-   dynamics <http://dx.doi.org/10.1016/S0045-7825(01)00254-7>`__ (Gray
+   dynamics <http://dx.doi.org/10.1016/S0045-7825(01)00254-7>`_ (Gray
    et al. 2001, CMAME, Vol. 190, pp 6641--6662)
--  `Compressible SPH <http://dx.doi.org/10.1016/j.jcp.2013.08.060>`__
+-  `Compressible SPH <http://dx.doi.org/10.1016/j.jcp.2013.08.060>`_
    (Puri et al. 2014, JCP, Vol. 256, pp 308--333)
 
 Installation
@@ -72,13 +64,13 @@ Installation
 
 Up-to-date details on how to install PySPH on Linux/OS X and Windows are
 available from
-`here <http://pysph.readthedocs.org/en/latest/installation.html>`__.
+`here <http://pysph.readthedocs.org/en/latest/installation.html>`_.
 
 If you wish to see a working build/test script please see our `shippable.yml
-<https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`__.  Or you could
-see the `build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`__
-hosted at `drone.io <http://drone.io>`__ or for Windows platforms see the
-`appveyor.yml <https://bitbucket.org/pysph/pysph/src/master/appveyor.yml>`__.
+<https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`_.  Or you could
+see the `build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`_
+hosted at `drone.io <http://drone.io>`_ or for Windows platforms see the
+`appveyor.yml <https://bitbucket.org/pysph/pysph/src/master/appveyor.yml>`_.
 
 Running the examples
 --------------------
@@ -105,7 +97,7 @@ as::
     $ python dam_break3D.py
 
 This runs the 3D dam-break problem which is also a SPHERIC benchmark
-`Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`__
+`Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`_
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/db3d.png
    :width: 550px
@@ -146,14 +138,14 @@ Credits
 --------
 
 PySPH is primarily developed at the `Department of Aerospace
-Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`__. We are grateful
+Engineering, IIT Bombay <http://www.aero.iitb.ac.in>`_. We are grateful
 to IIT Bombay for their support.  Our primary goal is to build a
 powerful SPH based tool for both application and research. We hope that
 this makes it easy to perform reproducible computational research.
 
 Lead developers:
 
-- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`__
+- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`_
 - Kunal Puri
 
 Earlier developers:
