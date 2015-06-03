@@ -1,6 +1,23 @@
 import numpy
 import os
-from subprocess import check_output
+try:
+    from subprocess import check_output
+except ImportError:
+    # check_output does not exist in Python-2.6
+    from subprocess import Popen, PIPE, CalledProcessError
+    def check_output(*popenargs, **kwargs):
+        if 'stdout' in kwargs:
+            raise ValueError('stdout argument not allowed, it will be overridden.')
+        process = Popen(stdout=PIPE, *popenargs, **kwargs)
+        output, unused_err = process.communicate()
+        retcode = process.poll()
+        if retcode:
+            cmd = kwargs.get("args")
+            if cmd is None:
+                cmd = popenargs[0]
+            raise CalledProcessError(retcode, cmd, output=output)
+        return output
+
 import sys
 from os import path
 
