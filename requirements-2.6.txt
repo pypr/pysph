@@ -1,0 +1,8 @@
+numpy
+setuptools>=3.2
+Cython>=0.20
+mako
+nose>=1.0.0
+ordereddict
+importlib
+unittest2

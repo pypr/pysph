@@ -4,7 +4,11 @@ Copyright (c) 2015, Prabhu Ramachandran
 License: BSD
 """
 import numpy as np
-import unittest
+try:
+    # This is for Python-2.6.x
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from pysph.base.utils import get_particle_array
 from pysph.sph.simple_inlet_outlet import SimpleInlet, SimpleOutlet

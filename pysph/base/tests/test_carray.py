@@ -7,7 +7,11 @@ for one class hould suffice.
 
 
 # standard imports
-import unittest
+try:
+    # This is for Python-2.6.x
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 import numpy
 
 # local imports
