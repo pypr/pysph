@@ -1,5 +1,5 @@
-import numpy
 import os
+from os import path
 try:
     from subprocess import check_output
 except ImportError:
@@ -19,10 +19,12 @@ except ImportError:
         return output
 
 import sys
-from os import path
 
-from setuptools import find_packages, setup
-from Cython.Distutils import build_ext, Extension
+MODE = 'normal'
+if len(sys.argv) >= 2 and ('--help' in sys.argv[1:] or
+        sys.argv[1] in ('--help-commands', 'egg_info', '--version',
+                        'clean')):
+    MODE = 'info'
 
 HAVE_MPI = True
 try:
@@ -67,6 +69,7 @@ def get_openmp_flags():
         return [], []
 
     from textwrap import dedent
+    from Cython.Distutils import Extension
     from pyximport import pyxbuild
     from distutils.errors import CompileError, LinkError
     import shutil
@@ -201,76 +204,101 @@ def get_zoltan_args():
     return zoltan_include_dirs, zoltan_library_dirs
 
 
-openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
-mpi_inc_dirs, mpi_compile_args, mpi_link_args = get_mpi_flags()
-zoltan_include_dirs, zoltan_library_dirs = get_zoltan_args()
+def get_basic_extensions():
+    if MODE == 'info':
+        try:
+            from Cython.Distutils import Extension
+        except ImportError:
+            from distutils.core import Extension
+        try:
+            import numpy
+        except ImportError:
+            include_dirs = []
+        else:
+            include_dirs = [numpy.get_include()]
+            openmp_compile_args, openmp_link_args, openmp_env = [], [], False
+    else:
+        from Cython.Distutils import Extension
+        import numpy
+        include_dirs = [numpy.get_include()]
+        openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
-
-include_dirs = [numpy.get_include()]
-
-cmdclass = {'build_ext': build_ext}
-
-ext_modules = [
-    Extension(
-        name="pyzoltan.core.carray",
-        sources=["pyzoltan/core/carray.pyx"],
-        include_dirs = include_dirs,
-        extra_compile_args=extra_compile_args,
-        language="c++"
-    ),
-
-    Extension(
-        name="pysph.base.particle_array",
-        sources=["pysph/base/particle_array.pyx"],
-        depends=get_deps("pyzoltan/core/carray"),
-        extra_compile_args=extra_compile_args,
-        language="c++"
-    ),
-
-    Extension(
-        name="pysph.base.point",
-        sources=["pysph/base/point.pyx"],
-        extra_compile_args=extra_compile_args,
-        language="c++"
-    ),
-
-    Extension(
-        name="pysph.base.nnps",
-        sources=["pysph/base/nnps.pyx"],
-        depends=get_deps(
-            "pyzoltan/core/carray", "pysph/base/point",
-            "pysph/base/particle_array",
+    ext_modules = [
+        Extension(
+            name="pyzoltan.core.carray",
+            sources=["pyzoltan/core/carray.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++"
         ),
-        extra_compile_args=extra_compile_args + openmp_compile_args,
-        extra_link_args=openmp_link_args,
-        cython_compile_time_env={'OPENMP': openmp_env},
-        language="c++"
-    ),
 
-    # kernels used for tests
-    Extension(
-        name="pysph.base.c_kernels",
-        sources=["pysph/base/c_kernels.pyx"],
-        include_dirs=include_dirs,
-        extra_compile_args=extra_compile_args,
-        language="c++"
-    ),
+        Extension(
+            name="pysph.base.particle_array",
+            sources=["pysph/base/particle_array.pyx"],
+            depends=get_deps("pyzoltan/core/carray"),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++"
+        ),
 
-    # Eigen decomposition code
-    Extension(
-        name="pysph.sph.solid_mech.linalg",
-        sources=["pysph/sph/solid_mech/linalg.pyx"],
-        include_dirs=include_dirs,
-        extra_compile_args=extra_compile_args,
-        language="c++"
-    ),
-]
+        Extension(
+            name="pysph.base.point",
+            sources=["pysph/base/point.pyx"],
+            extra_compile_args=extra_compile_args,
+            include_dirs=include_dirs,
+            language="c++"
+        ),
 
-# add the include dirs for the extension modules
-for ext in ext_modules:
-    ext.include_dirs = include_dirs
+        Extension(
+            name="pysph.base.nnps",
+            sources=["pysph/base/nnps.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/particle_array",
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
 
-if HAVE_MPI:
+        # kernels used for tests
+        Extension(
+            name="pysph.base.c_kernels",
+            sources=["pysph/base/c_kernels.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++"
+        ),
+
+        # Eigen decomposition code
+        Extension(
+            name="pysph.sph.solid_mech.linalg",
+            sources=["pysph/sph/solid_mech/linalg.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++"
+        ),
+    ]
+    return ext_modules
+
+def get_parallel_extensions():
+    if not HAVE_MPI:
+        return []
+
+    if MODE == 'info':
+        from distutils.core import Extension
+        include_dirs = []
+        mpi_inc_dirs, mpi_compile_args, mpi_link_args = [], [], []
+        zoltan_include_dirs, zoltan_library_dirs = [], []
+    else:
+        from Cython.Distutils import Extension
+        import numpy
+        include_dirs = [numpy.get_include()]
+        mpi_inc_dirs, mpi_compile_args, mpi_link_args = get_mpi_flags()
+        zoltan_include_dirs, zoltan_library_dirs = get_zoltan_args()
+
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -338,71 +366,98 @@ if HAVE_MPI:
             language="c++"
         ),
     ]
-
-    ext_modules += zoltan_modules + parallel_modules
-
-if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
-    generator = path.join('pyzoltan', 'core', 'generator.py')
-    for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-        print check_output([sys.executable, generator, pth])
-
-info = {}
-execfile(path.join('pysph', '__init__.py'), info)
-
-extras_require = dict(
-    mpi=['mpi4py>=1.2'],
-    ui=['mayavi>=4.0', 'nose'],
-    test=['nose']
-)
-
-everything = set()
-for dep in extras_require.values(): everything.update(dep)
-extras_require['all'] = everything
+    return zoltan_modules + parallel_modules
 
 
-setup(name='PySPH',
-      version = info['__version__'],
-      author = 'PySPH Developers',
-      author_email = 'pysph-dev@googlegroups.com',
-      description = "A general purpose Smoothed Particle Hydrodynamics framework",
-      long_description = open('README.rst').read(),
-      url = 'http://pysph.bitbucket.org',
-      license = "BSD",
-      keywords = "SPH simulation computational fluid dynamics",
-      test_suite = "nose.collector",
-      packages = find_packages(),
-      package_data = {
-          '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt']
-      },
-      # exclude package data in installation.
-      exclude_package_data={
-          '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
-      },
-      ext_modules = ext_modules,
-      include_package_data = True,
-      cmdclass=cmdclass,
-      install_requires = ['numpy', 'mako', 'Cython>=0.20'],
-      extras_require = extras_require,
-      zip_safe = False,
-      entry_points = """
-          [console_scripts]
-          pysph_viewer = pysph.tools.mayavi_viewer:main
-          """,
-      platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
-      classifiers = [c.strip() for c in """\
-        Development Status :: 3 - Alpha
-        Environment :: Console
-        Intended Audience :: Developers
-        Intended Audience :: Science/Research
-        License :: OSI Approved :: BSD License
-        Natural Language :: English
-        Operating System :: MacOS :: MacOS X
-        Operating System :: Microsoft :: Windows
-        Operating System :: POSIX
-        Operating System :: Unix
-        Programming Language :: Python
-        Topic :: Scientific/Engineering
-        Topic :: Scientific/Engineering :: Physics
-        Topic :: Software Development :: Libraries
-        """.splitlines() if len(c.split()) > 0],
-      )
+def create_sources():
+    if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
+        generator = path.join('pyzoltan', 'core', 'generator.py')
+        for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
+            print check_output([sys.executable, generator, pth])
+
+
+def setup_package():
+    from setuptools import find_packages, setup
+    if MODE == 'info':
+        cmdclass = {}
+    else:
+        from Cython.Distutils import build_ext
+        cmdclass = {'build_ext': build_ext}
+
+    create_sources()
+
+    # Extract the version information from pysph/__init__.py
+    info = {}
+    execfile(path.join('pysph', '__init__.py'), info)
+
+    # The requirements.
+    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=3.2']
+    if sys.version_info[:2] == (2, 6):
+        install_requires += [
+            'ordereddict', 'importlib', 'unittest2'
+        ]
+
+    extras_require = dict(
+        mpi=['mpi4py>=1.2'],
+        ui=['mayavi>=4.0', 'nose'],
+        test=['nose>=1.0.0']
+    )
+
+    everything = set()
+    for dep in extras_require.values():
+        everything.update(dep)
+    extras_require['all'] = everything
+
+    ext_modules = get_basic_extensions() + get_parallel_extensions()
+
+
+    setup(name='PySPH',
+          version = info['__version__'],
+          author = 'PySPH Developers',
+          author_email = 'pysph-dev@googlegroups.com',
+          description = "A general purpose Smoothed Particle Hydrodynamics framework",
+          long_description = open('README.rst').read(),
+          url = 'http://pysph.bitbucket.org',
+          license = "BSD",
+          keywords = "SPH simulation computational fluid dynamics",
+          test_suite = "nose.collector",
+          packages = find_packages(),
+          package_data = {
+              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt']
+          },
+          # exclude package data in installation.
+          exclude_package_data = {
+              '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
+          },
+          ext_modules = ext_modules,
+          include_package_data = True,
+          cmdclass = cmdclass,
+          install_requires = install_requires,
+          extras_require = extras_require,
+          zip_safe = False,
+          entry_points = """
+              [console_scripts]
+              pysph_viewer = pysph.tools.mayavi_viewer:main
+              """,
+          platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
+          classifiers = [c.strip() for c in """\
+            Development Status :: 3 - Alpha
+            Environment :: Console
+            Intended Audience :: Developers
+            Intended Audience :: Science/Research
+            License :: OSI Approved :: BSD License
+            Natural Language :: English
+            Operating System :: MacOS :: MacOS X
+            Operating System :: Microsoft :: Windows
+            Operating System :: POSIX
+            Operating System :: Unix
+            Programming Language :: Python
+            Topic :: Scientific/Engineering
+            Topic :: Scientific/Engineering :: Physics
+            Topic :: Software Development :: Libraries
+            """.splitlines() if len(c.split()) > 0],
+          )
+
+if __name__ == '__main__':
+    setup_package()
+
