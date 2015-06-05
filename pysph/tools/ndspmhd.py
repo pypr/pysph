@@ -1,10 +1,9 @@
 """Utility functions to read Daniel Price's NDSPMHD solution files"""
 
 import struct
-import numpy
 from pysph.base.utils import get_particle_array_gasd as gpa
 
-from fortranfile import FortranFile
+from .fortranfile import FortranFile
 
 def ndspmhd2pysph(fname, dim=2, read_type=False):
     """Read output data file from NDSPMHD

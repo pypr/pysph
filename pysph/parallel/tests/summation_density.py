@@ -251,4 +251,4 @@ if rank == 0:
         assert condition, "diff = %g"%(diff)
 
 if rank == 0:
-    print "Summation density test: OK"
+    print("Summation density test: OK")

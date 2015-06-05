@@ -4,7 +4,7 @@ except ImportError:
     from ordereddict import OrderedDict
 
 import numpy
-from particle_array import ParticleArray, \
+from .particle_array import ParticleArray, \
     get_local_tag, get_remote_tag, get_ghost_tag
 
 from pyzoltan.core.carray import LongArray
@@ -73,7 +73,7 @@ def get_particle_array(additional_props=None, constants=None, **props):
     """
 
     # handle the name separately
-    if props.has_key('name'):
+    if 'name' in props:
         name = props['name']
         props.pop('name')
     else:
@@ -172,7 +172,7 @@ def get_particle_array_wcsph(constants=None, **props):
     """
 
     # handle the name separately
-    if props.has_key('name'):
+    if 'name' in props:
         name = props['name']
         props.pop('name')
     else:
@@ -437,13 +437,13 @@ def get_particles_info(particles):
     info = OrderedDict()
     for parray in particles:
         prop_info = {}
-        for prop_name, prop in parray.properties.iteritems():
+        for prop_name, prop in parray.properties.items():
             prop_info[prop_name] = {
                 'name':prop_name, 'type':prop.get_c_type(),
                 'default':parray.default_values[prop_name],
                 'data':None}
         const_info = {}
-        for c_name, value in parray.constants.iteritems():
+        for c_name, value in parray.constants.items():
             const_info[c_name] = value.get_npy_array()
         info[ parray.name ] = dict(
             properties=prop_info, constants=const_info,
@@ -455,7 +455,7 @@ def get_particles_info(particles):
 def create_dummy_particles(info):
     """Returns a replica (empty) of a list of particles"""
     particles = []
-    for name, pa_data in info.iteritems():
+    for name, pa_data in info.items():
         prop_dict = pa_data['properties']
         constants = pa_data['constants']
         pa = ParticleArray(name=name, constants=constants, **prop_dict)

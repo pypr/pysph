@@ -39,24 +39,24 @@ senddata = x[ object_ids ]
 recvdata = np.ones( zcomm.nreturn )
 
 # use zoltan to exchange doubles
-print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+print("Proc %d, Sending %s to %s"%(rank, senddata, proclist))
 zcomm.Comm_Do(senddata, recvdata)
-print "Proc %d, Received %s"%(rank, recvdata)
+print("Proc %d, Received %s"%(rank, recvdata))
 
 # use zoltan to exchange unsigned ints
 senddata = gids[ object_ids ]
 recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
 zcomm.set_nbytes(recvdata.itemsize, recvdata.dtype)
 
-print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+print("Proc %d, Sending %s to %s"%(rank, senddata, proclist))
 zcomm.Comm_Do(senddata, recvdata)
-print "Proc %d, Received %s"%(rank, recvdata)
+print("Proc %d, Received %s"%(rank, recvdata))
 
 # Test the Comm Reverse function
 # modify the received data
 recvdata[:] = rank
 
 updated_info = np.zeros(zcomm.nsend, dtype=senddata.dtype)
-print 'Proc %d, sending updated data %s'%(rank, recvdata)
+print('Proc %d, sending updated data %s'%(rank, recvdata))
 zcomm.Comm_Do_Reverse(recvdata, updated_info)
-print 'Proc %d, received updated data %s'%(rank, updated_info)
+print('Proc %d, received updated data %s'%(rank, updated_info))

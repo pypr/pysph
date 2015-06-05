@@ -103,7 +103,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
 
         # check each cell for it's contents
         for key in cells:
-            self.assertTrue( nnps.cells.has_key(key) )
+            self.assertTrue( key in nnps.cells )
 
             cell = nnps.cells.get(key)
 
@@ -341,7 +341,7 @@ def test_large_number_of_neighbors():
     nps = nnps.LinkedListNNPS(dim=3, particles=[pa], cache=False)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
-    print nbrs.length
+    # print(nbrs.length)
     assert nbrs.length == len(x)
 
 

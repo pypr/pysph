@@ -401,7 +401,7 @@ class Gmsh(object):
 
     #### Private Protocol #################################
     def _ask_user_for_gmsh(self):
-        gmsh = raw_input('Please provide the path to gmsh executable: ')
+        gmsh = input('Please provide the path to gmsh executable: ')
         return gmsh
 
     def _read_config(self):
@@ -450,8 +450,8 @@ def example_cube(fp=sys.stdout):
 def example_plot_3d_p(gmsh):
     """Note: this will only work if you have gmsh installed.
     """
-    import StringIO
-    fp = StringIO.StringIO()
+    import io
+    fp = io.StringIO()
     ex = example_3d_p(fp)
     g = Gmsh(gmsh)
     x, y, z = g.get_points([ex])

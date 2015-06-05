@@ -9,6 +9,8 @@ When used to locate source files as a main program:
     Example: `carray.pyx.mako` is generated into `carray.pyx`
 '''
 
+from __future__ import print_function
+
 import glob
 import os
 import sys
@@ -61,12 +63,12 @@ def main(paths=None):
 if __name__ == '__main__':
     import sys
     if '--help' in sys.argv or '-h' in sys.argv:
-        print 'usage:'
-        print '    generator.py [filenames]'
-        print
+        print('usage:')
+        print('    generator.py [filenames]')
+        print()
         print('    Convert template files with extension .mako into '
                'source files')
-        print ('    If filenames is omitted all .mako files in current '
+        print('    If filenames is omitted all .mako files in current '
         'directory will be converted')
 
     else:

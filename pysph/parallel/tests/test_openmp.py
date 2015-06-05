@@ -8,7 +8,7 @@ This is done till better strategy for parallel testing is implemented
 
 from nose.plugins.attrib import attr
 
-from example_test_case import ExampleTestCase
+from .example_test_case import ExampleTestCase
 
 def skip_if_no_openmp():
     from pysph.base.nnps import get_number_of_threads

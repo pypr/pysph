@@ -142,7 +142,7 @@ class PySPH2VTK(object):
             raise RuntimeError('Cannot generate VTK output!')
 
         # check if the array is legal
-        if array_name not in self.array_dict.keys():
+        if array_name not in list(self.array_dict.keys()):
             raise RuntimeError('Array %s not defined'%array_name)
 
         # create a list of props

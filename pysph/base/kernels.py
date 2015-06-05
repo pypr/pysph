@@ -13,7 +13,7 @@ def get_correction(kernel, h0):
 def get_compiled_kernel(kernel):
     """Given a kernel, return a high performance wrapper kernel.
     """
-    import c_kernels
+    from pysph.base import c_kernels
     cls = getattr(c_kernels, kernel.__class__.__name__)
     wrapper = getattr(c_kernels, kernel.__class__.__name__ + 'Wrapper')
     kern = cls(**kernel.__dict__)

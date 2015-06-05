@@ -1,4 +1,5 @@
 ''' convert pysph .npz output to vtk file format '''
+from __future__ import print_function
 import os
 import re
 
@@ -51,13 +52,13 @@ def write_vtk(data, filename, scalars=None, vectors={'V':('u','v','w')}, tensors
         pd.scalars.name = v
         sg.point_data.add_array(pd.scalars)
 
-    for vec,vec_vars in vectors.iteritems():
+    for vec,vec_vars in vectors.items():
         u,v,w = [data[i] for i in vec_vars]
         pd.vectors = c_[ravel(u),ravel(v),ravel(w)]
         pd.vectors.name = vec
         sg.point_data.add_array(pd.vectors)
 
-    for ten,ten_vars in tensors.iteritems():
+    for ten,ten_vars in tensors.items():
         vars = [data[i] for i in ten_vars]
         tensors = c_[[ravel(i) for i in vars]].T
         pd.tensors = tensors
@@ -91,7 +92,7 @@ def detect_vectors_tensors(keys):
     vectors = {}
     tensors = {}
 
-    for n,l in d.iteritems():
+    for n,l in d.items():
         if n<2:
             continue
         l.sort()
@@ -205,11 +206,11 @@ def pysph_to_vtk(path, merge_procs=False, skip_existing=True, binary=True):
 
     if merge_procs is True:
         # FIXME: implement
-        raise NotImplementedError, 'merge_procs=True not implemented yet'
+        raise NotImplementedError('merge_procs=True not implemented yet')
 
     solvers = get_output_details(path)
-    for solver, (procs, entities, times) in solvers.iteritems():
-        print 'converting solver:', solver
+    for solver, (procs, entities, times) in solvers.items():
+        print('converting solver:', solver)
         dir = os.path.join(path,solver+'_vtk')
         if not os.path.exists(dir):
             os.mkdir(dir)
@@ -219,20 +220,20 @@ def pysph_to_vtk(path, merge_procs=False, skip_existing=True, binary=True):
         times_file = open(os.path.join(dir,'times'), 'w')
 
         for entity in entities:
-            print '    entity:', entity
+            print('    entity:', entity)
             for proc in procs:
-                print '        proc:', proc
-                print '        timesteps:', len(times)
+                print('        proc:', proc)
+                print('        timesteps:', len(times))
                 f = '%s_%s_%s_'%(solver,proc,entity)
                 of = os.path.join(dir,f)
 
                 for i, time in enumerate(times):
-                    print '\r',i,
+                    print('\r',i,)
                     if skip_existing and os.path.exists(f+str(i)):
                         continue
                     d = load(os.path.join(path, f+time+'.npz'))
                     arrs = {}
-                    for nam,val in d.iteritems():
+                    for nam,val in d.items():
                         if val.ndim > 0:
                             arrs[nam] = val
                     d.close()
@@ -257,8 +258,8 @@ def extract_text(path, particle_idx, props=['x','y','u','v','p','rho','sigma00',
     else:
         solvers = get_output_details(path)
 
-    for solver, (procs, entities, times) in solvers.iteritems():
-        print 'converting solver:', solver
+    for solver, (procs, entities, times) in solvers.items():
+        print('converting solver:', solver)
         dir = os.path.join(path,solver+'_vtk')
         if not os.path.exists(dir):
             os.mkdir(dir)
@@ -272,18 +273,18 @@ def extract_text(path, particle_idx, props=['x','y','u','v','p','rho','sigma00',
         for entity in entities:
             if entity not in e:
                 continue
-            print '    entity:', entity
+            print('    entity:', entity)
             for proc in procs:
-                print '        proc:', proc
-                print '        timesteps:', len(times)
+                print('        proc:', proc)
+                print('        timesteps:', len(times))
                 f = '%s_%s_%s_'%(solver,proc,entity)
                 of = os.path.join(dir,f)
                 files = [open(os.path.join(path,f+'%d.dat'%particle_id), 'w') for particle_id in particle_idx]
-                print files
+                print(files)
                 for file in files:
                     file.write('i\tt\t'+'\t'.join(props))
                 for i, time in enumerate(times):
-                    print '\r',i,
+                    print('\r',i,)
                     d = load(os.path.join(path, f+time+'.npz'))
                     s = '\n%d\t%s'%(i,time)
                     for j,file in enumerate(files):

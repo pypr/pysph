@@ -152,9 +152,9 @@ def get_mpi_flags():
             link_args = check_output([mpic, '--showme:link']).strip()
             compile_args = check_output([mpic, '--showme:compile']).strip()
     except:
-        print '-'*80
-        print "Unable to run mpic++ correctly, skipping parallel build"
-        print '-'*80
+        print('-'*80)
+        print("Unable to run mpic++ correctly, skipping parallel build")
+        print('-'*80)
         HAVE_MPI = False
     else:
         mpi_link_args.extend(link_args.split())
@@ -299,6 +299,11 @@ def get_parallel_extensions():
         mpi_inc_dirs, mpi_compile_args, mpi_link_args = get_mpi_flags()
         zoltan_include_dirs, zoltan_library_dirs = get_zoltan_args()
 
+    # We should check again here as HAVE_MPI may be set to False when we try to
+    # get the MPI flags and are not successful.
+    if not HAVE_MPI:
+        return []
+
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -373,7 +378,7 @@ def create_sources():
     if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
         generator = path.join('pyzoltan', 'core', 'generator.py')
         for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-            print check_output([sys.executable, generator, pth])
+            print(check_output([sys.executable, generator, pth]).decode())
 
 
 def setup_package():
@@ -388,7 +393,8 @@ def setup_package():
 
     # Extract the version information from pysph/__init__.py
     info = {}
-    execfile(path.join('pysph', '__init__.py'), info)
+    module = path.join('pysph', '__init__.py')
+    exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
     install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=3.2']
@@ -452,6 +458,7 @@ def setup_package():
             Operating System :: POSIX
             Operating System :: Unix
             Programming Language :: Python
+            Programming Language :: Python :: 3
             Topic :: Scientific/Engineering
             Topic :: Scientific/Engineering :: Physics
             Topic :: Software Development :: Libraries

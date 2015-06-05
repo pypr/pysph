@@ -141,7 +141,7 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         y = dest_pa.y
         p = dest_pa.p
         h = dest_pa.h
-        print x, y
+        print(x, y)
         self.assertEqual(self.dest_pa.get_number_of_particles(), 9)
 
         # Calculate the expected positions.

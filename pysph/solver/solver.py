@@ -9,7 +9,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
 
-from utils import FloatPBar, load, dump
+from pysph.solver.utils import FloatPBar, load, dump
 
 import logging
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ class Solver(object):
         self.force_output = False
 
         # Set all extra keyword arguments
-        for attr, value in kwargs.iteritems():
+        for attr, value in kwargs.items():
             if hasattr(self, attr):
                 setattr(self, attr, value)
             else:
@@ -264,7 +264,7 @@ class Solver(object):
         """ Append the particle arrays to the existing particle arrays
         """
         if not self.particles:
-            print 'Warning! Particles not defined.'
+            print('Warning! Particles not defined.')
             return
 
         for array in self.particles:

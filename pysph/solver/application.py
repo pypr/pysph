@@ -11,7 +11,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
-from utils import mkdir, load
+from pysph.solver.utils import mkdir, load
 
 # conditional parallel imports
 from pysph import Has_MPI, Has_Zoltan
@@ -771,8 +771,8 @@ class Application(object):
                     try_next_port = False
                 port = int(port)
 
-                interface = MultiprocessingInterface((host,port), authkey,
-                                                     try_next_port)
+                interface = MultiprocessingInterface(
+                    (host,port), authkey.encode(), try_next_port)
 
                 self.command_manager.add_interface(interface.start)
 
@@ -799,8 +799,8 @@ class Application(object):
             return
         if self.num_procs == 1:
             logger.info(msg)
-            print msg
+            print(msg)
         elif (self.num_procs > 1 and self.rank in (0,1)):
             s = "Rank %d: %s"%(self.rank, msg)
             logger.info(s)
-            print s
+            print(s)

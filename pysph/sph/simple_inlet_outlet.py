@@ -95,7 +95,7 @@ class SimpleInlet(object):
     def _create_inlet_particles(self):
         props =  self.inlet_pa.get_property_arrays()
         inlet_props = {}
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             new_array = np.array([], dtype=array.dtype)
             for i in range(1, self.n):
                 if prop == self.axis:
@@ -128,7 +128,7 @@ class SimpleInlet(object):
 
         # adding particles to the destination array.
         props = inlet_pa.get_property_arrays()
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             pa_add[prop] = np.array(array[all_idx])
         self.dest_pa.add_particles(**pa_add)
 
@@ -182,7 +182,7 @@ class SimpleOutlet(object):
         # adding particles to the destination array.
         pa_add = {}
         props = source_pa.get_property_arrays()
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             pa_add[prop] = np.array(array[idx])
         outlet_pa.add_particles(**pa_add)
 

@@ -5,11 +5,16 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 import inspect
 import logging
 from mako.template import Template
 from textwrap import dedent
 import types
+
 
 from pysph.base.ast_utils import get_assigned, has_return
 from pysph.base.config import get_config
@@ -26,11 +31,11 @@ class CythonClassHelper(object):
     def generate(self):
         template = dedent("""
 cdef class ${class_name}:
-    %for name, type in public_vars.iteritems():
+    %for name, type in public_vars.items():
     cdef public ${type} ${name}
     %endfor
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
 %for defn, body in methods:
@@ -62,7 +67,11 @@ def get_func_definition(sourcelines):
 def all_numeric(seq):
     """Return true if all values in given sequence are numeric.
     """
-    return all(type(x) in [int, float, long] for x in seq)
+    try:
+        types = [int, float, long]
+    except NameError:
+        types = [int, float]
+    return all(type(x) in types for x in seq)
 
 class CodeGenerationError(Exception):
     pass
@@ -244,7 +253,7 @@ class CythonGenerator(object):
         dedented_body = dedent(body)
         symbols = get_assigned(dedented_body)
         undefined = symbols - set(declared) - args
-        declare = [indent +'cdef double %s\n'%x for x in undefined]
+        declare = [indent +'cdef double %s\n'%x for x in sorted(undefined)]
         code = ''.join(declare) + cython_body
         return code
 
@@ -265,8 +274,8 @@ class CythonGenerator(object):
     def _get_public_vars(self, obj):
         # For now get it all from the dict.
         data = obj.__dict__
-        vars = dict((name, self.detect_type(name, data[name]))
-                        for name in sorted(data.keys()))
+        vars = OrderedDict((name, self.detect_type(name, data[name]))
+                            for name in sorted(data.keys()))
         return vars
 
     def _get_py_method_spec(self, name, returns, args, indent=' '*8):

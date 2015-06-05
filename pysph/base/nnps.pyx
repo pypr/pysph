@@ -1500,7 +1500,7 @@ cdef class DictBoxSortNNPS(NNPS):
             #gindices.append( gid.data[i] )
 
         self.n_cells = <int>len(cells)
-        self._cell_keys = cells.keys()
+        self._cell_keys = list(cells.keys())
 
 
 #############################################################################
