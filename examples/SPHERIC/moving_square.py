@@ -183,10 +183,10 @@ def create_particles(hcp=False, **kwargs):
 
     fluid.remove_particles(indices)
 
-    print "SPHERIC benchmark 6 :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
+    print("SPHERIC benchmark 6 :: Re = %d, nfluid = %d, nsolid=%d, nobstacle = %d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
         solid.get_number_of_particles(),
-        obstacle.get_number_of_particles(), dt)
+        obstacle.get_number_of_particles(), dt))
 
     # setup requisite particle properties and initial conditions
 

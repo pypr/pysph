@@ -58,8 +58,8 @@ def create_particles(**kwargs):
     for prop in ('color', 'ax', 'ay', 'az', 'u0', 'v0'):
         fluid.add_property(name=prop)
 
-    print "Advection mixing problem :: nfluid = %d"%(
-        fluid.get_number_of_particles())
+    print("Advection mixing problem :: nfluid = %d"%(
+        fluid.get_number_of_particles()))
 
     # setup the particle properties
     pi = np.pi; cos = np.cos; sin=np.sin

@@ -73,9 +73,9 @@ def create_particles(**kwargs):
     channel = get_particle_array(name='channel', x=cx, y=cy)
     fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
-    print "Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
+    print("Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
-        channel.get_number_of_particles(), dt)
+        channel.get_number_of_particles(), dt))
 
     # add requisite properties to the arrays:
     # particle volume
@@ -122,8 +122,8 @@ def create_particles(**kwargs):
     channel.h[:] = hdx * dx
 
     # load balancing props
-    fluid.set_lb_props( fluid.properties.keys() )
-    channel.set_lb_props( channel.properties.keys() )
+    fluid.set_lb_props( list(fluid.properties.keys()) )
+    channel.set_lb_props( list(channel.properties.keys()) )
 
     # return the particle list
     return [fluid, channel]
