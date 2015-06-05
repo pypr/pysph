@@ -1,6 +1,8 @@
 """Clone of the Zoltan tests for the geometric partitioners (RCB, RIB
 and HSFC)"""
 
+from __future__ import print_function
+
 from os.path import abspath, dirname, join
 import sys
 
@@ -125,13 +127,13 @@ def show_mesh(rank, numPoints, gids, parts):
             for j in range(5):
                 part = allPartAssign[i+j]
                 if j < 4:
-                    print "%d----"%(part),
+                    print("%d----"%(part),)
                 else:
-                    print "%d"%(part)
+                    print("%d"%(part))
             if i > 0:
-                print ("|     |     |     |     |")
+                print("|     |     |     |     |")
 
-        print ""
+        print()
 
 # read the input file and distribute objects across processors
 numMyPoints, myGlobalIds, x, y = read_input_file()
@@ -161,7 +163,7 @@ pz.Zoltan_Set_Param("DEBUG_LEVEL","0")
 pz.Zoltan_LB_Balance()
 
 if rank == 0:
-    print "\nMesh partition before Zoltan\n"
+    print("\nMesh partition before Zoltan\n")
 
 comm.barrier()
 
@@ -171,6 +173,6 @@ for i in range(pz.numExport):
     parts[ pz.exportLocalids[i] ] = pz.exportProcs[i]
 
 if rank == 0:
-    print "Mesh partition assignment after calling Zoltan"
+    print("Mesh partition assignment after calling Zoltan")
 
 show_mesh(rank, numMyPoints, myGlobalIds, parts)

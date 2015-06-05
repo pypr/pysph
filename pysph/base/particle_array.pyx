@@ -3,8 +3,6 @@
 A `ParticleArray` represents a collection of particles.
 
 """
-cdef extern from "string.h":
-    int strcmp(char *s1, char *s2)
 
 # logging imports
 import logging
@@ -142,7 +140,7 @@ cdef class ParticleArray:
 
         self.constants = {}
         if constants is not None:
-            for const, data in constants.iteritems():
+            for const, data in constants.items():
                 self.add_constant(name=const, data=data)
 
         # default lb_props are all the arrays
@@ -158,8 +156,7 @@ cdef class ParticleArray:
         care on using this numpy array.
 
         """
-        keys = self.properties.keys()
-        if name in keys:
+        if name in self.properties:
             return self._get_real_particle_prop(name)
         elif name in self.constants:
             return self.constants[name].get_npy_array()
@@ -179,7 +176,7 @@ cdef class ParticleArray:
         props = {}
         default_values = {}
 
-        for prop, arr in self.properties.iteritems():
+        for prop, arr in self.properties.items():
             pinfo = {}
             pinfo['name'] = prop
             pinfo['type'] = arr.get_c_type()
@@ -190,7 +187,7 @@ cdef class ParticleArray:
         d['properties'] = props
 
         props = {}
-        for prop, arr in self.constants.iteritems():
+        for prop, arr in self.constants.items():
             pinfo = dict(name=prop, data=arr)
             props[prop] = pinfo
 
@@ -252,7 +249,7 @@ cdef class ParticleArray:
             return
 
         # add the properties
-        for name, prop in props.iteritems():
+        for name, prop in props.items():
             if isinstance(prop, dict):
                 prop_info = prop
                 prop_info['name'] = name
@@ -337,7 +334,7 @@ cdef class ParticleArray:
         # the list of properties
         props = self.output_property_arrays
         if all or len(props) == 0:
-            props = self.properties.keys()
+            props = list(self.properties.keys())
 
         # number of particles
         num_particles = self.get_number_of_particles(only_real)
@@ -388,7 +385,7 @@ cdef class ParticleArray:
         explicitly set by the user, return all of the properties.
         """
         if self.lb_props is None:
-            return self.properties.keys()
+            return list(self.properties.keys())
         else:
             return self.lb_props
 
@@ -397,8 +394,8 @@ cdef class ParticleArray:
         if real:
             return self.num_real_particles
         else:
-            if len(self.properties.values()) > 0:
-                prop0 = self.properties.values()[0]
+            if len(self.properties) > 0:
+                prop0 = list(self.properties.values())[0]
                 return prop0.length
             else:
                 return 0
@@ -451,9 +448,9 @@ cdef class ParticleArray:
             raise ValueError, msg
 
         sorted_indices = numpy.sort(index_list.get_npy_array())
-        num_arrays = len(self.properties.keys())
+        num_arrays = len(self.properties)
 
-        property_arrays = self.properties.values()
+        property_arrays = list(self.properties.values())
 
         for i in range(num_arrays):
             prop_array = property_arrays[i]
@@ -516,10 +513,10 @@ cdef class ParticleArray:
             return 0
 
         # check if the input properties are valid.
-        for prop in particle_props.keys():
+        for prop in particle_props:
             self._check_property(prop)
 
-        num_extra_particles = len(particle_props.values()[0])
+        num_extra_particles = len(list(particle_props.values())[0])
         old_num_particles = self.get_number_of_particles()
         new_num_particles = num_extra_particles + old_num_particles
 
@@ -561,7 +558,7 @@ cdef class ParticleArray:
         # extend current arrays by the required number of particles
         self.extend(num_extra_particles)
 
-        for prop_name in parray.properties.keys():
+        for prop_name in parray.properties:
             if PyDict_Contains(self.properties, prop_name):
                 arr = <BaseArray>PyDict_GetItem(self.properties, prop_name)
             else:
@@ -608,7 +605,7 @@ cdef class ParticleArray:
         cdef BaseArray arr
         cdef numpy.ndarray nparr
 
-        for key in self.properties.keys():
+        for key in self.properties:
             arr = self.properties[key]
             arr.resize(new_size)
             nparr = arr.get_npy_array()
@@ -714,14 +711,14 @@ cdef class ParticleArray:
         cdef str prop
         cdef BaseArray prop_array
         cdef int nprops = len(props)
-        cdef list prop_names = props.keys()
+        cdef list prop_names = list(props.keys())
         cdef int i
 
         for i in range(nprops):
             prop = prop_names[i]
             self._check_property(prop)
 
-        for prop in props.keys():
+        for prop in props:
             proparr = numpy.asarray(props[prop])
             if self.properties.has_key(prop):
                 prop_array = self.properties[prop]
@@ -861,7 +858,7 @@ cdef class ParticleArray:
                 # particles are currently present. First resize the current
                 # properties to this new length, and then add this new
                 # property.
-                for prop in self.properties.keys():
+                for prop in self.properties:
                     arr = self.properties[prop]
                     arr.resize(len(data))
                     arr.get_npy_array()[:] = self.default_values[prop]
@@ -938,19 +935,19 @@ cdef class ParticleArray:
         cdef BaseArray arr
         if data_type == None:
             arr = DoubleArray(size)
-        elif strcmp(PyString_AsString(data_type), 'double') == 0:
+        elif data_type == 'double':
             arr = DoubleArray(size)
-        elif strcmp(PyString_AsString(data_type), 'long') == 0:
+        elif data_type == 'long':
             arr = LongArray(size)
-        elif strcmp(PyString_AsString(data_type), 'float') == 0:
+        elif data_type == 'float':
             arr = FloatArray(size)
-        elif strcmp(PyString_AsString(data_type), 'int') == 0:
+        elif data_type == 'int':
             arr = IntArray(size)
-        elif strcmp(PyString_AsString(data_type), 'unsigned int') == 0:
+        elif data_type == 'unsigned int':
             arr = UIntArray(size)
         else:
             logger.error('Trying to create carray of unknown '
-                   'datatype: %s' %PyString_AsString(data_type))
+                   'datatype: %s' %data_type)
 
         if size > 0:
             arr.get_npy_array()[:] = default
@@ -1066,7 +1063,7 @@ cdef class ParticleArray:
         self.num_real_particles = num_real_particles
         # we now have the aligned indices. Rearrage the particles particles
         # accordingly.
-        arrays = self.properties.values()
+        arrays = list(self.properties.values())
         num_arrays = len(arrays)
 
         for i in range(num_arrays):
@@ -1115,7 +1112,7 @@ cdef class ParticleArray:
         cdef str prop_type, prop
 
         if props is None:
-            prop_names = self.properties.keys()
+            prop_names = list(self.properties.keys())
         else:
             prop_names = props
 
@@ -1266,7 +1263,7 @@ cdef class ParticleArray:
 
     cpdef resize(self, long size):
         """Resize all arrays to the new size"""
-        for prop, array in self.properties.iteritems():
+        for prop, array in self.properties.items():
             array.resize(size)
 
     ######################################################################

@@ -98,9 +98,9 @@ def create_particles(**kwargs):
                 indices.append(i)
     solid.remove_particles(indices)
 
-    print "Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
+    print("Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
         fluid.get_number_of_particles(),
-        solid.get_number_of_particles(), dt)
+        solid.get_number_of_particles(), dt))
 
     ###### ADD PARTICLE PROPS SPH ######
 

@@ -52,7 +52,7 @@ def get_all_array_names(particle_arrays):
     props = defaultdict(set)
     for array in particle_arrays:
         for properties in (array.properties, array.constants):
-            for name, arr in properties.iteritems():
+            for name, arr in properties.items():
                 a_type = arr.__class__.__name__
                 props[a_type].add(name)
     return dict(props)
@@ -88,7 +88,7 @@ def get_known_types_for_arrays(array_names):
 
     """
     result = {}
-    for arr_type, arrays in array_names.iteritems():
+    for arr_type, arrays in array_names.items():
         c_type = getattr(carray, arr_type)().get_c_type()
         for arr in arrays:
             known_type = KnownType(c_type + '*')
@@ -194,14 +194,14 @@ class AccelerationEvalCythonHelper(object):
             dest_arrays.update(d)
         lines = ['NP_DEST = self.%s.size(real=%s)'%(dest_name, real)]
         lines += ['%s = dst.%s.data'%(n, n[2:])
-                 for n in dest_arrays]
+                  for n in sorted(dest_arrays)]
         return '\n'.join(lines)
 
     def get_src_array_setup(self, src_name, eq_group):
         src_arrays, dest = eq_group.get_array_names()
         lines = ['NP_SRC = self.%s.size()'%src_name]
         lines += ['%s = src.%s.data'%(n, n[2:])
-                 for n in src_arrays]
+                 for n in sorted(src_arrays)]
         return '\n'.join(lines)
 
     def get_parallel_block(self):

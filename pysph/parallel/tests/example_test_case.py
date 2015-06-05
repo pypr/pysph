@@ -38,7 +38,7 @@ class ExampleTestCase(unittest.TestCase):
             return arg.replace('_', '-')
 
         cmd_line = []
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             option = _key_to_option(key)
             if value is None:
                 arg = "--{option}".format(option=option)

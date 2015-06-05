@@ -160,8 +160,8 @@ def create_particles(**kwargs):
     for name in ['ug','vg','wg']:
         wall.add_property(name)
 
-    print "2D KHI with %d fluid particles and %d wall particles"%(
-            fluid.get_number_of_particles(), wall.get_number_of_particles())
+    print("2D KHI with %d fluid particles and %d wall particles"%(
+            fluid.get_number_of_particles(), wall.get_number_of_particles()))
 
     return [fluid, wall]
     

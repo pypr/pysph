@@ -1,12 +1,17 @@
+# Standard library imports
+from functools import reduce
 
+# Library imports.
 import numpy as np
-from pysph.base.utils import get_particle_array
 
+# Package imports.
+from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
+
 
 class InterpolateFunction(Equation):
     def initialize(self, d_idx, d_prop, d_number_density):
@@ -292,14 +297,14 @@ class Interpolator(object):
 
 def main(fname, prop, npoint):
     from pysph.solver.utils import load
-    print "Loading", fname
+    print("Loading", fname)
     data = load(fname)
-    arrays = data['arrays'].values()
+    arrays = list(data['arrays'].values())
     interp = Interpolator(arrays, num_points=npoint)
-    print interp.shape
-    print "Interpolating"
+    print(interp.shape)
+    print("Interpolating")
     prop = interp.interpolate(prop)
-    print "Visualizing"
+    print("Visualizing")
     from mayavi import mlab
     src = mlab.pipeline.scalar_field(interp.x, interp.y, interp.z, prop)
     if interp.dim == 3:
@@ -312,7 +317,7 @@ def main(fname, prop, npoint):
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 4:
-        print "Usage: interpolator.py filename property num_points"
+        print("Usage: interpolator.py filename property num_points")
         sys.exit(1)
     else:
         main(sys.argv[1], sys.argv[2], int(sys.argv[3]))

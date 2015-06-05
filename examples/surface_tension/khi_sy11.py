@@ -144,8 +144,8 @@ def create_particles(**kwargs):
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
                              'p', 'rho', 'au', 'av'])
     
-    print "2D KHI with %d fluid particles and %d wall particles"%(
-            fluid.get_number_of_particles(), wall.get_number_of_particles())
+    print("2D KHI with %d fluid particles and %d wall particles"%(
+            fluid.get_number_of_particles(), wall.get_number_of_particles()))
 
     return [fluid, wall]
     

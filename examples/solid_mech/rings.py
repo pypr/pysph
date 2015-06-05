@@ -56,8 +56,8 @@ def create_particles(**kwargs):
     x = numpy.concatenate([x-spacing,x+spacing])
     y = numpy.concatenate([y,y])
 
-    print 'Ellastic Collision with %d particles'%(x.size)
-    print "Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu)
+    print('Ellastic Collision with %d particles'%(x.size))
+    print("Shear modulus G = %g, Young's modulus = %g, Poisson's ratio =%g"%(G,E,nu))
 
     #print bdry, numpy.flatnonzero(bdry)
     m = numpy.ones_like(x)*dx*dx
@@ -111,7 +111,7 @@ def create_particles(**kwargs):
     add_properties(pa, 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0')
 
     # load balancing properties
-    pa.set_lb_props( pa.properties.keys() )
+    pa.set_lb_props( list(pa.properties.keys()) )
 
     return [pa,]
 

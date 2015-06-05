@@ -90,7 +90,7 @@ def create_particles(**kwargs):
     fluid = gpa(name='fluid', x=x, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy(), 
                 alpha1=alpha1, alpha2=alpha2)
 
-    print "1D Shocktube with %d particles"%(fluid.get_number_of_particles())
+    print("1D Shocktube with %d particles"%(fluid.get_number_of_particles()))
 
     return [fluid,]
 

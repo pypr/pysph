@@ -32,9 +32,9 @@ def get_alpha_dot():
     # Now do some awesome sympy magic.
     syms, result = S.cse(res, symbols=S.numbered_symbols('tmp'))
     for lhs, rhs in syms:
-        print "%s = %s"%(lhs, rhs)
+        print("%s = %s"%(lhs, rhs))
     for i in range(3):
-        print "omega_dot[%d] ="%i, result[0][i]
+        print("omega_dot[%d] ="%i, result[0][i])
 
 
 def get_torque():
@@ -47,15 +47,15 @@ def get_torque():
     x, y, z, fx, fy, fz = S.symbols("x, y, z, fx, fy, fz")
     R = S.Matrix([x, y, z])
     F = S.Matrix([fx, fy, fz])
-    print "Torque:", R.cross(F)
+    print("Torque:", R.cross(F))
     cx, cy, cz = S.symbols('cx, cy, cz')
     d = S.Matrix([cx, cy, cz])
-    print "c_m x f = ", d.cross(F)
+    print("c_m x f = ", d.cross(F))
     wx, wy, wz = S.symbols('wx, wy, wz')
     rx, ry, rz = S.symbols('rx, ry, rz')
     w = S.Matrix([wx, wy, wz])
     r = S.Matrix([rx, ry, rz])
-    print "w x r =", w.cross(r)
+    print("w x r = %s"%w.cross(r))
 
 
 

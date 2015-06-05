@@ -25,7 +25,7 @@ from pysph.base.config import get_config
 def get_md5(data):
     """Return the MD5 sum of the given data.
     """
-    return hashlib.md5(data).hexdigest()
+    return hashlib.md5(data.encode()).hexdigest()
 
 
 class ExtModule(object):
@@ -183,5 +183,5 @@ class ExtModule(object):
 
     def _message(self, *args):
         if self.verbose:
-            print ' '.join(args)
+            print(' '.join(args))
 

@@ -255,7 +255,7 @@ def sort_precomputed(precomputed):
     pre_comp = Group.pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
     depends = dict((x, None) for x in precomputed)
-    for pre, cb in precomputed.iteritems():
+    for pre, cb in precomputed.items():
         depends[pre] = [x for x in cb.symbols if x in pre_comp and x != pre]
 
     # The basic algorithm is to assign weights to each of the precomputed
@@ -298,7 +298,7 @@ def get_predefined_types(precomp):
               't': 0.0,
               'dst': KnownType('ParticleArrayWrapper'),
               'src': KnownType('ParticleArrayWrapper')}
-    for sym, value in precomp.iteritems():
+    for sym, value in precomp.items():
         result[sym] = value.context[sym]
     return result
 
@@ -430,7 +430,7 @@ class Group(object):
     ##########################################################################
     def _get_variable_decl(self, context, mode='declare'):
         decl = []
-        names = context.keys()
+        names = list(context.keys())
         names.sort()
         for var in names:
             value = context[var]
@@ -469,7 +469,7 @@ class Group(object):
         # for loops and not post_loops and initialization.
         pre = []
         if kind == 'loop':
-            for p, cb in self.precomputed.iteritems():
+            for p, cb in self.precomputed.items():
                 pre.append(cb.code.strip())
             if len(pre) > 0:
                 pre.append('')
@@ -534,7 +534,7 @@ class Group(object):
 
         # Update the context.
         context = self.context
-        for p, cb in self.precomputed.iteritems():
+        for p, cb in self.precomputed.items():
             context[p] = cb.context[p]
 
     ##########################################################################
@@ -605,7 +605,7 @@ class Group(object):
         return self._get_variable_decl(context, mode='declare')
 
     def get_variable_array_setup(self):
-        names = self.context.keys()
+        names = list(self.context.keys())
         names.sort()
         code = []
         for var in names:

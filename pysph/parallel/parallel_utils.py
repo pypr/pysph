@@ -136,7 +136,7 @@ def get_send_data(
         indices = numpy.where( procs == pid )[0]
         #if len(indices) > 0:
         send[pid] = {}
-        for prop, prop_array in props.iteritems():
+        for prop, prop_array in props.items():
             send[pid][prop] = prop_array[ exportIndices[indices] ]
 
         # save the local ids exported to each processor

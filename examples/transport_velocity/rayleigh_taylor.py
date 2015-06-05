@@ -85,9 +85,9 @@ def create_particles(empty=False, **kwargs):
     fluid1.rho[:] = rho1
     fluid2.rho[:] = rho2
 
-    print "Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+    print("Rayleigh Taylor Instability problem :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid1.get_number_of_particles() + fluid2.get_number_of_particles(),
-        solid.get_number_of_particles(), dt)
+        solid.get_number_of_particles(), dt))
 
     # add requisite properties to the arrays:
     # particle volume
@@ -139,9 +139,9 @@ def create_particles(empty=False, **kwargs):
     solid.h[:] = hdx * dx
 
     # load balancing props
-    fluid1.set_lb_props( fluid1.properties.keys() )
-    fluid2.set_lb_props( fluid2.properties.keys() )
-    solid.set_lb_props( solid.properties.keys() )
+    fluid1.set_lb_props( list(fluid1.properties.keys()) )
+    fluid2.set_lb_props( list(fluid2.properties.keys()) )
+    solid.set_lb_props( list(solid.properties.keys()) )
 
     # return the arrays
     return [fluid1, fluid2, solid]

@@ -28,7 +28,7 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
-        for array_name, integrator_step in kw.iteritems():
+        for array_name, integrator_step in kw.items():
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
                 raise ValueError(msg)

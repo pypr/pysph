@@ -330,7 +330,7 @@ class TestLongArray(unittest.TestCase):
 
         # Then.
         self.assertEqual(view.length, 3)
-        expect = range(1, 4)
+        expect = list(range(1, 4))
         self.assertListEqual(view.get_npy_array().tolist(), expect)
 
     def test_set_view_for_empty_array(self):
@@ -359,7 +359,7 @@ class TestLongArray(unittest.TestCase):
 
         # Then.
         self.assertEqual(view.length, 3)
-        expect = range(1, 4)
+        expect = list(range(1, 4))
         self.assertListEqual(view.get_npy_array().tolist(), expect)
 
     def test_reset_works_after_set_view(self):

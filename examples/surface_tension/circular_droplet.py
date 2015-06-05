@@ -158,8 +158,8 @@ def create_particles(staggered=True, **kwargs):
     fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta', 'p', 
                              'kappa', 'N', 'scolor'])
     
-    print "2D Circular droplet deformation with %d fluid particles"%(
-            fluid.get_number_of_particles())
+    print("2D Circular droplet deformation with %d fluid particles"%(
+            fluid.get_number_of_particles()))
 
     return [fluid,]
     

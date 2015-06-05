@@ -301,11 +301,11 @@ class PressureSolve(Equation):
 
         if compression > self.tolerance:
             if debug:
-                print "Not converged:", compression
+                print("Not converged:", compression)
             return -1.0
         else:
             if debug:
-                print "Converged:", compression
+                print("Converged:", compression)
             return 1.0
 
 class PressureSolveBoundary(Equation):

@@ -56,7 +56,7 @@ def create_particles():
     obstacle.total_mass[0] = np.sum(m)
     obstacle.add_property('cs')
     obstacle.add_property('arho')
-    obstacle.set_lb_props( obstacle.properties.keys() )
+    obstacle.set_lb_props( list(obstacle.properties.keys()) )
     obstacle.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'fx', 'fy', 'fz',
                                  'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
 

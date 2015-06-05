@@ -24,10 +24,10 @@ class TestContext(unittest.TestCase):
     def test_context_behaves_like_dict(self):
         c = Context(a=1)
         c.b = 2
-        keys = c.keys()
+        keys = list(c.keys())
         keys.sort()
         self.assertEqual(keys, ['a', 'b'])
-        values = c.values()
+        values = list(c.values())
         values.sort()
         self.assertEqual(values, [1, 2])
         self.assertTrue('a' in c)
@@ -131,7 +131,9 @@ class TestEquations(TestBase):
             input = dict((x, pre_comp[x]) for x in ['RIJ', 'R2IJ',
                                                     'XIJ', 'HIJ', 'AIJ'])
             pre = sort_precomputed(input)
-            self.assertEqual(pre.keys(), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ'])
+            self.assertEqual(
+                list(pre.keys()), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ']
+            )
         finally:
             from pysph.sph.equation import precomputed_symbols
             Group.pre_comp = precomputed_symbols()
@@ -157,7 +159,7 @@ class TestGroup(TestBase):
     def test_precomputed(self):
         g = self.group
         self.assertEqual(len(g.precomputed), 5)
-        self.assertEqual(g.precomputed.keys(),
+        self.assertEqual(list(g.precomputed.keys()),
                          ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'WIJ'])
 
     def test_array_names(self):

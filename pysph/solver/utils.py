@@ -7,8 +7,6 @@ import pickle
 import numpy
 import sys
 import os
-import platform
-import commands
 import tempfile
 import zipfile
 from numpy.lib import format
@@ -141,7 +139,7 @@ def savez_compressed(file, *args, **kwds):
     _savez(file, args, kwds, True)
 
 def _savez(file, args, kwds, compress):
-    if isinstance(file, basestring):
+    if isinstance(file, str):
         if not file.endswith('.npz'):
             file = file + '.npz'
 
@@ -150,7 +148,7 @@ def _savez(file, args, kwds, compress):
         key = 'arr_%d' % i
         if key in namedict.keys():
             msg = "Cannot use un-named variables and keyword %s" % key
-            raise ValueError, msg
+            raise ValueError(msg)
         namedict[key] = val
 
     if compress:
@@ -164,7 +162,7 @@ def _savez(file, args, kwds, compress):
     fd, tmpfile = tempfile.mkstemp(suffix='-numpy.npy')
     os.close(fd)
     try:
-        for key, val in namedict.iteritems():
+        for key, val in namedict.items():
             fname = key + '.npy'
             fid = open(tmpfile, 'wb')
             try:
@@ -380,7 +378,7 @@ def dump(filename, particles, solver_data, detailed_output=False,
     if mpi_comm is not None:
         all_array_data = _gather_array_data(all_array_data, mpi_comm)
 
-    for name, arrays in all_array_data.iteritems():
+    for name, arrays in all_array_data.items():
         particle_data[name]["arrays"] = arrays
 
     if mpi_comm is None or mpi_comm.Get_rank() == 0:
@@ -471,14 +469,14 @@ def load(fname):
     elif version == 2:
         particles = _get_dict_from_arrays(data["particles"])
 
-        for array_name, array_info in particles.iteritems():
+        for array_name, array_info in particles.items():
             array = ParticleArray(name=array_name,
                                   constants=array_info["constants"],
                                   **array_info["arrays"])
             array.set_output_arrays(
                 array_info.get('output_property_arrays', [])
             )
-            for prop, prop_info in array_info["properties"].iteritems():
+            for prop, prop_info in array_info["properties"].items():
                 if prop not in array_info["arrays"]:
                     array.add_property(**prop_info)
             ret["arrays"][array_name] = array
@@ -705,13 +703,10 @@ def get_files(dirname=None, fname=None, endswith=".npz"):
     files = [os.path.join(path, f) for f in files]
 
     # sort the files
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
+    def _key_func(arg):
+        a = os.path.splitext(arg)[0]
+        return int(a[a.rfind('_')+1:])
 
-    files.sort(_sort_func)
+    files.sort(key=_key_func)
 
     return files

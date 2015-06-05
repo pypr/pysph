@@ -90,7 +90,7 @@ def get_circular_patch(dx=0.025, **kwargs):
                                   cs=cs, name=name)
     pa.remove_particles(indices)
 
-    print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
+    print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
 
     # add requisite variables needed for this formulation
     for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',

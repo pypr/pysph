@@ -62,7 +62,7 @@ def get_symbols(code, ctx=(ast.Load, ast.Store)):
 
     ctx: The context of the names, can be one of ast.Load, ast.Store, ast.Del.
     """
-    if isinstance(code, basestring):
+    if isinstance(code, str):
         tree = ast.parse(code)
     else:
         tree = code
@@ -81,7 +81,7 @@ def get_aug_assign_symbols(code):
     code: A code string or the result of an ast.parse.
 
     """
-    if isinstance(code, basestring):
+    if isinstance(code, str):
         tree = ast.parse(code)
     else:
         tree = code
@@ -99,7 +99,7 @@ def get_assigned(code):
     code: A code string or the result of an ast.parse.
 
     """
-    if isinstance(code, basestring):
+    if isinstance(code, str):
         tree = ast.parse(code)
     else:
         tree = code
@@ -122,7 +122,7 @@ def has_node(code, node):
     node: A node type or tuple of node types to check for.  If a tuple is passed
     it returns True if any one of them is in the code.
     """
-    tree = ast.parse(code) if isinstance(code, basestring) else code
+    tree = ast.parse(code) if isinstance(code, str) else code
     for n in ast.walk(tree):
         if isinstance(n, node):
             return True

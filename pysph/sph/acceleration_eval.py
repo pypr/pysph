@@ -39,7 +39,8 @@ def check_equation_array_properties(equation, particle_arrays):
     def _check_array(array, eq_props, errors):
         """Updates the `errors` with any errors.
         """
-        props = set(array.properties.keys() + array.constants.keys())
+        props = set(list(array.properties.keys()) +
+                    list(array.constants.keys()))
         if not eq_props < props:
             errors[array.name].update(eq_props - props)
 
@@ -51,9 +52,9 @@ def check_equation_array_properties(equation, particle_arrays):
 
     if len(errors) > 0:
         msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
-        for name, missing in errors.iteritems():
+        for name, missing in errors.items():
             msg += "Array '%s' missing properties %s.\n"%(name, missing)
-        print msg
+        print(msg)
         raise RuntimeError(msg)
 
 

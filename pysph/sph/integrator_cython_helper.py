@@ -47,7 +47,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_code(self):
         classes = {}
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls = stepper.__class__.__name__
             classes[cls] = stepper
 
@@ -63,7 +63,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_defs(self):
         lines = []
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
             code = 'cdef public {cls} {name}'.format(cls=cls_name,
                                                      name=dest+'_stepper')
@@ -72,7 +72,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_init(self):
         lines = []
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
             code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
                         .format(name=dest+'_stepper', cls=cls_name,
@@ -119,7 +119,7 @@ class IntegratorCythonHelper(object):
 
     def get_array_setup(self, dest, method):
         s, d = get_array_names(self.get_args(dest, method))
-        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in s|d]
+        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in sorted(s|d)]
         return '\n'.join(lines)
 
     def get_stepper_loop(self, dest, method):
