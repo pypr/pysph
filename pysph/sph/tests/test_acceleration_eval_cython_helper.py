@@ -17,9 +17,9 @@ class TestGetAllArrayNames(unittest.TestCase):
         pa = ParticleArray(name='f', x=x)
         result = get_all_array_names([pa])
         self.assertEqual(len(result), 3)
-        self.assertEqual(result['DoubleArray'], {'x'})
-        self.assertEqual(result['IntArray'], {'pid', 'tag'})
-        self.assertEqual(result['UIntArray'], {'gid'})
+        self.assertEqual(result['DoubleArray'], set(('x',)))
+        self.assertEqual(result['IntArray'], set(('pid', 'tag')))
+        self.assertEqual(result['UIntArray'], set(('gid',)))
 
     def test_that_all_properties_are_found_with_multiple_arrays(self):
         x = np.linspace(0, 1, 10)
@@ -27,9 +27,9 @@ class TestGetAllArrayNames(unittest.TestCase):
         pa2 = ParticleArray(name='b', y=x)
         result = get_all_array_names([pa1, pa2])
         self.assertEqual(len(result), 3)
-        self.assertEqual(result['DoubleArray'], {'x', 'y'})
-        self.assertEqual(result['IntArray'], {'pid', 'tag'})
-        self.assertEqual(result['UIntArray'], {'gid'})
+        self.assertEqual(result['DoubleArray'], set(('x', 'y')))
+        self.assertEqual(result['IntArray'], set(('pid', 'tag')))
+        self.assertEqual(result['UIntArray'], set(('gid',)))
 
 class TestGetKnownTypesForAllArrays(unittest.TestCase):
     def test_that_all_types_are_detected_correctly(self):
