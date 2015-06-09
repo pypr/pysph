@@ -12,23 +12,20 @@ python:
 virtualenv:
     system_site_packages: true
 
-env:
-    - ZOLTAN=$HOME/zoltan BUILD_DIR=$HOME/build_$SHIPPABLE_PYTHON
-
 before_install:
-    # System dependencies via apt.
+    - export BUILD_DIR=$HOME/build_$PYTHON_VERSION
+     # System dependencies via apt.
     - echo $BUILD_DIR
-    - sudo apt-get install build-essential python-dev libopenmpi-dev
-    - if [[ $SHIPPABLE_PYTHON == "2.7.3" ]]; then
-        sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose;
+    - sudo apt-get install -y build-essential python-dev libopenmpi-dev
+    - if [[ $PYTHON_VERSION == "2.7" ]]; then
+        sudo apt-get install -y cython python-numpy python-mako python-mpi4py python-nose;
       fi
-    - if [[ $SHIPPABLE_PYTHON == "3.4.1" ]]; then
-        sudo apt-get install cython3 python3-numpy python3-mako python3-mpi4py python3-nose;
+    - if [[ $PYTHON_VERSION == "3.4" ]]; then
+        sudo apt-get install -y cython3 python3-numpy python3-mako python3-mpi4py python3-nose;
       fi
 
     # Build zoltan.
-    - ./build_zoltan.sh $ZOLTAN
-
+    - ./build_zoltan.sh $HOME/zoltan
     # Setup the virtual env.
     - deactivate # Deactivate the current virtualenv
     - mkdir -p $BUILD_DIR
