@@ -15,6 +15,12 @@ def skip_if_no_mpi4py():
         reason = "mpi4py not installed"
         raise SkipTest(reason)
 
+    try:
+        from pyzoltan.core import zoltan
+    except ImportError:
+        from nose.plugins.skip import SkipTest
+        raise SkipTest('Build does not support Zoltan.')
+
 def get_directory(file):
     return dirname(abspath(file))
 

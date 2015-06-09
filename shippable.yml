@@ -13,12 +13,10 @@ virtualenv:
     system_site_packages: true
 
 env:
-    - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=$HOME/build_$TRAVIS_PYTHON_VERSION
+    - ZOLTAN=$HOME/zoltan PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=$HOME/build_$TRAVIS_PYTHON_VERSION
 
 before_install:
     - env
-    - rm -rf $BUILD_DIR
-    - mkdir -p $BUILD_DIR
 
     # System dependencies via apt.
     - sudo apt-get update
@@ -31,9 +29,11 @@ before_install:
       fi
 
     # Build zoltan.
-    - ./build_zoltan.sh ~/zoltan
+    - ./build_zoltan.sh $ZOLTAN
 
     # Setup the virtual env.
+    - rm -rf $BUILD_DIR
+    - mkdir -p $BUILD_DIR
     - virtualenv --system-site-packages -p $SHIPPABLE_PYTHON $BUILD_DIR
     - source $BUILD_DIR/bin/activate
 
@@ -46,8 +46,8 @@ install:
 
 before_script:
     - rm -rf ~/.pysph/source
-    - mkdir -p shippable/testresults
+    - mkdir -p ~/shippable/testresults
 
 script:
-    - python -m nose.core -v -A slow --with-xunit --xunit-file=shippable/testresults/nosetests_$PYTHON_VERSION.xml -w docs pyzoltan pysph
+    - python -m nose.core -v -A slow --with-xunit --xunit-file=~/shippable/testresults/nosetests_$PYTHON_VERSION.xml -w docs pyzoltan pysph
 
