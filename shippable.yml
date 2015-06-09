@@ -49,5 +49,5 @@ before_script:
     - mkdir -p ~/shippable/testresults
 
 script:
-    - python -m nose.core -v -A slow --with-xunit --xunit-file=$HOME/shippable/testresults/nosetests_$PYTHON_VERSION.xml -w docs pyzoltan pysph
+    - python -m nose.core -v -A slow --with-xunit --xunit-file=$HOME/shippable/testresults/nosetests.xml -w docs pyzoltan pysph
 
