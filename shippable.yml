@@ -13,7 +13,7 @@ virtualenv:
     system_site_packages: true
 
 env:
-    - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=~/build_$TRAVIS_PYTHON_VERSION
+    - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=$HOME/build_$TRAVIS_PYTHON_VERSION
 
 before_install:
     - env
@@ -34,7 +34,6 @@ before_install:
     - ./build_zoltan.sh ~/zoltan
 
     # Setup the virtual env.
-    - deactivate # Deactivate the current virtualenv
     - virtualenv --system-site-packages -p $SHIPPABLE_PYTHON $BUILD_DIR
     - source $BUILD_DIR/bin/activate
 
