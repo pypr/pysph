@@ -12,15 +12,16 @@ python:
 virtualenv:
     system_site_packages: true
 
+env:
+    - PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=~/build_$TRAVIS_PYTHON_VERSION
+
 before_install:
     - env
-    - export PYTHON_VERSION=`$SHIPPABLE_PYTHON -c "import sys; print(sys.version[:3])"`
-    - export BUILD_DIR=~/build_$PYTHON_VERSION
-    - echo $BUILD_DIR
     - rm -rf $BUILD_DIR
     - mkdir -p $BUILD_DIR
 
     # System dependencies via apt.
+    - sudo apt-get update
     - sudo apt-get install -y build-essential python-dev libopenmpi-dev curl
     - if [[ $PYTHON_VERSION == "2.7" ]]; then
         sudo apt-get install -y cython python-numpy python-mako python-mpi4py python-nose;
@@ -49,5 +50,5 @@ before_script:
     - mkdir -p shippable/testresults
 
 script:
-    - nosetests -v -A slow --with-xunit --xunit-file=shippable/testresults/nosetests_$PYTHON_VERSION.xml -w docs pyzoltan pysph
+    - python -m nose.core -v -A slow --with-xunit --xunit-file=shippable/testresults/nosetests_$PYTHON_VERSION.xml -w docs pyzoltan pysph
 
