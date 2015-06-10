@@ -142,15 +142,21 @@ def get_mpi_flags():
     try:
         mpic = 'mpic++'
         if compiler == 'intel':
-            link_args = check_output([mpic, '-cc=icc', '-link_info']).strip()
+            link_args = check_output(
+                [mpic, '-cc=icc', '-link_info'], universal_newlines=True
+            ).strip()
             link_args = link_args[3:]
             compile_args = check_output(
-                [mpic, '-cc=icc', '-compile_info']
+                [mpic, '-cc=icc', '-compile_info'], universal_newlines=True
             ).strip()
             compile_args = compile_args[3:]
         else:
-            link_args = check_output([mpic, '--showme:link']).strip()
-            compile_args = check_output([mpic, '--showme:compile']).strip()
+            link_args = check_output(
+                [mpic, '--showme:link'], universal_newlines=True
+            ).strip()
+            compile_args = check_output(
+                [mpic, '--showme:compile'], universal_newlines=True
+            ).strip()
     except:
         print('-'*80)
         print("Unable to run mpic++ correctly, skipping parallel build")

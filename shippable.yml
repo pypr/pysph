@@ -46,8 +46,8 @@ install:
 
 before_script:
     - rm -rf ~/.pysph/source
-    - mkdir -p ~/shippable/testresults
+    - mkdir -p $TRAVIS_BUILD_DIR/shippable/testresults
 
 script:
-    - python -m nose.core -v -A slow --with-xunit --xunit-file=$HOME/shippable/testresults/nosetests.xml -w docs pyzoltan pysph
+    - python -m nose.core -v -A slow --with-xunit --xunit-file=$TRAVIS_BUILD_DIR/shippable/testresults/nosetests.xml -w docs pyzoltan pysph
 
