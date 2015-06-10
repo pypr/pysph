@@ -1,38 +1,55 @@
 language: python
 
+build_image: shippableimages/ubuntu1404_python:latest
+
 # See here: http://docs.shippable.com/en/latest/config.html#caching-minions
 # Add [reset_minion] to the commit message to reset the minion.
 cache: true
 
 python:
     - 2.7
+    - 3.4
 
 # This doesn't work yet on shippable but we keep it here in case it does.
 virtualenv:
     system_site_packages: true
 
 env:
-    - ZOLTAN=$HOME/zoltan
+    - ZOLTAN=$HOME/zoltan PYTHON_VERSION=$TRAVIS_PYTHON_VERSION BUILD_DIR=$HOME/build_$TRAVIS_PYTHON_VERSION
 
 before_install:
+    - env
+
     # System dependencies via apt.
-    - sudo apt-get install build-essential python-dev libopenmpi-dev
-    - sudo apt-get install cython python-numpy python-mako python-mpi4py python-nose
+    - sudo apt-get update
+    - sudo apt-get install -y build-essential python-dev libopenmpi-dev curl
+    - if [[ $PYTHON_VERSION == "2.7" ]]; then
+        sudo apt-get install -y cython python-numpy python-mako python-mpi4py python-nose;
+      fi
+    - if [[ $PYTHON_VERSION == "3.4" ]]; then
+        sudo apt-get install -y cython3 python3-numpy python3-mako python3-mpi4py python3-nose;
+      fi
+
     # Build zoltan.
-    - ./build_zoltan.sh $HOME/zoltan
+    - ./build_zoltan.sh $ZOLTAN
+
+    # Setup the virtual env.
+    - rm -rf $BUILD_DIR
+    - mkdir -p $BUILD_DIR
+    - virtualenv --system-site-packages -p $SHIPPABLE_PYTHON $BUILD_DIR
+    - source $BUILD_DIR/bin/activate
 
 install:
-    # This hack gets system_site_packages working.
-    - rm $VIRTUAL_ENV/lib/python2.7/no-global-site-packages.txt
     # We need a recent version of Cython.
-    - pip install --upgrade cython
+    - pip install -r requirements.txt
     # Build pysph.
     - make clean
-    - python setup.py develop
+    - python setup.py install
 
 before_script:
     - rm -rf ~/.pysph/source
-    - mkdir -p shippable/testresults
+    - mkdir -p $TRAVIS_BUILD_DIR/shippable/testresults
 
 script:
-    - nosetests -v -A slow --with-xunit --xunit-file=shippable/testresults/nosetests.xml
+    - python -m nose.core -v -A slow --with-xunit --xunit-file=$TRAVIS_BUILD_DIR/shippable/testresults/nosetests.xml -w docs pyzoltan pysph
+
