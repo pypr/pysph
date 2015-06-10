@@ -389,7 +389,8 @@ def create_sources():
     if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
         generator = path.join('pyzoltan', 'core', 'generator.py')
         for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-            print(check_output([sys.executable, generator, pth]).decode())
+            cmd = [sys.executable, generator, path.abspath(pth)]
+            print(check_output(cmd).decode())
 
 
 def setup_package():

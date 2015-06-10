@@ -13,6 +13,7 @@ from __future__ import print_function
 
 import glob
 import os
+from os.path import abspath, dirname, exists, join
 import sys
 
 
@@ -20,22 +21,30 @@ def is_modified_later(filename1, filename2):
     '''Return `True` if the file1 is modified later than file2'''
     return os.stat(filename1).st_mtime > os.stat(filename2).st_mtime
 
+def _inject_paths_in_sys_path(outfile):
+    # Inject the directory of the output file into the path,
+    # so that local imports will work.
+    sys.path.insert(0, dirname(outfile))
+    # inject the path to pysph if pysph cannot be imported.
+    try:
+        import pysph
+    except ImportError:
+        sys.path.insert(0, dirname(dirname(dirname(__file__))))
+
 def generate_files(dirname, if_modified=True):
     '''Generates source files from the template files with extension `.mako`
 
     If `if_modified` is True (default), the source file will be created only
     if the template has been modified later than the source
     '''
-    for filename in glob.glob(os.path.join(dirname, '*.mako')):
-        outfile = filename[:-5]
+    for filename in glob.glob(join(dirname, '*.mako')):
+        outfile = abspath(filename[:-5])
         message = 'generating file {outfile} from {filename}'.format(
             outfile=outfile, filename=filename
         )
-        if not os.path.exists(outfile) or \
+        if not exists(outfile) or \
             (if_modified and is_modified_later(filename, outfile)):
-            # Inject the directory of the output file into the path,
-            # so that local imports will work.
-            sys.path.insert(0, os.path.dirname(outfile))
+            _inject_paths_in_sys_path(outfile)
             from mako.template import Template
             print(message)
             template = Template(filename=filename)
@@ -55,7 +64,7 @@ def main(paths=None):
 
     '''
     if not paths:
-        generate_files(os.path.dirname(__file__))
+        generate_files(dirname(__file__))
     else:
         for pth in paths:
             generate_files(pth)
