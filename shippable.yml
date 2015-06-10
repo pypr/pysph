@@ -1,5 +1,7 @@
 language: python
 
+build_image: shippableimages/ubuntu1404_python:latest
+
 # See here: http://docs.shippable.com/en/latest/config.html#caching-minions
 # Add [reset_minion] to the commit message to reset the minion.
 cache: true
