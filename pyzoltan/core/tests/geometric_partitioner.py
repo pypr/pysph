@@ -35,7 +35,7 @@ def read_input_file(fname=join(MY_DIR, 'mesh.txt')):
         numGlobalPoints = data[data_line][0]; data_line += 1
 
         if size > 1:
-            nobj = numGlobalPoints / 2
+            nobj = numGlobalPoints // 2
             remaining = numGlobalPoints - nobj
         else:
             nobj = numGlobalPoints
@@ -55,7 +55,7 @@ def read_input_file(fname=join(MY_DIR, 'mesh.txt')):
 
         for i in range(1,size):
             if (remaining > 1):
-                nobj = remaining / 2
+                nobj = remaining // 2
                 remaining -= nobj
 
             elif (remaining == 1):
