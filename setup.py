@@ -23,7 +23,7 @@ import sys
 MODE = 'normal'
 if len(sys.argv) >= 2 and ('--help' in sys.argv[1:] or
         sys.argv[1] in ('--help-commands', 'egg_info', '--version',
-                        'clean')):
+                        'clean', 'sdist')):
     MODE = 'info'
 
 HAVE_MPI = True
@@ -66,11 +66,16 @@ def get_openmp_flags():
     if env_var.lower() in ("0", 'false', 'n'):
         print("-"*70)
         print("OpenMP disabled by environment variable (USE_OPENMP).")
-        return [], []
+        return [], [], False
 
     from textwrap import dedent
-    from Cython.Distutils import Extension
-    from pyximport import pyxbuild
+    try:
+        from Cython.Distutils import Extension
+        from pyximport import pyxbuild
+    except ImportError:
+        print("Unable to import Cython, disabling OpenMP for now.")
+        return [], [], False
+
     from distutils.errors import CompileError, LinkError
     import shutil
     import tempfile
@@ -222,12 +227,12 @@ def get_basic_extensions():
             include_dirs = []
         else:
             include_dirs = [numpy.get_include()]
-            openmp_compile_args, openmp_link_args, openmp_env = [], [], False
     else:
         from Cython.Distutils import Extension
         import numpy
         include_dirs = [numpy.get_include()]
-        openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
+
+    openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
     ext_modules = [
         Extension(
