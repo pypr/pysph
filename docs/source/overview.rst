@@ -1,3 +1,4 @@
+====================================
 PySPH: a Python-based SPH framework
 ====================================
 
@@ -35,6 +36,7 @@ details.
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
 
+---------
 Features
 ---------
 
@@ -47,6 +49,7 @@ Features
   - Seamless parallel integration using Zoltan_.
   - `BSD license <https://bitbucket.org/pysph/pysph/src/master/LICENSE.txt>`_.
 
+-----------------
 SPH formulations
 -----------------
 
@@ -92,6 +95,7 @@ following formulations are currently implemented:
 .. _`Test 2`: https://wiki.manchester.ac.uk/spheric/index.php/Test2
 
 
+--------
 Credits
 --------
 
@@ -115,6 +119,7 @@ The following have contributed bug-fixes, features, documentation etc.
 
 - Arkopal Dutt, Arpit Agarwal, Sarang Minhas, S Saravanan, Vishnu Sivadasan
 
+-------------
 Citing PySPH
 -------------
 
@@ -127,6 +132,7 @@ wish to cite it you may use this:
    Conference on Particle-Based Methods (Particles 2013), Stuttgart,
    Germany, 18th September 2013.
 
+--------
 History
 --------
 
@@ -164,6 +170,7 @@ History
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
 
+-------
 Support
 -------
 
@@ -173,4 +180,10 @@ https://groups.google.com/d/forum/pysph-users
 
 Please also take a look at the `PySPH issue tracker
 <https://bitbucket.org/pysph/pysph/issues>`_.
+
+----------
+Changelog
+----------
+
+.. include:: ../../CHANGES.rst
 
