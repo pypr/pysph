@@ -6,10 +6,10 @@ Installation and getting started
 
 To install PySPH, you need a working Python environment with the required
 dependencies installed. You may use any of the available Python distributions.
-Note that PySPH is currently tested with Python-2.x and not with 3.x (yet).  If
-you are new to Python we recommend `Enthought Canopy`_. PySPH will work
-fine with Anaconda_ or other environments like WinPython_.  The following
-instructions should help you get started.
+PySPH is currently tested with Python-2.6.x, 2.7.x and 3.4.x.  If you are new
+to Python we recommend `Enthought Canopy`_. PySPH will work fine with Anaconda_
+or other environments like WinPython_.  The following instructions should help
+you get started.
 
 Since there is a lot of information here, we suggest that you skim the section
 on :ref:`dependencies` and then directly jump to one of the "Installing the
@@ -20,6 +20,39 @@ and links referred therein.
 .. contents::
     :local:
     :depth: 1
+
+.. _quick-install:
+
+-------------------
+Quick installation
+-------------------
+
+If you are reasonably experienced with installing Python packages, already have
+a C++ compiler setup on your machine, and are not immediately interested in
+running PySPH on multiple CPUs (using MPI), then installing PySPH is simple.
+Simply running pip_ like so::
+
+    $ pip install PySPH
+
+should do the trick.  You may do this in a virtualenv_ if you chose to.  This
+will only install PySPH as a package you can use from Python.  If you want to
+get the examples and run them, you can download the sources either using the
+tarball/ZIP or from git, see :ref:`downloading-pysph`.
+
+The above will install the latest released version of PySPH, you can install
+the development version using::
+
+    $ pip install git+https://bitbucket.org/pysph/pysph.git#egg=PySPH
+
+If you wish to track the development of the package, clone the repository (as
+described in :ref:`downloading-pysph` and do the following::
+
+    $ pip install -r requirements.txt
+    $ python setup.py develop
+
+The following instructions are more detailed and also show how optional
+dependencies can be installed.  Instructions on how to set things up on Windows
+is also available below.
 
 
 .. _dependencies:
@@ -42,6 +75,10 @@ The core dependencies are:
 These packages can be installed from your Python distribution's package
 manager, or using pip_ or ``easy_install``.  For more detailed instructions on
 how to do this for different distributions, see below.
+
+On Python-2.6.x a few additional packages are needed and these are listed in
+the project's `requirements-2.6.txt
+<https://bitbucket.org/pysph/pysph/src/master/requirements-2.6.txt>`_
 
 Running PySPH requires a working C/C++ compiler on your machine.  On Linux/OS X
 the gcc toolchain will work well.  On Windows, you will need to have `Microsoft
@@ -135,7 +172,7 @@ install the dependencies using::
     $ sudo apt-get install build-essential python-dev python-numpy \
         python-mako cython python-nose mayavi2 python-qt4 python-virtualenv
 
-OpenMP_ is typically available but can be installed with::
+OpenMP_ is typically available but if it is not, it can be installed with::
 
     $ sudo apt-get install libgomp1
 
@@ -598,11 +635,11 @@ tests as::
 
    $ python -m nose.core -w docs pysph
 
-This is because nosetests will incorrectly  will pick up the local pysph
-packages instead of the installed version.  The ``-w`` option just changes the
-active directory to ``docs``.  Alternatively, change directory to some other
-directory that does not contain the directory ``pysph`` in it and run the first
-command above.
+This is because ``nosetests`` will incorrectly pick up the local pysph packages
+instead of the installed version.  The ``-w`` option just changes the active
+directory to ``docs``.  Alternatively, change directory to some other directory
+that does not contain the directory ``pysph`` in it and run the first command
+above.
 
 If you see errors you might want more verbose reporting which you can get
 with::
