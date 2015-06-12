@@ -1,7 +1,7 @@
 1.0a2
 ------
 
-* Release date: not yet released.
+* Release date: 12th June, 2015
 * Support for tox_, this makes it trivial to test PySPH on py26, py27 and py34
   (and potentially more if needed).
 * Fix bug in code generator where it is unable to import pysph before it is
@@ -19,7 +19,7 @@
 1.0a1
 ------
 
-* Release date: 3rd June 2015.
+* Release date: 3rd June, 2015.
 * First public release of the new PySPH code which uses code-generation and is
   hosted on `bitbucket <http://bitbucket.org/pysph/pysph>`_.
 * OpenMP support.
