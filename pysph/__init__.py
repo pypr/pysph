@@ -1,5 +1,5 @@
 # See PEP 440 for more on suitable version numbers.
-__version__ = '1.0a2'
+__version__ = '1.0a3.dev0'
 
 
 # Conditional Imports for Parallel stuff
