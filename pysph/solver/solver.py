@@ -14,6 +14,8 @@ from pysph.solver.utils import FloatPBar, load, dump
 import logging
 logger = logging.getLogger(__name__)
 
+EPSILON = numpy.finfo(float).eps*2
+
 class Solver(object):
     """Base class for all PySPH Solvers
 
@@ -116,6 +118,9 @@ class Solver(object):
         # set the default rank to 0
         self.rank = 0
 
+        # set the default comm to None.
+        self.comm = None
+
         # set the default mode to serial
         self.in_parallel = False
 
@@ -159,7 +164,7 @@ class Solver(object):
         # default time step constants
         self.tf = tf
         self.dt = dt
-        self._old_dt = dt
+        self._prev_dt = dt
         self._damping_factor = 1.0
 
         # flag for constant smoothing lengths
@@ -403,7 +408,7 @@ class Solver(object):
         # integrate with.
         self.dt = self._get_timestep()
 
-        while self.t < self.tf:
+        while (self.tf - self.t) > EPSILON:
 
             # perform any pre step functions
             for callback in self.pre_step_callbacks:
@@ -427,31 +432,17 @@ class Solver(object):
             self.t += self.dt
             self.count += 1
 
-            # dump output if the iteration number is a multiple of the
-            # printing frequency
-            if self.count % self.pfreq == 0:
-                self.dump_output()
-                self.barrier()
+            # Compute the next timestep.
+            self.dt = self._get_timestep()
 
-            # dump output if forced
-            if self.force_output:
-                self.dump_output()
-                self.barrier()
-
-                self.force_output = False
-
-                # re-set the time-step to the old time step before it
-                # was adjusted
-                self.dt = self._old_dt
+            # Note: this may adjust dt to land at a desired time.
+            self._dump_output_if_needed()
 
             # update progress bar
             bar.update(self.t)
 
             # update the time for all arrays
             self.update_particle_time()
-
-            # Compute the next timestep.
-            self.dt = self._get_timestep()
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
@@ -638,37 +629,75 @@ class Solver(object):
 
         return dt*self._damping_factor
 
-    def _get_timestep(self):
+    def _dump_output_if_needed(self):
+        """Dump output if needed while solve is running.
 
-        dt = self._compute_timestep()
-        dt = self._damp_timestep(dt)
+        This is called by `solve`.
 
-        # adjust dt to land on final time
-        if self.t + dt > self.tf:
-            dt = self.tf - self.t
+        Warning
+        -------
 
-        # solution output times
+        This will adjust `dt` if the user has asked for output at a
+        non-integral multiple of dt.
+        """
+        if abs(self.t - self.tf) < EPSILON:
+            return
+
+        # dump output if the iteration number is a multiple of the printing
+        # frequency.
+        dump = self.count % self.pfreq == 0
+
+        # Consider the other cases if user has requested output at a specified
+        # time.
+
         output_at_times = self.output_at_times
+        dt = self.dt
 
-        # adjust dt to land on specific output times
+        # adjust dt to land on specific output times or dump output if we have
+        # reached a desired time.
         if len(output_at_times) > 0:
             tdiff = output_at_times - self.t
-            condition = (tdiff > 0) & (tdiff < dt)
 
-            if numpy.any( condition ):
-                output_time = output_at_times[ numpy.where(condition) ]
-                if abs(output_time - self.t) > 1e-14:
+            if numpy.any(numpy.abs(tdiff) < EPSILON):
+                dump = True
+
+            # Our next step may exceed a required timestep so we adjust the
+            # timestep.
+            timestep_too_big = (tdiff > 0.0) & (tdiff < dt)
+            if numpy.any(timestep_too_big):
+                index = numpy.where(timestep_too_big)[0]
+                output_time = output_at_times[index]
+                if abs(output_time - self.t) > EPSILON:
                     # It sometimes happens that the current time is just
                     # shy of the requested output time which results in a
                     # ridiculously small dt so we skip that case.
 
-                    # save the old time-step and compute the new
-                    # time-step to fall on the specified output time
-                    # instant
-                    self._old_dt = dt
-                    dt = float( output_time - self.t )
+                    # Compute the new time-step to fall on the specified output
+                    # time instant and save the previous dt value.
+                    self._prev_dt = dt
+                    self.dt = float(output_time - self.t)
 
-                    self.force_output = True
+        if dump:
+            self.dump_output()
+            self.barrier()
+
+    def _get_timestep(self):
+        if abs(self.tf - self.t) < EPSILON:
+            # We have reached the end, so no need to adjust the timestep
+            # anymore.
+            return self.dt
+
+        if abs(self._prev_dt - self.dt) > EPSILON:
+            # if the _prev_dt was set then we need to use it as the current dt
+            # was set to print at an intermediate time.
+            self.dt = self._prev_dt
+
+        dt = self._compute_timestep()
+        dt = self._damp_timestep(dt)
+
+        # adjust dt to land exactly on final time
+        if (self.t + dt) > (self.tf - EPSILON):
+            dt = self.tf - self.t
 
         return dt
 
