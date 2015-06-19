@@ -417,8 +417,8 @@ def setup_package():
 
     extras_require = dict(
         mpi=['mpi4py>=1.2'],
-        ui=['mayavi>=4.0', 'nose'],
-        test=['nose>=1.0.0']
+        ui=['mayavi>=4.0'],
+        test=['nose>=1.0.0', 'mock>=1.0']
     )
 
     everything = set()
