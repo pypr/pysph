@@ -45,7 +45,7 @@ class Solver(object):
 
         n_damp : int
             Number of timesteps for which the initial damping is required.
-            This is used to improve stability for problems with strong 
+            This is used to improve stability for problems with strong
             discontinuity in initial condition.
             Setting it to zero will disable damping of the timesteps.
 
@@ -164,7 +164,7 @@ class Solver(object):
         # default time step constants
         self.tf = tf
         self.dt = dt
-        self._prev_dt = dt
+        self._prev_dt = None
         self._damping_factor = 1.0
 
         # flag for constant smoothing lengths
@@ -281,10 +281,10 @@ class Solver(object):
         self.setup(self.particles)
 
     def set_adaptive_timestep(self, value):
-        """Set it to True to use adaptive timestepping based on 
+        """Set it to True to use adaptive timestepping based on
         cfl, viscous and force factor.
 
-        Look at pysph.sph.integrator.compute_time_step for more details.  
+        Look at pysph.sph.integrator.compute_time_step for more details.
         """
         self.adaptive_timestep = value
 
@@ -687,10 +687,11 @@ class Solver(object):
             # anymore.
             return self.dt
 
-        if abs(self._prev_dt - self.dt) > EPSILON:
+        if self._prev_dt is not None and abs(self._prev_dt - self.dt) > EPSILON:
             # if the _prev_dt was set then we need to use it as the current dt
             # was set to print at an intermediate time.
             self.dt = self._prev_dt
+            self._prev_dt = None
 
         dt = self._compute_timestep()
         dt = self._damp_timestep(dt)
