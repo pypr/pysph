@@ -14,8 +14,8 @@ from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load
 
 # conditional parallel imports
-from pysph import Has_MPI, Has_Zoltan
-if (Has_MPI and Has_Zoltan):
+from pysph import has_mpi, has_zoltan
+if has_mpi() and has_zoltan():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
 
@@ -63,7 +63,7 @@ class Application(object):
         self.comm = None
         self.num_procs = 1
         self.rank = 0
-        if Has_MPI:
+        if has_mpi():
             self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
@@ -481,7 +481,7 @@ class Application(object):
             options = self.options
 
             if options.with_zoltan:
-                if not (Has_Zoltan and Has_MPI):
+                if not (has_zoltan() and has_mpi()):
                     raise RuntimeError("Cannot run in parallel!")
 
             else:
@@ -686,7 +686,7 @@ class Application(object):
         # Setup the solver output file name
         fname = options.output
 
-        if Has_MPI:
+        if has_mpi():
             rank = self.rank
             if self.num_procs > 1:
                 fname += '_' + str(rank)
