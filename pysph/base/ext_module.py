@@ -1,6 +1,7 @@
 # Standard library imports
 from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
+from distutils.util import get_platform
 import hashlib
 import imp
 import importlib
@@ -21,6 +22,11 @@ except ImportError:
 import pysph
 from pysph.base.config import get_config
 
+
+def get_platform_dir():
+    return 'py{version}-{platform_dir}'.format(
+        version=sys.version[:3], platform_dir=get_platform()
+    )
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
@@ -101,7 +107,8 @@ class ExtModule(object):
 
     def _setup_root(self, root):
         if root is None:
-            self.root = expanduser(join('~', '.pysph', 'source'))
+            plat_dir = get_platform_dir()
+            self.root = expanduser(join('~', '.pysph', 'source', plat_dir))
         else:
             self.root = root
 
@@ -142,14 +149,14 @@ class ExtModule(object):
             if force or self.should_recompile():
                 self._message("Compiling code at:", self.src_path)
                 inc_dirs = [
-                    dirname(dirname(pysph.__file__)), 
+                    dirname(dirname(pysph.__file__)),
                     numpy.get_include()
                 ]
                 extra_compile_args, extra_link_args = self._get_extra_args()
 
                 extension = Extension(
                     name=self.name, sources=[self.src_path],
-                    include_dirs=inc_dirs, 
+                    include_dirs=inc_dirs,
                     extra_compile_args=extra_compile_args,
                     extra_link_args=extra_link_args,
                     language="c++"
@@ -184,4 +191,3 @@ class ExtModule(object):
     def _message(self, *args):
         if self.verbose:
             print(' '.join(args))
-
