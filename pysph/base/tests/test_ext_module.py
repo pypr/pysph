@@ -6,9 +6,35 @@ import shutil
 import sys
 import tempfile
 from textwrap import dedent
+from multiprocessing import Pool
 from unittest import TestCase, main
 
+import mock
+
 from pysph.base.ext_module import get_md5, ExtModule
+
+
+def _check_write_source(root):
+    """Used to create an ExtModule and test if a file was opened.
+
+    It returns the number of times "open" was called.
+    """
+    m = mock.mock_open()
+    with mock.patch('pysph.base.ext_module.open', m, create=True):
+        s = ExtModule("print 'hello'", root=root)
+    if m.called:
+        with open(*m.call_args[0]) as fp:
+            fp.write("junk")
+    return m.call_count
+
+def _check_compile(root):
+    with mock.patch('shutil.copy') as m:
+        s = ExtModule("print 'hello'", root=root)
+        s.build()
+    if m.called:
+        # If it was called, do the copy to mimic the action.
+        shutil.copy(*m.call_args[0])
+    return m.call_count
 
 
 class TestMiscExtMod(TestCase):
@@ -117,6 +143,40 @@ class TestExtModule(TestCase):
 
             # Then.
             self.assertTrue(s.should_recompile())
+
+    def test_that_multiple_writes_do_not_occur_for_same_source(self):
+        # Given
+        n_proc = 5
+        p = Pool(n_proc)
+
+        # When
+
+        # Note that _create_extension cannot be defined here or even in the
+        # class as a nested function or instance method cannot be pickled.
+
+        result = p.map(_check_write_source, [self.root]*n_proc)
+        p.close()
+
+        # Then
+        # The file should have been opened only once.
+        self.assertEqual(sum(result), 1)
+
+    def test_that_multiple_compiles_do_not_occur_for_same_source(self):
+        # Given
+        n_proc = 5
+        p = Pool(n_proc)
+
+        # When
+
+        # Note that _check_compile cannot be defined here or even in the
+        # class as a nested function or instance method cannot be pickled.
+
+        result = p.map(_check_compile, [self.root]*n_proc)
+        p.close()
+
+        # Then
+        # The shutil.copy should have been run only once.
+        self.assertEqual(sum(result), 1)
 
 
 if __name__ == '__main__':
