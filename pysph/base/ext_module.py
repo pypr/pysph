@@ -1,6 +1,8 @@
 # Standard library imports
+from contextlib import contextmanager
 from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
+from distutils.util import get_platform
 import hashlib
 import imp
 import importlib
@@ -10,6 +12,7 @@ from os.path import expanduser, join, isdir, exists, dirname
 from pyximport import pyxbuild
 import shutil
 import sys
+import time
 
 # Optional imports.
 try:
@@ -21,6 +24,11 @@ except ImportError:
 import pysph
 from pysph.base.config import get_config
 
+
+def get_platform_dir():
+    return 'py{version}-{platform_dir}'.format(
+        version=sys.version[:3], platform_dir=get_platform()
+    )
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
@@ -44,7 +52,8 @@ class ExtModule(object):
             Do not specify the '.' (defaults to 'pyx').
 
         root : str: root of directory to store code and modules in.
-            If not set it defaults to "~/.pysph/source".
+            If not set it defaults to "~/.pysph/source/<platform-directory>".
+            where <platform-directory> is platform specific.
 
         verbose : Bool : Print messages for convenience.
 
@@ -77,11 +86,40 @@ class ExtModule(object):
         base = self.name
         self.src_path = join(self.root, base + '.' + self.extension)
         self.ext_path = join(self.root, base + get_config_var('SO'))
+        self.lock_path = join(self.root, base + '.lock')
+
+    @contextmanager
+    def _lock(self, timeout=60):
+        t1 = time.time()
+        def _is_timed_out():
+            if timeout is None:
+                return False
+            else:
+                return (time.time() - t1) > timeout
+        def _try_to_lock():
+            if not exists(self.lock_path):
+                try:
+                    os.mkdir(self.lock_path)
+                except OSError:
+                    return False
+	        else:
+                    return True
+            return False
+
+        while not _try_to_lock():
+            time.sleep(0.1)
+            if _is_timed_out():
+                break
+        try:
+            yield
+        finally:
+            os.rmdir(self.lock_path)
 
     def _create_source(self):
         # Create the source.
         if self.rank == 0:
-            self._write_source(self.src_path)
+            with self._lock():
+                self._write_source(self.src_path)
         if self.num_procs > 1:
             self.comm.barrier()
             if not exists(self.src_path):
@@ -90,7 +128,8 @@ class ExtModule(object):
                 # filesystem (multi-core CPUs) whose rank is non-zero.
                 self.name = 'm_{0}_{1}'.format(self.hash, self.rank)
                 self._setup_filenames()
-                self._write_source(self.src_path)
+                with self._lock():
+                    self._write_source(self.src_path)
             else:
                 self.shared_filesystem = True
 
@@ -101,14 +140,19 @@ class ExtModule(object):
 
     def _setup_root(self, root):
         if root is None:
-            self.root = expanduser(join('~', '.pysph', 'source'))
+            plat_dir = get_platform_dir()
+            self.root = expanduser(join('~', '.pysph', 'source', plat_dir))
         else:
             self.root = root
 
         self.build_dir = join(self.root, 'build')
 
         if not isdir(self.build_dir):
-            os.makedirs(self.build_dir)
+            try:
+                os.makedirs(self.build_dir)
+            except OSError:
+                # The directory was created at the same time by another process.
+                pass
 
     def _dependencies_have_changed(self):
         depends = self.depends
@@ -139,27 +183,28 @@ class ExtModule(object):
         previously compiled module is returned.
         """
         if not self.shared_filesystem or self.rank == 0:
-            if force or self.should_recompile():
-                self._message("Compiling code at:", self.src_path)
-                inc_dirs = [
-                    dirname(dirname(pysph.__file__)), 
-                    numpy.get_include()
-                ]
-                extra_compile_args, extra_link_args = self._get_extra_args()
+            with self._lock():
+                if force or self.should_recompile():
+                    self._message("Compiling code at:", self.src_path)
+                    inc_dirs = [
+                        dirname(dirname(pysph.__file__)),
+                        numpy.get_include()
+                    ]
+                    extra_compile_args, extra_link_args = self._get_extra_args()
 
-                extension = Extension(
-                    name=self.name, sources=[self.src_path],
-                    include_dirs=inc_dirs, 
-                    extra_compile_args=extra_compile_args,
-                    extra_link_args=extra_link_args,
-                    language="c++"
-                )
-                mod = pyxbuild.pyx_to_dll(self.src_path, extension,
-                    pyxbuild_dir=self.build_dir, force_rebuild=True
-                )
-                shutil.copy(mod, self.ext_path)
-            else:
-                self._message("Precompiled code from:", self.src_path)
+                    extension = Extension(
+                        name=self.name, sources=[self.src_path],
+                        include_dirs=inc_dirs,
+                        extra_compile_args=extra_compile_args,
+                        extra_link_args=extra_link_args,
+                        language="c++"
+                    )
+                    mod = pyxbuild.pyx_to_dll(self.src_path, extension,
+                        pyxbuild_dir=self.build_dir, force_rebuild=True
+                    )
+                    shutil.copy(mod, self.ext_path)
+                else:
+                    self._message("Precompiled code from:", self.src_path)
         if MPI is not None:
             self.comm.barrier()
 
@@ -184,4 +229,3 @@ class ExtModule(object):
     def _message(self, *args):
         if self.verbose:
             print(' '.join(args))
-
