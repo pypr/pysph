@@ -26,7 +26,6 @@ install:
 
 test_script:
     # Run the tests.
-    - "%CMD_IN_ENV% nosetests -v -A slow --with-xunit --xunit-file=nosetests.xml"
+    - "%CMD_IN_ENV% python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml"
     # Upload results to appveyor.
     - ps: (new-object System.Net.WebClient).UploadFile("https://ci.appveyor.com/api/testresults/xunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\nosetests.xml))
-
