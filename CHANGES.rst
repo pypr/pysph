@@ -1,3 +1,15 @@
+1.0a3
+------
+
+* Release date: not yet released.
+* Fix bug with ``output_at_times`` specification for solver.
+* Don't import anything in ``pysph/__init__.py`` unless necessary.
+* Put generated sources and extensions into a platform specific directory in
+  ``~/.pysph/sources/<platform-specific-dir>`` to avoid problems with multiple
+  Python versions, operating systems etc.
+* Use locking while creating extension modules to prevent problems when
+  multiple processes generate the same extesion.
+
 1.0a2
 ------
 
@@ -36,4 +48,3 @@
   <https://app.shippable.com/projects/540e849c3479c5ea8f9f030e/builds/latest>`_,
   `Drone.io <https://drone.io/bitbucket.org/pysph/pysph>`_, and `AppVeyor
   <https://ci.appveyor.com/project/prabhuramachandran/pysph>`_.
-

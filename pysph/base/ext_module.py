@@ -102,7 +102,7 @@ class ExtModule(object):
                     os.mkdir(self.lock_path)
                 except OSError:
                     return False
-	        else:
+                else:
                     return True
             return False
 
