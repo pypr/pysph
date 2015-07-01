@@ -4,6 +4,7 @@ __version__ = '1.0a3.dev0'
 # Utility functions to determine if Zoltan/MPI are available.
 _has_mpi = None
 _has_zoltan = None
+_in_parallel = None
 
 def has_mpi():
     """Return True if mpi4py is available.
@@ -28,3 +29,12 @@ def has_zoltan():
         except ImportError:
             _has_zoltan = False
     return _has_zoltan
+
+def in_parallel():
+    """Return true if we're running with MPI and Zoltan support
+    """
+    global _in_parallel
+    if _in_parallel is None:
+        _in_parallel = has_mpi() and has_zoltan()
+
+    return _in_parallel

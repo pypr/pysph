@@ -14,11 +14,10 @@ from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load
 
 # conditional parallel imports
-from pysph import has_mpi, has_zoltan
-if has_mpi() and has_zoltan():
+from pysph import has_mpi, has_zoltan, in_parallel
+if in_parallel():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
-
 
 def list_option_callback(option, opt, value, parser):
     val = value.split(',')
@@ -63,7 +62,7 @@ class Application(object):
         self.comm = None
         self.num_procs = 1
         self.rank = 0
-        if has_mpi():
+        if in_parallel():
             self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
@@ -686,7 +685,7 @@ class Application(object):
         # Setup the solver output file name
         fname = options.output
 
-        if has_mpi():
+        if in_parallel():
             rank = self.rank
             if self.num_procs > 1:
                 fname += '_' + str(rank)
