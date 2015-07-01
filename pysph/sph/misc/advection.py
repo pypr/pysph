@@ -1,4 +1,7 @@
-"""Functions for advection"""
+"""
+Functions for advection
+#######################
+"""
 
 from pysph.sph.equation import Equation
 from numpy import cos, pi

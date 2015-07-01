@@ -4,7 +4,11 @@ Copyright (c) 2015, Prabhu Ramachandran
 License: BSD
 """
 import numpy as np
-import unittest
+try:
+    # This is for Python-2.6.x
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 from pysph.base.utils import get_particle_array
 from pysph.sph.simple_inlet_outlet import SimpleInlet, SimpleOutlet
@@ -137,7 +141,7 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         y = dest_pa.y
         p = dest_pa.p
         h = dest_pa.h
-        print x, y
+        print(x, y)
         self.assertEqual(self.dest_pa.get_number_of_particles(), 9)
 
         # Calculate the expected positions.

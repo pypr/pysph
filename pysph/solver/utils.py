@@ -7,8 +7,6 @@ import pickle
 import numpy
 import sys
 import os
-import platform
-import commands
 import tempfile
 import zipfile
 from numpy.lib import format
@@ -141,7 +139,7 @@ def savez_compressed(file, *args, **kwds):
     _savez(file, args, kwds, True)
 
 def _savez(file, args, kwds, compress):
-    if isinstance(file, basestring):
+    if isinstance(file, str):
         if not file.endswith('.npz'):
             file = file + '.npz'
 
@@ -150,7 +148,7 @@ def _savez(file, args, kwds, compress):
         key = 'arr_%d' % i
         if key in namedict.keys():
             msg = "Cannot use un-named variables and keyword %s" % key
-            raise ValueError, msg
+            raise ValueError(msg)
         namedict[key] = val
 
     if compress:
@@ -164,7 +162,7 @@ def _savez(file, args, kwds, compress):
     fd, tmpfile = tempfile.mkstemp(suffix='-numpy.npy')
     os.close(fd)
     try:
-        for key, val in namedict.iteritems():
+        for key, val in namedict.items():
             fname = key + '.npy'
             fid = open(tmpfile, 'wb')
             try:
@@ -341,19 +339,26 @@ def dump(filename, particles, solver_data, detailed_output=False,
          only_real=True, mpi_comm=None):
     """Dump the given particles and solver data to the given filename.
 
-    **Parameters**
+    Parameters
+    ----------
 
-     - filename: str: Filename to dump to.
+    filename: str
+        Filename to dump to.
 
-     - particles: sequence(ParticleArray): Sequence of particle arrays to dump.
+    particles: sequence(ParticleArray)
+        Sequence of particle arrays to dump.
 
-     - solver_data: dict: Additional information to dump about solver state.
+    solver_data: dict
+        Additional information to dump about solver state.
 
-     - detailed_output: bool: Specifies if all arrays should be dumped.
+    detailed_output: bool
+        Specifies if all arrays should be dumped.
 
-     - only_real: bool: Only dump the real particles.
+    only_real: bool
+        Only dump the real particles.
 
-     - mpi_comm: An MPI communicator to use for parallel commmunications.
+    mpi_comm: mpi4pi.MPI.Intracomm
+        An MPI communicator to use for parallel commmunications.
 
     If `mpi_comm` is not passed or is set to None the local particles alone
     are dumped, otherwise only rank 0 dumps the output.
@@ -373,7 +378,7 @@ def dump(filename, particles, solver_data, detailed_output=False,
     if mpi_comm is not None:
         all_array_data = _gather_array_data(all_array_data, mpi_comm)
 
-    for name, arrays in all_array_data.iteritems():
+    for name, arrays in all_array_data.items():
         particle_data[name]["arrays"] = arrays
 
     if mpi_comm is None or mpi_comm.Get_rank() == 0:
@@ -405,16 +410,37 @@ def dump_v1(filename, particles, solver_data, detailed_output=False,
 
 
 def load(fname):
-    """ Load and return data from an  output (.npz) file dumped by PySPH.
+    """Load and return data from an  output (.npz) file dumped by PySPH.
 
     For output file version 1, the function returns a dictionary with
     the keys:
 
-    solver_data : Solver constants at the time of output like time,
+    ``"solver_data"`` : Solver constants at the time of output like time,
     time step and iteration count.
 
-    arrays : ParticleArrays keyed on names with the ParticleArray
-    object as value.
+    ``"arrays"`` : ParticleArrays keyed on names with the ParticleArray object
+    as value.
+
+    Parameters
+    ----------
+
+    fname : str
+        Name of the file.
+
+    Examples
+    --------
+
+    >>> data = load('elliptical_drop_100.npz')
+    >>> data.keys()
+    ['arrays', 'solver_data']
+    >>> arrays = data['arrays']
+    >>> arrays.keys()
+    ['fluid']
+    >>> fluid = arrays['fluid']
+    >>> type(fluid)
+    pysph.base.particle_array.ParticleArray
+    >>> data['solver_data']
+    {'count': 100, 'dt': 4.6416394784204199e-05, 't': 0.0039955855395528766}
 
     """
     def _get_dict_from_arrays(arrays):
@@ -443,14 +469,14 @@ def load(fname):
     elif version == 2:
         particles = _get_dict_from_arrays(data["particles"])
 
-        for array_name, array_info in particles.iteritems():
+        for array_name, array_info in particles.items():
             array = ParticleArray(name=array_name,
                                   constants=array_info["constants"],
                                   **array_info["arrays"])
             array.set_output_arrays(
                 array_info.get('output_property_arrays', [])
             )
-            for prop, prop_info in array_info["properties"].iteritems():
+            for prop, prop_info in array_info["properties"].items():
                 if prop not in array_info["arrays"]:
                     array.add_property(**prop_info)
             ret["arrays"][array_name] = array
@@ -466,8 +492,8 @@ def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
     Given a filename prefix and the number of processors, return a
     concatenated version of the dictionary returned via load.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
 
     prefix : str
         A filename prefix for the output file.
@@ -648,10 +674,20 @@ class SPHInterpolate(object):
 
         return resultx, resulty, resultz
 
-################################################################################
-# Get all solution files in a given directory
-###############################################################################
 def get_files(dirname=None, fname=None, endswith=".npz"):
+    """Get all solution files in a given directory, `dirname`.
+
+    Parameters
+    ----------
+
+    dirname: str
+        Name of directory.
+    fname: str
+        An initial part of the filename, if not specified use the first
+        part of the dirname.
+    endswith: str
+        The extension of the file to load.
+    """
 
     if dirname is None:
         return []
@@ -667,13 +703,10 @@ def get_files(dirname=None, fname=None, endswith=".npz"):
     files = [os.path.join(path, f) for f in files]
 
     # sort the files
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
+    def _key_func(arg):
+        a = os.path.splitext(arg)[0]
+        return int(a[a.rfind('_')+1:])
 
-    files.sort(_sort_func)
+    files.sort(key=_key_func)
 
     return files

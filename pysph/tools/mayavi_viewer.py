@@ -5,6 +5,7 @@ communicate with a running solver and displays the particles using
 Mayavi.  It can also display a list of supplied files.
 """
 
+from functools import reduce
 import glob
 import sys
 import math
@@ -738,7 +739,7 @@ class MayaviViewer(HasTraits):
         self.current_time = t = float(solver_data['t'])
         self.time_step = float(solver_data['dt'])
         self.iteration = int(solver_data['count'])
-        names = arrays.keys()
+        names = list(arrays.keys())
         pa_names = self.pa_names
 
         if len(pa_names) == 0:
@@ -759,7 +760,7 @@ class MayaviViewer(HasTraits):
                 pah = self.particle_arrays[idx]
                 pah.set(particle_array=pa, time=t)
 
-        self.interpolator.particle_arrays = arrays.values()
+        self.interpolator.particle_arrays = list(arrays.values())
 
         if self.record:
             self._do_snap()
@@ -834,7 +835,7 @@ class MayaviViewer(HasTraits):
 
 ######################################################################
 def usage():
-    print """Usage:
+    print("""Usage:
 pysph_viewer [-v] <trait1=value> <trait2=value> [files.npz]
 
 If *.npz files are not supplied it will connect to a running solver, if not it
@@ -871,10 +872,10 @@ Examples::
   $ pysph_viewer foo.npz
   $ pysph_viewer *.npz play=True loop=True
 
-"""
+""")
 
 def error(msg):
-    print msg
+    print(msg)
     sys.exit()
 
 def main(args=None):

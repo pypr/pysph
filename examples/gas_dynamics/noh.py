@@ -73,7 +73,7 @@ def create_particles(**kwargs):
 
     fluid = gpa(name='fluid', x=x,y=y,m=m,rho=rho, h=h,u=u,v=v,p=p,e=e)
 
-    print "Noh's problem with %d particles"%(fluid.get_number_of_particles())
+    print("Noh's problem with %d particles"%(fluid.get_number_of_particles()))
 
     return [fluid,]
 

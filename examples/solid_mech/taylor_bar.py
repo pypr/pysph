@@ -73,7 +73,7 @@ def get_bar_particles():
     x,y = numpy.meshgrid( xarr, yarr )
     x, y = x.ravel(), y.ravel()
 
-    print 'Number of bar particles: ', len(x)
+    print('Number of bar particles: ', len(x))
 
     hf = numpy.ones_like(x) * h
     mf = numpy.ones_like(x) * dx * dy * r0

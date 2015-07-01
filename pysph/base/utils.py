@@ -4,7 +4,7 @@ except ImportError:
     from ordereddict import OrderedDict
 
 import numpy
-from particle_array import ParticleArray, \
+from .particle_array import ParticleArray, \
     get_local_tag, get_remote_tag, get_ghost_tag
 
 from pyzoltan.core.carray import LongArray
@@ -36,29 +36,44 @@ def arange_long(start, stop=-1):
 
 
 def get_particle_array(additional_props=None, constants=None, **props):
-    """ Create and return a particle array with default properties
+    """Create and return a particle array with default properties.
+
+    The default properties are ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho',
+    'p', 'au', 'av', 'aw', 'gid', 'pid', 'tag']
+
 
     Parameters
     ----------
 
+    additional_props : list
+        If specified, add these properties.
+
+    constants : dict
+        Any constants to be added to the particle array.
+
+    Other Parameters
+    ----------------
     props : dict
-        A dictionary of properties requested.
+        Additional keywords passed are set as the property arrays.
 
-    Example Usage:
-    --------------
-    In [1]: import particle
+    Examples
+    --------
 
-    In [2]: x = linspace(0,1,10)
+    >>> x = linspace(0,1,10)
+    >>> pa = get_particle_array(name='fluid', x=x)
+    >>> pa.properties.keys()
+    ['x', 'z', 'rho', 'pid', 'v', 'tag', 'm', 'p', 'gid', 'au', 
+     'aw', 'av', 'y', 'u', 'w', 'h']
+    >>> pa1 = get_particle_array(name='fluid', additional_props=['xx', 'yy'])
 
-    In [3]: pa = particle.get_particle_array(x=x)
-
-    In [4]: pa
-    Out[4]: <pysph.base.particle_array.ParticleArray object at 0x9ec302c>
+    >>> pa = get_particle_array(name='fluid', x=x, constants={'alpha': 1.0})
+    >>> pa.constants.keys()
+    ['alpha']
 
     """
 
     # handle the name separately
-    if props.has_key('name'):
+    if 'name' in props:
         name = props['name']
         props.pop('name')
     else:
@@ -132,10 +147,32 @@ def get_particle_array(additional_props=None, constants=None, **props):
     return pa
 
 def get_particle_array_wcsph(constants=None, **props):
-    """Return a particle array for the WCSPH formulation"""
+    """Return a particle array for the WCSPH formulation.
+
+    This sets the default properties to be::
+
+        ['x', 'y', 'z', 'u', 'v', 'w', 'h', 'rho', 'm', 'p', 'cs', 'ax', 'ay',
+        'az', 'au', 'av', 'aw', 'x0','y0', 'z0','u0', 'v0','w0', 'arho',
+        'rho0', 'div', 'gid','pid', 'tag']
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
 
     # handle the name separately
-    if props.has_key('name'):
+    if 'name' in props:
         name = props['name']
         props.pop('name')
     else:
@@ -203,7 +240,31 @@ def get_particle_array_wcsph(constants=None, **props):
     return pa
 
 def get_particle_array_iisph(constants=None, **props):
-    """Get a particle array for the IISPH formulation."""
+    """Get a particle array for the IISPH formulation.
+
+    The default properties are::
+
+        ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p', 'au', 'av', 'aw',
+        'gid', 'pid', 'tag' 'uadv', 'vadv', 'wadv', 'rho_adv', 'au', 'av',
+        'aw','ax', 'ay', 'az', 'dii0', 'dii1', 'dii2', 'V', 'aii', 'dijpj0',
+        'dijpj1', 'dijpj2', 'p', 'p0', 'piter', 'compression'
+         ]
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
     iisph_props = ['uadv', 'vadv', 'wadv', 'rho_adv',
                  'au', 'av', 'aw','ax', 'ay', 'az',
                  'dii0', 'dii1', 'dii2', 'V',
@@ -224,6 +285,23 @@ def get_particle_array_iisph(constants=None, **props):
     return pa
 
 def get_particle_array_rigid_body(constants=None, **props):
+    """Return a particle array for a rigid body motion.
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
     extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'x0', 'y0', 'z0']
     consts = {'total_mass':0.0,
               'cm': [0.0, 0.0, 0.0],
@@ -254,7 +332,23 @@ def get_particle_array_rigid_body(constants=None, **props):
     return pa
 
 def get_particle_array_tvf_fluid(constants=None, **props):
-    "Get the fluid array for the transport velocity formulation"
+    """Return a particle array for the TVF formulation for a fluid.
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
     tv_props = ['uhat', 'vhat', 'what',
                 'auhat', 'avhat', 'awhat', 'vmag2', 'V']
 
@@ -267,7 +361,23 @@ def get_particle_array_tvf_fluid(constants=None, **props):
     return pa
 
 def get_particle_array_tvf_solid(constants=None, **props):
-    "Get the solid array for the transport velocity formulation"
+    """Return a particle array for the TVF formulation for a solid.
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
     tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az',
                 'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
 
@@ -276,7 +386,23 @@ def get_particle_array_tvf_solid(constants=None, **props):
     )
 
 def get_particle_array_gasd(constants=None, **props):
-    "Get the particle array with requisite properties for gas-dynamics"
+    """Return a particle array for a Gas Dynamics problem.
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
     required_props = [
         'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
         'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
@@ -302,21 +428,22 @@ def get_particle_array_gasd(constants=None, **props):
 def get_particles_info(particles):
     """Return the array information for a list of particles.
 
-    This function returns a dictionary containing the property
-    information for a list of particles. This dict can be used for
-    example to set-up dummy/empty particle arrays.
+    Returns
+    -------
+    A dictionary containing the property information for a list of particles.
+    This dict can be used for example to set-up dummy/empty particle arrays.
 
     """
     info = OrderedDict()
     for parray in particles:
         prop_info = {}
-        for prop_name, prop in parray.properties.iteritems():
+        for prop_name, prop in parray.properties.items():
             prop_info[prop_name] = {
                 'name':prop_name, 'type':prop.get_c_type(),
                 'default':parray.default_values[prop_name],
                 'data':None}
         const_info = {}
-        for c_name, value in parray.constants.iteritems():
+        for c_name, value in parray.constants.items():
             const_info[c_name] = value.get_npy_array()
         info[ parray.name ] = dict(
             properties=prop_info, constants=const_info,
@@ -328,7 +455,7 @@ def get_particles_info(particles):
 def create_dummy_particles(info):
     """Returns a replica (empty) of a list of particles"""
     particles = []
-    for name, pa_data in info.iteritems():
+    for name, pa_data in info.items():
         prop_dict = pa_data['properties']
         constants = pa_data['constants']
         pa = ParticleArray(name=name, constants=constants, **prop_dict)

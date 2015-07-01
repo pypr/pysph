@@ -1,7 +1,10 @@
+from collections import defaultdict
 from mako.template import Template
 from os.path import dirname, join
 
-from pysph.base.cython_generator import CythonGenerator
+from pyzoltan.core import carray
+from pysph.base.config import get_config
+from pysph.base.cython_generator import CythonGenerator, KnownType
 
 
 ###############################################################################
@@ -24,36 +27,95 @@ def get_code(obj):
     return result
 
 ###############################################################################
-def get_array_names(particle_arrays):
-    """Get the union of the names of all particle array properties.
+def get_all_array_names(particle_arrays):
+    """For each type of carray, find the union of the names of all particle
+    array properties/constants along with their array type.  Returns a
+    dictionary keyed on the name of the Array class with values being a set of
+    property names for each.
+
+    Parameters
+    ----------
+
+    particle_arrays : list
+        A list of particle arrays.
+
+    Examples
+    --------
+
+    A simple example would be::
+
+        >>> x = np.linspace(0, 1, 10)
+        >>> pa = ParticleArray(name='f', x=x)
+        >>> get_all_array_names([pa])
+        {'DoubleArray': {'x'}, 'IntArray': {'pid', 'tag'}, 'UIntArray': {'gid'}}
     """
-    props = set()
+    props = defaultdict(set)
     for array in particle_arrays:
-        for name in array.properties.keys() + array.constants.keys():
-            props.add(name)
-    props.difference_update(set(('tag', 'pid', 'gid')))
-    array_names = ', '.join(sorted(props))
-    return array_names
+        for properties in (array.properties, array.constants):
+            for name, arr in properties.items():
+                a_type = arr.__class__.__name__
+                props[a_type].add(name)
+    return dict(props)
+
+def get_known_types_for_arrays(array_names):
+    """Given all the array names from `get_all_array_names` this creates known
+    types for each of them so that the code generators can use this type
+    information when needed.  Note that known type info is generated for both
+    source and destination style arrays.
+
+    Parameters
+    ----------
+
+    array_names: dict
+        A dictionary produced by `get_all_array_names`.
+
+    Examples
+    --------
+
+    A simple example would be::
+
+        >>> x = np.linspace(0, 1, 10)
+        >>> pa = ParticleArray(name='f', x=x)
+        >>> pa.remove_property('pid')
+        >>> info = get_all_array_names([pa])
+        >>> get_known_types_for_arrays(info)
+        {'d_gid': KnownType("unsigned int*"),
+         'd_tag': KnownType("int*"),
+         'd_x': KnownType("double*"),
+         's_gid': KnownType("unsigned int*"),
+         's_tag': KnownType("int*"),
+         's_x': KnownType("double*")}
+
+    """
+    result = {}
+    for arr_type, arrays in array_names.items():
+        c_type = getattr(carray, arr_type)().get_c_type()
+        for arr in arrays:
+            known_type = KnownType(c_type + '*')
+            result['s_' + arr] = known_type
+            result['d_' + arr] = known_type
+    return result
 
 
 ###############################################################################
 class AccelerationEvalCythonHelper(object):
     def __init__(self, acceleration_eval):
         self.object = acceleration_eval
+        self.config = get_config()
+        self.all_array_names = get_all_array_names(
+            self.object.particle_arrays
+        )
+        self.known_types = get_known_types_for_arrays(
+            self.all_array_names
+        )
 
     ##########################################################################
     # Public interface.
     ##########################################################################
     def get_code(self):
-        object = self.object
-        header = self.get_header()
-        array_names =  get_array_names(object.particle_arrays)
-        parrays = [pa.name for pa in object.particle_arrays]
-        pa_names = ', '.join(parrays)
         path = join(dirname(__file__), 'acceleration_eval_cython.mako')
         template = Template(filename=path)
-        main = template.render(header=header, array_names=array_names,
-                               pa_names=pa_names, helper=self)
+        main = template.render(helper=self)
         return main
 
     def setup_compiled_module(self, module):
@@ -68,6 +130,18 @@ class AccelerationEvalCythonHelper(object):
     ##########################################################################
     # Mako interface.
     ##########################################################################
+    def get_array_decl_for_wrapper(self):
+        array_names = self.all_array_names
+        decl = []
+        for a_type in sorted(array_names.keys()):
+            props = array_names[a_type]
+            decl.append(
+                'cdef public {a_type} {attrs}'.format(
+                    a_type=a_type, attrs=', '.join(sorted(props))
+                )
+            )
+        return '\n'.join(decl)
+
     def get_header(self):
         object = self.object
         headers = []
@@ -78,12 +152,14 @@ class AccelerationEvalCythonHelper(object):
             headers.extend(get_code(equation))
 
         # Kernel wrappers.
-        cg = CythonGenerator()
+        cg = CythonGenerator(known_types=self.known_types)
         cg.parse(object.kernel)
         headers.append(cg.get_code())
 
         # Equation wrappers.
-        headers.append(object.all_group.get_equation_wrappers())
+        headers.append(object.all_group.get_equation_wrappers(
+            self.known_types
+        ))
 
         return '\n'.join(headers)
 
@@ -109,7 +185,7 @@ class AccelerationEvalCythonHelper(object):
         group = self.object.all_group
         src, dest = group.get_array_names()
         src.update(dest)
-        return group.get_array_declarations(src)
+        return group.get_array_declarations(src, self.known_types)
 
     def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources, real):
         src, dest_arrays = eqs_with_no_source.get_array_names()
@@ -118,12 +194,22 @@ class AccelerationEvalCythonHelper(object):
             dest_arrays.update(d)
         lines = ['NP_DEST = self.%s.size(real=%s)'%(dest_name, real)]
         lines += ['%s = dst.%s.data'%(n, n[2:])
-                 for n in dest_arrays]
+                  for n in sorted(dest_arrays)]
         return '\n'.join(lines)
 
     def get_src_array_setup(self, src_name, eq_group):
         src_arrays, dest = eq_group.get_array_names()
         lines = ['NP_SRC = self.%s.size()'%src_name]
         lines += ['%s = src.%s.data'%(n, n[2:])
-                 for n in src_arrays]
+                 for n in sorted(src_arrays)]
         return '\n'.join(lines)
+
+    def get_parallel_block(self):
+        if self.config.use_openmp:
+            return "with nogil, parallel():"
+        else:
+            return "if True: # Placeholder used for OpenMP."
+
+    def get_particle_array_names(self):
+        parrays = [pa.name for pa in self.object.particle_arrays]
+        return ', '.join(parrays)

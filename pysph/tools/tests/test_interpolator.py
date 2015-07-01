@@ -3,7 +3,11 @@
 # License: BSD Style.
 
 # Standard library imports
-import unittest
+try:
+    # This is for Python-2.6.x
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 # Library imports.
 import numpy as np

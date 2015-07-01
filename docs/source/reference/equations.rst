@@ -12,6 +12,10 @@ SPH equations
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.wc.viscosity
+   :members:
+   :undoc-members:
+
 .. automodule:: pysph.sph.wc.transport_velocity
    :members:
    :undoc-members:
@@ -28,21 +32,50 @@ SPH equations
    :members:
    :undoc-members:
 
+Gas Dynamics
+-------------
+
+.. automodule:: pysph.sph.gas_dynamics.basic
+   :members:
+   :undoc-members:
+
+Surface tension
+----------------
+
+.. automodule:: pysph.sph.surface_tension
+   :members:
+   :undoc-members:
+
+Implicit Incompressible SPH
+----------------------------
+
+.. automodule:: pysph.sph.iisph
+   :members:
+   :undoc-members:
+
+
+Rigid body motion
+-----------------
+
+.. automodule:: pysph.sph.rigid_body
+   :members:
+   :undoc-members:
+
+Miscellaneous
+--------------
+
 .. automodule:: pysph.sph.misc.advection
    :members:
    :undoc-members:
 
-
-.. automodule:: pysph.base.serial_reduce_array
+.. automodule:: pysph.base.reduce_array
    :members:
    :undoc-members:
 
-.. automodule:: pysph.base.parallel_reduce_array
-   :members:
-   :undoc-members:
 
 Group of equations
 -------------------
 
 .. autoclass:: pysph.sph.equation.Group
-   :members:
+   :special-members:
+

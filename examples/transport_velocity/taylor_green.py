@@ -54,8 +54,8 @@ def create_particles(**kwargs):
     # add the requisite arrays
     fluid.add_property('color')
 
-    print "Taylor green vortex problem :: nfluid = %d, dt = %g"%(
-        fluid.get_number_of_particles(), dt)
+    print("Taylor green vortex problem :: nfluid = %d, dt = %g"%(
+        fluid.get_number_of_particles(), dt))
 
     # setup the particle properties
     pi = np.pi; cos = np.cos; sin=np.sin

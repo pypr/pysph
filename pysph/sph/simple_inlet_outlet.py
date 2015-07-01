@@ -11,9 +11,9 @@ added to a specified "outlet" particle array and removed from the source
 array.  When outlet particles leave the outlet region (specified with a
 bounding box) they are removed from the simulation.
 
-Copyright (c) 2015, Prabhu Ramachandran
-License: BSD
 """
+# Copyright (c) 2015, Prabhu Ramachandran
+# License: BSD
 
 import numpy as np
 
@@ -45,20 +45,26 @@ class SimpleInlet(object):
         the 'x' axis and n=5 with spacing 0.1, then xmax - xmin should be 0.5.
 
 
-        Arguments
-        -----------
+        Parameters
+        ----------
 
-         inlet_pa - Particle array for the inlet particles.
+        inlet_pa: ParticleArray
+           Particle array for the inlet particles.
 
-         dest_pa - Particle array for the destination into which inlet flows.
+        dest_pa: ParticleArray
+           Particle array for the destination into which inlet flows.
 
-         spacing - Spacing of particles in the inlet domain.
+        spacing: float
+           Spacing of particles in the inlet domain.
 
-         n - Total number of copies of the initial particles.
+        n: int
+           Total number of copies of the initial particles.
 
-         axis: one of 'x', 'y', 'z' - Axis along which to stack particles.
+        axis: str
+           Axis along which to stack particles, one of 'x', 'y', 'z'.
 
-         xmin, xmax, ymin, ymax, zmin, zmax - Domain of the outlet.
+        xmin, xmax, ymin, ymax, zmin, zmax: float
+           Domain of the outlet.
 
         """
         self.inlet_pa = inlet_pa
@@ -89,7 +95,7 @@ class SimpleInlet(object):
     def _create_inlet_particles(self):
         props =  self.inlet_pa.get_property_arrays()
         inlet_props = {}
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             new_array = np.array([], dtype=array.dtype)
             for i in range(1, self.n):
                 if prop == self.axis:
@@ -122,7 +128,7 @@ class SimpleInlet(object):
 
         # adding particles to the destination array.
         props = inlet_pa.get_property_arrays()
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             pa_add[prop] = np.array(array[all_idx])
         self.dest_pa.add_particles(**pa_add)
 
@@ -142,14 +148,17 @@ class SimpleOutlet(object):
                  ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0):
         """Constructor.
 
-        Arguments
-        -----------
+        Parameters
+        ----------
 
-         outlet_pa - Particle array for the outlet particles.
+        outlet_pa : ParticleArray
+            Particle array for the outlet particles.
 
-         source_pa - Particle array from which the particles flow in.
+        source_pa : ParticleArray
+            Particle array from which the particles flow in.
 
-         xmin, xmax, ymin, ymax, zmin, zmax - Domain of the outlet.
+        xmin, xmax, ymin, ymax, zmin, zmax: float
+            Domain of the outlet.
 
         """
         self.outlet_pa = outlet_pa
@@ -173,7 +182,7 @@ class SimpleOutlet(object):
         # adding particles to the destination array.
         pa_add = {}
         props = source_pa.get_property_arrays()
-        for prop, array in props.iteritems():
+        for prop, array in props.items():
             pa_add[prop] = np.array(array[idx])
         outlet_pa.add_particles(**pa_add)
 

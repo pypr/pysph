@@ -1,5 +1,4 @@
-# Cython
-cimport cython
+#cython: embedsignature=True
 
 # Numpy
 import numpy as np
@@ -24,9 +23,9 @@ cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
 
 cdef extern from 'math.h':
-    cdef double ceil(double)
-    cdef double floor(double)
-    cdef double fabs(double)
+    cdef double ceil(double) nogil
+    cdef double floor(double) nogil
+    cdef double fabs(double) nogil
 
 cdef extern from 'limits.h':
     cdef int INT_MAX
@@ -313,8 +312,8 @@ cdef class ParallelManager:
                  bint update_cell_sizes=True):
         """Constructor.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Dimension
@@ -522,7 +521,8 @@ cdef class ParallelManager:
 
         (g) Update the local cell map to accomodate remote particles.
 
-        Notes:
+        Notes
+        -----
 
         Although not intended to be a 'parallel' NNPS, the
         ParallelManager can be used for this purpose. I don't think
@@ -649,8 +649,8 @@ cdef class ParallelManager:
     cdef _bin(self, int pa_index, UIntArray indices):
         """Bin a given particle array with indices.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         pa_index : int
             Index of the particle array corresponding to the particles list
@@ -911,8 +911,8 @@ cdef class ParallelManager:
                                 size_t d_idx, UIntArray nbrs):
         """Utility function to get near-neighbors for a particle.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         src_index : int
             Index of the source particle array in the particles list
@@ -990,8 +990,8 @@ cdef class ParallelManager:
                                 nbrs.data[ nnbrs ] = j
                                 nnbrs = nnbrs + 1
 
-        # update the _length for nbrs to indicate the number of neighbors
-        nbrs._length = nnbrs
+        # update the length for nbrs to indicate the number of neighbors
+        nbrs.length = nnbrs
 
 cdef class ZoltanParallelManager(ParallelManager):
     """Base class for Zoltan enabled parallel cell managers.
@@ -1015,8 +1015,8 @@ cdef class ZoltanParallelManager(ParallelManager):
                  bint update_cell_sizes=True):
         """Constructor.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Dimension

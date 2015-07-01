@@ -28,7 +28,7 @@ class Integrator(object):
 
         where "fluid" and "solid" are the names of the particle arrays.
         """
-        for array_name, integrator_step in kw.iteritems():
+        for array_name, integrator_step in kw.items():
             if not isinstance(integrator_step, IntegratorStep):
                 msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
                 raise ValueError(msg)
@@ -183,7 +183,6 @@ class Integrator(object):
 ###############################################################################
 class EulerIntegrator(Integrator):
     def one_timestep(self, t, dt):
-        self.initialize()
         self.compute_accelerations()
         self.stage1()
         self.do_post_stage(dt, 1)
@@ -308,3 +307,54 @@ class TVDRK3Integrator(Integrator):
         self.compute_accelerations()
         self.stage3()
         self.do_post_stage(dt, 3)
+
+
+###############################################################################
+class LeapFrogIntegrator(PECIntegrator):
+    r"""A leap-frog integrator.
+    """
+
+    def one_timestep(self, t, dt):
+
+        self.stage1()
+        self.do_post_stage(0.5*dt, 1)
+
+        self.compute_accelerations()
+        self.stage2()
+        self.do_post_stage(dt, 2)
+
+
+###############################################################################
+class PEFRLIntegrator(Integrator):
+    r"""A Position-Extended Forest-Ruth-Like integrator [Omeylan2002]_
+
+    References
+    ----------
+    .. [Omeylan2002] I.M. Omelyan, I.M. Mryglod and R. Folk, "Optimized
+       Forest-Ruth- and Suzuki-like algorithms for integration of motion
+       in many-body systems", Computer Physics Communications 146, 188 (2002)
+       http://arxiv.org/abs/cond-mat/0110585
+
+    """
+
+    def one_timestep(self, t, dt):
+
+        self.stage1()
+        self.do_post_stage(0.1786178958448091*dt, 1)
+
+        self.compute_accelerations()
+        self.stage2()
+        self.do_post_stage(0.1123533131749906*dt, 2)
+
+        self.compute_accelerations()
+        self.stage3()
+        self.do_post_stage(0.8876466868250094*dt, 3)
+
+        self.compute_accelerations()
+        self.stage4()
+        self.do_post_stage(0.8213821041551909*dt, 4)
+
+        self.compute_accelerations()
+        self.stage5()
+        self.do_post_stage(dt, 5)
+

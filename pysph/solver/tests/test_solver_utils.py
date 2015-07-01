@@ -2,7 +2,11 @@ import numpy as np
 import shutil
 from os.path import join
 from tempfile import mkdtemp
-from unittest import TestCase, main
+try:
+    # This is for Python-2.6.x
+    from unittest2 import TestCase, main
+except ImportError:
+    from unittest import TestCase, main
 
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.solver.utils import dump, load, dump_v1

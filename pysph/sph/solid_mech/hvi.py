@@ -1,4 +1,7 @@
-"""Functions for the High Velocity Impact problems"""
+"""
+Equations for the High Velocity Impact Problems
+###############################################
+"""
 
 from math import sqrt
 from pysph.sph.equation import Equation

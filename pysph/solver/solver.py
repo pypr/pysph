@@ -9,37 +9,15 @@ from pysph.base.kernels import CubicSpline
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
 
-from utils import FloatPBar, load, dump
+from pysph.solver.utils import FloatPBar, load, dump
 
 import logging
 logger = logging.getLogger(__name__)
 
+EPSILON = numpy.finfo(float).eps*2
+
 class Solver(object):
-    """ Base class for all PySPH Solvers
-
-    **Attributes**
-
-    - particles -- the particle arrays to operate on
-
-    - integrator_type -- the class of the integrator. This may be one of any
-      defined in solver/integrator.py
-
-    - kernel -- the kernel to be used throughout the calculations. This may
-      need to be modified to handle several kernels.
-
-    - t -- the internal time step counter
-
-    - pre_step_callbacks -- a list of functions to be performed before stepping
-
-    - post_step_callbacks -- a list of functions to execute after stepping
-
-    - pfreq -- the output print frequency
-
-    - dim -- the dimension of the problem
-
-    - pid -- the processor id if running in parallel
-
-    - cell_iteration :bool: -- should we use cell or particle iteration.
+    """Base class for all PySPH Solvers
 
     """
 
@@ -48,41 +26,58 @@ class Solver(object):
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times = [],
                  fixed_h=False, **kwargs):
-        """Constructor
+        """**Constructor**
 
         Any additional keyword args are used to set the values of any
         of the attributes.
 
         Parameters
-        -----------
+        ----------
 
         dim : int
-            Problem dimensionality
+            Dimension of the problem
 
-        integrator_type : integrator.Integrator
-            The integrator to use
+        integrator : pysph.sph.integrator.Integrator
+            Integrator to use
 
-        kernel : base.kernels.Kernel
+        kernel : pysph.base.kernels.Kernel
             SPH kernel to use
 
         n_damp : int
             Number of timesteps for which the initial damping is required.
-            Setting it to zero will disable damping the timesteps.
+            This is used to improve stability for problems with strong
+            discontinuity in initial condition.
+            Setting it to zero will disable damping of the timesteps.
 
-        tf, dt : double
-            Final time and suggested initial time-step
+        dt : double
+            Suggested initial time step for integration
+
+        tf : double
+            Final time for integration
 
         adaptive_timestep : bint
-            Flag to use adaptive time-steps
+            Flag to use adaptive time steps
 
         cfl : double
             CFL number for adaptive time stepping
 
+        pfreq : int
+            Output files dumping frequency.
+
         output_at_times : list/array
-            Optional list of output times to force output
+            Optional list of output times to force dump the output file
 
         fixed_h : bint
-            Flag for constant smoothing lengths
+            Flag for constant smoothing lengths `h`
+
+        Example
+        -------
+
+        >>> integrator = PECIntegrator(fluid=WCSPHStep())
+        >>> kernel = CubicSpline(dim=2)
+        >>> solver = Solver(dim=2, integrator=integrator, kernel=kernel,
+        ...                 n_damp=50, tf=1.0, dt=1e-3, adaptive_timestep=True,
+        ...                 pfreq=100, cfl=0.5, output_at_times=[1e-1, 1.0])
 
         """
 
@@ -123,6 +118,9 @@ class Solver(object):
         # set the default rank to 0
         self.rank = 0
 
+        # set the default comm to None.
+        self.comm = None
+
         # set the default mode to serial
         self.in_parallel = False
 
@@ -155,11 +153,8 @@ class Solver(object):
         self.output_at_times = numpy.asarray(output_at_times)
         self.force_output = False
 
-        # Use cell iterations or not.
-        self.cell_iteration = False
-
         # Set all extra keyword arguments
-        for attr, value in kwargs.iteritems():
+        for attr, value in kwargs.items():
             if hasattr(self, attr):
                 setattr(self, attr, value)
             else:
@@ -169,7 +164,7 @@ class Solver(object):
         # default time step constants
         self.tf = tf
         self.dt = dt
-        self._old_dt = dt
+        self._prev_dt = None
         self._damping_factor = 1.0
 
         # flag for constant smoothing lengths
@@ -197,7 +192,7 @@ class Solver(object):
 
         mode = 'mpi' if self.in_parallel else 'serial'
         self.acceleration_eval = AccelerationEval(
-            particles, equations, self.kernel, self.cell_iteration, mode
+            particles, equations, self.kernel, mode
         )
 
         sph_compiler = SPHCompiler(
@@ -222,10 +217,19 @@ class Solver(object):
         logger.debug("Solver setup complete.")
 
     def add_post_stage_callback(self, callback):
-        """These callbacks are called after each integrator stage.
+        """These callbacks are called *after* each integrator stage.
 
         The callbacks are passed (current_time, dt, stage).  See the the
         `Integrator.one_timestep` methods for examples of how this is called.
+
+        Example
+        -------
+
+        >>> def post_stage_callback_function(t, dt, stage):
+        >>>     # This function is called after every stage of integrator.
+        >>>     print t, dt, stage
+        >>>     # Do something
+        >>> solver.add_post_stage_callback(post_stage_callback_function)
         """
         self.post_stage_callbacks.append(callback)
 
@@ -233,6 +237,15 @@ class Solver(object):
         """These callbacks are called *after* each timestep is performed.
 
         The callbacks are passed the solver instance (i.e. self).
+
+        Example
+        -------
+
+        >>> def post_step_callback_function(solver):
+        >>>     # This function is called after every time step.
+        >>>     print solver.t, solver.dt
+        >>>     # Do something
+        >>> solver.add_post_step_callback(post_step_callback_function)
         """
         self.post_step_callbacks.append(callback)
 
@@ -240,6 +253,15 @@ class Solver(object):
         """These callbacks are called *before* each timestep is performed.
 
         The callbacks are passed the solver instance (i.e. self).
+
+        Example
+        -------
+
+        >>> def pre_step_callback_function(solver):
+        >>>     # This function is called before every time step.
+        >>>     print solver.t, solver.dt
+        >>>     # Do something
+        >>> solver.add_pre_step_callback(pre_step_callback_function)
         """
         self.pre_step_callbacks.append(callback)
 
@@ -247,7 +269,7 @@ class Solver(object):
         """ Append the particle arrays to the existing particle arrays
         """
         if not self.particles:
-            print 'Warning! Particles not defined.'
+            print('Warning! Particles not defined.')
             return
 
         for array in self.particles:
@@ -259,18 +281,16 @@ class Solver(object):
         self.setup(self.particles)
 
     def set_adaptive_timestep(self, value):
-        """Set if we should use adaptive timesteps or not.
+        """Set it to True to use adaptive timestepping based on
+        cfl, viscous and force factor.
+
+        Look at pysph.sph.integrator.compute_time_step for more details.
         """
         self.adaptive_timestep = value
 
     def set_cfl(self, value):
         'Set the CFL number for adaptive time stepping'
         self.cfl = value
-
-    def set_cell_iteration(self, value):
-        """Set if we should use cell_iteration or not.
-        """
-        self.cell_iteration = value
 
     def set_final_time(self, tf):
         """ Set the final time for the simulation """
@@ -388,7 +408,7 @@ class Solver(object):
         # integrate with.
         self.dt = self._get_timestep()
 
-        while self.t < self.tf:
+        while (self.tf - self.t) > EPSILON:
 
             # perform any pre step functions
             for callback in self.pre_step_callbacks:
@@ -412,31 +432,17 @@ class Solver(object):
             self.t += self.dt
             self.count += 1
 
-            # dump output if the iteration number is a multiple of the
-            # printing frequency
-            if self.count % self.pfreq == 0:
-                self.dump_output()
-                self.barrier()
+            # Compute the next timestep.
+            self.dt = self._get_timestep()
 
-            # dump output if forced
-            if self.force_output:
-                self.dump_output()
-                self.barrier()
-
-                self.force_output = False
-
-                # re-set the time-step to the old time step before it
-                # was adjusted
-                self.dt = self._old_dt
+            # Note: this may adjust dt to land at a desired time.
+            self._dump_output_if_needed()
 
             # update progress bar
             bar.update(self.t)
 
             # update the time for all arrays
             self.update_particle_time()
-
-            # Compute the next timestep.
-            self.dt = self._get_timestep()
 
             if self.execute_commands is not None:
                 if self.count % self.command_interval == 0:
@@ -508,21 +514,21 @@ class Solver(object):
              only_real=self.output_only_real, mpi_comm=comm)
 
     def load_output(self, count):
-        """ Load particle data from dumped output file.
+        """Load particle data from dumped output file.
 
         Parameters
         ----------
-        count : string
-            The iteration time from which to load the data. If time is
-            '?' then list of available data files is returned else
-             the latest available data file is used
+        count : str
+            The iteration time from which to load the data. If time is '?' then
+            list of available data files is returned else the latest available
+            data file is used
 
         Notes
         -----
         Data is loaded from the :py:attr:`output_directory` using the same format
         as stored by the :py:meth:`dump_output` method.
         Proper functioning required that all the relevant properties of arrays be
-        dumped
+        dumped.
 
         """
         # get the list of available files
@@ -623,37 +629,76 @@ class Solver(object):
 
         return dt*self._damping_factor
 
-    def _get_timestep(self):
+    def _dump_output_if_needed(self):
+        """Dump output if needed while solve is running.
 
-        dt = self._compute_timestep()
-        dt = self._damp_timestep(dt)
+        This is called by `solve`.
 
-        # adjust dt to land on final time
-        if self.t + dt > self.tf:
-            dt = self.tf - self.t
+        Warning
+        -------
 
-        # solution output times
+        This will adjust `dt` if the user has asked for output at a
+        non-integral multiple of dt.
+        """
+        if abs(self.t - self.tf) < EPSILON:
+            return
+
+        # dump output if the iteration number is a multiple of the printing
+        # frequency.
+        dump = self.count % self.pfreq == 0
+
+        # Consider the other cases if user has requested output at a specified
+        # time.
+
         output_at_times = self.output_at_times
+        dt = self.dt
 
-        # adjust dt to land on specific output times
+        # adjust dt to land on specific output times or dump output if we have
+        # reached a desired time.
         if len(output_at_times) > 0:
             tdiff = output_at_times - self.t
-            condition = (tdiff > 0) & (tdiff < dt)
 
-            if numpy.any( condition ):
-                output_time = output_at_times[ numpy.where(condition) ]
-                if abs(output_time - self.t) > 1e-14:
+            if numpy.any(numpy.abs(tdiff) < EPSILON):
+                dump = True
+
+            # Our next step may exceed a required timestep so we adjust the
+            # timestep.
+            timestep_too_big = (tdiff > 0.0) & (tdiff < dt)
+            if numpy.any(timestep_too_big):
+                index = numpy.where(timestep_too_big)[0]
+                output_time = output_at_times[index]
+                if abs(output_time - self.t) > EPSILON:
                     # It sometimes happens that the current time is just
                     # shy of the requested output time which results in a
                     # ridiculously small dt so we skip that case.
 
-                    # save the old time-step and compute the new
-                    # time-step to fall on the specified output time
-                    # instant
-                    self._old_dt = dt
-                    dt = float( output_time - self.t )
+                    # Compute the new time-step to fall on the specified output
+                    # time instant and save the previous dt value.
+                    self._prev_dt = dt
+                    self.dt = float(output_time - self.t)
 
-                    self.force_output = True
+        if dump:
+            self.dump_output()
+            self.barrier()
+
+    def _get_timestep(self):
+        if abs(self.tf - self.t) < EPSILON:
+            # We have reached the end, so no need to adjust the timestep
+            # anymore.
+            return self.dt
+
+        if self._prev_dt is not None and abs(self._prev_dt - self.dt) > EPSILON:
+            # if the _prev_dt was set then we need to use it as the current dt
+            # was set to print at an intermediate time.
+            self.dt = self._prev_dt
+            self._prev_dt = None
+
+        dt = self._compute_timestep()
+        dt = self._damp_timestep(dt)
+
+        # adjust dt to land exactly on final time
+        if (self.t + dt) > (self.tf - EPSILON):
+            dt = self.tf - self.t
 
         return dt
 

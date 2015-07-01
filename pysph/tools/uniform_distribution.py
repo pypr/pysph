@@ -1,5 +1,6 @@
 """Helper module to easily create uniform distributions of particles"""
 
+from __future__ import print_function
 import numpy
 
 def uniform_distribution_hcp2D(dx, xmin, xmax, ymin, ymax, adjust=False):
@@ -27,11 +28,13 @@ def uniform_distribution_hcp2D(dx, xmin, xmax, ymin, ymax, adjust=False):
     x[:,::2] += dxb2
     x = x.ravel(); y = y.ravel()
 
-    print 'HCP packing domain: xmin, xmax, ymin, ymax =  ', xmin, xmax, ymin, ymax
-    print 'HCP packing particles: xmin, xmax, ymin, ymax = ', x.min(), x.max(), y.min(), y.max()
-    print 'Particle spacings: dx, dy = ', dx, dy
-    print 'Offset: xmin, xmax = ', x.min()-xmin, xmax-x.max()
-    print 'Offset: ymin, ymax = ', y.min()-ymin, ymax-y.max()
+    print('HCP packing domain: xmin, xmax, ymin, ymax =  ', xmin, xmax, ymin,
+            ymax)
+    print('HCP packing particles: xmin, xmax, ymin, ymax = ', x.min(), x.max(),
+            y.min(), y.max())
+    print('Particle spacings: dx, dy = ', dx, dy)
+    print('Offset: xmin, xmax = ', x.min()-xmin, xmax-x.max())
+    print('Offset: ymin, ymax = ', y.min()-ymin, ymax-y.max())
 
     return x, y, dx, dy, xmin, xmax, ymin, ymax
 
@@ -51,11 +54,13 @@ def uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax, nrows=None):
 
     x = x.ravel(); y = y.ravel()
 
-    print 'Cubic packing domain: xmin, xmax, ymin, ymax =  ', xmin, xmax, ymin, ymax
-    print 'Cubic packing particles: xmin, xmax, ymin, ymax = ', x.min(), x.max(), y.min(), y.max()
-    print 'Particle spacings: dx, dy = ', dx, dy
-    print 'Offset: xmin, xmax = ', x.min()-xmin, xmax-x.max()
-    print 'Offset: ymin, ymax = ', y.min()-ymin, ymax-y.max()
+    print('Cubic packing domain: xmin, xmax, ymin, ymax =  ', xmin, xmax, ymin,
+            ymax)
+    print('Cubic packing particles: xmin, xmax, ymin, ymax = ', x.min(),
+            x.max(), y.min(), y.max())
+    print('Particle spacings: dx, dy = ', dx, dy)
+    print('Offset: xmin, xmax = ', x.min()-xmin, xmax-x.max())
+    print('Offset: ymin, ymax = ', y.min()-ymin, ymax-y.max())
 
     return x, y, dx, dy, xmin, xmax, ymin, ymax
 

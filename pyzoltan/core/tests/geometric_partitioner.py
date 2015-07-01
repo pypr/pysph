@@ -1,5 +1,9 @@
 """Clone of the Zoltan tests for the geometric partitioners (RCB, RIB
 and HSFC)"""
+
+from __future__ import print_function
+
+from os.path import abspath, dirname, join
 import sys
 
 import mpi4py.MPI as mpi
@@ -7,6 +11,8 @@ comm = mpi.COMM_WORLD
 
 from pyzoltan.core.carray import UIntArray, DoubleArray
 from pyzoltan.core import zoltan
+
+MY_DIR = dirname(abspath(__file__))
 
 ack_tag = 5
 count_tag = 10
@@ -18,7 +24,7 @@ ack = 0
 import numpy as np
 from numpy import loadtxt
 
-def read_input_file(fname='mesh.txt'):
+def read_input_file(fname=join(MY_DIR, 'mesh.txt')):
     rank = comm.Get_rank()
     size = comm.Get_size()
 
@@ -29,7 +35,7 @@ def read_input_file(fname='mesh.txt'):
         numGlobalPoints = data[data_line][0]; data_line += 1
 
         if size > 1:
-            nobj = numGlobalPoints / 2
+            nobj = numGlobalPoints // 2
             remaining = numGlobalPoints - nobj
         else:
             nobj = numGlobalPoints
@@ -49,7 +55,7 @@ def read_input_file(fname='mesh.txt'):
 
         for i in range(1,size):
             if (remaining > 1):
-                nobj = remaining / 2
+                nobj = remaining // 2
                 remaining -= nobj
 
             elif (remaining == 1):
@@ -121,13 +127,13 @@ def show_mesh(rank, numPoints, gids, parts):
             for j in range(5):
                 part = allPartAssign[i+j]
                 if j < 4:
-                    print "%d----"%(part),
+                    print("%d----"%(part),)
                 else:
-                    print "%d"%(part)
+                    print("%d"%(part))
             if i > 0:
-                print ("|     |     |     |     |")
+                print("|     |     |     |     |")
 
-        print ""
+        print()
 
 # read the input file and distribute objects across processors
 numMyPoints, myGlobalIds, x, y = read_input_file()
@@ -157,7 +163,7 @@ pz.Zoltan_Set_Param("DEBUG_LEVEL","0")
 pz.Zoltan_LB_Balance()
 
 if rank == 0:
-    print "\nMesh partition before Zoltan\n"
+    print("\nMesh partition before Zoltan\n")
 
 comm.barrier()
 
@@ -167,6 +173,6 @@ for i in range(pz.numExport):
     parts[ pz.exportLocalids[i] ] = pz.exportProcs[i]
 
 if rank == 0:
-    print "Mesh partition assignment after calling Zoltan"
+    print("Mesh partition assignment after calling Zoltan")
 
 show_mesh(rank, numMyPoints, myGlobalIds, parts)

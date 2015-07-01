@@ -5,13 +5,20 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 import inspect
 import logging
 from mako.template import Template
 from textwrap import dedent
 import types
 
-from ast_utils import get_assigned, has_return
+
+from pysph.base.ast_utils import get_assigned, has_return
+from pysph.base.config import get_config
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +31,11 @@ class CythonClassHelper(object):
     def generate(self):
         template = dedent("""
 cdef class ${class_name}:
-    %for name, type in public_vars.iteritems():
+    %for name, type in public_vars.items():
     cdef public ${type} ${name}
     %endfor
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
 %for defn, body in methods:
@@ -60,7 +67,11 @@ def get_func_definition(sourcelines):
 def all_numeric(seq):
     """Return true if all values in given sequence are numeric.
     """
-    return all(type(x) in [int, float, long] for x in seq)
+    try:
+        types = [int, float, long]
+    except NameError:
+        types = [int, float]
+    return all(type(x) in types for x in seq)
 
 class CodeGenerationError(Exception):
     pass
@@ -76,6 +87,9 @@ class KnownType(object):
     """
     def __init__(self, type_str):
         self.type = type_str
+
+    def __repr__(self):
+        return 'KnownType("%s")'%self.type
 
 
 class CythonGenerator(object):
@@ -97,6 +111,7 @@ class CythonGenerator(object):
         # Methods to not wrap.
         self.ignore_methods = ['_cython_code_']
         self.known_types = known_types if known_types is not None else {}
+        self._config = get_config()
 
     ##### Public protocol #####################################################
 
@@ -109,12 +124,12 @@ class CythonGenerator(object):
     def detect_type(self, name, value):
         """Given the variable name and value, detect its type.
         """
+        if isinstance(value, KnownType):
+            return value.type
         if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
             return 'double*'
         if name in ['s_idx', 'd_idx']:
             return 'long'
-        if isinstance(value, KnownType):
-            return value.type
         if value is Undefined or isinstance(value, Undefined):
             raise CodeGenerationError('Unknown type, for %s'%name)
 
@@ -201,8 +216,14 @@ class CythonGenerator(object):
 
         c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
-        cdefn = 'cdef inline {ret} {name}({arg_def}):'\
-                     .format(ret=c_ret, name=name, arg_def=c_arg_def)
+        if self._config.use_openmp:
+            ignore = ['reduce', 'converged']
+            gil = " nogil" if name not in ignore else ""
+        else:
+            gil = ""
+        cdefn = 'cdef inline {ret} {name}({arg_def}){gil}:'.format(
+            ret=c_ret, name=name, arg_def=c_arg_def, gil=gil
+        )
 
         return cdefn
 
@@ -232,7 +253,7 @@ class CythonGenerator(object):
         dedented_body = dedent(body)
         symbols = get_assigned(dedented_body)
         undefined = symbols - set(declared) - args
-        declare = [indent +'cdef double %s\n'%x for x in undefined]
+        declare = [indent +'cdef double %s\n'%x for x in sorted(undefined)]
         code = ''.join(declare) + cython_body
         return code
 
@@ -253,8 +274,8 @@ class CythonGenerator(object):
     def _get_public_vars(self, obj):
         # For now get it all from the dict.
         data = obj.__dict__
-        vars = dict((name, self.detect_type(name, data[name]))
-                        for name in sorted(data.keys()))
+        vars = OrderedDict((name, self.detect_type(name, data[name]))
+                            for name in sorted(data.keys()))
         return vars
 
     def _get_py_method_spec(self, name, returns, args, indent=' '*8):
@@ -301,11 +322,9 @@ class CythonGenerator(object):
             sz = matrix(eval(code[7:-1]))
             defn = 'cdef double %s%s'%(name, sz)
             return defn
-        elif code.startswith('cPoint'):
-            defn = 'cdef cPoint %s'%name
-            return defn
         else:
-            raise RuntimeError('Unknown declaration %s'%declare)
+            defn = 'cdef {type} {name}'.format(type=code, name=name)
+            return defn
 
     def _parse_function(self, obj):
         c_code, py_code = self._get_method_wrapper(obj, indent=' '*4)

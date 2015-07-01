@@ -1,7 +1,11 @@
 ''' Implement infrastructure for the solver to add various interfaces '''
 
 from functools import wraps
-import threading, thread
+import threading
+try:
+    from thread import LockType
+except ImportError:
+    from _thread import LockType
 from pysph.base.particle_array import ParticleArray
 
 import logging
@@ -44,7 +48,7 @@ def synchronized(lock_or_func):
 
     - sync_func = synchronized(func) # sync with a new private lock
     '''
-    if isinstance(lock_or_func, thread.LockType):
+    if isinstance(lock_or_func, LockType):
         lock = lock_or_func
         def synchronized_inner(func):
             @wraps(func)
@@ -377,7 +381,7 @@ class CommandManager(object):
         specifying processes is currently not implemented
         '''
         if procs is None:
-            procs = range(self.comm.size)
+            procs = list(range(self.comm.size))
         pa = self.solver.particles[idx]
         pas = self.comm.gather(pa)
         return pas
@@ -388,7 +392,7 @@ class CommandManager(object):
         specifying processes is currently not implemented
         '''
         if procs is None:
-            procs = range(self.comm.size)
+            procs = list(range(self.comm.size))
         pa = self.solver.particles[idx]
         pas = self.comm.gather(pa)
         pa = ParticleArray(name=pa.name)

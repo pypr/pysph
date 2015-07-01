@@ -164,28 +164,26 @@ cdef class PyZoltan:
     All Zoltan partitioners are derived from PyZoltan. This class sets
     up the basic arrays used (import/export lists) for load balancing,
     methods to set Zoltan parameters and the actual load balancing
-    method itself. 
+    method itself.
 
     The specific Zoltan interface functions that are exposed through
     this class are:
 
-     - Zoltan_LB_Balance : The main load balancing routine. 
-         Upon return, a list of indices (local, global) to 
-         be imported and exported are available.
+     - Zoltan_LB_Balance : The main load balancing routine. Upon return, a list
+       of indices (local, global) to be imported and exported are available.
 
-     - Zoltan_Invert_Lists : Invert import/export lists
-         Upon return, a given set of lists is inverted.
+     - Zoltan_Invert_Lists : Invert import/export lists. Upon return, a given
+       set of lists is inverted.
 
      - Zoltan_Set_Param : Set the value of a Zoltan parameter
-    
     """
     def __init__(self, object comm, str obj_weight_dim="0",
                  str edge_weight_dim="0", debug_level="0",
                  str return_lists="ALL"):
         """Initialize the Zoltan wrapper
 
-        Parameters:
-        
+        Parameters
+        ----------
         comm : MPI communicator
             MPI communicator to be used
 
@@ -201,22 +199,26 @@ cdef class PyZoltan:
             Zoltan debug level. Values in the range [0, 10] are accepted
 
         return_lists : str, default "ALL"
-            Kind of lists to be returned by Zoltan. Valid values:
-            
-            IMPORT - return only lists for objects to be imported
-            EXPORT - return only lists for objects to be exported
-            ALL    - return both import and export lists
-            PART   - return the processor and partition assignment for
-                     all local objects
-            NONE   - dont return anything
+            Kind of lists to be returned by Zoltan. Valid values are "IMPORT",
+            "EXPORT", "ALL", "PART", "NONE".  For explanation see notes section
+            below.
 
-        Notes:
-        
+        Notes
+        -----
+        Valid values of the return_lists argument are:
+
+            - "IMPORT": return only lists for objects to be imported,
+            - "EXPORT": return only lists for objects to be exported,
+            - "ALL": return both import and export lists,
+            - "PART": return the processor and partition assignment for
+              all local objects,
+            - "NONE": don't return anything
+
         Instantiation of the PyZoltan object initializes the Zoltan
         library, creates the Zoltan struct ubiquitous in Zoltan calls
         and also sets up the import/export lists that will be used for
         the data exchange. It also sets up some reasonable default
-        values. 
+        values.
 
         In general though, any parameter can be set using the
         Zoltan_Set_Param function wrapper
@@ -557,8 +559,8 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
                  ):
         """Constructor
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
         dim : int
             Problem dimensionality

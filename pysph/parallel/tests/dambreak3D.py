@@ -16,7 +16,8 @@ from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
-from pysph.sph.integrator import Integrator, WCSPHStep
+from pysph.sph.integrator import PECIntegrator
+from pysph.sph.integrator_step import WCSPHStep
 
 dim = 3
 
@@ -83,7 +84,7 @@ app = Application()
 kernel = CubicSpline(dim=3)
 
 # Create the integrator.
-integrator = Integrator(fluid=WCSPHStep(), boundary=WCSPHStep())
+integrator = PECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
@@ -101,7 +102,7 @@ equations = [
             TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
             TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-            ]),
+            ], real=False),
 
     # Continuity Momentum and XSPH equations
     Group(equations=[

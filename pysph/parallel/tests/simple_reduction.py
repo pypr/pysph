@@ -53,6 +53,9 @@ solver.set_final_time(0.1)
 equations = [TotalMass(dest='fluid', sources=['fluid'])]
 app.setup(solver=solver, equations=equations,
           particle_factory=create_particles)
+# There is no need to write any output as the test below
+# computes the total mass.
+solver.set_disable_output(True)
 app.run()
 
 fluid = solver.particles[0]

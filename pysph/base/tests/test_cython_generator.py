@@ -4,6 +4,7 @@ import unittest
 from textwrap import dedent
 from math import pi, sin
 
+from pysph.base.config import get_config, set_config
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
     KnownType, all_numeric)
 
@@ -26,7 +27,7 @@ class EqWithReturn(BasicEq):
         return d_x[d_idx]
 
 class EqWithKnownTypes:
-    def some_func(self, d_idx, d_p, WIJ, DWIJ, user):
+    def some_func(self, d_idx, d_p, WIJ, DWIJ, user, d_user, s_user):
         d_p[d_idx] = WIJ*DWIJ[0]
 
 class EqWithMatrix:
@@ -35,6 +36,14 @@ class EqWithMatrix:
         mat[0][0] = d_x[d_idx]
         vec = declare('matrix((3,))')
         vec[0] = d_x[d_idx]
+
+class EqWithDeclare:
+    def func(self, d_idx, d_x=[0.0, 0.0]):
+        val = declare('float')
+        val = d_x[d_idx]
+        index = declare('unsigned int')
+        index = d_idx
+
 
 def func_with_return(d_idx, d_x, x=0.0):
     x += 1
@@ -57,7 +66,10 @@ class TestMiscUtils(TestBase):
     def test_all_numeric(self):
         x = [1, 2, 3.0]
         self.assertTrue(all_numeric(x))
-        x = [0.0, 1, 3L]
+        try:
+            x = [0.0, 1, long(3)]
+        except NameError:
+            x = [0.0, 1, 3]
         self.assertTrue(all_numeric(x))
         x = [0.0, 1.0, '']
         self.assertFalse(all_numeric(x))
@@ -88,7 +100,7 @@ class TestMiscUtils(TestBase):
         cdef class A:
             cdef public double x
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             def f(self, x):
@@ -99,16 +111,22 @@ class TestMiscUtils(TestBase):
 
 
 class TestCythonCodeGenerator(TestBase):
+    def setUp(self):
+        get_config().use_openmp = False
+
+    def tearDown(self):
+        set_config(None)
+
     def test_simple_constructor(self):
         cg = CythonGenerator()
         cg.parse(BasicEq())
         expect = dedent("""
         cdef class BasicEq:
-            cdef public double c
             cdef public list _hidden
+            cdef public double c
             cdef public double rho
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -118,14 +136,36 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithMethod())
         expect = dedent("""
         cdef class EqWithMethod:
-            cdef public double c
             cdef public list _hidden
+            cdef public double c
             cdef public double rho
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
+                cdef double tmp
+                tmp = abs(self.rho*self.c)*sin(pi*self.c)
+                d_x[d_idx] = d_x[d_idx]*tmp
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_honors_use_openmp_setting(self):
+        # When
+        get_config().use_openmp = True
+        # Then
+        cg = CythonGenerator()
+        cg.parse(EqWithMethod())
+        expect = dedent("""
+        cdef class EqWithMethod:
+            cdef public list _hidden
+            cdef public double c
+            cdef public double rho
+            def __init__(self, **kwargs):
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x) nogil:
                 cdef double tmp
                 tmp = abs(self.rho*self.c)*sin(pi*self.c)
                 d_x[d_idx] = d_x[d_idx]*tmp
@@ -137,11 +177,11 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithMethod())
         expect = dedent("""
         cdef class EqWithMethod:
-            cdef public double c
             cdef public list _hidden
+            cdef public double c
             cdef public double rho
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
@@ -157,11 +197,11 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithReturn())
         expect = dedent("""
         cdef class EqWithReturn:
-            cdef public double c
             cdef public list _hidden
+            cdef public double c
             cdef public double rho
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             cdef inline double func(self, long d_idx, double* d_x):
@@ -189,11 +229,11 @@ class TestCythonCodeGenerator(TestBase):
         cg.parse(EqWithReturn())
         expect = dedent("""
         cdef class EqWithReturn:
-            cdef public double c
             cdef public list _hidden
+            cdef public double c
             cdef public double rho
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             cdef inline double func(self, long d_idx, double* d_x):
@@ -207,7 +247,7 @@ class TestCythonCodeGenerator(TestBase):
         expect = dedent("""
         cdef class EqWithMatrix:
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
@@ -218,19 +258,39 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
+    def test_method_with_declare(self):
+        cg = CythonGenerator()
+        cg.parse(EqWithDeclare())
+        expect = dedent("""
+        cdef class EqWithDeclare:
+            def __init__(self, **kwargs):
+                for key, value in kwargs.items():
+                    setattr(self, key, value)
+
+            cdef inline void func(self, long d_idx, double* d_x):
+                cdef float val
+                val = d_x[d_idx]
+                cdef unsigned int index
+                index = d_idx
+        """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
     def test_method_with_known_types(self):
         cg = CythonGenerator(
             known_types={'WIJ':0.0, 'DWIJ':[0.0, 0.0, 0.0],
-                         'user': KnownType('ndarray')}
+                         'user': KnownType('ndarray'),
+                         'd_user': KnownType('long*'),
+                         's_user': KnownType('int*'),
+                         }
         )
         cg.parse(EqWithKnownTypes())
         expect = dedent("""
         cdef class EqWithKnownTypes:
             def __init__(self, **kwargs):
-                for key, value in kwargs.iteritems():
+                for key, value in kwargs.items():
                     setattr(self, key, value)
 
-            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ, ndarray user):
+            cdef inline void some_func(self, long d_idx, double* d_p, double WIJ, double* DWIJ, ndarray user, long* d_user, int* s_user):
                 d_p[d_idx] = WIJ*DWIJ[0]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())

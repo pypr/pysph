@@ -60,7 +60,7 @@ def create_particles(**kwargs):
     # volume
     fluid.h[:] = kernel_factor * (fluid.m/fluid.rho)**(1./dim)
 
-    print "Sedov's point explosion with %d particles"%(fluid.get_number_of_particles())
+    print("Sedov's point explosion with %d particles"%(fluid.get_number_of_particles()))
 
     return [fluid,]
 

@@ -39,7 +39,8 @@ def check_equation_array_properties(equation, particle_arrays):
     def _check_array(array, eq_props, errors):
         """Updates the `errors` with any errors.
         """
-        props = set(array.properties.keys() + array.constants.keys())
+        props = set(list(array.properties.keys()) +
+                    list(array.constants.keys()))
         if not eq_props < props:
             errors[array.name].update(eq_props - props)
 
@@ -51,9 +52,9 @@ def check_equation_array_properties(equation, particle_arrays):
 
     if len(errors) > 0:
         msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
-        for name, missing in errors.iteritems():
+        for name, missing in errors.items():
             msg += "Array '%s' missing properties %s.\n"%(name, missing)
-        print msg
+        print(msg)
         raise RuntimeError(msg)
 
 
@@ -128,25 +129,21 @@ class MegaGroup(object):
 
 ###############################################################################
 class AccelerationEval(object):
-    def __init__(self, particle_arrays, equations, kernel,
-                 cell_iteration=False, mode='serial'):
+    def __init__(self, particle_arrays, equations, kernel, mode='serial'):
         """
 
         Parameters
         ----------
 
-        particle_arrays: list(ParticleArray): A list of particle arrays to use.
+        particle_arrays: list(ParticleArray): list of particle arrays to use.
         equations: list: A list of equations/groups.
         kernel: The kernel to use.
-        cell_iteration: bool:
-                should cell iteration be used for the computation.
         parallel: str: One of 'serial', 'mpi'.
         """
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
         self.kernel = kernel
         self.nnps = None
-        self.cell_iteration = cell_iteration
         self.mode = mode
 
         all_equations = []

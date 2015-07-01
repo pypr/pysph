@@ -1,12 +1,17 @@
+# Standard library imports
+from functools import reduce
 
+# Library imports.
 import numpy as np
-from pysph.base.utils import get_particle_array
 
+# Package imports.
+from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
+
 
 class InterpolateFunction(Equation):
     def initialize(self, d_idx, d_prop, d_number_density):
@@ -77,24 +82,29 @@ class Interpolator(object):
     """
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
-                 x=None, y=None, z=None):
+                 x=None, y=None, z=None, domain_manager=None):
         """
-        Parameters
-        ----------
-
-        particle_arrays: A list of particle arrays.
-        num_points: the number of points to interpolate on to.
-        kernel: the kernel to use for interpolation.
-
-        x: ndarray: the x-coordinate of points on which to interpolate.
-        y: ndarray: the y-coordinate of points on which to interpolate.
-        z: ndarray: the z-coordinate of points on which to interpolate.
-
-
         The x, y, z coordinates need not be specified, and if they are not,
         the bounds of the interpolated domain is automatically computed and
         `num_points` number of points are used in this domain uniformly placed.
 
+        Parameters
+        ----------
+
+        particle_arrays: list
+            A list of particle arrays.
+        num_points: int
+            the number of points to interpolate on to.
+        kernel: Kernel
+            the kernel to use for interpolation.
+        x: ndarray
+            the x-coordinate of points on which to interpolate.
+        y: ndarray
+            the y-coordinate of points on which to interpolate.
+        z: ndarray
+            the z-coordinate of points on which to interpolate.
+        domain_manager: DomainManager
+            An optional Domain manager for periodic domains.
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -109,6 +119,7 @@ class Interpolator(object):
         self.pa = None
         self.nnps = None
         self.func_eval = None
+        self.domain_manager = domain_manager
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)
         else:
@@ -118,15 +129,19 @@ class Interpolator(object):
     def set_interpolation_points(self, x=None, y=None, z=None):
         """Set the points on which we must interpolate the arrays.
 
-        Parameters
-        -----------
-
-        x: ndarray: the x-coordinate of points on which to interpolate.
-        y: ndarray: the y-coordinate of points on which to interpolate.
-        z: ndarray: the z-coordinate of points on which to interpolate.
-
         If any of x, y, z is not passed it is assumed to be 0.0 and shaped
         like the other non-None arrays.
+
+
+        Parameters
+        ----------
+
+        x: ndarray
+            the x-coordinate of points on which to interpolate.
+        y: ndarray
+            the y-coordinate of points on which to interpolate.
+        z: ndarray
+            the z-coordinate of points on which to interpolate.
 
         """
         tmp = None
@@ -153,11 +168,13 @@ class Interpolator(object):
     def set_domain(self, bounds, shape):
         """Set the domain to interpolate into.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
 
-        bounds: (xmin, xmax, ymin, ymax, zmin, zmax)
-        shape: (nx, ny, nz)
+        bounds: tuple
+            (xmin, xmax, ymin, ymax, zmin, zmax)
+        shape: tuple
+            (nx, ny, nz)
         """
         self.bounds = np.asarray(bounds)
         self.shape = np.asarray(shape)
@@ -165,14 +182,20 @@ class Interpolator(object):
         self.set_interpolation_points(x, y, z)
 
     def interpolate(self, prop, gradient=False):
-        """
+        """Interpolate given property.
 
-        :prop: The name of the property to interpolate.
+        Parameters
+        ----------
 
-        :gradient: bool: Evaluate gradient and not function.
+        prop: str
+            The name of the property to interpolate.
 
-        :return: A numpy array suitably shaped with the property
-        interpolated.
+        gradient: bool
+            Evaluate gradient and not function.
+
+        Returns
+        -------
+        A numpy array suitably shaped with the property interpolated.
         """
         for array in self.particle_arrays:
             data = array.get(prop, only_real_particles=False)
@@ -201,7 +224,9 @@ class Interpolator(object):
     def _create_nnps(self, arrays):
         # create the neighbor locator object
         self.nnps = NNPS(dim=self.kernel.dim, particles=arrays,
-                         radius_scale=self.kernel.radius_scale)
+                         radius_scale=self.kernel.radius_scale,
+                         domain=self.domain_manager,
+                         cache=True)
         self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
 
@@ -272,14 +297,14 @@ class Interpolator(object):
 
 def main(fname, prop, npoint):
     from pysph.solver.utils import load
-    print "Loading", fname
+    print("Loading", fname)
     data = load(fname)
-    arrays = data['arrays'].values()
+    arrays = list(data['arrays'].values())
     interp = Interpolator(arrays, num_points=npoint)
-    print interp.shape
-    print "Interpolating"
+    print(interp.shape)
+    print("Interpolating")
     prop = interp.interpolate(prop)
-    print "Visualizing"
+    print("Visualizing")
     from mayavi import mlab
     src = mlab.pipeline.scalar_field(interp.x, interp.y, interp.z, prop)
     if interp.dim == 3:
@@ -292,7 +317,7 @@ def main(fname, prop, npoint):
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 4:
-        print "Usage: interpolator.py filename property num_points"
+        print("Usage: interpolator.py filename property num_points")
         sys.exit(1)
     else:
         main(sys.argv[1], sys.argv[2], int(sys.argv[3]))

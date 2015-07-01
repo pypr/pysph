@@ -2,8 +2,13 @@
 import threading
 import os
 import socket
-from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
-from SimpleHTTPServer import SimpleHTTPRequestHandler
+try:
+    from SimpleXMLRPCServer import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
+    from SimpleHTTPServer import SimpleHTTPRequestHandler
+except ImportError:
+    # Python 3.x
+    from xmlrpc.server import SimpleXMLRPCServer, SimpleXMLRPCRequestHandler
+    from http.server import SimpleHTTPRequestHandler
 
 from multiprocessing.managers import BaseManager, BaseProxy
 
@@ -103,7 +108,7 @@ class CrossDomainXMLRPCRequestHandler(SimpleXMLRPCRequestHandler,
 
     def do_GET(self):
         """ Handle http requests to serve html/image files only """
-        print self.path, self.translate_path(self.path)
+        print(self.path, self.translate_path(self.path))
         permitted_extensions = ['.html','.png','.svg','.jpg', '.js']
         if not os.path.splitext(self.path)[1] in permitted_extensions:
             self.send_error(404, 'File Not Found/Allowed')
@@ -140,12 +145,15 @@ class CommandlineInterface(object):
     def start(self, controller):
         while True:
             try:
-                inp = raw_input('pysph[%d]>>> '%controller.get('count'))
+                try:
+                    inp = raw_input('pysph[%d]>>> '%controller.get('count'))
+                except NameError:
+                    inp = input('pysph[%d]>>> '%controller.get('count'))
                 cmd = inp.strip().split()
                 try:
                     cmd, args = cmd[0], cmd[1:]
                 except Exception as e:
-                    print 'Invalid command'
+                    print('Invalid command')
                     self.help()
                     continue
                 args2 = []
@@ -162,23 +170,23 @@ class CommandlineInterface(object):
                 elif cmd=='c' or cmd=='cont':
                     controller.cont()
                 elif cmd=='g' or cmd=='get':
-                    print controller.get(args[0])
+                    print(controller.get(args[0]))
                 elif cmd=='s' or cmd=='set':
-                    print controller.set(args[0], args2[1])
+                    print(controller.set(args[0], args2[1]))
                 elif cmd=='q' or cmd=='quit':
                     break
                 else:
-                    print getattr(controller, cmd)(*args2)
+                    print(getattr(controller, cmd)(*args2))
             except Exception as e:
                 self.help()
-                print e
+                print(e)
 
     def help(self):
-        print '''Valid commands are:
+        print('''Valid commands are:
     p | pause
     c | cont
     g | get <name>
     s | set <name> <value>
-    q | quit -- quit commandline interface (solver keeps running)'''
+    q | quit -- quit commandline interface (solver keeps running)''')
 
 

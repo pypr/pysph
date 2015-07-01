@@ -53,7 +53,12 @@ class Context(dict):
         >>> c.keys()
         ['a', 'x', 'b']
     """
-    __getattr__ = dict.__getitem__
+    def __getattr__(self, key):
+        try:
+            return self.__getitem__(key)
+        except KeyError:
+            raise AttributeError('Context has no attribute %s'%key)
+
     def __setattr__(self, key, value):
         self[key] = value
 
@@ -250,7 +255,7 @@ def sort_precomputed(precomputed):
     pre_comp = Group.pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
     depends = dict((x, None) for x in precomputed)
-    for pre, cb in precomputed.iteritems():
+    for pre, cb in precomputed.items():
         depends[pre] = [x for x in cb.symbols if x in pre_comp and x != pre]
 
     # The basic algorithm is to assign weights to each of the precomputed
@@ -289,9 +294,11 @@ def get_predefined_types(precomp):
     the precomputed symbols.
     """
     result = {'DT_ADAPT':[0.0, 0.0, 0.0],
+              'dt': 0.0,
+              't': 0.0,
               'dst': KnownType('ParticleArrayWrapper'),
               'src': KnownType('ParticleArrayWrapper')}
-    for sym, value in precomp.iteritems():
+    for sym, value in precomp.items():
         result[sym] = value.context[sym]
     return result
 
@@ -319,14 +326,22 @@ class Equation(object):
     ##########################################################################
     # `object` interface.
     ##########################################################################
-    def __init__(self, dest, sources=None, name=None):
+    def __init__(self, dest, sources=None):
+        r"""
+        Parameters
+        ----------
+        dest : str
+            name of the destination particle array
+        sources : list of str
+            names of the source particle arrays
+        """
         self.dest = dest
         self.sources = sources if sources is not None and len(sources) > 0 \
                                                                 else None
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
-        self.name = self.__class__.__name__ if name is None else name
-        # The name of the variable used in the compliled AccelerationEval
+        self.name = self.__class__.__name__
+        # The name of the variable used in the compiled AccelerationEval
         # instance.
         self.var_name = ''
 
@@ -352,27 +367,35 @@ class Group(object):
         """Constructor.
 
         Parameters
-        -----------
+        ----------
 
-        - equations: list: a list of equation objects.
+        equations: list
+            a list of equation objects.
 
-        - real: bool: specifies if only non-remote/non-ghost particles should
-                      be operated on.
+        real: bool
+            specifies if only non-remote/non-ghost particles should be 
+            operated on.
 
-        - update_nnps: bool: specifies if the neighbors should be re-computed
-                       locally after this group
+        update_nnps: bool
+            specifies if the neighbors should be re-computed locally after 
+            this group
 
-        - iterate: bool: specifies if the group should continue iterating
-                         until each equation's "converged()" methods returns
-                         with a positive value.
+        iterate: bool
+            specifies if the group should continue iterating until each
+            equation's "converged()" methods returns with a positive value.
 
-        - max_iterations: int: specifies the maximum number of times this
-                          group should be iterated.
+        max_iterations: int
+            specifies the maximum number of times this group should be
+            iterated.
 
-        - min_iterations: int: specifies the minimum number of times this
-                          group should be iterated.
+        min_iterations: int
+            specifies the minimum number of times this group should be
+            iterated.
 
-        Note that when running simulations in parallel, one should typically
+        Notes
+        -----
+
+        When running simulations in parallel, one should typically
         run the summation density over all particles (both local and remote)
         in each processor.  This is because we must update the
         pressure/density of the remote neighbors in the current processor.
@@ -407,7 +430,7 @@ class Group(object):
     ##########################################################################
     def _get_variable_decl(self, context, mode='declare'):
         decl = []
-        names = context.keys()
+        names = list(context.keys())
         names.sort()
         for var in names:
             value = context[var]
@@ -423,7 +446,12 @@ class Group(object):
                                                               value=value))
             elif isinstance(value, (list, tuple)):
                 if mode == 'declare':
-                    decl.append('cdef double[{size}] {var}'\
+                    decl.append('cdef DoubleArray _{var} = '\
+                        'DoubleArray(aligned({size}, 8)*self.n_threads)'.format(
+                            var=var, size=len(value)
+                        )
+                    )
+                    decl.append('cdef double* {var} = _{var}.data'\
                             .format(size=len(value), var=var))
                 else:
                     pass
@@ -441,7 +469,7 @@ class Group(object):
         # for loops and not post_loops and initialization.
         pre = []
         if kind == 'loop':
-            for p, cb in self.precomputed.iteritems():
+            for p, cb in self.precomputed.items():
                 pre.append(cb.code.strip())
             if len(pre) > 0:
                 pre.append('')
@@ -506,7 +534,7 @@ class Group(object):
 
         # Update the context.
         context = self.context
-        for p, cb in self.precomputed.iteritems():
+        for p, cb in self.precomputed.items():
             context[p] = cb.context[p]
 
     ##########################################################################
@@ -562,14 +590,32 @@ class Group(object):
 
         return filtered_vars
 
-    def get_array_declarations(self, names):
+    def get_array_declarations(self, names, known_types={}):
         decl = []
         for arr in sorted(names):
-            decl.append('cdef double* %s'%arr)
+            if arr in known_types:
+                decl.append('cdef {type} {arr}'.format(
+                    type=known_types[arr].type, arr=arr
+                ))
+            else:
+                decl.append('cdef double* %s'%arr)
         return '\n'.join(decl)
 
     def get_variable_declarations(self, context):
         return self._get_variable_decl(context, mode='declare')
+
+    def get_variable_array_setup(self):
+        names = list(self.context.keys())
+        names.sort()
+        code = []
+        for var in names:
+            value = self.context[var]
+            if isinstance(value, (list, tuple)):
+                code.append(
+                    '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'\
+                        .format(size=len(value), var=var)
+                )
+        return '\n'.join(code)
 
     def has_initialize(self):
         return self._has_code('initialize')
@@ -610,7 +656,7 @@ class Group(object):
             # and not be short-circuited by the first one that returns False.
             return ' & '.join(code)
 
-    def get_equation_wrappers(self):
+    def get_equation_wrappers(self, known_types={}):
         classes = defaultdict(lambda: 0)
         eqs = {}
         for equation in self.equations:
@@ -620,7 +666,8 @@ class Group(object):
             classes[cls] += 1
             eqs[cls] = equation
         wrappers = []
-        predefined = get_predefined_types(self.pre_comp)
+        predefined = dict(get_predefined_types(self.pre_comp))
+        predefined.update(known_types)
         code_gen = CythonGenerator(known_types=predefined)
         for cls in sorted(classes.keys()):
             code_gen.parse(eqs[cls])

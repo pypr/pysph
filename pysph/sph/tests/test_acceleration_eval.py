@@ -1,6 +1,10 @@
 
 # Standard library imports.
-import unittest
+try:
+    # This is for Python-2.6.x
+    import unittest2 as unittest
+except ImportError:
+    import unittest
 
 # Library imports.
 import numpy as np
@@ -37,6 +41,7 @@ class FindTotalMass(Equation):
 
     def post_loop(self, d_idx, d_m, d_total_mass):
         d_total_mass[0] += d_m[d_idx]
+
 
 class TestCheckEquationArrayProps(unittest.TestCase):
 
@@ -104,6 +109,7 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         # Then.
         check_equation_array_properties(eq, [f])
 
+
 class SimpleEquation(Equation):
     def __init__(self, dest, sources):
         super(SimpleEquation, self).__init__(dest, sources)
@@ -128,6 +134,18 @@ class SimpleEquation(Equation):
             self.count = 0
         return result
 
+class MixedTypeEquation(Equation):
+    def initialize(self, d_idx, d_u, d_au, d_pid, d_tag):
+        d_u[d_idx] = 0.0 + d_pid[d_idx]
+        d_au[d_idx] = 0.0 + d_tag[d_idx]
+
+    def loop(self, d_idx, d_au, s_idx, s_m, s_pid, s_tag):
+        #print d_idx, s_idx
+        d_au[d_idx] += s_m[s_idx] + s_pid[s_idx] + s_tag[s_idx]
+
+    def post_loop(self, d_idx, d_u, d_au, d_pid):
+        d_u[d_idx] = d_au[d_idx] + d_pid[d_idx]
+
 
 class SimpleReduction(Equation):
     def reduce(self, dst):
@@ -145,7 +163,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
-    def _make_accel_eval(self, equations):
+    def _make_accel_eval(self, equations, cache_nnps=False):
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
@@ -153,7 +171,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
-        nnps = NNPS(dim=kernel.dim, particles=arrays)
+        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval
@@ -176,6 +194,19 @@ class TestAccelerationEval1D(unittest.TestCase):
         pa = self.pa
         equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
         a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_work_with_cached_nnps(self):
+        # Given
+        pa = self.pa
+        equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations, cache_nnps=True)
 
         # When
         a_eval.compute(0.1, 0.1)
@@ -237,3 +268,17 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.sum(pa.m)
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_should_work_with_non_double_arrays(self):
+        # Given
+        pa = self.pa
+        equations = [MixedTypeEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        self.assertListEqual(list(pa.u), list(expect))
+

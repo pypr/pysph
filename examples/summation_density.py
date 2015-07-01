@@ -53,7 +53,7 @@ k = WendlandQuintic(dim=2)
 # or number density of the distribution based on the kernel
 wij_sum_estimate = get_number_density_hcp(dx, dy, k, h0)
 volume = 1./wij_sum_estimate
-print 'Volume estimates :: dx^2 = %g, Number density = %g'%(dx*dy, volume)
+print('Volume estimates :: dx^2 = %g, Number density = %g'%(dx*dy, volume))
 
 x = x.ravel(); y = y.ravel()
 h = numpy.ones_like(x) * h0
@@ -110,5 +110,5 @@ for i in range( pa.num_real_particles ):
 t2 = time()-t1
 
 avg_density = numpy.sum(pa.rho)/pa.num_real_particles
-print '2D Summation density: %d particles %g seconds, Max %d neighbors'%(pa.num_real_particles, t2, max_ngb)
-print """Average density = %g, Relative error = %g"""%(avg_density, (1-avg_density)*100), '%'
+print('2D Summation density: %d particles %g seconds, Max %d neighbors'%(pa.num_real_particles, t2, max_ngb))
+print("""Average density = %g, Relative error = %g"""%(avg_density, (1-avg_density)*100), '%')

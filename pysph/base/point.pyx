@@ -1,4 +1,6 @@
-"""
+#cython: embedsignature=True
+
+"""A handy set of classes/functions for 3D points.
 """
 
 from cpython cimport *

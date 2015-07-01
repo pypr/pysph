@@ -19,8 +19,9 @@ from pysph.base.cython_generator import CythonGenerator, get_func_definition
 class IntegratorCythonHelper(object):
     """A helper that generates Cython code for the Integrator class.
     """
-    def __init__(self, integrator):
+    def __init__(self, integrator, acceleration_eval_helper):
         self.object = integrator
+        self.acceleration_eval_helper = acceleration_eval_helper
 
     def get_code(self):
         if self.object is not None:
@@ -46,12 +47,15 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_code(self):
         classes = {}
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls = stepper.__class__.__name__
             classes[cls] = stepper
 
+        known_types = dict(self.acceleration_eval_helper.known_types)
+        known_types.update(dict(t=0.0, dt=0.0))
+        code_gen = CythonGenerator(known_types=known_types)
+
         wrappers = []
-        code_gen = CythonGenerator()
         for cls in sorted(classes.keys()):
             code_gen.parse(classes[cls])
             wrappers.append(code_gen.get_code())
@@ -59,7 +63,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_defs(self):
         lines = []
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
             code = 'cdef public {cls} {name}'.format(cls=cls_name,
                                                      name=dest+'_stepper')
@@ -68,7 +72,7 @@ class IntegratorCythonHelper(object):
 
     def get_stepper_init(self):
         lines = []
-        for dest, stepper in self.object.steppers.iteritems():
+        for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
             code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
                         .format(name=dest+'_stepper', cls=cls_name,
@@ -87,14 +91,35 @@ class IntegratorCythonHelper(object):
             s, d = get_array_names(self.get_args(dest, method))
             arrays.update(s | d)
 
+        known_types = self.acceleration_eval_helper.known_types
         decl = []
+        unknown = set()
         for arr in sorted(arrays):
-            decl.append('cdef double* %s'%arr)
+            if arr in known_types:
+                decl.append('cdef {type} {arr}'.format(
+                    type=known_types[arr].type, arr=arr
+                ))
+            else:
+                unknown.add(arr)
+                decl.append('cdef double* %s'%arr)
+
+        if len(unknown) > 0:
+            props = ', '.join([x[2:] for x in unknown])
+            msg = "ERROR: Integrator requires the following properties:"\
+                  "\n\t{props}\n"\
+                  "Please add them to the particle arrays.".format(
+                props=props
+            )
+            print('*'*70)
+            print(msg)
+            print('*'*70)
+            raise RuntimeError(msg)
+
         return '\n'.join(decl)
 
     def get_array_setup(self, dest, method):
         s, d = get_array_names(self.get_args(dest, method))
-        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in s|d]
+        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in sorted(s|d)]
         return '\n'.join(lines)
 
     def get_stepper_loop(self, dest, method):
@@ -120,4 +145,4 @@ class IntegratorCythonHelper(object):
         method = self.object.one_timestep
         sourcelines = inspect.getsourcelines(method)[0]
         defn, lines = get_func_definition(sourcelines)
-	return dedent(''.join(lines))
+        return dedent(''.join(lines))

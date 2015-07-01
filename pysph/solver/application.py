@@ -2,24 +2,23 @@
 import os
 import logging
 from optparse import OptionParser, OptionGroup, Option
-from os.path import basename, splitext, abspath
+from os.path import abspath, basename, splitext
 import sys
 import time
 
 # PySPH imports.
+from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
-from utils import mkdir, load
+from pysph.solver.utils import mkdir, load
 
 # conditional parallel imports
-from pysph import Has_MPI, Has_Zoltan
-if (Has_MPI and Has_Zoltan):
+from pysph import has_mpi, has_zoltan
+if has_mpi() and has_zoltan():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
 
-integration_methods = ['RK2']
-kernel_names = ['CubicSpline']
 
 def list_option_callback(option, opt, value, parser):
     val = value.split(',')
@@ -40,8 +39,10 @@ class Application(object):
 
         Parameters
         ----------
-        fname : file name to use.
-
+        fname : str
+            file name to use.
+        domain : pysph.nnps.DomainManager
+            A domain manager to use. This is used for periodic domains etc.
         """
         self.is_periodic = False
         self.domain = domain
@@ -52,7 +53,7 @@ class Application(object):
         self._parallel_manager = None
 
         if fname == None:
-            fname = sys.argv[0].split('.')[0]
+            fname = splitext(basename(abspath(sys.argv[0])))[0]
 
         self.fname = fname
 
@@ -62,7 +63,7 @@ class Application(object):
         self.comm = None
         self.num_procs = 1
         self.rank = 0
-        if Has_MPI:
+        if has_mpi():
             self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
@@ -176,30 +177,13 @@ class Application(object):
                          dest="output_dir", default=self.fname+'_output',
                          help="Dump output in the specified directory.")
 
-        # --kernel
-        parser.add_option("--kernel", action="store",
-                          dest="kernel", type="int",
-                          help="%-55s"%"The kernel function to use:"+
-                          ''.join(['%d - %-51s'%(d,s) for d,s in
-                                     enumerate(kernel_names)]))
-
-        # --integration
-        parser.add_option("--integration", action="store",
-                          dest="integration", type="int",
-                          help="%-55s"%"The integration method to use:"+
-                          ''.join(['%d - %-51s'%(d,s) for d,s in
-                                     enumerate(integration_methods)]))
-        # --cell-iteration
-        parser.add_option("--cell-iteration", action="store_true",
-                          dest="cell_iteration",
-                          default=False,
-                          help="Use cell based iteration instead of "\
-                          "particle based iteration")
-
-        # --cl
-        parser.add_option("--cl", action="store_true", dest="with_cl",
-                          default=False, help=""" Use OpenCL to run the
-                          simulation on an appropriate device """)
+        # --openmp
+        parser.add_option("--openmp", action="store_true", dest="with_openmp",
+                          default=None, help="Use OpenMP to run the "\
+                            "simulation using multiple cores.")
+        parser.add_option("--no-openmp", action="store_false", dest="with_openmp",
+                          default=None, help="Do not use OpenMP to run the "\
+                            "simulation using multiple cores.")
 
         # Restart options
         restart = OptionGroup(parser, "Restart options",
@@ -231,9 +215,15 @@ class Application(object):
                                 action="store_true", default=False,
                                 help="Option for fixed smoothing lengths")
 
-        nnps_options.add_option("--no-cache-nnps", dest="no_cache_nnps",
+        nnps_options.add_option("--cache-nnps", dest="cache_nnps",
                                 action="store_true", default=False,
-                        help="Option to disable the use of neighbor caching.")
+                        help="Option to enable the use of neighbor caching.")
+
+        nnps_options.add_option(
+            "--sort-gids", dest="sort_gids", action="store_true",
+            default=False, help="Sort neighbors by the GIDs to get "\
+            "consistent results in serial and parallel (slows down a bit)."
+        )
 
         parser.add_option_group( nnps_options )
 
@@ -300,11 +290,6 @@ class Application(object):
         parallel_options.add_option("--parallel-scale-factor", action="store",
                                     dest="parallel_scale_factor", default=2.0, type='float',
                                     help=("""Kernel scale factor for the parallel update"""))
-
-        # --parallel-mode
-        parallel_options.add_option("--parallel-mode", action="store",
-                            dest="parallel_mode", default="auto",
-                            help = """Use specified parallel mode.""")
 
         # --parallel-output-mode
         parallel_options.add_option("--parallel-output-mode", action="store",
@@ -496,7 +481,7 @@ class Application(object):
             options = self.options
 
             if options.with_zoltan:
-                if not (Has_Zoltan and Has_MPI):
+                if not (has_zoltan() and has_mpi()):
                     raise RuntimeError("Cannot run in parallel!")
 
             else:
@@ -583,31 +568,22 @@ class Application(object):
 
     def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
               particle_factory=None, *args, **kwargs):
-        """Set the application's solver.  This will call the solver's
-        `setup` method.
+        """Setup the application's solver.
 
-        The following solver options are set:
-
-        dt -- the time step for the solver
-
-        tf -- the final time for the simulationl
-
-        fname -- the file name for output file printing
-
-        freq -- the output print frequency
-
-        level -- the output detail level
-
-        dir -- the output directory
+        This will parse the command line arguments (if this is not called from
+        within an IPython notebook or shell) and then using those parameters
+        and any additional parameters and call the solver's setup method.
 
         Parameters
         ----------
-        solver: The solver instance.
+        solver: pysph.solver.solver.Solver
+            The solver instance.
 
-        equations: list: a list of Groups/Equations.
+        equations: list
+            A list of Groups/Equations.
 
-        nnps: NNPS instance: optional NNPS instance.
-            If none is given a default NNPS is created.
+        nnps: pysph.base.nnps.NNPS
+            Optional NNPS instance. If None is given a default NNPS is created.
 
         inlet_outlet_factory: callable or None
             The `inlet_outlet_factory` is passed a dictionary of the particle
@@ -618,10 +594,25 @@ class Application(object):
             particle arrays returned by the callable. Else particles for the
             solver need to be set before calling this method
 
-        args: extra arguments passed on to the particle_factory.
+        args:
+            extra positional arguments passed on to the `particle_factory`.
 
-        kwargs: extra keyword arguments passed to the particle factory.
+        kwargs:
+            extra keyword arguments passed to the `particle_factory`.
 
+
+        Examples
+        --------
+
+        >>> def create_particles():
+        ...    ...
+        ...
+        >>> solver = Solver(...)
+        >>> equations = [...]
+        >>> app = Application()
+        >>> app.setup(solver=solver, equations=equations,
+        ...           particle_factory=create_particles)
+        >>> app.run()
         """
         start_time = time.time()
         self._solver = solver
@@ -631,6 +622,10 @@ class Application(object):
         self._process_command_line()
 
         options = self.options
+
+        # Setup configuration options.
+        if options.with_openmp is not None:
+            get_config().use_openmp = options.with_openmp
 
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
@@ -649,20 +644,23 @@ class Application(object):
 
         if nnps is None:
             kernel = self._solver.kernel
-            cache = not options.no_cache_nnps
+            cache = options.cache_nnps
 
             # create the NNPS object
             if options.nnps == 'box':
                 nnps = BoxSortNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    cache=cache)
+                    cache=cache, sort_gids=options.sort_gids
+                )
 
             elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache)
+                    fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
+                )
 
         # once the NNPS has been set-up, we set the default Solver
         # post-stage callback to the DomainManager.setup_domain
@@ -688,7 +686,7 @@ class Application(object):
         # Setup the solver output file name
         fname = options.output
 
-        if Has_MPI:
+        if has_mpi():
             rank = self.rank
             if self.num_procs > 1:
                 fname += '_' + str(rank)
@@ -707,9 +705,6 @@ class Application(object):
 
         # disable_output
         solver.set_disable_output(options.disable_output)
-
-        # Cell iteration.
-        solver.set_cell_iteration(options.cell_iteration)
 
         # output print frequency
         if options.freq is not None:
@@ -736,11 +731,6 @@ class Application(object):
 
             # set solver cfl number
             solver.set_cfl(options.cfl)
-
-        if options.integration is not None:
-            # FIXME, this is bogus
-            #solver.integrator_type = integration_methods[options.integration]
-            pass
 
         # setup the solver. This is where the code is compiled
         solver.setup(particles=self.particles, equations=equations, nnps=nnps, fixed_h=fixed_h)
@@ -781,8 +771,8 @@ class Application(object):
                     try_next_port = False
                 port = int(port)
 
-                interface = MultiprocessingInterface((host,port), authkey,
-                                                     try_next_port)
+                interface = MultiprocessingInterface(
+                    (host,port), authkey.encode(), try_next_port)
 
                 self.command_manager.add_interface(interface.start)
 
@@ -809,8 +799,8 @@ class Application(object):
             return
         if self.num_procs == 1:
             logger.info(msg)
-            print msg
+            print(msg)
         elif (self.num_procs > 1 and self.rank in (0,1)):
             s = "Rank %d: %s"%(self.rank, msg)
             logger.info(s)
-            print s
+            print(s)

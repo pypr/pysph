@@ -5,6 +5,7 @@ from textwrap import dedent
 import unittest
 
 # Local imports.
+from pysph.base.cython_generator import KnownType
 from pysph.sph.equation import (BasicCodeBlock, Context, Equation,
     Group, sort_precomputed)
 
@@ -23,10 +24,10 @@ class TestContext(unittest.TestCase):
     def test_context_behaves_like_dict(self):
         c = Context(a=1)
         c.b = 2
-        keys = c.keys()
+        keys = list(c.keys())
         keys.sort()
         self.assertEqual(keys, ['a', 'b'])
-        values = c.values()
+        values = list(c.values())
         values.sort()
         self.assertEqual(values, [1, 2])
         self.assertTrue('a' in c)
@@ -88,8 +89,8 @@ class TestEquations(TestBase):
         self.assertFalse(hasattr(eq, 'post_loop'))
         self.assertFalse(hasattr(eq, 'initialize'))
 
-        eq = Equation('fluid', sources=['fluid'], name='Test')
-        self.assertEqual(eq.name, 'Test')
+        eq = Equation('fluid', sources=['fluid'])
+        self.assertEqual(eq.name, 'Equation')
         self.assertEqual(eq.no_source, False)
         self.assertEqual(eq.dest, 'fluid')
         self.assertEqual(eq.sources, ['fluid'])
@@ -130,7 +131,9 @@ class TestEquations(TestBase):
             input = dict((x, pre_comp[x]) for x in ['RIJ', 'R2IJ',
                                                     'XIJ', 'HIJ', 'AIJ'])
             pre = sort_precomputed(input)
-            self.assertEqual(pre.keys(), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ'])
+            self.assertEqual(
+                list(pre.keys()), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ']
+            )
         finally:
             from pysph.sph.equation import precomputed_symbols
             Group.pre_comp = precomputed_symbols()
@@ -156,7 +159,7 @@ class TestGroup(TestBase):
     def test_precomputed(self):
         g = self.group
         self.assertEqual(len(g.precomputed), 5)
-        self.assertEqual(g.precomputed.keys(),
+        self.assertEqual(list(g.precomputed.keys()),
                          ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'WIJ'])
 
     def test_array_names(self):
@@ -178,6 +181,16 @@ class TestGroup(TestBase):
         expect = 'cdef double* d_x'
         self.assertEqual(g.get_array_declarations(['d_x']), expect)
 
+    def test_array_declarations_with_known_types(self):
+        # Given
+        g = self.group
+        known_types = {'d_x': KnownType('float*')}
+        # When
+        result = g.get_array_declarations(['d_x'], known_types)
+        # Then.
+        expect = 'cdef float* d_x'
+        self.assertEqual(result, expect)
+
     def test_variable_declarations(self):
         g = self.group
         context = Context(x=1.0)
@@ -188,11 +201,13 @@ class TestGroup(TestBase):
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=[1., 2.])
-        expect = 'cdef double[2] x'
+        expect = ('cdef DoubleArray _x = DoubleArray(aligned(2, 8)*self.n_threads)\n'
+                  'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=(0, 1., 2.))
-        expect = 'cdef double[3] x'
+        expect = ('cdef DoubleArray _x = DoubleArray(aligned(3, 8)*self.n_threads)\n'
+                  'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
     def test_loop_code(self):

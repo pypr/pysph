@@ -62,9 +62,9 @@ def create_particles(**kwargs):
     fluid = solid.extract_particles(indices); fluid.set_name('fluid')
     solid.remove_particles(indices)
 
-    print "Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+    print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
         Re, fluid.get_number_of_particles(),
-        solid.get_number_of_particles(), dt)
+        solid.get_number_of_particles(), dt))
 
     # add requisite properties to the arrays:
 
@@ -120,9 +120,9 @@ def create_particles(**kwargs):
 
     # set the output arrays
     fluid.set_output_arrays( ['x', 'y', 'u', 'v', 'vmag2', 'rho', 'p',
-                              'V', 'm', 'h'] )
+                              'V', 'm', 'h', 'gid'] )
 
-    solid.set_output_arrays( ['x', 'y', 'u', 'rho', 'p'] )
+    solid.set_output_arrays( ['x', 'y', 'u', 'rho', 'p', 'gid'] )
 
     return [fluid, solid]
 
