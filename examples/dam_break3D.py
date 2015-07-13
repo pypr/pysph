@@ -94,64 +94,73 @@ dx = 0.02
 nboundary_layers=3
 hdx = 1.2
 ro = 1000.0
-
-# the geometry generator
-geom = DamBreak3DGeometry(
-    dx=dx, nboundary_layers=nboundary_layers, hdx=hdx, rho0=ro)
-
 h0 = dx * hdx
-co = 10.0 * geom.get_max_speed(g=9.81)
-
 gamma = 7.0
 alpha = 0.5
 beta = 0.0
-B = co*co*ro/gamma
 
-# Create the application.
-app = Application()
+class DamBreak3D(Application):
 
-# Create the kernel
-kernel = WendlandQuintic(dim=dim)
+    def initialize(self):
+        self.geom = DamBreak3DGeometry(
+            dx=dx, nboundary_layers=nboundary_layers, hdx=hdx, rho0=ro
+        )
+        self.co = co = 10.0 * self.geom.get_max_speed(g=9.81)
+        self.B = co*co*ro/gamma
 
-# Setup the integrator.
-integrator = EPECIntegrator(fluid=WCSPHStep(),
-                            boundary=WCSPHStep(),
-                            obstacle=WCSPHStep())
+    def create_particles(self):
+        # the geometry generator
+        return self.geom.create_particles()
 
-# Create a solver.
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt,
-                adaptive_timestep=True, n_damp=50)
+    def create_solver(self):
+        pass
 
-# create the equations
-equations = [
+        # Create the kernel
+        kernel = WendlandQuintic(dim=dim)
 
-    # Equation of state
-    Group(equations=[
+        # Setup the integrator.
+        integrator = EPECIntegrator(fluid=WCSPHStep(),
+                                    boundary=WCSPHStep(),
+                                    obstacle=WCSPHStep())
 
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOSHGCorrection(dest='obstacle', sources=None, rho0=ro, c0=co, gamma=gamma),
+        # Create a solver.
+        solver = Solver(
+            kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt,
+                        adaptive_timestep=True, n_damp=50
+        )
+        return solver
 
-            ], real=False),
+    def create_equations(self):
+        # create the equations
+        co = self.co
+        equations = [
 
-    # Continuity, momentum and xsph equations
-    Group(equations=[
+            # Equation of state
+            Group(equations=[
 
-            ContinuityEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle']),
-            ContinuityEquation(dest='boundary', sources=['fluid']),
-            ContinuityEquation(dest='obstacle', sources=['fluid']),
+                    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
+                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+                    TaitEOSHGCorrection(dest='obstacle', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
-                             alpha=alpha, beta=beta, gz=-9.81, c0=co,
-                             tensile_correction=True),
+                    ], real=False),
 
-            XSPHCorrection(dest='fluid', sources=['fluid'])
+            # Continuity, momentum and xsph equations
+            Group(equations=[
 
-            ]),
-    ]
+                    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle']),
+                    ContinuityEquation(dest='boundary', sources=['fluid']),
+                    ContinuityEquation(dest='obstacle', sources=['fluid']),
 
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=geom.create_particles, hdx=hdx)
+                    MomentumEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle'],
+                                    alpha=alpha, beta=beta, gz=-9.81, c0=co,
+                                    tensile_correction=True),
 
-app.run()
+                    XSPHCorrection(dest='fluid', sources=['fluid'])
+
+                    ]),
+            ]
+        return equations
+
+if __name__ == '__main__':
+    app = DamBreak3D()
+    app.run()

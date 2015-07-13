@@ -24,7 +24,54 @@ def list_option_callback(option, opt, value, parser):
     val.extend( parser.rargs )
     setattr( parser.values, option.dest, val )
 
+def is_overloaded_method(method):
+    """Returns True if the given method is overloaded from any of its bases.
+    """
+    method_name = method.im_func.func_name
+    self = method.im_self
+    klass = self.__class__
+    for base in klass.__bases__:
+        if hasattr(base, method_name):
+            if getattr(base, method_name) != getattr(klass, method_name):
+                return True
+    return False
+
+
 logger = logging.getLogger(__name__)
+
+
+class Tool(object):
+    """A tool is typically an object that can be used to perform a
+    specific task on the solver's pre_step/post_step or post_stage callbacks.
+    This can be used for a variety of things.  For example, one could save a
+    plot, print debug statistics or perform remeshing etc.
+
+    To create a new tool, simply subclass this class and overload any of its
+    desired methods.
+    """
+
+    def pre_step(self, solver):
+        """If overloaded, this is called automatically before each integrator
+        step.  The method is passed the solver instance.
+        """
+        pass
+
+    def post_stage(self, current_time, dt, stage):
+        """If overloaded, this is called automatically after each integrator
+        stage, i.e. if the integrator is a two stage integrator it will be
+        called after the first and second stages.
+
+        The method is passed (current_time, dt, stage).  See the the
+        `Integrator.one_timestep` methods for examples of how this is called.
+        """
+        pass
+
+    def post_step(self, solver):
+        """If overloaded, this is called automatically after each integrator
+        step.  The method is passed the solver instance.
+        """
+        pass
+
 
 ##############################################################################
 # `Application` class.
@@ -39,7 +86,7 @@ class Application(object):
         Parameters
         ----------
         fname : str
-            file name to use.
+            file name to use for the output files.
         domain : pysph.nnps.DomainManager
             A domain manager to use. This is used for periodic domains etc.
         """
@@ -48,7 +95,9 @@ class Application(object):
         if domain is not None:
             self.is_periodic = domain.is_periodic
 
-        self._solver = None
+        self.solver = None
+        self.nnps = None
+        self.tools = []
         self._parallel_manager = None
 
         if fname == None:
@@ -79,6 +128,18 @@ class Application(object):
         self.path = None
         self.particles = []
         self.inlet_outlet = []
+        self.initialize()
+
+    def _add_option(self, opt):
+        """ Add an Option/OptionGroup or their list to OptionParser """
+        if isinstance(opt, OptionGroup):
+            self.opt_parse.add_option_group(opt)
+        elif isinstance(opt, Option):
+            self.opt_parse.add_option(opt)
+        else:
+            # assume a list of Option/OptionGroup
+            for o in opt:
+                self._add_option(o)
 
     def _setup_optparse(self):
         usage = """
@@ -338,8 +399,8 @@ class Application(object):
                                 'available files')
                           )
 
-    def _process_command_line(self):
-        """ Parse any command line arguments.
+    def _parse_command_line(self):
+        """Parse any command line arguments.
 
         Add any new options before this is called.  This also sets up
         the logging automatically.
@@ -356,35 +417,24 @@ class Application(object):
             (options, args) = self.opt_parse.parse_args([])
         self.options = options
 
-        # Setup logging based on command line options.
-        level = self._log_levels[options.loglevel]
-
-        #save the path where we want to dump output
+        # save the path where we want to dump output
         self.path = abspath(options.output_dir)
         mkdir(self.path)
 
-        if level is not None:
-            self._setup_logging(options.logfile, level,
-                                options.print_log)
-
-    def _setup_logging(self, filename=None, loglevel=logging.WARNING,
-                       stream=True):
-        """ Setup logging for the application.
-
-        Parameters
-        ----------
-        filename : The filename to log messages to.  If this is None
-                   a filename is automatically chosen and if it is an
-                   empty string, no file is used
-
-        loglevel : The logging level
-
-        stream : Boolean indicating if logging is also printed on
-                    stderr
+    def _setup_logging(self):
+        """Setup logging for the application.
         """
-        # logging setup
-        logger.setLevel(loglevel)
+        options = self.options
+        # Setup logging based on command line options.
+        level = self._log_levels[options.loglevel]
 
+        if level is None:
+            return
+
+        # logging setup
+        logger.setLevel(level)
+
+        filename = options.logfile
         # Setup the log file.
         if filename is None:
             filename = splitext(basename(sys.argv[0]))[0] + '.log'
@@ -392,9 +442,9 @@ class Application(object):
         if len(filename) > 0:
             lfn = os.path.join(self.path,filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
-            logging.basicConfig(level=loglevel, format=format,
+            logging.basicConfig(level=level, format=format,
                                 filename=lfn, filemode='a')
-        if stream:
+        if options.print_log:
             logger.addHandler(logging.StreamHandler())
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
@@ -406,7 +456,7 @@ class Application(object):
         arrays.  The factory should return a list of inlets and outlets.
         """
         if inlet_outlet_factory is not None:
-            solver = self._solver
+            solver = self.solver
             particle_arrays = dict([(p.name, p) for p in self.particles])
             self.inlet_outlet = inlet_outlet_factory(particle_arrays)
             # Hook up the inlet/outlet's update method to be called after
@@ -419,7 +469,6 @@ class Application(object):
         """ Create particles given a callable `particle_factory` and any
         arguments to it.
         """
-        solver = self._solver
         options = self.options
         rank = self.rank
 
@@ -431,6 +480,8 @@ class Application(object):
         # dummy particle arrays.
         if rank == 0:
             if options.restart_file is not None:
+                # FIXME: not tested, probably does not work!
+                solver = self.solver
                 data = load(options.restart_file)
 
                 arrays = data['arrays']
@@ -472,7 +523,7 @@ class Application(object):
         # Instantiate the Parallel Manager here and do an initial LB
         num_procs = self.num_procs
         options = self.options
-        solver = self._solver
+        solver = self.solver
         comm = self.comm
 
         self.pm = None
@@ -485,9 +536,7 @@ class Application(object):
 
             else:
                 raise ValueError("""Sorry. You're stuck with Zoltan for now
-
-                use the option '--with_zoltan' for parallel runs
-
+                use the option '--with-zoltan' for parallel runs
                 """)
 
             # create the parallel manager
@@ -548,101 +597,24 @@ class Application(object):
         # set the solver's parallel manager
         solver.set_parallel_manager(self.pm)
 
-    ######################################################################
-    # Public interface.
-    ######################################################################
-    def set_args(self, args):
-        self.args = args
-
-    def add_option(self, opt):
-        """ Add an Option/OptionGroup or their list to OptionParser """
-        if isinstance(opt, OptionGroup):
-            self.opt_parse.add_option_group(opt)
-        elif isinstance(opt, Option):
-            self.opt_parse.add_option(opt)
-        else:
-            # assume a list of Option/OptionGroup
-            for o in opt:
-                self.add_option(o)
-
-    def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
-              particle_factory=None, *args, **kwargs):
-        """Setup the application's solver.
-
-        This will parse the command line arguments (if this is not called from
-        within an IPython notebook or shell) and then using those parameters
-        and any additional parameters and call the solver's setup method.
-
-        Parameters
-        ----------
-        solver: pysph.solver.solver.Solver
-            The solver instance.
-
-        equations: list
-            A list of Groups/Equations.
-
-        nnps: pysph.base.nnps.NNPS
-            Optional NNPS instance. If None is given a default NNPS is created.
-
-        inlet_outlet_factory: callable or None
-            The `inlet_outlet_factory` is passed a dictionary of the particle
-            arrays.  The factory should return a list of inlets and outlets.
-
-        particle_factory : callable or None
-            If supplied, particles will be created for the solver using the
-            particle arrays returned by the callable. Else particles for the
-            solver need to be set before calling this method
-
-        args:
-            extra positional arguments passed on to the `particle_factory`.
-
-        kwargs:
-            extra keyword arguments passed to the `particle_factory`.
-
-
-        Examples
-        --------
-
-        >>> def create_particles():
-        ...    ...
-        ...
-        >>> solver = Solver(...)
-        >>> equations = [...]
-        >>> app = Application()
-        >>> app.setup(solver=solver, equations=equations,
-        ...           particle_factory=create_particles)
-        >>> app.run()
+    def _configure(self):
+        """Configures the application using the options from the
+        command-line.
         """
-        start_time = time.time()
-        self._solver = solver
-        solver_opts = solver.get_options(self.opt_parse)
-        if solver_opts is not None:
-            self.add_option(solver_opts)
-        self._process_command_line()
-
         options = self.options
-
         # Setup configuration options.
         if options.with_openmp is not None:
             get_config().use_openmp = options.with_openmp
-
-        # Create particles either from scratch or restart
-        self._create_particles(particle_factory, *args, **kwargs)
-
-        # This must be done before the initial load balancing
-        # as the inlets will create new particles.
-        self._create_inlet_outlet(inlet_outlet_factory)
-
-        self._do_initial_load_balancing()
-
         # setup the solver using any options
-        self._solver.setup_solver(options.__dict__)
+        self.solver.setup_solver(options.__dict__)
+
+        solver = self.solver
 
         # fixed smoothing lengths
         fixed_h = solver.fixed_h or options.fixed_h
 
-        if nnps is None:
-            kernel = self._solver.kernel
+        if self.nnps is None:
+            kernel = self.solver.kernel
             cache = options.cache_nnps
 
             # create the NNPS object
@@ -660,7 +632,9 @@ class Application(object):
                     fixed_h=fixed_h, cache=cache,
                     sort_gids=options.sort_gids
                 )
+            self.nnps = nnps
 
+        nnps = self.nnps
         # once the NNPS has been set-up, we set the default Solver
         # post-stage callback to the DomainManager.setup_domain
         # method. This method is responsible to computing the new cell
@@ -670,9 +644,6 @@ class Application(object):
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
             nnps.set_in_parallel(True)
-
-        # save the NNPS with the application
-        self.nnps = nnps
 
         dt = options.time_step
         if dt is not None:
@@ -732,7 +703,8 @@ class Application(object):
             solver.set_cfl(options.cfl)
 
         # setup the solver. This is where the code is compiled
-        solver.setup(particles=self.particles, equations=equations, nnps=nnps, fixed_h=fixed_h)
+        solver.setup(particles=self.particles,
+                     equations=self.equations, nnps=nnps, fixed_h=fixed_h)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
@@ -777,21 +749,19 @@ class Application(object):
 
                 logger.info('started multiprocessing interface on %s'%(
                              interface.address,))
-        end_time = time.time()
-        self._message("Setup took: %.5f secs"%(end_time - start_time))
 
-    def run(self):
-        """Run the application.
+    def _setup_solver_callbacks(self, obj):
+        """Setup any solver callbacks given an object with any of `pre_step`,
+        `post_step' and `post_stage`
         """
-        start_time = time.time()
-        self._solver.solve(not self.options.quiet)
-        end_time = time.time()
-        self._message("Run took: %.5f secs"%(end_time - start_time))
+        if is_overloaded_method(obj.pre_step):
+            self.solver.add_pre_step_callback(obj.pre_step)
 
-    def dump_code(self, file):
-        """Dump the generated code to given file.
-        """
-        file.write(self._solver.sph_eval.ext_mod.code)
+        if is_overloaded_method(obj.post_stage):
+            self.solver.add_post_stage_callback(obj.post_stage)
+
+        if is_overloaded_method(self.post_step):
+            self.solver.add_post_step_callback(obj.post_step)
 
     def _message(self, msg):
         if self.options.quiet:
@@ -803,3 +773,212 @@ class Application(object):
             s = "Rank %d: %s"%(self.rank, msg)
             logger.info(s)
             print(s)
+
+    ######################################################################
+    # Public interface.
+    ######################################################################
+    def add_tool(self, tool):
+        """Add a `Tool` to the application.
+        """
+        self._setup_solver_callbacks(tool)
+        self.tools.append(tool)
+
+    def initialize(self):
+        """Called on the constructor, set constants etc. up here if needed.
+        """
+        pass
+
+    def set_args(self, args):
+        self.args = args
+
+    def setup(self, solver, equations, nnps=None, inlet_outlet_factory=None,
+              particle_factory=None, *args, **kwargs):
+        """Setup the application's solver.
+
+        This will parse the command line arguments (if this is not called from
+        within an IPython notebook or shell) and then using those parameters
+        and any additional parameters and call the solver's setup method.
+
+        Parameters
+        ----------
+        solver: pysph.solver.solver.Solver
+            The solver instance.
+
+        equations: list
+            A list of Groups/Equations.
+
+        nnps: pysph.base.nnps.NNPS
+            Optional NNPS instance. If None is given a default NNPS is created.
+
+        inlet_outlet_factory: callable or None
+            The `inlet_outlet_factory` is passed a dictionary of the particle
+            arrays.  The factory should return a list of inlets and outlets.
+
+        particle_factory : callable or None
+            If supplied, particles will be created for the solver using the
+            particle arrays returned by the callable. Else particles for the
+            solver need to be set before calling this method
+
+        args:
+            extra positional arguments passed on to the `particle_factory`.
+
+        kwargs:
+            extra keyword arguments passed to the `particle_factory`.
+
+
+        Examples
+        --------
+
+        >>> def create_particles():
+        ...    ...
+        ...
+        >>> solver = Solver(...)
+        >>> equations = [...]
+        >>> app = Application()
+        >>> app.setup(solver=solver, equations=equations,
+        ...           particle_factory=create_particles)
+        >>> app.run()
+        """
+        start_time = time.time()
+        self.solver = solver
+        self.equations = equations
+        solver_opts = solver.get_options(self.opt_parse)
+        if solver_opts is not None:
+            self._add_option(solver_opts)
+        self._parse_command_line()
+        self._setup_logging()
+
+        # Create particles either from scratch or restart
+        self._create_particles(particle_factory, *args, **kwargs)
+
+        # This must be done before the initial load balancing
+        # as the inlets will create new particles.
+        self._create_inlet_outlet(inlet_outlet_factory)
+
+        self._do_initial_load_balancing()
+
+        self._configure()
+
+        end_time = time.time()
+        self._message("Setup took: %.5f secs"%(end_time - start_time))
+
+    def run(self, argv=None):
+        """Run the application.
+        """
+        if argv is not None:
+            self.set_args(argv)
+
+        if self.solver is None:
+            start_time = time.time()
+
+            user_options = OptionGroup(
+                self.opt_parse, "User", "User defined command line arguments"
+            )
+            self.add_user_options(user_options)
+            if len(user_options.option_list) > 0:
+                self._add_option(user_options)
+
+            self._parse_command_line()
+            self._setup_logging()
+
+            self.solver = self.create_solver()
+            self.equations = self.create_equations()
+
+            self._create_particles(self.create_particles)
+
+            # This must be done before the initial load balancing
+            # as the inlets will create new particles.
+            if is_overloaded_method(self.create_inlet_outlet):
+                self._create_inlet_outlet(self.create_inlet_outlet)
+
+            self.nnps = self.create_nnps()
+            self._do_initial_load_balancing()
+
+            self._configure()
+
+            self._setup_solver_callbacks(self)
+            for tool in self.create_tools():
+                self.add_tool(tool)
+
+            end_time = time.time()
+            self._message("Setup took: %.5f secs"%(end_time - start_time))
+
+        start_time = time.time()
+        self.solver.solve(not self.options.quiet)
+        end_time = time.time()
+        self._message("Run took: %.5f secs"%(end_time - start_time))
+
+    def dump_code(self, file):
+        """Dump the generated code to given file.
+        """
+        file.write(self.solver.sph_eval.ext_mod.code)
+
+    def add_user_options(self, group):
+        """Add any user-defined options to the given option group.
+
+        Note
+        ----
+
+        This uses the `optparse` module.
+        """
+        pass
+
+    def create_inlet_outlet(self, particle_arrays):
+        """Create inlet and outlet objects and return them as a list.
+
+        The method is passed a dictionary of particle arrays keyed on the name
+        of the particle array.
+        """
+        pass
+
+    def create_particles(self):
+        """Create particle arrays and return a list of them.
+        """
+        message = "Application.create_particles method must be overloaded."
+        raise NotImplementedError(message)
+
+    def create_equations(self):
+        """Create the equations to be used and return them.
+        """
+        message = "Application.create_equations method must be overloaded."
+        raise NotImplementedError(message)
+
+    def create_nnps(self):
+        """Create any NNPS if desired and return it, else a default NNPS will
+        be created automatically.
+        """
+        return None
+
+    def create_solver(self):
+        """Create the solver and return it.
+        """
+        message = "Application.create_solver method must be overloaded."
+        raise NotImplementedError(message)
+
+    def create_tools(self):
+        """Create any tools and return a sequence of them.  This method is
+        called after particles/inlets etc. are all setup, configured etc.
+        """
+        return []
+
+    def pre_step(self, solver):
+        """If overloaded, this is called automatically before each integrator
+        step.  The method is passed the solver instance.
+        """
+        pass
+
+    def post_stage(self, current_time, dt, stage):
+        """If overloaded, this is called automatically after each integrator
+        stage, i.e. if the integrator is a two stage integrator it will be
+        called after the first and second stages.
+
+        The method is passed (current_time, dt, stage).  See the the
+        `Integrator.one_timestep` methods for examples of how this is called.
+        """
+        pass
+
+    def post_step(self, solver):
+        """If overloaded, this is called automatically after each integrator
+        step.  The method is passed the solver instance.
+        """
+        pass

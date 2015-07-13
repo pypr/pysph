@@ -92,10 +92,6 @@ fluid_column_width  = 1.0
 container_height = 3.0
 container_width  = 4.0
 nboundary_layers=2
-
-dt = 1e-4
-tf = 2.5
-
 #h = 0.0156
 h = 0.039
 hdx = 1.5
@@ -109,67 +105,73 @@ beta = 0.0
 B = co*co*ro/gamma
 p0 = 1000.0
 
-geom = DamBreak2DGeometry(
-    container_width=container_width, container_height=container_height,
-    fluid_column_height=fluid_column_height,
-    fluid_column_width=fluid_column_width, dx=dx, dy=dy,
-    nboundary_layers=1, ro=ro, co=co,
-    with_obstacle=False,
-    beta=2.0, nfluid_offset=1, hdx=hdx)
+class DamBreak2D(Application):
+    def create_particles(self):
+        geom = DamBreak2DGeometry(
+            container_width=container_width, container_height=container_height,
+            fluid_column_height=fluid_column_height,
+            fluid_column_width=fluid_column_width, dx=dx, dy=dy,
+            nboundary_layers=1, ro=ro, co=co,
+            with_obstacle=False,
+            beta=2.0, nfluid_offset=1, hdx=hdx)
+        return geom.create_particles()
 
-# Create the application.
-app = Application()
+    def create_solver(self):
+        dt = 1e-4
+        tf = 2.5
 
-# Create the kernel
-kernel = WendlandQuintic(dim=2)
+        # Create the kernel
+        kernel = WendlandQuintic(dim=2)
 
+        # Create the Integrator. Currently, PySPH supports multi-stage,
+        # predictor corrector and a TVD-RK3 integrators.
 
-# Create the Integrator. Currently, PySPH supports multi-stage,
-# predictor corrector and a TVD-RK3 integrators.
+        #integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
+        integrator = TVDRK3Integrator(fluid=WCSPHTVDRK3Step(), boundary=WCSPHTVDRK3Step())
 
-#integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
-integrator = TVDRK3Integrator(fluid=WCSPHTVDRK3Step(), boundary=WCSPHTVDRK3Step())
+        # Create a solver.  The damping is performed for the first 50 iterations.
+        solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
+                        dt=dt, tf=tf, adaptive_timestep=True, n_damp=50,
+                        fixed_h=False)
 
-# Create a solver.  The damping is performed for the first 50 iterations.
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=True, n_damp=50,
-                fixed_h=False)
+        return solver
 
-# create the equations
-equations = [
+    def create_equations(self):
 
-    # Equation of state
-    Group(equations=[
+        # create the equations
+        equations = [
 
-            TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-            TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-            ], real=False),
+            # Equation of state
+            Group(equations=[
 
-    Group(equations=[
+                    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
+                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
+                    ], real=False),
 
-            # Continuity equation with dissipative corrections for fluid on fluid
-            ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
-            ContinuityEquation(dest='fluid', sources=['boundary']),
-            ContinuityEquation(dest='boundary', sources=['fluid']),
+            Group(equations=[
 
-            # Momentum equation
-            MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                             alpha=alpha, beta=beta, gy=-9.81, c0=co,
-                             tensile_correction=True),
+                    # Continuity equation with dissipative corrections for fluid on fluid
+                    ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
+                    ContinuityEquation(dest='fluid', sources=['boundary']),
+                    ContinuityEquation(dest='boundary', sources=['fluid']),
 
-            # Position step with XSPH
-            XSPHCorrection(dest='fluid', sources=['fluid'])
+                    # Momentum equation
+                    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+                                    alpha=alpha, beta=beta, gy=-9.81, c0=co,
+                                    tensile_correction=True),
 
-            ]),
+                    # Position step with XSPH
+                    XSPHCorrection(dest='fluid', sources=['fluid'])
 
-    # smoothing length update
-    Group( equations=[
-            UpdateSmoothingLengthFerrari(dest='fluid', sources=None, hdx=1.2, dim=2)
-            ], real=True ),
-    ]
+                    ]),
 
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=geom.create_particles)
+            # smoothing length update
+            Group( equations=[
+                    UpdateSmoothingLengthFerrari(dest='fluid', sources=None, hdx=1.2, dim=2)
+                    ], real=True ),
+            ]
+        return equations
 
-app.run()
+if __name__ == '__main__':
+    app = DamBreak2D()
+    app.run()
