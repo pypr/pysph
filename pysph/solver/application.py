@@ -1,8 +1,10 @@
 # Standard imports.
-import os
+import glob
+import json
 import logging
+import os
 from optparse import OptionParser, OptionGroup, Option
-from os.path import abspath, basename, splitext
+from os.path import abspath, basename, join, isdir, splitext
 import sys
 import time
 
@@ -11,7 +13,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
 from pysph.solver.controller import CommandManager
-from pysph.solver.utils import mkdir, load
+from pysph.solver.utils import mkdir, load, get_files
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
@@ -19,10 +21,8 @@ if in_parallel():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
 
-def list_option_callback(option, opt, value, parser):
-    val = value.split(',')
-    val.extend( parser.rargs )
-    setattr( parser.values, option.dest, val )
+logger = logging.getLogger(__name__)
+
 
 def is_overloaded_method(method):
     """Returns True if the given method is overloaded from any of its bases.
@@ -36,8 +36,23 @@ def is_overloaded_method(method):
                 return True
     return False
 
+def is_using_ipython():
+    """Return True if the code is being run from an IPython session or
+    notebook.
+    """
+    try:
+        # If this is being run inside an IPython console or notebook
+        # then this is defined.
+        __IPYTHON__
+    except NameError:
+        return False
+    else:
+        return True
 
-logger = logging.getLogger(__name__)
+def guess_output_filename():
+    """Try to guess the output filename to use.
+    """
+    return splitext(basename(abspath(sys.argv[0])))[0]
 
 
 class Tool(object):
@@ -98,10 +113,10 @@ class Application(object):
         self.solver = None
         self.nnps = None
         self.tools = []
-        self._parallel_manager = None
+        self.parallel_manager = None
 
-        if fname == None:
-            fname = splitext(basename(abspath(sys.argv[0])))[0]
+        if fname is None:
+            fname = guess_output_filename()
 
         self.fname = fname
 
@@ -125,7 +140,7 @@ class Application(object):
 
         self._setup_optparse()
 
-        self.path = None
+        self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
         self.initialize()
@@ -140,6 +155,9 @@ class Application(object):
             # assume a list of Option/OptionGroup
             for o in opt:
                 self._add_option(o)
+
+    def _get_output_dir_from_fname(self):
+        return self.fname + '_output'
 
     def _setup_optparse(self):
         usage = """
@@ -215,7 +233,7 @@ class Application(object):
 
         # -o/ --fname
         parser.add_option("-o", "--fname", action="store",
-                          dest="output", default=self.fname,
+                          dest="fname", default=self.fname,
                           help="File name to use for output")
 
         # --pfreq.
@@ -234,8 +252,9 @@ class Application(object):
                           help="Save Remote particles in parallel")
         # --directory
         parser.add_option("--directory", action="store",
-                         dest="output_dir", default=self.fname+'_output',
-                         help="Dump output in the specified directory.")
+                          dest="output_dir",
+                          default=self._get_output_dir_from_fname(),
+                          help="Dump output in the specified directory.")
 
         # --openmp
         parser.add_option("--openmp", action="store_true", dest="with_openmp",
@@ -400,26 +419,17 @@ class Application(object):
                           )
 
     def _parse_command_line(self):
-        """Parse any command line arguments.
-
-        Add any new options before this is called.  This also sets up
-        the logging automatically.
-
-        """
-        try:
-            # If this is being run inside an IPython console or notebook
-            # then this is defined and we should not parse the command line
-            # arguments.
-            __IPYTHON__
-        except NameError:
-            (options, args) = self.opt_parse.parse_args(self.args)
-        else:
+        if is_using_ipython():
+            # Don't parse the command line args.
             (options, args) = self.opt_parse.parse_args([])
+        else:
+            (options, args) = self.opt_parse.parse_args(self.args)
+
         self.options = options
 
         # save the path where we want to dump output
-        self.path = abspath(options.output_dir)
-        mkdir(self.path)
+        self.output_dir = abspath(options.output_dir)
+        mkdir(self.output_dir)
 
     def _setup_logging(self):
         """Setup logging for the application.
@@ -437,10 +447,10 @@ class Application(object):
         filename = options.logfile
         # Setup the log file.
         if filename is None:
-            filename = splitext(basename(sys.argv[0]))[0] + '.log'
+            filename = self.fname + '.log'
 
         if len(filename) > 0:
-            lfn = os.path.join(self.path,filename)
+            lfn = os.path.join(self.output_dir,filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
             logging.basicConfig(level=level, format=format,
                                 filename=lfn, filemode='a')
@@ -465,7 +475,6 @@ class Application(object):
                 solver.add_post_step_callback(obj.update)
 
     def _create_particles(self, particle_factory, *args, **kw):
-
         """ Create particles given a callable `particle_factory` and any
         arguments to it.
         """
@@ -526,7 +535,7 @@ class Application(object):
         solver = self.solver
         comm = self.comm
 
-        self.pm = None
+        self.parallel_manager = None
         if num_procs > 1:
             options = self.options
 
@@ -554,7 +563,7 @@ class Application(object):
             # radius scale for the parallel update
             radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
 
-            self.pm = pm = ZoltanParallelManagerGeometric(
+            self.parallel_manager = pm = ZoltanParallelManagerGeometric(
                 dim=solver.dim, particles=self.particles, comm=comm,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
@@ -595,7 +604,7 @@ class Application(object):
             comm.barrier()
 
         # set the solver's parallel manager
-        solver.set_parallel_manager(self.pm)
+        solver.set_parallel_manager(self.parallel_manager)
 
     def _configure(self):
         """Configures the application using the options from the
@@ -654,7 +663,7 @@ class Application(object):
             solver.set_final_time(tf)
 
         # Setup the solver output file name
-        fname = options.output
+        fname = options.fname
 
         if in_parallel():
             rank = self.rank
@@ -774,6 +783,16 @@ class Application(object):
             logger.info(s)
             print(s)
 
+    def _write_info(self, filename, **kw):
+        """Write the information dictionary to given filename. Any extra
+        keyword arguments are written to the file.
+        """
+        info = dict(
+            fname=self.fname, output_dir=self.output_dir, args=self.args
+        )
+        info.update(kw)
+        json.dump(info, open(filename, 'wb'))
+
     ######################################################################
     # Public interface.
     ######################################################################
@@ -783,10 +802,88 @@ class Application(object):
         self._setup_solver_callbacks(tool)
         self.tools.append(tool)
 
+    def dump_code(self, file):
+        """Dump the generated code to given file.
+        """
+        file.write(self.solver.sph_eval.ext_mod.code)
+
+    @property
+    def info_filename(self):
+        return abspath(join(self.output_dir, self.fname + '.info'))
+
     def initialize(self):
         """Called on the constructor, set constants etc. up here if needed.
         """
         pass
+
+    @property
+    def output_files(self):
+        return get_files(self.output_dir, self.fname)
+
+    def read_info(self, fname_or_dir):
+        """Read the information from the given info file (or directory
+        containing the info file, the first found info file will be used).
+        """
+        if isdir(fname_or_dir):
+            fname_or_dir = glob.glob(join(fname_or_dir, "*.info"))[0]
+        info = json.load(open(fname_or_dir, 'rb'))
+        self.fname = info.get('fname', self.fname)
+        self.output_dir = info.get('output_dir', self.output_dir)
+        return info
+
+    def run(self, argv=None):
+        """Run the application.
+        """
+        if argv is not None:
+            self.set_args(argv)
+
+        if self.solver is None:
+            start_time = time.time()
+
+            user_options = OptionGroup(
+                self.opt_parse, "User", "User defined command line arguments"
+            )
+            self.add_user_options(user_options)
+            if len(user_options.option_list) > 0:
+                self._add_option(user_options)
+
+            self._parse_command_line()
+            self._setup_logging()
+
+            self.solver = self.create_solver()
+            self.equations = self.create_equations()
+
+            self._create_particles(self.create_particles)
+
+            # This must be done before the initial load balancing
+            # as the inlets will create new particles.
+            if is_overloaded_method(self.create_inlet_outlet):
+                self._create_inlet_outlet(self.create_inlet_outlet)
+
+            self.nnps = self.create_nnps()
+            self._do_initial_load_balancing()
+
+            self._configure()
+
+            self._setup_solver_callbacks(self)
+            for tool in self.create_tools():
+                self.add_tool(tool)
+
+            end_time = time.time()
+            setup_duration = end_time - start_time
+            self._message("Setup took: %.5f secs"%(setup_duration))
+            self._write_info(
+                self.info_filename, completed=False, cpu_time=0
+            )
+
+        start_time = time.time()
+        self.solver.solve(not self.options.quiet)
+        end_time = time.time()
+        run_duration = end_time - start_time
+        self._message("Run took: %.5f secs"%(run_duration))
+        self._write_info(
+            self.info_filename, completed=True, cpu_time=run_duration
+        )
 
     def set_args(self, args):
         self.args = args
@@ -860,59 +957,13 @@ class Application(object):
         self._configure()
 
         end_time = time.time()
-        self._message("Setup took: %.5f secs"%(end_time - start_time))
+        setup_duration = end_time - start_time
+        self._message("Setup took: %.5f secs"%(setup_duration))
+        self._write_info(self.info_filename, completed=False, cpu_time=0)
 
-    def run(self, argv=None):
-        """Run the application.
-        """
-        if argv is not None:
-            self.set_args(argv)
-
-        if self.solver is None:
-            start_time = time.time()
-
-            user_options = OptionGroup(
-                self.opt_parse, "User", "User defined command line arguments"
-            )
-            self.add_user_options(user_options)
-            if len(user_options.option_list) > 0:
-                self._add_option(user_options)
-
-            self._parse_command_line()
-            self._setup_logging()
-
-            self.solver = self.create_solver()
-            self.equations = self.create_equations()
-
-            self._create_particles(self.create_particles)
-
-            # This must be done before the initial load balancing
-            # as the inlets will create new particles.
-            if is_overloaded_method(self.create_inlet_outlet):
-                self._create_inlet_outlet(self.create_inlet_outlet)
-
-            self.nnps = self.create_nnps()
-            self._do_initial_load_balancing()
-
-            self._configure()
-
-            self._setup_solver_callbacks(self)
-            for tool in self.create_tools():
-                self.add_tool(tool)
-
-            end_time = time.time()
-            self._message("Setup took: %.5f secs"%(end_time - start_time))
-
-        start_time = time.time()
-        self.solver.solve(not self.options.quiet)
-        end_time = time.time()
-        self._message("Run took: %.5f secs"%(end_time - start_time))
-
-    def dump_code(self, file):
-        """Dump the generated code to given file.
-        """
-        file.write(self.solver.sph_eval.ext_mod.code)
-
+    ######################################################################
+    # User methods that could be overloaded.
+    ######################################################################
     def add_user_options(self, group):
         """Add any user-defined options to the given option group.
 
@@ -982,3 +1033,17 @@ class Application(object):
         step.  The method is passed the solver instance.
         """
         pass
+
+    def post_process(self, info_fname_or_directory):
+        """Given an info filename or a directory containing the info file, read
+        the information and do any post-processing of the results.  Please
+        overload the method to perform any processing.
+
+        The info file has a few useful attributes and can be read using the
+        `read_info` method.
+
+        The `output_files` property should provide the output files
+        generated.
+        """
+        print('Overload this method to post-process the results.')
+
