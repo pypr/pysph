@@ -700,6 +700,7 @@ class Application(object):
 
         # output directory
         solver.set_output_directory(abspath(options.output_dir))
+        self._message("Generating output in %s"%self.output_dir)
 
         # set parallel output mode
         if options.parallel_output_mode is not None:
