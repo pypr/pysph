@@ -4,7 +4,8 @@ import json
 import logging
 import os
 from optparse import OptionParser, OptionGroup, Option
-from os.path import abspath, basename, join, isdir, splitext
+from os.path import (abspath, basename, dirname, isdir, join, realpath,
+    splitext)
 import sys
 import time
 
@@ -826,9 +827,16 @@ class Application(object):
         """
         if isdir(fname_or_dir):
             fname_or_dir = glob.glob(join(fname_or_dir, "*.info"))[0]
+        info_dir = dirname(fname_or_dir)
         info = json.load(open(fname_or_dir, 'rb'))
         self.fname = info.get('fname', self.fname)
-        self.output_dir = info.get('output_dir', self.output_dir)
+        output_dir = info.get('output_dir', self.output_dir)
+        if realpath(info_dir) != realpath(output_dir):
+            # Happens if someone moved the directory!
+            self.output_dir = info_dir
+            info['output_dir'] = info_dir
+        else:
+            self.output_dir = output_dir
         return info
 
     def run(self, argv=None):
