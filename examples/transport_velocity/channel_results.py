@@ -2,6 +2,7 @@
 
 import pysph.solver.utils as utils
 from pysph.tools import pprocess
+from pysph.tools.interpolator import Interpolator
 from pysph.base.utils import get_particle_array as gpa
 import numpy as np
 
@@ -22,9 +23,6 @@ class PoieuilleChannelResults(pprocess.Results):
         self.fx = Vmax * 2*nu/(d**2)
 
     def get_results(self, array="fluid"):
-        files = self.files
-        nfiles = self.nfiles
-
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
 
@@ -38,10 +36,10 @@ class PoieuilleChannelResults(pprocess.Results):
         # take the last solution data
         fname = self.files[-1]
         data = utils.load(fname)
-        self.pa = src = data['arrays'][array]
+        self.pa = data['arrays'][array]
 
-        interp = utils.SPHInterpolate(dim=2, dst=dst, src=src)
-        self.ui = ui = interp.interpolate(src.u)
+        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
+        self.ui = interp.interpolate('u')
         self.y = y
 
         # exact parabolic profile for the u-velocity
@@ -51,7 +49,7 @@ class PoieuilleChannelResults(pprocess.Results):
 
 class CouetteFlowResults(pprocess.Results):
     def __init__(self, dirname='couette_output', fname='couette', endswith=".npz",
-                 d=0.5, Re=0.0125, nu=1.0):
+                 d=0.5, Re=0.0125, nu=0.01):
         super(CouetteFlowResults, self).__init__(dirname, fname, endswith)
 
         self.d = d
@@ -63,9 +61,6 @@ class CouetteFlowResults(pprocess.Results):
         self.Vmax = Vmax = nu*Re/(self.L)
 
     def get_results(self, array="fluid"):
-        files = self.files
-        nfiles = self.nfiles
-
         # compute the kinetic energy history for the array
         self.get_ke_history(array)
 
@@ -79,10 +74,10 @@ class CouetteFlowResults(pprocess.Results):
         # take the last solution data
         fname = self.files[-1]
         data = utils.load(fname)
-        self.pa = src = data['arrays'][array]
+        self.pa = data['arrays'][array]
 
-        interp = utils.SPHInterpolate(dim=2, dst=dst, src=src)
-        self.ui = ui = interp.interpolate(src.u)
+        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
+        self.ui = interp.interpolate('u')
         self.y = y
 
         # exact parabolic profile for the u-velocity
