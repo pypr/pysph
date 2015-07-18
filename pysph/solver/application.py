@@ -760,7 +760,7 @@ class Application(object):
             fname=self.fname, output_dir=self.output_dir, args=self.args
         )
         info.update(kw)
-        json.dump(info, open(filename, 'wb'))
+        json.dump(info, open(filename, 'w'))
 
     ######################################################################
     # Public interface.
