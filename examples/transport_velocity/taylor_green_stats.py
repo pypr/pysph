@@ -23,7 +23,7 @@ class TaylorGreenResults(pprocess.Results):
         self.Re = Re
         self.decay_rate_constant = -8*np.pi**2/Re
 
-    def comute_stats(self, array="fluid"):
+    def compute_stats(self, array="fluid"):
         files = self.files
         nfiles = self.nfiles
 
@@ -36,7 +36,13 @@ class TaylorGreenResults(pprocess.Results):
             data = utils.load(files[i])
 
             pa = data['arrays'][array]
-            vmag = np.sqrt( pa.vmag2 )
+            if 'vmag' in pa.properties:
+                vmag = pa.vmag
+            else:
+                if 'vmag2' in pa.properties:
+                    vmag = np.sqrt( pa.vmag2 )
+                else:
+                    vmag = np.sqrt(pa.u**2 + pa.v**2)
 
             t = data['solver_data']['t']
             decay[i] = vmag.max()

@@ -573,8 +573,6 @@ class Solver(object):
         All subclasses of Solver may implement this function to add the
         necessary operations for the problem at hand.
 
-        Look at solver/fluid_solver.py for an example.
-
         Parameters
         ----------
         options : dict
