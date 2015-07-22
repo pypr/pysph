@@ -1,5 +1,6 @@
 # Standard imports.
 import glob
+import inspect
 import json
 import logging
 import os
@@ -13,6 +14,7 @@ import time
 from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
+from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
 
@@ -50,10 +52,10 @@ def is_using_ipython():
     else:
         return True
 
-def guess_output_filename():
-    """Try to guess the output filename to use.
+def list_all_kernels():
+    """Return list of available kernels.
     """
-    return splitext(basename(abspath(sys.argv[0])))[0]
+    return [n for n in dir(kernels) if inspect.isclass(getattr(kernels, n))]
 
 
 ##############################################################################
@@ -84,7 +86,7 @@ class Application(object):
         self.parallel_manager = None
 
         if fname is None:
-            fname = guess_output_filename()
+            fname = self._guess_output_filename()
 
         self.fname = fname
 
@@ -126,6 +128,18 @@ class Application(object):
 
     def _get_output_dir_from_fname(self):
         return self.fname + '_output'
+
+    def _guess_output_filename(self):
+        """Try to guess the output filename to use.
+        """
+        module = self.__module__.rsplit('.', 1)[-1]
+        if is_using_ipython():
+            return module
+        else:
+            if len(sys.argv[0]) == 0:
+                return module
+            else:
+                return splitext(basename(abspath(sys.argv[0])))[0]
 
     def _setup_optparse(self):
         usage = """
@@ -231,6 +245,12 @@ class Application(object):
         parser.add_option("--no-openmp", action="store_false", dest="with_openmp",
                           default=None, help="Do not use OpenMP to run the "\
                             "simulation using multiple cores.")
+
+        # --kernel
+        parser.add_option(
+            "--kernel", action="store", dest="kernel", default=None,
+            type=str, help="Use specified kernel from %s"%list_all_kernels()
+        )
 
         # Restart options
         restart = OptionGroup(parser, "Restart options",
@@ -493,87 +513,6 @@ class Application(object):
         if rank != 0:
             self.particles = utils.create_dummy_particles(particles_info)
 
-    def _do_initial_load_balancing(self):
-        """ This will automatically distribute the particles among processors
-        if this is a parallel run.
-        """
-        # Instantiate the Parallel Manager here and do an initial LB
-        num_procs = self.num_procs
-        options = self.options
-        solver = self.solver
-        comm = self.comm
-
-        self.parallel_manager = None
-        if num_procs > 1:
-            options = self.options
-
-            if options.with_zoltan:
-                if not (has_zoltan() and has_mpi()):
-                    raise RuntimeError("Cannot run in parallel!")
-
-            else:
-                raise ValueError("""Sorry. You're stuck with Zoltan for now
-                use the option '--with-zoltan' for parallel runs
-                """)
-
-            # create the parallel manager
-            obj_weight_dim = "0"
-            if options.zoltan_weights:
-                obj_weight_dim = "1"
-
-            zoltan_lb_method = options.zoltan_lb_method
-            zoltan_debug_level = options.zoltan_debug_level
-            zoltan_obj_wgt_dim = obj_weight_dim
-
-            # ghost layers
-            ghost_layers = options.ghost_layers
-
-            # radius scale for the parallel update
-            radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
-
-            self.parallel_manager = pm = ZoltanParallelManagerGeometric(
-                dim=solver.dim, particles=self.particles, comm=comm,
-                lb_method=zoltan_lb_method,
-                obj_weight_dim=obj_weight_dim,
-                ghost_layers=ghost_layers,
-                update_cell_sizes=options.update_cell_sizes,
-                radius_scale=radius_scale,
-                )
-
-            ### ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
-
-            # RCB lock directions
-            if options.zoltan_rcb_lock_directions:
-                pm.set_zoltan_rcb_lock_directions()
-
-            if options.zoltan_rcb_reuse:
-                pm.set_zoltan_rcb_reuse()
-
-            if options.zoltan_rcb_rectilinear:
-                pm.set_zoltan_rcb_rectilinear_blocks()
-
-            if options.zoltan_rcb_set_direction > 0:
-                pm.set_zoltan_rcb_directions( str(options.zoltan_rcb_set_direction) )
-
-            # set zoltan options
-            pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
-            pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
-
-            # do an initial load balance
-            pm.update()
-            pm.initial_update = False
-
-            # set subsequent load balancing frequency
-            lb_freq = options.lb_freq
-            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
-            pm.set_lb_freq( lb_freq )
-
-            # wait till the initial partition is done
-            comm.barrier()
-
-        # set the solver's parallel manager
-        solver.set_parallel_manager(self.parallel_manager)
-
     def _configure(self):
         """Configures the application using the options from the
         command-line.
@@ -590,8 +529,16 @@ class Application(object):
         # fixed smoothing lengths
         fixed_h = solver.fixed_h or options.fixed_h
 
+        kernel = solver.kernel
+        if options.kernel is not None:
+            kernel = getattr(kernels, options.kernel)(dim=solver.dim)
+            solver.kernel = kernel
+
+        # This should be called before an NNPS is created as the particles are
+        # changed after the initial load-balancing.
+        self._setup_parallel_manager_and_initial_load_balance()
+
         if self.nnps is None:
-            kernel = self.solver.kernel
             cache = options.cache_nnps
 
             # create the NNPS object
@@ -680,9 +627,12 @@ class Application(object):
             # set solver cfl number
             solver.set_cfl(options.cfl)
 
+
         # setup the solver. This is where the code is compiled
-        solver.setup(particles=self.particles,
-                     equations=self.equations, nnps=nnps, fixed_h=fixed_h)
+        solver.setup(
+            particles=self.particles, equations=self.equations, nnps=nnps,
+            kernel=kernel, fixed_h=fixed_h
+        )
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
@@ -727,6 +677,86 @@ class Application(object):
 
                 logger.info('started multiprocessing interface on %s'%(
                              interface.address,))
+
+    def _setup_parallel_manager_and_initial_load_balance(self):
+        """This will automatically distribute the particles among processors
+        if this is a parallel run.
+        """
+        # Instantiate the Parallel Manager here and do an initial LB
+        num_procs = self.num_procs
+        options = self.options
+        solver = self.solver
+        comm = self.comm
+
+        self.parallel_manager = None
+        if num_procs > 1:
+            options = self.options
+
+            if options.with_zoltan:
+                if not (has_zoltan() and has_mpi()):
+                    raise RuntimeError("Cannot run in parallel!")
+
+            else:
+                raise ValueError("""Sorry. You're stuck with Zoltan for now
+                use the option '--with-zoltan' for parallel runs
+                """)
+
+            # create the parallel manager
+            obj_weight_dim = "0"
+            if options.zoltan_weights:
+                obj_weight_dim = "1"
+
+            zoltan_lb_method = options.zoltan_lb_method
+            zoltan_obj_wgt_dim = obj_weight_dim
+
+            # ghost layers
+            ghost_layers = options.ghost_layers
+
+            # radius scale for the parallel update
+            radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
+
+            self.parallel_manager = pm = ZoltanParallelManagerGeometric(
+                dim=solver.dim, particles=self.particles, comm=comm,
+                lb_method=zoltan_lb_method,
+                obj_weight_dim=obj_weight_dim,
+                ghost_layers=ghost_layers,
+                update_cell_sizes=options.update_cell_sizes,
+                radius_scale=radius_scale,
+                )
+
+            ### ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
+
+            # RCB lock directions
+            if options.zoltan_rcb_lock_directions:
+                pm.set_zoltan_rcb_lock_directions()
+
+            if options.zoltan_rcb_reuse:
+                pm.set_zoltan_rcb_reuse()
+
+            if options.zoltan_rcb_rectilinear:
+                pm.set_zoltan_rcb_rectilinear_blocks()
+
+            if options.zoltan_rcb_set_direction > 0:
+                pm.set_zoltan_rcb_directions( str(options.zoltan_rcb_set_direction) )
+
+            # set zoltan options
+            pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
+            pm.pz.Zoltan_Set_Param("DEBUG_MEMORY", "0")
+
+            # do an initial load balance
+            pm.update()
+            pm.initial_update = False
+
+            # set subsequent load balancing frequency
+            lb_freq = options.lb_freq
+            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
+            pm.set_lb_freq( lb_freq )
+
+            # wait till the initial partition is done
+            comm.barrier()
+
+        # set the solver's parallel manager
+        solver.set_parallel_manager(self.parallel_manager)
 
     def _setup_solver_callbacks(self, obj):
         """Setup any solver callbacks given an object with any of `pre_step`,
@@ -837,7 +867,6 @@ class Application(object):
                 self._create_inlet_outlet(self.create_inlet_outlet)
 
             self.nnps = self.create_nnps()
-            self._do_initial_load_balancing()
 
             self._configure()
 
@@ -927,8 +956,8 @@ class Application(object):
         # This must be done before the initial load balancing
         # as the inlets will create new particles.
         self._create_inlet_outlet(inlet_outlet_factory)
-
-        self._do_initial_load_balancing()
+        if nnps is not None:
+            self.nnps = nnps
 
         self._configure()
 
