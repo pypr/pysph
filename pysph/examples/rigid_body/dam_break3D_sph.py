@@ -2,14 +2,11 @@
 
  """
 import numpy as np
-from os import pardir
-import sys
-sys.path.append(pardir)
 
-from db_geometry import DamBreak3DGeometry
+from pysph.examples._db_geometry import DamBreak3DGeometry
 
 from pysph.base.kernels import WendlandQuintic
-from pysph.base.utils import get_particle_array_wcsph, get_particle_array_rigid_body
+from pysph.base.utils import get_particle_array_rigid_body
 
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection

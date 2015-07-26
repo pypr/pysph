@@ -5,8 +5,8 @@ The case is described as a SPHERIC benchmark
 
 By default the simulation runs for 6 seconds of simulation time.
 """
-import numpy
-from _db_geometry import DamBreak3DGeometry
+
+from pysph.examples._db_geometry import DamBreak3DGeometry
 
 from pysph.base.kernels import WendlandQuintic
 

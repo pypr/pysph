@@ -8,7 +8,8 @@ By default the simulation runs for 2.5 seconds of simulation time.
 """
 
 import numpy
-from _db_geometry import DamBreak2DGeometry
+
+from pysph.examples._db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import WendlandQuintic
 from pysph.sph.equation import Group
