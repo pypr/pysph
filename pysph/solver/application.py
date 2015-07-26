@@ -857,6 +857,8 @@ class Application(object):
             self._setup_logging()
 
             self.solver = self.create_solver()
+            msg = "Solver is None, you may have forgotten to return it!"
+            assert self.solver is not None, msg
             self.equations = self.create_equations()
 
             self._create_particles(self.create_particles)

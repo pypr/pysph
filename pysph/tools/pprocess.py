@@ -19,6 +19,19 @@ from os import path
 import numpy as np
 import pysph.solver.utils as utils
 
+
+def get_ke_history(files, array_name):
+    t, ke = [], []
+    for f in files:
+        data = utils.load(f)
+        array = data['arrays'][array_name]
+        t.append(data['solver_data']['t'])
+        m, u, v, w = array.get('m', 'u', 'v', 'w')
+        _ke = 0.5 * np.sum( m * (u**2 + v**2 + w**2) )
+        ke.append(_ke)
+    return np.asarray(t), np.asarray(ke)
+
+
 class Results(object):
     def __init__(self, dirname=None, fname=None, endswith=".npz"):
         self.dirname = dirname
@@ -48,21 +61,7 @@ class Results(object):
         self.load()
 
     def get_ke_history(self, array_name):
-        nfiles = self.nfiles
-
-        self.ke = ke = np.zeros(nfiles, dtype=np.float64)
-        self.t = t = np.zeros(nfiles, dtype=np.float64)
-
-        for i in range(nfiles):
-            data = utils.load(self.files[i])
-
-            # save the time array
-            t[i] = data['solver_data']['t']
-
-            array = data['arrays'][array_name]
-
-            m, u, v, w = array.get('m', 'u', 'v', 'w')
-            ke[i] = 0.5 * np.sum( m * (u**2 + v**2) )
+        self.t, self.ke = get_ke_history(self.files, array_name)
 
     def _write_vtk_snapshot(self, mesh, directory, _fname):
         fname = path.join(directory, _fname)
