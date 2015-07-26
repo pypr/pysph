@@ -1,4 +1,7 @@
-"""SPHERIC benchmark case 6 (https://wiki.manchester.ac.uk/spheric/index.php/Test6)"""
+"""SPHERIC benchmark case 6.
+
+See https://wiki.manchester.ac.uk/spheric/index.php/Test6 for more details.
+"""
 
 # math
 from math import exp

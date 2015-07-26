@@ -1,5 +1,5 @@
-""" 2D Kelvin Helmoltz Instability example using the Transport
-Velocity Formulation """
+"""2D Kelvin Helmoltz Instability example using TVF.
+"""
 import numpy
 
 # Particle generator

@@ -1,4 +1,6 @@
-"""Hydrostatic tank example (Section 6.0) of Adami et. al. JCP 231, 7057-7075
+"""Hydrostatic tank example.
+
+This example is from (Section 6.0) of Adami et. al. JCP 231, 7057-7075.
 
 This is a good problem to test the implementation of the wall boundary
 condition. Physically, a column of fluid is left in an open tank and

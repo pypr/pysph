@@ -1,4 +1,5 @@
-"""Taylor bar example with SPH"""
+"""Taylor bar example with SPH.
+"""
 import numpy
 
 from pysph.sph.equation import Group

@@ -1,4 +1,5 @@
-"""Rayleigh-Taylor instability problem"""
+"""Rayleigh-Taylor instability problem.
+"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray

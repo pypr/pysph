@@ -1,4 +1,5 @@
-"""Example for the Noh's cylindrical implosion test."""
+"""Example for the Noh's cylindrical implosion test.
+"""
 
 # NumPy and standard library imports
 import numpy

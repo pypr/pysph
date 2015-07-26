@@ -1,5 +1,8 @@
-""" 2D Kelvin Helmoltz Instability example using the Shadloo and
-Yildiz WCSPH formulation """
+"""2D Kelvin Helmoltz Instability example.
+
+This uses the Shadloo and Yildiz WCSPH formulation.
+
+"""
 import numpy
 
 # Particle generator

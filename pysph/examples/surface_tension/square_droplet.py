@@ -1,4 +1,4 @@
-r"""Deformation of a square droplet. 
+"""Deformation of a square droplet.
 
  
 _______________________________

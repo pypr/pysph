@@ -1,4 +1,5 @@
-"""Colliding Elastic Balls"""
+"""Colliding Elastic Balls.
+"""
 
 import numpy
 

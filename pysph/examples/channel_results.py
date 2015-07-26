@@ -1,4 +1,5 @@
-"""Results post-processing for the Poiseuille and Couette flow examples"""
+"""Results post-processing for the Poiseuille and Couette flow examples
+"""
 
 import pysph.solver.utils as utils
 from pysph.tools import pprocess

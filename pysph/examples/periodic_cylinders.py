@@ -1,4 +1,5 @@
-"""Incompressible flow past a periodic array of cylinders"""
+"""Incompressible flow past a periodic array of cylinders.
+"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray

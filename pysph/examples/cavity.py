@@ -1,4 +1,5 @@
-"""Lid driven cavity using the Transport Velocity formulation"""
+"""Lid driven cavity using the Transport Velocity formulation.
+"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray

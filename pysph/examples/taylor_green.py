@@ -1,4 +1,5 @@
-"""Taylor Green vortex flow"""
+"""Taylor Green vortex flow.
+"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray

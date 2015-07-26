@@ -1,4 +1,5 @@
-"""Poiseuille flow using the transport velocity formulation of Adami et.al."""
+"""Poiseuille flow using the transport velocity formulation of Adami et.al.
+"""
 
 # PyZoltan imports
 from pyzoltan.core.carray import LongArray

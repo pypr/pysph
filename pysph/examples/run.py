@@ -29,6 +29,7 @@ def _get_module(fname):
 def get_all_examples():
     basedir = HERE
     examples = []
+    ignore = [os.path.realpath(os.path.join(basedir, "run.py"))]
     for dirpath, dirs, files in os.walk(basedir):
         rel_dir = os.path.relpath(dirpath, basedir)
         if rel_dir == '.':
@@ -37,7 +38,10 @@ def get_all_examples():
                     if x.endswith('.py') and not x.startswith('_')]
         data = []
         for f in py_files:
-            module = _get_module(os.path.join(rel_dir, f))
+            full_path = os.path.join(rel_dir, f)
+            if os.path.realpath(full_path) in ignore:
+                continue
+            module = _get_module(full_path)
             doc = _extract_short_doc(dirpath, f)
             data.append((module, doc))
         examples.extend(data)

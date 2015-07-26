@@ -1,6 +1,6 @@
-""" 3D Dam Break Over a block of text spelling "SPH".
+"""3D Dam Break Over a block of text spelling "SPH".
 
- """
+"""
 import numpy as np
 
 from pysph.examples._db_geometry import DamBreak3DGeometry
