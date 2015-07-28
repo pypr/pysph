@@ -560,3 +560,40 @@ def get_files(dirname=None, fname=None, endswith=".npz"):
     files.sort(key=_key_func)
 
     return files
+
+
+def iter_output(files, *arrays):
+    """Given an iterable of the solution files, this loads the files, and
+    yields the solver data and the requested arrays.
+
+    If arrays is not supplied, it returns a dictionary of the arrays.
+
+    Parameters
+    ----------
+
+    files : iterable
+        Iterates over the list of desired files
+
+    *arrays : strings
+        Optional series of array names of arrays to return.
+
+    Examples
+    --------
+
+    >>> files = get_files('elliptical_drop_output')
+    >>> for solver_data, arrays in iter_output(files):
+    ...     print(solver_data['t'], arrays.keys())
+
+    >>> files = get_files('elliptical_drop_output')
+    >>> for solver_data, fluid in iter_output(files, 'fluid'):
+    ...     print(solver_data['t'], fluid.name)
+
+    """
+    for file in files:
+        data = load(file)
+        solver_data = data['solver_data']
+        if len(arrays) == 0:
+            yield solver_data, data['arrays']
+        else:
+            _arrays = [data['arrays'][x] for x in arrays]
+            yield [solver_data] + _arrays

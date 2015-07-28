@@ -22,10 +22,8 @@ import pysph.solver.utils as utils
 
 def get_ke_history(files, array_name):
     t, ke = [], []
-    for f in files:
-        data = utils.load(f)
-        array = data['arrays'][array_name]
-        t.append(data['solver_data']['t'])
+    for sd, array in utils.iter_output(files, array_name):
+        t.append(sd['t'])
         m, u, v, w = array.get('m', 'u', 'v', 'w')
         _ke = 0.5 * np.sum( m * (u**2 + v**2 + w**2) )
         ke.append(_ke)

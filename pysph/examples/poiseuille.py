@@ -52,6 +52,9 @@ dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 
 class PoiseuilleFlow(Application):
+    def initialize(self):
+        self.domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
+
     def create_particles(self):
         _x = np.arange( dx/2, Lx, dx )
 
@@ -251,8 +254,7 @@ class PoiseuilleFlow(Application):
 
 if __name__ == '__main__':
     # domain for periodicity
-    domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
-    app = PoiseuilleFlow(domain=domain)
+    app = PoiseuilleFlow()
     app.run()
     app.post_process(app.info_filename)
 

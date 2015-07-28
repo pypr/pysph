@@ -49,6 +49,9 @@ tf = 100.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 class CouetteFlow(Application):
+    def initialize(self):
+        self.domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
+
     def create_particles(self):
         _x = np.arange( dx/2, Lx, dx )
 
@@ -245,8 +248,6 @@ class CouetteFlow(Application):
 
 
 if __name__ == '__main__':
-    # domain for periodicity
-    domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
-    app = CouetteFlow(domain=domain)
+    app = CouetteFlow()
     app.run()
     app.post_process(app.info_filename)

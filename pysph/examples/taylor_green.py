@@ -1,13 +1,13 @@
 """Taylor Green vortex flow.
 """
 
-# PyZoltan imports
-from pyzoltan.core.carray import LongArray
+import numpy as np
+import os
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array_tvf_fluid
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
+from pysph.base.kernels import CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -19,8 +19,6 @@ from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC
 
-# numpy
-import numpy as np
 
 # domain and constants
 L = 1.0; U = 1.0
@@ -43,108 +41,150 @@ dt_force = 0.25 * 1.0
 tf = 5.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(**kwargs):
-    # create the particles
-    _x = np.arange( dx/2, L, dx )
-    x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
-    h = np.ones_like(x) * dx
 
-    # create the arrays
-    fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
+def exact_velocity(U, b, t, x, y):
+    pi = np.pi; sin = np.sin; cos = np.cos
+    factor = U * np.exp(b*t)
 
-    # add the requisite arrays
-    fluid.add_property('color')
-    fluid.add_output_arrays(['color'])
+    u = cos( 2 * pi * x ) * sin( 2 * pi * y)
+    v = sin( 2 * pi * x ) * cos( 2 * pi * y)
 
-    print("Taylor green vortex problem :: nfluid = %d, dt = %g"%(
-        fluid.get_number_of_particles(), dt))
+    return factor * u, factor * v
 
-    # setup the particle properties
-    pi = np.pi; cos = np.cos; sin=np.sin
 
-    # color
-    fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
+class TaylorGreen(Application):
+    def initialize(self):
+        self.domain = DomainManager(
+            xmin=0, xmax=L, ymin=0, ymax=L, periodic_in_x=True,
+            periodic_in_y=True
+        )
 
-    # velocities
-    fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
-    fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
+    def create_particles(self):
+        # create the particles
+        _x = np.arange( dx/2, L, dx )
+        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        h = np.ones_like(x) * dx
 
-    # mass is set to get the reference density of each phase
-    fluid.rho[:] = rho0
-    fluid.m[:] = volume * fluid.rho
+        # create the arrays
+        fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
 
-    # volume is set as dx^2
-    fluid.V[:] = 1./volume
+        # add the requisite arrays
+        fluid.add_property('color')
+        fluid.add_output_arrays(['color'])
 
-    # smoothing lengths
-    fluid.h[:] = hdx * dx
+        print("Taylor green vortex problem :: nfluid = %d, dt = %g"%(
+            fluid.get_number_of_particles(), dt))
 
-    # return the particle list
-    return [fluid,]
+        # setup the particle properties
+        pi = np.pi; cos = np.cos; sin=np.sin
 
-# domain for periodicity
-domain = DomainManager(xmin=0, xmax=L, ymin=0, ymax=L,
-                       periodic_in_x=True, periodic_in_y=True)
+        # color
+        fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
 
-# Create the application.
-app = Application(domain=domain)
+        # velocities
+        fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
+        fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
 
-# Create the kernel
-#kernel = QuinticSpline(dim=2)
-#kernel = WendlandQuintic(dim=2)
-#kernel = Gaussian(dim=2)
-kernel = CubicSpline(dim=2)
+        # mass is set to get the reference density of each phase
+        fluid.rho[:] = rho0
+        fluid.m[:] = volume * fluid.rho
 
-integrator = PECIntegrator(fluid=TransportVelocityStep())
+        # volume is set as dx^2
+        fluid.V[:] = 1./volume
 
-# Create a solver.
-solver = Solver(kernel=kernel, dim=2, integrator=integrator)
+        # smoothing lengths
+        fluid.h[:] = hdx * dx
 
-# Setup default parameters.
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+        # return the particle list
+        return [fluid]
 
-equations = [
+    def create_solver(self):
+        kernel = CubicSpline(dim=2)
+        integrator = PECIntegrator(fluid=TransportVelocityStep())
+        solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 
-    # Summation density along with volume summation for the fluid
-    # phase. This is done for all local and remote particles. At the
-    # end of this group, the fluid phase has the correct density
-    # taking into consideration the fluid and solid
-    # particles.
-    Group(
-        equations=[
-            SummationDensity(dest='fluid', sources=['fluid']),
-            ], real=False),
+        solver.set_time_step(dt)
+        solver.set_final_time(tf)
+        return solver
 
-    # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the shepard filtered velocity
-    # for the fluid phase is determined.
-    Group(
-        equations=[
-            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            ], real=False),
+    def create_equations(self):
+        equations = [
+            # Summation density along with volume summation for the fluid
+            # phase. This is done for all local and remote particles. At the
+            # end of this group, the fluid phase has the correct density
+            # taking into consideration the fluid and solid
+            # particles.
+            Group(
+                equations=[
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                    ], real=False),
 
-    # The main accelerations block. The acceleration arrays for the
-    # fluid phase are upadted in this stage for all local particles.
-    Group(
-        equations=[
-            # Pressure gradient terms
-            MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid'], pb=p0),
+            # Once the fluid density is computed, we can use the EOS to set
+            # the fluid pressure. Additionally, the shepard filtered velocity
+            # for the fluid phase is determined.
+            Group(
+                equations=[
+                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+                    ], real=False),
 
-            # fluid viscosity
-            MomentumEquationViscosity(
-                dest='fluid', sources=['fluid'], nu=nu),
+            # The main accelerations block. The acceleration arrays for the
+            # fluid phase are upadted in this stage for all local particles.
+            Group(
+                equations=[
+                    # Pressure gradient terms
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['fluid'], pb=p0),
 
-            # Artificial stress for the fluid phase
-            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                    # fluid viscosity
+                    MomentumEquationViscosity(
+                        dest='fluid', sources=['fluid'], nu=nu),
 
-            ], real=True),
+                    # Artificial stress for the fluid phase
+                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-    ]
+                    ], real=True),
+        ]
+        return equations
 
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=create_particles)
+    def post_process(self, info_fname):
+        info = self.read_info(info_fname)
+        from pysph.solver.utils import iter_output
 
-app.run()
+        files = self.output_files
+        t, ke, decay, linf = [], [], [], []
+        for sd, array in iter_output(files, 'fluid'):
+            _t = sd['t']
+            t.append(_t)
+            m, u, v = array.get('m', 'u', 'v')
+            vmag2 = u**2 + v**2
+            _ke = 0.5 * np.sum( m * vmag2 )
+            ke.append(_ke)
+            vmag = np.sqrt(vmag2)
+            vmag_max = vmag.max()
+            decay.append(vmag_max)
+            theoretical_max = U * np.exp(decay_rate * _t)
+            linf.append(abs( (vmag_max - theoretical_max)/theoretical_max ))
+
+        t, ke, decay, linf = map(np.asarray, (t, ke, decay, linf))
+        exact = U*np.exp(decay_rate*t)
+
+        from matplotlib import pyplot as plt
+        plt.clf()
+        plt.semilogy(t, exact, label="exact")
+        plt.semilogy(t, decay, label="computed")
+        plt.xlabel('t'); plt.ylabel('max velocity')
+        plt.legend()
+        fig = os.path.join(self.output_dir, "decay.png")
+        plt.savefig(fig, dpi=300)
+
+        plt.clf()
+        plt.plot(t, linf, label="error")
+        plt.xlabel('t'); plt.ylabel('Error')
+        fig = os.path.join(self.output_dir, "error.png")
+        plt.savefig(fig, dpi=300)
+
+
+if __name__ == '__main__':
+    app = TaylorGreen()
+    app.run()
+    app.post_process(app.info_filename)
