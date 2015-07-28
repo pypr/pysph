@@ -9,6 +9,15 @@
   Python versions, operating systems etc.
 * Use locking while creating extension modules to prevent problems when
   multiple processes generate the same extesion.
+* Improve the ``Application`` class so users can subclass it to create
+  examples. The users can also add their own command line arguments and add
+  pre/post step/stage callbacks by creating appropriate methods.
+* Moved examples into the ``pysph.examples``.  This makes the examples
+  reusable and easier to run as installation of pysph will also make the
+  examples available.  The examples also perform the post-processing to make
+  them completely self-contained.
+* Add support to write compressed output.
+* Add support to set the kernel from the command line.
 
 1.0a2
 ------
