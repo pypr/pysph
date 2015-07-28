@@ -110,6 +110,8 @@ class Solver(object):
         # default output printing frequency
         self.pfreq = 100
 
+        # Compress generated files.
+        self.compress_output = False
         self.disable_output = False
 
         # the process id for parallel runs
@@ -348,6 +350,11 @@ class Solver(object):
         """ Set a list of output times """
         self.output_at_times = numpy.asarray(output_at_times)
 
+    def set_compress_output(self, compress):
+        """Compress the dumped output files.
+        """
+        self.compress_output = compress
+
     def set_parallel_output_mode(self, mode="collected"):
         """Set the default solver dump mode in parallel.
 
@@ -511,7 +518,8 @@ class Solver(object):
 
         dump(fname, self.particles, solver_data,
              detailed_output=self.detailed_output,
-             only_real=self.output_only_real, mpi_comm=comm)
+             only_real=self.output_only_real, mpi_comm=comm,
+             compress=self.compress_output)
 
     def load_output(self, count):
         """Load particle data from dumped output file.

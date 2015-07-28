@@ -223,17 +223,24 @@ class Application(object):
                           dest="freq", default=None, type="int",
                           help="Printing frequency for the output")
 
-        # -d/ --detailed-output.
-        parser.add_option("-d", "--detailed-output", action="store_true",
+        # --detailed-output.
+        parser.add_option("--detailed-output", action="store_true",
                          dest="detailed_output", default=None,
                          help="Dump detailed output.")
+
+        # -z/--compress-output
+        parser.add_option(
+            "-z", "--compress-output", action="store_true",
+            dest="compress_output", default=False,
+            help="Compress generated output files."
+        )
 
         # --output-remote
         parser.add_option("--output-dump-remote", action="store_true",
                           dest="output_dump_remote", default=False,
                           help="Save Remote particles in parallel")
-        # --directory
-        parser.add_option("--directory", action="store",
+        # -d/--directory
+        parser.add_option("-d", "--directory", action="store",
                           dest="output_dir",
                           default=self._get_output_dir_from_fname(),
                           help="Dump output in the specified directory.")
@@ -247,9 +254,11 @@ class Application(object):
                             "simulation using multiple cores.")
 
         # --kernel
+        all_kernels = list_all_kernels()
         parser.add_option(
             "--kernel", action="store", dest="kernel", default=None,
-            type=str, help="Use specified kernel from %s"%list_all_kernels()
+            type="choice", choices=all_kernels,
+            help="Use specified kernel from %s"%all_kernels
         )
 
         # Restart options
@@ -597,6 +606,7 @@ class Application(object):
         # output file name
         solver.set_output_fname(fname)
 
+        solver.set_compress_output(options.compress_output)
         # disable_output
         solver.set_disable_output(options.disable_output)
 

@@ -181,7 +181,7 @@ def _gather_array_data(all_array_data, comm):
     return all_array_data
 
 def dump(filename, particles, solver_data, detailed_output=False,
-         only_real=True, mpi_comm=None):
+         only_real=True, mpi_comm=None, compress=False):
     """Dump the given particles and solver data to the given filename.
 
     Parameters
@@ -205,6 +205,9 @@ def dump(filename, particles, solver_data, detailed_output=False,
     mpi_comm: mpi4pi.MPI.Intracomm
         An MPI communicator to use for parallel commmunications.
 
+    compress: bool
+        Specify if the npz file is to be compressed or not.
+
     If `mpi_comm` is not passed or is set to None the local particles alone
     are dumped, otherwise only rank 0 dumps the output.
 
@@ -226,8 +229,10 @@ def dump(filename, particles, solver_data, detailed_output=False,
     for name, arrays in all_array_data.items():
         particle_data[name]["arrays"] = arrays
 
+    save_func = numpy.savez_compressed if compress else numpy.savez
+
     if mpi_comm is None or mpi_comm.Get_rank() == 0:
-        numpy.savez(filename, version=2, **output_data)
+        save_func(filename, version=2, **output_data)
 
 
 def dump_v1(filename, particles, solver_data, detailed_output=False,
