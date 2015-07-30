@@ -1,4 +1,4 @@
-"""A very simple example to help benchmark PySPH.
+"""A very simple example to help benchmark PySPH. (2 minutes)
 
 The example creates a cube shaped block of water falling in free-space under
 the influence of gravity while solving the incompressible, inviscid flow

@@ -1,4 +1,4 @@
-"""Lid driven cavity using the Transport Velocity formulation.
+"""Lid driven cavity using the Transport Velocity formulation. (3 minutes)
 """
 
 import os

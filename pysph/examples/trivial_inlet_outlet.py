@@ -1,4 +1,4 @@
-"""A trivial example to demonstrate the inlet and outlet feature in 2D.
+"""Demonstrate the inlet and outlet feature in 2D. (1 second)
 
 We first create three particle arrays, an "inlet", "fluid" and "outlet" in the
 `create_particle` method. Initially there are no fluid and outlet particles.
