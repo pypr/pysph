@@ -75,10 +75,7 @@ class Application(object):
         domain : pysph.nnps.DomainManager
             A domain manager to use. This is used for periodic domains etc.
         """
-        self.is_periodic = False
         self.domain = domain
-        if domain is not None:
-            self.is_periodic = domain.is_periodic
 
         self.solver = None
         self.nnps = None
@@ -878,6 +875,9 @@ class Application(object):
             if is_overloaded_method(self.create_inlet_outlet):
                 self._create_inlet_outlet(self.create_inlet_outlet)
 
+            if self.domain is None:
+                self.domain = self.create_domain()
+
             self.nnps = self.create_nnps()
 
             self._configure()
@@ -991,6 +991,14 @@ class Application(object):
         """
         pass
 
+    def create_domain(self):
+        """Create a `pysph.nnps.DomainManager` and return it if needed.
+
+        This is used for periodic domains etc.  Note that if the domain
+        is passed to ``__init__``, then this method is not called.
+        """
+        return None
+
     def create_inlet_outlet(self, particle_arrays):
         """Create inlet and outlet objects and return them as a list.
 
@@ -998,12 +1006,6 @@ class Application(object):
         of the particle array.
         """
         pass
-
-    def create_particles(self):
-        """Create particle arrays and return a list of them.
-        """
-        message = "Application.create_particles method must be overloaded."
-        raise NotImplementedError(message)
 
     def create_equations(self):
         """Create the equations to be used and return them.
@@ -1016,6 +1018,12 @@ class Application(object):
         be created automatically.
         """
         return None
+
+    def create_particles(self):
+        """Create particle arrays and return a list of them.
+        """
+        message = "Application.create_particles method must be overloaded."
+        raise NotImplementedError(message)
 
     def create_solver(self):
         """Create the solver and return it.

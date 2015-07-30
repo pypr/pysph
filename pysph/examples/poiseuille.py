@@ -1,4 +1,4 @@
-"""Poiseuille flow using the transport velocity formulation of Adami et.al.
+"""Poiseuille flow using the transport velocity formulation (5 minutes). 
 """
 import os
 
@@ -52,8 +52,8 @@ dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 
 class PoiseuilleFlow(Application):
-    def initialize(self):
-        self.domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
+    def create_domain(self):
+        return DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
 
     def create_particles(self):
         _x = np.arange( dx/2, Lx, dx )

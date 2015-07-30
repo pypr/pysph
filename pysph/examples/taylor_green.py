@@ -1,4 +1,4 @@
-"""Taylor Green vortex flow.
+"""Taylor Green vortex flow (6 minutes).
 """
 
 import numpy as np
@@ -53,8 +53,8 @@ def exact_velocity(U, b, t, x, y):
 
 
 class TaylorGreen(Application):
-    def initialize(self):
-        self.domain = DomainManager(
+    def create_domain(self):
+        return DomainManager(
             xmin=0, xmax=L, ymin=0, ymax=L, periodic_in_x=True,
             periodic_in_y=True
         )

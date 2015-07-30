@@ -1,4 +1,4 @@
-"""Couette flow using the transport velocity formulation of Adami et.al.
+"""Couette flow using the transport velocity formulation (30 seconds).
 """
 
 import os
@@ -49,8 +49,8 @@ tf = 100.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 class CouetteFlow(Application):
-    def initialize(self):
-        self.domain = DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
+    def create_domain(self):
+        return DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
 
     def create_particles(self):
         _x = np.arange( dx/2, Lx, dx )
