@@ -441,7 +441,8 @@ def setup_package():
           test_suite = "nose.collector",
           packages = find_packages(),
           package_data = {
-              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt']
+              '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',
+                  '*.rst', 'ndspmhd-sedov-initial-conditions.npz']
           },
           # exclude package data in installation.
           exclude_package_data = {

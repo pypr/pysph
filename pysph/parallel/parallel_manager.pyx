@@ -17,7 +17,6 @@ from pyzoltan.core import zoltan_utils
 # PySPH imports
 from pysph.base.nnps cimport DomainManager, Cell, find_cell_id, arange_uint
 from pysph.base.utils import ParticleTAGS
-from pysph.solver.utils import savez
 
 cdef int Local = ParticleTAGS.Local
 cdef int Remote = ParticleTAGS.Remote
@@ -802,9 +801,10 @@ cdef class ParallelManager:
 
         # save the partition locally
         fname = fname + '/partition%03d.%d'%(count, self.rank)
-        savez(fname,
-              x=x, y=y, lid=lid, tag=tag, cell_size=cell_size,
-              ncells_local=self.ncells_local, ncells_total=self.ncells_total)
+        np.savez(
+            fname, x=x, y=y, lid=lid, tag=tag, cell_size=cell_size,
+            ncells_local=self.ncells_local, ncells_total=self.ncells_total
+        )
 
     def set_lb_freq(self, int lb_freq):
         self.lb_freq = lb_freq

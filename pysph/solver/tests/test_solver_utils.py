@@ -1,5 +1,6 @@
 import numpy as np
 import shutil
+import os
 from os.path import join
 from tempfile import mkdtemp
 try:
@@ -30,6 +31,28 @@ class TestSolverUtils(TestCase):
         fname = self._get_filename('simple.npz')
         dump(fname, [pa], solver_data={'dt': dt})
         data = load(fname)
+        solver_data = data['solver_data']
+        arrays = data['arrays']
+        pa1 = arrays['fluid']
+        self.assertListEqual(list(solver_data.keys()), ['dt'])
+        self.assertListEqual(list(sorted(pa.properties.keys())),
+                             list(sorted(pa1.properties.keys())))
+        self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
+        self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
+
+    def test_dump_and_load_works_with_compress(self):
+        x = np.linspace(0, 1.0, 10)
+        y = x*2.0
+        dt = 1.0
+        pa = get_particle_array(name='fluid', x=x, y=y)
+        fname = self._get_filename('simple.npz')
+        dump(fname, [pa], solver_data={'dt': dt})
+        fnamez = self._get_filename('simplez.npz')
+        dump(fnamez, [pa], solver_data={'dt': dt}, compress=True)
+        # Check that the file size is indeed smaller
+        self.assertTrue(os.stat(fnamez).st_size < os.stat(fname).st_size)
+
+        data = load(fnamez)
         solver_data = data['solver_data']
         arrays = data['arrays']
         pa1 = arrays['fluid']
