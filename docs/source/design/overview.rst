@@ -345,10 +345,11 @@ section, we will see how PySPH does this automatically.
 PySPH implementation
 ---------------------
 
-Now that we have a hypothetical implementation outlined, we can
-proceed to describe the abstractions that PySPH introduces, enabling a
-highly user friendly and flexible way to define pairwise particle
-interactions.
+Now that we have a hypothetical implementation outlined, we can proceed to
+describe the abstractions that PySPH introduces, enabling a highly user
+friendly and flexible way to define pairwise particle interactions.  To see a
+working example, see `dam_break_2d.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/dam_break_2d.py>`_.
 
 We assume that we have the same **ParticleArrays** (*fluid* and
 *solid*) and **NNPS** objects as before.
@@ -371,7 +372,7 @@ performed on the particles by passing a *list* of **Equation** objects (see
 	       TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
 	       TaitEOS(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
 
-	       ]),
+	       ], real=False),
 
        Group(equations=[
 
@@ -409,6 +410,13 @@ method in our hypothetical implementation:
     PySPH will respect the order of the **Equation** and equation
     **Groups** as provided by the user. This flexibility also means it
     is quite easy to make subtle errors.
+
+Note that in the first group, we have an additional parameter called
+``real=False``.  This is only relevant for parallel simulations and what it
+says is that the equations in that group should be applied to all particles
+(remote and local), non-local particles are not "real".  By default a
+``Group`` has ``real=True``, thus only local particles are operated on.
+However, we wish to apply the Equation of state on all particles.
 
 Writing the equations
 ^^^^^^^^^^^^^^^^^^^^^^

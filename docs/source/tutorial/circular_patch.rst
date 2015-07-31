@@ -22,10 +22,11 @@ framework. *All* examples follow the following steps:
 The tutorials address each of the steps in this flowchart for problems
 with increasing complexity.
 
-The first example we consider is a "patch" test for SPH formulations
-for incompressible fluids in ``examples/elliptical_drop.py``. This
-problem simulates the evolution of a 2D circular patch of fluid under
-the influence of an initial velocity field given by:
+The first example we consider is a "patch" test for SPH formulations for
+incompressible fluids in `elliptical_drop.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/elliptical_drop.py>`_.
+This problem simulates the evolution of a 2D circular patch of fluid under the
+influence of an initial velocity field given by:
 
 .. math::
 
@@ -38,29 +39,33 @@ circular patch of fluid to deform into an ellipse such that the volume
 which makes it an ideal test to verify codes.
 
 Imports
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
 
-Taking a look at the example, the first several lines are imports of
-various modules:
+Taking a look at the example (see `elliptical_drop.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/elliptical_drop.py>`_),
+the first several lines are imports of various modules:
 
 .. code-block:: python
 
-   numpy import ones_like, mgrid, sqrt, array, savez
-   from time import time
+    import os
+    from numpy import array, ones_like, mgrid, sqrt
 
-   # PySPH base and carray imports
-   from pysph.base.utils import get_particle_array_wcsph
-   from pysph.base.kernels import CubicSpline
-   from pyzoltan.core.carray import LongArray
+    # PySPH base and carray imports
+    from pysph.base.utils import get_particle_array_wcsph
+    from pysph.base.kernels import Gaussian
 
-   # PySPH solver and integrator
-   from pysph.solver.application import Application
-   from pysph.solver.solver import Solver
-   from pysph.sph.integrator import PECIntegrator
+    # PySPH solver and integrator
+    from pysph.solver.application import Application
+    from pysph.solver.solver import Solver
+    from pysph.sph.integrator import EPECIntegrator, PECIntegrator, TVDRK3Integrator
+    from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
 
-   # PySPH sph imports
-   from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-   from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+    # PySPH sph imports
+    from pysph.sph.equation import Group
+    from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+    from pysph.sph.wc.basic import TaitEOS, MomentumEquation, \
+        UpdateSmoothingLengthFerrari, \
+        ContinuityEquationDeltaSPH, MomentumEquationDeltaSPH
 
 .. note::
 
@@ -74,56 +79,86 @@ various modules:
 Functions for loading/generating the particles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Next in the code are two functions called ``exact_solution`` and
-``get_circular_patch``. The former produces an exact solution for
-comparison, the latter looks like:
+Next in the code are a few functions related to obtaining the exact solution
+for the given problem which is used for comparing the computed solution.
+
+Next is a class called ``EllipticalDrop`` which derives from
+:py:class:`pysph.solver.application.Application`. There are several methods
+implemented on this class:
+
+ - ``initialize``: lets users specify any parameters of interest relevant to
+   the simulation.
+
+ - ``create_particles``: this method is where one creates the particles to be
+   simulated.
+
+ - ``create_solver``: create the :py:class:`pysph.solver.solver.Solver`
+   instance along with the choice of integrator etc.
+
+ - ``create_equations``: create a list of actual SPH equations to solve.
+
+ - ``post_process``: optionally post-process the results generated.
+
+Of these, ``create_particles``, ``create_solver`` and ``create_equations`` are
+mandatory for without them SPH would be impossible.  The rest (and other
+methods) are optional.  To see a complete listing of possible methods that one
+can subclass see :py:class:`pysph.solver.application.Application`.
+
+The ``create_particles`` method looks like:
 
 .. code-block:: python
 
-   def get_circular_patch(dx=0.025, **kwargs):
-       """Create the circular patch of fluid."""
-       name = 'fluid'
-       x,y = mgrid[-1.05:1.05+1e-4:dx, -1.05:1.05+1e-4:dx]
-       x = x.ravel()
-       y = y.ravel()
+    class EllipticalDrop(Application):
+        # ...
+        def create_particles(self):
+            """Create the circular patch of fluid."""
+            dx = self.dx
+            hdx = self.hdx
+            co = self.co
+            ro = self.ro
+            name = 'fluid'
+            x, y = mgrid[-1.05:1.05+1e-4:dx, -1.05:1.05+1e-4:dx]
+            x = x.ravel()
+            y = y.ravel()
 
-       m = ones_like(x)*dx*dx
-       h = ones_like(x)*hdx*dx
-       rho = ones_like(x) * ro
+            m = ones_like(x)*dx*dx
+            h = ones_like(x)*hdx*dx
+            rho = ones_like(x) * ro
 
-       p = ones_like(x) * 1./7.0 * co**2
-       cs = ones_like(x) * co
+            p = ones_like(x) * 1./7.0 * co**2
+            cs = ones_like(x) * co
 
-       u = -100*x
-       v = 100*y
+            u = -100*x
+            v = 100*y
 
-       # remove particles outside the circle
-       indices = []
-       for i in range(len(x)):
-	   if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
-	       indices.append(i)
+            # remove particles outside the circle
+            indices = []
+            for i in range(len(x)):
+                if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
+                    indices.append(i)
 
-       pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-				     cs=cs, name=name)
+            pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
+                                        cs=cs, name=name)
+            pa.remove_particles(indices)
 
-       la = LongArray(len(indices))
-       la.set_data(array(indices))
+            print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
 
-       pa.remove_particles(la)
+            # add requisite variables needed for this formulation
+            for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
+                        'v0', 'w0', 'x0', 'y0', 'z0'):
+                pa.add_property(name)
 
-       print "Elliptical drop :: %d particles"%(pa.get_number_of_particles())
+            # set the output property arrays
+            pa.set_output_arrays(
+                ['x', 'y', 'u', 'v', 'rho', 'h', 'p', 'pid', 'tag', 'gid']
+            )
 
-       # add requisite variables needed for this formulation
-       for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
-		    'v0', 'w0', 'x0', 'y0', 'z0'):
-	   pa.add_property(name)
-
-       return [pa,]
+            return [pa]
 
 
 .. py:currentmodule:: pysph.base.particle_array
 
-and is used to initialize the particles in Python. In PySPH, we use a
+The method is used to initialize the particles in Python. In PySPH, we use a
 :py:class:`ParticleArray` object as a container for particles of a given
 *species*. You can think of a particle species as any homogenous entity in a
 simulation. For example, in a two-phase air water flow, a species could be
@@ -139,25 +174,28 @@ created from the command line using NumPy arrays. For example
 
 would create a :py:class:`ParticleArray`, representing a uniform distribution
 of particles on a Cartesian lattice in 2D using the helper function
-:py:func:`get_particle_array` in the **base** subpackage.
+:py:func:`get_particle_array` in the **base** subpackage.  The
+:py:func:`get_particle_array_wcsph` is a special version of this suited to
+weakly-compressible formulations.
 
 .. note::
 
    **ParticleArrays** in PySPH use *flattened* or one-dimensional arrays.
 
 The :py:class:`ParticleArray` is highly convenient, supporting methods for
-insertions, deletions and concatenations. In the `get_circular_patch`
+insertions, deletions and concatenations. In the ``create_particles``
 function, we use this convenience to remove a list of particles that fall
 outside a circular region:
 
 .. code-block:: python
 
-   pa.remove_particles(la)
+   pa.remove_particles(indices)
 
 .. py:currentmodule:: pyzoltan.core.carray
 
-where, a list of indices is provided in the form of a :py:class:`LongArray`
-which, as the name suggests, is an array of 64 bit integers.
+where, a list of indices is provided.  One could also provide the indices in
+the form of a :py:class:`LongArray` which, as the name suggests, is an array
+of 64 bit integers.
 
 .. note::
 
@@ -176,47 +214,39 @@ Setting up the PySPH framework
 
 As we move on, we encounter instantiations of the PySPH framework objects.
 These are the :py:class:`pysph.solver.application.Application`,
-:py:class:`pysph.sph.integrator.PECIntegrator` and
-:py:class:`pysph.solver.solver.Solver` objects:
+:py:class:`pysph.sph.integrator.TVDRK3Integrator` and
+:py:class:`pysph.solver.solver.Solver` objects.  The ``create_solver`` method
+constructs a ``Solver`` instance and returns it as seen below:
 
 .. code-block:: python
 
-    # Create the application.
-    app = Application()
+        def create_solver(self):
+            kernel = Gaussian(dim=2)
 
-    kernel = CubicSpline(dim=2)
+            integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
 
-    integrator = PECIntegrator(fluid=WCSPHStep())
+            dt = 5e-6; tf = 0.0076
+            solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                            dt=dt, tf=tf, adaptive_timestep=True,
+                            cfl=0.05, n_damp=50,
+                            output_at_times=[0.0008, 0.0038])
 
-    # Create and setup a solver.
-    solver = Solver(kernel=kernel, dim=2, integrator=integrator)
+            return solver
 
-    # Setup default parameters.
-    solver.set_time_step(1e-5)
-    solver.set_final_time(0.0075)
-
-.. py:currentmodule:: pysph.solver.application
-
-The :py:class:`Application` makes it easy to pass command line arguments to
-the solver. It is also important for the seamless parallel execution of the
-same example. To appreciate the role of the :py:class:`Application` consider
-for a moment how might we write a parallel version of the same example. At
-some point, we would need some MPI imports and the particles should be created
-in a distributed fashion. All this (and more) is handled through the
-abstraction of the :py:class:`Application` which hides all this detail from
-the user.
+As can be seen, various options are configured for the solver, including
+initial damping etc.
 
 .. py:currentmodule:: pysph.sph.integrator
 
-Intuitively, in an SPH simulation, the role of the :py:class:`PECIntegrator`
-should be obvious. In the code, we see that we ask for the "fluid" to be
-stepped using a :py:class:`WCSPHStep` object. Taking a look at the
-`get_circular_patch` function once more, we notice that the **ParticleArray**
-representing the circular patch was named as `fluid`. So we're essentially
-asking the PySPH framework to step or *integrate* the properties of the
-**ParticleArray** fluid using :py:class:`WCSPHStep`. Safe to assume that the
-framework takes the responsibility to call this integrator at the appropriate
-time during a time-step.
+Intuitively, in an SPH simulation, the role of the
+:py:class:`TVDRK3Integrator` should be obvious. In the code, we see that we
+ask for the "fluid" to be stepped using a :py:class:`WCSPHStep` object. Taking
+a look at the ``create_particles`` method once more, we notice that the
+**ParticleArray** representing the circular patch was named as `fluid`. So
+we're essentially asking the PySPH framework to step or *integrate* the
+properties of the **ParticleArray** fluid using :py:class:`WCSPHStep`. It is
+safe to assume that the framework takes the responsibility to call this
+integrator at the appropriate time during a time-step.
 
 .. py:currentmodule:: pysph.solver.solver
 
@@ -247,27 +277,37 @@ straightforward:
     - Compute the rate of change of velocity (accelerations): :math:`\frac{d\boldsymbol{v}}{dt}`
     - Compute corrections for the velocity (XSPH): :math:`\frac{d\boldsymbol{x}}{dt}`
 
-We request this in PySPH like so:
+.. py:currentmodule:: pysph.sph.equation
+
+We request this in PySPH by creating a list of :py:class:`Equation` instances
+in the ``create_equations`` method:
 
 .. code-block:: python
 
-   # The equations of motion.
-   equations = [
-       # Equation of state: p = f(rho)
-       TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
+        def create_equations(self):
+            # The equations of motion.
+            equations = [
+                # Equation of state: p = f(rho)
+                TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=7.0),
 
-       # Density rate: drho/dt
-       ContinuityEquation(dest='fluid',  sources=['fluid',]),
+                # Density rate: drho/dt
+                ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-       # Acceleration: du,v/dt
-       MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
+                # Acceleration: du,v/dt
+                MomentumEquation(dest='fluid', sources=['fluid'], alpha=1.0, beta=1.0),
 
-       # XSPH velocity correction
-       XSPHCorrection(dest='fluid', sources=['fluid']),
+                # XSPH velocity correction
+                XSPHCorrection(dest='fluid', sources=['fluid']),
 
-       ]
+                ]
+            return equations
 
-.. py:currentmodule:: pysph.sph.equation
+.. note::
+
+    You may have noticed that the equations in the actual example are slightly
+    different with a few additional equations.  The details of the differences
+    are not important here at this stage hence we look at a simpler system.
+
 
 Each *interaction* is specified through an :py:class:`Equation` object, which
 is instantiated with the general syntax:
@@ -281,7 +321,7 @@ The `dest` argument specifies the *target* or *destination*
 on. Similarly, the `sources` argument specifies a *list* of
 **ParticleArrays** from which the contributions are sought. For some
 equations like the EOS, it doesn't make sense to define a list of
-sources and a `None` suffices. The specification basically tells PySPH
+sources and a ``None`` suffices. The specification basically tells PySPH
 that for one time step of the calculation:
 
     - Use the Tait's EOS to update the properties of the fluid array
@@ -301,38 +341,48 @@ now knows what to do with the particles within a time step. More
 importantly, this information is enough to generate code to carry out
 a complete SPH simulation.
 
+.. py:currentmodule:: pysph.solver.application
+
+Subclassing the :py:class:`Application` makes it easy to pass command line
+arguments to the solver. It is also important for the seamless parallel
+execution of the same example. To appreciate the role of the
+:py:class:`Application` consider for a moment how might we write a parallel
+version of the same example. At some point, we would need some MPI imports and
+the particles should be created in a distributed fashion. All this (and more)
+is handled through the abstraction of the :py:class:`Application` which hides
+all this detail from the user.
+
+
 Running the example
 ~~~~~~~~~~~~~~~~~~~
 
 .. py:currentmodule:: pysph.solver.application
 
-In the last two lines of the example, we use the :py:class:`Application`
-to run the problem:
+In the last two lines of the example, we instantiate the ``EllipticalDrop``
+class and run it:
 
 .. code-block:: python
 
-   # Setup the application and solver.  This also generates the particles.
-   app.setup(solver=solver, equations=equations,
-             particle_factory=get_circular_patch)
+    if __name__ == '__main__':
+        app = EllipticalDrop()
+        app.run()
 
-   app.run()
+There is an additional ``post_process`` call in the code which is entirely
+optional and will generate some data for comparison with the exact solution.
 
-We can see that the :py:meth:`Application.setup` method is where we tell PySPH
-what we want it to do. We pass in the function to create the particles, the
-list of equations defining the problem and the solver that will be used to
-marshal the problem.
+The :py:class:`Application` takes care of creating the particles, creating the
+solver, handling command line arguments etc.  Many parameters can be
+configured via the command line, and these will override any parameters setup
+in the respective ``create_*`` methods.  For example one may do the following
+to find out the various options::
 
-Many parameters can be configured via the command line, and these will
-override any parameters setup before the ``app.setup`` call.  For
-example one may do the following to find out the various options::
+    $ python -m pysph.examples.elliptical_drop -h
 
-    $ python elliptical_drop.py -h
+If we run the example without any arguments it will run until a final time of
+0.0075 seconds.  We can change this example to 0.005 by the
+following::
 
-If we run the example without any arguments it will run until a final
-time of 0.0075 seconds.  We can change this for example to 0.005 by
-the following::
-
-    $ python elliptical_drop.py --tf=0.005
+    $ python -m pysph.examples.elliptical_drop --tf=0.005
 
 When this is run, PySPH will generate Cython code from the equations and
 integrators that have been provided, compiles that code and runs the
@@ -340,12 +390,17 @@ simulation.  This provides a great deal of convenience for the user without
 sacrificing performance.  The generated code is available in
 ``~/.pysph/source``.  If the code/equations have not changed, then the code
 will not be recompiled.  This is all handled automatically without user
-intervention.
+intervention.  By default, output files will be generated in the directory
+``elliptical_drop_output``.
 
-If we wish to run the code in parallel (and have compiled PySPH with Zoltan
-and mpi4py) we can do::
+If we wish to utilize multiple cores we could do::
 
-    $ mpirun -np 4 /path/to/python elliptical_drop.py
+    $ python -m pysph.examples.elliptical_drop --openmp
+
+If we wish to run the code in parallel (and have compiled PySPH with Zoltan_
+and mpi4py_) we can do::
+
+    $ mpirun -np 4 /path/to/python -m pysph.examples.elliptical_drop
 
 This will automatically parallelize the run. In this example doing this will
 only slow it down as the number of particles is extremely small.
@@ -357,7 +412,7 @@ You can view the data generated by the simulation (after the simulation
 is complete or during the simulation) by running the ``pysph_viewer``
 application.  To view the simulated data you may do::
 
-    $ pysph_viewer elliptical_drop_output/*.npz
+    $ pysph_viewer elliptical_drop_output
 
 If you have Mayavi_ installed this should show a UI that looks like:
 
@@ -366,6 +421,8 @@ If you have Mayavi_ installed this should show a UI that looks like:
     :alt: PySPH viewer
 
 .. _Mayavi: http://code.enthought.com/projects/mayavi
+.. _mpi4py: http://mpi4py.scipy.org/
+.. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
 On the user interface, the right side shows the visualized data.  On top of it
 there are several toolbar icons.  The left most is the Mayavi logo and clicking
@@ -377,7 +434,7 @@ text "Launch Python Shell".  If one clicks on this, one obtains a full Python
 interpreter with a few useful objects available.  These are::
 
     >>> dir()
-    ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab', 
+    ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab',
      'particle_arrays', 'scene', 'self', 'viewer']
     >>> len(particle_arrays)
     1
@@ -415,6 +472,10 @@ You may obtain the PySPH particle array, ``fluid``, like so::
 array properties can thus be obtained and used for any post-processing task.
 The ``solver_data`` provides information about the iteration count, timestep
 and the current time.
+
+A good example that demonstrates the use of these is available in the
+``post_process`` method of the ``elliptical_drop.py`` example.
+
 
 Interpolating properties
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -465,3 +526,27 @@ For more details on the class and the available methods, see
 In addition to this there are other useful pre and post-processing utilities
 described in :doc:`../reference/tools`.
 
+Doing more
+~~~~~~~~~~~
+
+.. py:currentmodule:: pysph.solver.application
+
+The :py:class:`Application` has several more methods that can be used in
+additional contexts, for example one may override the following additional
+methods:
+
+ - ``add_user_options``: this is used to create additional user-defined
+   command line arguments.  The command line options are available in
+   ``self.options`` and can be used in the other methods.
+
+ - ``create_domain``: this is used when a periodic domain is needed.
+
+ - ``create_inlet_outlet``:  Override this to return any inlet an outlet
+   objects.  See the :py:class:`pysph.sph.simple_inlet_outlet` module.
+
+There are many others, please see the :py:class:`Application` class to see
+these.
+
+There are several `examples
+<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/>`_ that
+ship with PySPH, explore these to get a better idea of what is possible.
