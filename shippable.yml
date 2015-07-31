@@ -8,7 +8,7 @@ cache: true
 
 python:
     - 2.7
-    - 3.4
+      #- 3.4
 
 # This doesn't work yet on shippable but we keep it here in case it does.
 virtualenv:
@@ -42,6 +42,9 @@ before_install:
 install:
     # We need a recent version of Cython.
     - pip install -r requirements.txt
+    - if [[ $PYTHON_VERSION == "2.7" ]]; then
+        pip install --upgrade six;
+      fi
     # Build pysph.
     - make clean
     - python setup.py install
