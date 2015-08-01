@@ -158,9 +158,8 @@ class ExampleTestCase(unittest.TestCase):
         y_err = np.max(ys[gid] - yp)
         z_err = np.max(zs[gid] - zp)
         self.assertTrue(np.allclose(xs[gid], xp, atol=atol, rtol=0),
-                        "Max error %s"%x_err)
+                        "Max x_error %s"%x_err)
         self.assertTrue(np.allclose(ys[gid], yp, atol=atol, rtol=0),
-                        "Max error %s"%y_err)
+                        "Max y_error %s"%y_err)
         self.assertTrue(np.allclose(zs[gid], zp, atol=atol, rtol=0),
-                        "Max error %s"%z_err)
-
+                        "Max z_error %s"%z_err)
