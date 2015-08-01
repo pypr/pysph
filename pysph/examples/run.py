@@ -73,6 +73,16 @@ def run_command(module, args):
     cmd = [sys.executable, "-m", module] + list(args)
     subprocess.call(cmd)
 
+def run_example(example, args):
+    if example.endswith('.py'):
+        example = example[:-3]
+    example = example.replace('/', '.')
+    if not example.startswith('pysph.examples.'):
+        module = 'pysph.examples.' + example
+    else:
+        module = example
+    run_command(module, args)
+
 def main():
     examples = get_all_examples()
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
@@ -86,7 +96,8 @@ def main():
     )
     parser.add_argument(
         "args", type=str, nargs="?",
-        help="optional example name and arguments to the example."
+        help='''optional example name (for example both cavity or
+        pysph.examples.cavity will work) and arguments to the example.'''
     )
 
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
@@ -97,8 +108,7 @@ def main():
     if options.list:
         return list_examples(examples)
     if len(sys.argv) > 1:
-        module = 'pysph.examples.' + sys.argv[1]
-        run_command(module, sys.argv[2:])
+        run_example(sys.argv[1], sys.argv[2:])
     else:
         list_examples(examples)
         ans = int(get_input("Enter example number you wish to run: "))
