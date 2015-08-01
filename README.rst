@@ -1,7 +1,7 @@
 PySPH: a Python-based SPH framework
 ------------------------------------
 
-|Shippable Status| |Drone Status| |Appveyor Status| |Codeship Status|
+|Shippable Status| |Appveyor Status| |Codeship Status|
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in

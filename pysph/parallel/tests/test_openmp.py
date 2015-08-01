@@ -8,7 +8,7 @@ This is done till better strategy for parallel testing is implemented
 
 from nose.plugins.attrib import attr
 
-from .example_test_case import ExampleTestCase
+from .example_test_case import ExampleTestCase, get_example_script
 
 def skip_if_no_openmp():
     from pysph.base.nnps import get_number_of_threads
@@ -27,20 +27,23 @@ class TestOpenMPExamples(ExampleTestCase):
 
     @attr(slow=True)
     def test_3Ddam_break_example(self):
-        dt = 1e-5; tf = 25*dt
-        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=100)
+        dt = 2e-5; tf = 13*dt
+        serial_kwargs = dict(
+            timestep=dt, tf=tf, pfreq=100, test=None
+        )
         extra_parallel_kwargs = dict(openmp=None)
         # Note that we set nprocs=1 here since we do not want
         # to run this with mpirun.
         self.run_example(
-            'dambreak3D.py', nprocs=1, atol=1e-14,
+            get_example_script('sphysics/dambreak_sphysics.py'),
+            nprocs=1, atol=1e-14,
             serial_kwargs=serial_kwargs,
             extra_parallel_kwargs=extra_parallel_kwargs
         )
 
     @attr(slow=True)
     def test_elliptical_drop_example(self):
-        serial_kwargs = None
+        serial_kwargs = dict(kernel='CubicSpline')
         extra_parallel_kwargs = dict(openmp=None)
         # Note that we set nprocs=1 here since we do not want
         # to run this with mpirun.

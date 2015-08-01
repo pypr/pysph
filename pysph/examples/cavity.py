@@ -195,6 +195,13 @@ class LidDrivenCavity(Application):
         return equations
 
     def post_process(self, info_fname):
+        try:
+            from matplotlib import pyplot as plt
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
+        if self.rank > 0:
+            return
         info = self.read_info(info_fname)
         self._plot_ke_history()
         self._plot_velocity()

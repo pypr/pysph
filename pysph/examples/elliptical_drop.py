@@ -185,13 +185,20 @@ class EllipticalDrop(Application):
                     UpdateSmoothingLengthFerrari(
                         dest='fluid', sources=None, dim=2, hdx=self.hdx
                     ),
-                    ], real=True ),
+                    ], real=False),
 
 
             ]
         return equations
 
     def post_process(self, info_file_or_dir):
+        try:
+            from matplotlib import pyplot as plt
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
+        if self.rank > 0:
+            return
         info = self.read_info(info_file_or_dir)
         files = self.output_files
         last_output = files[-1]
@@ -203,7 +210,6 @@ class EllipticalDrop(Application):
         print("At tf=%s"%tf)
         print("Semi-major axis length (exact, computed) = %s, %s"
                 %(1.0/a, max(pa.y)))
-        from matplotlib import pyplot as plt
         plt.plot(xe, ye)
         plt.scatter(pa.x, pa.y, marker='.')
         plt.ylim(-2, 2)
