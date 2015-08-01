@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 def is_overloaded_method(method):
     """Returns True if the given method is overloaded from any of its bases.
     """
-    method_name = method.im_func.func_name
-    self = method.im_self
+    method_name = method.__name__
+    self = method.__self__
     klass = self.__class__
     for base in klass.__bases__:
         if hasattr(base, method_name):
@@ -1071,4 +1071,3 @@ class Application(object):
         generated.
         """
         print('Overload this method to post-process the results.')
-

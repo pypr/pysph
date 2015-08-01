@@ -35,7 +35,7 @@ class ParallelTests(ExampleTestCase):
         serial_kwargs = dict(sort_gids=None, kernel='CubicSpline', tf=0.005)
         extra_parallel_kwargs = dict(ghost_layers=1, lb_freq=5)
         self.run_example(
-            'elliptical_drop.py', nprocs=2, atol=1e-12,
+            'elliptical_drop.py', nprocs=2, atol=1e-11,
             serial_kwargs=serial_kwargs,
             extra_parallel_kwargs=extra_parallel_kwargs
         )
