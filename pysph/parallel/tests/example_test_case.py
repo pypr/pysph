@@ -11,6 +11,14 @@ from pysph.tools import run_parallel_script
 
 MY_DIR = run_parallel_script.get_directory(__file__)
 
+def get_example_script(script):
+    """Given a relative posix path to a script located inside the
+    pysph.examples package, return the full path to it.
+
+    """
+    ex_dir = os.path.join(os.path.dirname(os.path.dirname(MY_DIR)), 'examples')
+    return os.path.join(ex_dir, *script.split('/'))
+
 
 class ExampleTestCase(unittest.TestCase):
     """ A script to run an example in serial and parallel and compare results.
@@ -146,7 +154,13 @@ class ExampleTestCase(unittest.TestCase):
 
         self.assertTrue( xs.size, xp.size )
 
-        self.assertTrue(np.allclose(xs[gid], xp, atol=atol, rtol=0))
-        self.assertTrue(np.allclose(ys[gid], yp, atol=atol, rtol=0))
-        self.assertTrue(np.allclose(zs[gid], zp, atol=atol, rtol=0))
+        x_err = np.max(xs[gid] - xp)
+        y_err = np.max(ys[gid] - yp)
+        z_err = np.max(zs[gid] - zp)
+        self.assertTrue(np.allclose(xs[gid], xp, atol=atol, rtol=0),
+                        "Max error %s"%x_err)
+        self.assertTrue(np.allclose(ys[gid], yp, atol=atol, rtol=0),
+                        "Max error %s"%y_err)
+        self.assertTrue(np.allclose(zs[gid], zp, atol=atol, rtol=0),
+                        "Max error %s"%z_err)
 

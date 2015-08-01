@@ -10,6 +10,7 @@ data used for the run. The rest of the problem is set-up in the usual
 way.
 
 """
+import os
 import numpy
 
 from pysph.sph.equation import Group
@@ -19,10 +20,14 @@ from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import EPECIntegrator
+from pysph.sph.integrator import EPECIntegrator, PECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.tools.sphysics import sphysics2pysph
+
+MY_DIR = os.path.dirname(__file__)
+INDAT = os.path.join(MY_DIR, 'INDAT.gz')
+IPART = os.path.join(MY_DIR, 'IPART.gz')
 
 # problem dimensionality
 dim = 3
@@ -32,7 +37,7 @@ dt = 1e-5
 tf = 2.0
 
 # physical constants for the run loaded from SPHysics INDAT
-indat = numpy.loadtxt('INDAT.gz')
+indat = numpy.loadtxt(INDAT)
 H = float( indat[10] )
 B = float( indat[11] )
 gamma = float( indat[12] )
@@ -42,51 +47,57 @@ alpha = float( indat[16] )
 beta = 0.0
 c0 = numpy.sqrt( B*gamma/rho0 )
 
-# particle factory function
-def create_particles(ipart='IPART.gz', indat='INDAT.gz', **kwargs):
-     return sphysics2pysph(ipart, indat, vtk=False)
+class DamBreak3DSPhysics(Application):
+    def add_user_options(self, group):
+        group.add_option(
+            "--test", action="store_true", dest="test", default=False,
+            help="For use while testing of results, uses PEC integrator."
+        )
 
-# Create the application.
-app = Application()
+    def create_particles(self):
+         return sphysics2pysph(IPART, INDAT, vtk=False)
 
-# Specify the kernel
-kernel = CubicSpline(dim=3)
+    def create_solver(self):
+        kernel = CubicSpline(dim=3)
 
-# Setup the integrator.
-integrator = EPECIntegrator(fluid=WCSPHStep(),boundary=WCSPHStep())
+        print(self.options.test)
+        if self.options.test:
+            integrator = PECIntegrator(fluid=WCSPHStep(),boundary=WCSPHStep())
+            adaptive, n_damp = False, 0
+        else:
+            integrator = EPECIntegrator(fluid=WCSPHStep(),boundary=WCSPHStep())
+            adaptive, n_damp = True, 100
 
-# Create a solver. damping time is taken as 0.1% of the final time
-solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
-                adaptive_timestep=True, tf=tf, dt=dt, n_damp=100)
+        solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
+                        adaptive_timestep=adaptive, tf=tf, dt=dt, n_damp=n_damp)
+        return solver
 
-# create the equations
-equations = [
+    def create_equations(self):
+        equations = [
 
-    # Equation of state
-    Group(equations=[
+            # Equation of state
+            Group(equations=[
 
-            TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-            TaitEOSHGCorrection(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
 
-            ], real=False),
+                    ], real=False),
 
-    # Continuity Momentum and XSPH equations
-    Group(equations=[
-               ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-               ContinuityEquation(dest='boundary', sources=['fluid']),
+            # Continuity Momentum and XSPH equations
+            Group(equations=[
+                       ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
+                       ContinuityEquation(dest='boundary', sources=['fluid']),
 
-               MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                                alpha=alpha, beta=beta, gz=-9.81,
-                                tensile_correction=True),
+                       MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+                                        alpha=alpha, beta=beta, gz=-9.81,
+                                        tensile_correction=True),
 
-               # Position step with XSPH
-               XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
-               ])
-    ]
+                       # Position step with XSPH
+                       XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
+                       ])
+            ]
+        return equations
 
-
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=create_particles)
-
-app.run()
+if __name__ == '__main__':
+    app = DamBreak3DSPhysics()
+    app.run()
