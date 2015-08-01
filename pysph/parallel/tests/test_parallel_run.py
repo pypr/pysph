@@ -9,7 +9,7 @@ This is done till better strategy for parallel testing is implemented
 from nose.plugins.attrib import attr
 
 from pysph.tools import run_parallel_script
-from example_test_case import ExampleTestCase, get_example_script
+from pysph.parallel.tests.example_test_case import ExampleTestCase, get_example_script
 
 run_parallel_script.skip_if_no_mpi4py()
 
