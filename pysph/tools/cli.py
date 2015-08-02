@@ -5,27 +5,26 @@ from __future__ import print_function
 
 from argparse import ArgumentParser
 from os.path import exists, join
-import subprocess
 import sys
 
-def run_viewer(extra):
-    cmd = [sys.executable, '-m', 'pysph.tools.mayavi_viewer'] + extra
-    subprocess.call(cmd)
+def run_viewer(args):
+    from pysph.tools.mayavi_viewer import main
+    main(args)
 
-def run_examples(extra):
-    cmd = [sys.executable, '-m', 'pysph.examples.run'] + extra
-    subprocess.call(cmd)
+def run_examples(args):
+    from pysph.examples.run import main
+    main(args)
 
 def _has_pysph_dir():
     init_py = join('pysph', '__init__.py')
     init_pyc = join('pysph', '__init__.pyc')
     return exists(init_py) or exists(init_pyc)
 
-def run_tests(extra):
+def run_tests(args):
     wd = ['-w', 'docs'] if _has_pysph_dir() else []
-    cmd = [sys.executable, '-m', 'nose.core', 'pysph', 'pyzoltan'] \
-            + wd + extra
-    subprocess.call(cmd)
+    argv = ['nosetests', 'pysph', 'pyzoltan'] + wd + args
+    from nose.core import main
+    main(argv=argv)
 
 def main():
     parser = ArgumentParser(description=__doc__, add_help=False)
