@@ -7,16 +7,23 @@ One can optionally supply the name of the example and any additional arguments.
 from __future__ import print_function
 
 import argparse
+import ast
 import os
-import subprocess
 import sys
 
 HERE = os.path.dirname(__file__)
 
-def _extract_full_doc(module):
-    m = module.rsplit('.', 1)[1]
-    mod = __import__(module, fromlist=[m])
-    return mod.__doc__
+def _exec_file(filename):
+    ns = {'__name__':'__main__', '__file__': filename}
+    if sys.version_info.major > 2:
+        co = compile(open(filename, 'rb').read(), filename, 'exec')
+        exec(co, ns)
+    else:
+        execfile(filename, ns)
+
+def _extract_full_doc(filename):
+    p = ast.parse(open(filename, 'rb').read())
+    return ast.get_docstring(p)
 
 def _extract_short_doc(dirname, fname):
     return open(os.path.join(dirname, fname)).readline()[3:].strip()
@@ -29,6 +36,9 @@ def _get_module(fname):
         parts.append(dirname)
     return '.'.join(parts + [start[:-3]])
 
+def example_info(module, filename):
+    print("Information for example: %s"%module)
+    print(_extract_full_doc(filename))
 
 def get_all_examples():
     basedir = HERE
@@ -52,30 +62,73 @@ def get_all_examples():
         examples.extend(data)
     return examples
 
-def example_info(module):
-    print("Information for example: %s"%module)
-    print(_extract_full_doc(module))
-
-def list_examples(examples):
-    for idx, (module, doc) in enumerate(examples):
-        print("%d. %s"%(idx+1, module))
-        print("   %s"%doc)
-
 def get_input(prompt):
     if sys.version_info.major > 2:
         return input(prompt)
     else:
         return raw_input(prompt)
 
+def get_path(module):
+    """Return the path to the module filename given the module.
+    """
+    x = module[len('pysph.examples.'):].split('.')
+    x[-1] = x[-1] + '.py'
+    return os.path.join(HERE, *x)
+
+def guess_correct_module(example):
+    """Given some form of the example name guess and return a reasonable
+    module.
+
+    Examples
+    --------
+
+    >>> guess_correct_module('elliptical_drop')
+    'pysph.examples.elliptical_drop'
+    >>> guess_correct_module('pysph.examples.elliptical_drop')
+    'pysph.examples.elliptical_drop'
+    >>> guess_correct_module('solid_mech.rings')
+    'pysph.examples.solid_mech.rings'
+    >>> guess_correct_module('solid_mech/rings.py')
+    'pysph.examples.solid_mech.rings'
+    >>> guess_correct_module('solid_mech/rings')
+    'pysph.examples.solid_mech.rings'
+    """
+    if example.endswith('.py'):
+        example = example[:-3]
+    example = example.replace('/', '.')
+    if not example.startswith('pysph.examples.'):
+        module = 'pysph.examples.' + example
+    else:
+        module = example
+    return module
+
+def list_examples(examples):
+    for idx, (module, doc) in enumerate(examples):
+        print("%d. %s"%(idx+1, module[len('pysph.examples.'):]))
+        print("   %s"%doc)
+
 def run_command(module, args):
     print("Running example %s.\n"%module)
-    example_info(module)
-    cmd = [sys.executable, "-m", module] + list(args)
-    subprocess.call(cmd)
+    filename = get_path(module)
+    if '-h' not in args and '--help' not in args:
+        example_info(module, filename)
 
-def main():
+    # FIXME: This is ugly but we want the user to be able to run
+    #   mpirun -np 4 pysph run elliptical_drop
+    # This necessitates that we do not use subprocess.  The cleaner alternative
+    # is to expect each user to write a main function which accepts args that
+    # we can call.  For now we just clobber sys.argv.
+
+    sys.argv = [filename] + args
+    _exec_file(filename)
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
     examples = get_all_examples()
-    parser = argparse.ArgumentParser(description=__doc__, add_help=False)
+    parser = argparse.ArgumentParser(
+        prog="run", description=__doc__, add_help=False
+    )
     parser.add_argument(
         "-h", "--help", action="store_true", default=False, dest="help",
         help="show this help message and exit"
@@ -86,23 +139,28 @@ def main():
     )
     parser.add_argument(
         "args", type=str, nargs="?",
-        help="optional example name and arguments to the example."
+        help='''optional example name (for example both cavity or
+        pysph.examples.cavity will work) and arguments to the example.'''
     )
 
-    if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
+    if len(argv) > 0 and argv[0] in ['-h', '--help']:
         parser.print_help()
         sys.exit()
 
-    options, extra = parser.parse_known_args()
+    options, extra = parser.parse_known_args(argv)
     if options.list:
         return list_examples(examples)
-    if len(sys.argv) > 1:
-        module = 'pysph.examples.' + sys.argv[1]
-        run_command(module, sys.argv[2:])
+    if len(argv) > 0:
+        module = guess_correct_module(argv[0])
+        run_command(module, argv[1:])
     else:
         list_examples(examples)
         ans = int(get_input("Enter example number you wish to run: "))
-        args = str(get_input("Enter additional arguments (lave blank to skip): "))
+        if ans < 1 or ans > len(examples):
+            print("Invalid example number, exiting!")
+            sys.exit()
+
+        args = str(get_input("Enter additional arguments (leave blank to skip): "))
         module, doc = examples[ans-1]
         print("-"*80)
         run_command(module, args.split())

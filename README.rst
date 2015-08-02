@@ -78,25 +78,32 @@ Running the examples
 --------------------
 
 You can verify the installation by exploring some examples. A fairly
-quick running example (taking about 5-10 minutes) would be the
+quick running example (taking about 20 seconds) would be the
 following::
 
-    $ cd examples
-    $ python dam_break.py
-
-The solution can be viewed live by running::
-
-    $ pysph_viewer
+    $ pysph run elliptical_drop
 
 This requires that Mayavi be installed. The saved output data can be
 viewed by running::
 
-    $ pysph_viewer dam_break_output/
+    $ pysph view elliptical_drop_output/
+
+A more interesting example would be a 2D dam-break example (this takes about 30
+minutes in total to run)::
+
+    $ pysph run dam_break_2d
+
+The solution can be viewed live by running (on another shell)::
+
+    $ pysph view
+
+The generated output can also be viewed and the newly generated output files
+can be refreshed on the viewer UI.
 
 A 3D version of the dam-break problem is also available, and may be run
 as::
 
-    $ python dam_break3D.py
+    $ pysph run dam_break_3d
 
 This runs the 3D dam-break problem which is also a SPHERIC benchmark
 `Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`_
@@ -107,24 +114,21 @@ This runs the 3D dam-break problem which is also a SPHERIC benchmark
 
 PySPH is more than a tool for wave-body interactions:::
 
-    $ cd examples/transport_velocity
-    $ python cavity.py
+    $ pysph run cavity
 
-This runs the driven cavity problem using the transport velocity
-formulation of Adami et al. You can verify the results for this problem
-using the helper script
-``examples/transport_velocity/ldcavity_results.py`` to plot, for example
-the streamlines look like the following image:
+This runs the driven cavity problem using the transport velocity formulation of
+Adami et al. The output directory ``cavity_output`` will also contain
+streamlines and other post-processed results after the simulation completes.
+For example the streamlines look like the following image:
 
 .. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/ldc-streamlines.png
    :width: 550px
    :alt: Lid-driven-cavity example
 
 If you want to use PySPH for elastic dynamics, you can try some of the
-examples from the directory ``examples/solid_mech``::
+examples from the ``pysph.examples.solid_mech`` package::
 
-    $ cd examples/solid_mech
-    $ python rings.py
+    $ pysph run solid_mech.rings
 
 Which runs the problem of the collision of two elastic rings:
 
@@ -135,6 +139,11 @@ Which runs the problem of the collision of two elastic rings:
 The auto-generated code for the example resides in the directory
 ``~/.pysph/source``. A note of caution however, it's not for the faint
 hearted.
+
+There are many more examples, they can be listed by simply running::
+
+    $ pysph run
+
 
 Credits
 --------

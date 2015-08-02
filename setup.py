@@ -456,7 +456,7 @@ def setup_package():
           zip_safe = False,
           entry_points = """
               [console_scripts]
-              pysph_viewer = pysph.tools.mayavi_viewer:main
+              pysph = pysph.tools.cli:main
               """,
           platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
           classifiers = [c.strip() for c in """\

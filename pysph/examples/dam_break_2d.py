@@ -1,4 +1,4 @@
-"""Two-dimensional dam break over a dry bed.  (40 minutes)
+"""Two-dimensional dam break over a dry bed.  (30 minutes)
 
 The case is described in "State of the art classical SPH for free surface
 flows", Benedict D Rogers, Robert A, Dalrymple and Alex J.C Crespo, Journal of

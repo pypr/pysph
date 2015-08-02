@@ -19,7 +19,7 @@ As an object oriented framework for particle methods, PySPH provides
 convenient data structures to store and manipulate collections of
 particles. These can be constructed from within Python and are fully
 compatible with NumPy arrays. We begin with a brief description for
-the basic data structures for arrays
+the basic data structures for arrays.
 
 .. py:currentmodule:: pyzoltan.core.carray
 
