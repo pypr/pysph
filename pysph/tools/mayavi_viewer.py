@@ -835,13 +835,15 @@ class MayaviViewer(HasTraits):
 ######################################################################
 def usage():
     print("""Usage:
-pysph_viewer [-v] <trait1=value> <trait2=value> [files.npz]
+pysph view [-v] <trait1=value> <trait2=value> [files.npz]
 
 If *.npz files are not supplied it will connect to a running solver, if not it
 will display the given files.
 
 The arguments <trait1=value> are optional settings like host, port and authkey
 etc.  The following traits are available:
+
+  scalar        -- the default scalar to display on the view.
 
   host          -- hostname/IP address to connect to.
   port          -- Port to connect to
@@ -867,9 +869,9 @@ Options:
 Examples::
 ----------
 
-  $ pysph_viewer interval=10 host=localhost port=8900
-  $ pysph_viewer foo.npz
-  $ pysph_viewer *.npz play=True loop=True
+  $ pysph view scalar=u play=True loop=True elliptical_drop_output/
+  $ pysph view ellptical_drop_100.npz
+  $ pysph view interval=10 host=localhost port=8900
 
 """)
 
