@@ -6,7 +6,7 @@ import numpy as np
 
 # Package imports.
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import Gaussian
 from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
@@ -112,7 +112,7 @@ class Interpolator(object):
         self.dim = 3 - list(shape).count(1)
 
         if kernel is None:
-            self.kernel = CubicSpline(dim=self.dim)
+            self.kernel = Gaussian(dim=self.dim)
         else:
             self.kernel = kernel
 
