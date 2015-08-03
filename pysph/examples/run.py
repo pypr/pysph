@@ -102,6 +102,11 @@ def guess_correct_module(example):
         module = example
     return module
 
+def cat_example(module):
+    filename = get_path(module)
+    print("# File: %s"%filename)
+    print(open(filename).read())
+
 def list_examples(examples):
     for idx, (module, doc) in enumerate(examples):
         print("%d. %s"%(idx+1, module[len('pysph.examples.'):]))
@@ -138,6 +143,10 @@ def main(argv=None):
         help="List examples"
     )
     parser.add_argument(
+        "--cat", action="store_true", default=False, dest="cat",
+        help="Show/cat the example code on stdout"
+    )
+    parser.add_argument(
         "args", type=str, nargs="?",
         help='''optional example name (for example both cavity or
         pysph.examples.cavity will work) and arguments to the example.'''
@@ -150,6 +159,9 @@ def main(argv=None):
     options, extra = parser.parse_known_args(argv)
     if options.list:
         return list_examples(examples)
+    if options.cat:
+        module = guess_correct_module(options.args)
+        return cat_example(module)
     if len(argv) > 0:
         module = guess_correct_module(argv[0])
         run_command(module, argv[1:])
