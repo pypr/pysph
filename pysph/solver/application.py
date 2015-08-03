@@ -435,6 +435,7 @@ class Application(object):
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
+        self.consume_user_options()
 
     def _setup_logging(self):
         """Setup logging for the application.
@@ -998,6 +999,18 @@ class Application(object):
         """
         pass
 
+    def consume_user_options(self):
+        """This is called right after the command line arguments are parsed.
+
+        All the parsed options are available in ``self.options`` and can be
+        used in this method.
+
+        This is meant to be overridden by users to setup any internal variables
+        etc. that depend on the command line arguments passed.  Note that this
+        method is called well before the solver or particles are created.
+        """
+        pass
+
     def create_domain(self):
         """Create a `pysph.nnps.DomainManager` and return it if needed.
 
@@ -1078,3 +1091,4 @@ class Application(object):
         generated.
         """
         print('Overload this method to post-process the results.')
+

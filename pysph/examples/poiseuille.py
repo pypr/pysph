@@ -24,18 +24,6 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
 # numpy
 import numpy as np
 
-# domain and reference values
-Re = 0.0125
-d = 0.5; Ly = 2*d; Lx = 0.4*Ly
-rho0 = 1.0; nu = 1.0
-Vmax = nu*Re/(2*d)
-c0 = 10*Vmax; p0 = c0*c0*rho0
-
-# The body force is adjusted to give the Required Reynold's number
-# based on the steady state maximum velocity Vmax:
-# Vmax = fx/(2*nu)*(d^2) at the centerline
-fx = Vmax * 2*nu/(d**2)
-
 # Numerical setup
 dx = 0.025
 ghost_extent = 5 * dx
@@ -43,19 +31,41 @@ hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Vmax )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * np.sqrt(h0/fx)
-
-tf = 2.0
-dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
-
 
 class PoiseuilleFlow(Application):
+    def add_user_options(self, group):
+        group.add_option(
+            "--re", action="store", type=float, dest="re", default=0.0125,
+            help="Reynolds number of flow."
+        )
+        group.add_option(
+            "--remesh", action="store", type=float, dest="remesh", default=0,
+            help="Remeshing frequency (setting it to zero disables it)."
+        )
+
+    def consume_user_options(self):
+        self.Re = self.options.re
+        self.d = 0.5
+        self.Ly = 2*self.d
+        self.Lx = 0.4*self.Ly
+        self.rho0 = 1.0
+        self.nu = 1.0
+        self.Vmax = self.nu*self.Re/(2*self.d)
+        self.c0 = 10*self.Vmax
+        self.p0 = self.c0**2*self.rho0
+
+        # The body force is adjusted to give the Required Reynold's number
+        # based on the steady state maximum velocity Vmax:
+        # Vmax = fx/(2*nu)*(d^2) at the centerline
+
+        self.fx = self.Vmax * 2*self.nu/(self.d**2)
+
     def create_domain(self):
-        return DomainManager(xmin=0, xmax=Lx, periodic_in_x=True)
+        return DomainManager(xmin=0, xmax=self.Lx, periodic_in_x=True)
 
     def create_particles(self):
+        Lx = self.Lx
+        Ly = self.Ly
         _x = np.arange( dx/2, Lx, dx )
 
         # create the fluid particles
@@ -79,9 +89,9 @@ class PoiseuilleFlow(Application):
         channel = get_particle_array(name='channel', x=cx, y=cy)
         fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
-        print("Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            channel.get_number_of_particles(), dt))
+        print("Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d"%(
+            self.Re, fluid.get_number_of_particles(),
+            channel.get_number_of_particles()))
 
         # add requisite properties to the arrays:
         # particle volume
@@ -111,13 +121,16 @@ class PoiseuilleFlow(Application):
 
         # magnitude of velocity
         fluid.add_property('vmag2')
+        fluid.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
+                                  'm', 'au', 'av', 'aw', 'V', 'vmag2'] )
+        channel.add_output_arrays(['p'])
 
         # setup the particle properties
         volume = dx * dx
 
         # mass is set to get the reference density of rho0
-        fluid.m[:] = volume * rho0
-        channel.m[:] = volume * rho0
+        fluid.m[:] = volume * self.rho0
+        channel.m[:] = volume * self.rho0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
@@ -144,11 +157,23 @@ class PoiseuilleFlow(Application):
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 
         # Setup default parameters.
+        dt_cfl = 0.25 * h0/( self.c0 + self.Vmax )
+        dt_viscous = 0.125 * h0**2/self.nu
+        dt_force = 0.25 * np.sqrt(h0/self.fx)
+
+        tf = 2.0
+        dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+        print("dt = %g"%dt)
         solver.set_time_step(dt)
         solver.set_final_time(tf)
+        solver.set_print_freq(1000)
         return solver
 
     def create_equations(self):
+        rho0 = self.rho0
+        p0 = self.p0
+        fx = self.fx
+        nu = self.nu
         equations = [
 
             # Summation density along with volume summation for the fluid
@@ -206,6 +231,17 @@ class PoiseuilleFlow(Application):
             ]
         return equations
 
+    def create_tools(self):
+        tools = []
+        if self.options.remesh > 0:
+            from pysph.solver.tools import SimpleRemesher
+            remesher = SimpleRemesher(
+                self, 'fluid', props=['u', 'v', 'uhat', 'vhat'],
+                freq=self.options.remesh
+            )
+            tools.append(remesher)
+        return tools
+
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
 
@@ -236,6 +272,9 @@ class PoiseuilleFlow(Application):
         interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
         ui = interp.interpolate('u')
 
+        d = self.d
+        fx = self.fx
+        nu = self.nu
         # exact parabolic profile for the u-velocity
         ye = np.arange(-d, d+1e-3, 0.01)
         ue = -0.5 * fx/nu * (ye**2 - d*d)
