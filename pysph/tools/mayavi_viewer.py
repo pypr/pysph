@@ -364,8 +364,7 @@ class ParticleArrayHelper(HasTraits):
             elif self.plot is not None:
                 mlab.get_engine().current_object = self.plot
                 txt = mlab.text(0.01, 0.01, 'Time = 0.0',
-                                width=0.35,
-                                color=(1,1,1))
+                                width=0.35)
                 self._text = txt
                 self._time_changed(self.time)
         else:
