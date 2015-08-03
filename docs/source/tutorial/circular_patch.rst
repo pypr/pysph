@@ -540,6 +540,11 @@ methods:
    command line arguments.  The command line options are available in
    ``self.options`` and can be used in the other methods.
 
+ - ``consume_user_options``: this is called after the command line arguments are
+   parsed, and can be optionally used to setup any variables that have been
+   added by the user in ``add_user_options``.  Note that the method is called
+   before the particles and solver etc. are created.
+
  - ``create_domain``: this is used when a periodic domain is needed.
 
  - ``create_inlet_outlet``:  Override this to return any inlet an outlet

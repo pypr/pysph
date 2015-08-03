@@ -411,9 +411,20 @@ class Application(object):
                                 'a particular file; ? lists all '
                                 'available files')
                           )
+        # User options.
+        user_options = OptionGroup(
+            self.opt_parse, "User", "User defined command line arguments"
+        )
+        self.add_user_options(user_options)
+        if len(user_options.option_list) > 0:
+            self._add_option(user_options)
 
-    def _parse_command_line(self):
-        if is_using_ipython():
+    def _parse_command_line(self, force=False):
+        """If force is True, it will parse the arguments regardless of whether
+        it is running in IPython or not.  This is handy when you want to parse
+        the command line for a previously run case.
+        """
+        if is_using_ipython() and not force:
             # Don't parse the command line args.
             (options, args) = self.opt_parse.parse_args([])
         else:
@@ -424,6 +435,7 @@ class Application(object):
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
+        self.consume_user_options()
 
     def _setup_logging(self):
         """Setup logging for the application.
@@ -775,7 +787,7 @@ class Application(object):
         if is_overloaded_method(obj.post_stage):
             self.solver.add_post_stage_callback(obj.post_stage)
 
-        if is_overloaded_method(self.post_step):
+        if is_overloaded_method(obj.post_step):
             self.solver.add_post_step_callback(obj.post_step)
 
     def _message(self, msg):
@@ -842,6 +854,9 @@ class Application(object):
             info['output_dir'] = info_dir
         else:
             self.output_dir = output_dir
+
+        self.args = info.get('args', self.args)
+        self._parse_command_line(force=True)
         return info
 
     def run(self, argv=None):
@@ -852,13 +867,6 @@ class Application(object):
 
         if self.solver is None:
             start_time = time.time()
-
-            user_options = OptionGroup(
-                self.opt_parse, "User", "User defined command line arguments"
-            )
-            self.add_user_options(user_options)
-            if len(user_options.option_list) > 0:
-                self._add_option(user_options)
 
             self._parse_command_line()
             self._setup_logging()
@@ -991,6 +999,18 @@ class Application(object):
         """
         pass
 
+    def consume_user_options(self):
+        """This is called right after the command line arguments are parsed.
+
+        All the parsed options are available in ``self.options`` and can be
+        used in this method.
+
+        This is meant to be overridden by users to setup any internal variables
+        etc. that depend on the command line arguments passed.  Note that this
+        method is called well before the solver or particles are created.
+        """
+        pass
+
     def create_domain(self):
         """Create a `pysph.nnps.DomainManager` and return it if needed.
 
@@ -1071,3 +1091,4 @@ class Application(object):
         generated.
         """
         print('Overload this method to post-process the results.')
+

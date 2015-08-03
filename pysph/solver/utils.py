@@ -24,8 +24,6 @@ def check_array(x, y):
     1e-16."""
     return numpy.allclose(x, y, atol=1e-16, rtol=0)
 
-
-
 def get_distributed_particles(pa, comm, cell_size):
     # FIXME: this can be removed once the examples all use Application.
     from pysph.parallel.load_balancer import LoadBalancer
@@ -42,6 +40,13 @@ def get_distributed_particles(pa, comm, cell_size):
 
     return particles
 
+def get_array_by_name(arrays, name):
+    """Given a list of arrays and the name of the desired array, return the
+    desired array.
+    """
+    for array in arrays:
+        if array.name == name:
+            return array
 
 ################################################################################
 # `PBar` class.
@@ -129,19 +134,6 @@ def mkdir(newdir):
                     pass
                 else:
                     raise
-
-
-
-##############################################################################
-# read pickled data from a file
-##############################################################################
-def get_pickled_data(fname):
-
-    f = open(fname, 'r')
-    data = pickle.load(f)
-    f.close()
-
-    return data
 
 
 def get_pysph_root():
