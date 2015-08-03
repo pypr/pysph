@@ -18,6 +18,10 @@
   them completely self-contained.
 * Add support to write compressed output.
 * Add support to set the kernel from the command line.
+* Add a new ``pysph`` script that supports ``view``, ``run``, and ``test``
+  sub-commands.  The ``pysph_viewer`` is now removed, use ``pysph view``
+  instead.
+* Add a simple remeshing tool in ``pysph.solver.tools.SimpleRemesher``.
 
 1.0a2
 ------
