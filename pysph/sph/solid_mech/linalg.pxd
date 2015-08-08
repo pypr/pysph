@@ -1,15 +1,10 @@
-from pysph.base.point cimport cPoint
+"""Routines for eigen decomposition of symmetric 3x3 matrices.
+"""
+cdef double det(double a[3][3]) nogil
+cdef void get_eigenvalues(double a[3][3], double *result) nogil
+cdef void eigen_decomposition(double A[3][3], double V[3][3], double *d) nogil
+cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil
+cdef void transform_diag(double *A, double P[3][3], double res[3][3]) nogil
+cdef void transform_diag_inv(double *A, double P[3][3], double res[3][3]) nogil
 
-
-cdef double det(cPoint d, cPoint s)
-cdef cPoint get_eigenvalues(cPoint d, cPoint s)
-cdef cPoint get_eigenvector(cPoint d, cPoint s, double r)
-cdef void transform(double A[3][3], double P[3][3], double res[3][3])
-cdef void transform2(cPoint A, double P[3][3], double res[3][3])
-cdef void transform2inv(cPoint A, double P[3][3], double res[3][3])
-
-
-
-cdef cPoint get_eigenvalvec(cPoint d, cPoint s, double * R)
-cdef void eigen_decomposition(double A[3][3], double V[3][3], double d[3])
-
+cdef void get_eigenvalvec(double A[3][3], double *R, double *e)

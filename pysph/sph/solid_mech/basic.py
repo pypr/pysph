@@ -72,9 +72,8 @@ class MonaghanArtificialStress(Equation):
     def _cython_code_(self):
         code = dedent("""
         cimport cython
-        from pysph.sph.solid_mech.linalg cimport get_eigenvalvec
-        from pysph.sph.solid_mech.linalg cimport transform2inv
-        from pysph.base.point cimport cPoint
+        from pysph.sph.solid_mech.linalg cimport eigen_decomposition
+        from pysph.sph.solid_mech.linalg cimport transform_diag_inv
         """)
         return code
 
@@ -97,46 +96,44 @@ class MonaghanArtificialStress(Equation):
 
         ## Matrix and vector declarations ##
 
-        # diagonal and off-diaognal terms for the stress tensor
-        sd = declare('cPoint')
-        ss = declare('cPoint')
-
-        # artificial stress in the principle directions
-        rd = declare('cPoint')
-
         # Matrix of Eigenvectors (columns)
         R = declare('matrix((3,3))')
 
         # Artificial stress in the original coordinates
         Rab = declare('matrix((3,3))')
 
-        # Eigenvectors
-        S = declare('cPoint')
+        # Stress tensor with pressure.
+        S = declare('matrix((3,3))')
+        # Eigenvalues
+        V = declare('matrix((3,))')
+
+        # Artificial stress in principle direction
+        rd = declare('matrix((3,))')
 
         # get the diagonal terms for the stress tensor adding pressure
-        sd.x = d_s00[d_idx] - d_p[d_idx]
-        sd.y = d_s11[d_idx] - d_p[d_idx]
-        sd.z = d_s22[d_idx] - d_p[d_idx]
+        S[0][0] = d_s00[d_idx] - d_p[d_idx]
+        S[1][1] = d_s11[d_idx] - d_p[d_idx]
+        S[2][2] = d_s22[d_idx] - d_p[d_idx]
 
-        ss.x = d_s12[d_idx]
-        ss.y = d_s02[d_idx]
-        ss.z = d_s01[d_idx]
+        S[1][2] = S[2][1] = d_s12[d_idx]
+        S[0][2] = S[2][0] = d_s02[d_idx]
+        S[0][1] = S[1][0] = d_s01[d_idx]
 
         # compute the principle stresses
-        S = get_eigenvalvec(sd, ss, cython.address(R[0][0]))
+        eigen_decomposition(S, R, cython.address(V[0]))
 
         # artificial stress corrections
-        if S.x > 0: rd.x = -self.eps * S.x * rhoi21
-        else : rd.x = 0
+        if V[0] > 0: rd[0] = -self.eps * V[0] * rhoi21
+        else : rd[0] = 0
 
-        if S.y > 0: rd.y = -self.eps * S.y * rhoi21
-        else : rd.y = 0
+        if V[1] > 0: rd[1] = -self.eps * V[1] * rhoi21
+        else : rd[1] = 0
 
-        if S.z > 0: rd.z = -self.eps * S.z * rhoi21
-        else : rd.z = 0
+        if V[2] > 0: rd[2] = -self.eps * V[2] * rhoi21
+        else : rd[2] = 0
 
         # transform artificial stresses in original frame
-        transform2inv(rd, R, Rab)
+        transform_diag_inv(cython.address(rd[0]), R, Rab)
 
         # store the values
         d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]

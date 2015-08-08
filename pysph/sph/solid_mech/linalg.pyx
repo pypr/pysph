@@ -1,134 +1,104 @@
-# Eigen decomposition code for symmetric 3x3 matrices, copied from the public
-#   domain Java Matrix library JAMA
+#cython: boundscheck=False
 
-from libc.math cimport sqrt, cos, acos, sin, atan2
-cimport cython
+#
+# Eigen decomposition code for symmetric 3x3 matrices, some code taken
+# from the public domain Java Matrix library JAMA
 
-from numpy import empty
+from libc.math cimport sqrt, cos, acos, sin, atan2, M_PI
+from libc.string cimport memcpy
+
 from numpy.linalg import eigh
 cimport numpy
 import numpy
 
-from pysph.base.point cimport cPoint, cPoint_new, cPoint_sub, cPoint_dot, \
-        cPoint_norm, cPoint_scale, cPoint_length, Point
-
-
 cdef extern:
-    double fabs(double)
+    double fabs(double) nogil
 
 # this is cython substitute for const values
 cdef enum:
     n=3
 
-cdef inline MAX(double a, double b):
+cdef double EPS = numpy.finfo(float).eps
+
+cdef inline double MAX(double a, double b) nogil:
     return a if a>b else b
 
-cdef inline double hypot2(double x, double y):
+cdef inline double SQR(double a) nogil:
+    return a*a
+
+cdef inline double hypot2(double x, double y) nogil:
     return sqrt(x*x+y*y)
 
 
+cdef double det(double a[3][3]) nogil:
+    '''Determinant of symmetrix matrix
+    '''
+    return (a[0][0]*a[1][1]*a[2][2] + 2*a[1][2]*a[0][2]*a[0][1] -
+            a[0][0]*a[1][2]*a[1][2] - a[1][1]*a[0][2]*a[0][2] -
+            a[2][2]*a[0][1]*a[0][1])
+
+cpdef double py_det(double[:,:] m):
+    '''Determinant of symmetrix matrix
+    '''
+    return det(<double(*)[3]>&m[0][0])
+
 # d,s are diagonal and off-diagonal elements of a symmetric 3x3 matrix
 # d:11,22,33; s:23,13,12
+# d:00,11,22; s:12,02,01
 
-cdef double det(cPoint d, cPoint s):
-    ''' determinant of symmetrix matrix '''
-    return d.x*d.y*d.z + 2*s.x*s.y*s.z - d.x*s.x*s.x - d.y*s.y*s.y - d.z*s.z*s.z
-
-cpdef double py_det(diag, side):
-    ''' determinant of symmetrix matrix '''
-    cdef cPoint d
-    d.x, d.y, d.z = diag
-    cdef cPoint s
-    s.x, s.y, s.z = side
-    return det(d, s)
-
-cdef cPoint get_eigenvalues(cPoint d, cPoint s):
-    ''' eigenvalues of symmetric matrix '''
-    cdef cPoint ret
-    cdef double m = (d.x+d.y+d.z)/3
-    cdef cPoint Kd = cPoint_sub(d, cPoint_new(m,m,m)) # M-m*eye(3);
-    cdef cPoint Ks = s
-    
-    cdef double q = det(Kd, Ks)/2
-    
+cdef void get_eigenvalues(double a[3][3], double *result) nogil:
+    '''Compute the eigenvalues of symmetric matrix a and return in
+    result array.
+    '''
+    cdef double m = (a[0][0]+ a[1][1]+a[2][2])/3.0
+    cdef double K[3][3]
+    memcpy(&K[0][0], &a[0][0], sizeof(double)*9)
+    K[0][0], K[1][1], K[2][2] = a[0][0] - m, a[1][1] - m, a[2][2] - m
+    cdef double q = det(K)*0.5
     cdef double p = 0
-    p += Kd.x*Kd.x + 2*Ks.x*Ks.x
-    p += Kd.y*Kd.y + 2*Ks.y*Ks.y
-    p += Kd.z*Kd.z + 2*Ks.z*Ks.z
+    p += K[0][0]*K[0][0] + 2*K[1][2]*K[1][2]
+    p += K[1][1]*K[1][1] + 2*K[0][2]*K[0][2]
+    p += K[2][2]*K[2][2] + 2*K[0][1]*K[0][1]
     p /= 6.0
-    cdef double pi = acos(-1.0)
+    cdef double pi = M_PI
     cdef double phi = 0.5*pi
+    cdef double tmp = p**3 - q**2
 
-    if q == 0 and p == 0:
+    if q == 0.0 and p == 0.0:
         # singular zero matrix
-        ret.x = ret.y = ret.z = m
-        return ret
-    elif fabs(q) >= fabs(p**(3.0/2)): # eliminate roundoff error
+        result[0] = result[1] = result[2] = m
+        return
+    elif tmp < 0.0 or fabs(tmp) < EPS: # eliminate roundoff error
         phi = 0
     else:
-        phi = atan2(sqrt(p**3 - q**2), q)/3.0
+        phi = atan2(sqrt(tmp), q)/3.0
     if phi == 0 and q < 0:
         phi = pi
 
-    ret.x = m + 2*sqrt(p)*cos(phi)
-    ret.y = m - sqrt(p)*(cos(phi) + sqrt(3)*sin(phi))
-    ret.z = m - sqrt(p)*(cos(phi) - sqrt(3)*sin(phi))
-    
-    return ret
+    result[0] = m + 2*sqrt(p)*cos(phi)
+    result[1] = m - sqrt(p)*(cos(phi) + sqrt(3)*sin(phi))
+    result[2] = m - sqrt(p)*(cos(phi) - sqrt(3)*sin(phi))
 
-cdef cPoint get_eigenvalues_trig(cPoint d, cPoint s):
-    ''' eigenvalues of symmetric non-singular matrix '''
-    cdef cPoint ret
-    # characteristic equation is: ax^3+bx^2+cx+d=0
-    cdef double A = 1.0
-    cdef double B = -(d.x+d.y+d.z)
-    cdef double C = d.x*d.y + d.x*d.z + d.y*d.z -s.x**2 - s.y**2 - s.z**2
-    cdef double D = d.x*s.x**2 + d.y*s.y**2 + d.z*s.z**2 - d.x*d.y*d.z - 2*s.x*s.y*s.z
-    print 'ABCD:', A, B, C, D
-
-    cdef double m = -B/3/A
-    cdef double p = ((3*C/A) - (B**2/A**2))/3
-    cdef double q = ((2*B**3/A**3) - (9*B*C/A**2) + (27*D/A))/27
-    
-    if p==0==q:
-        ret.x = ret.y = ret.z = m
-        return ret
-
-    cdef double z = q**2/4 + p**3/27
- 
-    cdef double u = 2*sqrt(-3/p)
-    cdef double k = acos(3*q*u/4/p)/3
-
-    cdef double pi = acos(-1.0)
-    
-    # Define Eig1, Eig2, Eig3
-    ret.x = m + u*cos(k)
-    ret.y = m + u*cos(k-2*pi/3)
-    ret.z = m + u*cos(k-4*pi/3)
-
-    return ret
-
-cpdef py_get_eigenvalues(diag, side):
-    ''' eigenvalues of symmetric matrix '''
-    cdef cPoint d
-    d.x, d.y, d.z = diag
-    cdef cPoint s
-    s.x, s.y, s.z = side
-    cdef cPoint ret = get_eigenvalues(d, s)
-    return ret.x, ret.y, ret.z
+cpdef py_get_eigenvalues(double[:,:] m):
+    '''Return the eigenvalues of symmetric matrix.
+    '''
+    res = numpy.empty(3, float)
+    cdef double[:] _res  = res
+    get_eigenvalues(<double(*)[3]>&m[0][0], &_res[0])
+    return res
 
 
-@cython.boundscheck(False)
-cdef cPoint get_eigenvector_np(cPoint d, cPoint s, double r):
-    ''' eigenvector of symmetric matrix for given eigenvalue `r` using numpy '''
-    cdef numpy.ndarray[ndim=2,dtype=numpy.float64_t] mat=empty((3,3)), evec
+##############################################################################
+cdef void get_eigenvector_np(double A[n][n], double r, double *res):
+    ''' eigenvector of symmetric matrix for given eigenvalue `r` using numpy
+    '''
+    cdef numpy.ndarray[ndim=2, dtype=numpy.float64_t] mat=numpy.empty((3,3)), evec
     cdef numpy.ndarray[ndim=1, dtype=numpy.float64_t] evals
-    mat[0,0] = d.x
-    mat[1,1] = d.y
-    mat[2,2] = d.z
-    mat[0,1] = mat[1,0] = s.z
-    mat[0,2] = mat[2,0] = s.y
-    mat[2,1] = mat[1,2] = s.x
+    cdef double[:,:] _mat = mat
+    cdef int i, j
+    for i in range(3):
+        for j in range(3):
+            _mat[i,j] = A[i][j]
     evals, evec = eigh(mat)
     cdef int idx=0
     cdef double di = fabs(evals[0]-r)
@@ -136,136 +106,121 @@ cdef cPoint get_eigenvector_np(cPoint d, cPoint s, double r):
         idx = 1
     if fabs(evals[2]-r) < di:
         idx = 2
-    cdef cPoint ret
-    ret.x = evec[idx,0]
-    ret.y = evec[idx,1]
-    ret.z = evec[idx,2]
-    return ret
+    for i in range(3):
+        res[i] = evec[idx,i]
 
-cdef cPoint get_eigenvector(cPoint d, cPoint s, double r):
+cdef void get_eigenvector(double A[n][n], double r, double *res):
     ''' get eigenvector of symmetric 3x3 matrix for given eigenvalue `r`
 
-    uses a fast method to get eigenvectors with a fallback to using numpy '''
-    cdef cPoint ret
-    ret.x = s.z*s.x - s.y*(d.y-r) # a_12 * a_23 - a_13 * (a_22 - r)
-    ret.y = s.z*s.y - s.x*(d.x-r) # a_12 * a_13 - a_23 * (a_11 - r)
-    ret.z = (d.x-r)*(d.y-r) - s.z*s.z # (a_11 - r) * (a_22 - r) - a_12^2
-    cdef double norm = cPoint_length(ret)
-    
+    uses a fast method to get eigenvectors with a fallback to using numpy
+    '''
+    res[0] = A[0][1]*A[1][2] - A[0][2]*(A[1][1]-r) # a_01 * a_12 - a_02 * (a_11 - r)
+    res[1] = A[0][1]*A[0][2] - A[1][2]*(A[0][0]-r) # a_01 * a_02 - a_12 * (a_00 - r)
+    res[2] = (A[0][0]-r)*(A[1][1]-r) - A[0][1]*A[0][1] # (a_00 - r) * (a_11 - r) - a_01^2
+    cdef double norm = sqrt(SQR(res[0]) + SQR(res[1]) + SQR(res[2]))
+
     if norm *1e7 <= fabs(r):
         # its a zero, let numpy get the answer
-        return get_eigenvector_np(d, s, r)
-        
-    return cPoint_scale(ret, 1.0/norm)
+        get_eigenvector_np(A, r, res)
+    else:
+        res[0] /= norm
+        res[1] /= norm
+        res[2] /= norm
 
-cpdef py_get_eigenvector(diag, side, double r):
+cpdef py_get_eigenvector(double[:,:] A, double r):
     ''' get eigenvector of a symmetric matrix for given eigenvalue `r` '''
-    cdef cPoint d
-    d.x, d.y, d.z = diag
-    cdef cPoint s
-    s.x, s.y, s.z = side
-    cdef cPoint ret = get_eigenvector(d, s, r)
-    return ret.x, ret.y, ret.z
+    d = numpy.empty(3, dtype=float)
+    cdef double[:] _d = d
+    get_eigenvector(<double(*)[n]>&A[0,0], r, &_d[0])
+    return d
 
-cdef cPoint get_eigenvalvec_np(cPoint d, cPoint s, double * R):
-    ''' get eigenvector/eigenvalues using numpy (slow) '''
-    cdef int i,j
-    cdef numpy.ndarray[ndim=2,dtype=numpy.float64_t] mat=empty((3,3)), evec
-    cdef numpy.ndarray[ndim=1, dtype=numpy.float64_t] evals
-
-    mat[0,0] = d.x
-    mat[1,1] = d.y
-    mat[2,2] = d.z
-    mat[0,1] = mat[1,0] = s.z
-    mat[0,2] = mat[2,0] = s.y
-    mat[2,1] = mat[1,2] = s.x
-    try:
-        evals, evec = eigh(mat)
-    except numpy.linalg.linalg.LinAlgError, e:
-        print mat
-        raise
-
+cdef void get_eigenvec_from_val(double A[n][n], double *R, double *e):
+    cdef int i, j
+    cdef double res[3]
     for i in range(3):
+        tmp = get_eigenvector(A, e[i], &res[0])
         for j in range(3):
-            R[i*3+j] = evec[i,j]
+            R[j*3+i] = res[j]
 
-    cdef cPoint ret
-    ret.x = evals[0]
-    ret.y = evals[1]
-    ret.z = evals[2]
-    return ret
 
-cdef cPoint get_eigenvalvec(cPoint d, cPoint s, double * R):
-    ''' get the eigenvalues and eigenvectors of symm 3x3 matrix
+cdef bint _nearly_diagonal(double A[n][n]) nogil:
+    return (
+        (SQR(A[0][0]) + SQR(A[1][1]) + SQR(A[2][2])) >
+        1e8*(SQR(A[0][1]) + SQR(A[0][2]) + SQR(A[1][2]))
+    )
 
-    d,s are diagonal/off-diagonal elements
-    R is output eigenmatrix, eigenvalues are returned
+cdef void get_eigenvalvec(double A[n][n], double *R, double *e):
+    '''Get the eigenvalues and eigenvectors of symmetric 3x3 matrix.
+
+    A is the input 3x3 matrix.
+    R is the output eigen matrix
+    e are the output eigenvalues
     '''
-    cdef cPoint ret, tmp
     cdef bint use_iter = False
     cdef int i,j
-    if s.x==s.y==s.z==0:
-        # diagonal matrix
-        ret = d
+    if A[0][1] == A[0][2] == A[1][2] == 0.0:
+        # diagonal matrix.
+        e[0] = A[0][0]
+        e[1] = A[1][1]
+        e[2] = A[2][2]
         for i in range(3):
             for j in range(3):
                 R[i*3+j] = (i==j)
-        return ret
+        return
+
     # FIXME: implement fast version
-    ret = get_eigenvalues(d,s)
-    if ret.x!=ret.y and ret.y!=ret.z and ret.x!=ret.z:
-        # repeated eigenvalues
+    get_eigenvalues(A, e)
+    if e[0] != e[1] and e[1] != e[2] and e[0] != e[2]:
+        # no repeated eigenvalues
         use_iter = True
-    if cPoint_norm(d) > 1e8*cPoint_norm(s):
+    if _nearly_diagonal(A):
         # nearly diagonal matrix
         use_iter = True
     if not use_iter:
-        for i in range(3):
-            tmp = get_eigenvector(d, s, (&ret.x)[i])
-            for j in range(3):
-                R[j*3+i] = (&tmp.x)[j]
-        return ret
+        get_eigenvec_from_val(A, R, e)
     else:
-        return get_eigenvalvec_iter(d, s, R)
+        eigen_decomposition(
+            A, <double(*)[n]>&R[0], &e[0]
+        )
 
-def py_get_eigenvalvec(d, s):
-    cdef double vec[3][3]
-    cdef Point dp = Point(*d)
-    cdef Point ds = Point(*s)
-    cdef cPoint r = get_eigenvalvec(dp.data, ds.data, &vec[0][0])
-    cdef ret = numpy.empty((3,3))
-    for i in range(3):
-        for j in range(3):
-            ret[i][j] = vec[i][j]
-    return (r.x,r.y,r.z), ret
+def py_get_eigenvalvec(double[:,:] A):
+    v = numpy.empty((3,3), dtype=float)
+    d = numpy.empty(3, dtype=float)
+    cdef double[:,:] _v = v
+    cdef double[:] _d = d
+    get_eigenvalvec(<double(*)[n]>&A[0,0], &_v[0,0], &_d[0])
+    return d, v
 
-cdef void transform(double A[3][3], double P[3][3], double res[3][3]):
-    ''' compute the transformation P.T*A*P and add it into result '''
+
+##############################################################################
+
+cdef void transform(double A[3][3], double P[3][3], double res[3][3]) nogil:
+    '''Compute the transformation P.T*A*P and add it into res.
+    '''
     cdef int i, j, k, l
     for i in range(3):
         for j in range(3):
-            #res[i][j] = 0
             for k in range(3):
                 for l in range(3):
                     res[i][j] += P[k][i]*A[k][l]*P[l][j] # P.T*A*P
 
-cdef void transform2(cPoint A, double P[3][3], double res[3][3]):
-    ''' compute the transformation P.T*A*P and add it into result
-    
-    A is diagonal '''
+cdef void transform_diag(double *A, double P[3][3],
+                         double res[3][3]) nogil:
+    '''Compute the transformation P.T*A*P and add it into res.
+
+    A is diagonal and contains the diagonal entries alone.
+    '''
     cdef int i, j, k
     for i in range(3):
         for j in range(3):
-            #res[i][j] = 0
             for k in range(3):
-                # l = k
-                #for l in range(3):
-                res[i][j] += P[k][i]*(&A.x)[k]*P[k][j] # P.T*A*P
+                res[i][j] += P[k][i]*A[k]*P[k][j] # P.T*A*P
 
-cdef void transform2inv(cPoint A, double P[3][3], double res[3][3]):
-    ''' compute the transformation P*A*P.T and add it into result
-    
-    A is diagonal '''
+cdef void transform_diag_inv(double *A, double P[3][3],
+                             double res[3][3]) nogil:
+    '''Compute the transformation P*A*P.T and set it into res.
+    A is diagonal and contains just the diagonal entries.
+    '''
     cdef int i, j, k
     for i in range(3):
         for j in range(3):
@@ -273,55 +228,49 @@ cdef void transform2inv(cPoint A, double P[3][3], double res[3][3]):
 
     for i in range(3):
         for j in range(3):
-            #res[i][j] = 0
             for k in range(3):
-                # l = k
-                #for l in range(3):
-                res[i][j] += P[i][k]*(&A.x)[k]*P[j][k] # P.T*A*P
+                res[i][j] += P[i][k]*A[k]*P[j][k] # P*A*P.T
 
-def py_transform2(A, P):
-    cdef double res[3][3]
-    cdef double cP[3][3]
-    for i in range(3):
-        for j in range(3):
-            res[i][j] = 0
-            cP[i][j] = P[i][j]
-    cdef Point cA = Point(*A)
-    
-    transform2(cA.data, cP, res)
-    ret = empty((3,3))
-    for i in range(3):
-        for j in range(3):
-            ret[i][j] = res[i][j]
-    return ret
+def py_transform(double[:,:] A, double[:,:] P):
+    res = numpy.zeros((3,3), dtype=float)
+    cdef double[:,:] _res = res
+    transform(
+        <double(*)[3]>&A[0][0], <double(*)[3]>&P[0][0],
+        <double(*)[3]>&_res[0][0]
+    )
+    return res
 
-def py_transform2inv(A, P):
-    cdef double res[3][3]
-    cdef double cP[3][3]
-    for i in range(3):
-        for j in range(3):
-            res[i][j] = 0
-            cP[i][j] = P[i][j]
-    cdef Point cA = Point(*A)
-    
-    transform2inv(cA.data, cP, res)
-    ret = empty((3,3))
-    for i in range(3):
-        for j in range(3):
-            ret[i][j] = res[i][j]
-    return ret
+def py_transform_diag(double[:] A, double[:,:] P):
+    res = numpy.zeros((3,3), dtype=float)
+    cdef double[:,:] _res = res
+    transform_diag(
+        &A[0], <double(*)[3]>&P[0][0], <double(*)[3]>&_res[0][0]
+    )
+    return res
+
+def py_transform_diag_inv(double[:] A, double[:,:] P):
+    res = numpy.empty((3,3), dtype=float)
+    cdef double[:,:] _res = res
+    transform_diag_inv(
+        &A[0], <double(*)[3]>&P[0][0], <double(*)[3]>&_res[0][0]
+    )
+    return res
 
 
+cdef double * tred2(double V[n][n], double *d, double *e) nogil:
+    '''Symmetric Householder reduction to tridiagonal form
 
+    This is derived from the Algol procedures tred2 by
+    Bowdler, Martin, Reinsch, and Wilkinson, Handbook for
+    Auto. Comp., Vol.ii-Linear Algebra, and the corresponding
+    Fortran subroutine in EISPACK.
 
+    d contains the diagonal elements of the tridiagonal matrix.
 
-cdef double * tred2(double V[n][n], double * d, double e[n]):
-    ''' Symmetric Householder reduction to tridiagonal form '''
+    e contains the subdiagonal elements of the tridiagonal matrix in its
+    last n-1 positions.  e[0] is set to zero.
+    '''
 
-    #  This is derived from the Algol procedures tred2 by
-    #  Bowdler, Martin, Reinsch, and Wilkinson, Handbook for
-    #  Auto. Comp., Vol.ii-Linear Algebra, and the corresponding
-    #  Fortran subroutine in EISPACK.
     cdef:
         double scale, f, g, h, hh
         int i, j, k
@@ -338,7 +287,7 @@ cdef double * tred2(double V[n][n], double * d, double e[n]):
         h = 0.0
         for k in range(i):
             scale += fabs(d[k])
-    
+
         if (scale == 0.0):
             e[i] = d[i-1]
             for j in range(i):
@@ -351,18 +300,17 @@ cdef double * tred2(double V[n][n], double * d, double e[n]):
             for k in range(i):
                 d[k] /= scale
                 h += d[k] * d[k]
-      
+
             f = d[i-1]
             g = sqrt(h)
             if f > 0:
                 g = -g
-      
+
             e[i] = scale * g
             h = h - f * g
             d[i-1] = f - g
             for j in range(i):
                 e[j] = 0.0
-      
 
         # Apply similarity transformation to remaining columns.
 
@@ -380,22 +328,21 @@ cdef double * tred2(double V[n][n], double * d, double e[n]):
             for j in range(i):
                 e[j] /= h
                 f += e[j] * d[j]
-      
+
             hh = f / (h + h)
             for j in range(i):
                 e[j] -= hh * d[j]
-      
+
             for j in range(i):
                 f = d[j]
                 g = e[j]
                 for k in range(j,i):
                     V[k][j] -= (f * e[k] + g * d[k])
-        
+
                 d[j] = V[i-1][j];
                 V[i][j] = 0.0;
-    
+
         d[i] = h
-  
 
     # Accumulate transformations.
 
@@ -406,38 +353,43 @@ cdef double * tred2(double V[n][n], double * d, double e[n]):
         if h != 0.0:
             for k in range(i+1):
                 d[k] = V[k][i+1] / h
-            
+
             for j in range(i+1):
                 g = 0.0
                 for k in range(i+1):
                     g += V[k][i+1] * V[k][j]
-            
+
                 for k in range(i+1):
                     V[k][j] -= g * d[k]
-    
-    
-    
+
+
         for k in range(i+1):
             V[k][i+1] = 0.0
-    
-    
+
     for j in range(n):
         d[j] = V[n-1][j]
         V[n-1][j] = 0.0
-    
+
     V[n-1][n-1] = 1.0
     e[0] = 0.0
 
     return d
 
 
-cdef void tql2(double V[n][n], double d[n], double e[n]):
-    ''' symmetric tridiagonal QL algo for eigendecomposition '''
+cdef void tql2(double V[n][n], double *d, double *e) nogil:
+    '''Symmetric tridiagonal QL algo for eigendecomposition
 
-    #  This is derived from the Algol procedures tql2, by
-    #  Bowdler, Martin, Reinsch, and Wilkinson, Handbook for
-    #  Auto. Comp., Vol.ii-Linear Algebra, and the corresponding
-    #  Fortran subroutine in EISPACK.
+    This is derived from the Algol procedures tql2, by
+    Bowdler, Martin, Reinsch, and Wilkinson, Handbook for
+    Auto. Comp., Vol.ii-Linear Algebra, and the corresponding
+    Fortran subroutine in EISPACK.
+
+    d contains the eigenvalues in ascending order.  if an error exit is
+    made, the eigenvalues are correct but unordered for indices
+    1,2,...,ierr-1.
+
+    e has been destroyed.
+    '''
 
     cdef:
         double f, tst1, eps, g, h, p, r, dl1, c, c2, c3, el1, s, s2
@@ -446,7 +398,7 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
 
     for i in range(n):
         e[i-1] = e[i]
-    
+
     e[n-1] = 0.0
 
     f = 0.0
@@ -455,19 +407,15 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
     for l in range(n):
 
         # Find small subdiagonal element
-
         tst1 = MAX(tst1,fabs(d[l]) + fabs(e[l]))
         m = l
         while m < n:
             if fabs(e[m]) <= eps*tst1:
                 break
-
             m += 1
-        
 
         # If m == l, d[l] is an eigenvalue,
         # otherwise, iterate.
-
         if m > l:
             iter = 0
             cont = True
@@ -475,24 +423,22 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
                 iter = iter + 1        # (Could check iteration count here.)
 
                 # Compute implicit shift
-
                 g = d[l]
                 p = (d[l+1] - g) / (2.0 * e[l])
                 r = hypot2(p,1.0)
                 if p < 0:
                     r = -r
-                
+
                 d[l] = e[l] / (p + r)
                 d[l+1] = e[l] * (p + r)
                 dl1 = d[l+1]
                 h = g - d[l]
                 for i in range(l+2,n):
                     d[i] -= h
-                
+
                 f += h
 
                 # Implicit QL transformation.
-
                 p = d[m]
                 c = 1.0
                 c2 = c
@@ -514,28 +460,21 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
                     d[i+1] = h + s * (c * g + s * d[i])
 
                     # Accumulate transformation
-
                     for k in range(n):
                         h = V[k][i+1]
                         V[k][i+1] = s * V[k][i] + c * h
                         V[k][i] = c * V[k][i] - s * h
-                    
-                
+
                 p = -s * s2 * c3 * el1 * e[l] / dl1
                 e[l] = s * p
                 d[l] = c * p
 
                 # Check for convergence
                 cont = bool(fabs(e[l]) > eps*tst1)
-
-            
-        
         d[l] += f
         e[l] = 0.0
-    
-        
-    # Sort eigenvalues and corresponding vectors.
 
+    # Sort eigenvalues and corresponding vectors.
     for i in range(n-1):
         k = i
         p = d[i]
@@ -543,8 +482,7 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
             if d[j] < p:
                 k = j
                 p = d[j]
-            
-        
+
         if k != i:
             d[k] = d[i]
             d[i] = p
@@ -552,69 +490,50 @@ cdef void tql2(double V[n][n], double d[n], double e[n]):
                 p = V[j][i]
                 V[j][i] = V[j][k]
                 V[j][k] = p
-            
- 
 
-cdef void eigen_decomposition(double A[n][n], double V[n][n], double d[n]):
-    ''' get eigenvalues and eigenvectors of matrix A
-    V is output eigenvectors and d is eigenvalue '''
+
+cdef void zero_matrix_case(double V[n][n], double *d) nogil:
+    cdef int i, j
+    for i in range(3):
+        d[i] = 0.0
+        for j in range(3):
+            V[i][j] = (i==j)
+
+cdef void eigen_decomposition(double A[n][n], double V[n][n], double *d) nogil:
+    '''Get eigenvalues and eigenvectors of matrix A.
+    V is output eigenvectors and d are the eigenvalues.
+    '''
     cdef double e[n]
     cdef int i, j
+    # Scale the matrix, as if the matrix is tiny, floating point errors
+    # creep up leading to zero division errors in tql2.  This is
+    # specifically tested for with a tiny matrix.
+    cdef double s = 0.0
     for i in range(n):
         for j in range(n):
             V[i][j] = A[i][j]
-    
-    d = tred2(V, d, e)
-    tql2(V, d, e)
+            s += fabs(V[i][j])
+
+    if s == 0:
+        zero_matrix_case(V, d)
+    else:
+        for i in range(n):
+            for j in range(n):
+                V[i][j] /= s
+
+        d = tred2(V, d, &e[0])
+        tql2(V, d, &e[0])
+        for i in range(n):
+            d[i] *= s
 
 
+def py_eigen_decompose_eispack(double[:,:] a):
+    v = numpy.empty((3,3), dtype=float)
+    d = numpy.empty(3, dtype=float)
+    cdef double[:,:] _v = v
+    cdef double[:] _d = d
+    eigen_decomposition(
+        <double(*)[n]>&a[0,0], <double(*)[n]>&_v[0,0], &_d[0]
+    )
+    return d, v
 
-
-cdef cPoint get_eigenvalvec_iter(cPoint d, cPoint s, double * R):
-    ''' get eigenvalues and eigenvectors using an iterative method
-    d, s are diagonal/off-diagonal elements
-    R is the output eigenvectors and the eigenvalues are returned as cPoint
-    '''
-    cdef cPoint ret
-    cdef double V[3][3]
-    cdef int i, j
-    for i in range(3):
-        V[i][i] = (&d.x)[i]
-        for j in range(i):
-            V[i][j] = V[j][i] = (&s.x)[3-i-j]
-
-    eigen_decomposition(V, <double(*)[n]>R, &ret.x)
-    return ret
-
-cpdef test_main():    
-    cdef double A[3][3]
-    cdef double d[3]
-    print "Diagonals:"
-    for i in range(3):
-        A[i][i] = 1
-    
-    print "Off-diagonals:"
-    for p in range(3):
-        A[p==0][2-(p==2)] = (p==0)*1e-2
-        A[2-(p==2)][p==0] = A[p==0][2-(p==2)]
-
-    for i in range(3):
-        for j in range(3):
-            print A[i][j], "\t",
-        print
-    print
-
-    cdef double V[3][3]
-    eigen_decomposition(A, V, d)
-    print "Eigenvalues:\n"
-    for i in range(3):
-        print d[i], "\t",
-    
-    print "\n\nEigenvectors:"
-    for i in range(3):
-        for j in range(3):
-            print V[i][j], "\t",
-        
-        print
-    
-    print
