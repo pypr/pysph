@@ -138,7 +138,7 @@ cdef void get_eigenvec_from_val(double A[n][n], double *R, double *e):
     cdef int i, j
     cdef double res[3]
     for i in range(3):
-        tmp = get_eigenvector(A, e[i], &res[0])
+        get_eigenvector(A, e[i], &res[0])
         for j in range(3):
             R[j*3+i] = res[j]
 
@@ -536,4 +536,3 @@ def py_eigen_decompose_eispack(double[:,:] a):
         <double(*)[n]>&a[0,0], <double(*)[n]>&_v[0,0], &_d[0]
     )
     return d, v
-
