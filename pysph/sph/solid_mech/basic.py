@@ -72,8 +72,8 @@ class MonaghanArtificialStress(Equation):
     def _cython_code_(self):
         code = dedent("""
         cimport cython
-        from pysph.sph.solid_mech.linalg cimport eigen_decomposition
-        from pysph.sph.solid_mech.linalg cimport transform_diag_inv
+        from pysph.base.linalg3 cimport eigen_decomposition
+        from pysph.base.linalg3 cimport transform_diag_inv
         """)
         return code
 

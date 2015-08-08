@@ -285,8 +285,8 @@ def get_basic_extensions():
 
         # Eigen decomposition code
         Extension(
-            name="pysph.sph.solid_mech.linalg",
-            sources=["pysph/sph/solid_mech/linalg.pyx"],
+            name="pysph.base.linalg3",
+            sources=["pysph/base/linalg3.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
             language="c++"

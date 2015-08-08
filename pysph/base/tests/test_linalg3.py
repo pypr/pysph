@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from pysph.sph.solid_mech import linalg
+from pysph.base import linalg3
 
 class TestLinalg3(unittest.TestCase):
 
@@ -63,7 +63,7 @@ class TestLinalg3(unittest.TestCase):
 
         # Then
         self.assertAlmostEqual(
-            linalg.py_det(a), np.linalg.det(a), places=14
+            linalg3.py_det(a), np.linalg.det(a), places=14
         )
 
     def test_eigen_values(self):
@@ -72,7 +72,7 @@ class TestLinalg3(unittest.TestCase):
 
         # When/Then
         for matrix, info in data:
-            result = linalg.py_get_eigenvalues(matrix)
+            result = linalg3.py_get_eigenvalues(matrix)
             result.sort()
             expected = np.linalg.eigvals(matrix)
             expected.sort()
@@ -83,7 +83,7 @@ class TestLinalg3(unittest.TestCase):
         a = self._get_test_matrix()
 
         # When
-        val, vec = linalg.py_eigen_decompose_eispack(a)
+        val, vec = linalg3.py_eigen_decompose_eispack(a)
         check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
 
         # Then.
@@ -95,7 +95,7 @@ class TestLinalg3(unittest.TestCase):
 
         # When/Then
         for matrix, info in data:
-            val, vec = linalg.py_eigen_decompose_eispack(matrix)
+            val, vec = linalg3.py_eigen_decompose_eispack(matrix)
             check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
 
             self.assertMatricesEqual(check, matrix, vec, info)
@@ -113,7 +113,7 @@ class TestLinalg3(unittest.TestCase):
         p = np.random.random((3,3))
 
         # When
-        res = linalg.py_transform(a, p)
+        res = linalg3.py_transform(a, p)
 
         # Then
         expected = np.dot(p.T, np.dot(a, p))
@@ -129,7 +129,7 @@ class TestLinalg3(unittest.TestCase):
         p = np.random.random((3,3))
 
         # When
-        res = linalg.py_transform_diag(a, p)
+        res = linalg3.py_transform_diag(a, p)
 
         # Then
         expected = np.dot(p.T, np.dot(np.diag(a), p))
@@ -145,7 +145,7 @@ class TestLinalg3(unittest.TestCase):
         p = np.random.random((3,3))
 
         # When
-        res = linalg.py_transform_diag_inv(a, p)
+        res = linalg3.py_transform_diag_inv(a, p)
 
         # Then
         expected = np.dot(p, np.dot(np.diag(a), p.T))
