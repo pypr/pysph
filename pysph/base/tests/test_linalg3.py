@@ -70,34 +70,37 @@ class TestLinalg3(unittest.TestCase):
         # Given
         data = self._get_test_matrices()
 
-        # When/Then
         for matrix, info in data:
+            # When
             result = linalg3.py_get_eigenvalues(matrix)
             result.sort()
+            # Then
             expected = np.linalg.eigvals(matrix)
             expected.sort()
             self.assertMatricesEqual(result, expected, matrix, info)
 
     def test_eigen_decompose_eispack(self):
         # Given
-        a = self._get_test_matrix()
+        data = self._get_test_matrices()
 
-        # When
-        val, vec = linalg3.py_eigen_decompose_eispack(a)
-        check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
+        for matrix, info in data:
+            # When
+            val, vec = linalg3.py_eigen_decompose_eispack(matrix)
 
-        # Then.
-        self.assertMatricesEqual(check, a, vec, 'random')
+            # Then
+            check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
+            self.assertMatricesEqual(check, matrix, vec, info)
 
-    def test_eigen_decompose_eispack_all(self):
+    def test_get_eigenvalvec(self):
         # Given
         data = self._get_test_matrices()
 
-        # When/Then
         for matrix, info in data:
-            val, vec = linalg3.py_eigen_decompose_eispack(matrix)
-            check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
+            # When
+            val, vec = linalg3.py_get_eigenvalvec(matrix)
 
+            # Then
+            check = np.dot(np.asarray(vec), np.dot(np.diag(val), np.asarray(vec).T))
             self.assertMatricesEqual(check, matrix, vec, info)
 
     ##################################################################################
