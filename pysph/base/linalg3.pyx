@@ -396,7 +396,7 @@ cdef void tql2(double V[n][n], double *d, double *e) nogil:
         int i, j, k, l, m, iter
         bint cont
 
-    for i in range(n):
+    for i in range(1, n):
         e[i-1] = e[i]
 
     e[n-1] = 0.0
