@@ -22,6 +22,10 @@
   sub-commands.  The ``pysph_viewer`` is now removed, use ``pysph view``
   instead.
 * Add a simple remeshing tool in ``pysph.solver.tools.SimpleRemesher``.
+* Cleanup the symmetric eigenvalue computing routines used for solid
+  mechanics problems and allow them to be used with OpenMP.
+* The viewer can now view the velocity magnitude (``vmag``) even if it
+  is not present in the data.
 
 1.0a2
 ------
