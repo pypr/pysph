@@ -46,6 +46,7 @@ def _scipy_integrate(y0, tf, dt):
 
 def _numpy_integrate(y0, tf, dt):
     t = 0.0
+    y = y0
     while t <= tf:
         t += dt
         y += dt*_derivative(y, t)
