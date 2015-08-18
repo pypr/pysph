@@ -15,7 +15,7 @@ HERE = os.path.dirname(__file__)
 
 def _exec_file(filename):
     ns = {'__name__':'__main__', '__file__': filename}
-    if sys.version_info.major > 2:
+    if sys.version_info[0] > 2:
         co = compile(open(filename, 'rb').read(), filename, 'exec')
         exec(co, ns)
     else:
@@ -63,7 +63,7 @@ def get_all_examples():
     return examples
 
 def get_input(prompt):
-    if sys.version_info.major > 2:
+    if sys.version_info[0] > 2:
         return input(prompt)
     else:
         return raw_input(prompt)
