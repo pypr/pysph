@@ -1141,6 +1141,7 @@ cdef class ParticleArray:
 
         result_array.align_particles()
         result_array.name = self.name
+        result_array.set_output_arrays(list(self.output_property_arrays))
         return result_array
 
     cpdef set_tag(self, long tag_value, LongArray indices):
@@ -1161,7 +1162,7 @@ cdef class ParticleArray:
         source : ParticleArray
             the particle array from where to copy.
         start_index : long
-            the first particle in self which maps to the 0th particle in 
+            the first particle in self which maps to the 0th particle in
             source
         end_index : long
             the index of first particle from start_index that
