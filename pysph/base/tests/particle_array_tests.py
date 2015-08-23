@@ -641,6 +641,7 @@ class ParticleArrayTest(unittest.TestCase):
     def test_extract_particles_extracts_particles_and_output_arrays(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1,2,3])
+        p.set_output_arrays(['x'])
 
         # When.
         n = p.extract_particles(indices=[1])
@@ -651,6 +652,21 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(n.x[0], 2.0)
         self.assertEqual(n.output_property_arrays, p.output_property_arrays)
 
+    def test_extract_particles_works_with_specific_props(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1,2,3], y=[0,0,0])
+        p.set_output_arrays(['x', 'y'])
+
+        # When.
+        n = p.extract_particles(indices=[1], props=['x'])
+
+        # Then.
+        self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(n.x), 1)
+        self.assertEqual(n.x[0], 2.0)
+        self.assertFalse('y' in n.properties)
+        self.assertEqual(sorted(p.output_property_arrays), sorted(['x', 'y']))
+        self.assertEqual(n.output_property_arrays, ['x'])
 
 class ParticleArrayUtils(unittest.TestCase):
     def test_that_get_particles_info_works(self):

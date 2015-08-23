@@ -1107,7 +1107,7 @@ cdef class ParticleArray:
             index_array.set_data(indices)
 
         cdef ParticleArray result_array = ParticleArray()
-        cdef list prop_names
+        cdef list prop_names, output_arrays
         cdef BaseArray dst_prop_array, src_prop_array
         cdef str prop_type, prop
 
@@ -1141,7 +1141,15 @@ cdef class ParticleArray:
 
         result_array.align_particles()
         result_array.name = self.name
-        result_array.set_output_arrays(list(self.output_property_arrays))
+        if props is None:
+            output_arrays = list(self.output_property_arrays)
+        else:
+            output_arrays = list(
+                set(props).intersection(
+                    self.output_property_arrays
+                )
+            )
+        result_array.set_output_arrays(output_arrays)
         return result_array
 
     cpdef set_tag(self, long tag_value, LongArray indices):
