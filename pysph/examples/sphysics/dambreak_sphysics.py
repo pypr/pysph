@@ -14,7 +14,7 @@ import os
 import numpy
 
 from pysph.sph.equation import Group
-from pysph.base.kernels import CubicSpline, Gaussian
+from pysph.base.kernels import CubicSpline
 from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
 from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
 
