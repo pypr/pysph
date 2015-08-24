@@ -1,11 +1,11 @@
-"""Taylor bar example with SPH.
+"""Taylor bar example with SPH. (5 minutes)
 """
 import numpy
 
 from pysph.sph.equation import Group
 
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic
+from pysph.base.kernels import WendlandQuintic
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import PECIntegrator
@@ -60,9 +60,9 @@ def get_plate_particles():
     ny = numpy.ones_like(x)
     nx = numpy.zeros_like(x)
     nz = numpy.zeros_like(x)
-
+    cs = numpy.ones_like(x)*ss
     pa = get_particle_array(name='plate', x=x, y=y, tx=tx, ty=ty, tz=tz,
-                            nx=nx, ny=ny, nz=nz)
+                            nx=nx, ny=ny, nz=nz, cs=cs)
     pa.m[:] = m0
 
     return pa
@@ -88,118 +88,112 @@ def get_bar_particles():
     pa.v[:]=-200
     return pa
 
-def create_particles(**kwargs):
-    bar = get_bar_particles()
-    plate = get_plate_particles()
+class TaylorBar(Application):
+    def create_particles(self):
+        bar = get_bar_particles()
+        plate = get_plate_particles()
 
-    # add requisite properties
+        # add requisite properties
 
-    # velocity gradient for the bar
-    for name in ('v00', 'v01', 'v10', 'v11'):
-        bar.add_property(name)
+        # velocity gradient for the bar
+        for name in ('v00', 'v01', 'v10', 'v11'):
+            bar.add_property(name)
 
-    # deviatoric stress components
-    for name in ('s00', 's01', 's02', 's11', 's12', 's22'):
-        bar.add_property(name)
+        # deviatoric stress components
+        for name in ('s00', 's01', 's02', 's11', 's12', 's22'):
+            bar.add_property(name)
 
-    # deviatoric stress accelerations
-    for name in ('as00', 'as01', 'as02', 'as11', 'as12', 'as22'):
-        bar.add_property(name)
+        # deviatoric stress accelerations
+        for name in ('as00', 'as01', 'as02', 'as11', 'as12', 'as22'):
+            bar.add_property(name)
 
-    # deviatoric stress initial values
-    for name in ('s000', 's010', 's020', 's110', 's120', 's220'):
-        bar.add_property(name)
+        # deviatoric stress initial values
+        for name in ('s000', 's010', 's020', 's110', 's120', 's220'):
+            bar.add_property(name)
 
-    bar.add_property('e0')
+        bar.add_property('e0')
 
-    # artificial stress properties
-    for name in ('r00', 'r01', 'r11'):
-        bar.add_property(name)
+        # artificial stress properties
+        for name in ('r00', 'r01', 'r11'):
+            bar.add_property(name)
 
-    # standard acceleration variables and initial values.
-    for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae',
-                 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0'):
-        bar.add_property(name)
+        # standard acceleration variables and initial values.
+        for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae',
+                     'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0'):
+            bar.add_property(name)
 
-    return [bar, plate]
+        return [bar, plate]
 
-# create the Application
-app = Application()
+    def create_solver(self):
+        kernel = WendlandQuintic(dim=2)
+        self.wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
-# kernel
-kernel = WendlandQuintic(dim=2)
-wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
+        integrator = PECIntegrator(bar=SolidMechStep())
 
-# integrator
-integrator = PECIntegrator(bar=SolidMechStep())
+        solver = Solver(kernel=kernel, dim=2, integrator=integrator)
+        dt = 1e-9
+        tf = 2.5e-5
+        solver.set_time_step(dt)
+        solver.set_final_time(tf)
+        return solver
 
-# Create a solver
-solver = Solver(kernel=kernel, dim=2, integrator=integrator)
+    def create_equations(self):
+        equations = [
 
-# default parameters
-dt = 1e-9
-tf = 2.5e-5
-solver.set_time_step(dt)
-solver.set_final_time(tf)
+            # Properties computed set from the current state
+            Group(
+                equations=[
+                    # p
+                    MieGruneisenEOS(dest='bar', sources=None, r0=r0, c0=C, S=S),
 
-# add the equations
-equations = [
+                    # vi,j : requires properties v00, v01, v10, v11
+                    VelocityGradient2D(dest='bar', sources=['bar',]),
 
-    # Properties computed set from the current state
-    Group(
-        equations=[
-            # p
-            MieGruneisenEOS(dest='bar', sources=None, r0=r0, c0=C, S=S),
+                    # rij : requires properties s00, s01, s11
+                    VonMisesPlasticity2D(flow_stress=Yo, dest='bar',
+                                         sources=None),
+                    ],
+                ),
 
-            # vi,j : requires properties v00, v01, v10, v11
-            VelocityGradient2D(dest='bar', sources=['bar',]),
+            # Acceleration variables are now computed
+            Group(
+                equations=[
 
-            # rij : requires properties s00, s01, s11
-            VonMisesPlasticity2D(flow_stress=Yo, dest='bar',
-                                 sources=None),
-            ],
-        ),
+                    # arho
+                    ContinuityEquation(dest='bar', sources=['bar']),
 
-    # Acceleration variables are now computed
-    Group(
-        equations=[
+                    # au, av
+                    MomentumEquationWithStress2D(
+                        dest='bar', sources=['bar'], n=4, wdeltap=self.wdeltap),
 
-            # arho
-            ContinuityEquation(dest='bar', sources=['bar']),
+                    # au, av
+                    MonaghanArtificialViscosity(
+                        dest='bar', sources=['bar'], alpha=0.5, beta=0.5),
 
-            # au, av
-            MomentumEquationWithStress2D(
-                dest='bar', sources=['bar'], n=4, wdeltap=wdeltap),
+                    # au av
+                    MonaghanBoundaryForce(
+                        dest='bar', sources=['plate'], deltap=dx),
 
-            # au, av
-            MonaghanArtificialViscosity(
-                dest='bar', sources=['bar'], alpha=0.5, beta=0.5),
+                    # ae
+                    EnergyEquationWithStress2D(dest='bar', sources=['bar'],
+                                               alpha=0.5, beta=0.5, eta=0.01),
 
-            # au av
-            MonaghanBoundaryForce(
-                dest='bar', sources=['plate'], deltap=dx),
+                    # a_s00, a_s01, a_s11
+                    HookesDeviatoricStressRate2D(
+                        dest='bar', sources=None, shear_mod=G),
 
-            # ae
-            EnergyEquationWithStress2D(dest='bar', sources=['bar'],
-                                       alpha=0.5, beta=0.5, eta=0.01),
+                    # ax, ay, az
+                    XSPHCorrection(
+                        dest='bar', sources=['bar',], eps=0.5),
 
-            # a_s00, a_s01, a_s11
-            HookesDeviatoricStressRate2D(
-                dest='bar', sources=None, shear_mod=G),
+                    ]
 
-            # ax, ay, az
-            XSPHCorrection(
-                dest='bar', sources=['bar',], eps=0.5),
+                ) # End Acceleration Group
 
-            ]
+        ] # End Group list
+        return equations
 
-        ) # End Acceleration Group
 
-    ] # End Group list
-
-# Setup the application and solver.  This also generates the particles.
-app.setup(
-    solver=solver, equations=equations, particle_factory=create_particles)
-
-# run
-app.run()
+if __name__ == '__main__':
+    app = TaylorBar()
+    app.run()
