@@ -1,4 +1,4 @@
-"""Two-dimensional Shocktube problem.
+"""Two-dimensional Shocktube problem. (10 mins)
 
 The density is assumed to be uniform and the shocktube problem is
 defined by the pressure jump. The pressure jump of 10^5 (pl = 1000.0,
@@ -9,7 +9,6 @@ blastwave problem.
 
 # NumPy and standard library imports
 import numpy
-from numpy import sin, cos, pi
 
 # PySPH base and carray imports
 from pysph.base.nnps import DomainManager
@@ -51,160 +50,168 @@ beta = 2.0
 kernel_factor = 1.2
 h0 = kernel_factor*dx
 
-# The SPH kernel
-kernel = Gaussian(dim=dim)
 
-def create_particles(**kwargs):
-    global dx
-    data = ud.uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax)
-    
-    x = data[0]; y = data[1]
-    dx = data[2]; dy = data[3]
+class ShockTube2D(Application):
+    def add_user_options(self, group):
+        choices = ['gsph', 'mpm']
+        group.add_option(
+            "--adaptive-h", action="store", dest="scheme", default='mpm',
+            type="choice", choices=choices,
+            help="Specify scheme for adaptive smoothing lengths %s"%choices
+        )
 
-    # volume estimate
-    volume = dx*dy
+    def create_domain(self):
+        return DomainManager(
+            xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+            periodic_in_x=True, periodic_in_y=True)
 
-    # indices on either side of the initial discontinuity
-    right_indices = numpy.where( x > 0.0 )[0]
+    def create_particles(self):
+        global dx
+        data = ud.uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax)
 
-    # density is uniform
-    rho = numpy.ones_like(x)
-    
-    # pl = 100.0, pr = 0.1
-    p = numpy.ones_like(x) * 1000.0
-    p[right_indices] = 0.01
-    
-    # const h and mass
-    h = numpy.ones_like(x) * h0
-    m = numpy.ones_like(x) * volume * rho
+        x = data[0]; y = data[1]
+        dx = data[2]; dy = data[3]
 
-    # thermal energy from the ideal gas EOS
-    e = p/(gamma1*rho)
-    
-    fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
+        # volume estimate
+        volume = dx*dy
 
-    print("2D Shocktube with %d particles"%(fluid.get_number_of_particles()))
+        # indices on either side of the initial discontinuity
+        right_indices = numpy.where( x > 0.0 )[0]
 
-    return [fluid,]
+        # density is uniform
+        rho = numpy.ones_like(x)
 
-# Create the application.
-domain = DomainManager(
-    xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, 
-    periodic_in_x=True, periodic_in_y=True)
+        # pl = 100.0, pr = 0.1
+        p = numpy.ones_like(x) * 1000.0
+        p[right_indices] = 0.01
 
-app = Application(domain=domain)
+        # const h and mass
+        h = numpy.ones_like(x) * h0
+        m = numpy.ones_like(x) * volume * rho
 
-# Create the Integrator.
-integrator = PECIntegrator(fluid=GasDFluidStep())
+        # thermal energy from the ideal gas EOS
+        e = p/(gamma1*rho)
 
-# Create the soliver
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
+        fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m, h0=h.copy())
 
+        print("2D Shocktube with %d particles"%(fluid.get_number_of_particles()))
 
-# SPH equations using the Newton-Raphson iterations to determine the
-# consistent smoothing length with the density.
-equations_density_iterations = [
+        return [fluid,]
 
-    ################ BEGIN ADAPTIVE DENSITY-H ###################
-    # For the Newton-Raphson, iterative solution for the
-    # density-smoothing length relation, we place the SummationDensity
-    # Equation in a Group with the iterate argumnet set to True. After
-    # this Group, the density and the consitent smoothing length is
-    # available for the particles.
-    Group(
-        equations=[
-            SummationDensity(dest='fluid', sources=['fluid',], 
-                             k=kernel_factor, density_iterations=True, dim=dim, htol=1e-3),
-            ], update_nnps=True, iterate=True, max_iterations=50,
-        ),
-    ################ END ADAPTIVE DENSITY-H ###################
+    def create_solver(self):
+        kernel = Gaussian(dim=dim)
+        integrator = PECIntegrator(fluid=GasDFluidStep())
 
-    # The equation of state is also done now to update the particle
-    # pressure and sound speeds.
-    Group(
-        equations=[
-            IdealGasEOS(dest='fluid', sources=None, gamma=gamma),
-            ], update_nnps=False
-        ),
+        solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
+                        dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
+        return solver
 
-    # Now that we have the density, pressure and sound speeds, we can
-    # do the main acceleratio block.
-    Group(
-        equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
-            ], update_nnps=False
-        ),
-    ]
+    def create_equations(self):
 
-# SPH equations using the GSPH form of adaptive smoothing lengths,
-# using a pilot density
-equations_pilot_density_adaptive_h = [
+        # SPH equations using the Newton-Raphson iterations to determine the
+        # consistent smoothing length with the density.
+        equations_density_iterations = [
 
-    ################ BEGIN ADAPTIVE DENSITY-H ###################
-    #For the GSPH density and smoothing length update algorithm, we
-    #first scale the smoothing lengths to get the pilot density
-    #estimate. Since the particle smoothing lengths are updated, we
-    #need to re-compute the neighbors.  
-    
-    Group( equations=[
-           ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0), ],
-          update_nnps=True ),
+            ################ BEGIN ADAPTIVE DENSITY-H ###################
+            # For the Newton-Raphson, iterative solution for the
+            # density-smoothing length relation, we place the SummationDensity
+            # Equation in a Group with the iterate argumnet set to True. After
+            # this Group, the density and the consitent smoothing length is
+            # available for the particles.
+            Group(
+                equations=[
+                    SummationDensity(dest='fluid', sources=['fluid',], 
+                                     k=kernel_factor, density_iterations=True, dim=dim, htol=1e-3),
+                    ], update_nnps=True, iterate=True, max_iterations=50,
+                ),
+            ################ END ADAPTIVE DENSITY-H ###################
 
-    #Given the new smoothing lengths and (possibly) new neighbors, we
-    #compute the pilot density.
+            # The equation of state is also done now to update the particle
+            # pressure and sound speeds.
+            Group(
+                equations=[
+                    IdealGasEOS(dest='fluid', sources=None, gamma=gamma),
+                    ], update_nnps=False
+                ),
 
-    Group(
-       equations=[
-           SummationDensity(dest='fluid', sources=['fluid',]),
-           ], update_nnps=False
-       ),
+            # Now that we have the density, pressure and sound speeds, we can
+            # do the main acceleratio block.
+            Group(
+                equations=[
+                    MPMAccelerations(dest='fluid', sources=['fluid',],
+                                      alpha1_min=alpha1, alpha2_min=alpha2, beta=beta)
+                    ], update_nnps=False
+                ),
+            ]
 
-    # Once the pilot density has been computed, we can update the
-    # smoothing length from the new estimate of particle volume. Once
-    # again, the NNPS must be updated to reflect the updated smoothing
-    # lengths
+        # SPH equations using the GSPH form of adaptive smoothing lengths,
+        # using a pilot density
+        equations_pilot_density_adaptive_h = [
 
-    Group(
-        equations=[
-            UpdateSmoothingLengthFromVolume(
-                dest='fluid', sources=None, k=kernel_factor, dim=dim),
-            ], update_nnps=True
-        ),    
+            ################ BEGIN ADAPTIVE DENSITY-H ###################
+            #For the GSPH density and smoothing length update algorithm, we
+            #first scale the smoothing lengths to get the pilot density
+            #estimate. Since the particle smoothing lengths are updated, we
+            #need to re-compute the neighbors.  
+            
+            Group( equations=[
+                   ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0), ],
+                  update_nnps=True ),
 
-    #Now that we have the correct smoothing length, we need to
-    #evaluate the density which will be used in the
-    #accelerations.
+            #Given the new smoothing lengths and (possibly) new neighbors, we
+            #compute the pilot density.
 
-    Group(
-       equations=[
-           SummationDensity(dest='fluid', sources=['fluid',]),
-           ], update_nnps=False
-       ),
-    ################ END ADAPTIVE DENSITY-H ###################
+            Group(
+               equations=[
+                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   ], update_nnps=False
+               ),
 
-    # The equation of state is also done now to update the particle
-    # pressure and sound speeds.
-    Group(
-        equations=[
-            IdealGasEOS(dest='fluid', sources=None, gamma=gamma),
-            ], update_nnps=False
-        ),
+            # Once the pilot density has been computed, we can update the
+            # smoothing length from the new estimate of particle volume. Once
+            # again, the NNPS must be updated to reflect the updated smoothing
+            # lengths
 
-    # Now that we have the density, pressure and sound speeds, we can
-    # do the main acceleratio block.
-    Group(
-        equations=[
-            MPMAccelerations(dest='fluid', sources=['fluid',],
-                              alpha1=alpha1, alpha2=alpha2, beta=beta)
-            ], update_nnps=False
-        ),
-    ]
+            Group(
+                equations=[
+                    UpdateSmoothingLengthFromVolume(
+                        dest='fluid', sources=None, k=kernel_factor, dim=dim),
+                    ], update_nnps=True
+                ),    
 
-# Setup the application and solver.
-app.setup(solver=solver, equations=equations_density_iterations,
-          particle_factory=create_particles)
+            #Now that we have the correct smoothing length, we need to
+            #evaluate the density which will be used in the
+            #accelerations.
 
-# run the solver
-app.run()
+            Group(
+               equations=[
+                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   ], update_nnps=False
+               ),
+            ################ END ADAPTIVE DENSITY-H ###################
+
+            # The equation of state is also done now to update the particle
+            # pressure and sound speeds.
+            Group(
+                equations=[
+                    IdealGasEOS(dest='fluid', sources=None, gamma=gamma),
+                    ], update_nnps=False
+                ),
+
+            # Now that we have the density, pressure and sound speeds, we can
+            # do the main acceleratio block.
+            Group(
+                equations=[
+                    MPMAccelerations(dest='fluid', sources=['fluid',],
+                                      alpha1_min=alpha1, alpha2_min=alpha2, beta=beta)
+                    ], update_nnps=False
+                ),
+        ]
+        if self.options.scheme == "mpm":
+            return equations_density_iterations
+        else:
+            return equations_pilot_density_adaptive_h
+
+if __name__ == '__main__':
+    app = ShockTube2D()
+    app.run()
