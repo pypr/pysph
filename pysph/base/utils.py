@@ -62,7 +62,7 @@ def get_particle_array(additional_props=None, constants=None, **props):
     >>> x = linspace(0,1,10)
     >>> pa = get_particle_array(name='fluid', x=x)
     >>> pa.properties.keys()
-    ['x', 'z', 'rho', 'pid', 'v', 'tag', 'm', 'p', 'gid', 'au', 
+    ['x', 'z', 'rho', 'pid', 'v', 'tag', 'm', 'p', 'gid', 'au',
      'aw', 'av', 'y', 'u', 'w', 'h']
     >>> pa1 = get_particle_array(name='fluid', additional_props=['xx', 'yy'])
 
@@ -430,8 +430,10 @@ def get_particles_info(particles):
 
     Returns
     -------
-    A dictionary containing the property information for a list of particles.
-    This dict can be used for example to set-up dummy/empty particle arrays.
+
+    An OrderedDict containing the property information for a list of
+    particles. This dict can be used for example to set-up dummy/empty
+    particle arrays.
 
     """
     info = OrderedDict()
