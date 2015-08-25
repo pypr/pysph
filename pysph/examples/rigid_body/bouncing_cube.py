@@ -89,4 +89,3 @@ class BouncingCube(Application):
 if __name__ == '__main__':
     app = BouncingCube()
     app.run()
-
