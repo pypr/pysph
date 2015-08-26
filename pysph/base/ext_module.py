@@ -201,11 +201,20 @@ class ExtModule(object):
                         extra_link_args=extra_link_args,
                         language="c++"
                     )
+
+                    if not hasattr(sys.stdout, 'errors'):
+                        # FIXME: This happens when nosetests replaces the
+                        # stdout with the a Tee instance.  This Tee instance
+                        # does not have errors which breaks the tests so we
+                        # disable verbose reporting.
+                        script_args = []
+                    else:
+                        script_args = ['--verbose']
                     try:
                         with CaptureMultipleStreams() as stream:
                             mod = pyxbuild.pyx_to_dll(self.src_path, extension,
                                 pyxbuild_dir=self.build_dir, force_rebuild=True,
-                                setup_args={'script_args': ['--verbose']}
+                                setup_args={'script_args': script_args}
                             )
                     except (CompileError, LinkError):
                         hline = "*"*80
