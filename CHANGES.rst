@@ -26,6 +26,8 @@
   mechanics problems and allow them to be used with OpenMP.
 * The viewer can now view the velocity magnitude (``vmag``) even if it
   is not present in the data.
+* Do not display unnecessary compiler warnings when there are no errors but
+  display verbose details when there is an error.
 
 1.0a2
 ------

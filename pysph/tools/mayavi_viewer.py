@@ -320,7 +320,14 @@ class ParticleArrayHelper(HasTraits):
             else:
                 vmag = numpy.sqrt(pa.u**2 + pa.v**2 + pa.w**2)
             pa.add_property(name='vmag', data=vmag)
-            pa.add_output_arrays(['vmag'])
+            if len(pa.output_property_arrays) > 0:
+                # We do not call add_output_arrays when the default is empty
+                # as if it is empty, all arrays are saved anyway. However,
+                # adding just vmag in this case will mean that when the
+                # particle array is saved it will only save vmag!  This is
+                # not what we want, hence we add vmag *only* if the
+                # output_property_arrays is non-zero length.
+                pa.add_output_arrays(['vmag'])
             self.updated = True
 
     def _get_scalar(self, pa, scalar):
