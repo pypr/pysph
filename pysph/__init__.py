@@ -1,5 +1,5 @@
 # See PEP 440 for more on suitable version numbers.
-__version__ = '1.0a3.dev0'
+__version__ = '1.0a3'
 
 # Utility functions to determine if Zoltan/MPI are available.
 _has_mpi = None
