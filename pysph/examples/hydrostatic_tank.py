@@ -1,4 +1,4 @@
-"""Hydrostatic tank example.
+"""Hydrostatic tank example. (2 minutes)
 
 This example is from (Section 6.0) of Adami et. al. JCP 231, 7057-7075.
 

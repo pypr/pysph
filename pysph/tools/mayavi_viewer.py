@@ -23,9 +23,9 @@ if not os.environ.get('ETS_TOOLKIT'):
     ETSConfig.toolkit = 'qt4'
 
 try:
-    from traits.api import (Array, Dict, HasTraits, Instance, on_trait_change,
+    from traits.api import (Any, Array, Dict, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Password, Property, cached_property)
+                            Directory, Event, Password, Property, cached_property)
     from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup, ShellEditor, VSplit)
     from mayavi.core.api import PipelineBase
@@ -34,9 +34,9 @@ try:
     from tvtk.api import tvtk
     from tvtk.array_handler import array2vtk
 except ImportError:
-    from enthought.traits.api import (Array, Dict, HasTraits, Instance, on_trait_change,
+    from enthought.traits.api import (Any, Array, Dict, HasTraits, Instance, on_trait_change,
                             List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Password, Property, cached_property)
+                            Directory, Event, Password, Property, cached_property)
     from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
                           TitleEditor, HGroup, ShellEditor, VSplit)
     from enthought.mayavi.core.api import PipelineBase
@@ -47,7 +47,7 @@ except ImportError:
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
-from pysph.solver.utils import load
+from pysph.solver.utils import load, dump
 from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
     Interpolator)
 
@@ -289,6 +289,13 @@ class ParticleArrayHelper(HasTraits):
     # Private attribute to store the Text module.
     _text = Instance(PipelineBase)
 
+    # Extra scalars to show.  These will be added and saved to the data if
+    # needed.
+    extra_scalars = List(Str)
+
+    # Set to True when the particle array is updated with a new property say.
+    updated = Event
+
     ########################################
     # View related code.
     view = View(Item(name='name',
@@ -305,9 +312,34 @@ class ParticleArrayHelper(HasTraits):
                       ),
                 )
 
-    ######################################################################
-    # Private interface.
-    ######################################################################
+    #######  Private protocol ############################################
+    def _add_vmag(self, pa):
+        if 'vmag' not in pa.properties:
+            if 'vmag2' in pa.properties:
+                vmag = numpy.sqrt(pa.vmag2)
+            else:
+                vmag = numpy.sqrt(pa.u**2 + pa.v**2 + pa.w**2)
+            pa.add_property(name='vmag', data=vmag)
+            if len(pa.output_property_arrays) > 0:
+                # We do not call add_output_arrays when the default is empty
+                # as if it is empty, all arrays are saved anyway. However,
+                # adding just vmag in this case will mean that when the
+                # particle array is saved it will only save vmag!  This is
+                # not what we want, hence we add vmag *only* if the
+                # output_property_arrays is non-zero length.
+                pa.add_output_arrays(['vmag'])
+            self.updated = True
+
+    def _get_scalar(self, pa, scalar):
+        """Return the requested scalar from the given particle array.
+        """
+        if scalar in self.extra_scalars:
+            method_name = '_add_' + scalar
+            method = getattr(self, method_name)
+            method(pa)
+        return getattr(pa, scalar)
+
+    #######  Traits handlers #############################################
     def _particle_array_changed(self, pa):
         self.name = pa.name
         # Setup the scalars.
@@ -315,7 +347,7 @@ class ParticleArrayHelper(HasTraits):
 
         # Update the plot.
         x, y, z = pa.x, pa.y, pa.z
-        s = getattr(pa, self.scalar)
+        s = self._get_scalar(pa, self.scalar)
         p = self.plot
         mlab = self.scene.mlab
         if p is None:
@@ -343,17 +375,23 @@ class ParticleArrayHelper(HasTraits):
     def _scalar_changed(self, value):
         p = self.plot
         if p is not None:
-            p.mlab_source.scalars = getattr(self.particle_array, value)
+            p.mlab_source.scalars = self._get_scalar(
+                self.particle_array, value
+            )
             p.module_manager.scalar_lut_manager.data_name = value
 
     def _show_hidden_arrays_changed(self, value):
         pa = self.particle_array
         sc_list = pa.properties.keys()
         if value:
-            self.scalar_list = sorted(sc_list)
+            self.scalar_list = sorted(set(sc_list + self.extra_scalars))
         else:
-            self.scalar_list = sorted([x for x in sc_list
-                                       if not x.startswith('_')])
+            self.scalar_list = sorted(
+                set(
+                    [x for x in sc_list if not x.startswith('_')] +
+                    self.extra_scalars
+                )
+            )
 
     def _show_time_changed(self, value):
         txt = self._text
@@ -376,11 +414,13 @@ class ParticleArrayHelper(HasTraits):
         if txt is not None:
             txt.text = 'Time = %.3e'%(value)
 
+    def _extra_scalars_default(self):
+        return ['vmag']
+
 
 class PythonShellView(HasTraits):
     ns = Dict()
     view = View(Item('ns', editor=ShellEditor(), show_label=False))
-
 
 
 ##############################################################################
@@ -452,6 +492,8 @@ class MayaviViewer(HasTraits):
     _count = Int(0)
     _frame_count = Int(0)
     _last_time = Float
+    _solver_data = Any
+    _file_name = Str
 
     ########################################
     # The layout of the dialog created
@@ -666,8 +708,10 @@ class MayaviViewer(HasTraits):
         else:
             self.pa_names = self.client.controller.get_particle_array_names()
 
-        self.particle_arrays = [ParticleArrayHelper(scene=self.scene, name=x) for x in
-                                self.pa_names]
+        self.particle_arrays = [
+            self._make_particle_array_helper(self.scene, x)
+            for x in self.pa_names
+        ]
         self.interpolator = InterpolatorView(scene=self.scene)
         # Turn on the legend for the first particle array.
         if len(self.particle_arrays) > 0:
@@ -730,11 +774,13 @@ class MayaviViewer(HasTraits):
 
     def _file_count_changed(self, value):
         fname = self.files[value]
+        self._file_name = fname
         self.current_file = os.path.basename(fname)
         # Code to read the file, create particle array and setup the helper.
         data = load(fname)
         solver_data = data["solver_data"]
         arrays = data["arrays"]
+        self._solver_data = solver_data
         self.current_time = t = float(solver_data['t'])
         self.time_step = float(solver_data['dt'])
         self.iteration = int(solver_data['count'])
@@ -747,8 +793,7 @@ class MayaviViewer(HasTraits):
             pas = []
             for name in names:
                 pa = arrays[name]
-                pah = ParticleArrayHelper(scene=self.scene,
-                                          name=name)
+                pah = self._make_particle_array_helper(self.scene, name)
                 # Must set this after setting the scene.
                 pah.set(particle_array=pa, time=t)
                 pas.append(pah)
@@ -823,6 +868,7 @@ class MayaviViewer(HasTraits):
 
     def _live_mode_changed(self, value):
         if value:
+            self._file_name = ''
             self.client = None
             self._clear()
             self._mark_reconnect()
@@ -831,6 +877,19 @@ class MayaviViewer(HasTraits):
             self.client = None
             self._clear()
             self.timer.Stop()
+
+    def _particle_array_helper_updated(self, value):
+        # Called when the particle array helper fires an updated event.
+        if self._file_name:
+            sd = self._solver_data
+            arrays = [x.particle_array for x in self.particle_arrays]
+            dump(self._file_name, arrays, sd)
+
+    def _make_particle_array_helper(self, scene, name):
+        pah = ParticleArrayHelper(scene=scene, name=name)
+        pah.on_trait_change(self._particle_array_helper_updated, 'updated')
+        return pah
+
 
 ######################################################################
 def usage():

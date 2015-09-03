@@ -24,7 +24,7 @@ with increasing complexity.
 
 The first example we consider is a "patch" test for SPH formulations for
 incompressible fluids in `elliptical_drop.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/elliptical_drop.py>`_.
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop.py>`_.
 This problem simulates the evolution of a 2D circular patch of fluid under the
 influence of an initial velocity field given by:
 
@@ -42,7 +42,7 @@ Imports
 ~~~~~~~~~~~~~
 
 Taking a look at the example (see `elliptical_drop.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/elliptical_drop.py>`_),
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop.py>`_),
 the first several lines are imports of various modules:
 
 .. code-block:: python
@@ -554,5 +554,5 @@ There are many others, please see the :py:class:`Application` class to see
 these.
 
 There are several `examples
-<https://bitbucket.org/pysph/pysph/src/master/pysph/pysph/examples/>`_ that
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/>`_ that
 ship with PySPH, explore these to get a better idea of what is possible.

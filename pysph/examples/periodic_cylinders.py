@@ -1,13 +1,10 @@
-"""Incompressible flow past a periodic array of cylinders.
+"""Incompressible flow past a periodic array of cylinders. (2 hours)
 """
-
-# PyZoltan imports
-from pyzoltan.core.carray import LongArray
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian, WendlandQuintic, CubicSpline, QuinticSpline
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -48,164 +45,166 @@ dt_force = 0.25 * np.sqrt(h0/abs(fx))
 tf = 20.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(**kwargs):
-    # create all the particles
-    _x = np.arange( dx/2, L, dx )
-    _y = np.arange( -ghost_extent, H+ghost_extent, dx )
-    x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
-    # sort out the fluid and the solid
-    indices = []
-    cx = 0.5 * L; cy = 0.5 * H
-    for i in range(x.size):
-        xi = x[i]; yi = y[i]
-        if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
-            if ( (yi > 0) and (yi < H) ):
-                indices.append(i)
+class PeriodicCylinders(Application):
 
-    # create the arrays
-    solid = get_particle_array(name='solid', x=x, y=y)
+    def create_domain(self):
+        # domain for periodicity
+        domain = DomainManager(xmin=0, xmax=L, periodic_in_x=True)
+        return domain
 
-    # remove the fluid particles from the solid
-    fluid = solid.extract_particles(indices); fluid.set_name('fluid')
-    solid.remove_particles(indices)
+    def create_particles(self):
+        # create all the particles
+        _x = np.arange( dx/2, L, dx )
+        _y = np.arange( -ghost_extent, H+ghost_extent, dx )
+        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
 
-    print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
-        Re, fluid.get_number_of_particles(),
-        solid.get_number_of_particles(), dt))
+        # sort out the fluid and the solid
+        indices = []
+        cx = 0.5 * L; cy = 0.5 * H
+        for i in range(x.size):
+            xi = x[i]; yi = y[i]
+            if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
+                if ( (yi > 0) and (yi < H) ):
+                    indices.append(i)
 
-    # add requisite properties to the arrays:
+        # create the arrays
+        solid = get_particle_array(name='solid', x=x, y=y)
 
-    # volume from number density for fluid and solid
-    fluid.add_property('V')
-    solid.add_property('V' )
+        # remove the fluid particles from the solid
+        fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+        solid.remove_particles(indices)
 
-    # extrapolated velocities for the solid
-    for name in ['uf', 'vf', 'wf']:
-        solid.add_property(name)
+        print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
+            Re, fluid.get_number_of_particles(),
+            solid.get_number_of_particles(), dt))
 
-    # advection velocities and accelerations for the fluid
-    for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat'):
-        fluid.add_property(name)
+        # add requisite properties to the arrays:
 
-    # kernel summation correction for the solid
-    solid.add_property('wij')
+        # volume from number density for fluid and solid
+        fluid.add_property('V')
+        solid.add_property('V' )
 
-    # dummy velocities for the solid walls
-    # required for the no-slip BC
-    for name in ['ug', 'vg', 'wg']:
-        solid.add_property(name)
+        # extrapolated velocities for the solid
+        for name in ['uf', 'vf', 'wf']:
+            solid.add_property(name)
 
-    # imposed accelerations on the solid
-    solid.add_property('ax')
-    solid.add_property('ay')
-    solid.add_property('az')
+        # advection velocities and accelerations for the fluid
+        for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat'):
+            fluid.add_property(name)
 
-    # magnitude of velocity
-    fluid.add_property('vmag2')
+        # kernel summation correction for the solid
+        solid.add_property('wij')
 
-    # setup the particle properties
-    volume = dx * dx
+        # dummy velocities for the solid walls
+        # required for the no-slip BC
+        for name in ['ug', 'vg', 'wg']:
+            solid.add_property(name)
 
-    # mass is set to get the reference density of rho0
-    fluid.m[:] = volume * rho0
-    solid.m[:] = volume * rho0
+        # imposed accelerations on the solid
+        solid.add_property('ax')
+        solid.add_property('ay')
+        solid.add_property('az')
 
-    # initial particle density
-    fluid.rho[:] = rho0
-    solid.rho[:] = rho0
+        # magnitude of velocity
+        fluid.add_property('vmag2')
+        fluid.add_output_arrays(['vmag2'])
 
-    # volume is set as dx^2. V is the number density form of the
-    # particle volume and will be computed in the equations for the
-    # fluid phase. The initial values are used for the solid phase
-    fluid.V[:] = 1./volume
-    solid.V[:] = 1./volume
+        # setup the particle properties
+        volume = dx * dx
 
-    # particle smoothing lengths
-    fluid.h[:] = hdx * dx
-    solid.h[:] = hdx * dx
+        # mass is set to get the reference density of rho0
+        fluid.m[:] = volume * rho0
+        solid.m[:] = volume * rho0
 
-    # return the particle list
-    return [fluid, solid]
+        # initial particle density
+        fluid.rho[:] = rho0
+        solid.rho[:] = rho0
 
-# domain for periodicity
-domain = DomainManager(
-    xmin=0, xmax=L, periodic_in_x=True)
+        # volume is set as dx^2. V is the number density form of the
+        # particle volume and will be computed in the equations for the
+        # fluid phase. The initial values are used for the solid phase
+        fluid.V[:] = 1./volume
+        solid.V[:] = 1./volume
 
-# Create the application.
-app = Application(domain=domain)
+        # particle smoothing lengths
+        fluid.h[:] = hdx * dx
+        solid.h[:] = hdx * dx
 
-# Create the kernel
-#kernel = Gaussian(dim=2)
-kernel = QuinticSpline(dim=2)
+        # return the particle list
+        return [fluid, solid]
 
-# The predictor corrector integrator for the TV formulation. As per
-# the paper, the integrator is defined for PEC mode with only one
-# function evaluation per time step.
-integrator = PECIntegrator(fluid=TransportVelocityStep())
+    def create_solver(self):
+        kernel = QuinticSpline(dim=2)
 
-# Create a solver. Damping is performed for 100 iterations.
-solver = Solver(
-    kernel=kernel, dim=2, integrator=integrator,
-    adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
+        # The predictor corrector integrator for the TV formulation. As per
+        # the paper, the integrator is defined for PEC mode with only one
+        # function evaluation per time step.
+        integrator = PECIntegrator(fluid=TransportVelocityStep())
 
-equations = [
+        # Create a solver. Damping is performed for 100 iterations.
+        solver = Solver(
+            kernel=kernel, dim=2, integrator=integrator,
+            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
+        return solver
 
-    # Summation density along with volume summation for the fluid
-    # phase. This is done for all local and remote particles. At the
-    # end of this group, the fluid phase has the correct density
-    # taking into consideration the fluid and solid
-    # particles.
-    Group(
-        equations=[
-            SummationDensity(dest='fluid', sources=['fluid','solid']),
-            ], real=False),
+    def create_equations(self):
+        equations = [
 
-    # Once the fluid density is computed, we can use the EOS to set
-    # the fluid pressure. Additionally, the dummy velocity for the
-    # channel is set, which is later used in the no-slip wall BC.
-    Group(
-        equations=[
-            StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-            SetWallVelocity(dest='solid', sources=['fluid']),
-            ], real=False),
-
-    # Once the pressure for the fluid phase has been updated, we can
-    # extrapolate the pressure to the ghost particles. After this
-    # group, the fluid density, pressure and the boundary pressure has
-    # been updated and can be used in the integration equations.
-    Group(
-        equations=[
-            SolidWallPressureBC(dest='solid', sources=['fluid'],
-                                gx=fx, b=1.0, rho0=rho0, p0=p0),
-            ], real=False),
-
-    # The main accelerations block. The acceleration arrays for the
-    # fluid phase are upadted in this stage for all local particles.
-    Group(
-        equations=[
-            # Pressure gradient terms
-            MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
-
-            # fluid viscosity
-            MomentumEquationViscosity(
-                dest='fluid', sources=['fluid'], nu=nu),
-
-            # No-slip boundary condition. This is effectively a
-            # viscous interaction of the fluid with the ghost
+            # Summation density along with volume summation for the fluid
+            # phase. This is done for all local and remote particles. At the
+            # end of this group, the fluid phase has the correct density
+            # taking into consideration the fluid and solid
             # particles.
-            SolidWallNoSlipBC(
-                dest='fluid', sources=['solid'], nu=nu),
+            Group(
+                equations=[
+                    SummationDensity(dest='fluid', sources=['fluid','solid']),
+                    ], real=False),
 
-            # Artificial stress for the fluid phase
-            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+            # Once the fluid density is computed, we can use the EOS to set
+            # the fluid pressure. Additionally, the dummy velocity for the
+            # channel is set, which is later used in the no-slip wall BC.
+            Group(
+                equations=[
+                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+                    SetWallVelocity(dest='solid', sources=['fluid']),
+                    ], real=False),
 
-            ], real=True),
-    ]
+            # Once the pressure for the fluid phase has been updated, we can
+            # extrapolate the pressure to the ghost particles. After this
+            # group, the fluid density, pressure and the boundary pressure has
+            # been updated and can be used in the integration equations.
+            Group(
+                equations=[
+                    SolidWallPressureBC(dest='solid', sources=['fluid'],
+                                        gx=fx, b=1.0, rho0=rho0, p0=p0),
+                    ], real=False),
 
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=equations,
-          particle_factory=create_particles)
+            # The main accelerations block. The acceleration arrays for the
+            # fluid phase are upadted in this stage for all local particles.
+            Group(
+                equations=[
+                    # Pressure gradient terms
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
 
-app.run()
+                    # fluid viscosity
+                    MomentumEquationViscosity(
+                        dest='fluid', sources=['fluid'], nu=nu),
+
+                    # No-slip boundary condition. This is effectively a
+                    # viscous interaction of the fluid with the ghost
+                    # particles.
+                    SolidWallNoSlipBC(
+                        dest='fluid', sources=['solid'], nu=nu),
+
+                    # Artificial stress for the fluid phase
+                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+
+                    ], real=True),
+        ]
+        return equations
+
+if __name__ == '__main__':
+    app = PeriodicCylinders()
+    app.run()

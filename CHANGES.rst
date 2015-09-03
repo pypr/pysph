@@ -1,9 +1,8 @@
 1.0a3
 ------
 
-* Release date: not yet released.
+* Release date: 18th August, 2015.
 * Fix bug with ``output_at_times`` specification for solver.
-* Don't import anything in ``pysph/__init__.py`` unless necessary.
 * Put generated sources and extensions into a platform specific directory in
   ``~/.pysph/sources/<platform-specific-dir>`` to avoid problems with multiple
   Python versions, operating systems etc.
@@ -22,6 +21,13 @@
   sub-commands.  The ``pysph_viewer`` is now removed, use ``pysph view``
   instead.
 * Add a simple remeshing tool in ``pysph.solver.tools.SimpleRemesher``.
+* Cleanup the symmetric eigenvalue computing routines used for solid
+  mechanics problems and allow them to be used with OpenMP.
+* The viewer can now view the velocity magnitude (``vmag``) even if it
+  is not present in the data.
+* Port all examples to use new ``Application`` API.
+* Do not display unnecessary compiler warnings when there are no errors but
+  display verbose details when there is an error.
 
 1.0a2
 ------

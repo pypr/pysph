@@ -1,10 +1,10 @@
-"""2D Kelvin Helmoltz Instability example using TVF.
+"""2D Kelvin Helmoltz Instability example using TVF. (1 hour)
 """
 import numpy
 
 # Particle generator
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian
+from pysph.base.kernels import WendlandQuintic
 
 # SPH Equations and Group
 from pysph.sph.equation import Group
@@ -71,226 +71,219 @@ dt_force = 1.0
 
 dt = 0.8 * min(dt_cfl, dt_viscous, dt_force)
 
-def create_particles(**kwargs):
-    ghost_extent = (nghost_layers + 0.5)*dx
+class KHITVF(Application):
+    def create_particles(self):
+        ghost_extent = (nghost_layers + 0.5)*dx
 
-    x, y = numpy.mgrid[ dxb2:domain_width:dx, -ghost_extent:domain_height+ghost_extent:dy ]
-    x = x.ravel(); y = y.ravel()
+        x, y = numpy.mgrid[ dxb2:domain_width:dx, -ghost_extent:domain_height+ghost_extent:dy ]
+        x = x.ravel(); y = y.ravel()
 
-    m = numpy.ones_like(x) * volume * rho0
-    rho = numpy.ones_like(x) * rho0
-    h = numpy.ones_like(x) * h0
-    cs = numpy.ones_like(x) * c0
+        m = numpy.ones_like(x) * volume * rho0
+        rho = numpy.ones_like(x) * rho0
+        h = numpy.ones_like(x) * h0
+        cs = numpy.ones_like(x) * c0
 
-    # additional properties required for the fluid.
-    additional_props = [
-        # volume inverse or number density
-        'V', 
+        # additional properties required for the fluid.
+        additional_props = [
+            # volume inverse or number density
+            'V',
 
-        # color and gradients
-        'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
-        
-        # discretized interface normals and dirac delta
-        'nx', 'ny', 'nz', 'ddelta',
+            # color and gradients
+            'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
 
-        # interface curvature
-        'kappa',
+            # discretized interface normals and dirac delta
+            'nx', 'ny', 'nz', 'ddelta',
 
-        # transport velocities
-        'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 
-        
-        # imposed accelerations on the solid wall
-        'ax', 'ay', 'az', 'wij', 
-       
-        # velocity of magnitude squared
-        'vmag2',
+            # interface curvature
+            'kappa',
 
-        # variable to indicate reliable normals and normalizing
-        # constant
-        'N', 'wij_sum',
-        
+            # transport velocities
+            'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat',
+
+            # imposed accelerations on the solid wall
+            'ax', 'ay', 'az', 'wij',
+
+            # velocity of magnitude squared
+            'vmag2',
+
+            # variable to indicate reliable normals and normalizing
+            # constant
+            'N', 'wij_sum',
+
+            ]
+
+        # get the fluid particle array
+        fluid = get_particle_array(
+            name='fluid', x=x, y=y, h=h, m=m, rho=rho, cs=cs,
+            additional_props=additional_props)
+
+        # set the fluid velocity with respect to the sinusoidal
+        # perturbation
+        fluid.u[:] = -U
+        mode = 1
+        for i in range(len(fluid.x)):
+            if fluid.y[i] > domain_height/2 + psi0*domain_height*numpy.sin(2*numpy.pi*fluid.x[i]/(mode*domain_width)):
+                fluid.u[i] = U
+                fluid.color[i] = 1
+                fluid.rho[i] = rho1
+                fluid.m[i] = volume*rho1
+            else:
+                fluid.rho[i] = rho2
+                fluid.m[i] = rho2/rho1*volume*rho2
+
+        # extract the top and bottom boundary particles
+        indices = numpy.where( fluid.y > domain_height )[0]
+        wall = fluid.extract_particles( indices )
+        fluid.remove_particles( indices )
+
+        indices = numpy.where( fluid.y < 0 )[0]
+        bottom = fluid.extract_particles( indices )
+        fluid.remove_particles( indices )
+
+        # concatenate the two boundaries
+        wall.append_parray( bottom )
+        wall.set_name( 'wall' )
+
+        # set the number density initially for all particles
+        fluid.V[:] = 1./volume
+        wall.V[:] = 1./volume
+
+        # set additional output arrays for the fluid
+        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
+                                 'kappa', 'N', 'p', 'rho'])
+
+        # extrapolated velocities for the wall
+        for name in ['uf', 'vf', 'wf']:
+            wall.add_property(name)
+
+        # dummy velocities for the wall
+        # required for the no-slip BC
+        for name in ['ug','vg','wg']:
+            wall.add_property(name)
+
+        print("2D KHI with %d fluid particles and %d wall particles"%(
+                fluid.get_number_of_particles(), wall.get_number_of_particles()))
+
+        return [fluid, wall]
+
+    def create_domain(self):
+        return DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
+                               periodic_in_x=True, periodic_in_y=False)
+
+    def create_solver(self):
+        kernel = WendlandQuintic(dim=2)
+        integrator = PECIntegrator( fluid=TransportVelocityStep() )
+        solver = Solver(
+            kernel=kernel, dim=dim, integrator=integrator,
+            dt=dt, tf=tf, adaptive_timestep=False)
+        return solver
+
+    def create_equations(self):
+        tvf_equations = [
+
+            # We first compute the mass and number density of the fluid
+            # phase. This is used in all force computations henceforth. The
+            # number density (1/volume) is explicitly set for the solid phase
+            # and this isn't modified for the simulation.
+            Group(equations=[
+                    SummationDensity( dest='fluid', sources=['fluid', 'wall'] )
+                    ] ),
+
+            # Given the updated number density for the fluid, we can update
+            # the fluid pressure. Additionally, we can extrapolate the fluid
+            # velocity to the wall for the no-slip boundary
+            # condition. Also compute the smoothed color based on the color
+            # index for a particle.
+            Group(equations=[
+                    StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+                    SetWallVelocity(dest='wall', sources=['fluid']),
+                    SmoothedColor( dest='fluid', sources=['fluid'] ),
+                    ] ),
+
+            #################################################################
+            # Begin Surface tension formulation
+            #################################################################
+            # Scale the smoothing lengths to determine the interface
+            # quantities. The NNPS need not be updated since the smoothing
+            # length is decreased.
+            Group(equations=[
+                    ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
+                    ], update_nnps=False ),
+
+            # Compute the gradient of the color function with respect to the
+            # new smoothing length. At the end of this Group, we will have the
+            # interface normals and the discretized dirac delta function for
+            # the fluid-fluid interface.
+            Group(equations=[
+                    ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall'],
+                                                    epsilon=0.01/h0),
+                    ],
+                  ),
+
+            # Compute the interface curvature using the modified smoothing
+            # length and interface normals computed in the previous Group.
+            Group(equations=[
+                    InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
+                                                        with_morris_correction=True),
+                    ], ),
+
+            # Now rescale the smoothing length to the original value for the
+            # rest of the computations.
+            Group(equations=[
+                    ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
+                    ], update_nnps=False,
+                  ),
+            #################################################################
+            # End Surface tension formulation
+            #################################################################
+
+            # Once the pressure for the fluid phase has been updated via the
+            # state-equation, we can extrapolate the pressure to the wall
+            # ghost particles. After this group, the density and pressure of
+            # the boundary particles has been updated and can be used in the
+            # integration equations.
+            Group(
+                equations=[
+                    SolidWallPressureBC(dest='wall', sources=['fluid'], p0=p0, rho0=rho0,
+                                        gy=gy),
+
+                    ], ),
+
+            # The main acceleration block
+            Group(
+                equations=[
+
+                    # Gradient of pressure for the fluid phase using the
+                    # number density formulation. No penetration boundary
+                    # condition using Adami et al's generalized wall boundary
+                    # condition. The extrapolated pressure and density on the
+                    # wall particles is used in the gradient of pressure to
+                    # simulate a repulsive force.
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['fluid', 'wall'], pb=p0,
+                        gy=gy),
+
+                    # Artificial viscosity for the fluid phase.
+                    MomentumEquationViscosity(
+                        dest='fluid', sources=['fluid'], nu=nu),
+
+                    # No-slip boundary condition using Adami et al's
+                    # generalized wall boundary condition. This equation
+                    # basically computes the viscous contribution on the fluid
+                    # from the wall particles.
+                    SolidWallNoSlipBC(dest='fluid', sources=['wall'], nu=nu),
+
+                    # Surface tension force for the SY11 formulation
+                    ShadlooYildizSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+
+                    # Artificial stress for the fluid phase
+                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+
+                    ], )
         ]
+        return tvf_equations
 
-    # get the fluid particle array
-    fluid = get_particle_array(
-        name='fluid', x=x, y=y, h=h, m=m, rho=rho, cs=cs, 
-        additional_props=additional_props)
 
-    # set the fluid velocity with respect to the sinusoidal
-    # perturbation
-    fluid.u[:] = -U
-    mode = 1
-    for i in range(len(fluid.x)):
-        if fluid.y[i] > domain_height/2 + psi0*domain_height*numpy.sin(2*numpy.pi*fluid.x[i]/(mode*domain_width)):
-            fluid.u[i] = U
-            fluid.color[i] = 1
-            fluid.rho[i] = rho1
-            fluid.m[i] = volume*rho1
-        else:
-            fluid.rho[i] = rho2
-            fluid.m[i] = rho2/rho1*volume*rho2
-
-    # extract the top and bottom boundary particles
-    indices = numpy.where( fluid.y > domain_height )[0]
-    wall = fluid.extract_particles( indices )
-    fluid.remove_particles( indices )
-
-    indices = numpy.where( fluid.y < 0 )[0]
-    bottom = fluid.extract_particles( indices )
-    fluid.remove_particles( indices )
-    
-    # concatenate the two boundaries
-    wall.append_parray( bottom )
-    wall.set_name( 'wall' )
-
-    # set the number density initially for all particles
-    fluid.V[:] = 1./volume
-    wall.V[:] = 1./volume
-
-    # set additional output arrays for the fluid
-    fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
-                             'kappa', 'N', 'p', 'rho'])
-
-    # extrapolated velocities for the wall
-    for name in ['uf', 'vf', 'wf']:
-        wall.add_property(name)
-    
-    # dummy velocities for the wall
-    # required for the no-slip BC
-    for name in ['ug','vg','wg']:
-        wall.add_property(name)
-
-    print("2D KHI with %d fluid particles and %d wall particles"%(
-            fluid.get_number_of_particles(), wall.get_number_of_particles()))
-
-    return [fluid, wall]
-    
-# domain for periodicity
-domain = DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
-                       periodic_in_x=True, periodic_in_y=False)
-
-# Create the application.
-app = Application(domain=domain)
-
-# Create the kernel
-kernel = WendlandQuintic(dim=2)
-#kernel = CubicSpline(dim=2)
-#kernel = Gaussian(dim=2)
-
-# Create the Integrator.
-integrator = PECIntegrator( fluid=TransportVelocityStep() )
-
-# create the equations
-tvf_equations = [
-
-    # We first compute the mass and number density of the fluid
-    # phase. This is used in all force computations henceforth. The
-    # number density (1/volume) is explicitly set for the solid phase
-    # and this isn't modified for the simulation.
-    Group(equations=[
-            SummationDensity( dest='fluid', sources=['fluid', 'wall'] )
-            ] ),
-    
-    # Given the updated number density for the fluid, we can update
-    # the fluid pressure. Additionally, we can extrapolate the fluid
-    # velocity to the wall for the no-slip boundary
-    # condition. Also compute the smoothed color based on the color
-    # index for a particle.
-    Group(equations=[
-            StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
-            SetWallVelocity(dest='wall', sources=['fluid']),
-            SmoothedColor( dest='fluid', sources=['fluid'] ),
-            ] ),
-
-    #################################################################
-    # Begin Surface tension formulation
-    #################################################################
-    # Scale the smoothing lengths to determine the interface
-    # quantities. The NNPS need not be updated since the smoothing
-    # length is decreased.
-    Group(equations=[
-            ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
-            ], update_nnps=False ),
-
-    # Compute the gradient of the color function with respect to the
-    # new smoothing length. At the end of this Group, we will have the
-    # interface normals and the discretized dirac delta function for
-    # the fluid-fluid interface.
-    Group(equations=[
-            ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall'],
-                                            epsilon=0.01/h0),
-            ], 
-          ),
-
-    # Compute the interface curvature using the modified smoothing
-    # length and interface normals computed in the previous Group.
-    Group(equations=[
-            InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
-                                                with_morris_correction=True),
-            ], ),
-
-    # Now rescale the smoothing length to the original value for the
-    # rest of the computations.
-    Group(equations=[
-            ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
-            ], update_nnps=False,
-          ),
-    #################################################################
-    # End Surface tension formulation
-    #################################################################
-
-    # Once the pressure for the fluid phase has been updated via the
-    # state-equation, we can extrapolate the pressure to the wall
-    # ghost particles. After this group, the density and pressure of
-    # the boundary particles has been updated and can be used in the
-    # integration equations.
-    Group(
-        equations=[
-            SolidWallPressureBC(dest='wall', sources=['fluid'], p0=p0, rho0=rho0, 
-                                gy=gy),
-            
-            ], ),
-    
-    # The main acceleration block
-    Group(
-        equations=[
-
-            # Gradient of pressure for the fluid phase using the
-            # number density formulation. No penetration boundary
-            # condition using Adami et al's generalized wall boundary
-            # condition. The extrapolated pressure and density on the
-            # wall particles is used in the gradient of pressure to
-            # simulate a repulsive force.
-            MomentumEquationPressureGradient(
-                dest='fluid', sources=['fluid', 'wall'], pb=p0,
-                gy=gy),
-
-            # Artificial viscosity for the fluid phase.
-            MomentumEquationViscosity(
-                dest='fluid', sources=['fluid'], nu=nu),
-
-            # No-slip boundary condition using Adami et al's
-            # generalized wall boundary condition. This equation
-            # basically computes the viscous contribution on the fluid
-            # from the wall particles.
-            SolidWallNoSlipBC(dest='fluid', sources=['wall'], nu=nu),
-                                      
-            # Surface tension force for the SY11 formulation
-            ShadlooYildizSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
-
-            # Artificial stress for the fluid phase
-            MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
-                                               
-            ], )
-    ]
-
-# Create a solver.
-solver = Solver(
-    kernel=kernel, dim=dim, integrator=integrator,
-    dt=dt, tf=tf, adaptive_timestep=False)
-
-# Setup the application and solver.  This also generates the particles.
-app.setup(solver=solver, equations=tvf_equations,
-          particle_factory=create_particles)
-
-app.run()
+if __name__ == '__main__':
+    app = KHITVF()
+    app.run()

@@ -205,7 +205,7 @@ def dump(filename, particles, solver_data, detailed_output=False,
 
     """
 
-    particle_data = get_particles_info(particles)
+    particle_data = dict(get_particles_info(particles))
     output_data = {"particles":particle_data, "solver_data":solver_data}
 
     all_array_data = {}

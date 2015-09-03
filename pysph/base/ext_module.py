@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 from distutils.util import get_platform
+from distutils.errors import CompileError, LinkError
 import hashlib
 import imp
 import importlib
@@ -23,6 +24,7 @@ except ImportError:
 # Package imports.
 import pysph
 from pysph.base.config import get_config
+from pysph.base.capture_stream import CaptureMultipleStreams
 
 
 def get_platform_dir():
@@ -199,9 +201,30 @@ class ExtModule(object):
                         extra_link_args=extra_link_args,
                         language="c++"
                     )
-                    mod = pyxbuild.pyx_to_dll(self.src_path, extension,
-                        pyxbuild_dir=self.build_dir, force_rebuild=True
-                    )
+
+                    if not hasattr(sys.stdout, 'errors'):
+                        # FIXME: This happens when nosetests replaces the
+                        # stdout with the a Tee instance.  This Tee instance
+                        # does not have errors which breaks the tests so we
+                        # disable verbose reporting.
+                        script_args = []
+                    else:
+                        script_args = ['--verbose']
+                    try:
+                        with CaptureMultipleStreams() as stream:
+                            mod = pyxbuild.pyx_to_dll(self.src_path, extension,
+                                pyxbuild_dir=self.build_dir, force_rebuild=True,
+                                setup_args={'script_args': script_args}
+                            )
+                    except (CompileError, LinkError):
+                        hline = "*"*80
+                        print(hline + "\nERROR")
+                        print(stream.get_output()[0])
+                        print(stream.get_output()[1])
+                        msg = "Compilation of code failed, please check "\
+                                "error messages above."
+                        print(hline + "\n" + msg)
+                        sys.exit(1)
                     shutil.copy(mod, self.ext_path)
                 else:
                     self._message("Precompiled code from:", self.src_path)
