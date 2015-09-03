@@ -5,7 +5,6 @@ import numpy
 from pysph.base.utils import get_particle_array_wcsph as gpa
 
 # Post-process module for VTK output
-from .pprocess import PySPH2VTK
 
 def sphysics2pysph(partfile, indat='INDAT', dim=3, vtk=True):
     """Load an SPHysics part file and input data
@@ -89,6 +88,7 @@ def sphysics2pysph(partfile, indat='INDAT', dim=3, vtk=True):
 
     # Dump out vtk files for Paraview viewing
     if vtk:
+        from .pprocess import PySPH2VTK
         props = ['u', 'v', 'w', 'rho', 'p', 'vmag', 'tag']
         pysph2vtk = PySPH2VTK(arrays, fileno=fileno)
 
