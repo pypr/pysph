@@ -421,17 +421,19 @@ class MomentumEquationArtificialStress(Equation):
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_V, d_uhat, d_vhat,
-             d_au, d_av, d_aw, d_m, s_rho, s_u, s_v, s_V, s_uhat, s_vhat,
-             DWIJ):
+    def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_w, d_V,
+             d_uhat, d_vhat, d_what, d_au, d_av, d_aw, d_m,
+             s_rho, s_u, s_v, s_w, s_V, s_uhat, s_vhat, s_what, DWIJ):
         rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
 
         # physical and advection velocities
         ui = d_u[d_idx]; uhati = d_uhat[d_idx]
         vi = d_v[d_idx]; vhati = d_vhat[d_idx]
+        wi = d_w[d_idx]; whati = d_what[d_idx]
 
         uj = s_u[s_idx]; uhatj = s_uhat[s_idx]
         vj = s_v[s_idx]; vhatj = s_vhat[s_idx]
+        wj = s_w[s_idx]; whatj = s_what[s_idx]
 
         # particle volumes
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
@@ -439,17 +441,37 @@ class MomentumEquationArtificialStress(Equation):
 
         # artificial stress tensor
         Axxi = rhoi*ui*(uhati - ui); Axyi = rhoi*ui*(vhati - vi)
+        Axzi = rhoi*ui*(whati - wi)
         Ayxi = rhoi*vi*(uhati - ui); Ayyi = rhoi*vi*(vhati - vi)
+        Ayzi = rhoi*vi*(whati - wi)
+        Azxi = rhoi*wi*(uhati - ui); Azyi = rhoi*wi*(vhati - vi)
+        Azzi = rhoi*wi*(whati - wi)
 
         Axxj = rhoj*uj*(uhatj - uj); Axyj = rhoj*uj*(vhatj - vj)
+        Axzj = rhoj*uj*(whatj - wj)
         Ayxj = rhoj*vj*(uhatj - uj); Ayyj = rhoj*vj*(vhatj - vj)
+        Ayzj = rhoj*vj*(whatj - wj)
+        Azxj = rhoj*wj*(uhatj - uj); Azyj = rhoj*wj*(vhatj - vj)
+        Azzj = rhoj*wj*(whatj - wj)
 
         # contraction of stress tensor with kernel gradient
-        Ax = 0.5 * (Axxi + Axxj) * DWIJ[0] + 0.5 * (Axyi + Axyj) * DWIJ[1]
-        Ay = 0.5 * (Ayxi + Ayxj) * DWIJ[0] + 0.5 * (Ayyi + Ayyj) * DWIJ[1]
-        
-        # FIXME: THIS NEEDS TO BE WORKED OUT AND IMPLEMENTED FOR 3D
-        Az = 0.0
+        Ax = 0.5*(
+            (Axxi + Axxj)*DWIJ[0] +
+            (Axyi + Axyj)*DWIJ[1] +
+            (Axzi + Axzj)*DWIJ[2]
+        )
+
+        Ay = 0.5*(
+            (Ayxi + Ayxj)*DWIJ[0] +
+            (Ayyi + Ayyj)*DWIJ[1] +
+            (Ayzi + Ayzj)*DWIJ[2]
+        )
+
+        Az = 0.5*(
+            (Azxi + Azxj)*DWIJ[0] +
+            (Azyi + Azyj)*DWIJ[1] +
+            (Azzi + Azzj)*DWIJ[2]
+        )
 
         # accelerations 2nd part of Eq. (8)
         tmp = 1./d_m[d_idx] * (Vi2 + Vj2)
