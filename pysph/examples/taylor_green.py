@@ -46,7 +46,7 @@ def exact_velocity(U, b, t, x, y):
     pi = np.pi; sin = np.sin; cos = np.cos
     factor = U * np.exp(b*t)
 
-    u = cos( 2 * pi * x ) * sin( 2 * pi * y)
+    u = -cos( 2 * pi * x ) * sin( 2 * pi * y)
     v = sin( 2 * pi * x ) * cos( 2 * pi * y)
 
     return factor * u, factor * v
@@ -66,6 +66,7 @@ class TaylorGreen(Application):
         h = np.ones_like(x) * dx
 
         # create the arrays
+
         fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
 
         # add the requisite arrays
@@ -128,7 +129,7 @@ class TaylorGreen(Application):
                     ], real=False),
 
             # The main accelerations block. The acceleration arrays for the
-            # fluid phase are upadted in this stage for all local particles.
+            # fluid phase are updated in this stage for all local particles.
             Group(
                 equations=[
                     # Pressure gradient terms
@@ -142,7 +143,8 @@ class TaylorGreen(Application):
                     # Artificial stress for the fluid phase
                     MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-                    ], real=True),
+                    ], real=True
+            ),
         ]
         return equations
 

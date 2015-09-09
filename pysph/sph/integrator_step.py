@@ -264,31 +264,36 @@ class TransportVelocityStep(IntegratorStep):
     def initialize(self):
         pass
 
-    def stage1(self, d_idx, d_u, d_v, d_au, d_av, d_uhat, d_auhat, d_vhat,
-                  d_avhat, d_x, d_y, dt):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_uhat, d_auhat, d_vhat,
+                  d_avhat, d_what, d_awhat, d_x, d_y, d_z, dt):
         dtb2 = 0.5*dt
 
         # velocity update eqn (14)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
+        d_w[d_idx] += dtb2*d_aw[d_idx]
 
         # advection velocity update eqn (15)
         d_uhat[d_idx] = d_u[d_idx] + dtb2*d_auhat[d_idx]
         d_vhat[d_idx] = d_v[d_idx] + dtb2*d_avhat[d_idx]
+        d_what[d_idx] = d_w[d_idx] + dtb2*d_awhat[d_idx]
 
         # position update eqn (16)
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
+        d_z[d_idx] += dt*d_what[d_idx]
 
-    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_vmag2, dt):
+    def stage2(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_vmag2, dt):
         dtb2 = 0.5*dt
 
         # corrector update eqn (17)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
+        d_w[d_idx] += dtb2*d_aw[d_idx]
 
         # magnitude of velocity squared
-        d_vmag2[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
+        d_vmag2[d_idx] = (d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
+                          d_w[d_idx]*d_w[d_idx])
 
 ###############################################################################
 # `AdamiVerletStep` class
@@ -305,34 +310,39 @@ class AdamiVerletStep(IntegratorStep):
     def initialize(self):
         pass
 
-    def stage1(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, dt):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y, d_z, dt):
         dtb2 = 0.5*dt
 
         # velocity predictor eqn (14)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
+        d_w[d_idx] += dtb2*d_aw[d_idx]
 
         # position predictor eqn (15)
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
+        d_z[d_idx] += dtb2*d_w[d_idx]
 
-    def stage2(self, d_idx, d_u, d_v, d_au, d_av, d_x, d_y, d_rho, d_arho,
-               d_vmag2, dt):
+    def stage2(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y, d_z,
+               d_rho, d_arho, d_vmag2, dt):
         dtb2 = 0.5*dt
 
         # velocity corrector eqn (18)
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
+        d_w[d_idx] += dtb2*d_aw[d_idx]
 
         # position corrector eqn (17)
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
+        d_z[d_idx] += dtb2*d_w[d_idx]
 
         # density corrector eqn (16)
         d_rho[d_idx] += dt * d_arho[d_idx]
 
         # magnitude of velocity squared
-        d_vmag2[d_idx] = d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx]
+        d_vmag2[d_idx] = (d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
+                          d_w[d_idx]*d_w[d_idx])
 
 ###############################################################################
 # `GasDFluidStep` class

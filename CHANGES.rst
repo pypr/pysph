@@ -1,3 +1,10 @@
+1.0a4
+------
+
+* Release date: not yet released.
+* Fixed major bug with TVF implementation and add support for 3D simulations.
+
+
 1.0a3
 ------
 
