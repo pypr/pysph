@@ -224,7 +224,7 @@ class MomentumEquationPressureGradient(Equation):
         instantaneous accelerations. By default, damping is neglected.
         """
         
-        self.pb = 0.0
+        self.pb = pb
         self.gx = gx
         self.gy = gy
         self.gz = gz
