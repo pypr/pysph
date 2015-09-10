@@ -153,22 +153,30 @@ class TaylorGreen(Application):
         from pysph.solver.utils import iter_output
 
         files = self.output_files
-        t, ke, decay, linf = [], [], [], []
+        t, ke, decay, linf, l1 = [], [], [], [], []
         for sd, array in iter_output(files, 'fluid'):
             _t = sd['t']
             t.append(_t)
-            m, u, v = array.get('m', 'u', 'v')
+            m, u, v, x, y = array.get('m', 'u', 'v', 'x', 'y')
+            u_e, v_e = exact_velocity(U, decay_rate, _t, x, y)
             vmag2 = u**2 + v**2
             _ke = 0.5 * np.sum( m * vmag2 )
             ke.append(_ke)
             vmag = np.sqrt(vmag2)
+            vmag_e = np.sqrt(u_e**2 + v_e**2)
             vmag_max = vmag.max()
             decay.append(vmag_max)
             theoretical_max = U * np.exp(decay_rate * _t)
             linf.append(abs( (vmag_max - theoretical_max)/theoretical_max ))
 
-        t, ke, decay, linf = map(np.asarray, (t, ke, decay, linf))
+            l1_err = np.sum(np.abs(vmag - vmag_e))/len(vmag)
+            # scale the error by the maximum velocity.
+            l1.append(l1_err/theoretical_max)
+
+        t, ke, decay, l1, linf = list(map(np.asarray, (t, ke, decay, l1, linf)))
         exact = U*np.exp(decay_rate*t)
+        fname = os.path.join(self.output_dir, 'results.npz')
+        np.savez(fname, t=t, ke=ke, decay=decay, linf=linf, l1=l1, exact_decay=exact)
 
         from matplotlib import pyplot as plt
         plt.clf()
