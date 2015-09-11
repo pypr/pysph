@@ -25,24 +25,8 @@ from pysph.sph.wc.viscosity import LaminarViscosity
 
 # domain and constants
 L = 1.0; U = 1.0
-Re = 100.0; nu = U*L/Re
 rho0 = 1.0; c0 = 10 * U
 p0 = c0**2 * rho0
-decay_rate = -8.0 * np.pi**2/Re
-b = 1.0
-
-# Numerical setup
-nx = 50; dx = L/nx; volume = dx*dx
-hdx = 1.2
-
-# adaptive time steps
-h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + U )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * 1.0
-
-tf = 5.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 
 def exact_velocity(U, b, t, x, y):
@@ -66,6 +50,36 @@ class TaylorGreen(Application):
             "--standard-sph", action="store_true", dest="standard_sph",
             default=False, help="Use standard SPH (defaults to TVF)."
         )
+        group.add_option(
+            "--nx", action="store", type=int, dest="nx", default=50,
+            help="Number of points along x direction."
+        )
+        group.add_option(
+            "--re", action="store", type=float, dest="re", default=100,
+            help="Reynolds number (defaults to 100)."
+        )
+        group.add_option(
+            "--hdx", action="store", type=float, dest="hdx", default=1.2,
+            help="Ratio h/dx."
+        )
+
+    def consume_user_options(self):
+        nx = self.options.nx
+        re = self.options.re
+
+        self.nu = nu = U*L/re
+
+        self.dx = dx = L/nx
+        self.volume = dx*dx
+        self.hdx = self.options.hdx
+
+        h0 = self.hdx * self.dx
+        dt_cfl = 0.25 * h0/( c0 + U )
+        dt_viscous = 0.125 * h0**2/nu
+        dt_force = 0.25 * 1.0
+
+        self.tf = 5.0
+        self.dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(
@@ -75,6 +89,7 @@ class TaylorGreen(Application):
 
     def create_particles(self):
         # create the particles
+        dx = self.dx
         _x = np.arange( dx/2, L, dx )
         x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
         if self.options.perturb > 0:
@@ -93,7 +108,7 @@ class TaylorGreen(Application):
         fluid.add_output_arrays(['color'])
 
         print("Taylor green vortex problem :: nfluid = %d, dt = %g"%(
-            fluid.get_number_of_particles(), dt))
+            fluid.get_number_of_particles(), self.dt))
 
         # setup the particle properties
         pi = np.pi; cos = np.cos; sin=np.sin
@@ -108,13 +123,13 @@ class TaylorGreen(Application):
 
         # mass is set to get the reference density of each phase
         fluid.rho[:] = rho0
-        fluid.m[:] = volume * fluid.rho
+        fluid.m[:] = self.volume * fluid.rho
 
         # volume is set as dx^2
-        fluid.V[:] = 1./volume
+        fluid.V[:] = 1./self.volume
 
         # smoothing lengths
-        fluid.h[:] = hdx * dx
+        fluid.h[:] = self.hdx * dx
 
         if self.options.standard_sph:
             fluid.remove_property('vmag2')
@@ -136,8 +151,8 @@ class TaylorGreen(Application):
             integrator = PECIntegrator(fluid=TransportVelocityStep())
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 
-        solver.set_time_step(dt)
-        solver.set_final_time(tf)
+        solver.set_time_step(self.dt)
+        solver.set_final_time(self.tf)
         return solver
 
     def create_equations(self):
@@ -155,7 +170,7 @@ class TaylorGreen(Application):
                                          alpha=0.1, beta=0.0),
 
                         LaminarViscosity(
-                            dest='fluid', sources=['fluid'], nu=nu
+                            dest='fluid', sources=['fluid'], nu=self.nu
                         ),
 
                         XSPHCorrection(dest='fluid', sources=['fluid']),
@@ -193,7 +208,7 @@ class TaylorGreen(Application):
 
                         # fluid viscosity
                         MomentumEquationViscosity(
-                            dest='fluid', sources=['fluid'], nu=nu),
+                            dest='fluid', sources=['fluid'], nu=self.nu),
 
                         # Artificial stress for the fluid phase
                         MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
@@ -206,6 +221,7 @@ class TaylorGreen(Application):
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
         from pysph.solver.utils import iter_output
+        decay_rate = -8.0 * np.pi**2/self.options.re
 
         files = self.output_files
         t, ke, ke_ex, decay, linf, l1 = [], [], [], [], [], []
