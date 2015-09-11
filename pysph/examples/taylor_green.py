@@ -53,6 +53,13 @@ def exact_velocity(U, b, t, x, y):
 
 
 class TaylorGreen(Application):
+    def add_user_options(self, group):
+        group.add_option(
+            "--perturb", action="store", type=float, dest="perturb", default=0,
+            help="Random perturbation of initial particles as a fraction "\
+                "of dx (setting it to zero disables it)."
+        )
+
     def create_domain(self):
         return DomainManager(
             xmin=0, xmax=L, ymin=0, ymax=L, periodic_in_x=True,
@@ -63,6 +70,11 @@ class TaylorGreen(Application):
         # create the particles
         _x = np.arange( dx/2, L, dx )
         x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        if self.options.perturb > 0:
+            np.random.seed(1)
+            factor = dx*self.options.perturb
+            x += np.random.random(x.shape)*factor
+            y += np.random.random(x.shape)*factor
         h = np.ones_like(x) * dx
 
         # create the arrays
@@ -85,6 +97,7 @@ class TaylorGreen(Application):
         # velocities
         fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
         fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
+        fluid.p[:] = -U*U*(np.cos(4*np.pi*x) + np.cos(4*np.pi*y))*0.25
 
         # mass is set to get the reference density of each phase
         fluid.rho[:] = rho0
@@ -153,17 +166,19 @@ class TaylorGreen(Application):
         from pysph.solver.utils import iter_output
 
         files = self.output_files
-        t, ke, decay, linf, l1 = [], [], [], [], []
+        t, ke, ke_ex, decay, linf, l1 = [], [], [], [], [], []
         for sd, array in iter_output(files, 'fluid'):
             _t = sd['t']
             t.append(_t)
             m, u, v, x, y = array.get('m', 'u', 'v', 'x', 'y')
             u_e, v_e = exact_velocity(U, decay_rate, _t, x, y)
             vmag2 = u**2 + v**2
-            _ke = 0.5 * np.sum( m * vmag2 )
-            ke.append(_ke)
             vmag = np.sqrt(vmag2)
-            vmag_e = np.sqrt(u_e**2 + v_e**2)
+            ke.append(0.5*np.sum(m*vmag2))
+            vmag2_e = u_e**2 + v_e**2
+            vmag_e = np.sqrt(vmag2_e)
+            ke_ex.append(0.5*np.sum(m*vmag2_e))
+
             vmag_max = vmag.max()
             decay.append(vmag_max)
             theoretical_max = U * np.exp(decay_rate * _t)
@@ -173,14 +188,17 @@ class TaylorGreen(Application):
             # scale the error by the maximum velocity.
             l1.append(l1_err/theoretical_max)
 
-        t, ke, decay, l1, linf = list(map(np.asarray, (t, ke, decay, l1, linf)))
-        exact = U*np.exp(decay_rate*t)
+        t, ke, ke_ex, decay, l1, linf = list(map(
+            np.asarray, (t, ke, ke_ex, decay, l1, linf))
+        )
+        decay_ex = U*np.exp(decay_rate*t)
         fname = os.path.join(self.output_dir, 'results.npz')
-        np.savez(fname, t=t, ke=ke, decay=decay, linf=linf, l1=l1, exact_decay=exact)
+        np.savez(fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
+                 decay_ex=decay_ex)
 
         from matplotlib import pyplot as plt
         plt.clf()
-        plt.semilogy(t, exact, label="exact")
+        plt.semilogy(t, decay_ex, label="exact")
         plt.semilogy(t, decay, label="computed")
         plt.xlabel('t'); plt.ylabel('max velocity')
         plt.legend()
