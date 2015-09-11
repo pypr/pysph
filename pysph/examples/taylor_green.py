@@ -11,7 +11,7 @@ from pysph.base.kernels import CubicSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep
+from pysph.sph.integrator_step import TransportVelocityStep, WCSPHStep
 
 # the eqations
 from pysph.sph.equation import Group
@@ -19,6 +19,9 @@ from pysph.sph.wc.transport_velocity import SummationDensity,\
     StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
     MomentumEquationArtificialStress, SolidWallPressureBC
 
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation
+from pysph.sph.wc.viscosity import LaminarViscosity
 
 # domain and constants
 L = 1.0; U = 1.0
@@ -58,6 +61,10 @@ class TaylorGreen(Application):
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
                 "of dx (setting it to zero disables it)."
+        )
+        group.add_option(
+            "--standard-sph", action="store_true", dest="standard_sph",
+            default=False, help="Use standard SPH (defaults to TVF)."
         )
 
     def create_domain(self):
@@ -109,12 +116,24 @@ class TaylorGreen(Application):
         # smoothing lengths
         fluid.h[:] = hdx * dx
 
+        if self.options.standard_sph:
+            fluid.remove_property('vmag2')
+            for prop in ('cs', 'arho', 'ax', 'ay', 'az', 'rho0', 'u0', 'v0',
+                'w0', 'x0', 'y0', 'z0'):
+                fluid.add_property(prop)
+
+            fluid.set_output_arrays(
+                ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'm', 'h']
+            )
         # return the particle list
         return [fluid]
 
     def create_solver(self):
         kernel = CubicSpline(dim=2)
-        integrator = PECIntegrator(fluid=TransportVelocityStep())
+        if self.options.standard_sph:
+            integrator = PECIntegrator(fluid=WCSPHStep())
+        else:
+            integrator = PECIntegrator(fluid=TransportVelocityStep())
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
 
         solver.set_time_step(dt)
@@ -122,43 +141,66 @@ class TaylorGreen(Application):
         return solver
 
     def create_equations(self):
-        equations = [
-            # Summation density along with volume summation for the fluid
-            # phase. This is done for all local and remote particles. At the
-            # end of this group, the fluid phase has the correct density
-            # taking into consideration the fluid and solid
-            # particles.
-            Group(
-                equations=[
-                    SummationDensity(dest='fluid', sources=['fluid']),
-                    ], real=False),
+        if self.options.standard_sph:
+           equations = [
+                Group(equations=[
+                        TaitEOS(dest='fluid', sources=None, rho0=rho0,
+                                c0=c0, gamma=7.0),
+                        ], real=False),
 
-            # Once the fluid density is computed, we can use the EOS to set
-            # the fluid pressure. Additionally, the shepard filtered velocity
-            # for the fluid phase is determined.
-            Group(
-                equations=[
-                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-                    ], real=False),
+                Group(equations=[
+                        ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-            # The main accelerations block. The acceleration arrays for the
-            # fluid phase are updated in this stage for all local particles.
-            Group(
-                equations=[
-                    # Pressure gradient terms
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid'], pb=p0),
+                        MomentumEquation(dest='fluid', sources=['fluid'],
+                                         alpha=0.1, beta=0.0),
 
-                    # fluid viscosity
-                    MomentumEquationViscosity(
-                        dest='fluid', sources=['fluid'], nu=nu),
+                        LaminarViscosity(
+                            dest='fluid', sources=['fluid'], nu=nu
+                        ),
 
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                        XSPHCorrection(dest='fluid', sources=['fluid']),
 
-                    ], real=True
-            ),
-        ]
+                        ],),
+
+                ]
+        else:
+            equations = [
+                # Summation density along with volume summation for the fluid
+                # phase. This is done for all local and remote particles. At the
+                # end of this group, the fluid phase has the correct density
+                # taking into consideration the fluid and solid
+                # particles.
+                Group(
+                    equations=[
+                        SummationDensity(dest='fluid', sources=['fluid']),
+                        ], real=False),
+
+                # Once the fluid density is computed, we can use the EOS to set
+                # the fluid pressure. Additionally, the shepard filtered velocity
+                # for the fluid phase is determined.
+                Group(
+                    equations=[
+                        StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+                        ], real=False),
+
+                # The main accelerations block. The acceleration arrays for the
+                # fluid phase are updated in this stage for all local particles.
+                Group(
+                    equations=[
+                        # Pressure gradient terms
+                        MomentumEquationPressureGradient(
+                            dest='fluid', sources=['fluid'], pb=p0),
+
+                        # fluid viscosity
+                        MomentumEquationViscosity(
+                            dest='fluid', sources=['fluid'], nu=nu),
+
+                        # Artificial stress for the fluid phase
+                        MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+
+                        ], real=True
+                ),
+            ]
         return equations
 
     def post_process(self, info_fname):
