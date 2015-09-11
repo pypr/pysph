@@ -84,17 +84,32 @@ def glob_files(fname):
     ext = fname[fname.rfind('.'):]
     return glob.glob("%s*%s"%(fbase, ext))
 
+def _sort_key(arg):
+    a = os.path.splitext(arg)[0]
+    return int(a[a.rfind('_')+1:])
+
+def remove_irrelevant_files(files):
+    """Remove any npz files that are not output files.
+
+    That is, the file should not end with a '_number.npz'.  This allows users
+    to dump other .npz files in the output while post-processing without
+    breaking the viewer.
+    """
+    result = []
+    for f in files:
+        try:
+            _sort_key(f)
+        except ValueError:
+            pass
+        else:
+            result.append(f)
+    return result
+
 def sort_file_list(files):
     """Given a list of input files, sort them in serial order, in-place.
     """
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
-
-    files.sort(_sort_func)
+    files[:] = remove_irrelevant_files(files)
+    files.sort(key=_sort_key)
     return files
 
 
