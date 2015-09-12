@@ -35,11 +35,19 @@ def arange_long(start, stop=-1):
         return arange
 
 
+# A collection of default properties for all SPH arrays.
+DEFAULT_PROPS = set(
+    ('x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
+     'au', 'av', 'aw', 'gid', 'pid', 'tag')
+)
+
+
 def get_particle_array(additional_props=None, constants=None, **props):
     """Create and return a particle array with default properties.
 
     The default properties are ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho',
-    'p', 'au', 'av', 'aw', 'gid', 'pid', 'tag']
+    'p', 'au', 'av', 'aw', 'gid', 'pid', 'tag'], this set is available in
+    `DEFAULT_PROPS`.
 
 
     Parameters
@@ -79,25 +87,25 @@ def get_particle_array(additional_props=None, constants=None, **props):
     else:
         name = "array"
 
+    # default properties for an SPH particle
+    default_props = set(DEFAULT_PROPS)
+
+    # add any additional props to the default_props
+    if additional_props:
+        default_props = default_props.union(additional_props)
+
     np = 0
-    nprops = len(props)
 
     prop_dict = {}
     for prop in props.keys():
         data = numpy.asarray(props[prop])
         np = data.size
 
-        if prop in ['tag']:
+        if prop in ['tag', 'pid']:
             prop_dict[prop] = {'data':data,
                                'type':'int',
                                'name':prop}
-
-        if prop in ['pid']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['gid']:
+        elif prop in ['gid']:
             prop_dict[prop] = {'data':data.astype(numpy.uint32),
                                'type':'unsigned int',
                                'name':prop}
@@ -106,31 +114,21 @@ def get_particle_array(additional_props=None, constants=None, **props):
                                'type':'double',
                                'name':prop}
 
-    # default properties for an SPH particle
-    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
-                     'au', 'av', 'aw', 'gid', 'pid', 'tag']
-
-    # add any additional props
-    if additional_props:
-        default_props.extend( additional_props )
-        default_props = list( set(default_props) )
-
     # Add the default props
     for prop in default_props:
         if not prop in prop_dict:
             if prop in ["pid"]:
                 prop_dict[prop] = {'name':prop, 'type':'int',
                                    'default':0}
-
+            elif prop in ['tag']:
+                prop_dict[prop] = {'name':prop, 'type':'int',
+                                    'default':ParticleTAGS.Local}
             elif prop in ['gid']:
                 data = numpy.ones(shape=np, dtype=numpy.uint32)
                 data[:] = UINT_MAX
 
                 prop_dict[prop] = {'name':prop, 'type':'unsigned int',
                                    'data':data, 'default':UINT_MAX}
-
-            elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'int'}
 
             else:
                 prop_dict[prop] = {'name':prop, 'type':'double',
@@ -171,67 +169,12 @@ def get_particle_array_wcsph(constants=None, **props):
 
     """
 
-    # handle the name separately
-    if 'name' in props:
-        name = props['name']
-        props.pop('name')
-    else:
-        name = ""
+    wcsph_props = ['cs', 'ax', 'ay', 'az', 'arho', 'x0','y0', 'z0',
+                   'u0', 'v0','w0', 'rho0', 'div']
 
-    nprops = len(props)
-    np = 0
-
-    prop_dict = {}
-    for prop in props.keys():
-        data = numpy.asarray(props[prop])
-        np = data.size
-
-        if prop in ['tag']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['pid']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['gid']:
-            prop_dict[prop] = {'data':data.astype(numpy.uint32),
-                               'type': 'unsigned int',
-                               'name':prop}
-        else:
-            prop_dict[prop] = {'data':data,
-                               'type':'double',
-                               'name':prop}
-
-    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'h', 'rho', 'm',
-                     'p', 'cs', 'ax', 'ay', 'az', 'au', 'av', 'aw',
-                     'x0','y0', 'z0','u0', 'v0','w0',
-                     'arho', 'rho0', 'div', 'gid','pid', 'tag']
-
-    for prop in default_props:
-        if not prop in prop_dict:
-            if prop in ["pid"]:
-                prop_dict[prop] = {'name':prop, 'type':'int',
-                                   'default':0}
-
-            elif prop in ['gid']:
-                data = numpy.ones(shape=np, dtype=numpy.uint32)
-                data[:] = UINT_MAX
-
-                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
-                                   'data':data}
-
-            elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'int',}
-
-            else:
-                prop_dict[prop] = {'name':prop, 'type':'double',
-                                   'default':0}
-
-    # create the particle array
-    pa = ParticleArray(name=name, constants=constants, **prop_dict)
+    pa = get_particle_array(
+        constants=constants, additional_props=wcsph_props, **props
+    )
 
     # default property arrays to save out.
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
