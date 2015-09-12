@@ -206,8 +206,10 @@ class CouetteFlow(Application):
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
 
-        self._plot_u_vs_y()
-        self._plot_ke_history()
+        y, u_ex, u = self._plot_u_vs_y()
+        t, ke = self._plot_ke_history()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, t=t, ke=ke, y=y, u=u, u_ex=u_ex)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -218,6 +220,7 @@ class CouetteFlow(Application):
         plt.xlabel('t'); plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
+        return t, ke
 
     def _plot_u_vs_y(self):
         files = self.output_files
@@ -245,6 +248,7 @@ class CouetteFlow(Application):
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
+        return y, ue, ui
 
 
 if __name__ == '__main__':
