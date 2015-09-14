@@ -23,29 +23,41 @@ import numpy as np
 
 # domain and reference values
 L = 1.0; Umax = 1.0
-c0 = 10 * Umax; rho0 = 1.0
+c0 = 10 * Umax
+rho0 = 1.0
 p0 = c0*c0*rho0
 
-# Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * L/Re
-
 # Numerical setup
-nx = 50; dx = L/nx
-ghost_extent = 5 * dx
 hdx = 1.2
-
-# adaptive time steps
-h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Umax )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
-
-tf = 5.0
-dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 
 class LidDrivenCavity(Application):
+    def add_user_options(self, group):
+        group.add_option(
+            "--nx", action="store", type=int, dest="nx", default=50,
+            help="Number of points along x direction."
+        )
+        group.add_option(
+            "--re", action="store", type=float, dest="re", default=100,
+            help="Reynolds number (defaults to 100)."
+        )
+
+    def consume_user_options(self):
+        nx = self.options.nx
+        self.dx = L/nx
+        self.re = self.options.re
+        h0 = hdx * self.dx
+        self.nu = Umax*L/self.re
+        dt_cfl = 0.25 * h0/( c0 + Umax )
+        dt_viscous = 0.125 * h0**2/self.nu
+        dt_force = 1.0
+
+        self.tf = 5.0
+        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+
     def create_particles(self):
+        dx = self.dx
+        ghost_extent = 5 * dx
         # create all the particles
         _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
         x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
@@ -65,8 +77,8 @@ class LidDrivenCavity(Application):
         solid.remove_particles(indices)
 
         print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt))
+            self.re, fluid.get_number_of_particles(),
+            solid.get_number_of_particles(), self.dt))
 
         # add requisite properties to the arrays:
 
@@ -134,10 +146,11 @@ class LidDrivenCavity(Application):
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=tf, dt=dt, adaptive_timestep=False)
+                        tf=self.tf, dt=self.dt, adaptive_timestep=False)
         return solver
 
     def create_equations(self):
+        nu = self.nu
         equations = [
 
             # Summation density along with volume summation for the fluid
@@ -203,8 +216,10 @@ class LidDrivenCavity(Application):
         if self.rank > 0:
             return
         info = self.read_info(info_fname)
-        self._plot_ke_history()
-        self._plot_velocity()
+        t, ke = self._plot_ke_history()
+        x, ui, vi, ui_c, vi_c = self._plot_velocity()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, t=t, ke=ke, x=x, u=ui, v=vi, u_c=ui_c, v_c=vi_c)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -215,6 +230,7 @@ class LidDrivenCavity(Application):
         plt.xlabel('t'); plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
+        return t, ke
 
     def _plot_velocity(self):
         from pysph.tools.interpolator import Interpolator
@@ -268,6 +284,7 @@ class LidDrivenCavity(Application):
 
         fig = os.path.join(self.output_dir, 'centerline.png')
         plt.savefig(fig, dpi=300)
+        return _x, ui, vi, ui_c, vi_c
 
 if __name__ == '__main__':
     app = LidDrivenCavity()
