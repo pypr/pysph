@@ -59,6 +59,12 @@ class PoiseuilleFlow(Application):
         # Vmax = fx/(2*nu)*(d^2) at the centerline
 
         self.fx = self.Vmax * 2*self.nu/(self.d**2)
+        # Setup default parameters.
+        dt_cfl = 0.25 * h0/( self.c0 + self.Vmax )
+        dt_viscous = 0.125 * h0**2/self.nu
+        dt_force = 0.25 * np.sqrt(h0/self.fx)
+
+        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(xmin=0, xmax=self.Lx, periodic_in_x=True)
@@ -155,16 +161,9 @@ class PoiseuilleFlow(Application):
 
         # Create a solver.
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-        # Setup default parameters.
-        dt_cfl = 0.25 * h0/( self.c0 + self.Vmax )
-        dt_viscous = 0.125 * h0**2/self.nu
-        dt_force = 0.25 * np.sqrt(h0/self.fx)
-
         tf = 2.0
-        dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
-        print("dt = %g"%dt)
-        solver.set_time_step(dt)
+        print("dt = %g"%self.dt)
+        solver.set_time_step(self.dt)
         solver.set_final_time(tf)
         solver.set_print_freq(1000)
         return solver
@@ -248,8 +247,10 @@ class PoiseuilleFlow(Application):
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
 
-        self._plot_u_vs_y()
-        self._plot_ke_history()
+        y, u_ex, u = self._plot_u_vs_y()
+        t, ke = self._plot_ke_history()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, t=t, ke=ke, y=y, u=u, u_ex=u_ex)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -260,6 +261,7 @@ class PoiseuilleFlow(Application):
         plt.xlabel('t'); plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
+        return t, ke
 
     def _plot_u_vs_y(self):
         files = self.output_files
@@ -291,11 +293,11 @@ class PoiseuilleFlow(Application):
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
+        return y, ue, ui
 
 
 
 if __name__ == '__main__':
-    # domain for periodicity
     app = PoiseuilleFlow()
     app.run()
     app.post_process(app.info_filename)
