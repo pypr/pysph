@@ -1259,6 +1259,8 @@ cdef class ParticleArray:
         if self.properties.has_key(prop_name):
             self.properties.pop(prop_name)
             self.default_values.pop(prop_name)
+        if prop_name in self.output_property_arrays:
+            self.output_property_arrays.remove(prop_name)
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
