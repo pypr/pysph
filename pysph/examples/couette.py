@@ -21,7 +21,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 
 # domain and reference values
@@ -105,8 +105,10 @@ class CouetteFlow(Application):
         for name in ['ug','vg','wg']:
             channel.add_property(name)
 
+        channel.add_output_arrays(['ug', 'vg', 'uf', 'vf', 'V'])
         # magnitude of velocity
         fluid.add_property('vmag2')
+        fluid.add_output_arrays(['vmag2'])
 
         # setup the particle properties
         volume = dx * dx
@@ -155,6 +157,9 @@ class CouetteFlow(Application):
             # particles.
             Group(
                 equations=[
+                    VolumeSummation(
+                        dest='channel', sources=['fluid', 'channel']
+                    ),
                     SummationDensity(dest='fluid', sources=['fluid','channel']),
                     ], real=False),
 

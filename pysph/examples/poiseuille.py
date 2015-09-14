@@ -19,7 +19,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 # numpy
 import numpy as np
@@ -183,6 +183,9 @@ class PoiseuilleFlow(Application):
             # particles.
             Group(
                 equations=[
+                    VolumeSummation(
+                        dest='channel', sources=['fluid', 'channel']
+                    ),
                     SummationDensity(dest='fluid', sources=['fluid','channel']),
                     ], real=False),
 

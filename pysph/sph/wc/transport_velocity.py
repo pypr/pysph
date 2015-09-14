@@ -521,12 +521,12 @@ class SolidWallNoSlipBC(Equation):
     """
     
     def __init__(self, dest, sources=None, nu=0.01):
-        r"""        
+        r"""
         Parameters
         ----------
         nu : float
             kinematic viscosity
-        
+
         Notes
         -----
         For this equation the destination particle array should be the
@@ -534,7 +534,7 @@ class SolidWallNoSlipBC(Equation):
         boundary particles must define a prescribed velocity :math:`u_0,
         v_0, w_0`
         """
-        
+
         self.nu = nu
         super(SolidWallNoSlipBC, self).__init__(dest, sources)
 
@@ -544,8 +544,7 @@ class SolidWallNoSlipBC(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, d_V, s_V,
-             d_u, d_v, d_w, s_uf, s_vf, s_wf,
-             s_u, s_v, s_w, 
+             d_u, d_v, d_w,
              d_au, d_av, d_aw,
              s_ug, s_vg, s_wg,
              DWIJ, R2IJ, EPS, XIJ):
@@ -562,7 +561,7 @@ class SolidWallNoSlipBC(Equation):
 
         # scalar part of the kernel gradient
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
-            
+
         # viscous contribution (third term) from Eq. (8), with VIJ
         # defined appropriately using the ghost values
         tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * (etaij * Fij/(R2IJ + EPS))
