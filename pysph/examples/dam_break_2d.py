@@ -1,8 +1,9 @@
 """Two-dimensional dam break over a dry bed.  (30 minutes)
 
 The case is described in "State of the art classical SPH for free surface
-flows", Benedict D Rogers, Robert A, Dalrymple and Alex J.C Crespo, Journal of
-Hydraulic Research, Vol 48, Extra Issue (2010), pp 6-27.
+flows", Moncho Gomez-Gesteira, Benedict D Rogers, Robert A, Dalrymple and Alex
+J.C Crespo, Journal of Hydraulic Research, Vol 48, Extra Issue (2010), pp
+6-27. DOI:10.1080/00221686.2010.9641242
 
 By default the simulation runs for 2.5 seconds of simulation time.
 """
