@@ -272,7 +272,7 @@ class MomentumEquationPressureGradient(Equation):
         d_avhat[d_idx] += tmp * DWIJ[1]
         d_awhat[d_idx] += tmp * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw, t=0.0):
+    def post_loop(self, d_idx, d_au, d_av, d_aw, t):
         # damped accelerations due to body or external force
         damping_factor = 1.0
         if t < self.tdamp:
@@ -634,7 +634,7 @@ class SolidWallPressureBC(Equation):
         
         self.rho0 = rho0
         self.p0 = p0
-        self.b=b
+        self.b = b
         self.gx = gx
         self.gy = gy
         self.gz = gz

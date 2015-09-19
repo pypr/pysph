@@ -16,7 +16,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 # numpy
 import numpy as np
@@ -42,7 +42,9 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 20.0
+T = a/Umax
+
+tf = 2.5*T
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 
@@ -78,6 +80,7 @@ class PeriodicCylinders(Application):
         print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt))
+        print("tf = %f"%tf)
 
         # add requisite properties to the arrays:
 
@@ -105,10 +108,10 @@ class PeriodicCylinders(Application):
         solid.add_property('ax')
         solid.add_property('ay')
         solid.add_property('az')
-
+        solid.add_output_arrays(['p'])
         # magnitude of velocity
         fluid.add_property('vmag2')
-        fluid.add_output_arrays(['vmag2'])
+        fluid.add_output_arrays(['vmag2', 'p'])
 
         # setup the particle properties
         volume = dx * dx
@@ -158,6 +161,9 @@ class PeriodicCylinders(Application):
             # particles.
             Group(
                 equations=[
+                    VolumeSummation(
+                        dest='solid', sources=['fluid', 'solid']
+                    ),
                     SummationDensity(dest='fluid', sources=['fluid','solid']),
                     ], real=False),
 

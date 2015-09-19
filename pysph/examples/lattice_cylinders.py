@@ -42,7 +42,7 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 100.0
+tf = 250.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 class LatticeCylinders(Application):
@@ -132,8 +132,8 @@ class LatticeCylinders(Application):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        fluid.add_output_arrays( ['vmag2'] )
-        solid.add_output_arrays( ['vmag2'] )
+        fluid.add_output_arrays( ['vmag2', 'p'] )
+        solid.add_output_arrays( ['vmag2', 'p'] )
         # return the particle list
         return [fluid, solid]
 
