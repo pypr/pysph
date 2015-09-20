@@ -1,4 +1,4 @@
-"""Incompressible flow past a periodic lattice of cylinders. (4 minutes)
+"""Incompressible flow past a periodic lattice of cylinders. (20 minutes)
 """
 
 # PySPH imports
@@ -42,7 +42,7 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 250.0
+tf = 500.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 class LatticeCylinders(Application):

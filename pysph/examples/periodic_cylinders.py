@@ -1,4 +1,4 @@
-"""Incompressible flow past a periodic array of cylinders. (2 hours)
+"""Incompressible flow past a periodic array of cylinders. (42 hours)
 """
 
 # PySPH imports
@@ -26,6 +26,7 @@ L = 0.12; Umax = 1.2e-4
 a = 0.02; H = 4*a
 fx = 2.5e-4
 c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
+
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
@@ -34,7 +35,7 @@ nu = 0.1/rho0; Re = a*Umax/nu
 # Numerical setup
 nx = 144; dx = L/nx
 ghost_extent = 5 * 1.5 * dx
-hdx = 1.05
+hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
