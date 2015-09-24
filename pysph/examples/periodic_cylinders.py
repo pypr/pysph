@@ -1,4 +1,13 @@
 """Incompressible flow past a periodic array of cylinders. (42 hours)
+
+
+See Ellero and Adams, International Journal for Numerical Methods in
+Engineering, 2011, vol 86, pp 1027-1040 for the detailed parameters for this
+problem and also  Adami, Hu and Adams, JCP, 2013, vol 241, pp 292-307.
+
+In particular, we note that we set c0 from Ellero and Adams as using the
+value from Adami et al. will cause the solution to blow up.
+
 """
 
 # PySPH imports
@@ -25,8 +34,12 @@ import numpy as np
 L = 0.12; Umax = 1.2e-4
 a = 0.02; H = 4*a
 fx = 2.5e-4
-c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
 
+# c0 is set from Ellero and Adams.
+# Note that setting this to 0.1*np.sqrt(a*fx) as per Adami Hu and Adams is
+# incorrect and will actually cause a blow up of the solution.
+c0 = 0.02
+rho0 = 1000.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
