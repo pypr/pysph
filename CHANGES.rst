@@ -3,7 +3,9 @@
 
 * Release date: not yet released.
 * Fixed major bug with TVF implementation and add support for 3D simulations.
-
+* Improve many examples to make it easier to make comparisons.
+* Many equation parameters no longer have defaults to prevent accidental
+  errors from not specifying important parameters.
 
 1.0a3
 ------
