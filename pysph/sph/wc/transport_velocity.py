@@ -158,7 +158,7 @@ class StateEquation(Equation):
         p_0 = \frac{c^2\rho_0}{\gamma}
     """
     
-    def __init__(self, dest, sources=None, p0=1.0, rho0=1.0, b=1.0):
+    def __init__(self, dest, sources, p0, rho0, b):
         r"""
         Parameters
         ----------
@@ -195,7 +195,7 @@ class MomentumEquationPressureGradient(Equation):
         \bar{p}_{ab} = \frac{\rho_b p_a + \rho_a p_b}{\rho_a + \rho_b}
     """
     
-    def __init__(self, dest, sources=None, pb=0.0, gx=0., gy=0., gz=0.,
+    def __init__(self, dest, sources, pb, gx=0., gy=0., gz=0.,
                  tdamp=0.0):
                      
         r"""
@@ -300,7 +300,7 @@ class MomentumEquationViscosity(Equation):
         \bar{\eta}_{ab} = \frac{2\eta_a \eta_b}{\eta_a + \eta_b}
     """
     
-    def __init__(self, dest, sources=None, nu=0.01):
+    def __init__(self, dest, sources, nu):
         r"""
         Parameters
         ----------
@@ -362,7 +362,7 @@ class MomentumEquationArtificialViscosity(Equation):
         
         h_{ab} = \frac{h_a + h_b}{2}
     """
-    def __init__(self, dest, sources=None, alpha=0.1, c0=1.0):
+    def __init__(self, dest, sources, c0, alpha=0.1):
         r"""
         Parameters
         ----------
@@ -520,7 +520,7 @@ class SolidWallNoSlipBC(Equation):
     is the ghost particle in the interaction.
     """
     
-    def __init__(self, dest, sources=None, nu=0.01):
+    def __init__(self, dest, sources, nu):
         r"""
         Parameters
         ----------
@@ -602,8 +602,7 @@ class SolidWallPressureBC(Equation):
         1\right)^{\frac{1}{\gamma}}
     """
     
-    def __init__(self, dest, sources=None, rho0=1.0, p0=100.0,
-                 gx=0.0, gy=0.0, gz=0.0, b=1.0):
+    def __init__(self, dest, sources, rho0, p0, b, gx=0.0, gy=0.0, gz=0.0):
         r"""
         Parameters
         ----------

@@ -4,7 +4,7 @@ from pysph.sph.equation import Equation
 from math import sqrt
 
 class ScaleSmoothingLength(Equation):
-    def __init__(self, dest, sources=None, factor=2.0):
+    def __init__(self, dest, sources, factor=2.0):
         super(ScaleSmoothingLength, self).__init__(dest, sources)
         self.factor = factor
         
@@ -12,7 +12,7 @@ class ScaleSmoothingLength(Equation):
         d_h[d_idx] = d_h[d_idx] * self.factor
 
 class UpdateSmoothingLengthFromVolume(Equation):
-    def __init__(self, dest, sources=None, k=1.2, dim=1.0):
+    def __init__(self, dest, sources, dim, k=1.2):
         super(UpdateSmoothingLengthFromVolume, self).__init__(dest, sources)
         self.k = k
         self.dim1 = 1./dim
@@ -22,7 +22,7 @@ class UpdateSmoothingLengthFromVolume(Equation):
 
 class SummationDensity(Equation):
     def __init__(
-        self, dest, sources=None, dim=2, 
+        self, dest, sources, dim,
         density_iterations=False, iterate_only_once=False, k=1.2, htol=1e-6):
         r"""Summation density with iterative solution of the smoothing lengths.
 
@@ -164,7 +164,7 @@ class SummationDensity(Equation):
         return self.equation_has_converged
 
 class IdealGasEOS(Equation):
-    def __init__(self, dest, sources=None, gamma=1.4):
+    def __init__(self, dest, sources, gamma):
         self.gamma = gamma
         self.gamma1 = gamma - 1.0
         super(IdealGasEOS, self).__init__(dest, sources)

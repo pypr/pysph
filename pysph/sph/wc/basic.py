@@ -24,8 +24,7 @@ class TaitEOS(Equation):
         Reports on Progress in Physics, 68 (2005), pp. 1703-1759. 
 
     """
-    def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0, gamma=7.0, p0=0.0):
+    def __init__(self, dest, sources, rho0, c0, gamma, p0):
                      
         r"""
         Parameters
@@ -87,8 +86,7 @@ class TaitEOSHGCorrection(Equation):
 
     """
     
-    def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0, gamma=7.0):
+    def __init__(self, dest, sources, rho0, c0, gamma):
         
         r"""
         Parameters
@@ -161,13 +159,15 @@ class MomentumEquation(Equation):
     .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual 
         Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
-    def __init__(self, dest, sources=None,
+    def __init__(self, dest, sources, c0,
                  alpha=1.0, beta=1.0, gx=0.0, gy=0.0, gz=0.0,
-                 c0=1.0, tensile_correction=False):
+                 tensile_correction=False):
         
         r"""
         Parameters
         ----------
+        c0 : float
+            reference speed of sound
         alpha : float
             produces a shear and bulk viscosity
         beta : float
@@ -178,8 +178,6 @@ class MomentumEquation(Equation):
             body force per unit mass along the y-axis
         gz : float
             body force per unit mass along the z-axis
-        c0 : float
-            reference speed of sound
         tensilte_correction : bool
             switch for tensile instability correction (Default: False)
         """
@@ -297,12 +295,16 @@ class MomentumEquationDeltaSPH(Equation):
        
     """
     def __init__(
-        self, dest, sources=None, alpha=1.0,
-        gx=0.0, gy=0.0, gz=0.0, rho0=1000.0, c0=1.0):
+        self, dest, sources, rho0, c0, alpha=1.0,
+        gx=0.0, gy=0.0, gz=0.0):
 
         r"""
         Parameters
         ----------
+        rho0 : float
+            reference density
+        c0 : float
+            reference speed of sound
         alpha : float
             coefficient used to control the intensity of the 
             diffusion of velocity
@@ -312,10 +314,6 @@ class MomentumEquationDeltaSPH(Equation):
             body force per unit mass along the y-axis
         gz : float
             body force per unit mass along the z-axis
-        rho0 : float
-            reference density
-        c0 : float
-            reference speed of sound
         
         Notes
         -----
@@ -436,7 +434,7 @@ class UpdateSmoothingLengthFerrari(Equation):
         surface flows", Computers and Fluids, 38 (2009), pp. 1203--1217.
     """
     
-    def __init__(self, dest, dim, hdx=1.0, sources=None):
+    def __init__(self, dest, sources, dim, hdx):
         r"""
         Parameters
         ----------

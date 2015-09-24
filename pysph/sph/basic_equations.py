@@ -23,8 +23,7 @@ class BodyForce(Equation):
     :math:`\boldsymbol{f} = f_x, f_y, f_z`
 
     """
-    def __init__(self, dest, sources,
-                 fx=0.0, fy=0.0, fz=0.0):
+    def __init__(self, dest, sources, fx=0.0, fy=0.0, fz=0.0):
 
         r"""
         Parameters
@@ -91,8 +90,7 @@ class IsothermalEOS(Equation):
     :math:`p = p_0 + c_0^2(\rho_0 - \rho)`
 
     """
-    def __init__(self, dest, sources=None,
-                 rho0=1000.0, c0=1.0, p0=0.0):
+    def __init__(self, dest, sources, rho0, c0, p0):
 
         r"""
         Parameters
@@ -160,7 +158,7 @@ class MonaghanArtificialViscosity(Equation):
     .. [Monaghan2005] J. Monaghan, "Smoothed particle hydrodynamics",
         Reports on Progress in Physics, 68 (2005), pp. 1703-1759.
     """
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0):
+    def __init__(self, dest, sources, alpha=1.0, beta=1.0):
         r"""
         Parameters
         ----------
@@ -212,7 +210,7 @@ class XSPHCorrection(Equation):
     .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual
         Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
-    def __init__(self, dest, sources=None, eps=0.5):
+    def __init__(self, dest, sources, eps=0.5):
         r"""
         Parameters
         ----------
@@ -262,7 +260,7 @@ class XSPHCorrectionForLeapFrog(Equation):
     .. [Monaghan1992] J. Monaghan, Smoothed Particle Hydrodynamics, "Annual
         Review of Astronomy and Astrophysics", 30 (1992), pp. 543-574.
     """
-    def __init__(self, dest, sources=None, eps=0.5):
+    def __init__(self, dest, sources, eps=0.5):
         r"""
         Parameters
         ----------

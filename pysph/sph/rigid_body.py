@@ -163,7 +163,7 @@ class RigidBodyMotion(Equation):
         d_w[d_idx] = d_vc[2] + wx*ry - wy*rx
 
 class BodyForce(Equation):
-    def __init__(self, dest, sources=None, gx=0.0, gy=0.0, gz=0.0):
+    def __init__(self, dest, sources, gx=0.0, gy=0.0, gz=0.0):
         self.gx = gx
         self.gy = gy
         self.gz = gz
@@ -183,7 +183,7 @@ class NumberDensity(Equation):
         d_V[d_idx] += WIJ
 
 class SummationDensityRigidBody(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(SummationDensityRigidBody, self).__init__(dest, sources)
 
@@ -199,7 +199,7 @@ class ViscosityRigidBody(Equation):
     Use this with the fluid as a destination and body as source.
     """
 
-    def __init__(self, dest, sources=None, rho0=1.0, nu=1.0):
+    def __init__(self, dest, sources, rho0, nu):
         self.nu = nu
         self.rho0 = rho0
         super(ViscosityRigidBody, self).__init__(dest, sources)
@@ -229,7 +229,7 @@ class PressureRigidBody(Equation):
     Use this with the fluid as a destination and body as source.
     """
 
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(PressureRigidBody, self).__init__(dest, sources)
 
@@ -258,7 +258,7 @@ class RigidBodyCollision(Equation):
     A review of computer simulation of tumbling mills by the discrete element
     method: Part I - contact mechanics
     """
-    def __init__(self, dest, sources=None, k=1.0, d=1.0, eta=1.0, kt=1.0):
+    def __init__(self, dest, sources, k=1.0, d=1.0, eta=1.0, kt=1.0):
         """Note that d is a factor multiplied with the "h" of the particle.
         """
         self.k = k

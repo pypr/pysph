@@ -177,7 +177,8 @@ class LatticeCylinders(Application):
             # been updated and can be used in the integration equations.
             Group(
                 equations=[
-                    SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx, b=1.0),
+                    SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx,
+                        rho0=rho0, p0=p0, b=1.0),
                     ], real=False),
 
             # The main accelerations block. The acceleration arrays for the
