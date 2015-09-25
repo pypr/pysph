@@ -974,7 +974,7 @@ cdef class ParticleArray:
         """
         cdef int np = np_array.size
         cdef object a
-        if np_array.dtype is numpy.int32 or np_array.dtype is numpy.int64:
+        if np_array.dtype == numpy.int32 or np_array.dtype == numpy.int64:
             a = LongArray(np)
             a.set_data(np_array)
         elif np_array.dtype == numpy.float32:
