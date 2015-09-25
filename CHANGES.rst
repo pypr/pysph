@@ -6,6 +6,7 @@
 * Improve many examples to make it easier to make comparisons.
 * Many equation parameters no longer have defaults to prevent accidental
   errors from not specifying important parameters.
+* Add support to easily handle multiple rigid bodies.
 
 1.0a3
 ------
