@@ -24,7 +24,7 @@ class TaitEOS(Equation):
         Reports on Progress in Physics, 68 (2005), pp. 1703-1759. 
 
     """
-    def __init__(self, dest, sources, rho0, c0, gamma, p0):
+    def __init__(self, dest, sources, rho0, c0, gamma, p0=0.0):
                      
         r"""
         Parameters
@@ -36,7 +36,7 @@ class TaitEOS(Equation):
         gamma : float
             constant
         p0 : float
-            reference pressure in the system
+            reference pressure in the system (defaults to zero).
         
         Notes
         -----

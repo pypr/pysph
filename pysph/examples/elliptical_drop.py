@@ -1,4 +1,4 @@
-"""Evolution of a circular patch of incompressible fluid. (20 seconds)
+"""Evolution of a circular patch of incompressible fluid. (60 seconds)
 
 See J. J. Monaghan "Simulating Free Surface Flows with SPH", JCP, 1994, 100, pp
 399 - 406
@@ -145,7 +145,7 @@ class EllipticalDrop(Application):
         dt = 5e-6; tf = 0.0076
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                         dt=dt, tf=tf, adaptive_timestep=True,
-                        cfl=0.05, n_damp=50,
+                        cfl=0.3, n_damp=50,
                         output_at_times=[0.0008, 0.0038])
 
         # select True if you want to dump out remote particle properties in
@@ -174,7 +174,8 @@ class EllipticalDrop(Application):
 
                     # Acceleration: du,v/dt
                     #MomentumEquationDeltaSPH(dest='fluid', sources=['fluid'], alpha=0.2, rho0=ro, c0=co),
-                    MomentumEquation(dest='fluid', sources=['fluid'], alpha=0.2, beta=0.0),
+                    MomentumEquation(dest='fluid', sources=['fluid'],
+                        alpha=0.2, beta=0.0, c0=self.co),
 
                     # XSPH velocity correction
                     XSPHCorrection(dest='fluid', sources=['fluid']),
