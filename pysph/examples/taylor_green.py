@@ -167,7 +167,7 @@ class TaylorGreen(Application):
                         ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
                         MomentumEquation(dest='fluid', sources=['fluid'],
-                                         alpha=0.1, beta=0.0),
+                                         alpha=0.1, beta=0.0, c0=c0),
 
                         LaminarViscosity(
                             dest='fluid', sources=['fluid'], nu=self.nu
