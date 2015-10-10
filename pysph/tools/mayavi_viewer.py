@@ -874,7 +874,6 @@ class MayaviViewer(HasTraits):
         files = glob.glob(os.path.join(d, '*.npz'))
         if len(files) > 0:
             self._clear()
-            files = glob_files(files[0])
             sort_file_list(files)
             self.files = files
             self.file_count = min(self.file_count, len(files))
