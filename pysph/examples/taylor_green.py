@@ -264,9 +264,15 @@ class TaylorGreen(Application):
         plt.savefig(fig, dpi=300)
 
         plt.clf()
-        plt.plot(t, linf, label="error")
-        plt.xlabel('t'); plt.ylabel('Error')
-        fig = os.path.join(self.output_dir, "error.png")
+        plt.plot(t, linf)
+        plt.xlabel('t'); plt.ylabel(r'$L_\infty$ error')
+        fig = os.path.join(self.output_dir, "linf_error.png")
+        plt.savefig(fig, dpi=300)
+
+        plt.clf()
+        plt.plot(t, l1, label="error")
+        plt.xlabel('t'); plt.ylabel(r'$L_1$ error')
+        fig = os.path.join(self.output_dir, "l1_error.png")
         plt.savefig(fig, dpi=300)
 
 
