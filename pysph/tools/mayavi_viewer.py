@@ -900,7 +900,7 @@ class MayaviViewer(HasTraits):
             dump(self._file_name, arrays, sd)
 
     def _make_particle_array_helper(self, scene, name):
-        pah = ParticleArrayHelper(scene=scene, name=name)
+        pah = ParticleArrayHelper(scene=scene, name=name, scalar=self.scalar)
         pah.on_trait_change(self._particle_array_helper_updated, 'updated')
         return pah
 
