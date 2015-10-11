@@ -1,4 +1,4 @@
-"""Taylor Green vortex flow (6 minutes).
+"""Taylor Green vortex flow (10 minutes).
 """
 
 import numpy as np
@@ -7,7 +7,7 @@ import os
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array_tvf_fluid
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -42,6 +42,10 @@ def exact_velocity(U, b, t, x, y):
 class TaylorGreen(Application):
     def add_user_options(self, group):
         group.add_option(
+            "--init", action="store", type=str, default=None,
+            help="Initialize particle positions from given file."
+        )
+        group.add_option(
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
                 "of dx (setting it to zero disables it)."
@@ -59,7 +63,7 @@ class TaylorGreen(Application):
             help="Reynolds number (defaults to 100)."
         )
         group.add_option(
-            "--hdx", action="store", type=float, dest="hdx", default=1.2,
+            "--hdx", action="store", type=float, dest="hdx", default=1.0,
             help="Ratio h/dx."
         )
 
@@ -92,6 +96,13 @@ class TaylorGreen(Application):
         dx = self.dx
         _x = np.arange( dx/2, L, dx )
         x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        if self.options.init is not None:
+            fname = self.options.init
+            from pysph.solver.utils import load
+            data = load(fname)
+            _f = data['arrays']['fluid']
+            x, y = _f.x.copy(), _f.y.copy()
+
         if self.options.perturb > 0:
             np.random.seed(1)
             factor = dx*self.options.perturb
@@ -144,7 +155,7 @@ class TaylorGreen(Application):
         return [fluid]
 
     def create_solver(self):
-        kernel = CubicSpline(dim=2)
+        kernel = QuinticSpline(dim=2)
         if self.options.standard_sph:
             integrator = PECIntegrator(fluid=WCSPHStep())
         else:
