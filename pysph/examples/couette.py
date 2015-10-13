@@ -7,7 +7,7 @@ import numpy as np
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.utils import load
 from pysph.solver.application import Application
@@ -36,7 +36,7 @@ c0 = 10*Vmax; p0 = c0*c0*rho0
 # Numerical setup
 dx = 0.05
 ghost_extent = 5 * dx
-hdx = 1.2
+hdx = 1.0
 
 # adaptive time steps
 h0 = hdx * dx
@@ -136,7 +136,7 @@ class CouetteFlow(Application):
         return [fluid, channel]
 
     def create_solver(self):
-        kernel = Gaussian(dim=2)
+        kernel = QuinticSpline(dim=2)
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
