@@ -1,17 +1,16 @@
-"""Poiseuille flow using the transport velocity formulation (5 minutes). 
+"""Poiseuille flow using the transport velocity formulation (5 minutes).
 """
 import os
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.solver.utils import load
 from pysph.sph.integrator import PECIntegrator
 from pysph.sph.integrator_step import TransportVelocityStep
-from pysph.tools.interpolator import Interpolator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -25,9 +24,9 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
 import numpy as np
 
 # Numerical setup
-dx = 0.025
+dx = 1.0/60.0
 ghost_extent = 5 * dx
-hdx = 1.2
+hdx = 1.0
 
 # adaptive time steps
 h0 = hdx * dx
@@ -49,7 +48,7 @@ class PoiseuilleFlow(Application):
         self.Ly = 2*self.d
         self.Lx = 0.4*self.Ly
         self.rho0 = 1.0
-        self.nu = 1.0
+        self.nu = 0.01
         self.Vmax = self.nu*self.Re/(2*self.d)
         self.c0 = 10*self.Vmax
         self.p0 = self.c0**2*self.rho0
@@ -155,13 +154,13 @@ class PoiseuilleFlow(Application):
 
     def create_solver(self):
         # Create the kernel
-        kernel = Gaussian(dim=2)
+        kernel = QuinticSpline(dim=2)
 
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         # Create a solver.
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-        tf = 2.0
+        tf = 100.0
         print("dt = %g"%self.dt)
         solver.set_time_step(self.dt)
         solver.set_final_time(tf)
@@ -247,10 +246,10 @@ class PoiseuilleFlow(Application):
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
 
-        y, u_ex, u = self._plot_u_vs_y()
+        y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()
         res = os.path.join(self.output_dir, "results.npz")
-        np.savez(res, t=t, ke=ke, y=y, u=u, u_ex=u_ex)
+        np.savez(res, t=t, ke=ke, y=y, u=u, y_ex=y_ex, u_ex=u_ex)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -265,40 +264,36 @@ class PoiseuilleFlow(Application):
 
     def _plot_u_vs_y(self):
         files = self.output_files
-        # interpolate the u-velocity profile along the centerline
-        y = np.linspace(0,1,101)
-        x = np.ones_like(y) * 0.2
 
         # take the last solution data
         fname = files[-1]
         data = load(fname)
         tf = data['solver_data']['t']
+        fluid = data['arrays']['fluid']
+        u = fluid.u.copy()
+        y = fluid.y.copy()
 
-        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
-        ui = interp.interpolate('u')
-
+        # exact parabolic profile for the u-velocity
         d = self.d
         fx = self.fx
         nu = self.nu
-        # exact parabolic profile for the u-velocity
+
         ye = np.arange(-d, d+1e-3, 0.01)
         ue = -0.5 * fx/nu * (ye**2 - d*d)
         ye += d
         from matplotlib import pyplot as plt
         plt.clf()
         plt.plot(ye, ue, label="exact")
-        plt.plot(y, ui, label="computed")
+        plt.plot(y, u, 'ko', fillstyle='none', label="computed")
         plt.xlabel('y'); plt.ylabel('u')
         plt.legend()
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
-        return y, ue, ui
-
+        return ye, ue, y, u
 
 
 if __name__ == '__main__':
     app = PoiseuilleFlow()
     app.run()
     app.post_process(app.info_filename)
-

@@ -13,7 +13,6 @@ from pysph.solver.utils import load
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
 from pysph.sph.integrator_step import TransportVelocityStep
-from pysph.tools.interpolator import Interpolator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -211,10 +210,10 @@ class CouetteFlow(Application):
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
 
-        y, u_ex, u = self._plot_u_vs_y()
+        y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()
         res = os.path.join(self.output_dir, "results.npz")
-        np.savez(res, t=t, ke=ke, y=y, u=u, u_ex=u_ex)
+        np.savez(res, t=t, ke=ke, y_ex=y_ex, u_ex=u_ex, y=y, u=u)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -229,31 +228,27 @@ class CouetteFlow(Application):
 
     def _plot_u_vs_y(self):
         files = self.output_files
-        # interpolate the u-velocity profile along the centerline
-        y = np.linspace(0, 1, 101)
-        x = np.ones_like(y) * 0.2
-        h = np.ones_like(y) * 1.5 * 0.01
-
         # take the last solution data
         fname = files[-1]
         data = load(fname)
         tf = data['solver_data']['t']
-
-        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
-        ui = interp.interpolate('u')
+        fluid = data['arrays']['fluid']
+        yp = fluid.y.copy()
+        up = fluid.u.copy()
 
         # exact parabolic profile for the u-velocity
-        ue = Vmax*y/Ly
+        ye = np.linspace(0, 1, 101)
+        ue = Vmax*ye/Ly
         from matplotlib import pyplot as plt
         plt.clf()
-        plt.plot(y, ue, label="exact")
-        plt.plot(y, ui, label="computed")
+        plt.plot(ye, ue, label="exact")
+        plt.plot(yp, up, 'ko', fillstyle='none', label="computed")
         plt.xlabel('y'); plt.ylabel('u')
         plt.legend()
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
-        return y, ue, ui
+        return ye, ue, yp, up
 
 
 if __name__ == '__main__':
