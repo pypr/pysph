@@ -66,6 +66,10 @@ class TaylorGreen(Application):
             "--hdx", action="store", type=float, dest="hdx", default=1.0,
             help="Ratio h/dx."
         )
+        group.add_option(
+            "--gamma", action="store", type=float, dest="gamma",
+            default=7.0, help="Gamma for the state equation."
+        )
 
     def consume_user_options(self):
         nx = self.options.nx
@@ -76,6 +80,7 @@ class TaylorGreen(Application):
         self.dx = dx = L/nx
         self.volume = dx*dx
         self.hdx = self.options.hdx
+        self.gamma = self.options.gamma
 
         h0 = self.hdx * self.dx
         dt_cfl = 0.25 * h0/( c0 + U )
@@ -171,7 +176,7 @@ class TaylorGreen(Application):
            equations = [
                 Group(equations=[
                         TaitEOS(dest='fluid', sources=None, rho0=rho0,
-                                c0=c0, gamma=7.0),
+                                c0=c0, gamma=self.gamma),
                         ], real=False),
 
                 Group(equations=[

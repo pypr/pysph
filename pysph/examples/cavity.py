@@ -1,11 +1,11 @@
-"""Lid driven cavity using the Transport Velocity formulation. (3 minutes)
+"""Lid driven cavity using the Transport Velocity formulation. (10 minutes)
 """
 
 import os
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -28,7 +28,7 @@ rho0 = 1.0
 p0 = c0*c0*rho0
 
 # Numerical setup
-hdx = 1.2
+hdx = 1.0
 
 
 class LidDrivenCavity(Application):
@@ -52,7 +52,7 @@ class LidDrivenCavity(Application):
         dt_viscous = 0.125 * h0**2/self.nu
         dt_force = 1.0
 
-        self.tf = 5.0
+        self.tf = 10.0
         self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
     def create_particles(self):
@@ -141,12 +141,13 @@ class LidDrivenCavity(Application):
         return [fluid, solid]
 
     def create_solver(self):
-        kernel = CubicSpline(dim=2)
+        kernel = QuinticSpline(dim=2)
 
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=self.tf, dt=self.dt, adaptive_timestep=False)
+                        tf=self.tf, dt=self.dt, pfreq=1000,
+                        adaptive_timestep=False)
         return solver
 
     def create_equations(self):
@@ -235,6 +236,7 @@ class LidDrivenCavity(Application):
     def _plot_velocity(self):
         from pysph.tools.interpolator import Interpolator
         from pysph.solver.utils import load
+        from pysph.examples.ghia_cavity_data import get_u_vs_y, get_v_vs_x
         # interpolated velocities
         _x = np.linspace(0,1,101)
         xx, yy = np.meshgrid(_x, _x)
@@ -273,14 +275,25 @@ class LidDrivenCavity(Application):
         vi_c = vi[50]
 
         s1 = plt.subplot(211)
-        s1.plot(ui_c, _x)
+        s1.plot(ui_c, _x, label='Computed')
+
+        y, data = get_u_vs_y()
+        if self.re in data:
+            s1.plot(data[self.re], y, 'o', fillstyle='none',
+                    label='Ghia et al.')
         s1.set_xlabel(r'$v_x$')
         s1.set_ylabel(r'$y$')
+        s1.legend()
 
         s2 = plt.subplot(212)
-        s2.plot(_x, vi_c)
+        s2.plot(_x, vi_c, label='Computed')
+        x, data = get_v_vs_x()
+        if self.re in data:
+            s2.plot(x, data[self.re], 'o', fillstyle='none',
+                    label='Ghia et al.')
         s2.set_xlabel(r'$x$')
         s2.set_ylabel(r'$v_y$')
+        s2.legend()
 
         fig = os.path.join(self.output_dir, 'centerline.png')
         plt.savefig(fig, dpi=300)
@@ -290,4 +303,3 @@ if __name__ == '__main__':
     app = LidDrivenCavity()
     app.run()
     app.post_process(app.info_filename)
-
