@@ -330,7 +330,7 @@ class ParticleArrayHelper(HasTraits):
     #######  Private protocol ############################################
     def _add_vmag(self, pa):
         if 'vmag' not in pa.properties:
-            if 'vmag2' in pa.properties:
+            if 'vmag2' in pa.output_property_arrays:
                 vmag = numpy.sqrt(pa.vmag2)
             else:
                 vmag = numpy.sqrt(pa.u**2 + pa.v**2 + pa.w**2)
