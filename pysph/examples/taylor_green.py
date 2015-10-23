@@ -48,7 +48,7 @@ class TaylorGreen(Application):
         group.add_option(
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
-                "of dx (setting it to zero disables it)."
+                "of dx (setting it to zero disables it, the default)."
         )
         group.add_option(
             "--standard-sph", action="store_true", dest="standard_sph",
@@ -56,7 +56,7 @@ class TaylorGreen(Application):
         )
         group.add_option(
             "--nx", action="store", type=int, dest="nx", default=50,
-            help="Number of points along x direction."
+            help="Number of points along x direction. (default 50)"
         )
         group.add_option(
             "--re", action="store", type=float, dest="re", default=100,
@@ -69,6 +69,16 @@ class TaylorGreen(Application):
         group.add_option(
             "--gamma", action="store", type=float, dest="gamma",
             default=7.0, help="Gamma for the state equation."
+        )
+        group.add_option(
+            "--pb-factor", action="store", type=float, dest="pb_factor",
+            default=1.0,
+            help="Use fraction of the background pressure (default: 1.0)."
+        )
+        group.add_option(
+            "--tensile-correction", action="store_true", dest="tensile_corr",
+            default=False,
+            help="Use tensile instability correction (for standard SPH)."
         )
 
     def consume_user_options(self):
@@ -182,8 +192,11 @@ class TaylorGreen(Application):
                 Group(equations=[
                         ContinuityEquation(dest='fluid',  sources=['fluid',]),
 
-                        MomentumEquation(dest='fluid', sources=['fluid'],
-                                         alpha=0.1, beta=0.0, c0=c0),
+                        MomentumEquation(
+                            dest='fluid', sources=['fluid'], alpha=0.1,
+                            beta=0.0, c0=c0,
+                            tensile_correction=self.options.tensile_corr
+                        ),
 
                         LaminarViscosity(
                             dest='fluid', sources=['fluid'], nu=self.nu
@@ -197,37 +210,43 @@ class TaylorGreen(Application):
         else:
             equations = [
                 # Summation density along with volume summation for the fluid
-                # phase. This is done for all local and remote particles. At the
-                # end of this group, the fluid phase has the correct density
-                # taking into consideration the fluid and solid
+                # phase. This is done for all local and remote particles. At
+                # the end of this group, the fluid phase has the correct
+                # density taking into consideration the fluid and solid
                 # particles.
                 Group(
                     equations=[
                         SummationDensity(dest='fluid', sources=['fluid']),
                         ], real=False),
 
-                # Once the fluid density is computed, we can use the EOS to set
-                # the fluid pressure. Additionally, the shepard filtered velocity
-                # for the fluid phase is determined.
+                # Once the fluid density is computed, we can use the EOS to
+                # set the fluid pressure. Additionally, the shepard filtered
+                # velocity for the fluid phase is determined.
                 Group(
                     equations=[
-                        StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
+                        StateEquation(dest='fluid', sources=None,
+                                      p0=p0, rho0=rho0, b=1.0),
                         ], real=False),
 
-                # The main accelerations block. The acceleration arrays for the
-                # fluid phase are updated in this stage for all local particles.
+                # The main accelerations block. The acceleration arrays for
+                # the fluid phase are updated in this stage for all local
+                # particles.
                 Group(
                     equations=[
                         # Pressure gradient terms
                         MomentumEquationPressureGradient(
-                            dest='fluid', sources=['fluid'], pb=p0),
+                            dest='fluid', sources=['fluid'],
+                            pb=p0*self.options.pb_factor
+                        ),
 
                         # fluid viscosity
                         MomentumEquationViscosity(
                             dest='fluid', sources=['fluid'], nu=self.nu),
 
                         # Artificial stress for the fluid phase
-                        MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                        MomentumEquationArtificialStress(
+                            dest='fluid', sources=['fluid']
+                        ),
 
                         ], real=True
                 ),
@@ -258,9 +277,10 @@ class TaylorGreen(Application):
             theoretical_max = U * np.exp(decay_rate * _t)
             linf.append(abs( (vmag_max - theoretical_max)/theoretical_max ))
 
-            l1_err = np.sum(np.abs(vmag - vmag_e))/len(vmag)
+            l1_err = np.average(np.abs(vmag - vmag_e))
+            avg_vmag_e = np.average(np.abs(vmag_e))
             # scale the error by the maximum velocity.
-            l1.append(l1_err/theoretical_max)
+            l1.append(l1_err/avg_vmag_e)
 
         t, ke, ke_ex, decay, l1, linf = list(map(
             np.asarray, (t, ke, ke_ex, decay, l1, linf))
