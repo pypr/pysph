@@ -43,13 +43,13 @@ class PoiseuilleFlow(Application):
         )
 
     def consume_user_options(self):
-        self.Re = self.options.re
+        self.re = self.options.re
         self.d = 0.5
         self.Ly = 2*self.d
         self.Lx = 0.4*self.Ly
         self.rho0 = 1.0
         self.nu = 0.01
-        self.Vmax = self.nu*self.Re/(2*self.d)
+        self.Vmax = self.nu*self.re/(2*self.d)
         self.c0 = 10*self.Vmax
         self.p0 = self.c0**2*self.rho0
 
@@ -95,7 +95,7 @@ class PoiseuilleFlow(Application):
         fluid = get_particle_array(name='fluid', x=fx, y=fy)
 
         print("Poiseuille flow :: Re = %g, nfluid = %d, nchannel=%d"%(
-            self.Re, fluid.get_number_of_particles(),
+            self.re, fluid.get_number_of_particles(),
             channel.get_number_of_particles()))
 
         # add requisite properties to the arrays:

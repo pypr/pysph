@@ -41,9 +41,15 @@ class LidDrivenCavity(Application):
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
+        group.add_option(
+            "--n-vel-avg", action="store", type=int, dest="n_avg",
+            default=10,
+            help="Average velocities over these many saved timesteps."
+        )
 
     def consume_user_options(self):
         nx = self.options.nx
+        self.n_avg = self.options.n_avg
         self.dx = L/nx
         self.re = self.options.re
         h0 = hdx * self.dx
@@ -146,7 +152,7 @@ class LidDrivenCavity(Application):
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=self.tf, dt=self.dt, pfreq=1000,
+                        tf=self.tf, dt=self.dt, pfreq=500,
                         adaptive_timestep=False)
         return solver
 
@@ -246,12 +252,22 @@ class LidDrivenCavity(Application):
         data = load(fname)
         tf = data['solver_data']['t']
         interp = Interpolator(list(data['arrays'].values()), x=xx, y=yy)
+        ui = np.zeros_like(xx)
+        vi = np.zeros_like(xx)
+        # Average out the velocities over the last n_avg timesteps
+        for fname in self.output_files[-self.n_avg:]:
+            data = load(fname)
+            tf = data['solver_data']['t']
+            interp.update_particle_arrays(list(data['arrays'].values()))
+            _u = interp.interpolate('u')
+            _v = interp.interpolate('v')
+            _u.shape = 101,101
+            _v.shape = 101,101
+            ui += _u
+            vi += _v
 
-        ui = interp.interpolate('u')
-        vi = interp.interpolate('v')
-
-        ui.shape = 101,101
-        vi.shape = 101,101
+        ui /= self.n_avg
+        vi /= self.n_avg
 
         # velocity magnitude
         self.vmag = vmag = np.sqrt( ui**2 + vi**2 )
@@ -263,6 +279,7 @@ class LidDrivenCavity(Application):
             xx, yy, ui, vi, density=(2, 2), #linewidth=5*vmag/vmag.max(),
             color=vmag
         )
+        plt.xlim(0, 1); plt.ylim(0, 1)
         plt.colorbar()
         plt.xlabel('$x$'); plt.ylabel('$y$')
         plt.title('Streamlines at %s seconds'%tf)
