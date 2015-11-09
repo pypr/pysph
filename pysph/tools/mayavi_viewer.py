@@ -862,6 +862,8 @@ class MayaviViewer(HasTraits):
         sort_file_list(files)
         self.files = files
         self.file_count = fc
+        if self.play:
+            self._play_changed(self.play)
 
     def _shell_fired(self):
         ns = dict(viewer=self, particle_arrays=self.particle_arrays,
