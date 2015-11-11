@@ -41,6 +41,13 @@ if compiler == 'intel':
 else:
     extra_compile_args = []
 
+def setup_win32():
+    if sys.platform == 'win32':
+        os.environ['DISTUTILS_USE_SDK'] = "1"
+        os.environ['MSSdk'] = "1"
+
+setup_win32()
+
 
 def get_deps(*args):
     """Given a list of basenames, this checks if a .pyx or .pxd exists
@@ -480,4 +487,3 @@ def setup_package():
 
 if __name__ == '__main__':
     setup_package()
-
