@@ -403,14 +403,6 @@ class Application(object):
 
         parser.add_option_group(interfaces)
 
-        # solver job resume support
-        parser.add_option('--resume', action='store', dest='resume',
-                          metavar='COUNT|count|?',
-                          help=('Resume solver from specified time (as stored '
-                                'in the data in output directory); count chooses '
-                                'a particular file; ? lists all '
-                                'available files')
-                          )
         # User options.
         user_options = OptionGroup(
             self.opt_parse, "User", "User defined command line arguments"
@@ -1091,4 +1083,3 @@ class Application(object):
         generated.
         """
         print('Overload this method to post-process the results.')
-
