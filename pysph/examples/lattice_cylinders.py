@@ -1,4 +1,4 @@
-"""Incompressible flow past a periodic lattice of cylinders. (4 minutes)
+"""Incompressible flow past a periodic lattice of cylinders. (20 minutes)
 """
 
 # PySPH imports
@@ -42,7 +42,7 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 100.0
+tf = 500.0
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 class LatticeCylinders(Application):
@@ -132,8 +132,8 @@ class LatticeCylinders(Application):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        fluid.add_output_arrays( ['vmag2'] )
-        solid.add_output_arrays( ['vmag2'] )
+        fluid.add_output_arrays( ['vmag2', 'p'] )
+        solid.add_output_arrays( ['vmag2', 'p'] )
         # return the particle list
         return [fluid, solid]
 
@@ -177,7 +177,8 @@ class LatticeCylinders(Application):
             # been updated and can be used in the integration equations.
             Group(
                 equations=[
-                    SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx, b=1.0),
+                    SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx,
+                        rho0=rho0, p0=p0, b=1.0),
                     ], real=False),
 
             # The main accelerations block. The acceleration arrays for the

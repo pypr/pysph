@@ -1,11 +1,11 @@
-"""Lid driven cavity using the Transport Velocity formulation. (3 minutes)
+"""Lid driven cavity using the Transport Velocity formulation. (10 minutes)
 """
 
 import os
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -23,29 +23,47 @@ import numpy as np
 
 # domain and reference values
 L = 1.0; Umax = 1.0
-c0 = 10 * Umax; rho0 = 1.0
+c0 = 10 * Umax
+rho0 = 1.0
 p0 = c0*c0*rho0
 
-# Reynolds number and kinematic viscosity
-Re = 100; nu = Umax * L/Re
-
 # Numerical setup
-nx = 50; dx = L/nx
-ghost_extent = 5 * dx
-hdx = 1.2
-
-# adaptive time steps
-h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Umax )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 1.0
-
-tf = 5.0
-dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+hdx = 1.0
 
 
 class LidDrivenCavity(Application):
+    def add_user_options(self, group):
+        group.add_option(
+            "--nx", action="store", type=int, dest="nx", default=50,
+            help="Number of points along x direction."
+        )
+        group.add_option(
+            "--re", action="store", type=float, dest="re", default=100,
+            help="Reynolds number (defaults to 100)."
+        )
+        group.add_option(
+            "--n-vel-avg", action="store", type=int, dest="n_avg",
+            default=10,
+            help="Average velocities over these many saved timesteps."
+        )
+
+    def consume_user_options(self):
+        nx = self.options.nx
+        self.n_avg = self.options.n_avg
+        self.dx = L/nx
+        self.re = self.options.re
+        h0 = hdx * self.dx
+        self.nu = Umax*L/self.re
+        dt_cfl = 0.25 * h0/( c0 + Umax )
+        dt_viscous = 0.125 * h0**2/self.nu
+        dt_force = 1.0
+
+        self.tf = 10.0
+        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+
     def create_particles(self):
+        dx = self.dx
+        ghost_extent = 5 * dx
         # create all the particles
         _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
         x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
@@ -65,8 +83,8 @@ class LidDrivenCavity(Application):
         solid.remove_particles(indices)
 
         print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt))
+            self.re, fluid.get_number_of_particles(),
+            solid.get_number_of_particles(), self.dt))
 
         # add requisite properties to the arrays:
 
@@ -129,15 +147,17 @@ class LidDrivenCavity(Application):
         return [fluid, solid]
 
     def create_solver(self):
-        kernel = CubicSpline(dim=2)
+        kernel = QuinticSpline(dim=2)
 
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=tf, dt=dt, adaptive_timestep=False)
+                        tf=self.tf, dt=self.dt, pfreq=500,
+                        adaptive_timestep=False)
         return solver
 
     def create_equations(self):
+        nu = self.nu
         equations = [
 
             # Summation density along with volume summation for the fluid
@@ -203,8 +223,12 @@ class LidDrivenCavity(Application):
         if self.rank > 0:
             return
         info = self.read_info(info_fname)
-        self._plot_ke_history()
-        self._plot_velocity()
+        if len(self.output_files) == 0:
+            return
+        t, ke = self._plot_ke_history()
+        x, ui, vi, ui_c, vi_c = self._plot_velocity()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, t=t, ke=ke, x=x, u=ui, v=vi, u_c=ui_c, v_c=vi_c)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -215,10 +239,12 @@ class LidDrivenCavity(Application):
         plt.xlabel('t'); plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
+        return t, ke
 
     def _plot_velocity(self):
         from pysph.tools.interpolator import Interpolator
         from pysph.solver.utils import load
+        from pysph.examples.ghia_cavity_data import get_u_vs_y, get_v_vs_x
         # interpolated velocities
         _x = np.linspace(0,1,101)
         xx, yy = np.meshgrid(_x, _x)
@@ -228,12 +254,22 @@ class LidDrivenCavity(Application):
         data = load(fname)
         tf = data['solver_data']['t']
         interp = Interpolator(list(data['arrays'].values()), x=xx, y=yy)
+        ui = np.zeros_like(xx)
+        vi = np.zeros_like(xx)
+        # Average out the velocities over the last n_avg timesteps
+        for fname in self.output_files[-self.n_avg:]:
+            data = load(fname)
+            tf = data['solver_data']['t']
+            interp.update_particle_arrays(list(data['arrays'].values()))
+            _u = interp.interpolate('u')
+            _v = interp.interpolate('v')
+            _u.shape = 101,101
+            _v.shape = 101,101
+            ui += _u
+            vi += _v
 
-        ui = interp.interpolate('u')
-        vi = interp.interpolate('v')
-
-        ui.shape = 101,101
-        vi.shape = 101,101
+        ui /= self.n_avg
+        vi /= self.n_avg
 
         # velocity magnitude
         self.vmag = vmag = np.sqrt( ui**2 + vi**2 )
@@ -245,6 +281,7 @@ class LidDrivenCavity(Application):
             xx, yy, ui, vi, density=(2, 2), #linewidth=5*vmag/vmag.max(),
             color=vmag
         )
+        plt.xlim(0, 1); plt.ylim(0, 1)
         plt.colorbar()
         plt.xlabel('$x$'); plt.ylabel('$y$')
         plt.title('Streamlines at %s seconds'%tf)
@@ -257,20 +294,31 @@ class LidDrivenCavity(Application):
         vi_c = vi[50]
 
         s1 = plt.subplot(211)
-        s1.plot(ui_c, _x)
+        s1.plot(ui_c, _x, label='Computed')
+
+        y, data = get_u_vs_y()
+        if self.re in data:
+            s1.plot(data[self.re], y, 'o', fillstyle='none',
+                    label='Ghia et al.')
         s1.set_xlabel(r'$v_x$')
         s1.set_ylabel(r'$y$')
+        s1.legend()
 
         s2 = plt.subplot(212)
-        s2.plot(_x, vi_c)
+        s2.plot(_x, vi_c, label='Computed')
+        x, data = get_v_vs_x()
+        if self.re in data:
+            s2.plot(x, data[self.re], 'o', fillstyle='none',
+                    label='Ghia et al.')
         s2.set_xlabel(r'$x$')
         s2.set_ylabel(r'$v_y$')
+        s2.legend()
 
         fig = os.path.join(self.output_dir, 'centerline.png')
         plt.savefig(fig, dpi=300)
+        return _x, ui, vi, ui_c, vi_c
 
 if __name__ == '__main__':
     app = LidDrivenCavity()
     app.run()
     app.post_process(app.info_filename)
-

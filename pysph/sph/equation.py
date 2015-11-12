@@ -326,13 +326,13 @@ class Equation(object):
     ##########################################################################
     # `object` interface.
     ##########################################################################
-    def __init__(self, dest, sources=None):
+    def __init__(self, dest, sources):
         r"""
         Parameters
         ----------
         dest : str
             name of the destination particle array
-        sources : list of str
+        sources : list of str or None
             names of the source particle arrays
         """
         self.dest = dest

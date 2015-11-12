@@ -186,6 +186,13 @@ class Application(object):
                           dest="time_step",
                           default=None,
                           help="Timestep to use for the simulation.")
+        # --max-steps
+        parser.add_option(
+            "--max-steps", action="store", type="int", dest="max_steps",
+            default=1<<31,
+            help="Maximum number of iteration steps to take (defaults to a "
+            "very large value)."
+        )
 
         # --adaptive-timestep
         parser.add_option("--adaptive-timestep", action="store_true",
@@ -403,14 +410,6 @@ class Application(object):
 
         parser.add_option_group(interfaces)
 
-        # solver job resume support
-        parser.add_option('--resume', action='store', dest='resume',
-                          metavar='COUNT|count|?',
-                          help=('Resume solver from specified time (as stored '
-                                'in the data in output directory); count chooses '
-                                'a particular file; ? lists all '
-                                'available files')
-                          )
         # User options.
         user_options = OptionGroup(
             self.opt_parse, "User", "User defined command line arguments"
@@ -594,6 +593,8 @@ class Application(object):
         tf = options.final_time
         if tf is not None:
             solver.set_final_time(tf)
+
+        solver.set_max_steps(self.options.max_steps)
 
         # Setup the solver output file name
         fname = options.fname
@@ -1091,4 +1092,3 @@ class Application(object):
         generated.
         """
         print('Overload this method to post-process the results.')
-

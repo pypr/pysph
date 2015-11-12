@@ -144,7 +144,8 @@ class TaylorBar(Application):
             Group(
                 equations=[
                     # p
-                    MieGruneisenEOS(dest='bar', sources=None, r0=r0, c0=C, S=S),
+                    MieGruneisenEOS(dest='bar', sources=None, gamma=gamma,
+                                    r0=r0, c0=C, S=S),
 
                     # vi,j : requires properties v00, v01, v10, v11
                     VelocityGradient2D(dest='bar', sources=['bar',]),

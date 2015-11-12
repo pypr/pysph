@@ -671,6 +671,19 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(sorted(p.output_property_arrays), sorted(['x', 'y']))
         self.assertEqual(n.output_property_arrays, ['x'])
 
+    def test_that_remove_property_also_removes_output_arrays(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1,2,3], y=[0,0,0])
+        p.add_property('test')
+        p.set_output_arrays(['x', 'y', 'test'])
+
+        # When
+        p.remove_property('test')
+
+        # Then
+        self.assertEqual(p.output_property_arrays, ['x', 'y'])
+
+
 class ParticleArrayUtils(unittest.TestCase):
     def test_that_get_particles_info_works(self):
         # Given.

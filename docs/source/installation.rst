@@ -429,22 +429,8 @@ menu for your architecture and start it (we will call this the MSVC command
 prompt).  You may make a short cut to it as you will need to use this command
 prompt to build PySPH and also run any of the examples.
 
-See section :ref:`downloading-pysph` and get a copy of PySPH.  On the MSVC
-command prompt, do the following (replace the ``pysph`` with the path to where
-you have downloaded and unzipped the pysph sources)::
-
-    > cd pysph
-    > .\windows_env.bat
-
-One this is done, you may follow section :ref:`building-pysph`.  You may
-notice that the ``windows_env.bat`` convenience batch file merely sets up
-two environment variables::
-
-    > SET DISTUTILS_USE_SDK=1
-    > SET MSSdk=1
-
-If you are using pip_ to directly install PySPH you will need to set these
-manually.
+After this is done, see section :ref:`downloading-pysph` and get a copy of
+PySPH. Thereafter, you may follow section :ref:`building-pysph`.
 
 .. warning::
 

@@ -139,7 +139,8 @@ class Rings(Application):
             Group(
                 equations=[
                     # p
-                    IsothermalEOS(dest='solid', sources=None, rho0=rho0, c0=c0),
+                    IsothermalEOS(dest='solid', sources=None,
+                                  rho0=rho0, c0=c0, p0=0.0),
 
                     # vi,j : requires properties v00, v01, v10, v11
                     VelocityGradient2D(dest='solid', sources=['solid',]),

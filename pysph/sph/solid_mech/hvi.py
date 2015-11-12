@@ -7,7 +7,7 @@ from math import sqrt
 from pysph.sph.equation import Equation
 
 class VonMisesPlasticity2D(Equation):
-    def __init__(self, dest, sources=None, flow_stress=-1):
+    def __init__(self, dest, sources, flow_stress):
         self.flow_stress = flow_stress
         self.factor = sqrt( 2.0 * flow_stress/3.0 )
         super(VonMisesPlasticity2D,self).__init__(dest, sources)
@@ -29,8 +29,7 @@ class VonMisesPlasticity2D(Equation):
         d_s11[d_idx] = scale * s11a
 
 class MieGruneisenEOS(Equation):
-    def __init__(self, dest, sources=None,
-                 gamma=1.4,r0=-1, c0=-1, S=-1):
+    def __init__(self, dest, sources, gamma,r0, c0, S):
 
         self.gamma = gamma
         self.r0 = r0

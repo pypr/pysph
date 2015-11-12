@@ -2,8 +2,21 @@
 ------
 
 * Release date: not yet released.
-* Fixed major bug with TVF implementation and add support for 3D simulations.
+* Fixed major bug with TVF implementation and add support for 3D simulations
+  with the TVF.
+* Improve many examples to make it easier to make comparisons.
+* Many equation parameters no longer have defaults to prevent accidental
+  errors from not specifying important parameters.
 * Add support to easily handle multiple rigid bodies.
+* Remove the need for the ``windows_env.bat`` script on Windows.  This is
+  automatically setup internally.
+* Add test that checks if all examples run.
+* Remove unused command line options and add a ``--max-steps`` option to allow
+  a user to run a specified number of iterations.
+* Added Ghia et al.'s results for lid-driven-cavity flow for easy comparison.
+* Fix bug with uploaded tarballs that breaks ``pip install pysph`` on Windows.
+* Fix the viewer UI to continue playing files when refresh is pushed.
+
 
 1.0a3
 ------

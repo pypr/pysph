@@ -29,7 +29,7 @@ class SmoothedColor(Equation):
     particle.
 
     """
-    def __init__(self, dest, sources=None, smooth=False):
+    def __init__(self, dest, sources, smooth=False):
         self.smooth = smooth
         super(SmoothedColor, self).__init__(dest, sources)
 
@@ -64,7 +64,7 @@ class ColorGradientUsingNumberDensity(Equation):
     20 & 21) using the parameter :math:`\epsilon`
 
     """
-    def __init__(self, dest, sources=None, epsilon=1e-6):
+    def __init__(self, dest, sources, epsilon=1e-6):
         self.epsilon2 = epsilon*epsilon
         super(ColorGradientUsingNumberDensity, self).__init__(dest, sources)
 
@@ -141,7 +141,7 @@ class MorrisColorGradient(Equation):
     20 & 21) using the parameter :math:`\epsilon`
 
     """
-    def __init__(self, dest, sources=None, epsilon=1e-6):
+    def __init__(self, dest, sources, epsilon=1e-6):
         self.epsilon2 = epsilon*epsilon
         super(MorrisColorGradient, self).__init__(dest, sources)
 
@@ -211,7 +211,7 @@ class SY11ColorGradient(Equation):
     loop. 
 
     """
-    def __init__(self, dest, sources=None, epsilon=1e-6):
+    def __init__(self, dest, sources, epsilon=1e-6):
         self.epsilon2 = epsilon*epsilon
         super(SY11ColorGradient, self).__init__(dest, sources)
 
@@ -282,7 +282,7 @@ class SY11DiracDelta(Equation):
     overwrite the color gradient.
 
     """
-    def __init__(self, dest, sources=None, epsilon=1e-6):
+    def __init__(self, dest, sources, epsilon=1e-6):
         self.epsilon2 = epsilon*epsilon
         super(SY11DiracDelta, self).__init__(dest, sources)
 
@@ -333,7 +333,7 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         \nabla_a W_{ab}
 
     """
-    def __init__(self, dest, sources=None, with_morris_correction=True):
+    def __init__(self, dest, sources, with_morris_correction=True):
         self.with_morris_correction = with_morris_correction
 
         super(InterfaceCurvatureFromNumberDensity,self).__init__(dest, sources)
@@ -382,7 +382,7 @@ class ShadlooYildizSurfaceTensionForce(Equation):
     surface tension force constant.
     
     """
-    def __init__(self, dest, sources=None, sigma=0.1):
+    def __init__(self, dest, sources, sigma=0.1):
         self.sigma = sigma
         
         # base class initialization
@@ -419,7 +419,7 @@ class CSFSurfaceTensionForce(Equation):
     term therefore depends on the gradient of the color field.
     
     """
-    def __init__(self, dest, sources=None, sigma=0.1):
+    def __init__(self, dest, sources, sigma=0.1):
         self.sigma = sigma
         
         # base class initialization
@@ -530,7 +530,7 @@ class AdamiReproducingDivergence(Equation):
         W_{ab}V_b}{\sum_b\boldsymbol{x}_{ab}\cdot \nabla_a W_{ab} V_b}
 
     """
-    def __init__(self, dest, sources=None, dim=2):
+    def __init__(self, dest, sources, dim):
         self.dim = dim
         super(AdamiReproducingDivergence,self).__init__(dest, sources)
 

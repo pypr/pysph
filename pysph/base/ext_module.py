@@ -64,6 +64,7 @@ class ExtModule(object):
             module, the extension will be recompiled.
 
         """
+        self._setup_env_vars()
         self._setup_root(root)
         self.code = src
         self.hash = get_md5(src)
@@ -83,6 +84,11 @@ class ExtModule(object):
 
         self.shared_filesystem = False
         self._create_source()
+
+    def _setup_env_vars(self):
+        if sys.platform == 'win32':
+            os.environ['DISTUTILS_USE_SDK'] = "1"
+            os.environ['MSSdk'] = "1"
 
     def _setup_filenames(self):
         base = self.name
