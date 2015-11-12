@@ -186,6 +186,13 @@ class Application(object):
                           dest="time_step",
                           default=None,
                           help="Timestep to use for the simulation.")
+        # --max-steps
+        parser.add_option(
+            "--max-steps", action="store", type="int", dest="max_steps",
+            default=1<<31,
+            help="Maximum number of iteration steps to take (defaults to a "
+            "very large value)."
+        )
 
         # --adaptive-timestep
         parser.add_option("--adaptive-timestep", action="store_true",
@@ -586,6 +593,8 @@ class Application(object):
         tf = options.final_time
         if tf is not None:
             solver.set_final_time(tf)
+
+        solver.set_max_steps(self.options.max_steps)
 
         # Setup the solver output file name
         fname = options.fname

@@ -255,6 +255,9 @@ class TaylorGreen(Application):
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
+
         from pysph.solver.utils import iter_output
         decay_rate = -8.0 * np.pi**2/self.options.re
 

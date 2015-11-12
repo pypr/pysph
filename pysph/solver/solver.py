@@ -24,7 +24,7 @@ class Solver(object):
     def __init__(self, dim=2, integrator=None, kernel=None,
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
-                 output_at_times = [],
+                 output_at_times=(),
                  fixed_h=False, **kwargs):
         """**Constructor**
 
@@ -155,6 +155,16 @@ class Solver(object):
         self.output_at_times = numpy.asarray(output_at_times)
         self.force_output = False
 
+        # default time step constants
+        self.tf = tf
+        self.dt = dt
+        self.max_steps = 1 << 31
+        self._prev_dt = None
+        self._damping_factor = 1.0
+
+        # flag for constant smoothing lengths
+        self.fixed_h = fixed_h
+
         # Set all extra keyword arguments
         for attr, value in kwargs.items():
             if hasattr(self, attr):
@@ -163,14 +173,6 @@ class Solver(object):
                 msg = 'Unknown keyword arg "%s" passed to constructor'%attr
                 raise TypeError(msg)
 
-        # default time step constants
-        self.tf = tf
-        self.dt = dt
-        self._prev_dt = None
-        self._damping_factor = 1.0
-
-        # flag for constant smoothing lengths
-        self.fixed_h = fixed_h
 
     ##########################################################################
     # Public interface.
@@ -350,6 +352,11 @@ class Solver(object):
         """ Set a list of output times """
         self.output_at_times = numpy.asarray(output_at_times)
 
+    def set_max_steps(self, max_steps):
+        """Set the maximum number of iterations to perform.
+        """
+        self.max_steps = max_steps
+
     def set_compress_output(self, compress):
         """Compress the dumped output files.
         """
@@ -415,7 +422,7 @@ class Solver(object):
         # integrate with.
         self.dt = self._get_timestep()
 
-        while (self.tf - self.t) > EPSILON:
+        while ((self.tf - self.t) > EPSILON) and (self.count < self.max_steps):
 
             # perform any pre step functions
             for callback in self.pre_step_callbacks:

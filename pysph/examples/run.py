@@ -43,8 +43,10 @@ def example_info(module, filename):
 def get_all_examples():
     basedir = HERE
     examples = []
-    ignore = [os.path.abspath(os.path.join(basedir, *vals))
-              for vals in [['run.py'], ['ghia_cavity_data.py']]]
+    _ignore = [['run.py'], ['ghia_cavity_data.py'],
+              ['tests', 'test_examples.py']]
+    ignore = [os.path.abspath(os.path.join(basedir, *pth))
+              for pth in _ignore]
     for dirpath, dirs, files in os.walk(basedir):
         rel_dir = os.path.relpath(dirpath, basedir)
         if rel_dir == '.':

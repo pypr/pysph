@@ -195,7 +195,8 @@ class KHITVF(Application):
             # condition. Also compute the smoothed color based on the color
             # index for a particle.
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+                    StateEquation(dest='fluid', sources=None, rho0=rho0,
+                                  p0=p0, b=1.0),
                     SetWallVelocity(dest='wall', sources=['fluid']),
                     SmoothedColor( dest='fluid', sources=['fluid'] ),
                     ] ),

@@ -251,6 +251,8 @@ class EllipticalDrop(Application):
         if self.rank > 0:
             return
         info = self.read_info(info_file_or_dir)
+        if len(self.output_files) == 0:
+            return
         self._compute_results()
         self._make_final_plot()
 

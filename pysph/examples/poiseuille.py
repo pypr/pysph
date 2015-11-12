@@ -245,6 +245,8 @@ class PoiseuilleFlow(Application):
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
 
         y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()

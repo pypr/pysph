@@ -103,7 +103,7 @@ class NohImplosion(Application):
             # compute the pilot density.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',]),
+                    SummationDensity(dest='fluid', sources=['fluid',], dim=2),
                     ], update_nnps=False
                 ),
 
@@ -123,7 +123,7 @@ class NohImplosion(Application):
             # accelerations.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',]),
+                    SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                     ], update_nnps=False
                 ),
 

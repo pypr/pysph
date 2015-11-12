@@ -223,6 +223,8 @@ class LidDrivenCavity(Application):
         if self.rank > 0:
             return
         info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
         t, ke = self._plot_ke_history()
         x, ui, vi, ui_c, vi_c = self._plot_velocity()
         res = os.path.join(self.output_dir, "results.npz")
