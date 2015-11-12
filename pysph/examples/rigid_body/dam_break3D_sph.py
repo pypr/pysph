@@ -19,11 +19,7 @@ from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
-try:
-    from pysph.tools.gmsh import vtk_file_to_points
-except ImportError:
-    from nose.plugins.skip import SkipTest
-    raise SkipTest('TVTK module not available.')
+from pysph.tools.gmsh import vtk_file_to_points
 
 from pysph.sph.rigid_body import (BodyForce, NumberDensity, RigidBodyCollision,
     RigidBodyMoments, RigidBodyMotion,
