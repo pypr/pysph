@@ -846,7 +846,8 @@ class Application(object):
         if isdir(fname_or_dir):
             fname_or_dir = glob.glob(join(fname_or_dir, "*.info"))[0]
         info_dir = dirname(fname_or_dir)
-        info = json.load(open(fname_or_dir, 'rb'))
+        with open(fname_or_dir, 'r') as f:
+            info = json.load(f)
         self.fname = info.get('fname', self.fname)
         output_dir = info.get('output_dir', self.output_dir)
         if realpath(info_dir) != realpath(output_dir):
