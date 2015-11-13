@@ -29,10 +29,9 @@ rho0 = 10.0
 def make_cube(lx, ly, lz, dx):
     """Return points x, y, z for a cube centered at origin with given lengths.
     """
-    _x = np.arange(-lx/2, lx/2 + dx, dx)
-    _y = np.arange(-ly/2, ly/2 + dx, dx)
-    _z = np.arange(-lz/2, lz/2 + dx, dx)
-    x, y, z = np.meshgrid(_x, _y, _z)
+    # Convert to floats to be safe with integer division.
+    lx, ly, lz = list(map(float, (lx, ly, lz)))
+    x, y, z = np.mgrid[-lx/2:lx/2+dx:dx,-ly/2:ly/2+dx:dx,-lz/2:lz/2+dx:dx]
     x = x.ravel()
     y = y.ravel()
     z = z.ravel()

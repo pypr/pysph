@@ -1,6 +1,5 @@
 # Standard library imports
 from contextlib import contextmanager
-from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 from distutils.util import get_platform
 from distutils.errors import CompileError, LinkError
@@ -9,13 +8,18 @@ import imp
 import importlib
 import numpy
 import os
-from os.path import expanduser, join, isdir, exists, dirname
+from os.path import dirname, exists, expanduser, isdir, join
 from pyximport import pyxbuild
 import shutil
 import sys
 import time
 
-# Optional imports.
+# Conditional/Optional imports.
+if sys.platform == 'win32':
+    from setuptools.extension import Extension
+else:
+    from distutils.extension import Extension
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -64,7 +68,6 @@ class ExtModule(object):
             module, the extension will be recompiled.
 
         """
-        self._setup_env_vars()
         self._setup_root(root)
         self.code = src
         self.hash = get_md5(src)
@@ -84,11 +87,6 @@ class ExtModule(object):
 
         self.shared_filesystem = False
         self._create_source()
-
-    def _setup_env_vars(self):
-        if sys.platform == 'win32':
-            os.environ['DISTUTILS_USE_SDK'] = "1"
-            os.environ['MSSdk'] = "1"
 
     def _setup_filenames(self):
         base = self.name
@@ -194,10 +192,7 @@ class ExtModule(object):
             with self._lock():
                 if force or self.should_recompile():
                     self._message("Compiling code at:", self.src_path)
-                    inc_dirs = [
-                        dirname(dirname(pysph.__file__)),
-                        numpy.get_include()
-                    ]
+                    inc_dirs = [numpy.get_include()]
                     extra_compile_args, extra_link_args = self._get_extra_args()
 
                     extension = Extension(
