@@ -32,6 +32,6 @@ test_script:
     - ps: >
         if($true)
         {
-        "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat" amd64
+        "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat" amd64;
         python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml
         }
