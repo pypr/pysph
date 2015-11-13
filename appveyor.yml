@@ -3,14 +3,12 @@ environment:
 
   global:
     python: "C:\\Python27-x64"
-    SET_ENV: "C:\\Program Files (x86)\\Common Files\\Microsoft\\Visual C++ for Python\\9.0\\vcvarsall.bat"
 
   EPD_AUTH:
     secure: 8xQi8VNnhx6CdGMEbDsSRCeRh94jQdq1LX9nab6LAWSFaT3cEm61dD3wVtUqn5QM
 
 init:
   - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path
-  - "\"%SET_ENV%\" amd64"
 
 install:
   # Just test to see if we have a reasonable Python.
