@@ -236,6 +236,9 @@ class SummationDensityRigidBody(Equation):
         self.rho0 = rho0
         super(SummationDensityRigidBody, self).__init__(dest, sources)
 
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
     def loop(self, d_idx, d_rho, s_idx, s_V, WIJ):
         d_rho[d_idx] += self.rho0/s_V[s_idx]*WIJ
 
@@ -363,7 +366,7 @@ class EulerStepRigidBody(IntegratorStep):
 
 class RK2StepRigidBody(IntegratorStep):
     def initialize(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_omega, d_omega0, d_vc, d_vc0, d_num_body):
+                   d_omega, d_omega0, d_vc, d_vc0, d_num_body):
         _i = declare('int')
         _j = declare('int')
         base = declare('int')
