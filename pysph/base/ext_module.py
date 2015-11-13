@@ -1,6 +1,5 @@
 # Standard library imports
 from contextlib import contextmanager
-from distutils.extension import Extension
 from distutils.sysconfig import get_config_var
 from distutils.util import get_platform
 from distutils.errors import CompileError, LinkError
@@ -11,6 +10,7 @@ import numpy
 import os
 from os.path import expanduser, join, isdir, exists, dirname
 from pyximport import pyxbuild
+from setuptools.extension import Extension
 import shutil
 import sys
 import time
@@ -64,7 +64,6 @@ class ExtModule(object):
             module, the extension will be recompiled.
 
         """
-        self._setup_env_vars()
         self._setup_root(root)
         self.code = src
         self.hash = get_md5(src)
@@ -84,11 +83,6 @@ class ExtModule(object):
 
         self.shared_filesystem = False
         self._create_source()
-
-    def _setup_env_vars(self):
-        if sys.platform == 'win32':
-            os.environ['DISTUTILS_USE_SDK'] = "1"
-            os.environ['MSSdk'] = "1"
 
     def _setup_filenames(self):
         base = self.name

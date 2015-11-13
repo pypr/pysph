@@ -1,5 +1,5 @@
 numpy
-setuptools>=3.2
+setuptools>=6.0
 Cython>=0.20
 mako
 nose>=1.0.0
