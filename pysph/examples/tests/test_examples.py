@@ -15,7 +15,7 @@ def run_example(module):
     cmd = [sys.executable, "-m", module, "--max-steps", "1",
            "--disable-output", "-q", "-d", out_dir]
     try:
-        subprocess.check_output(' '.join(cmd), shell=True)
+        subprocess.check_output(cmd)
     finally:
         shutil.rmtree(out_dir)
 
