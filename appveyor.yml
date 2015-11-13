@@ -29,12 +29,9 @@ install:
 
 test_script:
     # Run the tests.
-    - ps: |
-    if($true)
-    {
-    "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat" amd64
-    python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml
-    }
-    # "%CMD_IN_ENV% python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml"
-    # Upload results to appveyor.
-    - ps: (new-object System.Net.WebClient).UploadFile("https://ci.appveyor.com/api/testresults/xunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\nosetests.xml))
+    - ps: >
+        if($true)
+        {
+        "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\vcvarsall.bat" amd64
+        python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml
+        }
