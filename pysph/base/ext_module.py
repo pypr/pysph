@@ -8,14 +8,18 @@ import imp
 import importlib
 import numpy
 import os
-from os.path import expanduser, join, isdir, exists, dirname
+from os.path import dirname, exists, expanduser, isdir, join
 from pyximport import pyxbuild
-from setuptools.extension import Extension
 import shutil
 import sys
 import time
 
-# Optional imports.
+# Conditional/Optional imports.
+if sys.platform == 'win32':
+    from setuptools.extension import Extension
+else:
+    from distutils.extension import Extension
+
 try:
     from mpi4py import MPI
 except ImportError:
@@ -188,10 +192,7 @@ class ExtModule(object):
             with self._lock():
                 if force or self.should_recompile():
                     self._message("Compiling code at:", self.src_path)
-                    inc_dirs = [
-                        dirname(dirname(pysph.__file__)),
-                        numpy.get_include()
-                    ]
+                    inc_dirs = [numpy.get_include()]
                     extra_compile_args, extra_link_args = self._get_extra_args()
 
                     extension = Extension(
