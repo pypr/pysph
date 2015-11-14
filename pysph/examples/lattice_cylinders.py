@@ -6,7 +6,7 @@ import os
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -36,7 +36,7 @@ Re = 1.0; nu = a*Umax/Re
 # Numerical setup
 nx = 100; dx = L/nx
 ghost_extent = 5 * 1.5 * dx
-hdx = 1.2
+hdx = 1.0
 
 # adaptive time steps
 h0 = hdx * dx
@@ -141,7 +141,7 @@ class LatticeCylinders(Application):
 
     def create_solver(self):
         # Create the kernel
-        kernel = Gaussian(dim=2)
+        kernel = QuinticSpline(dim=2)
 
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
