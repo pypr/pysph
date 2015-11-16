@@ -77,12 +77,13 @@ def get_nx_ny_nz(num_points, bounds):
 
 
 class Interpolator(object):
-    """Convenient class to interpolate particle properties onto a uniform
-    grid.  This is particularly handy for visualization.
+    """Convenient class to interpolate particle properties onto a uniform grid
+    or given set of particles.  This is particularly handy for visualization.
+
     """
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
-                 x=None, y=None, z=None, domain_manager=None):
+                 x=None, y=None, z=None, domain_manager=None, equations=None):
         """
         The x, y, z coordinates need not be specified, and if they are not,
         the bounds of the interpolated domain is automatically computed and
@@ -105,6 +106,9 @@ class Interpolator(object):
             the z-coordinate of points on which to interpolate.
         domain_manager: DomainManager
             An optional Domain manager for periodic domains.
+        equations: sequence
+            A sequence of equations or groups.  Defaults to None.  This is
+            used only if the default interpolation equations are inadequate.
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -118,6 +122,7 @@ class Interpolator(object):
 
         self.pa = None
         self.nnps = None
+        self.equations = equations
         self.func_eval = None
         self.domain_manager = domain_manager
         if x is None and y is None and z is None:
@@ -261,7 +266,11 @@ class Interpolator(object):
 
     def _compile_acceleration_eval(self, arrays):
         names = [x.name for x in self.particle_arrays]
-        equations = [InterpolateFunction(dest='interpolate', sources=names)]
+        if self.equations is None:
+            equations = [InterpolateFunction(dest='interpolate',
+                                             sources=names)]
+        else:
+            equations = self.equations
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
         compiler = SPHCompiler(self.func_eval, None)
         compiler.compile()
