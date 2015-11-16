@@ -226,7 +226,9 @@ class LatticeCylinders(Application):
         x = np.ones_like(y)*L/2
         fname = self.output_files[-1]
         data = load(fname)
-        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
+        dm = self.create_domain()
+        interp = Interpolator(list(data['arrays'].values()), x=x, y=y,
+                              domain_manager=dm)
         ui_lby2 = interp.interpolate('u')
         x = np.ones_like(y)*L
         interp.set_interpolation_points(x=x, y=y)
