@@ -28,6 +28,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 # numpy
+import os
 import numpy as np
 
 # domain and reference values
@@ -162,7 +163,7 @@ class PeriodicCylinders(Application):
         # Create a solver. Damping is performed for 100 iterations.
         solver = Solver(
             kernel=kernel, dim=2, integrator=integrator,
-            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
+            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100, pfreq=500)
         return solver
 
     def create_equations(self):
@@ -201,7 +202,7 @@ class PeriodicCylinders(Application):
                     ], real=False),
 
             # The main accelerations block. The acceleration arrays for the
-            # fluid phase are upadted in this stage for all local particles.
+            # fluid phase are updated in this stage for all local particles.
             Group(
                 equations=[
                     # Pressure gradient terms
@@ -225,6 +226,100 @@ class PeriodicCylinders(Application):
         ]
         return equations
 
+    def post_process(self, info_fname):
+        info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
+
+        t, cd = self._plot_cd_vs_t()
+        res = os.path.join(self.output_dir, 'results.npz')
+        np.savez(res, t=t, cd=cd)
+
+    def _plot_cd_vs_t(self):
+        from pysph.solver.utils import iter_output, load
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.rigid_body import (NumberDensity, ViscosityRigidBody,
+                                          PressureRigidBody)
+        from pysph.sph.equation import Group
+
+        data = load(self.output_files[0])
+        solid = data['arrays']['solid']
+        fluid = data['arrays']['fluid']
+        x, y = solid.x.copy(), solid.y.copy()
+        cx = 0.5 * L; cy = 0.5 * H
+        inside = np.sqrt((x-cx)**2 + (y-cy)**2) <= a
+        dest = solid.extract_particles(inside.nonzero()[0])
+        dest.set_name('solid')
+        for prop in ('fx', 'fy', 'fz'):
+            dest.add_property(prop)
+        equations1 = [
+            Group(equations=[NumberDensity(dest='solid', sources=['solid'])]),
+            Group(equations=[
+                PressureRigidBody(dest='fluid', sources=['solid'], rho0=rho0),
+                ViscosityRigidBody(dest='fluid', sources=['solid'],
+                                   rho0=rho0, nu=nu),
+                ]),
+        ]
+        equations = [
+            Group(
+                equations=[
+                    VolumeSummation(
+                        dest='fluid', sources=['fluid', 'solid']
+                    ),
+                    VolumeSummation(
+                        dest='solid', sources=['fluid', 'solid']
+                    ),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    SetWallVelocity(dest='solid', sources=['fluid']),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    SolidWallPressureBC(dest='solid', sources=['fluid'],
+                                        gx=0.0, b=1.0, rho0=rho0, p0=p0),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    # Pressure gradient terms
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['solid'], gx=0.0, pb=p0),
+                    SolidWallNoSlipBC(
+                        dest='fluid', sources=['solid'], nu=nu),
+                    ], real=True),
+        ]
+
+        sph_eval = SPHEvaluator(
+            arrays=[dest, fluid], equations=equations, dim=2,
+            kernel=QuinticSpline(dim=2)
+        )
+
+        t, cd = [], []
+        for sd, fluid in iter_output(self.output_files, 'fluid'):
+            t.append(sd['t'])
+            dest.fx[:] = dest.fy[:] = dest.fz[:] = 0.0
+            sph_eval.update_particle_arrays([dest, fluid])
+            sph_eval.evaluate()
+            #Fx = np.sum(dest.fx)
+            Fx = np.sum(-fluid.au*fluid.m)
+            cd.append(Fx/(nu*rho0*Umax))
+
+        t, cd = list(map(np.asarray, (t, cd)))
+
+        from matplotlib import pyplot as plt
+        f = plt.figure()
+        plt.plot(t, cd)
+        plt.xlabel('$t$'); plt.ylabel(r'$C_D$')
+        fig = os.path.join(self.output_dir, "cd_vs_t.png")
+        plt.savefig(fig, dpi=300)
+        plt.close()
+
+        return t, cd
+
 if __name__ == '__main__':
     app = PeriodicCylinders()
     app.run()
+    app.post_process(app.info_filename)
