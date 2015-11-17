@@ -13,21 +13,19 @@ from pysph.sph.sph_compiler import SPHCompiler
 
 
 class SPHEvaluator(object):
-    def __init__(self, dest, sources, equations, dim, kernel=None,
+    def __init__(self, arrays, equations, dim, kernel=None,
                  domain_manager=None):
         """Constructor.
 
         Parameters
         ----------
-        dest: ParticleArray
-        sources: list(ParticleArray)
+        arrays: list(ParticleArray)
         equations: list
         dim: int
         kernel: kernel instance.
         domain_manager: DomainManager
         """
-        self.dest = dest
-        self.sources = sources
+        self.arrays = arrays
         self.equations = equations
         self.domain_manager = domain_manager
         self.dim = dim
@@ -36,7 +34,6 @@ class SPHEvaluator(object):
         else:
             self.kernel = kernel
 
-        arrays = list(sources) + [dest]
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
         compiler = SPHCompiler(self.func_eval, None)
         compiler.compile()
@@ -48,8 +45,7 @@ class SPHEvaluator(object):
         """
         self.func_eval.compute(t, dt)
 
-    def update_particle_arrays(self, dest, sources):
-        arrays = list(sources) + [dest]
+    def update_particle_arrays(self, arrays):
         self._create_nnps(arrays)
         self.func_eval.update_particle_arrays(arrays)
 

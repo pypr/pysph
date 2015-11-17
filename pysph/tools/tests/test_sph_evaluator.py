@@ -24,7 +24,7 @@ class TestSPHEvaluator(unittest.TestCase):
         hd = self.src.h[:1]
         dest = get_particle_array(name='dest', x=xd, h=hd)
         sph_eval = SPHEvaluator(
-            dest=dest, sources=[self.src], equations=self.equations, dim=1
+            arrays=[dest, self.src], equations=self.equations, dim=1
         )
 
         # When.
@@ -41,7 +41,7 @@ class TestSPHEvaluator(unittest.TestCase):
         dx = self.dx
         dm = DomainManager(xmin=-dx/2, xmax=1.0+dx/2, periodic_in_x=True)
         sph_eval = SPHEvaluator(
-            dest=dest, sources=[self.src], equations=self.equations, dim=1,
+            arrays=[dest, self.src], equations=self.equations, dim=1,
             domain_manager=dm
         )
 
@@ -57,14 +57,14 @@ class TestSPHEvaluator(unittest.TestCase):
         hd = self.src.h[:1]
         dest = get_particle_array(name='dest', x=xd, h=hd)
         sph_eval = SPHEvaluator(
-            dest=dest, sources=[self.src], equations=self.equations, dim=1
+            [dest, self.src], equations=self.equations, dim=1
         )
         sph_eval.evaluate()
         rho0 = dest.rho[0]
 
         # When.
         dest.x[0] = 0.0
-        sph_eval.update_particle_arrays(dest, [self.src])
+        sph_eval.update_particle_arrays([dest, self.src])
         sph_eval.evaluate()
 
         # Then.
