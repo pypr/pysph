@@ -249,17 +249,10 @@ class PeriodicCylinders(Application):
         cx = 0.5 * L; cy = 0.5 * H
         inside = np.sqrt((x-cx)**2 + (y-cy)**2) <= a
         dest = solid.extract_particles(inside.nonzero()[0])
-        dest.set_name('solid')
-        for prop in ('fx', 'fy', 'fz'):
-            dest.add_property(prop)
-        equations1 = [
-            Group(equations=[NumberDensity(dest='solid', sources=['solid'])]),
-            Group(equations=[
-                PressureRigidBody(dest='fluid', sources=['solid'], rho0=rho0),
-                ViscosityRigidBody(dest='fluid', sources=['solid'],
-                                   rho0=rho0, nu=nu),
-                ]),
-        ]
+        # We use the same equations for this as the simulation, except that we
+        # do not include the acceleration terms as these are externally
+        # imposed.  The goal of these is to find the force of the fluid on the
+        # cylinder, thus, gx=0.0 is used in the following.
         equations = [
             Group(
                 equations=[
@@ -300,15 +293,14 @@ class PeriodicCylinders(Application):
         t, cd = [], []
         for sd, fluid in iter_output(self.output_files, 'fluid'):
             t.append(sd['t'])
-            dest.fx[:] = dest.fy[:] = dest.fz[:] = 0.0
             sph_eval.update_particle_arrays([dest, fluid])
             sph_eval.evaluate()
-            #Fx = np.sum(dest.fx)
             Fx = np.sum(-fluid.au*fluid.m)
             cd.append(Fx/(nu*rho0*Umax))
 
         t, cd = list(map(np.asarray, (t, cd)))
 
+        # Now plot the results.
         from matplotlib import pyplot as plt
         f = plt.figure()
         plt.plot(t, cd)
