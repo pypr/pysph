@@ -8,6 +8,9 @@ problem and also  Adami, Hu and Adams, JCP, 2013, vol 241, pp 292-307.
 In particular, we note that we set c0 from Ellero and Adams as using the
 value from Adami et al. will cause the solution to blow up.
 
+If one sets c0=10*Umax and sets pb=300*p0, that will cause particles to void
+at the rear of the cylinder.
+
 """
 
 # PySPH imports
@@ -42,6 +45,7 @@ fx = 2.5e-4
 c0 = 0.02
 rho0 = 1000.0
 p0 = c0*c0*rho0
+pb = p0
 
 # Reynolds number and kinematic viscosity
 nu = 0.1/rho0; Re = a*Umax/nu
@@ -60,7 +64,7 @@ dt_force = 0.25 * np.sqrt(h0/abs(fx))
 T = a/Umax
 
 tf = 2.5*T
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 
 class PeriodicCylinders(Application):
@@ -207,7 +211,7 @@ class PeriodicCylinders(Application):
                 equations=[
                     # Pressure gradient terms
                     MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
+                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=pb),
 
                     # fluid viscosity
                     MomentumEquationViscosity(
@@ -279,7 +283,7 @@ class PeriodicCylinders(Application):
                 equations=[
                     # Pressure gradient terms
                     MomentumEquationPressureGradient(
-                        dest='fluid', sources=['solid'], gx=0.0, pb=p0),
+                        dest='fluid', sources=['solid'], gx=0.0, pb=pb),
                     SolidWallNoSlipBC(
                         dest='fluid', sources=['solid'], nu=nu),
                     ], real=True),
