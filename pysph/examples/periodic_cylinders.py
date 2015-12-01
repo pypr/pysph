@@ -296,6 +296,7 @@ class PeriodicCylinders(Application):
 
         t, cd = [], []
         for sd, fluid in iter_output(self.output_files, 'fluid'):
+            fluid.remove_property('vmag2')
             t.append(sd['t'])
             sph_eval.update_particle_arrays([dest, fluid])
             sph_eval.evaluate()
