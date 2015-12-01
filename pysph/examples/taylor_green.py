@@ -1,4 +1,4 @@
-"""Taylor Green vortex flow (10 minutes).
+"""Taylor Green vortex flow (5 minutes).
 """
 
 import numpy as np
@@ -98,7 +98,7 @@ class TaylorGreen(Application):
         dt_force = 0.25 * 1.0
 
         self.tf = 5.0
-        self.dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(

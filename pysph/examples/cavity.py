@@ -59,7 +59,7 @@ class LidDrivenCavity(Application):
         dt_force = 1.0
 
         self.tf = 10.0
-        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_particles(self):
         dx = self.dx

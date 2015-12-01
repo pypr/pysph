@@ -45,7 +45,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 100.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 class CouetteFlow(Application):
     def create_domain(self):

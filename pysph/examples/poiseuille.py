@@ -63,7 +63,7 @@ class PoiseuilleFlow(Application):
         dt_viscous = 0.125 * h0**2/self.nu
         dt_force = 0.25 * np.sqrt(h0/self.fx)
 
-        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(xmin=0, xmax=self.Lx, periodic_in_x=True)

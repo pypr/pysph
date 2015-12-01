@@ -45,7 +45,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
 tf = 1000.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 class LatticeCylinders(Application):
     def create_domain(self):
