@@ -293,6 +293,9 @@ class TaylorGreen(Application):
         np.savez(fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
                  decay_ex=decay_ex)
 
+        import matplotlib
+        matplotlib.use('Agg')
+
         from matplotlib import pyplot as plt
         plt.clf()
         plt.semilogy(t, decay_ex, label="exact")

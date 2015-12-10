@@ -233,6 +233,10 @@ class LatticeCylinders(Application):
         x = np.ones_like(y)*L
         interp.set_interpolation_points(x=x, y=y)
         ui_l = interp.interpolate('u')
+
+        import matplotlib
+        matplotlib.use('Agg')
+
         from matplotlib import pyplot as plt
         y /= H
         y -= 0.5

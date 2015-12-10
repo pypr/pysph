@@ -244,6 +244,8 @@ class EllipticalDrop(Application):
 
     def post_process(self, info_file_or_dir):
         try:
+            import matplotlib
+            matplotlib.use('Agg')
             from matplotlib import pyplot as plt
         except ImportError:
             print("Post processing requires matplotlib.")

@@ -216,6 +216,8 @@ class LidDrivenCavity(Application):
 
     def post_process(self, info_fname):
         try:
+            import matplotlib
+            matplotlib.use('Agg')
             from matplotlib import pyplot as plt
         except ImportError:
             print("Post processing requires matplotlib.")

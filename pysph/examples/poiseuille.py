@@ -248,6 +248,9 @@ class PoiseuilleFlow(Application):
         if len(self.output_files) == 0:
             return
 
+        import matplotlib
+        matplotlib.use('Agg')
+
         y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()
         res = os.path.join(self.output_dir, "results.npz")

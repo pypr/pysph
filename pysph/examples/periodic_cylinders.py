@@ -306,6 +306,9 @@ class PeriodicCylinders(Application):
         t, cd = list(map(np.asarray, (t, cd)))
 
         # Now plot the results.
+        import matplotlib
+        matplotlib.use('Agg')
+
         from matplotlib import pyplot as plt
         f = plt.figure()
         plt.plot(t, cd)
