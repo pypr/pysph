@@ -1,15 +1,9 @@
 """General post-processing utility for solution data"""
 
-VV=True
-try:
-    import visvis
-except ImportError:
-    VV=False
-
-TVTK=True
+TVTK = True
 try:
     from tvtk.api import tvtk, write_data
-except ImportError:
+except (ImportError, SystemExit):
     TVTK = False
 
 if TVTK:
@@ -128,7 +122,7 @@ class PySPH2VTK(object):
             array_dict[ array.name ] = array
 
         self.array_dict = array_dict
-            
+
     def _write_vtk_snapshot(self, mesh, directory, _fname):
         fname = path.join(directory, _fname)
         write_data( mesh, fname )
