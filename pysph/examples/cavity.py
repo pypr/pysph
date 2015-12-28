@@ -43,7 +43,7 @@ class LidDrivenCavity(Application):
         )
         group.add_option(
             "--n-vel-avg", action="store", type=int, dest="n_avg",
-            default=10,
+            default=1,
             help="Average velocities over these many saved timesteps."
         )
 
