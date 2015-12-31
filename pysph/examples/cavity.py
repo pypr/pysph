@@ -41,15 +41,17 @@ class LidDrivenCavity(Application):
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
+        self.n_avg = 5
         group.add_option(
             "--n-vel-avg", action="store", type=int, dest="n_avg",
-            default=1,
+            default=None,
             help="Average velocities over these many saved timesteps."
         )
 
     def consume_user_options(self):
         nx = self.options.nx
-        self.n_avg = self.options.n_avg
+        if self.options.n_avg is not None:
+            self.n_avg = self.options.n_avg
         self.dx = L/nx
         self.re = self.options.re
         h0 = hdx * self.dx
