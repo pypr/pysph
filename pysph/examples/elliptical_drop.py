@@ -1,4 +1,4 @@
-"""Evolution of a circular patch of incompressible fluid. (20 seconds)
+"""Evolution of a circular patch of incompressible fluid. (60 seconds)
 
 See J. J. Monaghan "Simulating Free Surface Flows with SPH", JCP, 1994, 100, pp
 399 - 406
@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import os
 from numpy import array, ones_like, mgrid, sqrt
+import numpy as np
 
 # PySPH base and carray imports
 from pysph.base.utils import get_particle_array_wcsph
@@ -52,8 +53,10 @@ def _numpy_integrate(y0, tf, dt):
         y += dt*_derivative(y, t)
     return y
 
-def exact_solution(tf=0.0075, dt=1e-6):
+def exact_solution(tf=0.0075, dt=1e-6, n=101):
     """Exact solution for the locus of the circular patch.
+
+    n is the number of points to find the result at.
 
     Returns the semi-minor axis, A, pressure, x, y.
 
@@ -73,7 +76,7 @@ def exact_solution(tf=0.0075, dt=1e-6):
     dadt = _derivative([Anew, anew], tf)[0]
     po = 0.5*-anew**2 * (dadt - Anew**2)
 
-    theta = numpy.linspace(0,2*numpy.pi, 101)
+    theta = numpy.linspace(0,2*numpy.pi, n)
 
     return anew, Anew, po, anew*numpy.cos(theta), 1/anew*numpy.sin(theta)
 
@@ -84,6 +87,7 @@ class EllipticalDrop(Application):
         self.ro = 1.0
         self.hdx = 1.3
         self.dx = 0.025
+        self.alpha = 0.1
 
     def create_particles(self):
         """Create the circular patch of fluid."""
@@ -117,6 +121,8 @@ class EllipticalDrop(Application):
         pa.remove_particles(indices)
 
         print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
+        mu = ro*self.alpha*hdx*dx*co/8.0
+        print("Effective viscosity: rho*alpha*h*c/8 = %s"%mu)
 
         # add requisite variables needed for this formulation
         for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
@@ -124,7 +130,8 @@ class EllipticalDrop(Application):
             pa.add_property(name)
 
         # set the output property arrays
-        pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'h', 'p', 'pid', 'tag', 'gid'] )
+        pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm',
+                               'h', 'p', 'pid', 'tag', 'gid'] )
 
         return [pa]
 
@@ -135,8 +142,8 @@ class EllipticalDrop(Application):
         # predictor corrector and a TVD-RK3 integrators.
 
         #integrator = PECIntegrator(fluid=WCSPHStep())
-        #integrator = EPECIntegrator(fluid=WCSPHStep())
-        integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
+        integrator = EPECIntegrator(fluid=WCSPHStep())
+        #integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
 
         # Construct the solver. n_damp determines the iterations until which smaller
         # time-steps are used when using adaptive time-steps. Use the output_at_times
@@ -145,7 +152,7 @@ class EllipticalDrop(Application):
         dt = 5e-6; tf = 0.0076
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                         dt=dt, tf=tf, adaptive_timestep=True,
-                        cfl=0.05, n_damp=50,
+                        cfl=0.3, n_damp=50,
                         output_at_times=[0.0008, 0.0038])
 
         # select True if you want to dump out remote particle properties in
@@ -174,7 +181,8 @@ class EllipticalDrop(Application):
 
                     # Acceleration: du,v/dt
                     #MomentumEquationDeltaSPH(dest='fluid', sources=['fluid'], alpha=0.2, rho0=ro, c0=co),
-                    MomentumEquation(dest='fluid', sources=['fluid'], alpha=0.2, beta=0.0),
+                    MomentumEquation(dest='fluid', sources=['fluid'],
+                        alpha=self.alpha, beta=0.0, c0=self.co),
 
                     # XSPH velocity correction
                     XSPHCorrection(dest='fluid', sources=['fluid']),
@@ -192,17 +200,9 @@ class EllipticalDrop(Application):
             ]
         return equations
 
-    def post_process(self, info_file_or_dir):
-        try:
-            from matplotlib import pyplot as plt
-        except ImportError:
-            print("Post processing requires matplotlib.")
-            return
-        if self.rank > 0:
-            return
-        info = self.read_info(info_file_or_dir)
-        files = self.output_files
-        last_output = files[-1]
+    def _make_final_plot(self):
+        from matplotlib import pyplot as plt
+        last_output = self.output_files[-1]
         from pysph.solver.utils import load
         data = load(last_output)
         pa = data['arrays']['fluid']
@@ -220,6 +220,41 @@ class EllipticalDrop(Application):
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
         print("Figure written to %s."%fig)
+
+    def _compute_results(self):
+        from pysph.solver.utils import iter_output
+        from collections import defaultdict
+        data = defaultdict(list)
+        for sd, array in iter_output(self.output_files, 'fluid'):
+            _t = sd['t']
+            data['t'].append(_t)
+            m, u, v, x, y = array.get('m', 'u', 'v', 'x', 'y')
+            vmag2 = u**2 + v**2
+            data['ke'].append(0.5*np.sum(m*vmag2))
+            data['xmax'].append(x.max())
+            data['ymax'].append(y.max())
+            a, A, po, _xe, _ye = exact_solution(_t, n=0)
+            data['minor'].append(a)
+            data['major'].append(1.0/a)
+
+        for key in data:
+            data[key] = np.asarray(data[key])
+        fname = os.path.join(self.output_dir, 'results.npz')
+        np.savez(fname, **data)
+
+    def post_process(self, info_file_or_dir):
+        try:
+            from matplotlib import pyplot as plt
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
+        if self.rank > 0:
+            return
+        info = self.read_info(info_file_or_dir)
+        if len(self.output_files) == 0:
+            return
+        self._compute_results()
+        self._make_final_plot()
 
 
 if __name__ == '__main__':

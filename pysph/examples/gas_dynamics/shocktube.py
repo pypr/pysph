@@ -120,7 +120,7 @@ class ShockTube2D(Application):
             # available for the particles.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',], 
+                    SummationDensity(dest='fluid', sources=['fluid',],
                                      k=kernel_factor, density_iterations=True, dim=dim, htol=1e-3),
                     ], update_nnps=True, iterate=True, max_iterations=50,
                 ),
@@ -152,8 +152,8 @@ class ShockTube2D(Application):
             #For the GSPH density and smoothing length update algorithm, we
             #first scale the smoothing lengths to get the pilot density
             #estimate. Since the particle smoothing lengths are updated, we
-            #need to re-compute the neighbors.  
-            
+            #need to re-compute the neighbors.
+
             Group( equations=[
                    ScaleSmoothingLength(dest='fluid', sources=None, factor=2.0), ],
                   update_nnps=True ),
@@ -163,7 +163,7 @@ class ShockTube2D(Application):
 
             Group(
                equations=[
-                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                    ], update_nnps=False
                ),
 
@@ -177,7 +177,7 @@ class ShockTube2D(Application):
                     UpdateSmoothingLengthFromVolume(
                         dest='fluid', sources=None, k=kernel_factor, dim=dim),
                     ], update_nnps=True
-                ),    
+                ),
 
             #Now that we have the correct smoothing length, we need to
             #evaluate the density which will be used in the
@@ -185,7 +185,7 @@ class ShockTube2D(Application):
 
             Group(
                equations=[
-                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                    ], update_nnps=False
                ),
             ################ END ADAPTIVE DENSITY-H ###################

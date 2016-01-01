@@ -80,7 +80,7 @@ class TestBasicCodeBlock(TestBase):
 
 class TestEquations(TestBase):
     def test_simple_equation(self):
-        eq = Equation('fluid')
+        eq = Equation('fluid', None)
         self.assertEqual(eq.name, 'Equation')
         self.assertEqual(eq.no_source, True)
         self.assertEqual(eq.dest, 'fluid')
@@ -97,7 +97,7 @@ class TestEquations(TestBase):
 
         class Test(Equation):
             pass
-        eq = Test('fluid')
+        eq = Test('fluid', [])
         self.assertEqual(eq.name, 'Test')
         self.assertEqual(eq.no_source, True)
 
@@ -154,7 +154,10 @@ class TestGroup(TestBase):
     def setUp(self):
         from pysph.sph.basic_equations import SummationDensity
         from pysph.sph.wc.basic import TaitEOS
-        self.group = Group([SummationDensity('f', ['f']), TaitEOS('f', None)])
+        self.group = Group(
+            [SummationDensity('f', ['f']),
+             TaitEOS('f', None, rho0=1.0, c0=1.0, gamma=1.4, p0=1.0)]
+        )
 
     def test_precomputed(self):
         g = self.group

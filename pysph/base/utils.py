@@ -35,11 +35,19 @@ def arange_long(start, stop=-1):
         return arange
 
 
+# A collection of default properties for all SPH arrays.
+DEFAULT_PROPS = set(
+    ('x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
+     'au', 'av', 'aw', 'gid', 'pid', 'tag')
+)
+
+
 def get_particle_array(additional_props=None, constants=None, **props):
     """Create and return a particle array with default properties.
 
     The default properties are ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho',
-    'p', 'au', 'av', 'aw', 'gid', 'pid', 'tag']
+    'p', 'au', 'av', 'aw', 'gid', 'pid', 'tag'], this set is available in
+    `DEFAULT_PROPS`.
 
 
     Parameters
@@ -79,25 +87,25 @@ def get_particle_array(additional_props=None, constants=None, **props):
     else:
         name = "array"
 
+    # default properties for an SPH particle
+    default_props = set(DEFAULT_PROPS)
+
+    # add any additional props to the default_props
+    if additional_props:
+        default_props = default_props.union(additional_props)
+
     np = 0
-    nprops = len(props)
 
     prop_dict = {}
     for prop in props.keys():
         data = numpy.asarray(props[prop])
         np = data.size
 
-        if prop in ['tag']:
+        if prop in ['tag', 'pid']:
             prop_dict[prop] = {'data':data,
                                'type':'int',
                                'name':prop}
-
-        if prop in ['pid']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['gid']:
+        elif prop in ['gid']:
             prop_dict[prop] = {'data':data.astype(numpy.uint32),
                                'type':'unsigned int',
                                'name':prop}
@@ -106,31 +114,21 @@ def get_particle_array(additional_props=None, constants=None, **props):
                                'type':'double',
                                'name':prop}
 
-    # default properties for an SPH particle
-    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho', 'p',
-                     'au', 'av', 'aw', 'gid', 'pid', 'tag']
-
-    # add any additional props
-    if additional_props:
-        default_props.extend( additional_props )
-        default_props = list( set(default_props) )
-
     # Add the default props
     for prop in default_props:
         if not prop in prop_dict:
             if prop in ["pid"]:
                 prop_dict[prop] = {'name':prop, 'type':'int',
                                    'default':0}
-
+            elif prop in ['tag']:
+                prop_dict[prop] = {'name':prop, 'type':'int',
+                                    'default':ParticleTAGS.Local}
             elif prop in ['gid']:
                 data = numpy.ones(shape=np, dtype=numpy.uint32)
                 data[:] = UINT_MAX
 
                 prop_dict[prop] = {'name':prop, 'type':'unsigned int',
                                    'data':data, 'default':UINT_MAX}
-
-            elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'int'}
 
             else:
                 prop_dict[prop] = {'name':prop, 'type':'double',
@@ -171,67 +169,12 @@ def get_particle_array_wcsph(constants=None, **props):
 
     """
 
-    # handle the name separately
-    if 'name' in props:
-        name = props['name']
-        props.pop('name')
-    else:
-        name = ""
+    wcsph_props = ['cs', 'ax', 'ay', 'az', 'arho', 'x0','y0', 'z0',
+                   'u0', 'v0','w0', 'rho0', 'div']
 
-    nprops = len(props)
-    np = 0
-
-    prop_dict = {}
-    for prop in props.keys():
-        data = numpy.asarray(props[prop])
-        np = data.size
-
-        if prop in ['tag']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['pid']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
-
-        if prop in ['gid']:
-            prop_dict[prop] = {'data':data.astype(numpy.uint32),
-                               'type': 'unsigned int',
-                               'name':prop}
-        else:
-            prop_dict[prop] = {'data':data,
-                               'type':'double',
-                               'name':prop}
-
-    default_props = ['x', 'y', 'z', 'u', 'v', 'w', 'h', 'rho', 'm',
-                     'p', 'cs', 'ax', 'ay', 'az', 'au', 'av', 'aw',
-                     'x0','y0', 'z0','u0', 'v0','w0',
-                     'arho', 'rho0', 'div', 'gid','pid', 'tag']
-
-    for prop in default_props:
-        if not prop in prop_dict:
-            if prop in ["pid"]:
-                prop_dict[prop] = {'name':prop, 'type':'int',
-                                   'default':0}
-
-            elif prop in ['gid']:
-                data = numpy.ones(shape=np, dtype=numpy.uint32)
-                data[:] = UINT_MAX
-
-                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
-                                   'data':data}
-
-            elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'int',}
-
-            else:
-                prop_dict[prop] = {'name':prop, 'type':'double',
-                                   'default':0}
-
-    # create the particle array
-    pa = ParticleArray(name=name, constants=constants, **prop_dict)
+    pa = get_particle_array(
+        constants=constants, additional_props=wcsph_props, **props
+    )
 
     # default property arrays to save out.
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
@@ -287,6 +230,9 @@ def get_particle_array_iisph(constants=None, **props):
 def get_particle_array_rigid_body(constants=None, **props):
     """Return a particle array for a rigid body motion.
 
+    For multiple bodies, add a body_id property starting at index 0 with each
+    index denoting the body to which the particle corresponds to.
+
     Parameters
     ----------
     constants : dict
@@ -303,32 +249,37 @@ def get_particle_array_rigid_body(constants=None, **props):
 
     """
     extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'x0', 'y0', 'z0']
+
+    body_id = props.pop('body_id', None)
+    nb = 1 if body_id is None else numpy.max(body_id) + 1
+
     consts = {'total_mass':0.0,
-              'cm': [0.0, 0.0, 0.0],
+              'num_body': numpy.asarray(nb, dtype=int),
+              'cm': numpy.zeros(3*nb, dtype=float),
 
               # The mi are also used to temporarily reduce mass (1), center of
               # mass (3) and the interia components (6), total force (3), total
               # torque (3).
-              'mi': [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-              'force': [0.0, 0.0, 0.0],
-              'torque': [0.0, 0.0, 0.0],
+              'mi': numpy.zeros(16*nb, dtype=float),
+              'force': numpy.zeros(3*nb, dtype=float),
+              'torque': numpy.zeros(3*nb, dtype=float),
               # velocity, acceleration of CM.
-              'vc': [0.0, 0.0, 0.0],
-              'ac': [0.0, 0.0, 0.0],
-              'vc0': [0.0, 0.0, 0.0],
+              'vc': numpy.zeros(3*nb, dtype=float),
+              'ac': numpy.zeros(3*nb, dtype=float),
+              'vc0': numpy.zeros(3*nb, dtype=float),
               # angular velocity, acceleration of body.
-              'omega': [0.0, 0.0, 0.0],
-              'omega0': [0.0, 0.0, 0.0],
-              'omega_dot': [0.0, 0.0, 0.0]
+              'omega': numpy.zeros(3*nb, dtype=float),
+              'omega0': numpy.zeros(3*nb, dtype=float),
+              'omega_dot': numpy.zeros(3*nb, dtype=float)
               }
     if constants:
         consts.update(constants)
     pa = get_particle_array(constants=consts, additional_props=extra_props,
                             **props)
+    pa.add_property('body_id', type='int', data=body_id)
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
                            'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V',
-                           'fx', 'fy', 'fz'] )
+                           'fx', 'fy', 'fz', 'body_id'] )
     return pa
 
 def get_particle_array_tvf_fluid(constants=None, **props):

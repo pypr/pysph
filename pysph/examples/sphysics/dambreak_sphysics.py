@@ -60,7 +60,6 @@ class DamBreak3DSPhysics(Application):
     def create_solver(self):
         kernel = CubicSpline(dim=3)
 
-        print(self.options.test)
         if self.options.test:
             integrator = PECIntegrator(fluid=WCSPHStep(),boundary=WCSPHStep())
             adaptive, n_damp = False, 0
@@ -69,7 +68,8 @@ class DamBreak3DSPhysics(Application):
             adaptive, n_damp = True, 100
 
         solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
-                        adaptive_timestep=adaptive, tf=tf, dt=dt, n_damp=n_damp)
+                        adaptive_timestep=adaptive, tf=tf, dt=dt,
+                        n_damp=n_damp)
         return solver
 
     def create_equations(self):
@@ -77,24 +77,27 @@ class DamBreak3DSPhysics(Application):
 
             # Equation of state
             Group(equations=[
-
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=rho0, c0=c0, gamma=gamma),
+                    TaitEOS(dest='fluid', sources=None,
+                            rho0=rho0, c0=c0, gamma=gamma),
+                    TaitEOSHGCorrection(dest='boundary', sources=None,
+                                        rho0=rho0, c0=c0, gamma=gamma),
 
                     ], real=False),
 
             # Continuity Momentum and XSPH equations
             Group(equations=[
-                       ContinuityEquation(dest='fluid', sources=['fluid', 'boundary']),
-                       ContinuityEquation(dest='boundary', sources=['fluid']),
+                    ContinuityEquation(dest='fluid',
+                                       sources=['fluid', 'boundary']),
+                    ContinuityEquation(dest='boundary', sources=['fluid']),
 
-                       MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                                        alpha=alpha, beta=beta, gz=-9.81,
-                                        tensile_correction=True),
+                    MomentumEquation(
+                        dest='fluid', sources=['fluid', 'boundary'], c0=c0,
+                        alpha=alpha, beta=beta, gz=-9.81,
+                        tensile_correction=True),
 
                        # Position step with XSPH
-                       XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
-                       ])
+                    XSPHCorrection(dest='fluid', sources=['fluid'], eps=eps)
+                 ])
             ]
         return equations
 

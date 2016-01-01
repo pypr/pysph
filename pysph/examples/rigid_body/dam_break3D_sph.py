@@ -135,4 +135,3 @@ class DamBreak3DSPH(Application):
 if __name__ == '__main__':
     app = DamBreak3DSPH()
     app.run()
-

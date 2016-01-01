@@ -7,13 +7,12 @@ import numpy as np
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.utils import load
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
 from pysph.sph.integrator_step import TransportVelocityStep
-from pysph.tools.interpolator import Interpolator
 
 # the eqations
 from pysph.sph.equation import Group
@@ -21,7 +20,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 
 # domain and reference values
@@ -37,7 +36,7 @@ c0 = 10*Vmax; p0 = c0*c0*rho0
 # Numerical setup
 dx = 0.05
 ghost_extent = 5 * dx
-hdx = 1.2
+hdx = 1.0
 
 # adaptive time steps
 h0 = hdx * dx
@@ -105,8 +104,10 @@ class CouetteFlow(Application):
         for name in ['ug','vg','wg']:
             channel.add_property(name)
 
+        channel.add_output_arrays(['ug', 'vg', 'uf', 'vf', 'V'])
         # magnitude of velocity
         fluid.add_property('vmag2')
+        fluid.add_output_arrays(['vmag2'])
 
         # setup the particle properties
         volume = dx * dx
@@ -135,7 +136,7 @@ class CouetteFlow(Application):
         return [fluid, channel]
 
     def create_solver(self):
-        kernel = Gaussian(dim=2)
+        kernel = QuinticSpline(dim=2)
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
         solver = Solver(kernel=kernel, dim=2, integrator=integrator)
@@ -155,6 +156,9 @@ class CouetteFlow(Application):
             # particles.
             Group(
                 equations=[
+                    VolumeSummation(
+                        dest='channel', sources=['fluid', 'channel']
+                    ),
                     SummationDensity(dest='fluid', sources=['fluid','channel']),
                     ], real=False),
 
@@ -205,9 +209,13 @@ class CouetteFlow(Application):
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
 
-        self._plot_u_vs_y()
-        self._plot_ke_history()
+        y_ex, u_ex, y, u = self._plot_u_vs_y()
+        t, ke = self._plot_ke_history()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, t=t, ke=ke, y_ex=y_ex, u_ex=u_ex, y=y, u=u)
 
     def _plot_ke_history(self):
         from pysph.tools.pprocess import get_ke_history
@@ -218,33 +226,31 @@ class CouetteFlow(Application):
         plt.xlabel('t'); plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
+        return t, ke
 
     def _plot_u_vs_y(self):
         files = self.output_files
-        # interpolate the u-velocity profile along the centerline
-        y = np.linspace(0, 1, 101)
-        x = np.ones_like(y) * 0.2
-        h = np.ones_like(y) * 1.5 * 0.01
-
         # take the last solution data
         fname = files[-1]
         data = load(fname)
         tf = data['solver_data']['t']
-
-        interp = Interpolator(list(data['arrays'].values()), x=x, y=y)
-        ui = interp.interpolate('u')
+        fluid = data['arrays']['fluid']
+        yp = fluid.y.copy()
+        up = fluid.u.copy()
 
         # exact parabolic profile for the u-velocity
-        ue = Vmax*y/Ly
+        ye = np.linspace(0, 1, 101)
+        ue = Vmax*ye/Ly
         from matplotlib import pyplot as plt
         plt.clf()
-        plt.plot(y, ue, label="exact")
-        plt.plot(y, ui, label="computed")
+        plt.plot(ye, ue, label="exact")
+        plt.plot(yp, up, 'ko', fillstyle='none', label="computed")
         plt.xlabel('y'); plt.ylabel('u')
         plt.legend()
         plt.title('Velocity profile at %s'%tf)
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
+        return ye, ue, yp, up
 
 
 if __name__ == '__main__':

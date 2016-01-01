@@ -46,7 +46,7 @@ class SummationDensity(Equation):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
 class SummationDensityBoundary(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(SummationDensityBoundary, self).__init__(dest, sources)
 
@@ -71,7 +71,7 @@ class NormalizedSummationDensity(Equation):
 
 
 class AdvectionAcceleration(Equation):
-    def __init__(self, dest, sources=None, gx=0.0, gy=0.0, gz=0.0):
+    def __init__(self, dest, sources, gx=0.0, gy=0.0, gz=0.0):
         self.gx = gx
         self.gy = gy
         self.gz = gz
@@ -95,7 +95,7 @@ class AdvectionAcceleration(Equation):
         d_wadv[d_idx] = d_w[d_idx] + dt*d_aw[d_idx]
 
 class ViscosityAcceleration(Equation):
-    def __init__(self, dest, sources=None, nu=1.0):
+    def __init__(self, dest, sources, nu):
         self.nu = nu
         super(ViscosityAcceleration, self).__init__(dest, sources)
 
@@ -110,7 +110,7 @@ class ViscosityAcceleration(Equation):
 class ViscosityAccelerationBoundary(Equation):
     """The acceleration on the fluid due to a boundary.
     """
-    def __init__(self, dest, sources=None, rho0=1.0, nu=1.0):
+    def __init__(self, dest, sources, rho0, nu):
         self.nu = nu
         self.rho0 = rho0
         super(ViscosityAccelerationBoundary, self).__init__(dest, sources)
@@ -142,7 +142,7 @@ class ComputeDII(Equation):
 
 
 class ComputeDIIBoundary(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(ComputeDIIBoundary, self).__init__(dest, sources)
 
@@ -172,7 +172,7 @@ class ComputeRhoAdvection(Equation):
 
 
 class ComputeRhoBoundary(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(ComputeRhoBoundary, self).__init__(dest, sources)
 
@@ -205,7 +205,7 @@ class ComputeAII(Equation):
 class ComputeAIIBoundary(Equation):
     """ This is important and not really discussed in the original IISPH paper.
     """
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(ComputeAIIBoundary, self).__init__(dest, sources)
 
@@ -233,7 +233,7 @@ class ComputeDIJPJ(Equation):
 
 
 class PressureSolve(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0, omega=0.5,
+    def __init__(self, dest, sources, rho0, omega=0.5,
                  tolerance=1e-2, debug=False):
         self.rho0 = rho0
         self.omega = omega
@@ -309,7 +309,7 @@ class PressureSolve(Equation):
             return 1.0
 
 class PressureSolveBoundary(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(PressureSolveBoundary, self).__init__(dest, sources)
 
@@ -348,7 +348,7 @@ class PressureForce(Equation):
 
 
 class PressureForceBoundary(Equation):
-    def __init__(self, dest, sources=None, rho0=1.0):
+    def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(PressureForceBoundary, self).__init__(dest, sources)
 

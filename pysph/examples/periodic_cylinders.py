@@ -1,4 +1,13 @@
-"""Incompressible flow past a periodic array of cylinders. (2 hours)
+"""Incompressible flow past a periodic array of cylinders. (42 hours)
+
+
+See Ellero and Adams, International Journal for Numerical Methods in
+Engineering, 2011, vol 86, pp 1027-1040 for the detailed parameters for this
+problem and also  Adami, Hu and Adams, JCP, 2013, vol 241, pp 292-307.
+
+In particular, we note that we set c0 from Ellero and Adams as using the
+value from Adami et al. will cause the solution to blow up.
+
 """
 
 # PySPH imports
@@ -16,7 +25,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SetWallVelocity, StateEquation,
     MomentumEquationPressureGradient, MomentumEquationViscosity,
     MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 # numpy
 import numpy as np
@@ -25,7 +34,12 @@ import numpy as np
 L = 0.12; Umax = 1.2e-4
 a = 0.02; H = 4*a
 fx = 2.5e-4
-c0 = 0.1*np.sqrt(a*fx); rho0 = 1000.0
+
+# c0 is set from Ellero and Adams.
+# Note that setting this to 0.1*np.sqrt(a*fx) as per Adami Hu and Adams is
+# incorrect and will actually cause a blow up of the solution.
+c0 = 0.02
+rho0 = 1000.0
 p0 = c0*c0*rho0
 
 # Reynolds number and kinematic viscosity
@@ -34,7 +48,7 @@ nu = 0.1/rho0; Re = a*Umax/nu
 # Numerical setup
 nx = 144; dx = L/nx
 ghost_extent = 5 * 1.5 * dx
-hdx = 1.05
+hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
@@ -42,7 +56,9 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 20.0
+T = a/Umax
+
+tf = 2.5*T
 dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
 
@@ -78,6 +94,7 @@ class PeriodicCylinders(Application):
         print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt))
+        print("tf = %f"%tf)
 
         # add requisite properties to the arrays:
 
@@ -105,10 +122,10 @@ class PeriodicCylinders(Application):
         solid.add_property('ax')
         solid.add_property('ay')
         solid.add_property('az')
-
+        solid.add_output_arrays(['p'])
         # magnitude of velocity
         fluid.add_property('vmag2')
-        fluid.add_output_arrays(['vmag2'])
+        fluid.add_output_arrays(['vmag2', 'p'])
 
         # setup the particle properties
         volume = dx * dx
@@ -158,6 +175,9 @@ class PeriodicCylinders(Application):
             # particles.
             Group(
                 equations=[
+                    VolumeSummation(
+                        dest='solid', sources=['fluid', 'solid']
+                    ),
                     SummationDensity(dest='fluid', sources=['fluid','solid']),
                     ], real=False),
 

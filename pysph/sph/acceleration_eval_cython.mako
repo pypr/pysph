@@ -133,7 +133,7 @@ from pysph.base.reduce_array import mpi_reduce_array as parallel_reduce_array
 % endif
 
 from pysph.base.nnps import get_number_of_threads
-from pyzoltan.core.carray cimport (DoubleArray, IntArray, UIntArray,
+from pyzoltan.core.carray cimport (DoubleArray, FloatArray, IntArray, LongArray, UIntArray,
     aligned, aligned_free, aligned_malloc)
 
 ${helper.get_header()}

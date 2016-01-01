@@ -231,7 +231,8 @@ class KHISY11(Application):
             Group(
                 equations=[
                     SolidWallPressureBC(
-                        dest='wall', sources=['fluid'], p0=p0, rho0=rho0, gy=gy),
+                        dest='wall', sources=['fluid'], p0=p0, rho0=rho0,
+                        gy=gy, b=1.0),
                     ], ),
 
             # The main acceleration block

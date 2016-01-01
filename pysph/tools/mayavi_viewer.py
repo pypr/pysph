@@ -84,17 +84,32 @@ def glob_files(fname):
     ext = fname[fname.rfind('.'):]
     return glob.glob("%s*%s"%(fbase, ext))
 
+def _sort_key(arg):
+    a = os.path.splitext(arg)[0]
+    return int(a[a.rfind('_')+1:])
+
+def remove_irrelevant_files(files):
+    """Remove any npz files that are not output files.
+
+    That is, the file should not end with a '_number.npz'.  This allows users
+    to dump other .npz files in the output while post-processing without
+    breaking the viewer.
+    """
+    result = []
+    for f in files:
+        try:
+            _sort_key(f)
+        except ValueError:
+            pass
+        else:
+            result.append(f)
+    return result
+
 def sort_file_list(files):
     """Given a list of input files, sort them in serial order, in-place.
     """
-    def _sort_func(x, y):
-        """Sort the files correctly."""
-        def _process(arg):
-            a = os.path.splitext(arg)[0]
-            return int(a[a.rfind('_')+1:])
-        return cmp(_process(x), _process(y))
-
-    files.sort(_sort_func)
+    files[:] = remove_irrelevant_files(files)
+    files.sort(key=_sort_key)
     return files
 
 
@@ -315,7 +330,7 @@ class ParticleArrayHelper(HasTraits):
     #######  Private protocol ############################################
     def _add_vmag(self, pa):
         if 'vmag' not in pa.properties:
-            if 'vmag2' in pa.properties:
+            if 'vmag2' in pa.output_property_arrays:
                 vmag = numpy.sqrt(pa.vmag2)
             else:
                 vmag = numpy.sqrt(pa.u**2 + pa.v**2 + pa.w**2)
@@ -847,6 +862,8 @@ class MayaviViewer(HasTraits):
         sort_file_list(files)
         self.files = files
         self.file_count = fc
+        if self.play:
+            self._play_changed(self.play)
 
     def _shell_fired(self):
         ns = dict(viewer=self, particle_arrays=self.particle_arrays,
@@ -859,7 +876,6 @@ class MayaviViewer(HasTraits):
         files = glob.glob(os.path.join(d, '*.npz'))
         if len(files) > 0:
             self._clear()
-            files = glob_files(files[0])
             sort_file_list(files)
             self.files = files
             self.file_count = min(self.file_count, len(files))
@@ -886,7 +902,7 @@ class MayaviViewer(HasTraits):
             dump(self._file_name, arrays, sd)
 
     def _make_particle_array_helper(self, scene, name):
-        pah = ParticleArrayHelper(scene=scene, name=name)
+        pah = ParticleArrayHelper(scene=scene, name=name, scalar=self.scalar)
         pah.on_trait_change(self._particle_array_helper_updated, 'updated')
         return pah
 

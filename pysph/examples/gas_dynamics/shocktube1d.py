@@ -5,7 +5,7 @@ diaphgram that is instantaneously ruptured at t = 0. The two states
 (left,right) are defined by the properties:
 
      left                               right
-  
+
      density = 1.0                      density = 0.125
      pressure = 1.0                     pressure = 0.1
 
@@ -123,7 +123,7 @@ class ShockTube1D(Application):
             # available for the particles.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',], 
+                    SummationDensity(dest='fluid', sources=['fluid',],
                                      k=kernel_factor, density_iterations=True, dim=dim, htol=1e-3),
                     ], update_nnps=True, iterate=True, max_iterations=50,
                 ),
@@ -166,7 +166,7 @@ class ShockTube1D(Application):
 
             Group(
                equations=[
-                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                    ], update_nnps=False
                ),
 
@@ -180,7 +180,7 @@ class ShockTube1D(Application):
                     UpdateSmoothingLengthFromVolume(
                         dest='fluid', sources=None, k=kernel_factor, dim=dim),
                     ], update_nnps=True
-                ),    
+                ),
 
             #Now that we have the correct smoothing length, we need to
             #evaluate the density which will be used in the
@@ -188,7 +188,7 @@ class ShockTube1D(Application):
 
             Group(
                equations=[
-                   SummationDensity(dest='fluid', sources=['fluid',]),
+                   SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                    ], update_nnps=False
                ),
             ################ END ADAPTIVE DENSITY-H ###################

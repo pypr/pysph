@@ -3,7 +3,7 @@
 from pysph.sph.equation import Equation
 
 class LaminarViscosity(Equation):
-    def __init__(self, dest, sources=None, nu=1e-6, eta=0.01):
+    def __init__(self, dest, sources, nu, eta=0.01):
         self.nu = nu
         self.eta = eta
         super(LaminarViscosity,self).__init__(dest, sources)
@@ -26,10 +26,8 @@ class LaminarViscosity(Equation):
         d_aw[d_idx] += tmp * VIJ[2]
 
 class MonaghanSignalViscosityFluids(Equation):
-    def __init__(self, dest, sources=None, alpha=0.5, h=None):
+    def __init__(self, dest, sources, alpha, h):
         self.alpha=0.125 * alpha * h
-        if h is None:
-            raise ValueError("Invalid value for parameter h : %s"%h)
         super(MonaghanSignalViscosityFluids,self).__init__(dest, sources)
 
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m,
@@ -75,7 +73,7 @@ class ClearyArtificialViscosity(Equation):
 
     """
 
-    def __init__(self, dest, sources, alpha=1.0, dim=2):
+    def __init__(self, dest, sources, dim, alpha=1.0):
         self.alpha = alpha
         self.factor = 16.0
         if dim == 3:

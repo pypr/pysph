@@ -565,12 +565,15 @@ class ParticleArrayTest(unittest.TestCase):
 
         # When
         p.add_constant('s', 0.0)
+        p.add_constant('ii', 0)
         p.add_constant('v', [0.0, 1.0, 2.0])
 
         # Then
-        self.assertEqual(len(p.constants), 2)
+        self.assertEqual(len(p.constants), 3)
         self.assertEqual(len(p.properties), nprop)
         self.assertEqual(p.s[0], 0.0)
+        self.assertEqual(p.ii[0], 0)
+        self.assertTrue(str(p.ii[0].dtype).startswith('int'))
         self.assertTrue(check_array(p.v, [0.0, 1.0, 2.0]))
 
     def test_that_constants_can_be_set_in_constructor(self):
@@ -667,6 +670,19 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertFalse('y' in n.properties)
         self.assertEqual(sorted(p.output_property_arrays), sorted(['x', 'y']))
         self.assertEqual(n.output_property_arrays, ['x'])
+
+    def test_that_remove_property_also_removes_output_arrays(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1,2,3], y=[0,0,0])
+        p.add_property('test')
+        p.set_output_arrays(['x', 'y', 'test'])
+
+        # When
+        p.remove_property('test')
+
+        # Then
+        self.assertEqual(p.output_property_arrays, ['x', 'y'])
+
 
 class ParticleArrayUtils(unittest.TestCase):
     def test_that_get_particles_info_works(self):

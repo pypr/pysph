@@ -59,7 +59,7 @@ class MonaghanArtificialStress(Equation):
         \bar{R}_a^{yy}\right)
     """
     
-    def __init__(self, dest, sources=None, eps=0.3):
+    def __init__(self, dest, sources, eps=0.3):
         r"""
         Parameters
         ----------
@@ -155,7 +155,7 @@ class MomentumEquationWithStress2D(Equation):
         
         R_{ab}^{ij} = R_{a}^{ij} + R_{b}^{ij}
     """
-    def __init__(self, dest, sources=None, wdeltap=-1, n=1):
+    def __init__(self, dest, sources, wdeltap=-1, n=1):
         r"""
         Parameters
         ----------
@@ -259,7 +259,7 @@ class HookesDeviatoricStressRate2D(Equation):
            \frac{\partial v^j}{\partial x^i} \right)
 
     """
-    def __init__(self, dest, sources=None, shear_mod=1.0):
+    def __init__(self, dest, sources, shear_mod):
         r"""
         Parameters
         ----------
@@ -316,7 +316,7 @@ class HookesDeviatoricStressRate2D(Equation):
             ( s10*omega10 ) + ( s01*omega10 )
 
 class EnergyEquationWithStress2D(Equation):
-    def __init__(self, dest, sources=None, alpha=1.0, beta=1.0,
+    def __init__(self, dest, sources, alpha=1.0, beta=1.0,
                  eta=0.01):
         self.alpha = alpha
         self.beta = beta

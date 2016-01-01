@@ -55,7 +55,7 @@ class SedovPointExplosion(Application):
         h = data['h']
         m = data['m']
 
-        fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m)    
+        fluid = gpa(name='fluid', x=x, y=y, rho=rho, p=p, e=e, h=h, m=m)
 
         # set the initial smoothing length proportional to the particle
         # volume
@@ -90,7 +90,7 @@ class SedovPointExplosion(Application):
             # compute the pilot density.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',]),
+                    SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                     ], update_nnps=False
                 ),
 
@@ -110,7 +110,7 @@ class SedovPointExplosion(Application):
             # accelerations.
             Group(
                 equations=[
-                    SummationDensity(dest='fluid', sources=['fluid',]),
+                    SummationDensity(dest='fluid', sources=['fluid',], dim=dim),
                     ], update_nnps=False
                 ),
 

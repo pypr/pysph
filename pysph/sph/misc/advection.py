@@ -12,7 +12,7 @@ class Advect(Equation):
         d_ay[d_idx] = d_v[d_idx]
 
 class MixingVelocityUpdate(Equation):
-    def __init__(self, dest, sources=None, T=1.0):
+    def __init__(self, dest, sources, T):
         self.T = T
         super(MixingVelocityUpdate, self).__init__(dest, sources)
 

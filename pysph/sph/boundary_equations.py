@@ -16,7 +16,7 @@ def wendland_quintic(rij=1.0, h=1.0):
 
 
 class MonaghanBoundaryForce(Equation):
-    def __init__(self, dest, sources=None, deltap=-1):
+    def __init__(self, dest, sources, deltap):
         self.deltap = deltap
         super(MonaghanBoundaryForce,self).__init__(dest,sources)
 
@@ -79,7 +79,7 @@ class MonaghanBoundaryForce(Equation):
         d_aw[d_idx] += force * norm[2]
 
 class MonaghanKajtarBoundaryForce(Equation):
-    def __init__(self, dest, sources=None, K=None, beta=None, h=None):
+    def __init__(self, dest, sources, K=None, beta=None, h=None):
         self.K = K
         self.beta = beta
         self.h = h
