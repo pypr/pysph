@@ -128,19 +128,18 @@ class Application(object):
                 return splitext(basename(abspath(sys.argv[0])))[0]
 
     def _setup_optparse(self):
-        usage = """
-        %prog [options]
-
+        usage = '%(prog)s [options]'
+        description = """
         Note that you may run this program via MPI and the run will be
         automatically parallelized.  To do this run::
 
-         $ mpirun -n 4 /path/to/your/python %prog [options]
+         $ mpirun -n 4 /path/to/your/python %prog [options] 
 
         Replace '4' above with the number of processors you have.
         Below are the options you may pass.
 
         """
-        parser = ArgumentParser()#description = usage)
+        parser = ArgumentParser(usage = usage,description = description)
         self.arg_parse = parser
 
 
