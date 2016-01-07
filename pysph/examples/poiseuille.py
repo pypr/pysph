@@ -33,11 +33,11 @@ h0 = hdx * dx
 
 class PoiseuilleFlow(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--re", action="store", type=float, dest="re", default=0.0125,
             help="Reynolds number of flow."
         )
-        group.add_option(
+        group.add_argument(
             "--remesh", action="store", type=float, dest="remesh", default=0,
             help="Remeshing frequency (setting it to zero disables it)."
         )
