@@ -32,7 +32,7 @@ from pysph.sph.integrator_step import WCSPHStep
 
 class Cube(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--np", action="store", type=float, dest="np", default=int(1e5),
             help="Number of particles in the cube (1e5 by default)."
         )

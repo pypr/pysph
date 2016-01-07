@@ -54,9 +54,9 @@ h0 = kernel_factor*dx
 class ShockTube2D(Application):
     def add_user_options(self, group):
         choices = ['gsph', 'mpm']
-        group.add_option(
+        group.add_argument(
             "--adaptive-h", action="store", dest="scheme", default='mpm',
-            type="choice", choices=choices,
+            choices=choices,
             help="Specify scheme for adaptive smoothing lengths %s"%choices
         )
 

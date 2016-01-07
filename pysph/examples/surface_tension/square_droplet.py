@@ -114,9 +114,9 @@ dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
 class SquareDroplet(Application):
     def add_user_options(self, group):
         choices = ['adami', 'morris', 'shadloo']
-        group.add_option(
+        group.add_argument(
             "--scheme", action="store", dest="scheme", default='morris',
-            type="choice", choices=choices,
+            choices=choices,
             help="Specify scheme to use among %s"%choices
         )
 
