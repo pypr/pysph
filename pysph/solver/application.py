@@ -105,7 +105,7 @@ class Application(object):
                            'critical': logging.CRITICAL,
                            'none': None}
 
-        self._setup_optparse()
+        self._setup_argparse()
 
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
@@ -127,7 +127,7 @@ class Application(object):
             else:
                 return splitext(basename(abspath(sys.argv[0])))[0]
 
-    def _setup_optparse(self):
+    def _setup_argparse(self):
         usage = '%(prog)s [options]'
         description = """
         Note that you may run this program via MPI and the run will be
@@ -976,7 +976,7 @@ class Application(object):
         Note
         ----
 
-        This uses the `optparse` module.
+        This uses the `argparse` module.
         """
         pass
 
