@@ -81,7 +81,7 @@ def read_input_file(fname=join(MY_DIR, 'mesh.txt')):
                 comm.send(ycoord[:nobj], dest=i, tag=y_tag)
 
         ack = 0
-        for i in range(size):
+        for i in range(1, size):
             comm.send(ack, dest=i, tag=0)
 
     else:
