@@ -14,7 +14,7 @@ except ImportError:
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
-class TestApp(Application):
+class MockApp(Application):
     def add_user_options(self,group):
         group.add_argument( "--testarg", action="store", type=float,
                 dest="testarg", default=int(10.0), help="Test Argument")
@@ -25,52 +25,51 @@ class TestApp(Application):
     def create_particles(self):
         return []
 
-class TestApplication(TestCase):
-    def setUp(self):
+    def create_equations(self):
+        return []
+
+    def create_solver(self):
+        solver = Solver()
+        solver.particles =[]
+        solver.solve = mock.Mock()
+        solver.setup = mock.Mock()
+        return solver
+
+    def create_nnps(self):
         patcher = mock.patch('pysph.base.nnps.BoxSortNNPS', spec=True)
         Nnps = patcher.start()
         self.nnps = Nnps()
-        self.addCleanup(patcher.stop)
-        self.solver = Solver()
-        self.solver.particles =[]
-        self.solver.solve = mock.Mock()
-        self.solver.setup = mock.Mock()
+        return self.nnps
+ 
+class TestApplication(TestCase):
 
     # Test When testarg is  notpassed
     def test_user_options_false(self):
         #Given
-        self.app = TestApp()
+        self.app = MockApp()
 
         #When
         args = []
-        self.app.args = []
-        self.app.setup(solver = self.solver, equations=[],
-                particle_factory=self.app.create_particles,
-                nnps = self.nnps)
-        self.app.run()
+        self.app.run(args)
         record = self.app.testarg
 
         #Then
         expected = 10.0
         error_message = "Expected %f, got %f"%(expected, record)
-        self.assertEqual(expected,record)
+        self.assertEqual(expected,record,error_message)
 
     # Test When testarg is passed
     def test_user_options_true(self):
-         #Given
-        self.app = TestApp()
+        #Given
+        self.app = MockApp()
 
         #When
         args = ['--testarg', '20']
-        self.app.args = args
-        self.app.setup(solver = self.solver, equations=[],
-                particle_factory=self.app.create_particles,
-                nnps = self.nnps)
-        self.app.run()
+        self.app.run(args)
         record = self.app.testarg
 
         #Then
         expected = 20.0
         error_message = "Expected %f, got %f"%(expected, record)
-        self.assertEqual(expected,record)
+        self.assertEqual(expected,record,error_message)
 
