@@ -36,10 +36,8 @@ class MockApp(Application):
         return solver
 
     def create_nnps(self):
-        patcher = mock.patch('pysph.base.nnps.BoxSortNNPS', spec=True)
-        Nnps = patcher.start()
-        self.nnps = Nnps()
-        return self.nnps
+        nnps = mock.Mock()
+        return nnps
  
 class TestApplication(TestCase):
 
