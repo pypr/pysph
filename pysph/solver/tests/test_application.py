@@ -44,30 +44,29 @@ class TestApplication(TestCase):
     # Test When testarg is  notpassed
     def test_user_options_false(self):
         #Given
-        self.app = MockApp()
+        app = MockApp()
 
         #When
         args = []
-        self.app.run(args)
-        record = self.app.testarg
+        app.run(args)
+        record = app.testarg
 
         #Then
         expected = 10.0
-        error_message = "Expected %f, got %f"%(expected, record)
-        self.assertEqual(expected,record,error_message)
+        error_message = "Expected %f, got %f"%(expected, app.testarg)
+        self.assertEqual(expected,app.testarg,error_message)
 
     # Test When testarg is passed
     def test_user_options_true(self):
         #Given
-        self.app = MockApp()
+        app = MockApp()
 
         #When
         args = ['--testarg', '20']
-        self.app.run(args)
-        record = self.app.testarg
+        app.run(args)
 
         #Then
         expected = 20.0
-        error_message = "Expected %f, got %f"%(expected, record)
-        self.assertEqual(expected,record,error_message)
+        error_message = "Expected %f, got %f"%(expected, app.testarg)
+        self.assertEqual(expected,app.testarg,error_message)
 
