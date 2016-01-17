@@ -41,7 +41,7 @@ p0 = 1000.0
 class DamBreak2D(Application):
     def add_user_options(self, group):
         self.hdx = 1.3
-        group.add_option(
+        group.add_argument(
             "--h-factor", action="store", type=float, dest="h_factor",
             default=1.0,
             help="Divide default h by this factor to change resolution"
