@@ -182,7 +182,7 @@ class MovingSquare(Application):
         return particles
 
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--hcp", action="store_true", dest="hcp", default=False,
             help="Use hexagonal close packing of particles."
         )
