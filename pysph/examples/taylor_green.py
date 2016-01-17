@@ -41,41 +41,41 @@ def exact_velocity(U, b, t, x, y):
 
 class TaylorGreen(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
         )
-        group.add_option(
+        group.add_argument(
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
                 "of dx (setting it to zero disables it, the default)."
         )
-        group.add_option(
+        group.add_argument(
             "--standard-sph", action="store_true", dest="standard_sph",
             default=False, help="Use standard SPH (defaults to TVF)."
         )
-        group.add_option(
+        group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
             help="Number of points along x direction. (default 50)"
         )
-        group.add_option(
+        group.add_argument(
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
-        group.add_option(
+        group.add_argument(
             "--hdx", action="store", type=float, dest="hdx", default=1.0,
             help="Ratio h/dx."
         )
-        group.add_option(
+        group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
             default=7.0, help="Gamma for the state equation."
         )
-        group.add_option(
+        group.add_argument(
             "--pb-factor", action="store", type=float, dest="pb_factor",
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
-        group.add_option(
+        group.add_argument(
             "--tensile-correction", action="store_true", dest="tensile_corr",
             default=False,
             help="Use tensile instability correction (for standard SPH)."

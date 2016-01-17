@@ -578,7 +578,7 @@ class Solver(object):
         self.dt = float(solver_data['dt'])
         self.count = int(solver_data['count'])
 
-    def get_options(self, opt_parser):
+    def get_options(self, arg_parser):
         """ Implement this to add additional options for the application """
         pass
 

@@ -33,16 +33,16 @@ hdx = 1.0
 
 class LidDrivenCavity(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
             help="Number of points along x direction."
         )
-        group.add_option(
+        group.add_argument(
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
         self.n_avg = 5
-        group.add_option(
+        group.add_argument(
             "--n-vel-avg", action="store", type=int, dest="n_avg",
             default=None,
             help="Average velocities over these many saved timesteps."
