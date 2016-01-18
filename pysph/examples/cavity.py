@@ -41,15 +41,17 @@ class LidDrivenCavity(Application):
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
+        self.n_avg = 5
         group.add_argument(
             "--n-vel-avg", action="store", type=int, dest="n_avg",
-            default=10,
+            default=None,
             help="Average velocities over these many saved timesteps."
         )
 
     def consume_user_options(self):
         nx = self.options.nx
-        self.n_avg = self.options.n_avg
+        if self.options.n_avg is not None:
+            self.n_avg = self.options.n_avg
         self.dx = L/nx
         self.re = self.options.re
         h0 = hdx * self.dx
@@ -59,7 +61,7 @@ class LidDrivenCavity(Application):
         dt_force = 1.0
 
         self.tf = 10.0
-        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_particles(self):
         dx = self.dx
@@ -216,6 +218,8 @@ class LidDrivenCavity(Application):
 
     def post_process(self, info_fname):
         try:
+            import matplotlib
+            matplotlib.use('Agg')
             from matplotlib import pyplot as plt
         except ImportError:
             print("Post processing requires matplotlib.")

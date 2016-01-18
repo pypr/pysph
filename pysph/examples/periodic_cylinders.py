@@ -8,6 +8,9 @@ problem and also  Adami, Hu and Adams, JCP, 2013, vol 241, pp 292-307.
 In particular, we note that we set c0 from Ellero and Adams as using the
 value from Adami et al. will cause the solution to blow up.
 
+If one sets c0=10*Umax and sets pb=300*p0, that will cause particles to void
+at the rear of the cylinder.
+
 """
 
 # PySPH imports
@@ -28,6 +31,7 @@ from pysph.sph.wc.transport_velocity import (SummationDensity,
     SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
 
 # numpy
+import os
 import numpy as np
 
 # domain and reference values
@@ -41,6 +45,7 @@ fx = 2.5e-4
 c0 = 0.02
 rho0 = 1000.0
 p0 = c0*c0*rho0
+pb = p0
 
 # Reynolds number and kinematic viscosity
 nu = 0.1/rho0; Re = a*Umax/nu
@@ -59,7 +64,7 @@ dt_force = 0.25 * np.sqrt(h0/abs(fx))
 T = a/Umax
 
 tf = 2.5*T
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 
 class PeriodicCylinders(Application):
@@ -162,7 +167,7 @@ class PeriodicCylinders(Application):
         # Create a solver. Damping is performed for 100 iterations.
         solver = Solver(
             kernel=kernel, dim=2, integrator=integrator,
-            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100)
+            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100, pfreq=500)
         return solver
 
     def create_equations(self):
@@ -201,12 +206,12 @@ class PeriodicCylinders(Application):
                     ], real=False),
 
             # The main accelerations block. The acceleration arrays for the
-            # fluid phase are upadted in this stage for all local particles.
+            # fluid phase are updated in this stage for all local particles.
             Group(
                 equations=[
                     # Pressure gradient terms
                     MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
+                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=pb),
 
                     # fluid viscosity
                     MomentumEquationViscosity(
@@ -225,6 +230,96 @@ class PeriodicCylinders(Application):
         ]
         return equations
 
+    def post_process(self, info_fname):
+        info = self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
+
+        t, cd = self._plot_cd_vs_t()
+        res = os.path.join(self.output_dir, 'results.npz')
+        np.savez(res, t=t, cd=cd)
+
+    def _plot_cd_vs_t(self):
+        from pysph.solver.utils import iter_output, load
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.rigid_body import (NumberDensity, ViscosityRigidBody,
+                                          PressureRigidBody)
+        from pysph.sph.equation import Group
+
+        data = load(self.output_files[0])
+        solid = data['arrays']['solid']
+        fluid = data['arrays']['fluid']
+        x, y = solid.x.copy(), solid.y.copy()
+        cx = 0.5 * L; cy = 0.5 * H
+        inside = np.sqrt((x-cx)**2 + (y-cy)**2) <= a
+        dest = solid.extract_particles(inside.nonzero()[0])
+        # We use the same equations for this as the simulation, except that we
+        # do not include the acceleration terms as these are externally
+        # imposed.  The goal of these is to find the force of the fluid on the
+        # cylinder, thus, gx=0.0 is used in the following.
+        equations = [
+            Group(
+                equations=[
+                    VolumeSummation(
+                        dest='fluid', sources=['fluid', 'solid']
+                    ),
+                    VolumeSummation(
+                        dest='solid', sources=['fluid', 'solid']
+                    ),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    SetWallVelocity(dest='solid', sources=['fluid']),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    SolidWallPressureBC(dest='solid', sources=['fluid'],
+                                        gx=0.0, b=1.0, rho0=rho0, p0=p0),
+                    ], real=False),
+
+            Group(
+                equations=[
+                    # Pressure gradient terms
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['solid'], gx=0.0, pb=pb),
+                    SolidWallNoSlipBC(
+                        dest='fluid', sources=['solid'], nu=nu),
+                    ], real=True),
+        ]
+
+        sph_eval = SPHEvaluator(
+            arrays=[dest, fluid], equations=equations, dim=2,
+            kernel=QuinticSpline(dim=2)
+        )
+
+        t, cd = [], []
+        for sd, fluid in iter_output(self.output_files, 'fluid'):
+            fluid.remove_property('vmag2')
+            t.append(sd['t'])
+            sph_eval.update_particle_arrays([dest, fluid])
+            sph_eval.evaluate()
+            Fx = np.sum(-fluid.au*fluid.m)
+            cd.append(Fx/(nu*rho0*Umax))
+
+        t, cd = list(map(np.asarray, (t, cd)))
+
+        # Now plot the results.
+        import matplotlib
+        matplotlib.use('Agg')
+
+        from matplotlib import pyplot as plt
+        f = plt.figure()
+        plt.plot(t, cd)
+        plt.xlabel('$t$'); plt.ylabel(r'$C_D$')
+        fig = os.path.join(self.output_dir, "cd_vs_t.png")
+        plt.savefig(fig, dpi=300)
+        plt.close()
+
+        return t, cd
+
 if __name__ == '__main__':
     app = PeriodicCylinders()
     app.run()
+    app.post_process(app.info_filename)
