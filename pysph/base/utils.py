@@ -253,7 +253,7 @@ def get_particle_array_rigid_body(constants=None, **props):
     body_id = props.pop('body_id', None)
     nb = 1 if body_id is None else numpy.max(body_id) + 1
 
-    consts = {'total_mass':0.0,
+    consts = {'total_mass':numpy.zeros(nb, dtype=float),
               'num_body': numpy.asarray(nb, dtype=int),
               'cm': numpy.zeros(3*nb, dtype=float),
 
