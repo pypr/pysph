@@ -1,3 +1,4 @@
+import os
 import tempfile
 import shutil
 import subprocess
@@ -7,6 +8,21 @@ from nose.plugins.attrib import attr
 
 from pysph.examples import run
 
+_orig_ets_toolkit = None
+def setup_module():
+    # Set the ETS_TOOLKIT to null to avoid errors when importing TVTK.
+    global _orig_ets_toolkit
+    var = 'ETS_TOOLKIT'
+    _orig_ets_toolkit = os.environ.get(var)
+    os.environ[var] = 'null'
+
+def teardown_module():
+    var = 'ETS_TOOLKIT'
+    if _orig_ets_toolkit is None:
+        del os.environ[var]
+    else:
+        os.environ[var] = _orig_ets_toolkit
+
 def run_example(module):
     """This simply runs the example to make sure that the example executes
     correctly.  It wipes out the generated output directory.
@@ -14,8 +30,10 @@ def run_example(module):
     out_dir = tempfile.mkdtemp()
     cmd = [sys.executable, "-m", module, "--max-steps", "1",
            "--disable-output", "-q", "-d", out_dir]
+    env_vars = dict(os.environ)
+    env_vars['ETS_TOOLKIT'] = 'null'
     try:
-        subprocess.check_output(cmd)
+        subprocess.check_output(cmd, env=env_vars)
     finally:
         shutil.rmtree(out_dir)
 
