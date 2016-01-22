@@ -43,7 +43,8 @@ class TestOpenMPExamples(ExampleTestCase):
 
     @attr(slow=True)
     def test_elliptical_drop_example(self):
-        serial_kwargs = dict(kernel='CubicSpline')
+        tf = 0.0076*0.25
+        serial_kwargs = dict(kernel='CubicSpline', tf=tf)
         extra_parallel_kwargs = dict(openmp=None)
         # Note that we set nprocs=1 here since we do not want
         # to run this with mpirun.
@@ -64,4 +65,3 @@ class TestOpenMPExamples(ExampleTestCase):
             serial_kwargs=serial_kwargs,
             extra_parallel_kwargs=extra_parallel_kwargs
         )
-
