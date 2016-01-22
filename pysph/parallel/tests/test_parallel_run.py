@@ -18,9 +18,8 @@ class ParallelTests(ExampleTestCase):
 
     @attr(slow=True, parallel=True)
     def test_3Ddam_break_example(self):
-        dt = 2e-5; tf = 50*dt
         serial_kwargs = dict(
-            timestep=dt, tf=tf, pfreq=200, sort_gids=None, test=None
+            max_steps=50, pfreq=200, sort_gids=None, test=None
         )
         extra_parallel_kwargs = dict(ghost_layers=1, lb_freq=5)
         self.run_example(
@@ -32,7 +31,7 @@ class ParallelTests(ExampleTestCase):
 
     @attr(slow=True, parallel=True)
     def test_elliptical_drop_example(self):
-        serial_kwargs = dict(sort_gids=None, kernel='CubicSpline', tf=0.005)
+        serial_kwargs = dict(sort_gids=None, kernel='CubicSpline', tf=0.0038)
         extra_parallel_kwargs = dict(ghost_layers=1, lb_freq=5)
         self.run_example(
             'elliptical_drop.py', nprocs=2, atol=1e-11,
@@ -42,8 +41,8 @@ class ParallelTests(ExampleTestCase):
 
     @attr(parallel=True)
     def test_ldcavity_example(self):
-        dt=1e-4; tf=200*dt
-        serial_kwargs = dict(timestep=dt, tf=tf, pfreq=500, sort_gids=None)
+        max_steps = 150
+        serial_kwargs = dict(max_steps=max_steps, pfreq=500, sort_gids=None)
         extra_parallel_kwargs = dict(ghost_layers=2, lb_freq=5)
         self.run_example(
             'cavity.py', nprocs=4, atol=1e-14, serial_kwargs=serial_kwargs,
