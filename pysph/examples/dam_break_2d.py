@@ -23,6 +23,8 @@ from pysph.solver.solver import Solver
 from pysph.sph.integrator import PECIntegrator, EPECIntegrator, TVDRK3Integrator
 from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
 
+from pysph.sph.scheme import WCSPHScheme
+
 fluid_column_height = 2.0
 fluid_column_width = 1.0
 container_height = 3.0
@@ -46,12 +48,29 @@ class DamBreak2D(Application):
             default=1.0,
             help="Divide default h by this factor to change resolution"
         )
+        WCSPHScheme.add_user_options(
+            group, alpha=alpha, beta=beta, gamma=gamma, hg_correction=True,
+            update_h=True
+        )
 
     def consume_user_options(self):
         self.h = h/self.options.h_factor
         print("Using h = %f"%self.h)
         self.hdx = self.hdx
         self.dx = self.h/self.hdx
+
+    def create_scheme(self):
+        s = WCSPHScheme(
+            ['fluid'], ['boundary'], dim=2, rho0=ro, c0=co,
+            h0=self.h, hdx=self.hdx, gy=-9.81
+        )
+        kernel = WendlandQuintic(dim=2)
+        tf = 2.5
+        s.configure_solver(
+            kernel=kernel, integrator_cls=TVDRK3Integrator, tf=tf,
+            adaptive_timestep=True, n_damp=50, fixed_h=False
+        )
+        return s
 
     def create_particles(self):
         geom = DamBreak2DGeometry(
@@ -62,64 +81,6 @@ class DamBreak2D(Application):
             with_obstacle=False,
             beta=2.0, nfluid_offset=1, hdx=self.hdx)
         return geom.create_particles()
-
-    def create_solver(self):
-        dt = 0.125*self.h/co
-        print("dt = %f"%dt)
-        tf = 2.5
-
-        dim = 2
-        # Create the kernel
-        kernel = WendlandQuintic(dim=dim)
-
-        # Create the Integrator. Currently, PySPH supports multi-stage,
-        # predictor corrector and a TVD-RK3 integrators.
-
-        #integrator = EPECIntegrator(fluid=WCSPHStep(), boundary=WCSPHStep())
-        integrator = TVDRK3Integrator(fluid=WCSPHTVDRK3Step(), boundary=WCSPHTVDRK3Step())
-
-        # Create a solver.  The damping is performed for the first 50 iterations.
-        solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                        dt=dt, tf=tf, adaptive_timestep=True, n_damp=50,
-                        fixed_h=False)
-
-        return solver
-
-    def create_equations(self):
-
-        # create the equations
-        equations = [
-
-            # Equation of state
-            Group(equations=[
-
-                    TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=ro, c0=co, gamma=gamma),
-                    ], real=False),
-
-            Group(equations=[
-
-                    # Continuity equation with dissipative corrections for fluid on fluid
-                    ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=co, delta=0.1),
-                    ContinuityEquation(dest='fluid', sources=['boundary']),
-                    ContinuityEquation(dest='boundary', sources=['fluid']),
-
-                    # Momentum equation
-                    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
-                                    alpha=alpha, beta=beta, gy=-9.81, c0=co,
-                                    tensile_correction=True),
-
-                    # Position step with XSPH
-                    XSPHCorrection(dest='fluid', sources=['fluid'])
-
-                    ]),
-
-            # smoothing length update
-            Group( equations=[
-                    UpdateSmoothingLengthFerrari(dest='fluid', sources=None, hdx=self.hdx, dim=2)
-                    ], real=True ),
-            ]
-        return equations
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)

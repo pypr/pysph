@@ -19,20 +19,14 @@ from numpy import array, ones_like, mgrid, sqrt
 import numpy as np
 
 # PySPH base and carray imports
-from pysph.base.utils import get_particle_array_wcsph
+from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian
 
 # PySPH solver and integrator
 from pysph.solver.application import Application
-from pysph.solver.solver import Solver
-from pysph.sph.integrator import EPECIntegrator, PECIntegrator, TVDRK3Integrator
-from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
+from pysph.sph.integrator import EPECIntegrator
+from pysph.sph.scheme import WCSPHScheme
 
-# PySPH sph imports
-from pysph.sph.equation import Group
-from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation, UpdateSmoothingLengthFerrari, \
-    ContinuityEquationDeltaSPH, MomentumEquationDeltaSPH
 
 def _derivative(x, t):
     A, a = x
@@ -89,6 +83,23 @@ class EllipticalDrop(Application):
         self.dx = 0.025
         self.alpha = 0.1
 
+    def add_user_options(self, group):
+        WCSPHScheme.add_user_options(group, gamma=7.0, alpha=0.1, beta=0.0)
+
+    def create_scheme(self):
+        s = WCSPHScheme(
+            ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
+            h0=self.dx*self.hdx, hdx=self.hdx
+        )
+        kernel = Gaussian(dim=2)
+        dt = 5e-6; tf = 0.0076
+        s.configure_solver(
+            kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
+            adaptive_timestep=True, cfl=0.3, n_damp=50,
+            output_at_times=[0.0008, 0.0038]
+        )
+        return s
+
     def create_particles(self):
         """Create the circular patch of fluid."""
         dx = self.dx
@@ -116,89 +127,16 @@ class EllipticalDrop(Application):
             if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
                 indices.append(i)
 
-        pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-                                    cs=cs, name=name)
+        pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
+                                cs=cs, name=name)
         pa.remove_particles(indices)
 
         print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
         mu = ro*self.alpha*hdx*dx*co/8.0
         print("Effective viscosity: rho*alpha*h*c/8 = %s"%mu)
 
-        # add requisite variables needed for this formulation
-        for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
-                    'v0', 'w0', 'x0', 'y0', 'z0'):
-            pa.add_property(name)
-
-        # set the output property arrays
-        pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm',
-                               'h', 'p', 'pid', 'tag', 'gid'] )
-
+        self.scheme.setup_properties([pa])
         return [pa]
-
-    def create_solver(self):
-        kernel = Gaussian(dim=2)
-
-        # Create the Integrator. Currently, PySPH supports multi-stage,
-        # predictor corrector and a TVD-RK3 integrators.
-
-        #integrator = PECIntegrator(fluid=WCSPHStep())
-        integrator = EPECIntegrator(fluid=WCSPHStep())
-        #integrator = TVDRK3Integrator( fluid=WCSPHTVDRK3Step() )
-
-        # Construct the solver. n_damp determines the iterations until which smaller
-        # time-steps are used when using adaptive time-steps. Use the output_at_times
-        # list to specify instants of time at which the output solution is
-        # required.
-        dt = 5e-6; tf = 0.0076
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        dt=dt, tf=tf, adaptive_timestep=True,
-                        cfl=0.3, n_damp=50,
-                        output_at_times=[0.0008, 0.0038])
-
-        # select True if you want to dump out remote particle properties in
-        # parallel runs. This can be over-ridden with the --output-remote
-        # command line option
-        solver.set_output_only_real(True)
-
-        return solver
-
-    def create_equations(self):
-        # Define the SPH equations used to solve this problem
-        equations = [
-
-            # Equation of state: p = f(rho)
-            Group(equations=[
-                    TaitEOS(dest='fluid', sources=None, rho0=self.ro, c0=self.co, gamma=7.0),
-                    ], real=False),
-
-            # Block for the accelerations. Choose between either the Delta-SPH
-            # formulation or the standard Monaghan 1994 formulation
-            Group( equations=[
-
-                    # Density rate: drho/dt with dissipative penalization
-                    #ContinuityEquationDeltaSPH(dest='fluid',  sources=['fluid',], delta=0.1, c0=co),
-                    ContinuityEquation(dest='fluid',  sources=['fluid',]),
-
-                    # Acceleration: du,v/dt
-                    #MomentumEquationDeltaSPH(dest='fluid', sources=['fluid'], alpha=0.2, rho0=ro, c0=co),
-                    MomentumEquation(dest='fluid', sources=['fluid'],
-                        alpha=self.alpha, beta=0.0, c0=self.co),
-
-                    # XSPH velocity correction
-                    XSPHCorrection(dest='fluid', sources=['fluid']),
-
-                    ],),
-
-            # Update smoothing lengths at the end.
-            Group( equations=[
-                    UpdateSmoothingLengthFerrari(
-                        dest='fluid', sources=None, dim=2, hdx=self.hdx
-                    ),
-                    ], real=False),
-
-
-            ]
-        return equations
 
     def _make_final_plot(self):
         from matplotlib import pyplot as plt
