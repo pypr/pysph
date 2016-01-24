@@ -20,14 +20,8 @@ import numpy
 
 from pysph.base.kernels import CubicSpline
 from pysph.base.utils import get_particle_array_wcsph
-
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
-
 from pysph.solver.application import Application
-from pysph.solver.solver import Solver
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import WCSPHStep
+from pysph.sph.scheme import WCSPHScheme
 
 
 class Cube(Application):
@@ -36,15 +30,34 @@ class Cube(Application):
             "--np", action="store", type=float, dest="np", default=int(1e5),
             help="Number of particles in the cube (1e5 by default)."
         )
+        gamma = 7.0
+        alpha = 0.5
+        beta = 0.0
+        WCSPHScheme.add_user_options(
+            group, alpha=alpha, beta=beta, gamma=gamma
+        )
 
     def consume_user_options(self):
+        self.hdx = 1.5
         self.dx = 1.0/pow(self.options.np, 1.0/3.0)
         self.rho0 = 1000.0
 
+    def create_scheme(self):
+        co = 10.0
+        s = WCSPHScheme(
+            ['fluid'], [], dim=3, rho0=self.rho0, c0=co,
+            h0=self.hdx*self.dx, hdx=self.hdx, gz=-9.81
+        )
+        kernel = CubicSpline(dim=3)
+        dt = 1e-4
+        tf = 5e-4
+        s.configure_solver(kernel=kernel, tf=tf, dt=dt)
+        return s
+
     def create_particles(self):
         dx = self.dx
-        hdx = 1.5
         rho0 = self.rho0
+        hdx = self.hdx
         xmin, xmax = 0.0, 1.0
         ymin, ymax = 0.0, 1.0
         zmin, zmax = 0.0, 1.0
@@ -71,42 +84,6 @@ class Cube(Application):
         fluid.set_lb_props( list(fluid.properties.keys()) )
         return [fluid]
 
-    def create_solver(self):
-        # Create the kernel
-        kernel = CubicSpline(dim=3)
-
-        # Create the integrator.
-        integrator = PECIntegrator(fluid=WCSPHStep())
-
-        # Create a solver.
-        solver = Solver(kernel=kernel, dim=3, integrator=integrator)
-
-        # Setup default parameters.
-        dt = 1e-4
-        tf = 5e-4
-        solver.set_time_step(dt)
-        solver.set_final_time(tf)
-        return solver
-
-    def create_equations(self):
-        # create the equations
-        ro = self.rho0
-        co = 10.0
-        gamma = 7.0
-        alpha = 0.5
-        beta = 0.0
-
-        equations = [
-                TaitEOS(dest='fluid', sources=None, rho0=ro, c0=co, gamma=gamma),
-
-                ContinuityEquation(dest='fluid', sources=['fluid']),
-
-                MomentumEquation(dest='fluid', sources=['fluid'],
-                                    alpha=alpha, beta=beta, gz=-9.81, c0=co),
-
-                XSPHCorrection(dest='fluid', sources=['fluid']),
-        ]
-        return equations
 
 if __name__ == '__main__':
     app = Cube()
