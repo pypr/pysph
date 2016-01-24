@@ -24,6 +24,7 @@ class Scheme(object):
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
+        self.solver = None
 
     @classmethod
     def add_user_options(klass, group, **defaults):
@@ -259,7 +260,8 @@ class WCSPHScheme(Scheme):
         cls = integrator_cls if integrator_cls is not None else PECIntegrator
         step_cls = WCSPHTVDRK3Step if cls is TVDRK3Integrator else WCSPHStep
         for name in self.fluids + self.solids:
-            steppers[name] = step_cls()
+            if name not in steppers:
+                steppers[name] = step_cls()
 
         integrator = cls(**steppers)
 
@@ -355,5 +357,157 @@ class WCSPHScheme(Scheme):
         output_props = ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
                         'pid', 'gid', 'tag', 'p']
         for pa in particles:
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+
+class TVFScheme(Scheme):
+    def __init__(self, fluids, solids, dim, rho0, c0, nu, p0, pb, h0,
+                  gx=0.0, gy=0.0, gz=0.0):
+        self.fluids = fluids
+        self.solids = solids
+        self.solver = None
+        self.rho0 = rho0
+        self.c0 = c0
+        self.pb = pb
+        self.p0 = p0
+        self.nu = nu
+        self.dim = dim
+        self.h0 = h0
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+
+    def get_timestep(self, cfl=0.25):
+        dt_cfl = cfl * self.h0/self.c0
+        if self.nu > 1e-12:
+            dt_viscous = 0.125 * self.h0**2/self.nu
+        else:
+            dt_viscous = 1.0
+        dt_force = 1.0
+
+        return min(dt_cfl, dt_viscous, dt_force)
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                           extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import QuinticSpline
+        from pysph.sph.integrator_step import TransportVelocityStep
+        from pysph.sph.integrator import PECIntegrator
+        if kernel is None:
+            kernel = QuinticSpline(dim=self.dim)
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        step_cls = TransportVelocityStep
+        for fluid in self.fluids:
+            if fluid not in steppers:
+                steppers[fluid] = step_cls()
+
+        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        integrator = cls(**steppers)
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.wc.transport_velocity import (SummationDensity,
+            StateEquation, MomentumEquationPressureGradient,
+            MomentumEquationViscosity, MomentumEquationArtificialStress,
+            SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity)
+        equations = []
+        all = self.fluids + self.solids
+        g1 = []
+        for fluid in self.fluids:
+            g1.append(SummationDensity(dest=fluid, sources=all))
+
+        equations.append(Group(equations=g1, real=False))
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(StateEquation(
+                dest=fluid, sources=None, p0=self.p0, rho0=self.rho0, b=1.0
+            ))
+        for solid in self.solids:
+            g2.append(SetWallVelocity(dest=solid, sources=self.fluids))
+
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for solid in self.solids:
+            g3.append(SolidWallPressureBC(
+                dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
+                p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
+            ))
+
+        equations.append(Group(equations=g3, real=False))
+
+        g4 = []
+        for fluid in self.fluids:
+            g4.append(
+                MomentumEquationPressureGradient(
+                    dest=fluid, sources=all, pb=self.pb, gx=self.gx,
+                    gy=self.gy, gz=self.gz
+                )
+            )
+            if self.nu > 0.0:
+                g4.append(
+                    MomentumEquationViscosity(
+                        dest=fluid, sources=self.fluids, nu=self.nu
+                    )
+                )
+                if len(self.solids) > 0:
+                    g4.append(
+                        SolidWallNoSlipBC(
+                            dest=fluid, sources=self.solids, nu=self.nu
+                        )
+                    )
+
+            g4.append(
+                MomentumEquationArtificialStress(
+                    dest=fluid, sources=self.fluids)
+            )
+
+        equations.append(Group(equations=g4))
+        return equations
+
+    def get_solver(self):
+        return self.solver
+
+    def setup_properties(self, particles, clean=True):
+        from pysph.base.utils import (get_particle_array_tvf_fluid,
+            get_particle_array_tvf_solid)
+        particle_arrays = dict([(p.name, p) for p in particles])
+        dummy = get_particle_array_tvf_fluid(name='junk')
+        props = list(dummy.properties.keys())
+        output_props = dummy.output_property_arrays
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        dummy = get_particle_array_tvf_solid(name='junk')
+        props = list(dummy.properties.keys())
+        output_props = dummy.output_property_arrays
+        for solid in self.solids:
+            pa = particle_arrays[solid]
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
