@@ -10,19 +10,9 @@ J.C Crespo, Journal of Hydraulic Research, Vol 48, Extra Issue (2010), pp
 import os
 import numpy as np
 
-from pysph.examples._db_geometry import DamBreak2DGeometry
-
 from pysph.base.kernels import WendlandQuintic
-from pysph.sph.equation import Group
-from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
-    UpdateSmoothingLengthFerrari, ContinuityEquationDeltaSPH
-
+from pysph.examples._db_geometry import DamBreak2DGeometry
 from pysph.solver.application import Application
-from pysph.solver.solver import Solver
-from pysph.sph.integrator import PECIntegrator, EPECIntegrator, TVDRK3Integrator
-from pysph.sph.integrator_step import WCSPHStep, WCSPHTVDRK3Step
-
 from pysph.sph.scheme import WCSPHScheme
 
 fluid_column_height = 2.0
@@ -60,6 +50,7 @@ class DamBreak2D(Application):
         self.dx = self.h/self.hdx
 
     def create_scheme(self):
+        from pysph.sph.integrator import TVDRK3Integrator
         s = WCSPHScheme(
             ['fluid'], ['boundary'], dim=2, rho0=ro, c0=co,
             h0=self.h, hdx=self.hdx, gy=-9.81
