@@ -258,8 +258,8 @@ class WCSPHScheme(Scheme):
 
         cls = integrator_cls if integrator_cls is not None else PECIntegrator
         step_cls = WCSPHTVDRK3Step if cls is TVDRK3Integrator else WCSPHStep
-        for fluid in self.fluids:
-            steppers[fluid] = step_cls()
+        for name in self.fluids + self.solids:
+            steppers[name] = step_cls()
 
         integrator = cls(**steppers)
 
@@ -306,7 +306,10 @@ class WCSPHScheme(Scheme):
                 other = all[:]
                 other.remove(name)
                 g2.extend([
-                    ContinuityEquationDeltaSPH(dest=name, sources=[name]),
+                    ContinuityEquationDeltaSPH(
+                        dest=name, sources=[name], c0=self.c0,
+                        delta=self.delta
+                    ),
                     ContinuityEquation(dest=name, sources=other),
                     MomentumEquationDeltaSPH(
                         dest=name, sources=[name], rho0=self.rho0, c0=self.c0,
