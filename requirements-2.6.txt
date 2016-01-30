@@ -7,3 +7,4 @@ mock>=1.0
 ordereddict
 importlib
 unittest2
+argparse

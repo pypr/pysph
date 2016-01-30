@@ -63,7 +63,7 @@ class PoiseuilleFlow(Application):
         dt_viscous = 0.125 * h0**2/self.nu
         dt_force = 0.25 * np.sqrt(h0/self.fx)
 
-        self.dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(xmin=0, xmax=self.Lx, periodic_in_x=True)
@@ -247,6 +247,9 @@ class PoiseuilleFlow(Application):
         info = self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
+
+        import matplotlib
+        matplotlib.use('Agg')
 
         y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()

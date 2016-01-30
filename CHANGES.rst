@@ -14,9 +14,12 @@
 * Remove unused command line options and add a ``--max-steps`` option to allow
   a user to run a specified number of iterations.
 * Added Ghia et al.'s results for lid-driven-cavity flow for easy comparison.
+* Added some experimental results for the dam break problem.
 * Fix bug with uploaded tarballs that breaks ``pip install pysph`` on Windows.
 * Fix the viewer UI to continue playing files when refresh is pushed.
-
+* Use argparse instead of optparse as it is deprecated in Python 3.x.
+* Add ``pysph.tools.automation`` to facilitate easier automation and
+  reproducibility of PySPH simulations.
 
 1.0a3
 ------

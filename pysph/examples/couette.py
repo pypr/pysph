@@ -45,7 +45,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 100.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 class CouetteFlow(Application):
     def create_domain(self):
@@ -211,6 +211,9 @@ class CouetteFlow(Application):
         info = self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
+
+        import matplotlib
+        matplotlib.use('Agg')
 
         y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()

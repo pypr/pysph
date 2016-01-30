@@ -1,10 +1,12 @@
-"""Incompressible flow past a periodic lattice of cylinders. (20 minutes)
+"""Incompressible flow past a periodic lattice of cylinders. (30 minutes)
 """
+
+import os
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import Gaussian
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 from pysph.sph.integrator import PECIntegrator
@@ -34,7 +36,7 @@ Re = 1.0; nu = a*Umax/Re
 # Numerical setup
 nx = 100; dx = L/nx
 ghost_extent = 5 * 1.5 * dx
-hdx = 1.2
+hdx = 1.0
 
 # adaptive time steps
 h0 = hdx * dx
@@ -42,8 +44,8 @@ dt_cfl = 0.25 * h0/( c0 + Umax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
-tf = 500.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+tf = 1000.0
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 class LatticeCylinders(Application):
     def create_domain(self):
@@ -139,7 +141,7 @@ class LatticeCylinders(Application):
 
     def create_solver(self):
         # Create the kernel
-        kernel = Gaussian(dim=2)
+        kernel = QuinticSpline(dim=2)
 
         integrator = PECIntegrator(fluid=TransportVelocityStep())
 
@@ -206,6 +208,67 @@ class LatticeCylinders(Application):
         ]
         return equations
 
+    def post_process(self, info_fname):
+        info = self.read_info(info_fname)
+        if len(self.output_files) == 0 or self.rank > 0:
+            return
+
+        y, ui_lby2, ui_l, xx, yy, vmag = self._plot_velocity()
+        res = os.path.join(self.output_dir, "results.npz")
+        np.savez(res, y=y, ui_l=ui_l, ui_lby2=ui_lby2, xx=xx, yy=yy, vmag=vmag)
+
+    def _plot_velocity(self):
+        from pysph.tools.interpolator import Interpolator
+        from pysph.solver.utils import load
+
+        # Find the u profile for comparison.
+        y = np.linspace(0.0, H, 100)
+        x = np.ones_like(y)*L/2
+        fname = self.output_files[-1]
+        data = load(fname)
+        dm = self.create_domain()
+        interp = Interpolator(list(data['arrays'].values()), x=x, y=y,
+                              domain_manager=dm)
+        ui_lby2 = interp.interpolate('u')
+        x = np.ones_like(y)*L
+        interp.set_interpolation_points(x=x, y=y)
+        ui_l = interp.interpolate('u')
+
+        import matplotlib
+        matplotlib.use('Agg')
+
+        from matplotlib import pyplot as plt
+        y /= H
+        y -= 0.5
+        f = plt.figure()
+        plt.plot(y, ui_lby2, 'k-', label='x=L/2')
+        plt.plot(y, ui_l, 'k-', label='x=L')
+        plt.xlabel('y/H'); plt.ylabel('u')
+        plt.legend()
+        fig = os.path.join(self.output_dir, 'u_profile.png')
+        plt.savefig(fig, dpi=300)
+        plt.close()
+
+        # Plot the contours of vmag.
+        xx, yy = np.mgrid[0:L:100j,0:H:100j]
+        interp.set_interpolation_points(x=xx, y=yy)
+        u = interp.interpolate('u')
+        v = interp.interpolate('v')
+        xx /= L
+        yy /= H
+        vmag = np.sqrt(u*u + v*v)
+        f = plt.figure()
+        plt.contourf(xx, yy, vmag)
+        plt.xlabel('x/L'); plt.ylabel('y/H')
+        plt.colorbar()
+        fig = os.path.join(self.output_dir, 'vmag_contour.png')
+        plt.savefig(fig, dpi=300)
+        plt.close()
+
+        return y, ui_lby2, ui_l, xx, yy, vmag
+
+
 if __name__ == '__main__':
     app = LatticeCylinders()
     app.run()
+    app.post_process(app.info_filename)
