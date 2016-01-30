@@ -87,7 +87,7 @@ dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
 
 class HydrostaticTank(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             '--bc-type', action='store', type=int,
             dest='bc_type', default=1,
             help="Specify the implementation type one of (1, 2, 3)"

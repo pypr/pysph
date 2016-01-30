@@ -58,7 +58,7 @@ from pysph.sph.basic_equations import SummationDensity
 class InletOutletApp(Application):
 
     def add_user_options(self, group):
-        group.add_option("--speed", action="store",
+        group.add_argument("--speed", action="store",
                           type=float,
                           dest="speed",
                           default=0.25,

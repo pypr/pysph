@@ -49,7 +49,7 @@ c0 = numpy.sqrt( B*gamma/rho0 )
 
 class DamBreak3DSPhysics(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--test", action="store_true", dest="test", default=False,
             help="For use while testing of results, uses PEC integrator."
         )

@@ -9,7 +9,10 @@ from textwrap import dedent
 from multiprocessing import Pool
 from unittest import TestCase, main
 
-import mock
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from pysph.base.ext_module import get_md5, ExtModule
 

@@ -4,7 +4,7 @@ import inspect
 import json
 import logging
 import os
-from optparse import OptionParser, OptionGroup, Option
+from argparse import ArgumentParser
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
     splitext)
 import sys
@@ -105,23 +105,12 @@ class Application(object):
                            'critical': logging.CRITICAL,
                            'none': None}
 
-        self._setup_optparse()
+        self._setup_argparse()
 
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
         self.initialize()
-
-    def _add_option(self, opt):
-        """ Add an Option/OptionGroup or their list to OptionParser """
-        if isinstance(opt, OptionGroup):
-            self.opt_parse.add_option_group(opt)
-        elif isinstance(opt, Option):
-            self.opt_parse.add_option(opt)
-        else:
-            # assume a list of Option/OptionGroup
-            for o in opt:
-                self._add_option(o)
 
     def _get_output_dir_from_fname(self):
         return self.fname + '_output'
@@ -138,152 +127,151 @@ class Application(object):
             else:
                 return splitext(basename(abspath(sys.argv[0])))[0]
 
-    def _setup_optparse(self):
-        usage = """
-        %prog [options]
-
+    def _setup_argparse(self):
+        usage = '%(prog)s [options]'
+        description = """
         Note that you may run this program via MPI and the run will be
         automatically parallelized.  To do this run::
 
-         $ mpirun -n 4 /path/to/your/python %prog [options]
+         $ mpirun -n 4 /path/to/your/python %prog [options] 
 
         Replace '4' above with the number of processors you have.
         Below are the options you may pass.
 
         """
-        parser = OptionParser(usage)
-        self.opt_parse = parser
+        parser = ArgumentParser(usage = usage,description = description)
+        self.arg_parse = parser
 
-        # Add some default options.
-        # -v
+
+         # Add some default options.
+         # -v
         valid_vals = "Valid values: %s"%self._log_levels.keys()
-        parser.add_option("-v", "--loglevel", action="store",
-                          type="string",
+        parser.add_argument("-v", "--loglevel", action="store",
                           dest="loglevel",
                           default='info',
                           help="Log-level to use for log messages. " +
                                valid_vals)
         # --logfile
-        parser.add_option("--logfile", action="store",
-                          type="string",
+      
+        parser.add_argument("--logfile", action="store",
                           dest="logfile",
                           default=None,
                           help="Log file to use for logging, set to "+
                                "empty ('') for no file logging.")
         # -l
-        parser.add_option("-l", "--print-log", action="store_true",
+        parser.add_argument("-l", "--print-log", action="store_true",
                           dest="print_log", default=False,
                           help="Print log messages to stderr.")
         # --final-time
-        parser.add_option("--tf", action="store",
-                          type="float",
+        parser.add_argument("--tf", action="store",
+                          type=float,
                           dest="final_time",
                           default=None,
                           help="Total time for the simulation.")
         # --timestep
-        parser.add_option("--timestep", action="store",
-                          type="float",
+        parser.add_argument("--timestep", action="store",
+                          type=float,
                           dest="time_step",
                           default=None,
                           help="Timestep to use for the simulation.")
         # --max-steps
-        parser.add_option(
-            "--max-steps", action="store", type="int", dest="max_steps",
+        parser.add_argument(
+            "--max-steps", action="store", type=int, dest="max_steps",
             default=1<<31,
             help="Maximum number of iteration steps to take (defaults to a "
             "very large value)."
         )
 
         # --adaptive-timestep
-        parser.add_option("--adaptive-timestep", action="store_true",
+        parser.add_argument("--adaptive-timestep", action="store_true",
                           dest="adaptive_timestep", default=None,
                           help="Use adaptive time stepping.")
-        parser.add_option("--no-adaptive-timestep", action="store_false",
+        parser.add_argument("--no-adaptive-timestep", action="store_false",
                           dest="adaptive_timestep", default=None,
                           help="Do not use adaptive time stepping.")
 
         # --cfl
-        parser.add_option("--cfl", action="store", dest="cfl", type='float',
+        parser.add_argument("--cfl", action="store", dest="cfl", type=float,
                           default=0.3,
                           help="CFL number for adaptive time steps")
 
         # -q/--quiet.
-        parser.add_option("-q", "--quiet", action="store_true",
+        parser.add_argument("-q", "--quiet", action="store_true",
                          dest="quiet", default=False,
                          help="Do not print any progress information.")
 
         # --disable-output
-        parser.add_option("--disable-output", action="store_true",
+        parser.add_argument("--disable-output", action="store_true",
                          dest="disable_output", default=False,
                          help="Do not dump any output files.")
 
         # -o/ --fname
-        parser.add_option("-o", "--fname", action="store",
+        parser.add_argument("-o", "--fname", action="store",
                           dest="fname", default=self.fname,
                           help="File name to use for output")
 
         # --pfreq.
-        parser.add_option("--pfreq", action="store",
-                          dest="freq", default=None, type="int",
+        parser.add_argument("--pfreq", action="store",
+                          dest="freq", default=None, type=int,
                           help="Printing frequency for the output")
 
         # --detailed-output.
-        parser.add_option("--detailed-output", action="store_true",
+        parser.add_argument("--detailed-output", action="store_true",
                          dest="detailed_output", default=None,
                          help="Dump detailed output.")
 
         # -z/--compress-output
-        parser.add_option(
+        parser.add_argument(
             "-z", "--compress-output", action="store_true",
             dest="compress_output", default=False,
             help="Compress generated output files."
         )
 
         # --output-remote
-        parser.add_option("--output-dump-remote", action="store_true",
+        parser.add_argument("--output-dump-remote", action="store_true",
                           dest="output_dump_remote", default=False,
                           help="Save Remote particles in parallel")
         # -d/--directory
-        parser.add_option("-d", "--directory", action="store",
+        parser.add_argument("-d", "--directory", action="store",
                           dest="output_dir",
                           default=self._get_output_dir_from_fname(),
                           help="Dump output in the specified directory.")
 
         # --openmp
-        parser.add_option("--openmp", action="store_true", dest="with_openmp",
+        parser.add_argument("--openmp", action="store_true", dest="with_openmp",
                           default=None, help="Use OpenMP to run the "\
                             "simulation using multiple cores.")
-        parser.add_option("--no-openmp", action="store_false", dest="with_openmp",
+        parser.add_argument("--no-openmp", action="store_false", dest="with_openmp",
                           default=None, help="Do not use OpenMP to run the "\
                             "simulation using multiple cores.")
 
         # --kernel
         all_kernels = list_all_kernels()
-        parser.add_option(
+        parser.add_argument(
             "--kernel", action="store", dest="kernel", default=None,
-            type="choice", choices=all_kernels,
+             choices=all_kernels,
             help="Use specified kernel from %s"%all_kernels
         )
 
         # Restart options
-        restart = OptionGroup(parser, "Restart options",
+        restart = parser.add_argument_group("Restart options",
                               "Restart options for PySPH")
 
-        restart.add_option("--restart-file", action="store", dest="restart_file",
+        restart.add_argument("--restart-file", action="store", dest="restart_file",
                            default=None,
                            help=("""Restart a PySPH simulation using a specified file """)),
 
-        restart.add_option("--rescale-dt", action="store", dest="rescale_dt",
-                           default=1.0, type="float",
+        restart.add_argument("--rescale-dt", action="store", dest="rescale_dt",
+                           default=1.0, type=float,
                            help=("Scale dt upon restarting by a numerical constant"))
 
-        parser.add_option_group( restart )
 
         # NNPS options
-        nnps_options = OptionGroup(parser, "NNPS", "Nearest Neighbor searching")
+        nnps_options = parser.add_argument_group("NNPS",
+                "Nearest Neighbor searching")
 
         # --nnps
-        nnps_options.add_option("--nnps", dest="nnps",
+        nnps_options.add_argument("--nnps", dest="nnps",
                                 choices=['box', 'll'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
@@ -291,111 +279,108 @@ class Application(object):
                                 )
 
         # --fixed-h
-        nnps_options.add_option("--fixed-h", dest="fixed_h",
+        nnps_options.add_argument("--fixed-h", dest="fixed_h",
                                 action="store_true", default=False,
                                 help="Option for fixed smoothing lengths")
 
-        nnps_options.add_option("--cache-nnps", dest="cache_nnps",
+        nnps_options.add_argument("--cache-nnps", dest="cache_nnps",
                                 action="store_true", default=False,
                         help="Option to enable the use of neighbor caching.")
 
-        nnps_options.add_option(
+        nnps_options.add_argument(
             "--sort-gids", dest="sort_gids", action="store_true",
             default=False, help="Sort neighbors by the GIDs to get "\
             "consistent results in serial and parallel (slows down a bit)."
         )
 
-        parser.add_option_group( nnps_options )
 
         # Zoltan Options
-        zoltan = OptionGroup(parser, "PyZoltan",
+        zoltan = parser.add_argument_group("PyZoltan",
                              "Zoltan load balancing options")
 
-        zoltan.add_option("--with-zoltan", action="store_true",
+        zoltan.add_argument("--with-zoltan", action="store_true",
                           dest="with_zoltan", default=True,
                           help=("""Use PyZoltan for dynamic load balancing """))
 
-        zoltan.add_option("--zoltan-lb-method", action="store",
+        zoltan.add_argument("--zoltan-lb-method", action="store",
                           dest="zoltan_lb_method", default="RCB",
                           help=("""Choose the Zoltan load balancnig method"""))
 
         # --rcb-lock
-        zoltan.add_option("--rcb-lock", action="store_true", dest="zoltan_rcb_lock_directions",
+        zoltan.add_argument("--rcb-lock", action="store_true", dest="zoltan_rcb_lock_directions",
                           default=False,
                           help=("Lock the directions of the RCB cuts"))
 
         # rcb--reuse
-        zoltan.add_option("--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
+        zoltan.add_argument("--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
                           default=False,
                           help=("Reuse previous RCB cuts"))
 
         # rcb-rectilinear
-        zoltan.add_option("--rcb-rectilinear", action="store_true", dest='zoltan_rcb_rectilinear',
+        zoltan.add_argument("--rcb-rectilinear", action="store_true", dest='zoltan_rcb_rectilinear',
                           default=False,
                           help=("Produce nice rectilinear blocks without projections"))
 
         # rcb-set-direction
-        zoltan.add_option("--rcb-set-direction", action='store', dest="zoltan_rcb_set_direction",
-                          default=0, type="int",
+        zoltan.add_argument("--rcb-set-direction", action='store', dest="zoltan_rcb_set_direction",
+                          default=0, type=int,
                           help=("Set the order of the RCB cuts"))
 
-        zoltan.add_option("--zoltan-weights", action="store_false",
+        zoltan.add_argument("--zoltan-weights", action="store_false",
                           dest="zoltan_weights", default=True,
                           help=("""Switch between using weights for input to Zoltan.
                           defaults to True"""))
 
-        zoltan.add_option("--ghost-layers", action='store', dest='ghost_layers',
-                          default=3.0, type='float',
+        zoltan.add_argument("--ghost-layers", action='store', dest='ghost_layers',
+                          default=3.0, type=float,
                           help=('Number of ghost cells to share for remote neighbors'))
 
-        zoltan.add_option("--lb-freq", action='store', dest='lb_freq',
-                          default=10, type='int',
+        zoltan.add_argument("--lb-freq", action='store', dest='lb_freq',
+                          default=10, type=int,
                           help=('The frequency for load balancing'))
 
-        zoltan.add_option("--zoltan-debug-level", action="store",
+        zoltan.add_argument("--zoltan-debug-level", action="store",
                           dest="zoltan_debug_level", default="0",
                           help=("""Zoltan debugging level"""))
 
-        parser.add_option_group( zoltan )
 
         # Options to control parallel execution
-        parallel_options=OptionGroup(parser, "Parallel Options")
+        parallel_options=parser.add_argument_group("Parallel Options")
 
         # --update-cell-sizes
-        parallel_options.add_option("--update-cell-sizes", action='store_true',
+        parallel_options.add_argument("--update-cell-sizes", action='store_true',
                                     dest='update_cell_sizes', default=False,
                                     help=("Recompute cell sizes for binning in parallel"))
 
         # --parallel-scale-factor
-        parallel_options.add_option("--parallel-scale-factor", action="store",
-                                    dest="parallel_scale_factor", default=2.0, type='float',
+        parallel_options.add_argument("--parallel-scale-factor", action="store",
+                                    dest="parallel_scale_factor", default=2.0, type=float,
                                     help=("""Kernel scale factor for the parallel update"""))
 
         # --parallel-output-mode
-        parallel_options.add_option("--parallel-output-mode", action="store",
+        parallel_options.add_argument("--parallel-output-mode", action="store",
                             dest="parallel_output_mode", default=None,
                             help="""Use 'collected' to dump one output at
                           root or 'distributed' for every processor. """)
 
-        parser.add_option_group( parallel_options )
 
 
         # solver interfaces
-        interfaces = OptionGroup(parser, "Interfaces",
+        interfaces = parser.add_argument_group("Interfaces",
                                  "Add interfaces to the solver")
 
-        interfaces.add_option("--interactive", action="store_true",
+        interfaces.add_argument("--interactive", action="store_true",
                               dest="cmd_line", default=False,
                               help=("Add an interactive commandline interface "
                                     "to the solver"))
+    
+        interfaces.add_argument("--xml-rpc", action="store",
+                dest="xml_rpc", metavar="[HOST:] PORT",
+                              help=("Add an XML-RPC interface to the solver;"
+                                      "HOST=0.0.0.0 by default"))
 
-        interfaces.add_option("--xml-rpc", action="store",
-                              dest="xml_rpc", metavar='[HOST:]PORT',
-                              help=("Add an XML-RPC interface to the solver; "
-                                    "HOST=0.0.0.0 by default"))
-
-        interfaces.add_option("--multiproc", action="store",
-                              dest="multiproc", metavar='[[AUTHKEY@]HOST:]PORT[+]',
+        interfaces.add_argument("--multiproc", action="store",
+                              dest="multiproc", metavar='[[AUTHKEY@] HOST:] PORT[+] ',
                               default="pysph@0.0.0.0:8800+",
                               help=("Add a python multiprocessing interface "
                                     "to the solver; "
@@ -403,20 +388,16 @@ class Application(object):
                                     " default (8800+ means first available port "
                                     "number 8800 onwards)"))
 
-        interfaces.add_option("--no-multiproc", action="store_const",
+        interfaces.add_argument("--no-multiproc", action="store_const",
                               dest="multiproc", const=None,
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-        parser.add_option_group(interfaces)
 
-        # User options.
-        user_options = OptionGroup(
-            self.opt_parse, "User", "User defined command line arguments"
-        )
+          # User options.
+        user_options = parser.add_argument_group("User",
+                 "User defined command line arguments")
         self.add_user_options(user_options)
-        if len(user_options.option_list) > 0:
-            self._add_option(user_options)
 
     def _parse_command_line(self, force=False):
         """If force is True, it will parse the arguments regardless of whether
@@ -425,9 +406,9 @@ class Application(object):
         """
         if is_using_ipython() and not force:
             # Don't parse the command line args.
-            (options, args) = self.opt_parse.parse_args([])
+            options  = self.arg_parse.parse_args([])
         else:
-            (options, args) = self.opt_parse.parse_args(self.args)
+            options  = self.arg_parse.parse_args(self.args)
 
         self.options = options
 
@@ -966,9 +947,7 @@ class Application(object):
         start_time = time.time()
         self.solver = solver
         self.equations = equations
-        solver_opts = solver.get_options(self.opt_parse)
-        if solver_opts is not None:
-            self._add_option(solver_opts)
+        solver_opts = solver.get_options(self.arg_parse)
         self._parse_command_line()
         self._setup_logging()
 
@@ -997,7 +976,7 @@ class Application(object):
         Note
         ----
 
-        This uses the `optparse` module.
+        This uses the `argparse` module.
         """
         pass
 

@@ -43,7 +43,7 @@ def example_info(module, filename):
 def get_all_examples():
     basedir = HERE
     examples = []
-    _ignore = [['run.py'], ['ghia_cavity_data.py'],
+    _ignore = [['run.py'], ['ghia_cavity_data.py'], ['db_exp_data.py'],
               ['tests', 'test_examples.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]

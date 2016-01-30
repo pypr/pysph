@@ -1,4 +1,4 @@
-"""Taylor Green vortex flow (10 minutes).
+"""Taylor Green vortex flow (5 minutes).
 """
 
 import numpy as np
@@ -41,41 +41,41 @@ def exact_velocity(U, b, t, x, y):
 
 class TaylorGreen(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
         )
-        group.add_option(
+        group.add_argument(
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
                 "of dx (setting it to zero disables it, the default)."
         )
-        group.add_option(
+        group.add_argument(
             "--standard-sph", action="store_true", dest="standard_sph",
             default=False, help="Use standard SPH (defaults to TVF)."
         )
-        group.add_option(
+        group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
             help="Number of points along x direction. (default 50)"
         )
-        group.add_option(
+        group.add_argument(
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
-        group.add_option(
+        group.add_argument(
             "--hdx", action="store", type=float, dest="hdx", default=1.0,
             help="Ratio h/dx."
         )
-        group.add_option(
+        group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
             default=7.0, help="Gamma for the state equation."
         )
-        group.add_option(
+        group.add_argument(
             "--pb-factor", action="store", type=float, dest="pb_factor",
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
-        group.add_option(
+        group.add_argument(
             "--tensile-correction", action="store_true", dest="tensile_corr",
             default=False,
             help="Use tensile instability correction (for standard SPH)."
@@ -98,7 +98,7 @@ class TaylorGreen(Application):
         dt_force = 0.25 * 1.0
 
         self.tf = 5.0
-        self.dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
 
     def create_domain(self):
         return DomainManager(
@@ -292,6 +292,9 @@ class TaylorGreen(Application):
         fname = os.path.join(self.output_dir, 'results.npz')
         np.savez(fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
                  decay_ex=decay_ex)
+
+        import matplotlib
+        matplotlib.use('Agg')
 
         from matplotlib import pyplot as plt
         plt.clf()
