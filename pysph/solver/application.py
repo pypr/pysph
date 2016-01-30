@@ -477,7 +477,7 @@ class Application(object):
             if options.restart_file is not None:
                 # FIXME: not tested, probably does not work!
                 solver = self.solver
-                data = load(options.restart_file)
+                data = solver.output_handler.load(options.restart_file)
 
                 arrays = data['arrays']
                 solver_data = data['solver_data']

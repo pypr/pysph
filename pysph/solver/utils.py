@@ -10,6 +10,7 @@ import os
 
 from pysph.base.particle_array import ParticleArray
 from pysph.base.utils import get_particle_array, get_particles_info
+from pysph.solver.output_handler import load, output_formats
 
 HAS_PBAR = True
 try:
@@ -251,7 +252,7 @@ def dump_v1(filename, particles, solver_data, detailed_output=False,
         numpy.savez(filename, version=1, **output_data)
 
 
-def load(fname):
+def load_prev(fname):
     """Load and return data from an  output (.npz) file dumped by PySPH.
 
     For output file version 1, the function returns a dictionary with
@@ -516,7 +517,7 @@ class SPHInterpolate(object):
 
         return resultx, resulty, resultz
 
-def get_files(dirname=None, fname=None, endswith=".npz"):
+def get_files(dirname=None, fname=None, endswith=output_formats):
     """Get all solution files in a given directory, `dirname`.
 
     Parameters

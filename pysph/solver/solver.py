@@ -10,7 +10,7 @@ from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
 
 from pysph.solver.utils import FloatPBar, load, dump
-
+from pysph.solver.output_handler import OutputHandler
 import logging
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class Solver(object):
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
                  output_at_times=(),
-                 fixed_h=False, **kwargs):
+                 fixed_h=False, output_format = 'hdf5', **kwargs):
         """**Constructor**
 
         Any additional keyword args are used to set the values of any
@@ -69,7 +69,9 @@ class Solver(object):
 
         fixed_h : bint
             Flag for constant smoothing lengths `h`
-
+    
+        output_format : string
+            Output format to save
         Example
         -------
 
@@ -165,6 +167,9 @@ class Solver(object):
         # flag for constant smoothing lengths
         self.fixed_h = fixed_h
 
+        #OutputFormat 
+        self.output_format = output_format
+
         # Set all extra keyword arguments
         for attr, value in kwargs.items():
             if hasattr(self, attr):
@@ -217,7 +222,15 @@ class Solver(object):
         # set integrator option for constant smoothing length
         self.fixed_h = fixed_h
         self.integrator.set_fixed_h( fixed_h )
-
+   
+        comm = None
+        if self.parallel_output_mode == "collected" and self.in_parallel:
+            comm = self.comm
+        self.output_handler = OutputHandler(
+                self.output_directory, self.output_format, 
+                detailed_output=self.detailed_output,
+                only_real=self.output_only_real,
+                compress = self.compress_output, mpi_comm = comm)
         logger.debug("Solver setup complete.")
 
     def add_post_stage_callback(self, callback):
@@ -515,18 +528,9 @@ class Solver(object):
                 self.t, self.count, self.dt)
             logger.info(msg)
 
-        fname = os.path.join(self.output_directory,
-                             self.fname  + '_' + str(self.count) +'.npz')
-
+        fname = os.path.join(self.fname  + '_' + str(self.count))
         solver_data = {'dt': self.dt, 't': self.t, 'count': self.count}
-        comm = None
-        if self.parallel_output_mode == "collected" and self.in_parallel:
-            comm = self.comm
-
-        dump(fname, self.particles, solver_data,
-             detailed_output=self.detailed_output,
-             only_real=self.output_only_real, mpi_comm=comm,
-             compress=self.compress_output)
+        self.output_handler.dump(fname, self.particles, solver_data)        
 
     def load_output(self, count):
         """Load particle data from dumped output file.
@@ -564,8 +568,7 @@ class Solver(object):
         array_names = [pa.name for pa in self.particles]
 
         # load the output file
-        data = load(os.path.join(self.output_directory,
-                                 self.fname+'_'+str(count)+'.npz'))
+        data = self.output_handler.load(self.fname+'_'+str(count))
 
         arrays = [ data["arrays"][i] for i in array_names ]
 
