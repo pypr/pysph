@@ -47,8 +47,7 @@ except ImportError:
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
-from pysph.solver.utils import load 
-from pysph.solver.output_handler import OutputHandler
+from pysph.solver.utils import load, dump
 from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
     Interpolator)
 
@@ -900,8 +899,7 @@ class MayaviViewer(HasTraits):
         if self._file_name:
             sd = self._solver_data
             arrays = [x.particle_array for x in self.particle_arrays]
-            output_handler = OutputHandler()
-            output_handler.dump(self._file_name, arrays, sd)
+            dump(self._file_name, arrays, sd)
 
     def _make_particle_array_helper(self, scene, name):
         pah = ParticleArrayHelper(scene=scene, name=name, scalar=self.scalar)
