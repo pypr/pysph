@@ -142,7 +142,7 @@ class HDFOutput(Output):
                 data = self.all_array_data[ptype]
                 self._set_constants(pdata, ptype_grp)
                 self._set_properties(pdata, arrays_grp, data)
-            self._set_attributes(solver_grp)
+            self._set_solver_data(solver_grp)
 
     def _load(self, fname):
         if has_h5py():
@@ -155,7 +155,7 @@ class HDFOutput(Output):
         with h5py.File(fname, 'r') as f:
             solver_grp = f['solver_data']
             particles_grp = f['particles']
-            ret["solver_data"] = self._get_attributes(solver_grp)
+            ret["solver_data"] = self._get_solver_data(solver_grp)
             ret["arrays"] = self._get_particles(particles_grp)
         return ret
 
@@ -183,7 +183,7 @@ class HDFOutput(Output):
             particles[str(name)] = array
         return particles
 
-    def _get_attributes(self, grp):
+    def _get_solver_data(self, grp):
         solver_data = {}
         for name, value in grp.attrs.items():
             solver_data[str(name)] = value
@@ -224,7 +224,7 @@ class HDFOutput(Output):
                     value = 'None'
                 prop.attrs[attname] = value
 
-    def _set_attributes(self, grp):
+    def _set_solver_data(self, grp):
         for name, data in self.solver_data.items():
             grp.attrs[name] = data
 

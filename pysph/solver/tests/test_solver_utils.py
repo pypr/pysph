@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.solver.utils import dump, load, dump_v1
 
 
-class TestOuptutNumpy(TestCase):
+class TestOutputNumpy(TestCase):
     def setUp(self):
         self.root = mkdtemp()
 
@@ -29,7 +29,6 @@ class TestOuptutNumpy(TestCase):
         dt = 1.0
         pa = get_particle_array(name='fluid', x=x, y=y)
         fname = self._get_filename('simple')
-        print(fname)
         dump(fname, [pa], solver_data={'dt': dt})
         data = load(fname)
         solver_data = data['solver_data']
@@ -136,11 +135,11 @@ class TestOuptutNumpy(TestCase):
         self.assertEqual(set(pa1.output_property_arrays), 
                 set(output_arrays))
 
-class TestOuptutHdf5(TestOuptutNumpy):
+class TestOutputHdf5(TestOuptutNumpy):
     def _get_filename(self, fname):
         return join(self.root, fname) + '.hdf5'
 
-class TestOuptutNumpyV1(TestCase):
+class TestOutputNumpyV1(TestCase):
     def setUp(self):
         self.root = mkdtemp()
 
