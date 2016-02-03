@@ -5,19 +5,9 @@ import os
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import QuinticSpline
-from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep
-from pysph.sph.scheme import TVFScheme
 
-# the eqations
-from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import SummationDensity,\
-    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
-    MomentumEquationArtificialStress, SolidWallPressureBC, SolidWallNoSlipBC,\
-    SetWallVelocity
+from pysph.sph.scheme import TVFScheme
 
 # numpy
 import numpy as np

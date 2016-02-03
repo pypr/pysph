@@ -453,10 +453,11 @@ class TVFScheme(Scheme):
 
         g3 = []
         for solid in self.solids:
-            g3.append(SolidWallPressureBC(
-                dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
-                p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
-            ))
+            for fluid in self.fluids:
+                g3.append(SolidWallPressureBC(
+                    dest=solid, sources=[fluid], b=1.0, rho0=self.rho0,
+                    p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
+                ))
 
         equations.append(Group(equations=g3, real=False))
 

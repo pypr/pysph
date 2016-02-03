@@ -13,26 +13,16 @@ at the rear of the cylinder.
 
 """
 
+import os
+import numpy as np
+
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import QuinticSpline
-from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep
 
-# the eqations
-from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import (SummationDensity,
-    SetWallVelocity, StateEquation,
-    MomentumEquationPressureGradient, MomentumEquationViscosity,
-    MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
+from pysph.sph.scheme import TVFScheme
 
-# numpy
-import os
-import numpy as np
 
 # domain and reference values
 L = 0.12; Umax = 1.2e-4
@@ -102,35 +92,7 @@ class PeriodicCylinders(Application):
         print("tf = %f"%tf)
 
         # add requisite properties to the arrays:
-
-        # volume from number density for fluid and solid
-        fluid.add_property('V')
-        solid.add_property('V' )
-
-        # extrapolated velocities for the solid
-        for name in ['uf', 'vf', 'wf']:
-            solid.add_property(name)
-
-        # advection velocities and accelerations for the fluid
-        for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat'):
-            fluid.add_property(name)
-
-        # kernel summation correction for the solid
-        solid.add_property('wij')
-
-        # dummy velocities for the solid walls
-        # required for the no-slip BC
-        for name in ['ug', 'vg', 'wg']:
-            solid.add_property(name)
-
-        # imposed accelerations on the solid
-        solid.add_property('ax')
-        solid.add_property('ay')
-        solid.add_property('az')
-        solid.add_output_arrays(['p'])
-        # magnitude of velocity
-        fluid.add_property('vmag2')
-        fluid.add_output_arrays(['vmag2', 'p'])
+        self.scheme.setup_properties([fluid, solid])
 
         # setup the particle properties
         volume = dx * dx
@@ -156,79 +118,13 @@ class PeriodicCylinders(Application):
         # return the particle list
         return [fluid, solid]
 
-    def create_solver(self):
-        kernel = QuinticSpline(dim=2)
-
-        # The predictor corrector integrator for the TV formulation. As per
-        # the paper, the integrator is defined for PEC mode with only one
-        # function evaluation per time step.
-        integrator = PECIntegrator(fluid=TransportVelocityStep())
-
-        # Create a solver. Damping is performed for 100 iterations.
-        solver = Solver(
-            kernel=kernel, dim=2, integrator=integrator,
-            adaptive_timestep=False, tf=tf, dt=dt, n_damp=100, pfreq=500)
-        return solver
-
-    def create_equations(self):
-        equations = [
-
-            # Summation density along with volume summation for the fluid
-            # phase. This is done for all local and remote particles. At the
-            # end of this group, the fluid phase has the correct density
-            # taking into consideration the fluid and solid
-            # particles.
-            Group(
-                equations=[
-                    VolumeSummation(
-                        dest='solid', sources=['fluid', 'solid']
-                    ),
-                    SummationDensity(dest='fluid', sources=['fluid','solid']),
-                    ], real=False),
-
-            # Once the fluid density is computed, we can use the EOS to set
-            # the fluid pressure. Additionally, the dummy velocity for the
-            # channel is set, which is later used in the no-slip wall BC.
-            Group(
-                equations=[
-                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-                    SetWallVelocity(dest='solid', sources=['fluid']),
-                    ], real=False),
-
-            # Once the pressure for the fluid phase has been updated, we can
-            # extrapolate the pressure to the ghost particles. After this
-            # group, the fluid density, pressure and the boundary pressure has
-            # been updated and can be used in the integration equations.
-            Group(
-                equations=[
-                    SolidWallPressureBC(dest='solid', sources=['fluid'],
-                                        gx=fx, b=1.0, rho0=rho0, p0=p0),
-                    ], real=False),
-
-            # The main accelerations block. The acceleration arrays for the
-            # fluid phase are updated in this stage for all local particles.
-            Group(
-                equations=[
-                    # Pressure gradient terms
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=pb),
-
-                    # fluid viscosity
-                    MomentumEquationViscosity(
-                        dest='fluid', sources=['fluid'], nu=nu),
-
-                    # No-slip boundary condition. This is effectively a
-                    # viscous interaction of the fluid with the ghost
-                    # particles.
-                    SolidWallNoSlipBC(
-                        dest='fluid', sources=['solid'], nu=nu),
-
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
-
-                    ], real=True),
-        ]
-        return equations
+    def create_scheme(self):
+        s = TVFScheme(
+            ['fluid'], ['solid'], dim=2, rho0=rho0, c0=c0, nu=nu,
+            p0=p0, pb=p0, h0=dx*hdx, gx=fx
+        )
+        s.configure_solver(tf=tf, dt=dt, n_damp=100, pfreq=500)
+        return s
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
@@ -242,9 +138,10 @@ class PeriodicCylinders(Application):
     def _plot_cd_vs_t(self):
         from pysph.solver.utils import iter_output, load
         from pysph.tools.sph_evaluator import SPHEvaluator
-        from pysph.sph.rigid_body import (NumberDensity, ViscosityRigidBody,
-                                          PressureRigidBody)
         from pysph.sph.equation import Group
+        from pysph.sph.wc.transport_velocity import (SetWallVelocity,
+            MomentumEquationPressureGradient, SolidWallNoSlipBC,
+            SolidWallPressureBC, VolumeSummation)
 
         data = load(self.output_files[0])
         solid = data['arrays']['solid']

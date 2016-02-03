@@ -2,26 +2,16 @@
 """
 
 import os
+# numpy
+import numpy as np
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import QuinticSpline
-from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep
 
-# the eqations
-from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import (SummationDensity,
-    SetWallVelocity, StateEquation,
-    MomentumEquationPressureGradient, MomentumEquationViscosity,
-    MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC)
+from pysph.sph.scheme import TVFScheme
 
-# numpy
-import numpy as np
 
 # domain and reference values
 L = 0.1; Umax = 5e-5
@@ -82,39 +72,7 @@ class LatticeCylinders(Application):
             Re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt))
 
-        # add requisite properties to the arrays:
-        # particle volume
-        fluid.add_property('V')
-        solid.add_property('V' )
-
-        # advection velocities and accelerations
-        for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat',
-                     'au', 'av', 'aw'):
-            fluid.add_property(name)
-
-        # kernel summation correction for the solid
-        solid.add_property('wij')
-
-        # imposed accelerations on the solid
-        solid.add_property('ax')
-        solid.add_property('ay')
-        solid.add_property('az')
-
-        # extrapolated velocities for the solid
-        for name in ['uf', 'vf', 'wf']:
-            solid.add_property(name)
-
-        # dummy velocities for the solid wall
-        # required for the no-slip BC
-        for name in ['ug', 'vg', 'wg']:
-            solid.add_property(name)
-
-        # magnitude of velocity
-        fluid.add_property('vmag2')
-        solid.add_property('vmag2')
-
-        # density acceleration
-        fluid.add_property('arho')
+        self.scheme.setup_properties([fluid, solid])
 
         # setup the particle properties
         volume = dx * dx
@@ -134,79 +92,17 @@ class LatticeCylinders(Application):
         # smoothing lengths
         fluid.h[:] = hdx * dx
         solid.h[:] = hdx * dx
-        fluid.add_output_arrays( ['vmag2', 'p'] )
-        solid.add_output_arrays( ['vmag2', 'p'] )
+
         # return the particle list
         return [fluid, solid]
 
-    def create_solver(self):
-        # Create the kernel
-        kernel = QuinticSpline(dim=2)
-
-        integrator = PECIntegrator(fluid=TransportVelocityStep())
-
-        # Create a solver.
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        dt=dt, tf=tf)
-        return solver
-
-    def create_equations(self):
-        equations = [
-
-            # Summation density along with volume summation for the fluid
-            # phase. This is done for all local and remote particles. At the
-            # end of this group, the fluid phase has the correct density
-            # taking into consideration the fluid and solid
-            # particles.
-            Group(
-                equations=[
-                    SummationDensity(dest='fluid', sources=['fluid','solid']),
-                    ], real=False),
-
-
-            # Once the fluid density is computed, we can use the EOS to set
-            # the fluid pressure. Additionally, the dummy velocity for the
-            # channel is set, which is later used in the no-slip wall BC.
-            Group(
-                equations=[
-                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-                    SetWallVelocity(dest='solid', sources=['fluid']),
-                    ], real=False),
-
-            # Once the pressure for the fluid phase has been updated, we can
-            # extrapolate the pressure to the ghost particles. After this
-            # group, the fluid density, pressure and the boundary pressure has
-            # been updated and can be used in the integration equations.
-            Group(
-                equations=[
-                    SolidWallPressureBC(dest='solid', sources=['fluid'], gx=fx,
-                        rho0=rho0, p0=p0, b=1.0),
-                    ], real=False),
-
-            # The main accelerations block. The acceleration arrays for the
-            # fluid phase are upadted in this stage for all local particles.
-            Group(
-                equations=[
-                    # Pressure gradient terms
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], gx=fx, pb=p0),
-
-                    # fluid viscosity
-                    MomentumEquationViscosity(
-                        dest='fluid', sources=['fluid'], nu=nu),
-
-                    # No-slip boundary condition. This is effectively a
-                    # viscous interaction of the fluid with the ghost
-                    # particles.
-                    SolidWallNoSlipBC(
-                        dest='fluid', sources=['solid'], nu=nu),
-
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
-
-                    ], real=True),
-        ]
-        return equations
+    def create_scheme(self):
+        s = TVFScheme(
+            ['fluid'], ['solid'], dim=2, rho0=rho0, c0=c0, nu=nu,
+            p0=p0, pb=p0, h0=dx*hdx, gx=fx
+        )
+        s.configure_solver(tf=tf, dt=dt)
+        return s
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
