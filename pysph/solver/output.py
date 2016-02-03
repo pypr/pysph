@@ -73,7 +73,7 @@ class Output(object):
         raise NotImplementedError()
 
     def _load(self, fname):
-        """ Implement the method for loading the output to a file here """
+        """ Implement the method for loading from file here """
         raise NotImplementedError()
 
 
