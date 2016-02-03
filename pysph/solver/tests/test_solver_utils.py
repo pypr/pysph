@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.solver.utils import dump, load, dump_v1
 
 
-class TestSolverUtils(TestCase):
+class TestOuptutNumpy(TestCase):
     def setUp(self):
         self.root = mkdtemp()
 
@@ -21,7 +21,7 @@ class TestSolverUtils(TestCase):
         shutil.rmtree(self.root)
 
     def _get_filename(self, fname):
-        return join(self.root, fname)
+        return join(self.root, fname)+ '.npz'
 
     def test_dump_and_load_works_by_default(self):
         x = np.linspace(0, 1.0, 10)
@@ -47,7 +47,7 @@ class TestSolverUtils(TestCase):
         dt = 1.0
         pa = get_particle_array(name='fluid', x=x, y=y)
         fname = self._get_filename('simple')
-        dump(fname, [pa], solver_data={'dt': dt},file_format ='npz')
+        dump(fname, [pa], solver_data={'dt': dt})
         data = load(fname)
         solver_data = data['solver_data']
         arrays = data['arrays']
@@ -64,10 +64,10 @@ class TestSolverUtils(TestCase):
         y = x*2.0
         dt = 1.0
         pa = get_particle_array(name='fluid', x=x, y=y)
-        fname = self._get_filename('simple.npz')
-        dump(fname, [pa], solver_data={'dt': dt}, file_format ='npz')
-        fnamez = self._get_filename('simplez.npz')
-        dump(fnamez, [pa], solver_data={'dt': dt}, compress=True, file_format = 'npz')
+        fname = self._get_filename('simple')
+        dump(fname, [pa], solver_data={'dt': dt})
+        fnamez = self._get_filename('simplez')
+        dump(fnamez, [pa], solver_data={'dt': dt}, compress=True)
         # Check that the file size is indeed smaller
         self.assertTrue(os.stat(fnamez).st_size < os.stat(fname).st_size)
 
@@ -116,20 +116,6 @@ class TestSolverUtils(TestCase):
         self.assertTrue(np.allclose(pa.c1, pa1.c1, atol=1e-14))
         self.assertTrue(np.allclose(pa.c2, pa1.c2, atol=1e-14))
 
-    def test_load_works_with_dump_version1(self):
-        x = np.linspace(0, 1.0, 10)
-        y = x*2.0
-        pa = get_particle_array(name='fluid', x=x, y=y)
-        fname = self._get_filename('simple')
-        dump_v1(fname, [pa], solver_data={})
-        data = load(fname)
-        arrays = data['arrays']
-        pa1 = arrays['fluid']
-        self.assertListEqual(list(sorted(pa.properties.keys())),
-                             list(sorted(pa1.properties.keys())))
-        self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
-        self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
-
     def test_that_output_array_information_is_saved(self):
         # Given
         x = np.linspace(0, 1.0, 10)
@@ -149,6 +135,36 @@ class TestSolverUtils(TestCase):
                 set(output_arrays))
         self.assertEqual(set(pa1.output_property_arrays), 
                 set(output_arrays))
+
+class TestOuptutHdf5(TestOuptutNumpy):
+    def _get_filename(self, fname):
+        return join(self.root, fname) + '.hdf5'
+
+class TestOuptutNumpyV1(TestCase):
+    def setUp(self):
+        self.root = mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def _get_filename(self, fname):
+        return join(self.root, fname)+ '.npz'
+
+
+    def test_load_works_with_dump_version1(self):
+        x = np.linspace(0, 1.0, 10)
+        y = x*2.0
+        pa = get_particle_array(name='fluid', x=x, y=y)
+        fname = self._get_filename('simple')
+        dump_v1(fname, [pa], solver_data={})
+        data = load(fname)
+        arrays = data['arrays']
+        pa1 = arrays['fluid']
+        self.assertListEqual(list(sorted(pa.properties.keys())),
+                             list(sorted(pa1.properties.keys())))
+        self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
+        self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
+
 
 if __name__ == '__main__':
     main()
