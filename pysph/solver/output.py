@@ -7,7 +7,7 @@ import os
 
 from pysph.base.particle_array import ParticleArray
 from pysph.base.utils import get_particles_info, get_particle_array
-from pysph import has_h5py, has_pyvisfile
+from pysph import has_h5py
 
 output_formats = ('hdf5', 'npz')
 
