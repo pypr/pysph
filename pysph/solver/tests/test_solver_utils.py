@@ -3,6 +3,9 @@ import shutil
 import os
 from os.path import join
 from tempfile import mkdtemp
+from pysph import has_h5py
+from nose.plugins.skip import SkipTest
+
 try:
     # This is for Python-2.6.x
     from unittest2 import TestCase, main
@@ -135,7 +138,15 @@ class TestOutputNumpy(TestCase):
         self.assertEqual(set(pa1.output_property_arrays), 
                 set(output_arrays))
 
-class TestOutputHdf5(TestOuptutNumpy):
+class TestOutputHdf5(TestOutputNumpy):
+    
+    def setUp(self):
+        self.root = mkdtemp()
+        if not has_h5py():
+            msg = "h5py module is not present"
+            raise SkipTest(msg)
+
+
     def _get_filename(self, fname):
         return join(self.root, fname) + '.hdf5'
 
