@@ -256,7 +256,7 @@ def load(fname):
 
     if fname.endswith('npz'):
         output = NumpyOutput()
-    if fname.endswith('hdf5'):
+    elif fname.endswith('hdf5'):
         output = HDFOutput()
     if os.path.isfile(fname):
         return output.load(fname)
@@ -300,7 +300,7 @@ def dump(filename, particles, solver_data, detailed_output=False,
 
     """
     if filename.endswith(output_formats):
-        fname = filename.rsplit('.', 1)[0]
+        fname = os.path.splitext(filename)[0]
     else:
         fname = filename
         filename = fname + '.hdf5'

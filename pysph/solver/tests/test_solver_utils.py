@@ -43,24 +43,6 @@ class TestOutputNumpy(TestCase):
         self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
         self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
 
-    def test_dump_and_load_works_with_numpy(self):
-        x = np.linspace(0, 1.0, 10)
-        y = x*2.0
-        dt = 1.0
-        pa = get_particle_array(name='fluid', x=x, y=y)
-        fname = self._get_filename('simple')
-        dump(fname, [pa], solver_data={'dt': dt})
-        data = load(fname)
-        solver_data = data['solver_data']
-        arrays = data['arrays']
-        pa1 = arrays['fluid']
-        self.assertListEqual(list(solver_data.keys()), ['dt'])
-        self.assertListEqual(list(sorted(pa.properties.keys())),
-                             list(sorted(pa1.properties.keys())))
-        self.assertTrue(np.allclose(pa.x, pa1.x, atol=1e-14))
-        self.assertTrue(np.allclose(pa.y, pa1.y, atol=1e-14))
-
- 
     def test_dump_and_load_works_with_compress(self):
         x = np.linspace(0, 1.0, 10)
         y = x*2.0
@@ -141,11 +123,10 @@ class TestOutputNumpy(TestCase):
 class TestOutputHdf5(TestOutputNumpy):
     
     def setUp(self):
-        self.root = mkdtemp()
         if not has_h5py():
             msg = "h5py module is not present"
             raise SkipTest(msg)
-
+        super().setUp()
 
     def _get_filename(self, fname):
         return join(self.root, fname) + '.hdf5'
