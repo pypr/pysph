@@ -24,7 +24,7 @@ class TestOutputNumpy(TestCase):
         shutil.rmtree(self.root)
 
     def _get_filename(self, fname):
-        return join(self.root, fname)+ '.npz'
+        return join(self.root, fname) + '.npz'
 
     def test_dump_and_load_works_by_default(self):
         x = np.linspace(0, 1.0, 10)
@@ -84,7 +84,7 @@ class TestOutputNumpy(TestCase):
         x = np.linspace(0, 1.0, 10)
         y = x*2.0
         pa = get_particle_array_wcsph(name='fluid', x=x, y=y,
-            constants={'c1': 1.0, 'c2': [2.0, 3.0]})
+                                      constants={'c1': 1.0, 'c2': [2.0, 3.0]})
         pa.set_output_arrays(['x', 'y'])
         fname = self._get_filename('simple')
         dump(fname, [pa], solver_data={})
@@ -115,21 +115,20 @@ class TestOutputNumpy(TestCase):
         pa1 = data['arrays']['fluid']
 
         # Then.
-        self.assertEqual(set(pa.output_property_arrays), 
-                set(output_arrays))
-        self.assertEqual(set(pa1.output_property_arrays), 
-                set(output_arrays))
+        self.assertEqual(set(pa.output_property_arrays), set(output_arrays))
+        self.assertEqual(set(pa1.output_property_arrays), set(output_arrays))
+
 
 class TestOutputHdf5(TestOutputNumpy):
-    
     def setUp(self):
         if not has_h5py():
             msg = "h5py module is not present"
             raise SkipTest(msg)
-        super().setUp()
+        super(TestOutputHdf5, self).setUp()
 
     def _get_filename(self, fname):
         return join(self.root, fname) + '.hdf5'
+
 
 class TestOutputNumpyV1(TestCase):
     def setUp(self):
@@ -139,8 +138,7 @@ class TestOutputNumpyV1(TestCase):
         shutil.rmtree(self.root)
 
     def _get_filename(self, fname):
-        return join(self.root, fname)+ '.npz'
-
+        return join(self.root, fname) + '.npz'
 
     def test_load_works_with_dump_version1(self):
         x = np.linspace(0, 1.0, 10)
