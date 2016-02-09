@@ -293,7 +293,7 @@ def dump(filename, particles, solver_data, detailed_output=False,
         An MPI communicator to use for parallel commmunications.
 
     compress: bool
-        Specify if the npz file is to be compressed or not.
+        Specify if the  file is to be compressed or not.
 
     If `mpi_comm` is not passed or is set to None the local particles alone
     are dumped, otherwise only rank 0 dumps the output.
