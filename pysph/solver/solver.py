@@ -516,7 +516,7 @@ class Solver(object):
             logger.info(msg)
 
         fname = os.path.join(self.output_directory,
-                             self.fname  + '_' + str(self.count) +'.npz')
+                             self.fname  + '_' + str(self.count))
 
         solver_data = {'dt': self.dt, 't': self.t, 'count': self.count}
         comm = None
