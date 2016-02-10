@@ -117,7 +117,7 @@ def add_bool_argument(group, arg, dest, help, default):
 class WCSPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, rho0, c0, h0, hdx, gamma=7.0,
                   gx=0.0, gy=0.0, gz=0.0, alpha=0.1, beta=0.0, delta=0.1,
-                  tensile_correction=False, hg_correction=False,
+                  nu=0.0, tensile_correction=False, hg_correction=False,
                   update_h=False, delta_sph=False):
         """
         Parameters
@@ -147,6 +147,8 @@ class WCSPHScheme(Scheme):
             Coefficient for artificial viscosity.
         delta: float
             Coefficient used to control the intensity of diffusion of density
+        nu: float
+            Real viscosity of the fluid, defaults to no viscosity.
         tensile_correction: bool
             Use tensile correction.
         hg_correction: bool
@@ -187,6 +189,7 @@ class WCSPHScheme(Scheme):
         self.alpha = alpha
         self.beta = beta
         self.delta = delta
+        self.nu = nu
         self.tensile_correction = tensile_correction
         self.hg_correction = hg_correction
         self.update_h = update_h
@@ -280,6 +283,8 @@ class WCSPHScheme(Scheme):
                                         MomentumEquationDeltaSPH)
         from pysph.sph.basic_equations import (ContinuityEquation,
              XSPHCorrection)
+        from pysph.sph.wc.viscosity import LaminarViscosity
+
         equations = []
         g1 = []
         all = self.fluids + self.solids
@@ -335,6 +340,11 @@ class WCSPHScheme(Scheme):
                     ),
                     XSPHCorrection(dest=name, sources=[name])
                 ])
+            if abs(self.nu) > 1e-14:
+                eq = LaminarViscosity(
+                    dest=name, sources=self.fluids, nu=self.nu
+                )
+                g2.insert(-1, eq)
         equations.append(Group(equations=g2))
 
         if self.update_h:
