@@ -47,7 +47,7 @@ except ImportError:
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
-from pysph.solver.utils import load, dump
+from pysph.solver.utils import load, dump, output_formats
 from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
     Interpolator)
 
@@ -89,11 +89,12 @@ def _sort_key(arg):
     return int(a[a.rfind('_')+1:])
 
 def remove_irrelevant_files(files):
-    """Remove any npz files that are not output files.
+    """Remove any npz/hdf5 files that are not output files.
 
-    That is, the file should not end with a '_number.npz'.  This allows users
-    to dump other .npz files in the output while post-processing without
+    That is, the file should not end with a '_number.npz/hdf5'.  This allows
+    users to dump other files in the output while post-processing without
     breaking the viewer.
+
     """
     result = []
     for f in files:
@@ -873,7 +874,8 @@ class MayaviViewer(HasTraits):
         obj.edit_traits()
 
     def _directory_changed(self, d):
-        files = glob.glob(os.path.join(d, '*.npz'))
+        ext = os.splitext(self.files[-1])[1]
+        files = glob.glob(os.path.join(d, '*' + ext))
         if len(files) > 0:
             self._clear()
             sort_file_list(files)
@@ -971,11 +973,14 @@ def main(args=None):
     files = []
     for arg in args:
         if '=' not in arg:
-            if arg.endswith('.npz'):
+            if arg.endswith(output_formats):
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
-                files.extend(glob.glob(os.path.join(arg, '*.npz')))
+                _files = glob.glob(os.path.join(arg, '*.hdf5'))
+                if len(_files) == 0:
+                    _files = glob.glob(os.path.join(arg, '*.npz'))
+                files.extend(_files)
                 continue
             else:
                 usage()
