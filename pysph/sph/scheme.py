@@ -522,3 +522,229 @@ class TVFScheme(Scheme):
             pa = particle_arrays[solid]
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
+
+
+class GasDScheme(Scheme):
+    def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
+                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
+                  update_alpha1=False, update_alpha2=False):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries), currently
+            not supported
+        dim: int
+            Dimensionality of the problem.
+        gamma: float
+            Gamma for Equation of state.
+        kernel_factor: float
+            Kernel scaling factor.
+        alpha1: float
+            Artificial viscosity parameter.
+        alpha2: float
+            Artificial viscosity parameter.
+        beta: float
+            Artificial viscosity parameter.
+        adaptive_h_scheme: str
+            Adaptive h scheme to use. One of ['mpm', 'gsph']
+        update_alpha1: bool
+            Update the alpha1 parameter dynamically.
+        update_alpha2: bool
+            Update the alpha2 parameter dynamically.
+        """
+        self.fluids = fluids
+        self.solids = solids
+        self.dim = dim
+        self.solver = None
+        self.gamma = gamma
+        self.alpha1 = alpha1
+        self.alpha2 = alpha2
+        self.update_alpha1 = update_alpha1
+        self.update_alpha2 = update_alpha2
+        self.beta = beta
+        self.kernel_factor = kernel_factor
+        self.scheme = adaptive_h_scheme
+
+    @classmethod
+    def add_user_options(klass, group, **defaults):
+        choices = ['gsph', 'mpm']
+        default = defaults.get('adaptive_h_scheme', 'mpm')
+        group.add_argument(
+            "--adaptive-h", action="store", dest="adaptive_h_scheme",
+            default=default, choices=choices,
+            help="Specify scheme for adaptive smoothing lengths %s"%choices
+        )
+        group.add_argument(
+            "--alpha1", action="store", type=float, dest="alpha1",
+            default=defaults.get('alpha1', 1.0),
+            help="Alpha1 for the artificial viscosity."
+        )
+        group.add_argument(
+            "--beta", action="store", type=float, dest="beta",
+            default=defaults.get('beta', 0.0),
+            help="Beta for the artificial viscosity."
+        )
+        group.add_argument(
+            "--alpha2", action="store", type=float, dest="alpha2",
+            default=defaults.get('alpha2', 0.1),
+            help="Alpha2 for artificial viscosity"
+        )
+        group.add_argument(
+            "--gamma", action="store", type=float, dest="gamma",
+            default=defaults.get('gamma', 1.4),
+            help="Gamma for the state equation."
+        )
+        add_bool_argument(
+            group, "update-alpha1", dest="update_alpha1",
+            help="Update the alpha1 parameter.",
+            default=defaults.get('update_alpha1', False)
+        )
+        add_bool_argument(
+            group, "update-alpha2", dest="update_alpha2",
+            help="Update the alpha2 parameter.",
+            default=defaults.get('update_alpha2', False)
+        )
+
+    def consume_user_options(self, options):
+        self.scheme = options.adaptive_h_scheme
+        vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
+                'update_alpha2']
+        for var in vars:
+            setattr(self, var, getattr(options, var))
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                           extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import Gaussian
+        if kernel is None:
+            kernel = Gaussian(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        from pysph.sph.integrator import PECIntegrator
+        from pysph.sph.integrator_step import GasDFluidStep
+
+        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        step_cls = GasDFluidStep
+        for name in self.fluids:
+            if name not in steppers:
+                steppers[name] = step_cls()
+
+        integrator = cls(**steppers)
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.gas_dynamics.basic import (ScaleSmoothingLength,
+            UpdateSmoothingLengthFromVolume, SummationDensity, IdealGasEOS,
+            MPMAccelerations)
+
+        equations = []
+        # Find the optimal 'h'
+        if self.scheme == 'mpm':
+            g1 = []
+            for fluid in self.fluids:
+                g1.append(
+                    SummationDensity(
+                        dest=fluid, sources=self.fluids, k=self.kernel_factor,
+                        density_iterations=True, dim=self.dim, htol=1e-3
+                ))
+
+            equations.append(Group(
+                equations=g1, update_nnps=True, iterate=True,
+                max_iterations=50
+            ))
+
+        elif self.scheme == 'gsph':
+            group = []
+            for fluid in self.fluids:
+                group.append(
+                    ScaleSmoothingLength(dest=fluid, sources=None, factor=2.0)
+                )
+            equations.append(Group(equations=group, update_nnps=True))
+
+            group = []
+            for fluid in self.fluids:
+                group.append(
+                    SummationDensity(
+                        dest=fluid, sources=self.fluids, dim=self.dim
+                    )
+                )
+            equations.append(Group(equations=group, update_nnps=False))
+
+            group = []
+            for fluid in self.fluids:
+                group.append(
+                    UpdateSmoothingLengthFromVolume(
+                        dest=fluid, sources=None, k=self.kernel_factor,
+                        dim=self.dim
+                    )
+                )
+            equations.append(Group(equations=group, update_nnps=True))
+
+            group = []
+            for fluid in self.fluids:
+                group.append(
+                    SummationDensity(
+                        dest=fluid, sources=self.fluids, dim=self.dim
+                    )
+                )
+            equations.append(Group(equations=group, update_nnps=False))
+        # Done with finding the optimal 'h'
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
+
+        equations.append(Group(equations=g2))
+
+        alpha1 = self.alpha1
+        alpha2 = self.alpha2
+        g3 = []
+        for fluid in self.fluids:
+            g3.append(MPMAccelerations(
+                dest=fluid, sources=self.fluids, alpha1_min=self.alpha1,
+                alpha2_min=self.alpha2, beta=self.beta,
+                update_alpha1=self.update_alpha1,
+                update_alpha2=self.update_alpha2
+            ))
+        equations.append(Group(equations=g3))
+        return equations
+
+    def get_solver(self):
+        return self.solver
+
+    def setup_properties(self, particles, clean=True):
+        from pysph.base.utils import get_particle_array_gasd
+        particle_arrays = dict([(p.name, p) for p in particles])
+        dummy = get_particle_array_gasd(name='junk')
+        props = list(dummy.properties.keys())
+        output_props = dummy.output_property_arrays
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
