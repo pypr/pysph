@@ -21,7 +21,7 @@ class Output(object):
         self.only_real = only_real
         self.mpi_comm = mpi_comm
 
-    def dump(self, fname, particles, solver_data={}):
+    def dump(self, fname, particles, solver_data):
         self.particle_data = dict(get_particles_info(particles))
         self.all_array_data = {}
         for array in particles:
