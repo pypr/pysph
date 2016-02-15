@@ -106,12 +106,13 @@ class Application(object):
                            'critical': logging.CRITICAL,
                            'none': None}
 
-        self._setup_argparse()
-
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
+
         self.initialize()
+        self.scheme = self.create_scheme()
+        self._setup_argparse()
 
     def _get_output_dir_from_fname(self):
         return self.fname + '_output'
@@ -396,10 +397,11 @@ class Application(object):
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-
           # User options.
         user_options = parser.add_argument_group("User",
                  "User defined command line arguments")
+        if self.scheme is not None:
+            self.scheme.add_user_options(user_options)
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
@@ -418,10 +420,9 @@ class Application(object):
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
-        self.consume_user_options()
-        self.scheme = self.create_scheme()
         if self.scheme is not None:
             self.scheme.consume_user_options(self.options)
+        self.consume_user_options()
 
     def _setup_logging(self):
         """Setup logging for the application.

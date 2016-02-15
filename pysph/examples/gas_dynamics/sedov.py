@@ -31,13 +31,6 @@ beta = 2.0
 kernel_factor = 1.2
 
 class SedovPointExplosion(Application):
-    def add_user_options(self, group):
-        GasDScheme.add_user_options(
-            group, alpha1=alpha1, alpha2=alpha2, beta=beta, gamma=gamma,
-            adaptive_h_scheme="gsph", update_alpha1=True,
-            update_alpha2=True
-        )
-
     def create_particles(self):
         fpath = os.path.join(
             os.path.dirname(__file__), 'ndspmhd-sedov-initial-conditions.npz'
@@ -66,7 +59,8 @@ class SedovPointExplosion(Application):
         s = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta
+            beta=beta, gamma=gamma, adaptive_h_scheme="gsph",
+            update_alpha1=True, update_alpha2=True
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False, pfreq=25)
         return s

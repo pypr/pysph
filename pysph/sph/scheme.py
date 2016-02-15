@@ -26,8 +26,7 @@ class Scheme(object):
         self.dim = dim
         self.solver = None
 
-    @classmethod
-    def add_user_options(klass, group, **defaults):
+    def add_user_options(self, group):
         pass
 
     def consume_user_options(self, options):
@@ -56,7 +55,7 @@ class Scheme(object):
         raise NotImplementedError()
 
     def get_solver(self):
-        raise NotImplementedError()
+        return self.solver
 
     def setup_properties(self, particles, clean=True):
         """Setup the particle arrays so they have the right set of properties
@@ -72,6 +71,17 @@ class Scheme(object):
             If True, removes any unnecessary properties.
         """
         raise NotImplementedError()
+
+    def update(self, **kw):
+        """Update the scheme with given parameters.
+        """
+        for k, v in kw.items():
+            if not hasattr(self, k):
+                msg = 'Parameter {param} not defined for {scheme}.'.format(
+                    param=k, scheme=self.__class__.__name__
+                )
+                raise RuntimeError(msg)
+            setattr(self, k, v)
 
     #### Private protocol ###################################################
 
@@ -99,6 +109,68 @@ class Scheme(object):
         to_add = all_props - set(pa.properties.keys())
         for prop in to_add:
             pa.add_property(prop)
+
+
+class SchemeChooser(Scheme):
+    def __init__(self, default, **schemes):
+        """
+        Parameters
+        ----------
+
+        default: str
+            Name of the default scheme to use.
+        **schemes: kwargs
+            The schemes to choose between.
+        """
+        self.default = default
+        self.schemes = dict(schemes)
+        self.scheme = schemes[default]
+
+    def add_user_options(self, group):
+        for scheme in self.schemes.values():
+            scheme.add_user_options(group)
+        choices = list(self.schemes.keys())
+        group.add_argument(
+            "--scheme", action="store", dest="scheme",
+            default=self.default, choices=choices,
+            help="Specify scheme to use (one of %s)."%choices
+        )
+
+    def consume_user_options(self, options):
+        self.scheme = self.schemes[options.scheme]
+        self.scheme.consume_user_options(options)
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                           extra_steppers=None, **kw):
+        for scheme in self.schemes.values():
+            self.scheme.configure_solver(
+                kernel=kernel, integrator_cls=integrator_cls,
+                extra_steppers=extra_steppers, **kw
+            )
+
+    def get_equations(self):
+        return self.scheme.get_equations()
+
+    def get_solver(self):
+        return self.scheme.get_solver()
+
+    def setup_properties(self, particles, clean=True):
+        """Setup the particle arrays so they have the right set of properties
+        for this scheme.
+
+        Parameters
+        ----------
+
+        particles : list
+            List of particle arrays.
+
+        clean : bool
+            If True, removes any unnecessary properties.
+        """
+        self.scheme.setup_properties(particles, clean)
+
+    def update(self, **kw):
+        self.scheme.update(**kw)
 
 
 ############################################################################
@@ -195,47 +267,46 @@ class WCSPHScheme(Scheme):
         self.update_h = update_h
         self.delta_sph = delta_sph
 
-    @classmethod
-    def add_user_options(klass, group, **defaults):
+    def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=defaults.get('alpha', 0.1),
+            default=self.alpha,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=defaults.get('beta', 0.0),
+            default=self.beta,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--delta", action="store", type=float, dest="delta",
-            default=defaults.get('delta', 0.1),
+            default=self.delta,
             help="Delta for the delta-SPH."
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=defaults.get('gamma', 7.0),
+            default=self.gamma,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, 'tensile-correction', dest='tensile_correction',
             help="Use tensile instability correction.",
-            default=defaults.get('tensile_correction', False)
+            default=self.tensile_correction
         )
         add_bool_argument(
             group, "hg-correction", dest="hg_correction",
             help="Use the Hughes Graham correction.",
-            default=defaults.get('hg_correction', False)
+            default=self.hg_correction
         )
         add_bool_argument(
             group, "update-h", dest="update_h",
             help="Update the smoothing length as per Ferrari et al.",
-            default=defaults.get('update_h', False)
+            default=self.update_h
         )
         add_bool_argument(
             group, "delta-sph", dest="delta_sph",
             help="Use the delta-SPH correction terms.",
-            default=defaults.get('delta_sph', False)
+            default=self.delta_sph
         )
 
     def consume_user_options(self, options):
@@ -356,9 +427,6 @@ class WCSPHScheme(Scheme):
             equations.append(Group(equations=g3, real=False))
 
         return equations
-
-    def get_solver(self):
-        return self.solver
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_wcsph, DEFAULT_PROPS
@@ -500,9 +568,6 @@ class TVFScheme(Scheme):
         equations.append(Group(equations=g4))
         return equations
 
-    def get_solver(self):
-        return self.solver
-
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import (get_particle_array_tvf_fluid,
             get_particle_array_tvf_solid)
@@ -567,12 +632,11 @@ class GasDScheme(Scheme):
         self.update_alpha2 = update_alpha2
         self.beta = beta
         self.kernel_factor = kernel_factor
-        self.scheme = adaptive_h_scheme
+        self.adaptive_h_scheme = adaptive_h_scheme
 
-    @classmethod
-    def add_user_options(klass, group, **defaults):
+    def add_user_options(self, group):
         choices = ['gsph', 'mpm']
-        default = defaults.get('adaptive_h_scheme', 'mpm')
+        default = self.adaptive_h_scheme
         group.add_argument(
             "--adaptive-h", action="store", dest="adaptive_h_scheme",
             default=default, choices=choices,
@@ -580,37 +644,37 @@ class GasDScheme(Scheme):
         )
         group.add_argument(
             "--alpha1", action="store", type=float, dest="alpha1",
-            default=defaults.get('alpha1', 1.0),
+            default=self.alpha1,
             help="Alpha1 for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=defaults.get('beta', 0.0),
+            default=self.beta,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--alpha2", action="store", type=float, dest="alpha2",
-            default=defaults.get('alpha2', 0.1),
+            default=self.alpha2,
             help="Alpha2 for artificial viscosity"
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=defaults.get('gamma', 1.4),
+            default=self.gamma,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, "update-alpha1", dest="update_alpha1",
             help="Update the alpha1 parameter.",
-            default=defaults.get('update_alpha1', False)
+            default=self.update_alpha1
         )
         add_bool_argument(
             group, "update-alpha2", dest="update_alpha2",
             help="Update the alpha2 parameter.",
-            default=defaults.get('update_alpha2', False)
+            default=self.update_alpha2
         )
 
     def consume_user_options(self, options):
-        self.scheme = options.adaptive_h_scheme
+        self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
                 'update_alpha2']
         for var in vars:
@@ -665,7 +729,7 @@ class GasDScheme(Scheme):
 
         equations = []
         # Find the optimal 'h'
-        if self.scheme == 'mpm':
+        if self.adaptive_h_scheme == 'mpm':
             g1 = []
             for fluid in self.fluids:
                 g1.append(
@@ -679,7 +743,7 @@ class GasDScheme(Scheme):
                 max_iterations=50
             ))
 
-        elif self.scheme == 'gsph':
+        elif self.adaptive_h_scheme == 'gsph':
             group = []
             for fluid in self.fluids:
                 group.append(
@@ -734,9 +798,6 @@ class GasDScheme(Scheme):
             ))
         equations.append(Group(equations=g3))
         return equations
-
-    def get_solver(self):
-        return self.solver
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_gasd

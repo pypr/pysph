@@ -307,7 +307,8 @@ def get_particle_array_tvf_fluid(constants=None, **props):
         constants=constants, additional_props=tv_props, **props
     )
     pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
-                           'm', 'au', 'av', 'aw', 'V', 'vmag2'] )
+                           'm', 'au', 'av', 'aw', 'V', 'vmag2', 'pid', 'gid',
+                           'tag'] )
 
     return pa
 

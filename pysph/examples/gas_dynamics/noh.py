@@ -42,13 +42,6 @@ vr = -1.0
 
 
 class NohImplosion(Application):
-    def add_user_options(self, group):
-        GasDScheme.add_user_options(
-            group, alpha1=alpha1, alpha2=alpha2, beta=beta, gamma=gamma,
-            adaptive_h_scheme="gsph", update_alpha1=True,
-            update_alpha2=True
-        )
-
     def create_particles(self):
         x, y = numpy.mgrid[
             xmin:xmax:dx, ymin:ymax:dx]
@@ -82,7 +75,8 @@ class NohImplosion(Application):
         s = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta
+            beta=beta, gamma=gamma, adaptive_h_scheme="gsph",
+            update_alpha1=True, update_alpha2=True
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False)
         return s

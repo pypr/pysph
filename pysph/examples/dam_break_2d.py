@@ -38,28 +38,27 @@ class DamBreak2D(Application):
             default=1.0,
             help="Divide default h by this factor to change resolution"
         )
-        WCSPHScheme.add_user_options(
-            group, alpha=alpha, beta=beta, gamma=gamma, hg_correction=True,
-            update_h=True
-        )
 
     def consume_user_options(self):
         self.h = h/self.options.h_factor
         print("Using h = %f"%self.h)
         self.hdx = self.hdx
         self.dx = self.h/self.hdx
-
-    def create_scheme(self):
-        from pysph.sph.integrator import TVDRK3Integrator
-        s = WCSPHScheme(
-            ['fluid'], ['boundary'], dim=2, rho0=ro, c0=co,
-            h0=self.h, hdx=self.hdx, gy=-9.81
-        )
+        self.scheme.h0 = self.h
+        self.scheme.hdx = self.hdx
         kernel = WendlandQuintic(dim=2)
         tf = 2.5
-        s.configure_solver(
+        from pysph.sph.integrator import TVDRK3Integrator
+        self.scheme.configure_solver(
             kernel=kernel, integrator_cls=TVDRK3Integrator, tf=tf,
             adaptive_timestep=True, n_damp=50, fixed_h=False
+        )
+
+    def create_scheme(self):
+        s = WCSPHScheme(
+            ['fluid'], ['boundary'], dim=2, rho0=ro, c0=co,
+            h0=h, hdx=1.3, gy=-9.81, alpha=alpha, beta=beta,
+            gamma=gamma, hg_correction=True, update_h=True
         )
         return s
 

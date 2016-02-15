@@ -10,7 +10,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import QuinticSpline
 from pysph.solver.application import Application
 
-from pysph.sph.scheme import TVFScheme, WCSPHScheme
+from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 
 
 # domain and constants
@@ -41,10 +41,6 @@ class TaylorGreen(Application):
                 "of dx (setting it to zero disables it, the default)."
         )
         group.add_argument(
-            "--standard-sph", action="store_true", dest="standard_sph",
-            default=False, help="Use standard SPH (defaults to TVF)."
-        )
-        group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
             help="Number of points along x direction. (default 50)"
         )
@@ -61,8 +57,6 @@ class TaylorGreen(Application):
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
-
-        WCSPHScheme.add_user_options(group, gamma=7.0, alpha=0.1, beta=0.0)
 
     def consume_user_options(self):
         nx = self.options.nx
@@ -82,6 +76,29 @@ class TaylorGreen(Application):
 
         self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+
+        scheme = self.scheme
+        scheme.update(nu=self.nu, h0=h0)
+        if self.options.scheme == 'tvf':
+            scheme.update(pb=self.options.pb_factor*p0)
+        else:
+            scheme.update(hdx=self.hdx)
+        kernel = QuinticSpline(dim=2)
+        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
+
+    def create_scheme(self):
+        h0 = None
+        hdx = None
+        wcsph = WCSPHScheme(
+            ['fluid'], [], dim=2, rho0=rho0, c0=c0, h0=h0,
+            hdx=hdx, nu=None, gamma=7.0, alpha=0.1, beta=0.0
+        )
+        tvf = TVFScheme(
+            ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
+            p0=p0, pb=None, h0=h0
+        )
+        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf)
+        return s
 
     def create_domain(self):
         return DomainManager(
@@ -137,7 +154,7 @@ class TaylorGreen(Application):
         fluid.m[:] = self.volume * fluid.rho
 
         # volume is set as dx^2
-        if not self.options.standard_sph:
+        if self.options.scheme == 'tvf':
             fluid.V[:] = 1./self.volume
 
         # smoothing lengths
@@ -145,23 +162,6 @@ class TaylorGreen(Application):
 
         # return the particle list
         return [fluid]
-
-    def create_scheme(self):
-        h0 = self.dx*self.hdx
-        hdx = self.hdx
-        if self.options.standard_sph:
-            s = WCSPHScheme(
-                ['fluid'], [], dim=2, rho0=rho0, c0=c0, h0=h0,
-                hdx=hdx, nu=self.nu, gamma=self.gamma
-            )
-        else:
-            s = TVFScheme(
-                ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=self.nu,
-                p0=p0, pb=self.options.pb_factor*p0, h0=h0
-            )
-        kernel = QuinticSpline(dim=2)
-        s.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
-        return s
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)

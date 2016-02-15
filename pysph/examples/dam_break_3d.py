@@ -28,14 +28,7 @@ alpha = 0.5
 beta = 0.0
 
 class DamBreak3D(Application):
-
-    def add_user_options(self, group):
-        WCSPHScheme.add_user_options(
-            group, alpha=alpha, beta=beta, gamma=gamma, hg_correction=True,
-            tensile_correction=True
-        )
-
-    def consume_user_options(self):
+    def initialize(self):
         self.geom = DamBreak3DGeometry(
             dx=dx, nboundary_layers=nboundary_layers, hdx=hdx, rho0=ro
         )
@@ -44,7 +37,8 @@ class DamBreak3D(Application):
     def create_scheme(self):
         s = WCSPHScheme(
             ['fluid'], ['boundary'], dim=dim, rho0=ro, c0=self.co,
-            h0=h0, hdx=hdx, gz=-9.81
+            h0=h0, hdx=hdx, gz=-9.81, alpha=alpha, beta=beta, gamma=gamma,
+            hg_correction=True, tensile_correction=True
         )
         kernel = WendlandQuintic(dim=dim)
         s.configure_solver(

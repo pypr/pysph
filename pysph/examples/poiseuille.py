@@ -23,6 +23,13 @@ hdx = 1.0
 h0 = hdx * dx
 
 class PoiseuilleFlow(Application):
+    def initialize(self):
+        self.d = 0.5
+        self.Ly = 2*self.d
+        self.Lx = 0.4*self.Ly
+        self.rho0 = 1.0
+        self.nu = 0.01
+
     def add_user_options(self, group):
         group.add_argument(
             "--re", action="store", type=float, dest="re", default=0.0125,
@@ -35,11 +42,6 @@ class PoiseuilleFlow(Application):
 
     def consume_user_options(self):
         self.re = self.options.re
-        self.d = 0.5
-        self.Ly = 2*self.d
-        self.Lx = 0.4*self.Ly
-        self.rho0 = 1.0
-        self.nu = 0.01
         self.Vmax = self.nu*self.re/(2*self.d)
         self.c0 = 10*self.Vmax
         self.p0 = self.c0**2*self.rho0
@@ -55,6 +57,18 @@ class PoiseuilleFlow(Application):
         dt_force = 0.25 * np.sqrt(h0/self.fx)
 
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+        tf = 100.0
+        scheme = self.scheme
+        scheme.update(c0=self.c0, p0=self.p0, pb=self.p0, gx=self.fx)
+        scheme.configure_solver(tf=tf, dt=self.dt, pfreq=1000)
+        print("dt = %g"%self.dt)
+
+    def create_scheme(self):
+        s = TVFScheme(
+            ['fluid'], ['channel'], dim=2, rho0=self.rho0, c0=None,
+            nu=self.nu, p0=None, pb=None, h0=h0, gx=None
+        )
+        return s
 
     def create_domain(self):
         return DomainManager(xmin=0, xmax=self.Lx, periodic_in_x=True)
@@ -109,16 +123,6 @@ class PoiseuilleFlow(Application):
 
         # return the particle list
         return [fluid, channel]
-
-    def create_scheme(self):
-        s = TVFScheme(
-            ['fluid'], ['channel'], dim=2, rho0=self.rho0, c0=self.c0,
-            nu=self.nu, p0=self.p0, pb=self.p0, h0=h0, gx=self.fx
-        )
-        tf = 100.0
-        print("dt = %g"%self.dt)
-        s.configure_solver(tf=tf, dt=self.dt, pfreq=1000)
-        return s
 
     def create_tools(self):
         tools = []

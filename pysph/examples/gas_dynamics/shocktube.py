@@ -42,11 +42,6 @@ h0 = kernel_factor*dx
 
 
 class ShockTube2D(Application):
-    def add_user_options(self, group):
-        GasDScheme.add_user_options(
-            group, alpha1=alpha1, alpha2=alpha2, beta=beta, gamma=gamma
-        )
-
     def create_domain(self):
         return DomainManager(
             xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,

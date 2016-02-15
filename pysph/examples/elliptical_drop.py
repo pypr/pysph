@@ -83,13 +83,10 @@ class EllipticalDrop(Application):
         self.dx = 0.025
         self.alpha = 0.1
 
-    def add_user_options(self, group):
-        WCSPHScheme.add_user_options(group, gamma=7.0, alpha=0.1, beta=0.0)
-
     def create_scheme(self):
         s = WCSPHScheme(
             ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
-            h0=self.dx*self.hdx, hdx=self.hdx
+            h0=self.dx*self.hdx, hdx=self.hdx, gamma=7.0, alpha=0.1, beta=0.0
         )
         kernel = Gaussian(dim=2)
         dt = 5e-6; tf = 0.0076

@@ -53,14 +53,15 @@ class LidDrivenCavity(Application):
 
         self.tf = 10.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+        self.scheme.h0 = h0
+        self.scheme.nu = self.nu
+        self.scheme.configure_solver(tf=self.tf, dt=self.dt, pfreq=500)
 
     def create_scheme(self):
         s = TVFScheme(
-            ['fluid'], ['solid'], dim=2, rho0=rho0, c0=c0, nu=self.nu,
-            p0=p0, pb=p0, h0=self.dx*hdx
+            ['fluid'], ['solid'], dim=2, rho0=rho0, c0=c0, nu=None,
+            p0=p0, pb=p0, h0=hdx
         )
-        tf = 10.0
-        s.configure_solver(tf=tf, dt=self.dt, pfreq=500)
         return s
 
     def create_particles(self):

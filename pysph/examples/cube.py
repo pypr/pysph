@@ -23,6 +23,8 @@ from pysph.base.utils import get_particle_array_wcsph
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme
 
+rho0 = 1000.0
+
 
 class Cube(Application):
     def add_user_options(self, group):
@@ -30,33 +32,28 @@ class Cube(Application):
             "--np", action="store", type=float, dest="np", default=int(1e5),
             help="Number of particles in the cube (1e5 by default)."
         )
-        gamma = 7.0
-        alpha = 0.5
-        beta = 0.0
-        WCSPHScheme.add_user_options(
-            group, alpha=alpha, beta=beta, gamma=gamma
-        )
 
     def consume_user_options(self):
         self.hdx = 1.5
         self.dx = 1.0/pow(self.options.np, 1.0/3.0)
-        self.rho0 = 1000.0
+        self.scheme.h0 = self.hdx*self.dx
+        self.scheme.hdx = self.hdx
+        kernel = CubicSpline(dim=3)
+        dt = 1e-4
+        tf = 5e-4
+        self.scheme.configure_solver(kernel=kernel, tf=tf, dt=dt)
 
     def create_scheme(self):
         co = 10.0
         s = WCSPHScheme(
-            ['fluid'], [], dim=3, rho0=self.rho0, c0=co,
-            h0=self.hdx*self.dx, hdx=self.hdx, gz=-9.81
+            ['fluid'], [], dim=3, rho0=rho0, c0=co,
+            h0=0.1, hdx=1.5, gz=-9.81, gamma=7.0,
+            alpha=0.5, beta=0.0
         )
-        kernel = CubicSpline(dim=3)
-        dt = 1e-4
-        tf = 5e-4
-        s.configure_solver(kernel=kernel, tf=tf, dt=dt)
         return s
 
     def create_particles(self):
         dx = self.dx
-        rho0 = self.rho0
         hdx = self.hdx
         xmin, xmax = 0.0, 1.0
         ymin, ymax = 0.0, 1.0
