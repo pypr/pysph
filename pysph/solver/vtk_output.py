@@ -1,6 +1,15 @@
+"""Dumps the vtk Output for direct viewing.
+
+One can give the names  numpy or hdf output files or the example to run
+
+"""
+
 from pysph import has_tvtk, has_pyvisfile
-from pysph.solver.output import Output
+from pysph.solver.output import Output, load
 import numpy as np
+import argparse
+import sys
+import json
 
 
 class VtkOutput(Output):
@@ -9,7 +18,7 @@ class VtkOutput(Output):
                  vector_array=[]):
         self.set_output_scalar(scalar_array)
         self.set_output_vector(vector_array)
-        super(VtkOutput, self).__init__(False, only_real, mpi_comm)
+        super(VtkOutput, self).__init__(True, only_real, mpi_comm)
 
     def set_output_vector(self, vector_array={}):
         """
@@ -25,7 +34,7 @@ class VtkOutput(Output):
         """
 
         for name, vector in vector_array.items():
-            assert(len(vector), 3)
+            assert (len(vector) is 3)
         self.vector_array = vector_array
 
     def set_output_scalar(self, scalar_array=[]):
@@ -112,4 +121,64 @@ def dump_vtk(filename, particles, only_real=True, mpi_comm=None,
     else:
         msg = 'Tvtk and pyvisfile Not present'
         raise ImportError(msg)
-    output.dump(filename, particles)
+    output.dump(filename, particles, {})
+
+
+def run(options):
+    data = load(str(options.inputfile))
+    particles = []
+    for ptype, pdata in data['arrays'].items():
+        particles.append(pdata)
+    dump_vtk(str(options.outputfile), particles, scalars=options.scalars,
+             vectors=options.vectors)
+
+
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+
+    parser = argparse.ArgumentParser(
+        prog='dump_vtk', description=__doc__, add_help=False
+    )
+
+    parser.add_argument(
+        "-h", "--help", action="store_true", default=False, dest="help",
+        help="show this help message and exit"
+    )
+
+    parser.add_argument(
+        "--scalars",  metavar="scalars", type=str, nargs='+', default=[],
+        help="scalars variables to dump in vtk"
+    )
+
+    parser.add_argument(
+        "--vectors",  metavar="vectors", type=str, default="{}",
+        help="vectors  to dump in vtk. Example '{\"V\":[\"u\",\"v\",\"w\"]}'"
+    )
+
+    parser.add_argument(
+        "-if", "--inputfile",  metavar="inputfile", type=str, required=True,
+        help="input file to take (hdf5 or npz)"
+    )
+
+    parser.add_argument(
+        "-of", "--outputfile",  metavar="outputfile", type=str, required=True,
+        help="file to output the vtk"
+    )
+
+    if len(argv) > 0 and argv[0] in ['-h', '--help']:
+        parser.print_help()
+        sys.exit()
+
+    options, extra = parser.parse_known_args(argv)
+    vectors = json.loads(options.vectors)
+
+    # Conversion from unicode to string
+    vectors2 = {}
+    for name, arr in vectors.items():
+        vectors2[str(name)] = [str(arr[0]), str(arr[1]), str(arr[2])]
+    options.vectors = vectors2
+    run(options)
+
+if __name__ == '__main__':
+    main()
