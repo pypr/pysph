@@ -153,7 +153,7 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "-od", "--outdir",  metavar="outdir", type=str, default=None,
+        "-d", "--outdir",  metavar="outdir", type=str, default=None,
         help="Directory to output VTK files"
     )
 

@@ -51,7 +51,7 @@ def main():
     runner.set_defaults(func=run_examples)
 
     vtk_out = subparsers.add_parser(
-        'dump_vtk', help='Dump the Vtk Output',
+        'dump_vtk', help='Dump VTK Output',
          add_help=False
     )
     vtk_out.set_defaults(func=output_vtk)
