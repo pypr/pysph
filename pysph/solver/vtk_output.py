@@ -1,63 +1,62 @@
-"""Dumps the vtk Output for direct viewing.
+""" Dumps VTK output files
 
-One can give the names  numpy or hdf output files or the example to run
-
+It takes a hdf or npz file as an input and output vtu file.
 """
-
 from pysph import has_tvtk, has_pyvisfile
 from pysph.solver.output import Output, load
 import numpy as np
 import argparse
 import sys
-import json
+import os
 
 
-class VtkOutput(Output):
+class VTKOutput(Output):
 
-    def __init__(self, only_real=True, mpi_comm=None, scalar_array=[],
-                 vector_array=[]):
-        self.set_output_scalar(scalar_array)
-        self.set_output_vector(vector_array)
-        super(VtkOutput, self).__init__(True, only_real, mpi_comm)
+    def __init__(self, scalars=None, **kwargs):
+        self.set_output_scalar(scalars)
+        self.set_output_vector(**kwargs)
+        super(VTKOutput, self).__init__(True)
 
-    def set_output_vector(self, vector_array={}):
+    def set_output_vector(self, **kwargs):
         """
-        Set the vector to dump in vtk output
+        Set the vector to dump in VTK output
 
         Parameter
         ----------
 
-        vector_array: dictionary of list
-            dictionary of properties   to dump
-            The inner list can only have three elements
-            example: {'P': ['x', 'y', 'z'], 'V': ['u', 'v', 'w'}]
+        kwargs:
+            Vectors to dump
+            Example V=['u', 'v', 'z']
         """
 
-        for name, vector in vector_array.items():
+        self.vectors = {}
+        for name, vector in kwargs.items():
             assert (len(vector) is 3)
-        self.vector_array = vector_array
+            self.vectors[name] = vector
 
-    def set_output_scalar(self, scalar_array=[]):
+    def set_output_scalar(self, scalars=None):
         """
-        Set the scalars to dump in vtk_output
+        Set the scalars to dump in VTK output
 
         Parameter
         ---------
         scalar_array: list
             The set of properties to dump
         """
-
-        self.scalar_array = scalar_array
+        if scalars is None:
+            self.scalars = []
+        else:
+            self.scalars = scalars
 
     def _get_scalars(self, arrays):
         scalars = []
-        for prop_name in self.scalar_array:
+        for prop_name in self.scalars:
             scalars.append((prop_name, arrays[prop_name]))
         return scalars
 
     def _get_vectors(self, arrays):
         vectors = []
-        for prop_name, prop_list in self.vector_array.items():
+        for prop_name, prop_list in self.vectors.items():
             vec = np.array([arrays[prop_list[0]], arrays[prop_list[1]],
                             arrays[prop_list[2]]])
             data = (prop_name, vec)
@@ -78,7 +77,7 @@ class VtkOutput(Output):
         self.data.extend(self._get_vectors(arrays))
 
 
-class PyVisFileOutput(VtkOutput):
+class PyVisFileOutput(VTKOutput):
 
     def _dump_arrays(self, filename):
         from pyvisfile.vtk import (UnstructuredGrid, DataArray,
@@ -87,14 +86,14 @@ class PyVisFileOutput(VtkOutput):
         da = DataArray("points", self.points)
         grid = UnstructuredGrid((n, da), cells=np.arange(n),
                                 cell_types=np.asarray([VTK_VERTEX] * n))
-        for name, feild in self.data:
-            da = DataArray(name, feild)
+        for name, field in self.data:
+            da = DataArray(name, field)
             grid.add_pointdata(da)
         with open(filename + '.vtu', "w") as f:
             AppendedDataXMLGenerator(None)(grid).write(f)
 
 
-class TvtkOutput(VtkOutput):
+class TVTKOutput(VTKOutput):
     def _dump_arrays(self, filename):
         from tvtk.api import tvtk
         n = self.numPoints
@@ -112,14 +111,13 @@ class TvtkOutput(VtkOutput):
         write_data(ug, filename)
 
 
-def dump_vtk(filename, particles, only_real=True, mpi_comm=None,
-             scalars=[], vectors={}):
+def dump_vtk(filename, particles, scalars=None, **kwargs):
     if has_pyvisfile():
-        output = PyVisFileOutput(only_real, mpi_comm, scalars, vectors)
+        output = PyVisFileOutput(scalars, **kwargs)
     elif has_tvtk():
-        output = TvtkOutput(only_real, mpi_comm, scalars, vectors)
+        output = TVTKOutput(scalars, **kwargs)
     else:
-        msg = 'Tvtk and pyvisfile Not present'
+        msg = 'TVTK and pyvisfile Not present'
         raise ImportError(msg)
     output.dump(filename, particles, {})
 
@@ -129,8 +127,11 @@ def run(options):
     particles = []
     for ptype, pdata in data['arrays'].items():
         particles.append(pdata)
-    dump_vtk(str(options.outputfile), particles, scalars=options.scalars,
-             vectors=options.vectors)
+    filename = os.path.splitext(options.inputfile)[0]
+    if options.outdir is not None:
+        filename = options.os_dir + os.path.split(filename)[1]
+    dump_vtk(filename, particles, scalars=options.scalars,
+             V=['u', 'v', 'w'])
 
 
 def main(argv=None):
@@ -147,23 +148,18 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "--scalars",  metavar="scalars", type=str, nargs='+', default=[],
-        help="scalars variables to dump in vtk"
+        "-s", "--scalars",  metavar="scalars", type=str, nargs='+', default=[],
+        help="scalars variables to dump in VTK output"
     )
 
     parser.add_argument(
-        "--vectors",  metavar="vectors", type=str, default="{}",
-        help="vectors  to dump in vtk. Example '{\"V\":[\"u\",\"v\",\"w\"]}'"
+        "-od", "--outdir",  metavar="outdir", type=str, default=None,
+        help="Directory to output VTK files"
     )
 
     parser.add_argument(
-        "-if", "--inputfile",  metavar="inputfile", type=str, required=True,
+        "-if", "--inputfile", metavar="inputfile", type=str, required=True,
         help="input file to take (hdf5 or npz)"
-    )
-
-    parser.add_argument(
-        "-of", "--outputfile",  metavar="outputfile", type=str, required=True,
-        help="file to output the vtk"
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:
@@ -171,13 +167,6 @@ def main(argv=None):
         sys.exit()
 
     options, extra = parser.parse_known_args(argv)
-    vectors = json.loads(options.vectors)
-
-    # Conversion from unicode to string
-    vectors2 = {}
-    for name, arr in vectors.items():
-        vectors2[str(name)] = [str(arr[0]), str(arr[1]), str(arr[2])]
-    options.vectors = vectors2
     run(options)
 
 if __name__ == '__main__':
