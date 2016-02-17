@@ -3,7 +3,7 @@
 It takes a hdf or npz file as an input and output vtu file.
 """
 from pysph import has_tvtk, has_pyvisfile
-from pysph.solver.output import Output, load
+from pysph.solver.output import Output, load, output_formats
 import numpy as np
 import argparse
 import sys
@@ -68,10 +68,10 @@ class VTKOutput(Output):
         for ptype, pdata in self.all_array_data.items():
             self._setup_data(pdata)
             try:
-                fname,seq = filename.rsplit('_',1)
+                fname, seq = filename.rsplit('_', 1)
+                self._dump_arrays(fname + '_' + ptype + '_' + seq)
             except ValueError:
-                fname,seq = filename,''
-            self._dump_arrays(fname + '_' + ptype +'_' + seq)
+                self._dump_arrays(filename + '_' + ptype)
 
     def _setup_data(self, arrays):
         self.numPoints = arrays['x'].size
@@ -120,7 +120,7 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
     """
     Parameter
     ----------
-    
+
     filename: str
         Filename to dump to
 
@@ -129,7 +129,7 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
 
     scalars: list
         list of scalars to dump.
-    
+
     vectors:
         Vectors to dump
         Example V=['u', 'v', 'z']
@@ -147,6 +147,12 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
 
 def run(options):
     for fname in options.inputfile:
+        if os.path.isdir(fname):
+            files = [os.path.join(fname, file) for file in os.listdir(fname)
+                     if file.endswith(output_formats)]
+            options.inputfile.extend(files)
+            continue
+
         data = load(fname)
         particles = []
         for ptype, pdata in data['arrays'].items():
@@ -184,7 +190,7 @@ def main(argv=None):
 
     parser.add_argument(
         "inputfile",  type=str, nargs='+',
-        help="input files to take (hdf5 or npz)"
+        help=" list of input files  or/and directories (hdf5 or npz format)"
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:
