@@ -425,3 +425,25 @@ def iter_output(files, *arrays):
         else:
             _arrays = [data['arrays'][x] for x in arrays]
             yield [solver_data] + _arrays
+
+def _sort_key(arg):
+    a = os.path.splitext(arg)[0]
+    return int(a[a.rfind('_')+1:])
+
+def remove_irrelevant_files(files):
+    """Remove any npz files that are not output files.
+
+    That is, the file should not end with a '_number.npz'.  This allows users
+    to dump other .npz of .hdf5 files in the output while post-processing without
+    breaking.
+    """
+    result = []
+    for f in files:
+        try:
+            _sort_key(f)
+        except ValueError:
+            pass
+        else:
+            result.append(f)
+    return result
+

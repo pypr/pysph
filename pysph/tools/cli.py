@@ -15,6 +15,10 @@ def run_examples(args):
     from pysph.examples.run import main
     main(args)
 
+def output_vtk(args):
+    from pysph.solver.vtk_output import main
+    main(args)
+
 def _has_pysph_dir():
     init_py = join('pysph', '__init__.py')
     init_pyc = join('pysph', '__init__.pyc')
@@ -46,6 +50,11 @@ def main():
     )
     runner.set_defaults(func=run_examples)
 
+    vtk_out = subparsers.add_parser(
+        'dump_vtk', help='Dump VTK Output',
+         add_help=False
+    )
+    vtk_out.set_defaults(func=output_vtk)
     tests = subparsers.add_parser(
         'test', help='Run entire PySPH test-suite',
         add_help=False

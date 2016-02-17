@@ -171,7 +171,7 @@ class HDFOutput(Output):
 
             for pname, h5obj in arrays_grp.items():
                 prop_name = str(h5obj.attrs['name'])
-                type_ = h5obj.attrs['type']
+                type_ = str(h5obj.attrs['type'])
                 default = h5obj.attrs['default']
                 if h5obj.attrs['stored']:
                     output_array.append(str(pname))
