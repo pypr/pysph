@@ -1,4 +1,4 @@
-""" Dumps VTK output files
+""" Dumps VTK output files.
 
 It takes a hdf or npz file as an input and output vtu file.
 """
@@ -12,25 +12,25 @@ import os
 
 class VTKOutput(Output):
 
-    def __init__(self, scalars=None, **kwargs):
+    def __init__(self, scalars=None, **vectors):
         self.set_output_scalar(scalars)
-        self.set_output_vector(**kwargs)
+        self.set_output_vector(**vectors)
         super(VTKOutput, self).__init__(True)
 
-    def set_output_vector(self, **kwargs):
+    def set_output_vector(self, **vectors):
         """
         Set the vector to dump in VTK output
 
         Parameter
         ----------
 
-        kwargs:
+        vectors:
             Vectors to dump
             Example V=['u', 'v', 'z']
         """
 
         self.vectors = {}
-        for name, vector in kwargs.items():
+        for name, vector in vectors.items():
             assert (len(vector) is 3)
             self.vectors[name] = vector
 
@@ -43,12 +43,13 @@ class VTKOutput(Output):
         scalar_array: list
             The set of properties to dump
         """
-        if scalars is None:
-            self.scalars = []
-        else:
-            self.scalars = scalars
+        self.scalars = scalars
 
     def _get_scalars(self, arrays):
+
+        if self.scalars is None:
+            self.scalars = list(arrays.keys())
+
         scalars = []
         for prop_name in self.scalars:
             scalars.append((prop_name, arrays[prop_name]))
@@ -104,18 +105,36 @@ class TVTKOutput(VTKOutput):
         ug.set_cells(cell_type, cells)
         from mayavi.core.dataset_manager import DatasetManager
         dsm = DatasetManager(dataset=ug)
-        for name, feild in self.data:
-            dsm.add_array(feild.transpose(), name)
+        for name, field in self.data:
+            dsm.add_array(field.transpose(), name)
             dsm.activate(name)
         from tvtk.api import write_data
         write_data(ug, filename)
 
 
-def dump_vtk(filename, particles, scalars=None, **kwargs):
+def dump_vtk(filename, particles, scalars=None, **vectors):
+    """
+    Parameter
+    ----------
+    
+    filename: str
+        Filename to dump to
+
+    particles: sequence(ParticleArray)
+        Sequence if particles arrays to dump
+
+    scalars: list
+        list of scalars to dump.
+    
+    vectors:
+        Vectors to dump
+        Example V=['u', 'v', 'z']
+    """
+
     if has_pyvisfile():
-        output = PyVisFileOutput(scalars, **kwargs)
+        output = PyVisFileOutput(scalars, **vectors)
     elif has_tvtk():
-        output = TVTKOutput(scalars, **kwargs)
+        output = TVTKOutput(scalars, **vectors)
     else:
         msg = 'TVTK and pyvisfile Not present'
         raise ImportError(msg)
@@ -148,8 +167,9 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "-s", "--scalars",  metavar="scalars", type=str, nargs='+', default=[],
-        help="scalars variables to dump in VTK output"
+        "-s", "--scalars",  metavar="scalars", type=str, default=None,
+        help="scalars variables to dump in VTK output, Give comma seprated" +
+        " value. Example: -s x,y,z"
     )
 
     parser.add_argument(
@@ -158,8 +178,7 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "-if", "--inputfile", metavar="inputfile", type=str, required=True,
-        help="input file to take (hdf5 or npz)"
+        "inputfile",  type=str,  help="input file to take (hdf5 or npz)"
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:
@@ -167,6 +186,8 @@ def main(argv=None):
         sys.exit()
 
     options, extra = parser.parse_known_args(argv)
+    if options.scalars is not None:
+        options.scalars = options.scalars.split(',')
     run(options)
 
 if __name__ == '__main__':
