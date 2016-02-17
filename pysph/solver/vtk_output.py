@@ -168,8 +168,8 @@ def main(argv=None):
 
     parser.add_argument(
         "-s", "--scalars",  metavar="scalars", type=str, default=None,
-        help="scalars variables to dump in VTK output, Give comma seprated" +
-        " value. Example: -s x,y,z"
+        help="scalar variables to dump in VTK output, provide a " +
+        "comma-separated list, for example: -s rho,p,m"
     )
 
     parser.add_argument(
