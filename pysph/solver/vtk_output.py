@@ -67,7 +67,11 @@ class VTKOutput(Output):
     def _dump(self, filename):
         for ptype, pdata in self.all_array_data.items():
             self._setup_data(pdata)
-            self._dump_arrays(filename + '_' + ptype)
+            try:
+                fname,seq = filename.rsplit('_',1)
+            except ValueError:
+                fname,seq = filename,''
+            self._dump_arrays(fname + '_' + ptype +'_' + seq)
 
     def _setup_data(self, arrays):
         self.numPoints = arrays['x'].size
@@ -142,15 +146,16 @@ def dump_vtk(filename, particles, scalars=None, **vectors):
 
 
 def run(options):
-    data = load(str(options.inputfile))
-    particles = []
-    for ptype, pdata in data['arrays'].items():
-        particles.append(pdata)
-    filename = os.path.splitext(options.inputfile)[0]
-    if options.outdir is not None:
-        filename = options.os_dir + os.path.split(filename)[1]
-    dump_vtk(filename, particles, scalars=options.scalars,
-             V=['u', 'v', 'w'])
+    for fname in options.inputfile:
+        data = load(fname)
+        particles = []
+        for ptype, pdata in data['arrays'].items():
+            particles.append(pdata)
+        filename = os.path.splitext(fname)[0]
+        if options.outdir is not None:
+            filename = options.os_dir + os.path.split(filename)[1]
+        dump_vtk(filename, particles, scalars=options.scalars,
+                 V=['u', 'v', 'w'])
 
 
 def main(argv=None):
@@ -178,7 +183,8 @@ def main(argv=None):
     )
 
     parser.add_argument(
-        "inputfile",  type=str,  help="input file to take (hdf5 or npz)"
+        "inputfile",  type=str, nargs='+',
+        help="input files to take (hdf5 or npz)"
     )
 
     if len(argv) > 0 and argv[0] in ['-h', '--help']:
