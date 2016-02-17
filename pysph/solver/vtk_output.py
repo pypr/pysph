@@ -4,6 +4,8 @@ It takes a hdf or npz file as an input and output vtu file.
 """
 from pysph import has_tvtk, has_pyvisfile
 from pysph.solver.output import Output, load, output_formats
+from pysph.solver.utils import remove_irrelevant_files
+
 import numpy as np
 import argparse
 import sys
@@ -150,9 +152,9 @@ def run(options):
         if os.path.isdir(fname):
             files = [os.path.join(fname, file) for file in os.listdir(fname)
                      if file.endswith(output_formats)]
+            files = remove_irrelevant_files(files)
             options.inputfile.extend(files)
             continue
-
         data = load(fname)
         particles = []
         for ptype, pdata in data['arrays'].items():
