@@ -12,6 +12,7 @@ import math
 import numpy
 import os
 import os.path
+from pysph.solver.utils import remove_irrelevant_files, _sort_key
 
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
@@ -83,28 +84,6 @@ def glob_files(fname):
     fbase = fname[:fname.rfind('_')+1]
     ext = fname[fname.rfind('.'):]
     return glob.glob("%s*%s"%(fbase, ext))
-
-def _sort_key(arg):
-    a = os.path.splitext(arg)[0]
-    return int(a[a.rfind('_')+1:])
-
-def remove_irrelevant_files(files):
-    """Remove any npz/hdf5 files that are not output files.
-
-    That is, the file should not end with a '_number.npz/hdf5'.  This allows
-    users to dump other files in the output while post-processing without
-    breaking the viewer.
-
-    """
-    result = []
-    for f in files:
-        try:
-            _sort_key(f)
-        except ValueError:
-            pass
-        else:
-            result.append(f)
-    return result
 
 def sort_file_list(files):
     """Given a list of input files, sort them in serial order, in-place.
