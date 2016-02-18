@@ -47,6 +47,7 @@ Installation and getting started
    :maxdepth: 2
 
    installation.rst
+   tutorial/circular_patch_simple.rst
    tutorial/circular_patch.rst
 
 

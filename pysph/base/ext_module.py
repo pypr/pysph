@@ -95,7 +95,7 @@ class ExtModule(object):
         self.lock_path = join(self.root, base + '.lock')
 
     @contextmanager
-    def _lock(self, timeout=60):
+    def _lock(self, timeout=90):
         t1 = time.time()
         def _is_timed_out():
             if timeout is None:

@@ -4,7 +4,7 @@ import inspect
 import json
 import logging
 import os
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
     splitext)
 import sys
@@ -79,6 +79,7 @@ class Application(object):
 
         self.solver = None
         self.nnps = None
+        self.scheme = None
         self.tools = []
         self.parallel_manager = None
 
@@ -105,12 +106,13 @@ class Application(object):
                            'critical': logging.CRITICAL,
                            'none': None}
 
-        self._setup_argparse()
-
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
+
         self.initialize()
+        self.scheme = self.create_scheme()
+        self._setup_argparse()
 
     def _get_output_dir_from_fname(self):
         return self.fname + '_output'
@@ -133,15 +135,17 @@ class Application(object):
         Note that you may run this program via MPI and the run will be
         automatically parallelized.  To do this run::
 
-         $ mpirun -n 4 /path/to/your/python %prog [options] 
+         $ mpirun -n 4 /path/to/your/python %prog [options]
 
         Replace '4' above with the number of processors you have.
         Below are the options you may pass.
 
         """
-        parser = ArgumentParser(usage = usage,description = description)
+        parser = ArgumentParser(
+            usage=usage, description=description,
+            formatter_class=ArgumentDefaultsHelpFormatter
+        )
         self.arg_parse = parser
-
 
          # Add some default options.
          # -v
@@ -152,7 +156,7 @@ class Application(object):
                           help="Log-level to use for log messages. " +
                                valid_vals)
         # --logfile
-      
+
         parser.add_argument("--logfile", action="store",
                           dest="logfile",
                           default=None,
@@ -373,7 +377,7 @@ class Application(object):
                               dest="cmd_line", default=False,
                               help=("Add an interactive commandline interface "
                                     "to the solver"))
-    
+
         interfaces.add_argument("--xml-rpc", action="store",
                 dest="xml_rpc", metavar="[HOST:] PORT",
                               help=("Add an XML-RPC interface to the solver;"
@@ -393,10 +397,11 @@ class Application(object):
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-
           # User options.
         user_options = parser.add_argument_group("User",
                  "User defined command line arguments")
+        if self.scheme is not None:
+            self.scheme.add_user_options(user_options)
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
@@ -415,6 +420,8 @@ class Application(object):
         # save the path where we want to dump output
         self.output_dir = abspath(options.output_dir)
         mkdir(self.output_dir)
+        if self.scheme is not None:
+            self.scheme.consume_user_options(self.options)
         self.consume_user_options()
 
     def _setup_logging(self):
@@ -1011,8 +1018,11 @@ class Application(object):
     def create_equations(self):
         """Create the equations to be used and return them.
         """
-        message = "Application.create_equations method must be overloaded."
-        raise NotImplementedError(message)
+        if self.scheme is not None:
+            return self.scheme.get_equations()
+        else:
+            msg = "Application.create_equations method must be overloaded."
+            raise NotImplementedError(msg)
 
     def create_nnps(self):
         """Create any NNPS if desired and return it, else a default NNPS will
@@ -1026,11 +1036,22 @@ class Application(object):
         message = "Application.create_particles method must be overloaded."
         raise NotImplementedError(message)
 
+    def create_scheme(self):
+        """Create a suitable SPH scheme and return it.
+
+        Note that this method is called after the arguments are all
+        processed and after `consume_user_options` is called.
+        """
+        return None
+
     def create_solver(self):
         """Create the solver and return it.
         """
-        message = "Application.create_solver method must be overloaded."
-        raise NotImplementedError(message)
+        if self.scheme is not None:
+            return self.scheme.get_solver()
+        else:
+            msg = "Application.create_solver method must be overloaded."
+            raise NotImplementedError(msg)
 
     def create_tools(self):
         """Create any tools and return a sequence of them.  This method is
