@@ -89,7 +89,7 @@ class ShockTube1D(Application):
     def create_scheme(self):
         s = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
+            kernel_factor=kernel_factor, alpha1=a1, alpha2=a2,
             beta=beta, update_alpha1=True, update_alpha2=True
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=True, pfreq=50)

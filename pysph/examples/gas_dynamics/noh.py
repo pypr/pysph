@@ -75,7 +75,7 @@ class NohImplosion(Application):
         s = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=kernel_factor, alpha1=alpha1, alpha2=alpha2,
-            beta=beta, gamma=gamma, adaptive_h_scheme="gsph",
+            beta=beta, adaptive_h_scheme="gsph",
             update_alpha1=True, update_alpha2=True
         )
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False)
