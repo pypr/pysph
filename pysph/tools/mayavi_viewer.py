@@ -12,7 +12,6 @@ import math
 import numpy
 import os
 import os.path
-from pysph.solver.utils import remove_irrelevant_files, _sort_key
 
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
@@ -49,6 +48,7 @@ except ImportError:
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
 from pysph.solver.utils import load, dump, output_formats
+from pysph.solver.utils import remove_irrelevant_files, _sort_key
 from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
     Interpolator)
 
