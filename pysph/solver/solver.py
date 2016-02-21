@@ -18,9 +18,7 @@ EPSILON = numpy.finfo(float).eps*2
 
 class Solver(object):
     """Base class for all PySPH Solvers
-
     """
-
     def __init__(self, dim=2, integrator=None, kernel=None,
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
@@ -523,12 +521,11 @@ class Solver(object):
         fname = os.path.join(self.output_directory,
                              self.fname  + '_' + str(self.count))
 
-        solver_data = {'dt': self.dt, 't': self.t, 'count': self.count}
         comm = None
         if self.parallel_output_mode == "collected" and self.in_parallel:
             comm = self.comm
 
-        dump(fname, self.particles, solver_data,
+        dump(fname, self.particles, self._get_solver_data(),
              detailed_output=self.detailed_output,
              only_real=self.output_only_real, mpi_comm=comm,
              compress=self.compress_output)
@@ -698,6 +695,14 @@ class Solver(object):
         if dump:
             self.dump_output()
             self.barrier()
+
+    def _get_solver_data(self):
+        if self._prev_dt is not None:
+            dt = self._prev_dt/self._damping_factor
+        else:
+            dt = self._get_undamped_timestep()
+
+        return {'dt': dt, 't': self.t, 'count': self.count}
 
     def _get_timestep(self):
         if abs(self.tf - self.t) < self._epsilon:
