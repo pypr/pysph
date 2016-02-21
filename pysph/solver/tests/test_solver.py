@@ -10,6 +10,7 @@ except ImportError:
     import mock
 
 import numpy as np
+import numpy.testing as npt
 
 from pysph.solver.solver import Solver
 
@@ -48,9 +49,13 @@ class TestSolver(TestCase):
 
         # When
         record = []
+        record_dt = []
         def _mock_dump_output():
             # Record the time at which the solver dumped anything
             record.append(solver.t)
+            # This smells but ...
+            sd = solver._get_solver_data()
+            record_dt.append(sd['dt'])
         solver.dump_output = mock.Mock(side_effect=_mock_dump_output)
 
         solver.solve(show_progress=False)
@@ -67,6 +72,10 @@ class TestSolver(TestCase):
         self.assertEqual(101, solver.count)
         # The final timestep should not be a tiny one due to roundoff.
         self.assertTrue(solver.dt > 0.1*0.25)
+
+        npt.assert_array_almost_equal(
+            [0.1]*len(record_dt), record_dt, decimal=12
+        )
 
     def test_solver_honors_set_time_step(self):
         # Given

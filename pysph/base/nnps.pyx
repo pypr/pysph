@@ -985,7 +985,7 @@ cdef class NNPS:
             storage but speeds up neighbor calculations.
 
         sort_gids : bint, default (False)
-            Flag to sort neighbors using gids (if they are available). 
+            Flag to sort neighbors using gids (if they are available).
             This is useful when comparing parallel results with those
             from a serial run.
         """
@@ -997,7 +997,7 @@ cdef class NNPS:
         self.pa_wrappers = [NNPSParticleArrayWrapper(pa) for pa in particles]
 
         # radius scale and problem dimensionality.
-        self.radius_scale = radius_scale * 1.101
+        self.radius_scale = radius_scale
         self.dim = dim
 
         self.domain = domain
@@ -1232,6 +1232,7 @@ cdef class NNPS:
         cdef DoubleArray x, y, z
         cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
         cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
+        cdef double lx, ly, lz
 
         for pa_wrapper in pa_wrappers:
             x = pa_wrapper.x
@@ -1250,6 +1251,11 @@ cdef class NNPS:
             xmin = fmin(x.minimum, xmin)
             ymin = fmin(y.minimum, ymin)
             zmin = fmin(z.minimum, zmin)
+
+        # Add a small offset to the limits.
+        lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
+        xmin -= lx*0.01; ymin -= ly*0.01; zmin -= lz*0.01
+        xmax += lx*0.01; ymax += ly*0.01; zmax += lz*0.01
 
         # If all of the dimensions have very small extent give it a unit size.
         cdef double _eps = 1e-12
@@ -1538,7 +1544,7 @@ cdef class LinkedListNNPS(NNPS):
             storage but speeds up neighbor calculations.
 
         sort_gids : bint, default (False)
-            Flag to sort neighbors using gids (if they are available). 
+            Flag to sort neighbors using gids (if they are available).
             This is useful when comparing parallel results with those
             from a serial run.
         """
@@ -1897,8 +1903,8 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
     """Nearest neighbor query class using the box sort method but which
     uses the LinkedList algorithm.  This makes this very fast but
-    perhaps not as safe as the DictBoxSortNNPS.  All this class does 
-    is to use a std::map to obtain a linear cell index from the actual 
+    perhaps not as safe as the DictBoxSortNNPS.  All this class does
+    is to use a std::map to obtain a linear cell index from the actual
     flattened cell index.
     """
 
@@ -1995,4 +2001,3 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
         self.cell_to_index = _cid_to_index
         return count
-

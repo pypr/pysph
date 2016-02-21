@@ -1,4 +1,3 @@
-
 # Standard library imports.
 try:
     # This is for Python-2.6.x
@@ -159,7 +158,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         dx = 1.0/(n-1)
         x = np.linspace(0, 1, n)
         m = np.ones_like(x)
-        h = np.ones_like(x)*dx
+        h = np.ones_like(x)*dx*1.05
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
@@ -281,4 +280,3 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
-
