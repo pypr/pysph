@@ -77,12 +77,13 @@ class TaylorGreen(Application):
         self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
 
+    def configure_scheme(self):
         scheme = self.scheme
-        scheme.update(nu=self.nu, h0=h0)
+        scheme.configure(nu=self.nu, h0=h0)
         if self.options.scheme == 'tvf':
-            scheme.update(pb=self.options.pb_factor*p0)
+            scheme.configure(pb=self.options.pb_factor*p0)
         else:
-            scheme.update(hdx=self.hdx)
+            scheme.configure(hdx=self.hdx)
         kernel = QuinticSpline(dim=2)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
 

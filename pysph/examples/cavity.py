@@ -50,11 +50,12 @@ class LidDrivenCavity(Application):
         dt_cfl = 0.25 * h0/( c0 + Umax )
         dt_viscous = 0.125 * h0**2/self.nu
         dt_force = 1.0
-
         self.tf = 10.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
-        self.scheme.h0 = h0
-        self.scheme.nu = self.nu
+
+    def configure_scheme(self):
+        h0 = hdx * self.dx
+        self.scheme.configure(h0=h0, nu=self.nu)
         self.scheme.configure_solver(tf=self.tf, dt=self.dt, pfreq=500)
 
     def create_scheme(self):
@@ -98,6 +99,10 @@ class LidDrivenCavity(Application):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
+        # Set a reference rho also, some schemes will overwrite this with a
+        # summation density.
+        fluid.rho[:] = rho0
+        solid.rho[:] = rho0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume
