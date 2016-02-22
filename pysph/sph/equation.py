@@ -345,6 +345,16 @@ class Equation(object):
         # instance.
         self.var_name = ''
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        ignore = ['no_source', 'name', 'var_name']
+        keys = ['dest', 'sources']
+        keys += [k for k in self.__dict__ if k not in keys]
+
+        args = ['%s=%r'%(k, getattr(self, k)) for k in keys
+                if k not in ignore]
+        return '%s(%s)'%(name, ', '.join(args))
+
     def converged(self):
         """Return > 0 to indicate converged iterations and < 0 otherwise.
         """
@@ -373,11 +383,11 @@ class Group(object):
             a list of equation objects.
 
         real: bool
-            specifies if only non-remote/non-ghost particles should be 
+            specifies if only non-remote/non-ghost particles should be
             operated on.
 
         update_nnps: bool
-            specifies if the neighbors should be re-computed locally after 
+            specifies if the neighbors should be re-computed locally after
             this group
 
         iterate: bool
@@ -428,6 +438,15 @@ class Group(object):
     ##########################################################################
     # Non-public interface.
     ##########################################################################
+    def __repr__(self):
+        cls = self.__class__.__name__
+        eqs = [repr(eq) for eq in self.equations]
+        opts = ['real', 'update_nnps', 'iterate',
+                'max_iterations', 'min_iterations']
+        _kw = ['%s=%s'%(k, getattr(self, k)) for k in opts]
+        kws = ', '.join(_kw)
+        return '%s(equations=[\n%s],\n%s)'%(cls, ',\n'.join(eqs), kws)
+
     def _get_variable_decl(self, context, mode='declare'):
         decl = []
         names = list(context.keys())
