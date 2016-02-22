@@ -67,7 +67,6 @@ class TaylorGreen(Application):
         self.dx = dx = L/nx
         self.volume = dx*dx
         self.hdx = self.options.hdx
-        self.gamma = self.options.gamma
 
         h0 = self.hdx * self.dx
         dt_cfl = 0.25 * h0/( c0 + U )
@@ -79,11 +78,11 @@ class TaylorGreen(Application):
 
     def configure_scheme(self):
         scheme = self.scheme
-        scheme.configure(nu=self.nu, h0=h0)
+        h0 = self.hdx * self.dx
         if self.options.scheme == 'tvf':
-            scheme.configure(pb=self.options.pb_factor*p0)
-        else:
-            scheme.configure(hdx=self.hdx)
+            scheme.configure(pb=self.options.pb_factor*p0, nu=self.nu, h0=h0)
+        elif self.options.scheme == 'wcsph':
+            scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         kernel = QuinticSpline(dim=2)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
 

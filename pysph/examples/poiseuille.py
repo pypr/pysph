@@ -115,6 +115,10 @@ class PoiseuilleFlow(Application):
         fluid.m[:] = volume * self.rho0
         channel.m[:] = volume * self.rho0
 
+        # Set the default rho.
+        fluid.rho[:] = self.rho0
+        channel.rho[:] = self.rho0
+
         # volume is set as dx^2
         fluid.V[:] = 1./volume
         channel.V[:] = 1./volume
