@@ -317,6 +317,15 @@ def get_arrays_used_in_equation(equation):
             dest_arrays.update(d)
     return src_arrays, dest_arrays
 
+def get_init_args(obj, method, ignore=None):
+    """Return the arguments for the method given, typically an __init__.
+    """
+    ignore = ignore if ignore is not None else []
+    spec = inspect.getargspec(method)
+    keys = [k for k in spec.args[1:] if k not in ignore and k in obj.__dict__]
+    args = ['%s=%r'%(k, getattr(obj, k)) for k in keys]
+    return args
+
 
 ##############################################################################
 # `Equation` class.
@@ -347,12 +356,7 @@ class Equation(object):
 
     def __repr__(self):
         name = self.__class__.__name__
-        ignore = ['no_source', 'name', 'var_name']
-        keys = ['dest', 'sources']
-        keys += [k for k in self.__dict__ if k not in keys]
-
-        args = ['%s=%r'%(k, getattr(self, k)) for k in keys
-                if k not in ignore]
+        args = get_init_args(self, self.__init__, [])
         return '%s(%s)'%(name, ', '.join(args))
 
     def converged(self):
@@ -441,10 +445,8 @@ class Group(object):
     def __repr__(self):
         cls = self.__class__.__name__
         eqs = [repr(eq) for eq in self.equations]
-        opts = ['real', 'update_nnps', 'iterate',
-                'max_iterations', 'min_iterations']
-        _kw = ['%s=%s'%(k, getattr(self, k)) for k in opts]
-        kws = ', '.join(_kw)
+        ignore = ['equations']
+        kws = ', '.join(get_init_args(self, self.__init__, ignore))
         return '%s(equations=[\n%s\n    ],\n    %s)'%(
             cls, ',\n'.join(eqs), kws
         )
