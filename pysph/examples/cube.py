@@ -36,8 +36,9 @@ class Cube(Application):
     def consume_user_options(self):
         self.hdx = 1.5
         self.dx = 1.0/pow(self.options.np, 1.0/3.0)
-        self.scheme.h0 = self.hdx*self.dx
-        self.scheme.hdx = self.hdx
+
+    def configure_scheme(self):
+        self.scheme.configure(h0=self.hdx*self.dx, hdx=self.hdx)
         kernel = CubicSpline(dim=3)
         dt = 1e-4
         tf = 5e-4

@@ -57,9 +57,11 @@ class PoiseuilleFlow(Application):
         dt_force = 0.25 * np.sqrt(h0/self.fx)
 
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+
+    def configure_scheme(self):
         tf = 100.0
         scheme = self.scheme
-        scheme.update(c0=self.c0, p0=self.p0, pb=self.p0, gx=self.fx)
+        scheme.configure(c0=self.c0, p0=self.p0, pb=self.p0, gx=self.fx)
         scheme.configure_solver(tf=tf, dt=self.dt, pfreq=1000)
         print("dt = %g"%self.dt)
 
@@ -112,6 +114,10 @@ class PoiseuilleFlow(Application):
         # mass is set to get the reference density of rho0
         fluid.m[:] = volume * self.rho0
         channel.m[:] = volume * self.rho0
+
+        # Set the default rho.
+        fluid.rho[:] = self.rho0
+        channel.rho[:] = self.rho0
 
         # volume is set as dx^2
         fluid.V[:] = 1./volume

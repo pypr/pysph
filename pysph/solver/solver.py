@@ -198,6 +198,13 @@ class Solver(object):
             particles, equations, self.kernel, mode
         )
 
+        sep = '-'*70
+        eqn_info = '[\n' + ',\n'.join([str(e) for e in equations]) + '\n]'
+        logger.info('Using equations:\n%s\n%s\n%s'%(sep, eqn_info, sep))
+        logger.info(
+            'Using integrator:\n%s\n  %s\n%s'%(sep, self.integrator, sep)
+        )
+
         sph_compiler = SPHCompiler(
             self.acceleration_eval, self.integrator
         )

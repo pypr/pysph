@@ -44,8 +44,9 @@ class DamBreak2D(Application):
         print("Using h = %f"%self.h)
         self.hdx = self.hdx
         self.dx = self.h/self.hdx
-        self.scheme.h0 = self.h
-        self.scheme.hdx = self.hdx
+
+    def configure_scheme(self):
+        self.scheme.configure(h0=self.h, hdx=self.hdx)
         kernel = WendlandQuintic(dim=2)
         tf = 2.5
         from pysph.sph.integrator import TVDRK3Integrator

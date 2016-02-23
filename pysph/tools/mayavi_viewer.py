@@ -853,7 +853,7 @@ class MayaviViewer(HasTraits):
         obj.edit_traits()
 
     def _directory_changed(self, d):
-        ext = os.splitext(self.files[-1])[1]
+        ext = os.path.splitext(self.files[-1])[1]
         files = glob.glob(os.path.join(d, '*' + ext))
         if len(files) > 0:
             self._clear()

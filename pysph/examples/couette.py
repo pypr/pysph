@@ -61,8 +61,12 @@ class CouetteFlow(Application):
         cy = np.concatenate( (ty, by) )
 
         # create the arrays
-        channel = get_particle_array(name='channel', x=cx, y=cy)
-        fluid = get_particle_array(name='fluid', x=fx, y=fy)
+        channel = get_particle_array(
+            name='channel', x=cx, y=cy, rho=rho0*np.ones_like(cx)
+        )
+        fluid = get_particle_array(
+            name='fluid', x=fx, y=fy, rho=rho0*np.ones_like(fx)
+        )
 
         print("Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),

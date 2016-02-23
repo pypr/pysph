@@ -29,6 +29,19 @@ class Scheme(object):
     def add_user_options(self, group):
         pass
 
+    def configure(self, **kw):
+        """Configure the scheme with given parameters.
+
+        Overload this to do any scheme specific stuff.
+        """
+        for k, v in kw.items():
+            if not hasattr(self, k):
+                msg = 'Parameter {param} not defined for {scheme}.'.format(
+                    param=k, scheme=self.__class__.__name__
+                )
+                raise RuntimeError(msg)
+            setattr(self, k, v)
+
     def consume_user_options(self, options):
         pass
 
@@ -71,17 +84,6 @@ class Scheme(object):
             If True, removes any unnecessary properties.
         """
         raise NotImplementedError()
-
-    def update(self, **kw):
-        """Update the scheme with given parameters.
-        """
-        for k, v in kw.items():
-            if not hasattr(self, k):
-                msg = 'Parameter {param} not defined for {scheme}.'.format(
-                    param=k, scheme=self.__class__.__name__
-                )
-                raise RuntimeError(msg)
-            setattr(self, k, v)
 
     #### Private protocol ###################################################
 
@@ -136,6 +138,9 @@ class SchemeChooser(Scheme):
             help="Specify scheme to use (one of %s)."%choices
         )
 
+    def configure(self, **kw):
+        self.scheme.configure(**kw)
+
     def consume_user_options(self, options):
         self.scheme = self.schemes[options.scheme]
         self.scheme.consume_user_options(options)
@@ -168,9 +173,6 @@ class SchemeChooser(Scheme):
             If True, removes any unnecessary properties.
         """
         self.scheme.setup_properties(particles, clean)
-
-    def update(self, **kw):
-        self.scheme.update(**kw)
 
 
 ############################################################################

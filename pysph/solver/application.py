@@ -423,6 +423,7 @@ class Application(object):
         if self.scheme is not None:
             self.scheme.consume_user_options(self.options)
         self.consume_user_options()
+        self.configure_scheme()
 
     def _setup_logging(self):
         """Setup logging for the application.
@@ -984,6 +985,13 @@ class Application(object):
         ----
 
         This uses the `argparse` module.
+        """
+        pass
+
+    def configure_scheme(self):
+        """This is called after ``consume_user_options`` is called.  One can
+        configure the SPH scheme here as at this point all the command line
+        options are known.
         """
         pass
 
