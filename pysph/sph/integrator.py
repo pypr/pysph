@@ -39,6 +39,12 @@ class Integrator(object):
         # by the SPHCompiler.
         self.c_integrator = None
 
+    def __repr__(self):
+        name = self.__class__.__name__
+        s = self.steppers
+        args = ', '.join(['%s=%s'%(k, s[k]) for k in s])
+        return '%s(%s)'%(name, args)
+
     ##########################################################################
     # Public interface.
     ##########################################################################
@@ -357,4 +363,3 @@ class PEFRLIntegrator(Integrator):
         self.compute_accelerations()
         self.stage5()
         self.do_post_stage(dt, 5)
-

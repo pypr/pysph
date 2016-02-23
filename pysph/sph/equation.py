@@ -445,7 +445,9 @@ class Group(object):
                 'max_iterations', 'min_iterations']
         _kw = ['%s=%s'%(k, getattr(self, k)) for k in opts]
         kws = ', '.join(_kw)
-        return '%s(equations=[\n%s],\n%s)'%(cls, ',\n'.join(eqs), kws)
+        return '%s(equations=[\n%s\n    ],\n    %s)'%(
+            cls, ',\n'.join(eqs), kws
+        )
 
     def _get_variable_decl(self, context, mode='declare'):
         decl = []
