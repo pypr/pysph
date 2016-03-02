@@ -19,14 +19,19 @@ from numpy import array, ones_like, mgrid, sqrt
 import numpy as np
 
 # PySPH base and carray imports
-from pysph.base.utils import get_particle_array
+from pysph.base.utils import get_particle_array_wcsph
 from pysph.base.kernels import Gaussian
 
 # PySPH solver and integrator
 from pysph.solver.application import Application
+from pysph.solver.solver import Solver
 from pysph.sph.integrator import EPECIntegrator
-from pysph.sph.scheme import WCSPHScheme
+from pysph.sph.integrator_step import WCSPHStep
 
+# PySPH sph imports
+from pysph.sph.equation import Group
+from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
+from pysph.sph.wc.basic import TaitEOS, MomentumEquation
 
 def _derivative(x, t):
     A, a = x
@@ -83,20 +88,6 @@ class EllipticalDrop(Application):
         self.dx = 0.025
         self.alpha = 0.1
 
-    def create_scheme(self):
-        s = WCSPHScheme(
-            ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
-            h0=self.dx*self.hdx, hdx=self.hdx, gamma=7.0, alpha=0.1, beta=0.0
-        )
-        kernel = Gaussian(dim=2)
-        dt = 5e-6; tf = 0.0076
-        s.configure_solver(
-            kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
-            adaptive_timestep=True, cfl=0.3, n_damp=50,
-            output_at_times=[0.0008, 0.0038]
-        )
-        return s
-
     def create_particles(self):
         """Create the circular patch of fluid."""
         dx = self.dx
@@ -124,16 +115,55 @@ class EllipticalDrop(Application):
             if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
                 indices.append(i)
 
-        pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-                                cs=cs, name=name)
+        pa = get_particle_array_wcsph(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
+                                    cs=cs, name=name)
         pa.remove_particles(indices)
 
         print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
         mu = ro*self.alpha*hdx*dx*co/8.0
         print("Effective viscosity: rho*alpha*h*c/8 = %s"%mu)
 
-        self.scheme.setup_properties([pa])
+        # add requisite variables needed for this formulation
+        for name in ('arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'rho0', 'u0',
+                    'v0', 'w0', 'x0', 'y0', 'z0'):
+            pa.add_property(name)
+
+        # set the output property arrays
+        pa.set_output_arrays( ['x', 'y', 'u', 'v', 'rho', 'm',
+                               'h', 'p', 'pid', 'tag', 'gid'] )
+
         return [pa]
+
+    def create_solver(self):
+        kernel = Gaussian(dim=2)
+
+        integrator = EPECIntegrator(fluid=WCSPHStep())
+
+        dt = 5e-6; tf = 0.0076
+        solver = Solver(kernel=kernel, dim=2, integrator=integrator,
+                        dt=dt, tf=tf, adaptive_timestep=True,
+                        cfl=0.3, n_damp=50,
+                        output_at_times=[0.0008, 0.0038])
+
+        return solver
+
+    def create_equations(self):
+        equations = [
+            Group(equations=[
+                TaitEOS(dest='fluid', sources=None, rho0=self.ro, c0=self.co, gamma=7.0),
+            ], real=False),
+
+            Group(equations=[
+                ContinuityEquation(dest='fluid',  sources=['fluid',]),
+
+                MomentumEquation(dest='fluid', sources=['fluid'],
+                                 alpha=self.alpha, beta=0.0, c0=self.co),
+
+                XSPHCorrection(dest='fluid', sources=['fluid']),
+
+            ]),
+        ]
+        return equations
 
     def _make_final_plot(self):
         from matplotlib import pyplot as plt

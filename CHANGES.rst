@@ -7,15 +7,33 @@
 * Improve many examples to make it easier to make comparisons.
 * Many equation parameters no longer have defaults to prevent accidental
   errors from not specifying important parameters.
+* Added support for ``Scheme`` classes that manage the generation of equations
+  and solvers.  A user simply needs to create the particles and setup a scheme
+  with the appropriate parameters to simulate a problem.
 * Add support to easily handle multiple rigid bodies.
+* Add support to dump HDF5 files if h5py_ is installed.
+* Add support to directly dump VTK files using either Mayavi_ or PyVisfile_.
+* Improved the nearest neighbor code, which gives about 30% increase in
+  performance in 3D.
 * Remove the need for the ``windows_env.bat`` script on Windows.  This is
   automatically setup internally.
 * Add test that checks if all examples run.
 * Remove unused command line options and add a ``--max-steps`` option to allow
   a user to run a specified number of iterations.
 * Added Ghia et al.'s results for lid-driven-cavity flow for easy comparison.
+* Added some experimental results for the dam break problem.
+* Use argparse instead of optparse as it is deprecated in Python 3.x.
+* Add ``pysph.tools.automation`` to facilitate easier automation and
+  reproducibility of PySPH simulations.
 * Fix bug with uploaded tarballs that breaks ``pip install pysph`` on Windows.
 * Fix the viewer UI to continue playing files when refresh is pushed.
+* Fix bugs with the timestep values dumped in the outputs.
+* Fix floating point issues with timesteps, where examples would run a final
+  extremely tiny timestep in order to exactly hit the final time.
+
+.. _h5py: http://www.h5py.org
+.. _PyVisfile: http://github.com/inducer/pyvisfile
+.. _Mayavi: http://code.enthought.com/projects/mayavi/
 
 
 1.0a3

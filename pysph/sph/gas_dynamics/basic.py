@@ -7,7 +7,7 @@ class ScaleSmoothingLength(Equation):
     def __init__(self, dest, sources, factor=2.0):
         super(ScaleSmoothingLength, self).__init__(dest, sources)
         self.factor = factor
-        
+
     def loop(self, d_idx, d_h):
         d_h[d_idx] = d_h[d_idx] * self.factor
 
@@ -16,7 +16,7 @@ class UpdateSmoothingLengthFromVolume(Equation):
         super(UpdateSmoothingLengthFromVolume, self).__init__(dest, sources)
         self.k = k
         self.dim1 = 1./dim
-        
+
     def loop(self, d_idx, d_m, d_rho, d_h):
         d_h[d_idx] = self.k * pow( d_m[d_idx]/d_rho[d_idx], self.dim1)
 
@@ -27,11 +27,11 @@ class SummationDensity(Equation):
         r"""Summation density with iterative solution of the smoothing lengths.
 
         Parameters:
-        
+
         density_iterations : bint
             Flag to indicate density iterations are required.
 
-        iterate_only_once : bint 
+        iterate_only_once : bint
             Flag to indicate if only one iteration is required
 
         k : double
@@ -54,13 +54,13 @@ class SummationDensity(Equation):
         self.equation_has_converged = 1
 
         super(SummationDensity, self).__init__(dest, sources)
-        
+
     def initialize(
         self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho, d_dwdh):
 
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
-        
+
         d_grhox[d_idx] = 0.0
         d_grhoy[d_idx] = 0.0
         d_arho[d_idx]  = 0.0
@@ -72,22 +72,22 @@ class SummationDensity(Equation):
         # to False. The Group can therefore iterate till convergence.
         self.equation_has_converged = 1
 
-    def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho, 
+    def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho,
              d_dwdh, s_m, d_converged, VIJ, WI, DWI, GHI):
 
         mj = s_m[s_idx]
         vijdotdwij = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
-        
+
         # density
         d_rho[d_idx] += mj * WI
-        
+
         # density accelerations
         d_arho[d_idx] += mj * vijdotdwij
-        
+
         # gradient of density
         d_grhox[d_idx] += mj * DWI[0]
         d_grhoy[d_idx] += mj * DWI[1]
-        
+
         # gradient of kernel w.r.t h
         d_dwdh[d_idx] += mj * GHI
 
@@ -101,7 +101,7 @@ class SummationDensity(Equation):
                 # smoothing length h0 for this particle must be set
                 # outside the Group (that is, in the integrator)
                 mi = d_m[d_idx]; hi = d_h[d_idx]; hi0 = d_h0[d_idx]
-                
+
                 # density from the mass, smoothing length and kernel
                 # scale factor
                 rhoi = mi/(hi/self.k)**self.dim
@@ -132,21 +132,21 @@ class SummationDensity(Equation):
                     hnew = 1.2 * hi
                 elif ( hnew < 0.8 * hi ):
                     hnew = 0.8 * hi
-                
+
                 # overwrite if gone awry
                 if ( (hnew <= 1e-6) or (gradhi < 1e-6) ):
                     hnew = self.k * (mi/d_rho[d_idx])**(1./self.dim)
 
                 # check for convergence
                 diff = abs( hnew-hi )/hi0
-                
+
                 if not ( (diff < self.htol) and (omegai > 0) or self.iterate_only_once):
                     # this particle hasn't converged. This means the
                     # entire group must be repeated until this fellow
                     # has converged, or till the maximum iteration has
                     # been reached.
                     self.equation_has_converged = -1
-                    
+
                     # set particle properties for the next
                     # iteration. For the 'converged' array, a value of
                     # 0 indicates the particle hasn't converged
@@ -168,7 +168,7 @@ class IdealGasEOS(Equation):
         self.gamma = gamma
         self.gamma1 = gamma - 1.0
         super(IdealGasEOS, self).__init__(dest, sources)
-        
+
     def loop(self, d_idx, d_p, d_rho, d_e, d_cs):
         d_p[d_idx] = self.gamma1 * d_rho[d_idx] * d_e[d_idx]
         d_cs[d_idx] = sqrt( self.gamma * d_p[d_idx]/d_rho[d_idx] )
@@ -192,7 +192,7 @@ class Monaghan92Accelerations(Equation):
 
         rhoi2 = d_rho[d_idx] * d_rho[d_idx]
         rhoj2 = s_rho[s_idx] * s_rho[s_idx]
-        
+
         tmpi = d_p[d_idx]/rhoi2
         tmpj = s_p[s_idx]/rhoj2
 
@@ -203,33 +203,33 @@ class Monaghan92Accelerations(Equation):
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
             piij = -self.alpha*cij*muij + self.beta*muij*muij
-            piij *= RHOIJ1            
-        
+            piij *= RHOIJ1
+
         d_au[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[0]
         d_av[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmpi + tmpj + piij) * DWIJ[2]
-        
+
         vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
 
         d_ae[d_idx] += 0.5 * s_m[s_idx] * (tmpi + tmpj + piij) * vijdotdwij
 
 class MPMAccelerations(Equation):
     def __init__(
-        self, dest, sources, beta=2.0, 
-        update_alapha1=False, update_alapha2=False, 
+        self, dest, sources, beta=2.0,
+        update_alpha1=False, update_alpha2=False,
         alpha1_min=0.1, alpha2_min=0.1, sigma=0.1):
 
         self.beta = beta
         self.sigma = sigma
 
-        self.update_alapha1 = update_alapha1
-        self.update_alapha2 = update_alapha2
+        self.update_alpha1 = update_alpha1
+        self.update_alpha2 = update_alpha2
 
         self.alpha1_min = alpha1_min
         self.alpha2_min = alpha2_min
 
         super(MPMAccelerations, self).__init__(dest, sources)
-        
+
     def initialize(self, d_idx, d_au, d_av, d_aw, d_ae, d_am,
                    d_aalpha1, d_aalpha2, d_del2e):
         d_au[d_idx] = 0.0
@@ -255,14 +255,14 @@ class MPMAccelerations(Equation):
         # pi/rhoi**2
         rhoi2 = d_rho[d_idx]*d_rho[d_idx]
         pibrhoi2 = pi/rhoi2
-        
+
         # pj/rhoj**2
         rhoj2 = s_rho[s_idx]*s_rho[s_idx]
         pjbrhoj2 = pj/rhoj2
 
         # averaged sound speed
         cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
-        
+
         # averaged mass
         mi = d_m[d_idx]
         mj = s_m[s_idx]
@@ -285,7 +285,7 @@ class MPMAccelerations(Equation):
 
         # v_{ij} \cdot r_{ij} or vijdotxij
         dot = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
-        
+
         # scalar part of the kernel gradient DWIJ
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
@@ -331,17 +331,17 @@ class MPMAccelerations(Equation):
         # Laplacian of thermal energy
         d_del2e[d_idx] += mj/s_rho[s_idx] * eij/(RIJ + EPS) * Fij
 
-    def post_loop(self, d_idx, d_h, d_cs, d_alpha1, d_aalpha1, d_div, 
+    def post_loop(self, d_idx, d_h, d_cs, d_alpha1, d_aalpha1, d_div,
                   d_del2e, d_e, d_alpha2, d_aalpha2):
 
         hi = d_h[d_idx]
         tau = hi/(self.sigma*d_cs[d_idx])
 
-        if self.update_alapha1:
+        if self.update_alpha1:
             S1 = max( -d_div[d_idx], 0.0 )
             d_aalpha1[d_idx] = (self.alpha1_min - d_alpha1[d_idx])/tau + S1
 
-        if self.update_alapha2:
+        if self.update_alpha2:
             #S2 = d_h[d_idx] * abs(d_del2e[d_idx])/sqrt(d_e[d_idx])
             S2 = 0.01 * d_h[d_idx] * d_del2e[d_idx]
             d_aalpha2[d_idx] = (self.alpha2_min - d_alpha2[d_idx])/tau + S2

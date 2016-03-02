@@ -1,4 +1,4 @@
-"""Taylor Green vortex flow (10 minutes).
+"""Taylor Green vortex flow (5 minutes).
 """
 
 import numpy as np
@@ -6,22 +6,12 @@ import os
 
 # PySPH imports
 from pysph.base.nnps import DomainManager
-from pysph.base.utils import get_particle_array_tvf_fluid
+from pysph.base.utils import get_particle_array
 from pysph.base.kernels import QuinticSpline
-from pysph.solver.solver import Solver
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep, WCSPHStep
 
-# the eqations
-from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import SummationDensity,\
-    StateEquation, MomentumEquationPressureGradient, MomentumEquationViscosity,\
-    MomentumEquationArtificialStress, SolidWallPressureBC
+from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 
-from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
-from pysph.sph.wc.basic import TaitEOS, MomentumEquation
-from pysph.sph.wc.viscosity import LaminarViscosity
 
 # domain and constants
 L = 1.0; U = 1.0
@@ -41,44 +31,31 @@ def exact_velocity(U, b, t, x, y):
 
 class TaylorGreen(Application):
     def add_user_options(self, group):
-        group.add_option(
+        group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
         )
-        group.add_option(
+        group.add_argument(
             "--perturb", action="store", type=float, dest="perturb", default=0,
             help="Random perturbation of initial particles as a fraction "\
                 "of dx (setting it to zero disables it, the default)."
         )
-        group.add_option(
-            "--standard-sph", action="store_true", dest="standard_sph",
-            default=False, help="Use standard SPH (defaults to TVF)."
-        )
-        group.add_option(
+        group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
             help="Number of points along x direction. (default 50)"
         )
-        group.add_option(
+        group.add_argument(
             "--re", action="store", type=float, dest="re", default=100,
             help="Reynolds number (defaults to 100)."
         )
-        group.add_option(
+        group.add_argument(
             "--hdx", action="store", type=float, dest="hdx", default=1.0,
             help="Ratio h/dx."
         )
-        group.add_option(
-            "--gamma", action="store", type=float, dest="gamma",
-            default=7.0, help="Gamma for the state equation."
-        )
-        group.add_option(
+        group.add_argument(
             "--pb-factor", action="store", type=float, dest="pb_factor",
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
-        )
-        group.add_option(
-            "--tensile-correction", action="store_true", dest="tensile_corr",
-            default=False,
-            help="Use tensile instability correction (for standard SPH)."
         )
 
     def consume_user_options(self):
@@ -90,7 +67,6 @@ class TaylorGreen(Application):
         self.dx = dx = L/nx
         self.volume = dx*dx
         self.hdx = self.options.hdx
-        self.gamma = self.options.gamma
 
         h0 = self.hdx * self.dx
         dt_cfl = 0.25 * h0/( c0 + U )
@@ -98,7 +74,31 @@ class TaylorGreen(Application):
         dt_force = 0.25 * 1.0
 
         self.tf = 5.0
-        self.dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+        self.dt = min(dt_cfl, dt_viscous, dt_force)
+
+    def configure_scheme(self):
+        scheme = self.scheme
+        h0 = self.hdx * self.dx
+        if self.options.scheme == 'tvf':
+            scheme.configure(pb=self.options.pb_factor*p0, nu=self.nu, h0=h0)
+        elif self.options.scheme == 'wcsph':
+            scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
+        kernel = QuinticSpline(dim=2)
+        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
+
+    def create_scheme(self):
+        h0 = None
+        hdx = None
+        wcsph = WCSPHScheme(
+            ['fluid'], [], dim=2, rho0=rho0, c0=c0, h0=h0,
+            hdx=hdx, nu=None, gamma=7.0, alpha=0.1, beta=0.0
+        )
+        tvf = TVFScheme(
+            ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
+            p0=p0, pb=None, h0=h0
+        )
+        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf)
+        return s
 
     def create_domain(self):
         return DomainManager(
@@ -127,7 +127,9 @@ class TaylorGreen(Application):
 
         # create the arrays
 
-        fluid = get_particle_array_tvf_fluid(name='fluid', x=x, y=y, h=h)
+        fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
+
+        self.scheme.setup_properties([fluid])
 
         # add the requisite arrays
         fluid.add_property('color')
@@ -152,106 +154,14 @@ class TaylorGreen(Application):
         fluid.m[:] = self.volume * fluid.rho
 
         # volume is set as dx^2
-        fluid.V[:] = 1./self.volume
+        if self.options.scheme == 'tvf':
+            fluid.V[:] = 1./self.volume
 
         # smoothing lengths
         fluid.h[:] = self.hdx * dx
 
-        if self.options.standard_sph:
-            fluid.remove_property('vmag2')
-            for prop in ('cs', 'arho', 'ax', 'ay', 'az', 'rho0', 'u0', 'v0',
-                'w0', 'x0', 'y0', 'z0'):
-                fluid.add_property(prop)
-
-            fluid.set_output_arrays(
-                ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'm', 'h']
-            )
         # return the particle list
         return [fluid]
-
-    def create_solver(self):
-        kernel = QuinticSpline(dim=2)
-        if self.options.standard_sph:
-            integrator = PECIntegrator(fluid=WCSPHStep())
-        else:
-            integrator = PECIntegrator(fluid=TransportVelocityStep())
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-        solver.set_time_step(self.dt)
-        solver.set_final_time(self.tf)
-        return solver
-
-    def create_equations(self):
-        if self.options.standard_sph:
-           equations = [
-                Group(equations=[
-                        TaitEOS(dest='fluid', sources=None, rho0=rho0,
-                                c0=c0, gamma=self.gamma),
-                        ], real=False),
-
-                Group(equations=[
-                        ContinuityEquation(dest='fluid',  sources=['fluid',]),
-
-                        MomentumEquation(
-                            dest='fluid', sources=['fluid'], alpha=0.1,
-                            beta=0.0, c0=c0,
-                            tensile_correction=self.options.tensile_corr
-                        ),
-
-                        LaminarViscosity(
-                            dest='fluid', sources=['fluid'], nu=self.nu
-                        ),
-
-                        XSPHCorrection(dest='fluid', sources=['fluid']),
-
-                        ],),
-
-                ]
-        else:
-            equations = [
-                # Summation density along with volume summation for the fluid
-                # phase. This is done for all local and remote particles. At
-                # the end of this group, the fluid phase has the correct
-                # density taking into consideration the fluid and solid
-                # particles.
-                Group(
-                    equations=[
-                        SummationDensity(dest='fluid', sources=['fluid']),
-                        ], real=False),
-
-                # Once the fluid density is computed, we can use the EOS to
-                # set the fluid pressure. Additionally, the shepard filtered
-                # velocity for the fluid phase is determined.
-                Group(
-                    equations=[
-                        StateEquation(dest='fluid', sources=None,
-                                      p0=p0, rho0=rho0, b=1.0),
-                        ], real=False),
-
-                # The main accelerations block. The acceleration arrays for
-                # the fluid phase are updated in this stage for all local
-                # particles.
-                Group(
-                    equations=[
-                        # Pressure gradient terms
-                        MomentumEquationPressureGradient(
-                            dest='fluid', sources=['fluid'],
-                            pb=p0*self.options.pb_factor
-                        ),
-
-                        # fluid viscosity
-                        MomentumEquationViscosity(
-                            dest='fluid', sources=['fluid'], nu=self.nu),
-
-                        # Artificial stress for the fluid phase
-                        MomentumEquationArtificialStress(
-                            dest='fluid', sources=['fluid']
-                        ),
-
-                        ], real=True
-                ),
-            ]
-        return equations
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
@@ -292,6 +202,9 @@ class TaylorGreen(Application):
         fname = os.path.join(self.output_dir, 'results.npz')
         np.savez(fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
                  decay_ex=decay_ex)
+
+        import matplotlib
+        matplotlib.use('Agg')
 
         from matplotlib import pyplot as plt
         plt.clf()

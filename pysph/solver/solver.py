@@ -18,9 +18,7 @@ EPSILON = numpy.finfo(float).eps*2
 
 class Solver(object):
     """Base class for all PySPH Solvers
-
     """
-
     def __init__(self, dim=2, integrator=None, kernel=None,
                  n_damp=0, tf=1.0, dt=1e-3,
                  adaptive_timestep=False, cfl=0.3,
@@ -161,6 +159,7 @@ class Solver(object):
         self.max_steps = 1 << 31
         self._prev_dt = None
         self._damping_factor = 1.0
+        self._epsilon = EPSILON*tf
 
         # flag for constant smoothing lengths
         self.fixed_h = fixed_h
@@ -197,6 +196,13 @@ class Solver(object):
         mode = 'mpi' if self.in_parallel else 'serial'
         self.acceleration_eval = AccelerationEval(
             particles, equations, self.kernel, mode
+        )
+
+        sep = '-'*70
+        eqn_info = '[\n' + ',\n'.join([str(e) for e in equations]) + '\n]'
+        logger.info('Using equations:\n%s\n%s\n%s'%(sep, eqn_info, sep))
+        logger.info(
+            'Using integrator:\n%s\n  %s\n%s'%(sep, self.integrator, sep)
         )
 
         sph_compiler = SPHCompiler(
@@ -299,6 +305,7 @@ class Solver(object):
     def set_final_time(self, tf):
         """ Set the final time for the simulation """
         self.tf = tf
+        self._epsilon = EPSILON*tf
 
     def set_time_step(self, dt):
         """ Set the time step to use """
@@ -409,6 +416,7 @@ class Solver(object):
         else:
             show = show_progress
         bar = FloatPBar(self.t, self.tf, show=show)
+        self._epsilon = EPSILON*self.tf
 
         # Initial solution
         self.dump_output()
@@ -422,7 +430,8 @@ class Solver(object):
         # integrate with.
         self.dt = self._get_timestep()
 
-        while ((self.tf - self.t) > EPSILON) and (self.count < self.max_steps):
+        while (self.tf - self.t) > self._epsilon and \
+              (self.count < self.max_steps):
 
             # perform any pre step functions
             for callback in self.pre_step_callbacks:
@@ -445,6 +454,7 @@ class Solver(object):
             # integrated
             self.t += self.dt
             self.count += 1
+            self._epsilon = EPSILON*self.tf*self.count
 
             # Compute the next timestep.
             self.dt = self._get_timestep()
@@ -516,14 +526,13 @@ class Solver(object):
             logger.info(msg)
 
         fname = os.path.join(self.output_directory,
-                             self.fname  + '_' + str(self.count) +'.npz')
+                             self.fname  + '_' + str(self.count))
 
-        solver_data = {'dt': self.dt, 't': self.t, 'count': self.count}
         comm = None
         if self.parallel_output_mode == "collected" and self.in_parallel:
             comm = self.comm
 
-        dump(fname, self.particles, solver_data,
+        dump(fname, self.particles, self._get_solver_data(),
              detailed_output=self.detailed_output,
              only_real=self.output_only_real, mpi_comm=comm,
              compress=self.compress_output)
@@ -578,7 +587,7 @@ class Solver(object):
         self.dt = float(solver_data['dt'])
         self.count = int(solver_data['count'])
 
-    def get_options(self, opt_parser):
+    def get_options(self, arg_parser):
         """ Implement this to add additional options for the application """
         pass
 
@@ -653,7 +662,7 @@ class Solver(object):
         This will adjust `dt` if the user has asked for output at a
         non-integral multiple of dt.
         """
-        if abs(self.t - self.tf) < EPSILON:
+        if abs(self.t - self.tf) < self._epsilon:
             return
 
         # dump output if the iteration number is a multiple of the printing
@@ -671,7 +680,7 @@ class Solver(object):
         if len(output_at_times) > 0:
             tdiff = output_at_times - self.t
 
-            if numpy.any(numpy.abs(tdiff) < EPSILON):
+            if numpy.any(numpy.abs(tdiff) < self._epsilon):
                 dump = True
 
             # Our next step may exceed a required timestep so we adjust the
@@ -680,7 +689,7 @@ class Solver(object):
             if numpy.any(timestep_too_big):
                 index = numpy.where(timestep_too_big)[0]
                 output_time = output_at_times[index]
-                if abs(output_time - self.t) > EPSILON:
+                if abs(output_time - self.t) > self._epsilon:
                     # It sometimes happens that the current time is just
                     # shy of the requested output time which results in a
                     # ridiculously small dt so we skip that case.
@@ -694,13 +703,22 @@ class Solver(object):
             self.dump_output()
             self.barrier()
 
+    def _get_solver_data(self):
+        if self._prev_dt is not None:
+            dt = self._prev_dt/self._damping_factor
+        else:
+            dt = self._get_undamped_timestep()
+
+        return {'dt': dt, 't': self.t, 'count': self.count}
+
     def _get_timestep(self):
-        if abs(self.tf - self.t) < EPSILON:
+        if abs(self.tf - self.t) < self._epsilon:
             # We have reached the end, so no need to adjust the timestep
             # anymore.
             return self.dt
 
-        if self._prev_dt is not None and abs(self._prev_dt - self.dt) > EPSILON:
+        if self._prev_dt is not None and \
+           abs(self._prev_dt - self.dt) > self._epsilon:
             # if the _prev_dt was set then we need to use it as the current dt
             # was set to print at an intermediate time.
             self.dt = self._prev_dt
@@ -710,7 +728,7 @@ class Solver(object):
         dt = self._damp_timestep(dt)
 
         # adjust dt to land exactly on final time
-        if (self.t + dt) > (self.tf - EPSILON):
+        if (self.t + dt) > (self.tf - self._epsilon):
             dt = self.tf - self.t
 
         return dt

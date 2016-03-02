@@ -11,7 +11,8 @@ class IntegratorStep(object):
     """Subclass this and implement the methods ``initialize``, ``stage1`` etc.
     Use the same conventions as the equations.
     """
-    pass
+    def __repr__(self):
+        return '%s()'%(self.__class__.__name__)
 
 
 ###############################################################################

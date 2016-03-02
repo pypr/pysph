@@ -7,21 +7,10 @@ import numpy as np
 # PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import QuinticSpline
-from pysph.solver.solver import Solver
 from pysph.solver.utils import load
 from pysph.solver.application import Application
-from pysph.sph.integrator import PECIntegrator
-from pysph.sph.integrator_step import TransportVelocityStep
 
-# the eqations
-from pysph.sph.equation import Group
-from pysph.sph.wc.transport_velocity import (SummationDensity,
-    SetWallVelocity, StateEquation,
-    MomentumEquationPressureGradient, MomentumEquationViscosity,
-    MomentumEquationArtificialStress,
-    SolidWallPressureBC, SolidWallNoSlipBC, VolumeSummation)
-
+from pysph.sph.scheme import TVFScheme
 
 # domain and reference values
 Re = 0.0125
@@ -45,7 +34,7 @@ dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 tf = 100.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
+dt = min(dt_cfl, dt_viscous, dt_force)
 
 class CouetteFlow(Application):
     def create_domain(self):
@@ -72,42 +61,18 @@ class CouetteFlow(Application):
         cy = np.concatenate( (ty, by) )
 
         # create the arrays
-        channel = get_particle_array(name='channel', x=cx, y=cy)
-        fluid = get_particle_array(name='fluid', x=fx, y=fy)
+        channel = get_particle_array(
+            name='channel', x=cx, y=cy, rho=rho0*np.ones_like(cx)
+        )
+        fluid = get_particle_array(
+            name='fluid', x=fx, y=fy, rho=rho0*np.ones_like(fx)
+        )
 
         print("Couette flow :: Re = %g, nfluid = %d, nchannel=%d, dt = %g"%(
             Re, fluid.get_number_of_particles(),
             channel.get_number_of_particles(), dt))
 
-        # add requisite properties to the arrays:
-        # particle volume
-        fluid.add_property('V')
-        channel.add_property('V')
-
-        # advection velocities and accelerations
-        for name in ('uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat', 'au', 'av', 'aw'):
-            fluid.add_property(name)
-
-        # kernel summation correction for the channel
-        channel.add_property('wij')
-
-        channel.add_property('ax')
-        channel.add_property('ay')
-        channel.add_property('az')
-
-        # extrapolated velocities for the channel
-        for name in ['uf', 'vf', 'wf']:
-            channel.add_property(name)
-
-        # dummy velocities for the channel
-        # required for the no-slip BC
-        for name in ['ug','vg','wg']:
-            channel.add_property(name)
-
-        channel.add_output_arrays(['ug', 'vg', 'uf', 'vf', 'V'])
-        # magnitude of velocity
-        fluid.add_property('vmag2')
-        fluid.add_output_arrays(['vmag2'])
+        self.scheme.setup_properties([fluid, channel])
 
         # setup the particle properties
         volume = dx * dx
@@ -128,89 +93,24 @@ class CouetteFlow(Application):
         indices = np.where(channel.y > d)[0]
         channel.u[indices] = Vmax
 
-        # load balancing props
-        fluid.set_lb_props( list(fluid.properties.keys()) )
-        channel.set_lb_props( list(channel.properties.keys()) )
-
         # return the particle list
         return [fluid, channel]
 
-    def create_solver(self):
-        kernel = QuinticSpline(dim=2)
-        integrator = PECIntegrator(fluid=TransportVelocityStep())
-
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator)
-
-        # Setup default parameters.
-        solver.set_time_step(dt)
-        solver.set_final_time(tf)
-        return solver
-
-    def create_equations(self):
-        equations = [
-
-            # Summation density along with volume summation for the fluid
-            # phase. This is done for all local and remote particles. At the
-            # end of this group, the fluid phase has the correct density
-            # taking into consideration the fluid and solid
-            # particles.
-            Group(
-                equations=[
-                    VolumeSummation(
-                        dest='channel', sources=['fluid', 'channel']
-                    ),
-                    SummationDensity(dest='fluid', sources=['fluid','channel']),
-                    ], real=False),
-
-            # Once the fluid density is computed, we can use the EOS to set
-            # the fluid pressure. Additionally, the dummy velocity for the
-            # channel is set, which is later used in the no-slip wall BC.
-            Group(
-                equations=[
-                    StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
-                    SetWallVelocity(dest='channel', sources=['fluid']),
-                    ], real=False),
-
-            # Once the pressure for the fluid phase has been updated, we can
-            # extrapolate the pressure to the ghost particles. After this
-            # group, the fluid density, pressure and the boundary pressure has
-            # been updated and can be used in the integration equations.
-            Group(
-                equations=[
-                    SolidWallPressureBC(dest='channel', sources=['fluid'],
-                                        b=1.0, rho0=rho0, p0=p0),
-                    ], real=False),
-
-            # The main accelerations block. The acceleration arrays for the
-            # fluid phase are upadted in this stage for all local particles.
-            Group(
-                equations=[
-                    # Pressure gradient terms
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'channel'], pb=p0),
-
-                    # fluid viscosity
-                    MomentumEquationViscosity(
-                        dest='fluid', sources=['fluid'], nu=nu),
-
-                    # No-slip boundary condition. This is effectively a
-                    # viscous interaction of the fluid with the ghost
-                    # particles.
-                    SolidWallNoSlipBC(
-                        dest='fluid', sources=['channel'], nu=nu),
-
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
-
-                    ], real=True),
-        ]
-        return equations
-
+    def create_scheme(self):
+        s = TVFScheme(
+            ['fluid'], ['channel'], dim=2, rho0=rho0, c0=c0, nu=nu,
+            p0=p0, pb=p0, h0=dx*hdx
+        )
+        s.configure_solver(tf=tf, dt=dt)
+        return s
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
+
+        import matplotlib
+        matplotlib.use('Agg')
 
         y_ex, u_ex, y, u = self._plot_u_vs_y()
         t, ke = self._plot_ke_history()
