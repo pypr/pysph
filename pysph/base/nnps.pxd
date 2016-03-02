@@ -1,7 +1,9 @@
+# distutils: language = c++
 # numpy
 cimport numpy as np
 
 from libcpp.map cimport map
+from libcpp.vector cimport vector
 
 # PyZoltan CArrays
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
@@ -9,6 +11,17 @@ from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 # local imports
 from particle_array cimport ParticleArray
 from point cimport *
+
+#Imports for SpatialHashNNPS
+cdef extern from "utils.h":
+    cdef cppclass HashTable:
+        HashTable(long int) except +
+        void add(int, int, int, int)
+        vector[unsigned int] &get(int, int, int)
+
+    cdef inline double max_arr(double*, int)
+    cdef inline double min_arr(double*, int)
+
 
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)

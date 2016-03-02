@@ -1,3 +1,4 @@
+#distutils: language = c++
 #cython: embedsignature=True
 # Library imports.
 import numpy as np
@@ -334,6 +335,51 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
             arange.data[i] = <unsigned int>(start + i)
 
     return arange
+
+@cython.cdivision(True)
+cdef inline cIntPoint get_cell_id(double x, double y, double z,
+        double x_min, double y_min, double z_min, double h):
+    """Finds id of the cell to which the particle belongs.
+
+    Parameters
+    ----------
+
+    x : double
+        x coordinate of the particle
+
+    y : double
+        y coordinate of the particle
+
+    z : double
+        z coordinate of the particle
+
+    x_min : double
+        Minimum value of x coordinate for the given particles
+
+    y_min : double
+        Minimum value of y coordinate for the given particles
+
+    z_min : double
+        Minimum value of z coordinate for the given particles
+
+    h : double
+        Cell size for binning
+    """
+    return cIntPoint(
+            <int> floor((x - x_min)/h),
+            <int> floor((y - y_min)/h),
+            <int> floor((z - z_min)/h)
+            )
+
+cdef inline double MAX(double a, double b):
+    return a if a>b else b
+
+cdef inline double MIN(double a, double b):
+    return a if a<b else b
+
+cdef inline double square_dist(double x1, double y1, double z1,
+        double x2, double y2, double z2):
+    return (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2)
 
 
 ##############################################################################
@@ -2001,3 +2047,235 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
         self.cell_to_index = _cid_to_index
         return count
+
+cdef class SpatialHash:
+    cdef double h_max, x_min, y_min, z_min, radius_scale
+    cdef HashTable* hashtable
+
+    cdef double* x_ptr
+    cdef double* y_ptr
+    cdef double* z_ptr
+    cdef double* h_ptr
+
+    cdef bint alloc
+
+    def __cinit__(self):
+        self.alloc = False
+
+    cdef void set_up(self, double* x_ptr, double* y_ptr, double* z_ptr, double* h_ptr,
+            int num_particles, double h_max, double x_min, double y_min, double z_min,
+            double radius_scale = 1, long long int table_size = 131072):
+        self.alloc = True
+        self.hashtable = new HashTable(table_size)
+        self.x_ptr = x_ptr
+        self.y_ptr = y_ptr
+        self.z_ptr = z_ptr
+        self.h_ptr = h_ptr
+        self.h_max = h_max
+        self.x_min = x_min
+        self.y_min = y_min
+        self.z_min = z_min
+        self.radius_scale2 = radius_scale*radius_scale
+        cdef cIntPoint cid
+        cdef unsigned int i
+        for i from 0<=i<num_particles:
+            cid = get_cell_id(self.x_ptr[i], self.y_ptr[i], self.z_ptr[i],
+                    self.x_min, self.y_min, self.z_min, self.h_max)
+            self.add_to_hashtable(i, cid.x, cid.y, cid.z)
+
+    cdef inline void add_to_hashtable(self, unsigned int idx, int i, int j, int k):
+        self.hashtable.add(i,j,k,idx)
+
+    cdef int neighbour_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z):
+        cdef int length = 0
+        cdef int p, q, r
+        for p from -1<=p<2:
+            for q from -1<=q<2:
+                for r from -1<=r<2:
+                    if i+p>=0 and j+q>=0 and k+r>=0:
+                        x[length] = i+p
+                        y[length] = j+q
+                        z[length] = k+r
+                        length += 1
+        return length
+
+    cdef void c_nearest_neighbours(self, double x, double y, double z, double h,
+            UIntArray nbrs):
+        nbrs.c_reset()
+        cdef vector[unsigned int] candidates
+        cdef cIntPoint cid = get_cell_id(x, y, z,
+                self.x_min, self.y_min, self.z_min, self.h_max)
+        cdef int candidate_size = 0
+
+        cdef int x_boxes[27]
+        cdef int y_boxes[27]
+        cdef int z_boxes[27]
+        cdef int num_boxes = self.neighbour_boxes(cid.x, cid.y, cid.z,
+                x_boxes, y_boxes, z_boxes)
+
+        cdef unsigned int i, j, k
+        cdef double xij2 = 0
+        cdef double hi2 = self.radius_scale2*h*h
+        cdef double hj2 = 0
+
+        for i from 0<=i<num_boxes:
+            candidates = self.hashtable.get(x_boxes[i], y_boxes[i], z_boxes[i])
+            candidate_size = candidates.size()
+            for j from 0<=j<candidate_size:
+                k = candidates[j]
+                hj2 = self.radius_scale*self.h_ptr[k]*self.h_ptr[k]
+                xij2 = square_dist(self.x_ptr[k], self.y_ptr[k], self.z_ptr[k],
+                        x, y, z)
+                if (xij2 < hi2) or (xij2 < hj2):
+                    nbrs.c_append(k)
+
+    cdef void c_reset(self):
+        if self.alloc:
+            del self.hashtable
+            self.alloc = False
+
+    def __dealloc__(self):
+        if self.alloc:
+            del self.hashtable
+
+cdef class SpatialHashNNPS:
+    """Nearest Neighbour particle search using Spatial Hashing algorithm"""
+    cdef list particles
+    cdef double radius_scale
+    cdef double h_max, x_min, y_min, z_min
+    cdef long long int table_size
+    cdef bint context_set
+
+    cdef DoubleArray dst_x, dst_y, dst_z, dst_h
+    cdef DoubleArray src_x, src_y, src_z, src_h
+
+    cdef double* dst_x_ptr
+    cdef double* dst_y_ptr
+    cdef double* dst_z_ptr
+    cdef double* dst_h_ptr
+
+    cdef double* src_x_ptr
+    cdef double* src_y_ptr
+    cdef double* src_z_ptr
+    cdef double* src_h_ptr
+
+    cdef SpatialHash current_hash
+
+    def __cinit__(self, list particles, double radius_scale = 1, long long int table_size = 131072):
+        self.particles = particles
+        self.radius_scale = radius_scale
+        self.table_size = table_size
+        self.context_set = False
+        self.current_hash = SpatialHash()
+
+    cdef void c_set_context(self, int src, int dst):
+        self.current_hash.c_reset()
+        cdef ParticleArray dst_pa, src_pa
+        cdef int num_particles_src, num_particles_dst
+
+        src_pa = <ParticleArray> self.particles[src]
+
+        num_particles_src = src_pa.get_number_of_particles()
+
+        self.src_x = src_pa.get_carray('x')
+        self.src_y = src_pa.get_carray('y')
+        self.src_z = src_pa.get_carray('z')
+        self.src_h = src_pa.get_carray('h')
+
+        self.src_x_ptr = <double*> self.src_x.data
+        self.src_y_ptr = <double*> self.src_y.data
+        self.src_z_ptr = <double*> self.src_z.data
+        self.src_h_ptr = <double*> self.src_h.data
+
+        if dst != src:
+            dst_pa = <ParticleArray> self.particles[dst]
+
+            self.dst_x = dst_pa.get_carray('x')
+            self.dst_y = dst_pa.get_carray('y')
+            self.dst_z = dst_pa.get_carray('z')
+            self.dst_h = dst_pa.get_carray('h')
+
+            self.dst_x_ptr = <double*> self.dst_x.data
+            self.dst_y_ptr = <double*> self.dst_y.data
+            self.dst_z_ptr = <double*> self.dst_z.data
+            self.dst_h_ptr = <double*> self.dst_h.data
+
+            num_particles_dst = dst_pa.get_number_of_particles()
+
+            self.h_max = MAX(
+                    max_arr(self.dst_h_ptr, num_particles_dst),
+                    max_arr(self.src_h_ptr, num_particles_src)
+                    )
+            self.x_min = MIN(
+                    min_arr(self.dst_x_ptr, num_particles_dst),
+                    min_arr(self.src_x_ptr, num_particles_src)
+                    )
+            self.y_min = MIN(
+                    min_arr(self.dst_y_ptr, num_particles_dst),
+                    min_arr(self.src_y_ptr, num_particles_src)
+                    )
+            self.z_min = MIN(
+                    min_arr(self.dst_z_ptr, num_particles_dst),
+                    min_arr(self.src_z_ptr, num_particles_src)
+                    )
+        else:
+            self.h_max = max_arr(self.src_h_ptr, num_particles_src)
+            self.x_min = min_arr(self.src_x_ptr, num_particles_src)
+            self.y_min = min_arr(self.src_y_ptr, num_particles_src)
+            self.z_min = min_arr(self.src_z_ptr, num_particles_src)
+            self.dst_x_ptr = self.src_x_ptr
+            self.dst_y_ptr = self.src_y_ptr
+            self.dst_z_ptr = self.src_z_ptr
+            self.dst_h_ptr = self.src_h_ptr
+
+        self.current_hash.set_up(self.src_x_ptr, self.src_y_ptr, self.src_z_ptr,
+            self.src_h_ptr, num_particles_src, self.h_max, self.x_min,
+            self.y_min, self.z_min, self.radius_scale, self.table_size)
+        self.context_set = True
+
+    cpdef set_context(self, int src, int dst):
+        """Set context for nearest neighbour searches.
+
+        Parameters
+        ----------
+        src: int
+            Index in the list of particle arrays to which the neighbours belong
+
+        dst: int
+            Index in the list of particle arrays to which the query point belongs
+
+        """
+        self.c_set_context(src, dst)
+
+    cdef void c_get_nearest_neighbours(self, int src, int dst, unsigned int qid, UIntArray nbrs):
+        if not self.context_set:
+            self.c_set_context(src, dst)
+
+        cdef double q_x = self.dst_x_ptr[qid]
+        cdef double q_y = self.dst_y_ptr[qid]
+        cdef double q_z = self.dst_z_ptr[qid]
+        cdef double q_h = self.dst_h_ptr[qid]
+
+        self.current_hash.c_nearest_neighbours(q_x, q_y, q_z, q_h, nbrs)
+
+    cpdef get_nearest_neighbours(self, int src, int dst, unsigned int qid, UIntArray nbrs):
+        """Find nearest neighbours for particle id 'qid'
+
+        Parameters
+        ----------
+        src: int
+            Index in the list of particle arrays to which the neighbours belong
+
+        dst: int
+            Index in the list of particle arrays to which the query point belongs
+
+        qid: unsigned int
+            Index of the query point in the 'dst' particle array
+
+        nbrs: UIntArray
+            Array to be populated by nearest neighbours of 'qid'
+        """
+        self.c_get_nearest_neighbours(src, dst, qid, nbrs)
+
+
