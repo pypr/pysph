@@ -14,18 +14,19 @@ from point cimport *
 #Imports for SpatialHashNNPS
 cdef extern from "utils.h":
     cdef cppclass HashTable:
-        HashTable(long int) except +
-        void add(int, int, int, int)
-        vector[unsigned int] &get(int, int, int)
+        HashTable(long int) nogil except +
+        void add(int, int, int, int) nogil
+        vector[unsigned int] &get(int, int, int) nogil
 
-    cdef inline double max_arr(double*, int)
-    cdef inline double min_arr(double*, int)
+    cdef inline double max_arr(double*, int) nogil
+    cdef inline double min_arr(double*, int) nogil
 
 
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
-cdef inline cIntPoint get_cell_id(double x, double y, double z,
-        double x_min, double y_min, double z_min, double h)
+cdef inline void get_cell_id(double x, double y, double z,
+        double x_min, double y_min, double z_min, double h,
+        int* c_x, int* c_y, int* c_z) nogil
 
 cpdef UIntArray arange_uint(int start, int stop=*)
 
@@ -267,28 +268,26 @@ cdef class SpatialHash:
 
     cdef void set_up(self, double* x_ptr, double* y_ptr, double* z_ptr, double* h_ptr,
             int num_particles, double h_max, double x_min, double y_min, double z_min,
-            double radius_scale = *, long long int table_size = *)
+            double radius_scale = *, long long int table_size = *) nogil
 
-    cdef inline void add_to_hashtable(self, unsigned int pid, int i, int j, int k)
+    cdef inline void add_to_hashtable(self, unsigned int pid,
+            int i, int j, int k) nogil
 
-    cdef int neighbour_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z)
+    cdef int neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil
 
-    cdef void c_nearest_neighbours(self, double x, double y, double z, double h,
-            UIntArray nbrs)
+    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
+            UIntArray nbrs) nogil
 
-    cdef void c_reset(self)
+    cdef void c_reset(self) nogil
 
 # NNPS using Spatial Hashing algorithm
-cdef class SpatialHashNNPS:
+cdef class SpatialHashNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef list particles                         # List of ParticleArrays
-    cdef double radius_scale                    # Radius Scale
     cdef double h_max, x_min, y_min, z_min      # Max and min attributes
     cdef long long int table_size               # Size of hashtable
-    cdef bint context_set                       # Context set or not
 
     cdef DoubleArray dst_x, dst_y, dst_z, dst_h # Destination properties
     cdef DoubleArray src_x, src_y, src_z, src_h # Source properties
@@ -316,10 +315,10 @@ cdef class SpatialHashNNPS:
 
     cpdef set_context(self, int src, int dst)
 
-    cdef void c_get_nearest_particles(self, int src, int dst,
-            unsigned int qid, UIntArray nbrs)
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cpdef get_nearest_particles(self, int src, int dst,
-            unsigned int qid, UIntArray nbrs)
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc)
+
 
 

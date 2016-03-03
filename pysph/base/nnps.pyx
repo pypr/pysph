@@ -336,8 +336,9 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
     return arange
 
 @cython.cdivision(True)
-cdef inline cIntPoint get_cell_id(double x, double y, double z,
-        double x_min, double y_min, double z_min, double h):
+cdef inline void get_cell_id(double x, double y, double z,
+        double x_min, double y_min, double z_min, double h,
+        int* c_x, int* c_y, int* c_z) nogil:
     """Finds id of the cell to which the particle belongs.
 
     Parameters
@@ -364,11 +365,9 @@ cdef inline cIntPoint get_cell_id(double x, double y, double z,
     h : double
         Cell size for binning
     """
-    return cIntPoint(
-            <int> floor((x - x_min)/h),
-            <int> floor((y - y_min)/h),
-            <int> floor((z - z_min)/h)
-            )
+    c_x[0] = <int> floor((x - x_min)/h)
+    c_y[0] = <int> floor((y - y_min)/h)
+    c_z[0] = <int> floor((z - z_min)/h)
 
 cdef inline double MAX(double a, double b):
     return a if a>b else b
@@ -377,7 +376,7 @@ cdef inline double MIN(double a, double b):
     return a if a<b else b
 
 cdef inline double square_dist(double x1, double y1, double z1,
-        double x2, double y2, double z2):
+        double x2, double y2, double z2) nogil:
     return (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2)
 
 
@@ -2053,7 +2052,7 @@ cdef class SpatialHash:
 
     cdef void set_up(self, double* x_ptr, double* y_ptr, double* z_ptr, double* h_ptr,
             int num_particles, double h_max, double x_min, double y_min, double z_min,
-            double radius_scale = 1, long long int table_size = 131072):
+            double radius_scale = 1, long long int table_size = 131072) nogil:
         self.alloc = True
         self.hashtable = new HashTable(table_size)
         self.x_ptr = x_ptr
@@ -2065,18 +2064,22 @@ cdef class SpatialHash:
         self.y_min = y_min
         self.z_min = z_min
         self.radius_scale2 = radius_scale*radius_scale
-        cdef cIntPoint cid
+        cdef int c_x, c_y, c_z
         cdef unsigned int i
         for i from 0<=i<num_particles:
-            cid = get_cell_id(self.x_ptr[i], self.y_ptr[i], self.z_ptr[i],
-                    self.x_min, self.y_min, self.z_min, self.h_max)
-            self.add_to_hashtable(i, cid.x, cid.y, cid.z)
+            get_cell_id(
+                    self.x_ptr[i], self.y_ptr[i], self.z_ptr[i],
+                    self.x_min, self.y_min, self.z_min, self.h_max,
+                    &c_x, &c_y, &c_z
+                    )
+            self.add_to_hashtable(i, c_x, c_y, c_z)
 
-    cdef inline void add_to_hashtable(self, unsigned int pid, int i, int j, int k):
+    cdef inline void add_to_hashtable(self, unsigned int pid,
+            int i, int j, int k) nogil:
         self.hashtable.add(i,j,k,pid)
 
-    cdef int neighbour_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z):
+    cdef int neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int p, q, r
         for p from -1<=p<2:
@@ -2089,18 +2092,22 @@ cdef class SpatialHash:
                         length += 1
         return length
 
-    cdef void c_nearest_neighbours(self, double x, double y, double z, double h,
-            UIntArray nbrs):
+    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
+            UIntArray nbrs) nogil:
         nbrs.c_reset()
+        cdef int c_x, c_y, c_z
         cdef vector[unsigned int] candidates
-        cdef cIntPoint cid = get_cell_id(x, y, z,
-                self.x_min, self.y_min, self.z_min, self.h_max)
+        get_cell_id(
+                x, y, z,
+                self.x_min, self.y_min, self.z_min, self.h_max,
+                &c_x, &c_y, &c_z
+                )
         cdef int candidate_size = 0
 
         cdef int x_boxes[27]
         cdef int y_boxes[27]
         cdef int z_boxes[27]
-        cdef int num_boxes = self.neighbour_boxes(cid.x, cid.y, cid.z,
+        cdef int num_boxes = self.neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
         cdef unsigned int i, j, k
@@ -2119,7 +2126,7 @@ cdef class SpatialHash:
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
 
-    cdef void c_reset(self):
+    cdef void c_reset(self) nogil:
         if self.alloc:
             del self.hashtable
             self.alloc = False
@@ -2128,23 +2135,29 @@ cdef class SpatialHash:
         if self.alloc:
             del self.hashtable
 
-cdef class SpatialHashNNPS:
+cdef class SpatialHashNNPS(NNPS):
 
-    """Nearest Neighbour particle search using Spatial Hashing algorithm"""
+    """Nearest neighbor particle search using Spatial Hashing algorithm"""
 
-    def __cinit__(self, list particles, double radius_scale = 1, long long int table_size = 131072):
-        self.particles = particles
-        self.radius_scale = radius_scale
+    def __cinit__(self, int dim, list particles, double radius_scale = 1,
+            int ghost_layers = 1, domain=None,
+            bint fixed_h = False, bint cache = False,
+            bint sort_gids = False, long long int table_size = 131072):
+        NNPS.__init__(
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
+        )
+
         self.table_size = table_size
-        self.context_set = False
         self.current_hash = SpatialHash()
 
-    cdef void c_set_context(self, int src, int dst):
+    cdef void c_set_context(self, int src_index, int dst_index):
+        NNPS.set_context(self, src_index, dst_index)
         self.current_hash.c_reset()
         cdef ParticleArray dst_pa, src_pa
         cdef int num_particles_src, num_particles_dst
 
-        src_pa = <ParticleArray> self.particles[src]
+        src_pa = <ParticleArray> self.particles[src_index]
 
         num_particles_src = src_pa.get_number_of_particles()
 
@@ -2158,8 +2171,8 @@ cdef class SpatialHashNNPS:
         self.src_z_ptr = <double*> self.src_z.data
         self.src_h_ptr = <double*> self.src_h.data
 
-        if dst != src:
-            dst_pa = <ParticleArray> self.particles[dst]
+        if dst_index != src_index:
+            dst_pa = <ParticleArray> self.particles[dst_index]
 
             self.dst_x = dst_pa.get_carray('x')
             self.dst_y = dst_pa.get_carray('y')
@@ -2202,40 +2215,37 @@ cdef class SpatialHashNNPS:
         self.current_hash.set_up(self.src_x_ptr, self.src_y_ptr, self.src_z_ptr,
             self.src_h_ptr, num_particles_src, self.h_max, self.x_min,
             self.y_min, self.z_min, self.radius_scale, self.table_size)
-        self.context_set = True
 
-    cpdef set_context(self, int src, int dst):
-        """Set context for nearest neighbour searches.
+    cpdef set_context(self, int src_index, int dst_index):
+        """Set context for nearest neighbor searches.
 
         Parameters
         ----------
         src: int
-            Index in the list of particle arrays to which the neighbours belong
+            Index in the list of particle arrays to which the neighbors belong
 
         dst: int
             Index in the list of particle arrays to which the query point belongs
 
         """
-        self.c_set_context(src, dst)
+        self.c_set_context(src_index, dst_index)
 
-    cdef void c_get_nearest_particles(self, int src, int dst, unsigned int qid, UIntArray nbrs):
-        if not self.context_set:
-            self.c_set_context(src, dst)
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        cdef double q_x = self.dst_x_ptr[d_idx]
+        cdef double q_y = self.dst_y_ptr[d_idx]
+        cdef double q_z = self.dst_z_ptr[d_idx]
+        cdef double q_h = self.dst_h_ptr[d_idx]
 
-        cdef double q_x = self.dst_x_ptr[qid]
-        cdef double q_y = self.dst_y_ptr[qid]
-        cdef double q_z = self.dst_z_ptr[qid]
-        cdef double q_h = self.dst_h_ptr[qid]
+        self.current_hash.c_nearest_neighbors(q_x, q_y, q_z, q_h, nbrs)
 
-        self.current_hash.c_nearest_neighbours(q_x, q_y, q_z, q_h, nbrs)
-
-    cpdef get_nearest_particles(self, int src, int dst, unsigned int qid, UIntArray nbrs):
-        """Find nearest neighbours for particle id 'qid'
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc):
+        """Find nearest neighbors for particle id 'qid'
 
         Parameters
         ----------
         src: int
-            Index in the list of particle arrays to which the neighbours belong
+            Index in the list of particle arrays to which the neighbors belong
 
         dst: int
             Index in the list of particle arrays to which the query point belongs
@@ -2244,9 +2254,15 @@ cdef class SpatialHashNNPS:
             Index of the query point in the 'dst' particle array
 
         nbrs: UIntArray
-            Array to be populated by nearest neighbours of 'qid'
+            Array to be populated by nearest neighbors of 'qid'
 
         """
-        self.c_get_nearest_particles(src, dst, qid, nbrs)
+        self.c_set_context(src_index, dst_index)
 
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.c_reset()
+
+        self.find_nearest_neighbors(d_idx, nbrs)
 
