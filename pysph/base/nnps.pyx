@@ -2113,7 +2113,7 @@ cdef class SpatialHash:
             candidate_size = candidates.size()
             for j from 0<=j<candidate_size:
                 k = candidates[j]
-                hj2 = self.radius_scale*self.h_ptr[k]*self.h_ptr[k]
+                hj2 = self.radius_scale2*self.h_ptr[k]*self.h_ptr[k]
                 xij2 = square_dist(self.x_ptr[k], self.y_ptr[k], self.z_ptr[k],
                         x, y, z)
                 if (xij2 < hi2) or (xij2 < hj2):
