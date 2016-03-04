@@ -11,16 +11,6 @@
 
 using namespace std;
 
-inline double max_arr(double* arr, int length)
-{
-    return *max_element(arr, arr + length);
-}
-
-inline double min_arr(double* arr, int length)
-{
-    return *min_element(arr, arr + length);
-}
-
 class HashEntry
 {
 private:
@@ -91,9 +81,7 @@ public:
         {
             entry = new HashEntry(key, idx, i, j, k);
             if(prev==NULL)
-            {
                 this->hashtable[key] = entry;
-            }
             else
                 prev->next = entry;
         }

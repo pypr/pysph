@@ -12,12 +12,11 @@ from particle_array cimport ParticleArray
 from point cimport *
 
 #Imports for SpatialHashNNPS
-cdef extern from "utils.h":
+cdef extern from "spatial_hash.h":
     cdef cppclass HashTable:
         HashTable(long int) nogil except +
         void add(int, int, int, int) nogil
         vector[unsigned int] &get(int, int, int) nogil
-
 
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
@@ -262,7 +261,11 @@ cdef class SpatialHash:
     # Member functions
     ##########################################################################
 
-    cdef void set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
+    cdef void c_set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
+            double x_min, double y_min, double z_min,
+            double radius_scale = *, long long int table_size = *)
+
+    cpdef set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
             double x_min, double y_min, double z_min,
             double radius_scale = *, long long int table_size = *)
 
@@ -275,14 +278,14 @@ cdef class SpatialHash:
     cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
             UIntArray nbrs) nogil
 
-    cdef void c_reset(self) nogil
+    cdef void c_reset(self)
+    cpdef reset(self)
 
 # NNPS using Spatial Hashing algorithm
 cdef class SpatialHashNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef double h_max, x_min, y_min, z_min      # Max and min attributes
     cdef long long int table_size               # Size of hashtable
 
     # Pointers to destination ParticleArray properties
@@ -293,7 +296,7 @@ cdef class SpatialHashNNPS(NNPS):
 
     # Current SpatialHash object
     cdef SpatialHash current_hash
-    cdef NNPSParticleArrayWrapper dst
+    cdef NNPSParticleArrayWrapper dst, src
     cdef list hash_list
 
     ##########################################################################

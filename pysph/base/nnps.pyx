@@ -8,6 +8,7 @@ from cython.operator cimport dereference as deref, preincrement as inc
 from cython.parallel import parallel, prange, threadid
 
 # malloc and friends
+from libc.stdlib cimport malloc, free
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 from libcpp.vector cimport vector
@@ -1111,7 +1112,7 @@ cdef class NNPS:
         raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")
 
     cpdef set_context(self, int src_index, int dst_index):
-        """Setup the context before asing for neighbors.  The `dst_index`
+        """Setup the context before asking for neighbors.  The `dst_index`
         represents the particles for whom the neighbors are to be determined
         from the particle array with index `src_index`.
 
@@ -1619,7 +1620,7 @@ cdef class LinkedListNNPS(NNPS):
         cdef unsigned int _next
         cdef int ix, iy, iz
 
-        # this is the physica position of the particle that will be
+        # this is the physical position of the particle that will be
         # used in pairwise searching
         cdef double x = d_x[d_idx]
         cdef double y = d_y[d_idx]
@@ -2005,9 +2006,10 @@ cdef class SpatialHash:
     def __cinit__(self):
         self.alloc = False
 
-    cdef void set_up(self, NNPSParticleArrayWrapper pa_wrapper,
+    cdef void c_set_up(self, NNPSParticleArrayWrapper pa_wrapper,
             double h_max, double x_min, double y_min, double z_min,
             double radius_scale = 1, long long int table_size = 131072):
+        self.c_reset()
         self.alloc = True
         self.hashtable = new HashTable(table_size)
         self.pa_wrapper = pa_wrapper
@@ -2037,6 +2039,12 @@ cdef class SpatialHash:
                     )
             self.add_to_hashtable(i, c_x, c_y, c_z)
 
+
+    cpdef set_up(self, NNPSParticleArrayWrapper pa_wrapper,
+            double h_max, double x_min, double y_min, double z_min,
+            double radius_scale = 1, long long int table_size = 131072):
+        self.c_set_up(pa_wrapper, h_max, x_min, y_min, z_min, radius_scale, table_size)
+
     cdef inline void add_to_hashtable(self, unsigned int pid,
             int i, int j, int k) nogil:
         self.hashtable.add(i,j,k,pid)
@@ -2058,11 +2066,12 @@ cdef class SpatialHash:
     cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
             UIntArray nbrs) nogil:
         cdef int c_x, c_y, c_z
+        cdef unsigned int i, j, k
         cdef vector[unsigned int] candidates
         find_cell_id_raw(
-                self.x_ptr[i] - self.x_min,
-                self.y_ptr[i] - self.y_min,
-                self.z_ptr[i] - self.z_min,
+                x - self.x_min,
+                y - self.y_min,
+                z - self.z_min,
                 self.h_max,
                 &c_x, &c_y, &c_z
                 )
@@ -2074,7 +2083,6 @@ cdef class SpatialHash:
         cdef int num_boxes = self.neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
-        cdef unsigned int i, j, k
         cdef double xij2 = 0
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
@@ -2093,10 +2101,13 @@ cdef class SpatialHash:
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
 
-    cdef void c_reset(self) nogil:
+    cdef void c_reset(self):
         if self.alloc:
             del self.hashtable
             self.alloc = False
+
+    cpdef reset(self):
+        self.c_reset()
 
     def __dealloc__(self):
         if self.alloc:
@@ -2110,6 +2121,7 @@ cdef class SpatialHashNNPS(NNPS):
             int ghost_layers = 1, domain=None,
             bint fixed_h = False, bint cache = False,
             bint sort_gids = False, long long int table_size = 131072):
+        #Initialize base class
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
@@ -2118,8 +2130,11 @@ cdef class SpatialHashNNPS(NNPS):
         self.table_size = table_size
 
         cdef int i
-        self.hash_list = [0 for i from 0<=i<self.narrays]
-
+        cdef SpatialHash _hash
+        self.hash_list = []
+        for i from 0<=i<self.narrays:
+            _hash = SpatialHash()
+            self.hash_list.append(_hash)
         self.sort_gids = sort_gids
 
         self.domain.update()
@@ -2129,7 +2144,6 @@ cdef class SpatialHashNNPS(NNPS):
         NNPS.set_context(self, src_index, dst_index)
 
         self.current_hash = <SpatialHash> self.hash_list[src_index]
-        self.dst = self.pa_wrappers[dst_index]
 
         self.dst_x_ptr = <double*> self.dst.x.data
         self.dst_y_ptr = <double*> self.dst.y.data
@@ -2155,8 +2169,15 @@ cdef class SpatialHashNNPS(NNPS):
         cdef double q_y = self.dst_y_ptr[d_idx]
         cdef double q_z = self.dst_z_ptr[d_idx]
         cdef double q_h = self.dst_h_ptr[d_idx]
+        cdef unsigned int* s_gid = self.src.gid.data
+        cdef int orig_length = nbrs.length
 
         self.current_hash.c_nearest_neighbors(q_x, q_y, q_z, q_h, nbrs)
+
+        if self.sort_gids:
+            self._sort_neighbors(
+                &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
+            )
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
@@ -2187,19 +2208,18 @@ cdef class SpatialHashNNPS(NNPS):
         self.find_nearest_neighbors(d_idx, nbrs)
 
     cpdef _refresh(self):
-        pass
+        cdef int i
+        for i from 0<=i<self.narrays:
+            self.hash_list[i].reset()
 
     cdef void _c_bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
-
-        cdef int num_particles = indices.length
-        cdef SpatialHash _hash = SpatialHash()
         cdef double* xmin = self.xmin.data
 
-        _hash.set_up(pa_wrapper, self.cell_size, xmin[0], xmin[1], xmin[2],
-                self.radius_scale, self.table_size)
-
-        self.hash_list[pa_index] = _hash
+        cdef SpatialHash _hash = SpatialHash()
+        self.hash_list[pa_index].set_up(pa_wrapper, self.cell_size,
+                xmin[0], xmin[1], xmin[2], radius_scale = self.radius_scale,
+                table_size = self.table_size)
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         self._c_bin(pa_index, indices)
