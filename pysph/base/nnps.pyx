@@ -18,7 +18,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
-from cpython.list cimport PyList_GetItem
+from cpython.list cimport PyList_GetItem, PyList_SetItem
 
 # Cython for compiler directives
 cimport cython
@@ -334,51 +334,6 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
             arange.data[i] = <unsigned int>(start + i)
 
     return arange
-
-@cython.cdivision(True)
-cdef inline void get_cell_id(double x, double y, double z,
-        double x_min, double y_min, double z_min, double h,
-        int* c_x, int* c_y, int* c_z) nogil:
-    """Finds id of the cell to which the particle belongs.
-
-    Parameters
-    ----------
-
-    x : double
-        x coordinate of the particle
-
-    y : double
-        y coordinate of the particle
-
-    z : double
-        z coordinate of the particle
-
-    x_min : double
-        Minimum value of x coordinate for the given particles
-
-    y_min : double
-        Minimum value of y coordinate for the given particles
-
-    z_min : double
-        Minimum value of z coordinate for the given particles
-
-    h : double
-        Cell size for binning
-    """
-    c_x[0] = <int> floor((x - x_min)/h)
-    c_y[0] = <int> floor((y - y_min)/h)
-    c_z[0] = <int> floor((z - z_min)/h)
-
-cdef inline double MAX(double a, double b):
-    return a if a>b else b
-
-cdef inline double MIN(double a, double b):
-    return a if a<b else b
-
-cdef inline double square_dist(double x1, double y1, double z1,
-        double x2, double y2, double z2) nogil:
-    return (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2) + (z1-z2)*(z1-z2)
-
 
 ##############################################################################
 cdef class NNPSParticleArrayWrapper:
@@ -2050,26 +2005,34 @@ cdef class SpatialHash:
     def __cinit__(self):
         self.alloc = False
 
-    cdef void set_up(self, double* x_ptr, double* y_ptr, double* z_ptr, double* h_ptr,
-            int num_particles, double h_max, double x_min, double y_min, double z_min,
-            double radius_scale = 1, long long int table_size = 131072) nogil:
+    cdef void set_up(self, NNPSParticleArrayWrapper pa_wrapper,
+            double h_max, double x_min, double y_min, double z_min,
+            double radius_scale = 1, long long int table_size = 131072):
         self.alloc = True
         self.hashtable = new HashTable(table_size)
-        self.x_ptr = x_ptr
-        self.y_ptr = y_ptr
-        self.z_ptr = z_ptr
-        self.h_ptr = h_ptr
+        self.pa_wrapper = pa_wrapper
+
+        self.x_ptr = <double*> self.pa_wrapper.x.data
+        self.y_ptr = <double*> self.pa_wrapper.y.data
+        self.z_ptr = <double*> self.pa_wrapper.z.data
+        self.h_ptr = <double*> self.pa_wrapper.h.data
+
         self.h_max = h_max
         self.x_min = x_min
         self.y_min = y_min
         self.z_min = z_min
+
         self.radius_scale2 = radius_scale*radius_scale
         cdef int c_x, c_y, c_z
         cdef unsigned int i
+        cdef int num_particles = pa_wrapper.get_number_of_particles()
+
         for i from 0<=i<num_particles:
-            get_cell_id(
-                    self.x_ptr[i], self.y_ptr[i], self.z_ptr[i],
-                    self.x_min, self.y_min, self.z_min, self.h_max,
+            find_cell_id_raw(
+                    self.x_ptr[i] - self.x_min,
+                    self.y_ptr[i] - self.y_min,
+                    self.z_ptr[i] - self.z_min,
+                    self.h_max,
                     &c_x, &c_y, &c_z
                     )
             self.add_to_hashtable(i, c_x, c_y, c_z)
@@ -2094,12 +2057,13 @@ cdef class SpatialHash:
 
     cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
             UIntArray nbrs) nogil:
-        nbrs.c_reset()
         cdef int c_x, c_y, c_z
         cdef vector[unsigned int] candidates
-        get_cell_id(
-                x, y, z,
-                self.x_min, self.y_min, self.z_min, self.h_max,
+        find_cell_id_raw(
+                self.x_ptr[i] - self.x_min,
+                self.y_ptr[i] - self.y_min,
+                self.z_ptr[i] - self.z_min,
+                self.h_max,
                 &c_x, &c_y, &c_z
                 )
         cdef int candidate_size = 0
@@ -2121,8 +2085,11 @@ cdef class SpatialHash:
             for j from 0<=j<candidate_size:
                 k = candidates[j]
                 hj2 = self.radius_scale2*self.h_ptr[k]*self.h_ptr[k]
-                xij2 = square_dist(self.x_ptr[k], self.y_ptr[k], self.z_ptr[k],
-                        x, y, z)
+                xij2 = norm2(
+                        self.x_ptr[k] - x,
+                        self.y_ptr[k] - y,
+                        self.z_ptr[k] - z
+                        )
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
 
@@ -2149,72 +2116,25 @@ cdef class SpatialHashNNPS(NNPS):
         )
 
         self.table_size = table_size
-        self.current_hash = SpatialHash()
+
+        cdef int i
+        self.hash_list = [0 for i from 0<=i<self.narrays]
+
+        self.sort_gids = sort_gids
+
+        self.domain.update()
+        self.update()
 
     cdef void c_set_context(self, int src_index, int dst_index):
         NNPS.set_context(self, src_index, dst_index)
-        self.current_hash.c_reset()
-        cdef ParticleArray dst_pa, src_pa
-        cdef int num_particles_src, num_particles_dst
 
-        src_pa = <ParticleArray> self.particles[src_index]
+        self.current_hash = <SpatialHash> self.hash_list[src_index]
+        self.dst = self.pa_wrappers[dst_index]
 
-        num_particles_src = src_pa.get_number_of_particles()
-
-        self.src_x = src_pa.get_carray('x')
-        self.src_y = src_pa.get_carray('y')
-        self.src_z = src_pa.get_carray('z')
-        self.src_h = src_pa.get_carray('h')
-
-        self.src_x_ptr = <double*> self.src_x.data
-        self.src_y_ptr = <double*> self.src_y.data
-        self.src_z_ptr = <double*> self.src_z.data
-        self.src_h_ptr = <double*> self.src_h.data
-
-        if dst_index != src_index:
-            dst_pa = <ParticleArray> self.particles[dst_index]
-
-            self.dst_x = dst_pa.get_carray('x')
-            self.dst_y = dst_pa.get_carray('y')
-            self.dst_z = dst_pa.get_carray('z')
-            self.dst_h = dst_pa.get_carray('h')
-
-            self.dst_x_ptr = <double*> self.dst_x.data
-            self.dst_y_ptr = <double*> self.dst_y.data
-            self.dst_z_ptr = <double*> self.dst_z.data
-            self.dst_h_ptr = <double*> self.dst_h.data
-
-            num_particles_dst = dst_pa.get_number_of_particles()
-
-            self.h_max = MAX(
-                    max_arr(self.dst_h_ptr, num_particles_dst),
-                    max_arr(self.src_h_ptr, num_particles_src)
-                    )
-            self.x_min = MIN(
-                    min_arr(self.dst_x_ptr, num_particles_dst),
-                    min_arr(self.src_x_ptr, num_particles_src)
-                    )
-            self.y_min = MIN(
-                    min_arr(self.dst_y_ptr, num_particles_dst),
-                    min_arr(self.src_y_ptr, num_particles_src)
-                    )
-            self.z_min = MIN(
-                    min_arr(self.dst_z_ptr, num_particles_dst),
-                    min_arr(self.src_z_ptr, num_particles_src)
-                    )
-        else:
-            self.h_max = max_arr(self.src_h_ptr, num_particles_src)
-            self.x_min = min_arr(self.src_x_ptr, num_particles_src)
-            self.y_min = min_arr(self.src_y_ptr, num_particles_src)
-            self.z_min = min_arr(self.src_z_ptr, num_particles_src)
-            self.dst_x_ptr = self.src_x_ptr
-            self.dst_y_ptr = self.src_y_ptr
-            self.dst_z_ptr = self.src_z_ptr
-            self.dst_h_ptr = self.src_h_ptr
-
-        self.current_hash.set_up(self.src_x_ptr, self.src_y_ptr, self.src_z_ptr,
-            self.src_h_ptr, num_particles_src, self.h_max, self.x_min,
-            self.y_min, self.z_min, self.radius_scale, self.table_size)
+        self.dst_x_ptr = <double*> self.dst.x.data
+        self.dst_y_ptr = <double*> self.dst.y.data
+        self.dst_z_ptr = <double*> self.dst.z.data
+        self.dst_h_ptr = <double*> self.dst.h.data
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -2265,4 +2185,22 @@ cdef class SpatialHashNNPS(NNPS):
             nbrs.c_reset()
 
         self.find_nearest_neighbors(d_idx, nbrs)
+
+    cpdef _refresh(self):
+        pass
+
+    cdef void _c_bin(self, int pa_index, UIntArray indices):
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+
+        cdef int num_particles = indices.length
+        cdef SpatialHash _hash = SpatialHash()
+        cdef double* xmin = self.xmin.data
+
+        _hash.set_up(pa_wrapper, self.cell_size, xmin[0], xmin[1], xmin[2],
+                self.radius_scale, self.table_size)
+
+        self.hash_list[pa_index] = _hash
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        self._c_bin(pa_index, indices)
 

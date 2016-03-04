@@ -18,15 +18,9 @@ cdef extern from "utils.h":
         void add(int, int, int, int) nogil
         vector[unsigned int] &get(int, int, int) nogil
 
-    cdef inline double max_arr(double*, int) nogil
-    cdef inline double min_arr(double*, int) nogil
-
 
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
-cdef inline void get_cell_id(double x, double y, double z,
-        double x_min, double y_min, double z_min, double h,
-        int* c_x, int* c_y, int* c_z) nogil
 
 cpdef UIntArray arange_uint(int start, int stop=*)
 
@@ -260,15 +254,17 @@ cdef class SpatialHash:
     cdef double* z_ptr
     cdef double* h_ptr
 
+    cdef NNPSParticleArrayWrapper pa_wrapper
+
     cdef bint alloc     #HashTable allocated or not
 
     ##########################################################################
     # Member functions
     ##########################################################################
 
-    cdef void set_up(self, double* x_ptr, double* y_ptr, double* z_ptr, double* h_ptr,
-            int num_particles, double h_max, double x_min, double y_min, double z_min,
-            double radius_scale = *, long long int table_size = *) nogil
+    cdef void set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
+            double x_min, double y_min, double z_min,
+            double radius_scale = *, long long int table_size = *)
 
     cdef inline void add_to_hashtable(self, unsigned int pid,
             int i, int j, int k) nogil
@@ -289,36 +285,33 @@ cdef class SpatialHashNNPS(NNPS):
     cdef double h_max, x_min, y_min, z_min      # Max and min attributes
     cdef long long int table_size               # Size of hashtable
 
-    cdef DoubleArray dst_x, dst_y, dst_z, dst_h # Destination properties
-    cdef DoubleArray src_x, src_y, src_z, src_h # Source properties
-
     # Pointers to destination ParticleArray properties
     cdef double* dst_x_ptr
     cdef double* dst_y_ptr
     cdef double* dst_z_ptr
     cdef double* dst_h_ptr
 
-    # Pointers to source ParticleArray properties
-    cdef double* src_x_ptr
-    cdef double* src_y_ptr
-    cdef double* src_z_ptr
-    cdef double* src_h_ptr
-
     # Current SpatialHash object
     cdef SpatialHash current_hash
+    cdef NNPSParticleArrayWrapper dst
+    cdef list hash_list
 
     ##########################################################################
     # Member functions
     ##########################################################################
 
-    cdef void c_set_context(self, int src, int dst)
+    cdef void c_set_context(self, int src_index, int dst_index)
 
-    cpdef set_context(self, int src, int dst)
+    cpdef set_context(self, int src_index, int dst_index)
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
+    cpdef _refresh(self)
 
+    cdef void _c_bin(self, int pa_index, UIntArray indices)
+
+    cpdef _bin(self, int pa_index, UIntArray indices)
 
