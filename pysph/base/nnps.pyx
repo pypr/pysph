@@ -2129,21 +2129,19 @@ cdef class SpatialHashNNPS(NNPS):
 
         self.table_size = table_size
 
-        cdef int i
-        cdef SpatialHash _hash
+        self.current_hash = SpatialHash()
         self.hash_list = []
-        for i from 0<=i<self.narrays:
-            _hash = SpatialHash()
-            self.hash_list.append(_hash)
         self.sort_gids = sort_gids
-
         self.domain.update()
         self.update()
 
     cdef void c_set_context(self, int src_index, int dst_index):
         NNPS.set_context(self, src_index, dst_index)
-
+        self.current_hash.c_reset()
         self.current_hash = <SpatialHash> self.hash_list[src_index]
+
+        self.src = self.current_hash.pa_wrapper
+        self.dst = self.pa_wrappers[dst_index]
 
         self.dst_x_ptr = <double*> self.dst.x.data
         self.dst_y_ptr = <double*> self.dst.y.data
@@ -2209,17 +2207,18 @@ cdef class SpatialHashNNPS(NNPS):
 
     cpdef _refresh(self):
         cdef int i
-        for i from 0<=i<self.narrays:
+        cdef int num_hash = len(self.hash_list)
+        for i from 0<=i<num_hash:
             self.hash_list[i].reset()
 
     cdef void _c_bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
         cdef double* xmin = self.xmin.data
-
         cdef SpatialHash _hash = SpatialHash()
-        self.hash_list[pa_index].set_up(pa_wrapper, self.cell_size,
+        _hash.set_up(pa_wrapper, self.cell_size,
                 xmin[0], xmin[1], xmin[2], radius_scale = self.radius_scale,
                 table_size = self.table_size)
+        self.hash_list.append(_hash)
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         self._c_bin(pa_index, indices)
