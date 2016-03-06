@@ -2060,10 +2060,10 @@ cdef class SpatialHashNNPS(NNPS):
 
         Parameters
         ----------
-        src: int
+        src_index: int
             Index in the list of particle arrays to which the neighbors belong
 
-        dst: int
+        dst_index: int
             Index in the list of particle arrays to which the query point belongs
 
         """
@@ -2140,21 +2140,21 @@ cdef class SpatialHashNNPS(NNPS):
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
-        """Find nearest neighbors for particle id 'qid'
+        """Find nearest neighbors for particle id 'd_idx' without cache
 
         Parameters
         ----------
-        src: int
+        src_index: int
             Index in the list of particle arrays to which the neighbors belong
 
-        dst: int
+        dst_index: int
             Index in the list of particle arrays to which the query point belongs
 
-        qid: unsigned int
-            Index of the query point in the 'dst' particle array
+        d_idx: size_t
+            Index of the query point in the destination particle array
 
         nbrs: UIntArray
-            Array to be populated by nearest neighbors of 'qid'
+            Array to be populated by nearest neighbors of 'd_idx'
 
         """
         self.c_set_context(src_index, dst_index)
