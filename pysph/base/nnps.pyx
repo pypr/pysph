@@ -19,7 +19,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
-from cpython.list cimport PyList_GetItem, PyList_SetItem
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 
 # Cython for compiler directives
 cimport cython
@@ -2042,8 +2042,8 @@ cdef class SpatialHashNNPS(NNPS):
         self.current_hash = self.hashtable[src_index]
         self.context_id = dst_index*self.narrays + src_index
 
-        self.dst = self.pa_wrappers[dst_index]
-        self.src = self.pa_wrappers[src_index]
+        self.dst = <NNPSParticleArrayWrapper> PyList_GetItem(self.pa_wrappers, dst_index)
+        self.src = <NNPSParticleArrayWrapper> PyList_GetItem(self.pa_wrappers, src_index)
 
         self.dst_x_ptr = <double*> self.dst.x.data
         self.dst_y_ptr = <double*> self.dst.y.data
@@ -2173,7 +2173,8 @@ cdef class SpatialHashNNPS(NNPS):
             self.hashtable[i] = new HashTable(self.table_size)
 
     cdef void _c_bin(self, int pa_index, UIntArray indices):
-        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        cdef NNPSParticleArrayWrapper pa_wrapper = \
+                <NNPSParticleArrayWrapper> PyList_GET_ITEM(self.pa_wrappers, pa_index)
 
         cdef double* src_x_ptr = pa_wrapper.x.data
         cdef double* src_y_ptr = pa_wrapper.y.data
