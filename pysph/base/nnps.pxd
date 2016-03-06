@@ -240,47 +240,6 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     ############################################################################
     cdef public map[long, int] cell_to_index  # Maps cell ID to an index
 
-cdef class SpatialHash:
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef double h_max, x_min, y_min, z_min, radius_scale2    # ParticleArray properties
-    cdef HashTable* hashtable   # Hash table to store elements in corresponding cells
-
-    # Pointers to ParticleArray properties
-    cdef double* x_ptr
-    cdef double* y_ptr
-    cdef double* z_ptr
-    cdef double* h_ptr
-
-    cdef NNPSParticleArrayWrapper pa_wrapper
-
-    cdef bint alloc     #HashTable allocated or not
-
-    ##########################################################################
-    # Member functions
-    ##########################################################################
-
-    cdef void c_set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
-            double x_min, double y_min, double z_min,
-            double radius_scale = *, long long int table_size = *)
-
-    cpdef set_up(self, NNPSParticleArrayWrapper pa_wrapper, double h_max,
-            double x_min, double y_min, double z_min,
-            double radius_scale = *, long long int table_size = *)
-
-    cdef inline void add_to_hashtable(self, unsigned int pid,
-            int i, int j, int k) nogil
-
-    cdef int neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
-
-    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
-            UIntArray nbrs) nogil
-
-    cdef void c_reset(self)
-    cpdef reset(self)
-
 # NNPS using Spatial Hashing algorithm
 cdef class SpatialHashNNPS(NNPS):
     ############################################################################
@@ -288,16 +247,24 @@ cdef class SpatialHashNNPS(NNPS):
     ############################################################################
     cdef long long int table_size               # Size of hashtable
 
+    cdef double radius_scale2
+
+    cdef HashTable** hashtable
+    cdef HashTable* current_hash
+
     # Pointers to destination ParticleArray properties
     cdef double* dst_x_ptr
     cdef double* dst_y_ptr
     cdef double* dst_z_ptr
     cdef double* dst_h_ptr
 
+    cdef double* src_x_ptr
+    cdef double* src_y_ptr
+    cdef double* src_z_ptr
+    cdef double* src_h_ptr
+
     # Current SpatialHash object
-    cdef SpatialHash current_hash
     cdef NNPSParticleArrayWrapper dst, src
-    cdef list hash_list
 
     ##########################################################################
     # Member functions
@@ -308,6 +275,16 @@ cdef class SpatialHashNNPS(NNPS):
     cpdef set_context(self, int src_index, int dst_index)
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+    cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
+            int i, int j, int k) nogil
+
+    cdef int neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil
+
+    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
+            UIntArray nbrs) nogil
+
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)

@@ -47,6 +47,7 @@ private:
     vector <unsigned int> NULL_vector;
 public:
     long long int table_size;
+    
     HashTable(long long int table_size)
     {
         this->table_size = table_size;
