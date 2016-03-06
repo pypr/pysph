@@ -246,7 +246,7 @@ cdef class SpatialHashNNPS(NNPS):
     # Data Attributes
     ############################################################################
     cdef long long int table_size               # Size of hashtable
-
+    cdef int context_id
     cdef double radius_scale2
 
     cdef HashTable** hashtable

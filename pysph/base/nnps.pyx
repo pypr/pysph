@@ -2026,6 +2026,7 @@ cdef class SpatialHashNNPS(NNPS):
             self.hashtable[i] = new HashTable(table_size)
 
         self.current_hash = NULL
+        self.context_id = -1
         self.sort_gids = sort_gids
         self.domain.update()
         self.update()
@@ -2035,8 +2036,11 @@ cdef class SpatialHashNNPS(NNPS):
         self.hashtable[hash_id].add(i,j,k,pid)
 
     cdef void c_set_context(self, int src_index, int dst_index):
+        if self.context_id == (dst_index*self.narrays + src_index):
+            return
         NNPS.set_context(self, src_index, dst_index)
         self.current_hash = self.hashtable[src_index]
+        self.context_id = dst_index*self.narrays + src_index
 
         self.dst = self.pa_wrappers[dst_index]
         self.src = self.pa_wrappers[src_index]
@@ -2118,12 +2122,12 @@ cdef class SpatialHashNNPS(NNPS):
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
 
-
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
         cdef double q_x = self.dst_x_ptr[d_idx]
         cdef double q_y = self.dst_y_ptr[d_idx]
         cdef double q_z = self.dst_z_ptr[d_idx]
         cdef double q_h = self.dst_h_ptr[d_idx]
+
         cdef unsigned int* s_gid = self.src.gid.data
         cdef int orig_length = nbrs.length
 
