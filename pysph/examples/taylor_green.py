@@ -10,6 +10,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import QuinticSpline
 from pysph.solver.application import Application
 
+from pysph.sph.equation import Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 
 
@@ -19,14 +20,36 @@ rho0 = 1.0; c0 = 10 * U
 p0 = c0**2 * rho0
 
 
-def exact_velocity(U, b, t, x, y):
+def exact_solution(U, b, t, x, y):
     pi = np.pi; sin = np.sin; cos = np.cos
     factor = U * np.exp(b*t)
 
     u = -cos( 2 * pi * x ) * sin( 2 * pi * y)
     v = sin( 2 * pi * x ) * cos( 2 * pi * y)
+    p = -0.25*(cos(4*pi*x) + cos(4*pi*y))
 
-    return factor * u, factor * v
+    return factor * u, factor * v, factor*factor*p
+
+
+class ComputeAveragePressure(Equation):
+    """Simple function to compute the average pressure at each particle.
+
+    This is used for the Basa, Quinlan and Lastiwka correction from their 2009
+    paper.  This equation should be in a separate group and computed before the
+    Momentum equation.
+    """
+    def initialize(self, d_idx, d_pavg, d_nnbr):
+        d_pavg[d_idx] = 0.0
+        d_nnbr[d_idx] = 0.0
+
+    def loop(self, d_idx, d_pavg, s_idx, s_p, d_nnbr):
+        d_pavg[d_idx] += s_p[s_idx]
+        d_nnbr[d_idx] += 1.0
+
+    def post_loop(self, d_idx, d_pavg, d_nnbr):
+        if d_nnbr[d_idx] > 0:
+            d_pavg[d_idx] /= d_nnbr[d_idx]
+
 
 
 class TaylorGreen(Application):
@@ -163,6 +186,44 @@ class TaylorGreen(Application):
         # return the particle list
         return [fluid]
 
+
+    #####  The following are all related to post-processing.  #####
+    def _get_post_process_props(self, array):
+        """Return x, y, m, u, v, p.
+        """
+        if 'pavg' not in array.properties and \
+           'pavg' not in array.output_property_arrays:
+            self._add_extra_props(array)
+            sph_eval = self._get_sph_evaluator(array)
+            sph_eval.update_particle_arrays([array])
+            sph_eval.evaluate()
+
+        x, y, m, u, v, p, pavg = array.get(
+            'x', 'y', 'm', 'u', 'v', 'p', 'pavg'
+        )
+        return x, y, m, u, v, p - pavg
+
+    def _add_extra_props(self, array):
+        extra = ['pavg', 'nnbr']
+        for prop in extra:
+            if not prop in array.properties:
+                array.add_property(prop)
+        array.add_output_arrays(extra)
+
+    def _get_sph_evaluator(self, array):
+        if not hasattr(self, '_sph_eval'):
+            from pysph.tools.sph_evaluator import SPHEvaluator
+            equations = [
+                ComputeAveragePressure(dest='fluid', sources=['fluid'])
+            ]
+            dm = self.create_domain()
+            sph_eval = SPHEvaluator(
+                arrays=[array], equations=equations, dim=2,
+                kernel=QuinticSpline(dim=2), domain_manager=dm
+            )
+            self._sph_eval = sph_eval
+        return self._sph_eval
+
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
         if len(self.output_files) == 0:
@@ -172,12 +233,12 @@ class TaylorGreen(Application):
         decay_rate = -8.0 * np.pi**2/self.options.re
 
         files = self.output_files
-        t, ke, ke_ex, decay, linf, l1 = [], [], [], [], [], []
+        t, ke, ke_ex, decay, linf, l1, p_l1 = [], [], [], [], [], [], []
         for sd, array in iter_output(files, 'fluid'):
             _t = sd['t']
             t.append(_t)
-            m, u, v, x, y = array.get('m', 'u', 'v', 'x', 'y')
-            u_e, v_e = exact_velocity(U, decay_rate, _t, x, y)
+            x, y, m, u, v, p = self._get_post_process_props(array)
+            u_e, v_e, p_e = exact_solution(U, decay_rate, _t, x, y)
             vmag2 = u**2 + v**2
             vmag = np.sqrt(vmag2)
             ke.append(0.5*np.sum(m*vmag2))
@@ -195,13 +256,19 @@ class TaylorGreen(Application):
             # scale the error by the maximum velocity.
             l1.append(l1_err/avg_vmag_e)
 
-        t, ke, ke_ex, decay, l1, linf = list(map(
-            np.asarray, (t, ke, ke_ex, decay, l1, linf))
+            p_e_max = np.abs(p_e).max()
+            p_error = np.average(np.abs(p - p_e))/p_e_max
+            p_l1.append(p_error)
+
+        t, ke, ke_ex, decay, l1, linf, p_l1 = list(map(
+            np.asarray, (t, ke, ke_ex, decay, l1, linf, p_l1))
         )
         decay_ex = U*np.exp(decay_rate*t)
         fname = os.path.join(self.output_dir, 'results.npz')
-        np.savez(fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
-                 decay_ex=decay_ex)
+        np.savez(
+            fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
+            p_l1=p_l1, decay_ex=decay_ex
+        )
 
         import matplotlib
         matplotlib.use('Agg')
@@ -225,6 +292,12 @@ class TaylorGreen(Application):
         plt.plot(t, l1, label="error")
         plt.xlabel('t'); plt.ylabel(r'$L_1$ error')
         fig = os.path.join(self.output_dir, "l1_error.png")
+        plt.savefig(fig, dpi=300)
+
+        plt.clf()
+        plt.plot(t, p_l1, label="error")
+        plt.xlabel('t'); plt.ylabel(r'$L_1$ error for $p$')
+        fig = os.path.join(self.output_dir, "p_l1_error.png")
         plt.savefig(fig, dpi=300)
 
 
