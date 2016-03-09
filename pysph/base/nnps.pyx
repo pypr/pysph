@@ -2042,8 +2042,10 @@ cdef class SpatialHashNNPS(NNPS):
         self.current_hash = self.hashtable[src_index]
         self.context_id = dst_index*self.narrays + src_index
 
-        self.dst = <NNPSParticleArrayWrapper> PyList_GetItem(self.pa_wrappers, dst_index)
-        self.src = <NNPSParticleArrayWrapper> PyList_GetItem(self.pa_wrappers, src_index)
+        self.dst = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, dst_index)
+        self.src = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, src_index)
 
         self.dst_x_ptr = <double*> self.dst.x.data
         self.dst_y_ptr = <double*> self.dst.y.data
@@ -2069,7 +2071,7 @@ cdef class SpatialHashNNPS(NNPS):
         """
         self.c_set_context(src_index, dst_index)
 
-    cdef int neighbor_boxes(self, int i, int j, int k,
+    cdef inline int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int p, q, r
