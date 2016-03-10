@@ -1096,7 +1096,7 @@ cdef class NNPS:
         cdef int idx = dst_index*self.narrays + src_index
         if self.use_cache:
             if self.src_index != src_index \
-                and self.dst_index != dst_index:
+                or self.dst_index != dst_index:
                 self.set_context(src_index, dst_index)
             return self.cache[idx].get_neighbors(src_index, d_idx, nbrs)
         else:
@@ -2025,8 +2025,9 @@ cdef class SpatialHashNNPS(NNPS):
         for i from 0<=i<self.narrays:
             self.hashtable[i] = new HashTable(table_size)
 
+        self.src_index = -1
+        self.dst_index = -1
         self.current_hash = NULL
-        self.context_id = -1
         self.sort_gids = sort_gids
         self.domain.update()
         self.update()
@@ -2036,11 +2037,10 @@ cdef class SpatialHashNNPS(NNPS):
         self.hashtable[hash_id].add(i,j,k,pid)
 
     cdef void c_set_context(self, int src_index, int dst_index):
-        if self.context_id == (dst_index*self.narrays + src_index):
+        if (self.src_index == src_index) and (self.dst_index == dst_index):
             return
         NNPS.set_context(self, src_index, dst_index)
         self.current_hash = self.hashtable[src_index]
-        self.context_id = dst_index*self.narrays + src_index
 
         self.dst = <NNPSParticleArrayWrapper> \
                 PyList_GetItem(self.pa_wrappers, dst_index)
