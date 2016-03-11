@@ -252,18 +252,6 @@ cdef class SpatialHashNNPS(NNPS):
     cdef HashTable** hashtable
     cdef HashTable* current_hash
 
-    # Pointers to destination ParticleArray properties
-    cdef double* dst_x_ptr
-    cdef double* dst_y_ptr
-    cdef double* dst_z_ptr
-    cdef double* dst_h_ptr
-
-    cdef double* src_x_ptr
-    cdef double* src_y_ptr
-    cdef double* src_z_ptr
-    cdef double* src_h_ptr
-
-    # Current SpatialHash object
     cdef NNPSParticleArrayWrapper dst, src
 
     ##########################################################################

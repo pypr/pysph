@@ -2048,16 +2048,6 @@ cdef class SpatialHashNNPS(NNPS):
         self.src = <NNPSParticleArrayWrapper> \
                 PyList_GetItem(self.pa_wrappers, src_index)
 
-        self.dst_x_ptr = <double*> self.dst.x.data
-        self.dst_y_ptr = <double*> self.dst.y.data
-        self.dst_z_ptr = <double*> self.dst.z.data
-        self.dst_h_ptr = <double*> self.dst.h.data
-
-        self.src_x_ptr = <double*> self.src.x.data
-        self.src_y_ptr = <double*> self.src.y.data
-        self.src_z_ptr = <double*> self.src.z.data
-        self.src_h_ptr = <double*> self.src.h.data
-
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
 
@@ -2093,10 +2083,20 @@ cdef class SpatialHashNNPS(NNPS):
         neighbors to it.
 
         """
-        cdef double x = self.dst_x_ptr[d_idx]
-        cdef double y = self.dst_y_ptr[d_idx]
-        cdef double z = self.dst_z_ptr[d_idx]
-        cdef double h = self.dst_h_ptr[d_idx]
+        cdef double* dst_x_ptr = self.dst.x.data
+        cdef double* dst_y_ptr = self.dst.y.data
+        cdef double* dst_z_ptr = self.dst.z.data
+        cdef double* dst_h_ptr = self.dst.h.data
+
+        cdef double* src_x_ptr = self.src.x.data
+        cdef double* src_y_ptr = self.src.y.data
+        cdef double* src_z_ptr = self.src.z.data
+        cdef double* src_h_ptr = self.src.h.data
+
+        cdef double x = dst_x_ptr[d_idx]
+        cdef double y = dst_y_ptr[d_idx]
+        cdef double z = dst_z_ptr[d_idx]
+        cdef double h = dst_h_ptr[d_idx]
 
         cdef unsigned int* s_gid = self.src.gid.data
         cdef int orig_length = nbrs.length
@@ -2129,11 +2129,11 @@ cdef class SpatialHashNNPS(NNPS):
             candidate_size = candidates.size()
             for j from 0<=j<candidate_size:
                 k = candidates[j]
-                hj2 = self.radius_scale2*self.src_h_ptr[k]*self.src_h_ptr[k]
+                hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
-                        self.src_x_ptr[k] - x,
-                        self.src_y_ptr[k] - y,
-                        self.src_z_ptr[k] - z
+                        src_x_ptr[k] - x,
+                        src_y_ptr[k] - y,
+                        src_z_ptr[k] - z
                         )
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
