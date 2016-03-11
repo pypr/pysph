@@ -268,7 +268,7 @@ def get_basic_extensions():
                 "pysph/base/particle_array",
             ),
             include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_compile_args=extra_compile_args + openmp_compile_args + ["-std=c++11"],
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
             language="c++"

@@ -2,6 +2,7 @@
 cimport numpy as np
 
 from libcpp.map cimport map
+from libcpp.unordered_map cimport unordered_map
 from libcpp.vector cimport vector
 
 # PyZoltan CArrays
@@ -238,7 +239,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public map[long, int] cell_to_index  # Maps cell ID to an index
+    cdef public unordered_map[long, int] cell_to_index  # Maps cell ID to an index
 
 # NNPS using Spatial Hashing algorithm
 cdef class SpatialHashNNPS(NNPS):
@@ -280,10 +281,6 @@ cdef class SpatialHashNNPS(NNPS):
 
     cdef int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
-
-    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
-            UIntArray nbrs) nogil
-
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)

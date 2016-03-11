@@ -10,6 +10,7 @@ from cython.parallel import parallel, prange, threadid
 # malloc and friends
 from libc.stdlib cimport malloc, free
 from libcpp.map cimport map
+from libcpp.unordered_map cimport unordered_map
 from libcpp.pair cimport pair
 from libcpp.vector cimport vector
 
@@ -1940,7 +1941,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
                 is_valid = False
 
         # Given the validity of the cells, return the flattened cell index
-        cdef map[long, int].iterator it
+        cdef unordered_map[long, int].iterator it
         if is_valid:
             cell_id = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
             if cell_id > -1:
@@ -1964,7 +1965,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
         cdef cPoint pnt = cPoint_new(0, 0, 0)
         cdef long _cid
-        cdef map[long, int] _cid_to_index
+        cdef unordered_map[long, int] _cid_to_index
         cdef pair[long, int] _entry
 
         # flattened cell index
@@ -1991,7 +1992,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
                 _entry.second = 1
                 _cid_to_index.insert(_entry)
 
-        cdef map[long, int].iterator it = _cid_to_index.begin()
+        cdef unordered_map[long, int].iterator it = _cid_to_index.begin()
         cdef int count = 0
         while it != _cid_to_index.end():
             _entry = deref(it)
@@ -2085,8 +2086,21 @@ cdef class SpatialHashNNPS(NNPS):
                         length += 1
         return length
 
-    cdef void c_nearest_neighbors(self, double x, double y, double z, double h,
-            UIntArray nbrs) nogil:
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        """Low level, high-performance non-gil method to find neighbors.
+        This requires that `set_context()` be called beforehand.  This method
+        does not reset the neighbors array before it appends the
+        neighbors to it.
+
+        """
+        cdef double x = self.dst_x_ptr[d_idx]
+        cdef double y = self.dst_y_ptr[d_idx]
+        cdef double z = self.dst_z_ptr[d_idx]
+        cdef double h = self.dst_h_ptr[d_idx]
+
+        cdef unsigned int* s_gid = self.src.gid.data
+        cdef int orig_length = nbrs.length
+
         cdef int c_x, c_y, c_z
         cdef double* xmin = self.xmin.data
         cdef unsigned int i, j, k
@@ -2123,17 +2137,6 @@ cdef class SpatialHashNNPS(NNPS):
                         )
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
-
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
-        cdef double q_x = self.dst_x_ptr[d_idx]
-        cdef double q_y = self.dst_y_ptr[d_idx]
-        cdef double q_z = self.dst_z_ptr[d_idx]
-        cdef double q_h = self.dst_h_ptr[d_idx]
-
-        cdef unsigned int* s_gid = self.src.gid.data
-        cdef int orig_length = nbrs.length
-
-        self.c_nearest_neighbors(q_x, q_y, q_z, q_h, nbrs)
 
         if self.sort_gids:
             self._sort_neighbors(
