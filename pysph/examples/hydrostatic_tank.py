@@ -66,7 +66,7 @@ from pysph.sph.basic_equations import XSPHCorrection, \
 Lx = 2.0; Ly = 1.0; H = 0.9
 gy = -1.0
 Vmax = np.sqrt(abs(gy) * H)
-c0 = 10 * Vmax; rho0 = 1.0
+c0 = 10 * Vmax; rho0 = 1000.0
 p0 = c0*c0*rho0
 gamma = 1.0
 
