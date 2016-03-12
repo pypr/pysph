@@ -2,7 +2,6 @@
 cimport numpy as np
 
 from libcpp.map cimport map
-from libcpp.unordered_map cimport unordered_map
 from libcpp.vector cimport vector
 
 # PyZoltan CArrays
@@ -239,7 +238,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef public unordered_map[long, int] cell_to_index  # Maps cell ID to an index
+    cdef public map[long, int] cell_to_index  # Maps cell ID to an index
 
 # NNPS using Spatial Hashing algorithm
 cdef class SpatialHashNNPS(NNPS):

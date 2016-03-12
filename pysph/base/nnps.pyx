@@ -10,7 +10,6 @@ from cython.parallel import parallel, prange, threadid
 # malloc and friends
 from libc.stdlib cimport malloc, free
 from libcpp.map cimport map
-from libcpp.unordered_map cimport unordered_map
 from libcpp.pair cimport pair
 from libcpp.vector cimport vector
 
@@ -1941,7 +1940,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
                 is_valid = False
 
         # Given the validity of the cells, return the flattened cell index
-        cdef unordered_map[long, int].iterator it
+        cdef map[long, int].iterator it
         if is_valid:
             cell_id = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
             if cell_id > -1:
@@ -1965,7 +1964,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
 
         cdef cPoint pnt = cPoint_new(0, 0, 0)
         cdef long _cid
-        cdef unordered_map[long, int] _cid_to_index
+        cdef map[long, int] _cid_to_index
         cdef pair[long, int] _entry
 
         # flattened cell index
@@ -1992,7 +1991,7 @@ cdef class BoxSortNNPS(LinkedListNNPS):
                 _entry.second = 1
                 _cid_to_index.insert(_entry)
 
-        cdef unordered_map[long, int].iterator it = _cid_to_index.begin()
+        cdef map[long, int].iterator it = _cid_to_index.begin()
         cdef int count = 0
         while it != _cid_to_index.end():
             _entry = deref(it)
