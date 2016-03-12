@@ -213,7 +213,7 @@ cdef inline int real_to_int(double real_val, double step) nogil:
     return ret_val
 
 
-cdef void find_cell_id_raw(double x, double y, double z, double
+cdef inline void find_cell_id_raw(double x, double y, double z, double
                            cell_size, int *ix, int *iy, int *iz) nogil:
     """ Find the cell index for the corresponding point
 
@@ -2104,7 +2104,7 @@ cdef class SpatialHashNNPS(NNPS):
         cdef int c_x, c_y, c_z
         cdef double* xmin = self.xmin.data
         cdef unsigned int i, j, k
-        cdef vector[unsigned int] candidates
+        cdef vector[unsigned int] *candidates
         find_cell_id_raw(
                 x - xmin[0],
                 y - xmin[1],
@@ -2126,9 +2126,11 @@ cdef class SpatialHashNNPS(NNPS):
 
         for i from 0<=i<num_boxes:
             candidates = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
+            if candidates == NULL:
+                continue
             candidate_size = candidates.size()
             for j from 0<=j<candidate_size:
-                k = candidates[j]
+                k = (candidates[0])[j]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - x,
@@ -2193,7 +2195,7 @@ cdef class SpatialHashNNPS(NNPS):
         cdef unsigned int idx
 
         for i from 0<=i<num_indices:
-            idx = indices[i]
+            idx = indices.data[i]
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],
                     src_y_ptr[idx] - xmin[1],

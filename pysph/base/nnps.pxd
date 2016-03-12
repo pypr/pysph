@@ -17,7 +17,7 @@ cdef extern from "spatial_hash.h":
     cdef cppclass HashTable:
         HashTable(long int) nogil except +
         void add(int, int, int, int) nogil
-        vector[unsigned int] &get(int, int, int) nogil
+        vector[unsigned int] *get(int, int, int) nogil
 
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)

@@ -34,9 +34,9 @@ public:
         return this->key;
     }
 
-    inline vector <unsigned int> &get_value()
+    inline vector <unsigned int> *get_value()
     {
-        return this->indices;
+        return &this->indices;
     } 
 };
 
@@ -52,7 +52,6 @@ public:
     {
         this->table_size = table_size;
         this->hashtable = new HashEntry*[table_size];
-        this->NULL_vector = vector <unsigned int> ();
         for(int i=0; i<table_size; i++)
         {
             this->hashtable[i] = NULL;
@@ -88,7 +87,7 @@ public:
         }
     }
 
-    vector <unsigned int> &get(int i, int j, int k)
+    vector <unsigned int> *get(int i, int j, int k)
     {
         long long int key = this->hash(i,j,k);
         HashEntry* entry = this->hashtable[key];
@@ -98,7 +97,7 @@ public:
                 return entry->get_value();
             entry = entry->next;
         }
-        return this->NULL_vector;
+        return NULL;
     }
 
     ~HashTable()
