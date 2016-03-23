@@ -26,7 +26,9 @@ For the fluid dynamics, we use the multi-phase formulation presented
 in REF1.
 
 """
-# NumPy
+
+import os.path
+
 import numpy as np
 
 # PyZoltan imports
@@ -82,8 +84,18 @@ dt_cfl = 0.25 * h0/( c0 + Vmax )
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(gy))
 
+tdamp = 1.0
 tf = 2.0
 dt = 0.75 * min(dt_cfl, dt_viscous, dt_force)
+output_at_times = np.arange(0.25, 2.1, 0.25)
+
+
+def damping_factor(t, tdamp):
+    if t < tdamp:
+        return 0.5 * ( np.sin((-0.5 + t/tdamp)*np.pi)+ 1.0 )
+    else:
+        return 1.0
+
 
 class HydrostaticTank(Application):
     def add_user_options(self, group):
@@ -171,7 +183,7 @@ class HydrostaticTank(Application):
 
         # Create a solver.
         solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=tf, dt=dt)
+                        tf=tf, dt=dt, output_at_times=output_at_times)
         return solver
 
     def create_equations(self):
@@ -206,11 +218,11 @@ class HydrostaticTank(Application):
                     # Pressure gradient with acceleration damping.
                     MomentumEquationPressureGradient(
                         dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                        tdamp=1.0),
+                        tdamp=tdamp),
 
                     # artificial viscosity for stability
                     MomentumEquationArtificialViscosity(
-                        dest='fluid', sources=['fluid', 'solid'], alpha=0.25, c0=c0),
+                        dest='fluid', sources=['fluid', 'solid'], alpha=0.24, c0=c0),
 
                     # Position step with XSPH
                     XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
@@ -257,7 +269,7 @@ class HydrostaticTank(Application):
                     # Pressure gradient with acceleration damping.
                     MomentumEquationPressureGradient(
                         dest='fluid', sources=['fluid'], pb=0.0, gy=gy,
-                        tdamp=1.0),
+                        tdamp=tdamp),
 
                     # artificial viscosity for stability
                     MomentumEquationArtificialViscosity(
@@ -299,7 +311,7 @@ class HydrostaticTank(Application):
                     # Pressure gradient with acceleration damping.
                     MomentumEquationPressureGradient(
                         dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                        tdamp=1.0),
+                        tdamp=tdamp),
 
                     # artificial viscosity for stability
                     MomentumEquationArtificialViscosity(
@@ -318,6 +330,59 @@ class HydrostaticTank(Application):
         elif self.options.bc_type == 3:
             return equations3
 
+    def post_process(self, info_fname):
+        self.read_info(info_fname)
+        if len(self.output_files) == 0:
+            return
+
+        from pysph.tools.interpolator import Interpolator
+        from pysph.solver.utils import iter_output
+        files = self.output_files
+        y = np.linspace(0, 0.9, 20)
+        x = np.ones_like(y)
+        interp = None
+        t, p, p_ex = [], [], []
+        for sd, arrays in iter_output(files):
+            fluid, solid = arrays['fluid'], arrays['solid']
+            if interp is None:
+                interp = Interpolator([fluid, solid], x=x, y=y)
+            else:
+                interp.update_particle_arrays([fluid, solid])
+            t.append(sd['t'])
+            p.append(interp.interpolate('p'))
+            g = 1.0*damping_factor(t[-1], tdamp)
+            p_ex.append(abs(rho0*H*g))
+
+        t, p, p_ex = list(map(np.asarray, (t, p, p_ex)))
+        res = os.path.join(self.output_dir, 'results.npz')
+        np.savez(res, t=t, p=p, p_ex=p_ex, y=y)
+
+        import matplotlib
+        matplotlib.use('Agg')
+
+        pmax = abs(0.9*rho0*gy)
+
+        from matplotlib import pyplot as plt
+        plt.plot(t, p[:,0]/pmax, 'o-')
+        plt.xlabel(r'$t$'); plt.ylabel(r'$p$')
+        fig = os.path.join(self.output_dir, 'p_bottom.png')
+        plt.savefig(fig, dpi=300)
+
+        plt.clf()
+        output_at = np.arange(0.25, 2.1, 0.25)
+        count = 0
+        for i in range(len(t)):
+            if abs(t[i] - output_at[count]) < 1e-8:
+                plt.plot(y, p[i]/pmax, 'o', label='t=%.2f'%t[i])
+                plt.plot(y, p_ex[i]*(H-y)/(H*pmax), 'k-')
+                count += 1
+        plt.xlabel('$y$'); plt.ylabel('$p$')
+        plt.legend()
+        fig = os.path.join(self.output_dir, 'p_vs_y.png')
+        plt.savefig(fig, dpi=300)
+
+
 if __name__ == '__main__':
     app = HydrostaticTank()
     app.run()
+    app.post_process(app.info_filename)
