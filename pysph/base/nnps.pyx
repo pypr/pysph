@@ -2006,7 +2006,7 @@ cdef class SpatialHashNNPS(NNPS):
 
     """Nearest neighbor particle search using Spatial Hashing algorithm"""
 
-    def __cinit__(self, int dim, list particles, double radius_scale = 1,
+    def __init__(self, int dim, list particles, double radius_scale = 1,
             int ghost_layers = 1, domain=None,
             bint fixed_h = False, bint cache = False,
             bint sort_gids = False, long long int table_size = 131072):
@@ -2203,7 +2203,6 @@ cdef class SpatialHashNNPS(NNPS):
                     &c_x, &c_y, &c_z
                     )
             self.add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
-
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         self._c_bin(pa_index, indices)
