@@ -2006,7 +2006,7 @@ cdef class SpatialHashNNPS(NNPS):
 
     """Nearest neighbor particle search using Spatial Hashing algorithm"""
 
-    def __init__(self, int dim, list particles, double radius_scale = 1,
+    def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None,
             bint fixed_h = False, bint cache = False,
             bint sort_gids = False, long long int table_size = 131072):

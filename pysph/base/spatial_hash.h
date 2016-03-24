@@ -1,5 +1,5 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef SPATIAL_HASH_H
+#define SPATIAL_HASH_H
 #include <iostream>
 #include <vector>
 #include <algorithm>
@@ -44,7 +44,6 @@ class HashTable
 {
 private:
     HashEntry** hashtable;
-    vector <unsigned int> NULL_vector;
 public:
     long long int table_size;
     

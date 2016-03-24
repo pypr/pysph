@@ -76,9 +76,13 @@ class SimpleNNPSTestCase(unittest.TestCase):
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
+        self.sp_hash_nnps = nnps.SpatialHashNNPS(
+            dim=3, particles=[pa,], radius_scale=1.0
+        )
+
         # these are the expected cells
         self.expected_cells = {
-            IntPoint(-2, 0, 0):[0,6], 
+            IntPoint(-2, 0, 0):[0,6],
             IntPoint(0, -1, 0):[1,8],
             IntPoint(1, -2, 1):[2,],
             IntPoint(0, 1, -1):[3, 7, 9],
@@ -94,6 +98,9 @@ class SimpleNNPSTestCase(unittest.TestCase):
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
         nnps = self.ll_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
+        nnps = self.sp_hash_nnps
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
     def test_cells(self):
@@ -214,6 +221,13 @@ class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.SpatialHashNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
 
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
@@ -381,7 +395,7 @@ def test_1D_get_valid_cell_index():
     dim = 1
 
     # simulate a dummy distribution such that 10 cells are along the
-    # 'x' direction 
+    # 'x' direction
     n_cells = 10
     ncells_per_dim = IntArray(3)
 
