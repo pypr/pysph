@@ -278,3 +278,27 @@ cdef class SpatialHashNNPS(NNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices)
 
+cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef int H
+    cdef bint approximate
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+
+    cdef int h_mask_approx(self, int* x, int* y, int* z) nogil
+
+    cdef int h_mask_exact(self, int* x, int* y, int* z) nogil
+
+    cdef int neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+    cdef void _c_bin(self, int pa_index, UIntArray indices)
+
+    cpdef _bin(self, int pa_index, UIntArray indices)
+
