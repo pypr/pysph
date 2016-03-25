@@ -266,7 +266,7 @@ cdef class SpatialHashNNPS(NNPS):
     cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
             int i, int j, int k) nogil
 
-    cdef int neighbor_boxes(self, int i, int j, int k,
+    cdef inline int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
