@@ -2213,24 +2213,69 @@ cdef class SpatialHashNNPS(NNPS):
             del self.hashtable[i]
         free(self.hashtable)
 
-cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
-    '''
-    Finds nearest neighbors using Extended Spatial Hashing algorithm
-    '''
+cdef class ExtendedSpatialHashNNPS(NNPS):
+
+    """Finds nearest neighbors using Extended Spatial Hashing algorithm"""
+
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int H = 3, int ghost_layers = 1, domain=None, bint fixed_h = False,
             bint cache = False, bint sort_gids = False,
             long long int table_size = 131072, bint approximate = False):
-        SpatialHashNNPS.__init__(
+        NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            fixed_h, cache, sort_gids, table_size
+            cache, sort_gids
         )
 
+        self.table_size = table_size
         self.H = H
         self.approximate = approximate
 
+        self.radius_scale2 = radius_scale*radius_scale
+
+        self.hashtable = <HashTable**> malloc(self.narrays*sizeof(HashTable*))
+
+        cdef int i
+        for i from 0<=i<self.narrays:
+            self.hashtable[i] = new HashTable(table_size)
+
+        self.src_index = -1
+        self.dst_index = -1
+        self.current_hash = NULL
+        self.sort_gids = sort_gids
+        self.domain.update()
+        self.update()
+
+    cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
+            int i, int j, int k) nogil:
+        self.hashtable[hash_id].add(i,j,k,pid)
+
+    cdef void c_set_context(self, int src_index, int dst_index):
+        if (self.src_index == src_index) and (self.dst_index == dst_index):
+            return
+        NNPS.set_context(self, src_index, dst_index)
+        self.current_hash = self.hashtable[src_index]
+
+        self.dst = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, dst_index)
+        self.src = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, src_index)
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Set context for nearest neighbor searches.
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        """
+        self.c_set_context(src_index, dst_index)
+
     @cython.cdivision(True)
-    cdef int h_mask_approx(self, int* x, int* y, int* z) nogil:
+    cdef inline int h_mask_approx(self, int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -2248,7 +2293,7 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
 
         return length
 
-    cdef int h_mask_exact(self, int* x, int* y, int* z) nogil:
+    cdef inline int h_mask_exact(self, int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int s, t, u
 
@@ -2262,7 +2307,7 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
 
         return length
 
-    cdef int neighbor_boxes(self, int i, int j, int k,
+    cdef inline int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int p
@@ -2373,6 +2418,40 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
                 &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
             )
 
+    cpdef _refresh(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            del self.hashtable[i]
+            self.hashtable[i] = new HashTable(self.table_size)
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc):
+        """Find nearest neighbors for particle id 'd_idx' without cache
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        d_idx: size_t
+            Index of the query point in the destination particle array
+
+        nbrs: UIntArray
+            Array to be populated by nearest neighbors of 'd_idx'
+
+        """
+        self.c_set_context(src_index, dst_index)
+
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.c_reset()
+
+        self.find_nearest_neighbors(d_idx, nbrs)
+
     @cython.cdivision(True)
     cdef void _c_bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = \
@@ -2401,5 +2480,14 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
                     &c_x, &c_y, &c_z
                     )
             self.add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        self._c_bin(pa_index, indices)
+
+    def __dealloc__(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            del self.hashtable[i]
+        free(self.hashtable)
 
 
