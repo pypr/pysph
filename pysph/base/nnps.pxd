@@ -300,5 +300,4 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
 
     cdef void _c_bin(self, int pa_index, UIntArray indices)
 
-    cpdef _bin(self, int pa_index, UIntArray indices)
 

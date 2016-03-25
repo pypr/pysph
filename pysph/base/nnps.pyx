@@ -2223,7 +2223,7 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
             long long int table_size = 131072, bint approximate = False):
         SpatialHashNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, table_size
+            fixed_h, cache, sort_gids, table_size
         )
 
         self.H = H
@@ -2336,6 +2336,7 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
 
         cdef int candidate_size = 0
         cdef int mask_len = (2*self.H+1)*(2*self.H+1)*(2*self.H+1)
+
         cdef int* x_boxes = <int*> malloc(mask_len*sizeof(int))
         cdef int* y_boxes = <int*> malloc(mask_len*sizeof(int))
         cdef int* z_boxes = <int*> malloc(mask_len*sizeof(int))
@@ -2400,8 +2401,5 @@ cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
                     &c_x, &c_y, &c_z
                     )
             self.add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
-
-    cpdef _bin(self, int pa_index, UIntArray indices):
-        self._c_bin(pa_index, indices)
 
 
