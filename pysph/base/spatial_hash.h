@@ -57,7 +57,7 @@ public:
         }
     }
 
-    inline long long int hash(int i, int j, int k)
+    inline long long int hash(long long int i, long long int j, long long int k)
     {
         return ((i*p1)^(j*p2)^(k*p3))%this->table_size;
     }

@@ -291,13 +291,14 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
     cdef NNPSParticleArrayWrapper dst, src
 
     cdef int H
+    cdef double h_sub
     cdef bint approximate
 
     ##########################################################################
     # Member functions
     ##########################################################################
 
-    cdef void c_set_context(self, int src_index, int dst_index)
+    cdef inline void c_set_context(self, int src_index, int dst_index)
 
     cpdef set_context(self, int src_index, int dst_index)
 

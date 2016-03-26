@@ -2249,7 +2249,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
             int i, int j, int k) nogil:
         self.hashtable[hash_id].add(i,j,k,pid)
 
-    cdef void c_set_context(self, int src_index, int dst_index):
+    cdef inline void c_set_context(self, int src_index, int dst_index):
         if (self.src_index == src_index) and (self.dst_index == dst_index):
             return
         NNPS.set_context(self, src_index, dst_index)
@@ -2274,17 +2274,14 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         """
         self.c_set_context(src_index, dst_index)
 
-    @cython.cdivision(True)
     cdef inline int h_mask_approx(self, int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int s, t, u
 
-        cdef double h_sub = self.cell_size/self.H
-
         for s from -self.H<=s<=self.H:
             for t from -self.H<=t<=self.H:
                 for u from -self.H<=u<=self.H:
-                    if norm2(h_sub*s, h_sub*t, h_sub*u) \
+                    if norm2(self.h_sub*s, self.h_sub*t, self.h_sub*u) \
                         <= self.cell_size*self.cell_size:
                             x[length] = s
                             y[length] = t
@@ -2338,7 +2335,6 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
         return length
 
-    @cython.cdivision(True)
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
         """Low level, high-performance non-gil method to find neighbors.
         This requires that `set_context()` be called beforehand.  This method
@@ -2369,13 +2365,11 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef unsigned int i, j, k
         cdef vector[unsigned int] *candidates
 
-        cdef double h_sub = self.cell_size/self.H
-
         find_cell_id_raw(
                 x - xmin[0],
                 y - xmin[1],
                 z - xmin[2],
-                h_sub,
+                self.h_sub,
                 &c_x, &c_y, &c_z
                 )
 
@@ -2463,12 +2457,12 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
         cdef int num_indices = indices.length
 
-        cdef double h_sub = self.cell_size/self.H
-
         cdef double* xmin = self.xmin.data
         cdef int c_x, c_y, c_z
         cdef unsigned int i
         cdef unsigned int idx
+
+        self.h_sub = self.cell_size/self.H
 
         for i from 0<=i<num_indices:
             idx = indices.data[i]
@@ -2476,7 +2470,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                     src_x_ptr[idx] - xmin[0],
                     src_y_ptr[idx] - xmin[1],
                     src_z_ptr[idx] - xmin[2],
-                    h_sub,
+                    self.h_sub,
                     &c_x, &c_y, &c_z
                     )
             self.add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
