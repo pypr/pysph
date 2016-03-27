@@ -266,7 +266,7 @@ cdef class SpatialHashNNPS(NNPS):
     cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
             int i, int j, int k) nogil
 
-    cdef int neighbor_boxes(self, int i, int j, int k,
+    cdef inline int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
@@ -278,27 +278,50 @@ cdef class SpatialHashNNPS(NNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices)
 
-cdef class ExtendedSpatialHashNNPS(SpatialHashNNPS):
+cdef class ExtendedSpatialHashNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef long long int table_size               # Size of hashtable
+    cdef double radius_scale2
+
+    cdef HashTable** hashtable
+    cdef HashTable* current_hash
+
+    cdef NNPSParticleArrayWrapper dst, src
+
     cdef int H
+    cdef double h_sub
     cdef bint approximate
 
     ##########################################################################
     # Member functions
     ##########################################################################
 
-    cdef int h_mask_approx(self, int* x, int* y, int* z) nogil
+    cdef inline void c_set_context(self, int src_index, int dst_index)
 
-    cdef int h_mask_exact(self, int* x, int* y, int* z) nogil
+    cpdef set_context(self, int src_index, int dst_index)
 
-    cdef int neighbor_boxes(self, int i, int j, int k,
+    cdef inline int h_mask_approx(self, int* x, int* y, int* z) nogil
+
+    cdef inline int h_mask_exact(self, int* x, int* y, int* z) nogil
+
+    cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
+            int i, int j, int k) nogil
+
+    cdef inline int neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc)
+
+    cpdef _refresh(self)
+
     cdef void _c_bin(self, int pa_index, UIntArray indices)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
+
+
 
