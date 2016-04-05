@@ -48,7 +48,7 @@ h0 = kernel_factor*dxr
 
 class ShockTube1D(Application):
     def create_domain(self):
-        return DomainManager(xmin=xmin, xmax=xmax, periodic_in_x=True)
+        return DomainManager(xmin=xmin, xmax=xmax, periodic_in_x=False)
 
     def create_particles(self):
         # particle positions

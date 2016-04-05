@@ -1,7 +1,7 @@
 """Basic equations for Gas-dynamics"""
 
 from pysph.sph.equation import Equation
-from math import sqrt
+from math import sqrt, exp, log
 
 class ScaleSmoothingLength(Equation):
     def __init__(self, dest, sources, factor=2.0):
@@ -19,6 +19,48 @@ class UpdateSmoothingLengthFromVolume(Equation):
 
     def loop(self, d_idx, d_m, d_rho, d_h):
         d_h[d_idx] = self.k * pow( d_m[d_idx]/d_rho[d_idx], self.dim1)
+
+class SummationDensityADKE(Equation):
+
+    def __init__(self,dest, sources, k=1.0,  eps=0.0):
+        self.k = k
+        self.eps = eps
+        super(SummationDensityADKE, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_arho, d_rho, d_lng, d_h, d_h0):
+        d_rho[d_idx] = 0.0
+        d_arho[d_idx] = 0.0
+        d_lng[0] = 0.0
+        d_h[d_idx] = d_h0[d_idx]
+
+    def loop(self, d_idx, d_rho, d_arho, s_idx, s_m,  VIJ, DWI, WIJ):
+        d_rho[d_idx] += s_m[s_idx]*WIJ
+        mj = s_m[s_idx]
+        vijdotdwij = VIJ[0]*DWI[0] + VIJ[1]*DWI[1] + VIJ[2]*DWI[2]
+
+        # density accelerations
+        d_arho[d_idx] += mj * vijdotdwij
+
+
+    def post_loop(self, d_idx, d_rho, d_arho, d_div):
+        d_div[d_idx] = -d_arho[d_idx]/d_rho[d_idx]
+        d_arho[d_idx] = 0
+
+    def reduce(self, d_lng, d_rho, d_h, d_h0,  dst):
+
+        n = declare('int')
+        k = declare('int')
+        divFactor = 1.0/len(dst.x)
+        n = len(dst.x)
+
+        for k in range(n):
+            d_lng[0] += log(d_rho[k])
+        g = exp(d_lng[0]*divFactor)
+
+        for k in range(n):
+            lamda = self.k*pow(g/d_rho[k],self.eps)
+            d_h[k] = lamda*d_h0[k]
+
 
 class SummationDensity(Equation):
     def __init__(
@@ -212,6 +254,80 @@ class Monaghan92Accelerations(Equation):
         vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
 
         d_ae[d_idx] += 0.5 * s_m[s_idx] * (tmpi + tmpj + piij) * vijdotdwij
+
+class ADKEAccelerations(Equation):
+    def __init__(self, dest, sources, alpha, beta, g1, g2, k, eps):
+        self.alpha = alpha
+        self.g1 = g1
+        self.g2 = g1
+        self.alpha = alpha
+        self.beta = beta
+        self.k = k
+        self.eps = eps
+        super(ADKEAccelerations, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw, d_ae):
+
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+        d_ae[d_idx] = 0.0
+
+    def loop(self,d_idx, s_idx, d_au, d_av, d_aw, d_ae, d_p, s_p, d_rho, s_rho,
+            d_m, s_m, d_cs, s_cs, s_e, d_e, s_h, d_h, s_div, d_div,
+            DWIJ, HIJ, XIJ, VIJ, R2IJ, EPS, RHOIJ, RHOIJ1):
+
+        # particle pressure
+        pi = d_p[d_idx]
+        pj = s_p[s_idx]
+        # pi/rhoi**2
+        rhoi2 = d_rho[d_idx]*d_rho[d_idx]
+        pibrhoi2 = pi/rhoi2
+
+        # pj/rhoj**2
+        rhoj2 = s_rho[s_idx]*s_rho[s_idx]
+        pjbrhoj2 = pj/rhoj2
+
+        # averaged sound speed
+        cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
+
+        # averaged mass
+        mi = d_m[d_idx]
+        mj = s_m[s_idx]
+        mij = 0.5 * (mi + mj)
+
+        # averaged sound speed
+        ci = d_cs[d_idx]
+        cj = s_cs[s_idx]
+        cij = 0.5 * (ci + cj)
+
+        hi = d_h[d_idx]
+        hj = s_h[s_idx]
+
+
+        divi = d_div[d_idx]
+        divj = s_div[s_idx]
+
+        ei = d_e[d_idx]
+        ej = s_e[d_idx]
+
+        #Themal Conduction
+        Hi = self.g1* hi* ci + self.g2* hi* hi*(abs(divi)-divi)
+        Hj = self.g1* hj* cj + self.g2* hj* hj*(abs(divj)-divj)
+        Hij = (Hi+Hj)*(ei-ej)/(RHOIJ*(R2IJ+EPS))
+
+        xijdotvij = XIJ[0]*VIJ[0] + XIJ[1]*VIJ[1] +  XIJ[2]*VIJ[2]
+        piij = 0.0
+        if xijdotvij < 0:
+            muij = HIJ*xijdotvij/(R2IJ+EPS)
+            piij =  muij * (self.beta*muij - self.alpha*cij)*RHOIJ1
+        tmpv = pibrhoi2 + pjbrhoj2 +piij
+        d_au[d_idx] += -mj*tmpv * DWIJ[0]
+        d_av[d_idx] += -mj*tmpv * DWIJ[1]
+        d_aw[d_idx] += -mj*tmpv * DWIJ[2]
+        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
+        xijdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+        d_ae[d_idx] += 0.5*mj *(tmpv*vijdotdwij + 2*xijdotdwij*Hij)
 
 class MPMAccelerations(Equation):
     def __init__(
