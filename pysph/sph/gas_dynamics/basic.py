@@ -309,7 +309,7 @@ class ADKEAccelerations(Equation):
         divj = s_div[s_idx]
 
         ei = d_e[d_idx]
-        ej = s_e[d_idx]
+        ej = s_e[s_idx]
 
         #Themal Conduction
         Hi = self.g1* hi* ci + self.g2* hi* hi*(abs(divi)-divi)

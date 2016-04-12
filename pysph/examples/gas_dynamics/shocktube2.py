@@ -13,6 +13,7 @@ The solution examined at the final time T = 0.15s
 
 """
 
+import os
 # NumPy and standard library imports
 import numpy
 
@@ -21,7 +22,7 @@ from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array as gpa
 from pysph.solver.application import Application
 
-from pysph.sph.gasd_schemes import ADKEScheme
+from pysph.sph.scheme import ADKEScheme
 
 
 # Numerical constants
@@ -35,86 +36,82 @@ tf = 0.15
 
 # domain size and discretization parameters
 xmin = -0.5; xmax = 0.5
-nl = 400; nr = 50
-dxl = 0.5/nl; dxr = dxl/0.125
+nl = 320; nr = 40
+dxl = 0.5/nl; dxr = 8*dxl
 
 # scheme constants
 alpha = 1.0
-beta = 2.0
+beta = 1.0
 kernel_factor = 1.2
 h0 = kernel_factor*dxr
 
-bh0 = 10*dxr
 
-class ShockTube2(Application):
-    def create_domain(self):
-        return DomainManager(xmin=xmin, xmax=xmax, periodic_in_x=False)
+class ShockTube(Application):
 
-    def create_particles(self):
-        # particle positions
-        xt1 = numpy.arange( -0.60 + 0.5*dxl, 0, dxl )
-        xt2 = numpy.arange(  0.5*dxr, 0.60 , dxr )
-
+    def generate_particles(self, xmin, xmax, dxl, dxr, m, pl, pr, h0,  bx,
+            constants={}):
+        xt1 = numpy.arange(xmin-bx + 0.5*dxl, 0, dxl)
+        xt2 = numpy.arange(0.5*dxr, xmax+bx, dxr )
         xt = numpy.concatenate( [xt1, xt2] )
-        leftb_indices = numpy.where( xt <= -0.5)[0]
-        left_indices =  numpy.where( (xt > -0.5) & (xt < 0 ))[0]
-        right_indices = numpy.where( (xt >=  0) & (xt < 0.5))[0]
-        rightb_indices = numpy.where( xt >= 0.5)[0]
+        leftb_indices = numpy.where( xt <= xmin)[0]
+        left_indices =  numpy.where( (xt > xmin) & (xt < 0 ))[0]
+        right_indices = numpy.where( (xt >=  0) & (xt < xmax))[0]
+        rightb_indices = numpy.where( xt >= xmax)[0]
         x1 = xt[left_indices]
+        print(x1)
         x2 = xt[right_indices]
+        print(x2)
         b1 = xt[leftb_indices]
+        print(b1)
         b2 = xt[rightb_indices]
+        print(b2)
 
         x = numpy.concatenate( [x1, x2] )
         b = numpy.concatenate( [b1, b2] )
-
         right_indices = numpy.where(x>0.0)[0]
-        rightb_indices = numpy.where( b >= 0.5)[0]
-        # density
-        rho = numpy.ones_like(x)
-        rho[right_indices] = 0.125
 
-        # pl = 1.0, pr = 0.1
-        p = numpy.ones_like(x)
-        p[right_indices] = 0.1
+        rho = numpy.ones_like(x)*m/dxl
+        rho[right_indices] = m/dxr
 
-        # const h and mass
+        p = numpy.ones_like(x)*pl
+        p[right_indices] = pr
+
         h = numpy.ones_like(x) * h0
-        h_0 = numpy.ones_like(x) * h0
-        m = numpy.ones_like(x) * dxl
-
-        # thermal energy from the ideal gas EOS
+        m = numpy.ones_like(x)*m
         e = p/(gamma1*rho)
-
-
         wij = numpy.ones_like(x)
 
         bwij = numpy.ones_like(b)
         brho = numpy.ones_like(b)
-        brho[rightb_indices] = 0.125
         bp = numpy.ones_like(b)
-        bp[rightb_indices] = 0.1
         be = bp/(gamma1*brho)
         bm = numpy.ones_like(b)*dxl
-        bh = numpy.ones_like(b) * bh0
-        bh_0 = numpy.ones_like(b) * bh0
-        bhtmp = numpy.ones_like(b) * bh0
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
+        bh = numpy.ones_like(b) *h0
+        bhtmp = numpy.ones_like(b)
         fluid = gpa(
-                constants=consts,name='fluid', x=x, rho=rho, p=p,
-                e=e, h=h, m=m, wij=wij, h0=h_0
+                constants=constants, name='fluid', x=x, rho=rho, p=p,
+                e=e, h=h, m=m, wij=wij, h0=h.copy()
                 )
 
-        solid = gpa(
-                constants=consts,name='boundary', x=b, rho=brho, p=bp,
-                e=be, h=bh, m=bm, wij=bwij, h0=bh_0, htmp =bhtmp
+        boundary = gpa(
+                constants=constants, name='boundary', x=b, rho=brho, p=bp,
+                e=be, h=bh, m=bm, wij=bwij, h0=bh.copy(), htmp =bhtmp
                 )
 
-        self.scheme.setup_properties([fluid, solid])
+        self.scheme.setup_properties([fluid, boundary])
         print("1D Shocktube with %d particles"%(fluid.get_number_of_particles()))
 
-        return [fluid,solid]
+        return [fluid, boundary]
+
+
+
+
+    def create_particles(self):
+        lng = numpy.zeros(1, dtype=float)
+        consts ={ 'lng': lng}
+
+        return self.generate_particles(xmin = -0.5, xmax=0.5, dxl=dxl, dxr=dxr,
+                m=dxl, pl=1.0, pr=0.1, h0=h0, bx=0.03, constants=consts)
 
     def create_scheme(self):
         s = ADKEScheme(
@@ -130,12 +127,31 @@ class ShockTube2(Application):
         from pysph.solver.utils import load
         data = load(last_output)
         pa = data['arrays']['fluid']
-        plt.plot(pa.x,pa.rho)
-        plt.plot(pa.x,pa.e)
-        plt.show()
+        x = pa.x
+        rho = pa.rho
+        e = pa.e
+        cs = pa.cs
+        u = pa.u
+        plt.plot(x, rho)
+        plt.xlabel('x'); plt.ylabel('rho')
+        fig = os.path.join(self.output_dir, "density.png")
+        plt.savefig(fig, dpi=300)
+        plt.clf()
+        plt.plot(x, e)
+        plt.xlabel('x'); plt.ylabel('e')
+        fig = os.path.join(self.output_dir, "energy.png")
+        plt.savefig(fig, dpi=300)
+        plt.clf()
+
+        plt.plot(x,u/cs)
+        plt.xlabel('x'); plt.ylabel('M')
+        fig = os.path.join(self.output_dir, "Machno.png")
+        plt.savefig(fig, dpi=300)
+        plt.clf()
+
 
 
 if __name__ == '__main__':
-    app = ShockTube2()
+    app = ShockTube()
     app.run()
     app.post_process()
