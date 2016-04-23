@@ -1,4 +1,4 @@
-"""Abstract class to define the API for an SPH scheme.  The idea is thatD
+"""Abstract class to define the API for an SPH scheme.  The idea is that
 one can define a scheme and thereafter one simply instantiates a suitable
 scheme, gives it a bunch of particles and runs the application.
 """

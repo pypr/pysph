@@ -377,7 +377,6 @@ def get_particle_array_gasd(constants=None, **props):
 
     return pa
 
-
 def get_particles_info(particles):
     """Return the array information for a list of particles.
 
