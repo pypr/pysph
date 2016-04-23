@@ -21,7 +21,13 @@ class UpdateSmoothingLengthFromVolume(Equation):
         d_h[d_idx] = self.k * pow( d_m[d_idx]/d_rho[d_idx], self.dim1)
 
 class SummationDensityADKE(Equation):
-
+    """
+    References
+    ----------
+    ..  A comparison of SPH schemes for the compressible Euler equations,
+        2014, Journal of Computational Physics, 256, pp 308 -- 333
+            (http://dx.doi.org/10.1016/j.jcp.2013.08.060)
+    """
     def __init__(self,dest, sources, k=1.0,  eps=0.0):
         self.k = k
         self.eps = eps
@@ -256,6 +262,13 @@ class Monaghan92Accelerations(Equation):
         d_ae[d_idx] += 0.5 * s_m[s_idx] * (tmpi + tmpj + piij) * vijdotdwij
 
 class ADKEAccelerations(Equation):
+    """
+    Reference
+    ---------
+    ..  A comparison of SPH schemes for the compressible Euler equations,
+        2014, Journal of Computational Physics, 256, pp 308 -- 333
+            (http://dx.doi.org/10.1016/j.jcp.2013.08.060)
+    """
     def __init__(self, dest, sources, alpha, beta, g1, g2, k, eps):
         self.alpha = alpha
         self.g1 = g1
