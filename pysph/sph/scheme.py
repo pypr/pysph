@@ -860,7 +860,7 @@ class ADKEScheme(Scheme):
         g3 = []
         for fluid in self.fluids:
             g3.append(SummationDensity(fluid, self.fluids+self.solids))
-        equations.append(Group(g3, update_nnps=True,iterate=False))
+        equations.append(Group(g3))
 
 
 
