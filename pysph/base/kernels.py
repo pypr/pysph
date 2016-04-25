@@ -26,8 +26,8 @@ class CubicSpline(object):
     r"""Cubic Spline Kernel: [Monaghan1992]_
 
     .. math::
-             W(q) = \ &\sigma_3\left[ (2-q)^3 - 4(1-q)^3\right], \ & \textrm{for} \ 0 \leq q \leq 1,\\
-                  = \ &\sigma_3(2-q)^3, & \textrm{for}\ 1 \leq q \leq 2,\\
+             W(q) = \ &\sigma_3\left[ 1 - \frac{3}{2}q^2\left( 1 - \frac{q}{2} \right) \right], \ & \textrm{for} \ 0 \leq q \leq 1,\\
+                  = \ &\frac{\sigma_3}{4}(2-q)^3, & \textrm{for}\ 1 < q \leq 2,\\
                   = \ &0, & \textrm{for}\ q>2, \\
 
     where :math:`\sigma_3` is a dimensional normalizing factor for the
@@ -319,8 +319,8 @@ class QuinticSpline(object):
 
     .. math::
              W(q) = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 + 15(1-q)^5 \right], \ & \textrm{for} \ 0\leq q \leq 1,\\
-                  = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 \right], & \textrm{for} \ 1 \leq q \leq 2,\\
-                  = \ &\sigma_5 \ (3-5)^5 , & \textrm{for} \ 2 \leq q \leq 3,\\
+                  = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 \right], & \textrm{for} \ 1 <  q \leq 2,\\
+                  = \ &\sigma_5 \ (3-q)^5 , & \textrm{for} \ 2 < q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
     where :math:`\sigma_5` is a dimensional normalizing factor for the
