@@ -13,7 +13,7 @@ import time
 # PySPH imports.
 from pysph.base.config import get_config
 from pysph.base import utils
-from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
+from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS, SpatialHashNNPS
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
@@ -276,7 +276,7 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll'],
+                                choices=['box', 'll', 'sp'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll'). "
@@ -562,6 +562,16 @@ class Application(object):
                     fixed_h=fixed_h, cache=cache,
                     sort_gids=options.sort_gids
                 )
+
+            elif options.nnps == 'sp':
+                nnps = SpatialHashNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
+                )
+
+
             self.nnps = nnps
 
         nnps = self.nnps
