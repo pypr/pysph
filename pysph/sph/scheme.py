@@ -834,12 +834,12 @@ class ADKEScheme(Scheme):
         from pysph.sph.gas_dynamics.basic import ( IdealGasEOS,
                 ADKEAccelerations, SummationDensityADKE)
         from pysph.sph.gas_dynamics.boundary_equations import (
-                TransmissiveBoundary)
+                WallBoundary)
 
         equations = []
         g1 = []
         for solid in self.solids:
-            g1.append(TransmissiveBoundary(solid, sources=self.fluids))
+            g1.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g1))
 
         g2 = []
@@ -852,7 +852,7 @@ class ADKEScheme(Scheme):
 
         g7 = []
         for solid in self.solids:
-            g7.append(TransmissiveBoundary(solid, sources=self.fluids))
+            g7.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g7))
 
 
@@ -866,7 +866,7 @@ class ADKEScheme(Scheme):
 
         g4 = []
         for solid in self.solids:
-            g4.append(TransmissiveBoundary(solid, sources=self.fluids))
+            g4.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g4))
 
 

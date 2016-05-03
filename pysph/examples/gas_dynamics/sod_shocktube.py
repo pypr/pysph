@@ -30,10 +30,6 @@ class SodShockTube(ShockTubeSetup):
                 ul=0.0, ur=0.0, constants=consts)
 
     def create_scheme(self):
-        s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)
-        return s
-
-    def create_scheme(self):
         self.dt = dt
         self.tf = tf
         adke = ADKEScheme(

@@ -2,7 +2,7 @@
 
 from pysph.sph.equation import Equation
 
-class TransmissiveBoundary(Equation):
+class WallBoundary(Equation):
     def initialize(self, d_idx, d_p,  d_rho, d_e, d_m, d_cs, d_div, d_h,
             d_htmp, d_h0, d_u, d_v, d_w,  d_wij):
         d_p[d_idx] = 0.0
