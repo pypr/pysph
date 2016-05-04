@@ -307,7 +307,24 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
             x.sort(); y.sort()
             assert numpy.all(x == y)
 
-class TestNNPSWithSorting(unittest.TestCase):
+    def test_spatial_hash_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+
+class TestLinkedListNNPSWithSorting(unittest.TestCase):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
         h = numpy.ones_like(x)/(nx-1)
@@ -356,8 +373,16 @@ class TestNNPSWithSorting(unittest.TestCase):
             sorted_nbrs.sort()
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
+class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
+    def _make_particles(self, nx=20):
+        x = numpy.linspace(0, 1, nx)
+        h = numpy.ones_like(x)/(nx-1)
 
-def test_large_number_of_neighbors():
+        pa = get_particle_array(name='fluid', x=x, h=h)
+        nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
+        return pa, nps
+
+def test_large_number_of_neighbors_linked_list():
     x = numpy.random.random(1 << 14)*0.1
     y = x.copy()
     z = x.copy()
@@ -370,6 +395,18 @@ def test_large_number_of_neighbors():
     # print(nbrs.length)
     assert nbrs.length == len(x)
 
+def test_large_number_of_neighbors_spatial_hash():
+    x = numpy.random.random(1 << 14)*0.1
+    y = x.copy()
+    z = x.copy()
+    h = numpy.ones_like(x)
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
+
+    nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    # print(nbrs.length)
+    assert nbrs.length == len(x)
 
 def test_flatten_unflatten():
     # first consider the 2D case where we assume a 4 X 5 grid of cells

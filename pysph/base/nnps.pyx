@@ -2025,8 +2025,8 @@ cdef class SpatialHashNNPS(NNPS):
         for i from 0<=i<self.narrays:
             self.hashtable[i] = new HashTable(table_size)
 
-        self.src_index = -1
-        self.dst_index = -1
+        self.src_index = 0
+        self.dst_index = 0
         self.current_hash = NULL
         self.sort_gids = sort_gids
         self.domain.update()
@@ -2037,8 +2037,6 @@ cdef class SpatialHashNNPS(NNPS):
         self.hashtable[hash_id].add(i,j,k,pid)
 
     cdef void c_set_context(self, int src_index, int dst_index):
-        if (self.src_index == src_index) and (self.dst_index == dst_index):
-            return
         NNPS.set_context(self, src_index, dst_index)
         self.current_hash = self.hashtable[src_index]
 
@@ -2239,8 +2237,8 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         for i from 0<=i<self.narrays:
             self.hashtable[i] = new HashTable(table_size)
 
-        self.src_index = -1
-        self.dst_index = -1
+        self.src_index = 0
+        self.dst_index = 0
         self.current_hash = NULL
         self.sort_gids = sort_gids
         self.domain.update()
@@ -2251,8 +2249,6 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         self.hashtable[hash_id].add(i,j,k,pid)
 
     cdef inline void c_set_context(self, int src_index, int dst_index):
-        if (self.src_index == src_index) and (self.dst_index == dst_index):
-            return
         NNPS.set_context(self, src_index, dst_index)
         self.current_hash = self.hashtable[src_index]
 
