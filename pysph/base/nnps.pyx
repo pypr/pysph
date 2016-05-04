@@ -2177,6 +2177,7 @@ cdef class SpatialHashNNPS(NNPS):
         for i from 0<=i<self.narrays:
             del self.hashtable[i]
             self.hashtable[i] = new HashTable(self.table_size)
+        self.current_hash = self.hashtable[self.src_index]
 
     cdef void _c_bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = \
@@ -2417,6 +2418,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         for i from 0<=i<self.narrays:
             del self.hashtable[i]
             self.hashtable[i] = new HashTable(self.table_size)
+        self.current_hash = self.hashtable[self.src_index]
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
