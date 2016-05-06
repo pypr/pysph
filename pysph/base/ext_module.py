@@ -192,7 +192,8 @@ class ExtModule(object):
             with self._lock():
                 if force or self.should_recompile():
                     self._message("Compiling code at:", self.src_path)
-                    inc_dirs = [numpy.get_include(),"."]
+                    inc_dirs = [numpy.get_include()]
+                    inc_dirs.append(os.path.dirname(os.path.realpath(__file__)))
                     extra_compile_args, extra_link_args = self._get_extra_args()
 
                     extension = Extension(
