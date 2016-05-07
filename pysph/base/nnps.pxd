@@ -14,7 +14,7 @@ from point cimport *
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":
     cdef cppclass HashTable:
-        HashTable(long int) nogil except +
+        HashTable(long long int) nogil except +
         void add(int, int, int, int) nogil
         vector[unsigned int] *get(int, int, int) nogil
 
