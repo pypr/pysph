@@ -324,4 +324,54 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
     cpdef _bin(self, int pa_index, UIntArray indices)
 
 
+cdef struct OctreeNode:
+    bint is_leaf
+    double x_length, y_length, z_length
+    double xmin[3]
+    int num_particles
+
+    vector[unsigned int] indices
+    OctreeNode* children[2][2][2];
+
+
+cdef class OctreeNNPS(NNPS):
+    ##########################################################################
+    # Data Attributes
+    ##########################################################################
+    cdef OctreeNode** root
+    cdef OctreeNode* current_tree
+
+    cdef double radius_scale2
+    cdef NNPSParticleArrayWrapper dst, src
+    cdef double min_length
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+    cdef inline void _initialize(self, OctreeNode* root)
+
+    cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
+            double* xmin, double* xmax, OctreeNode* root = *)
+
+    cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
+            double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
+            UIntArray nbrs, OctreeNode* root = *, double half_diagonal = *) nogil
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc)
+
+    cdef inline void c_set_context(self, int src_index, int dst_index)
+
+    cpdef set_context(self, int src_index, int dst_index)
+
+    cdef void delete_tree(self, OctreeNode* root = *)
+
+    cpdef _refresh(self)
+
+    cdef void _c_bin(self, int pa_index, UIntArray indices)
+
+    cpdef _bin(self, int pa_index, UIntArray indices)
+
 

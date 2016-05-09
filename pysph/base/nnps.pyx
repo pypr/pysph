@@ -2483,3 +2483,301 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         free(self.hashtable)
 
 
+cdef class OctreeNNPS(NNPS):
+    def __init__(self, int dim, list particles, double radius_scale = 2.0,
+            int ghost_layers = 1, domain=None, bint fixed_h = False,
+            bint cache = False, bint sort_gids = False, double min_length = 0):
+        NNPS.__init__(
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
+        )
+
+        cdef int i
+
+        self.root = <OctreeNode**> malloc(self.narrays*sizeof(OctreeNode*))
+        for i from 0<i<self.narrays:
+            self.root[i] = <OctreeNode*> malloc(sizeof(OctreeNode))
+            self._initialize(self.root[i])
+
+        self.radius_scale2 = radius_scale*radius_scale
+
+        self.src_index = 0
+        self.dst_index = 0
+        self.min_length = min_length
+
+        self.current_tree = NULL
+        self.sort_gids = sort_gids
+        self.domain.update()
+
+        if min_length == 0:
+            min_length = self.cell_size
+
+        self.update()
+
+    cdef inline void _initialize(self, OctreeNode* root):
+        cdef int i, j, k
+        root.is_leaf = False
+        root.num_particles = 0
+        for i from 0<=i<2:
+            for j from 0<=j<2:
+                for k from 0<=k<2:
+                    root.children[i][j][k] = NULL
+
+
+    cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
+            double* xmin, double* xmax, OctreeNode* root = NULL):
+        """Build octree"""
+        if root == NULL:
+            root = self.root[self.src_index]
+
+        cdef double* src_x_ptr = pa.x.data
+        cdef double* src_y_ptr = pa.y.data
+        cdef double* src_z_ptr = pa.z.data
+        cdef double* src_h_ptr = pa.h.data
+
+        cdef double x_length = xmax[0] - xmin[0]
+        cdef double y_length = xmax[1] - xmin[1]
+        cdef double z_length = xmax[2] - xmin[2]
+
+        cdef unsigned int i, j, k
+        cdef unsigned int p, q, r
+
+        cdef OctreeNode* temp = NULL
+
+        for i from 0<=i<2:
+            for j from 0<=j<2:
+                for k from 0<=k<2:
+                    temp = root.children[i][j][k]
+                    temp = <OctreeNode*> malloc(sizeof(OctreeNode))
+                    self._initialize(temp)
+
+        cdef list new_indices = [UIntArray() for i in range(8)]
+
+        for p from 0<=p<indices.length:
+            q = indices.data[p]
+            if src_x_ptr[q] < xmin[0] + (x_length/2): i = 0
+            else: i = 1
+            if src_y_ptr[q] < xmin[1] + (y_length/2): j = 0
+            else: j = 1
+            if src_z_ptr[q] < xmin[2] + (z_length/2): k = 0
+            else: k = 1
+
+            (<UIntArray> new_indices[k+2*j+4*i]).c_append(q)
+
+            temp = root.children[i][j][k]
+            temp.indices.push_back(q)
+            temp.num_particles += 1
+
+            temp.x_length = x_length/2
+            temp.y_length = y_length/2
+            temp.z_length = z_length/2
+
+            temp.xmin[0] = xmin[0]
+            temp.xmin[1] = xmin[1]
+            temp.xmin[2] = xmin[2]
+
+        for i from 0<=i<2:
+            for j from 0<=j<2:
+                for k from 0<=k<2:
+                    xmin[0] += i*(x_length/2)
+                    xmax[0] = xmin[0] + (x_length/2)
+                    xmin[1] += j*(y_length/2)
+                    xmax[1] = xmin[1] + (y_length/2)
+                    xmin[2] += k*(z_length/2)
+                    xmax[2] = xmin[2] + (z_length/2)
+
+                    temp = root.children[i][j][k]
+
+                    if temp.x_length < self.min_length:
+                        temp.is_leaf = True
+                        return
+
+                    self.build_tree(pa, <UIntArray> new_indices[k+2*j+4*i],
+                            xmin, xmax, temp)
+
+    cdef void delete_tree(self, OctreeNode* root = NULL):
+        """Delete octree"""
+        cdef int i, j, k
+        cdef OctreeNode* temp = NULL
+
+        if root == NULL:
+            root = self.root[self.src_index]
+        if root == NULL:
+            return
+
+        while True:
+            for i from 0<=i<2:
+                for j from 0<=j<2:
+                    for k from 0<=k<2:
+                        temp = root.children[i][j][k]
+                        if temp == NULL:
+                            free(root)
+                            return
+                        else:
+                            free(root)
+                            self.delete_tree(temp)
+
+    cdef inline void c_set_context(self, int src_index, int dst_index):
+        NNPS.set_context(self, src_index, dst_index)
+        self.current_tree = self.root[src_index]
+
+        self.dst = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, dst_index)
+        self.src = <NNPSParticleArrayWrapper> \
+                PyList_GetItem(self.pa_wrappers, src_index)
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Set context for nearest neighbor searches.
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        """
+        self.c_set_context(src_index, dst_index)
+
+    cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
+            double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
+            UIntArray nbrs, OctreeNode* root = NULL, double half_diagonal = 0) nogil:
+        if root == NULL:
+            root = self.current_tree
+        if half_diagonal == 0:
+            half_diagonal = sqrt(norm2(root.x_length/2, root.y_length/2, root.z_length/2))
+
+        cdef double x_centre = root.xmin[0] + root.x_length/2
+        cdef double y_centre = root.xmin[1] + root.y_length/2
+        cdef double z_centre = root.xmin[2] + root.z_length/2
+
+        # If octant completely in S(q,r) add all points to N(q,r)
+        # If octant partially in S(q,r), recursively call _get_neighbors
+
+        cdef unsigned int i, j, k
+        cdef double hi2 = q_h*q_h
+        cdef double hj2 = 0
+        cdef double xij2 = 0
+
+        if root.is_leaf:
+            for i from 0<=i<root.indices.size():
+                k = root.indices[i]
+                hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
+                xij2 = norm2(
+                        src_x_ptr[k] - q_x,
+                        src_y_ptr[k] - q_y,
+                        src_z_ptr[k] - q_z
+                        )
+                if (xij2 < hi2) or (xij2 < hj2):
+                    nbrs.c_append(k)
+            return
+
+        half_diagonal /= 2
+
+        cdef double eff_radius = (self.radius_scale*self.cell_size + half_diagonal)**2
+
+        if norm2(q_x - x_centre, q_y - y_centre, q_z - z_centre) > eff_radius:
+            return
+
+        for i from 0<=i<2:
+            for j from 0<=j<2:
+                for k from 0<=k<2:
+                    self._get_neighbors(q_x, q_y, q_z, q_h,
+                            src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
+                            nbrs, root.children[i][j][k], half_diagonal)
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        """Low level, high-performance non-gil method to find neighbors.
+        This requires that `set_context()` be called beforehand.  This method
+        does not reset the neighbors array before it appends the
+        neighbors to it.
+
+        """
+        cdef double* dst_x_ptr = self.dst.x.data
+        cdef double* dst_y_ptr = self.dst.y.data
+        cdef double* dst_z_ptr = self.dst.z.data
+        cdef double* dst_h_ptr = self.dst.h.data
+
+        cdef double* src_x_ptr = self.src.x.data
+        cdef double* src_y_ptr = self.src.y.data
+        cdef double* src_z_ptr = self.src.z.data
+        cdef double* src_h_ptr = self.src.h.data
+
+        cdef double x = dst_x_ptr[d_idx]
+        cdef double y = dst_y_ptr[d_idx]
+        cdef double z = dst_z_ptr[d_idx]
+        cdef double h = dst_h_ptr[d_idx]
+
+        cdef unsigned int* s_gid = self.src.gid.data
+        cdef int orig_length = nbrs.length
+
+        self._get_neighbors(x, y, z, h, src_x_ptr, src_y_ptr, src_z_ptr,
+                src_h_ptr, nbrs)
+
+        if self.sort_gids:
+            self._sort_neighbors(
+                &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
+            )
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc):
+        """Find nearest neighbors for particle id 'd_idx' without cache
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        d_idx: size_t
+            Index of the query point in the destination particle array
+
+        nbrs: UIntArray
+            Array to be populated by nearest neighbors of 'd_idx'
+
+        """
+        self.c_set_context(src_index, dst_index)
+
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.c_reset()
+
+        self.find_nearest_neighbors(d_idx, nbrs)
+
+    cpdef _refresh(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            self.delete_tree(self.root[i])
+            self.root[i] = <OctreeNode*> malloc(sizeof(OctreeNode))
+        self.current_tree = self.root[self.src_index]
+
+    cdef void _c_bin(self, int pa_index, UIntArray indices):
+        cdef NNPSParticleArrayWrapper pa_wrapper = \
+                <NNPSParticleArrayWrapper> PyList_GET_ITEM(self.pa_wrappers, pa_index)
+
+        cdef double* xmin = self.xmin.data
+        cdef double* xmax = self.xmax.data
+
+        cdef double xmin_copy[3]
+        cdef double xmax_copy[3]
+
+        cdef unsigned int i
+        for i from 0<=i<3:
+            xmin_copy[i] = xmin[i]
+            xmax_copy[i] = xmax[i]
+
+        self.build_tree(pa_wrapper, indices, xmin_copy, xmax_copy,
+                self.root[self.src_index])
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        self._c_bin(pa_index, indices)
+
+    def __dealloc__(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            self.delete_tree(self.root[i])
+
