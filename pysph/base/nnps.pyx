@@ -336,6 +336,29 @@ cpdef UIntArray arange_uint(int start, int stop=-1):
 
     return arange
 
+cdef inline OctreeNode* new_node(double* xmin = NULL, double x_length = 0,
+        double y_length = 0, double z_length = 0, int num_particles = 0,
+        bint is_leaf = False):
+    cdef int i, j, k
+    cdef OctreeNode* root = <OctreeNode*> malloc(sizeof(OctreeNode))
+
+    if xmin != NULL:
+        for i from 0<=i<3:
+            root.xmin[i] = xmin[i]
+    else:
+        for i from 0<=i<3:
+            root.xmin[i] = 0
+
+    root.is_leaf = is_leaf
+    root.num_particles = num_particles
+    root.indices = vector[ZOLTAN_ID_TYPE] ()
+    for i from 0<=i<2:
+        for j from 0<=j<2:
+            for k from 0<=k<2:
+                root.children[i][j][k] = NULL
+    return root
+
+
 ##############################################################################
 cdef class NNPSParticleArrayWrapper:
     def __init__(self, ParticleArray pa):
@@ -2496,8 +2519,7 @@ cdef class OctreeNNPS(NNPS):
 
         self.root = <OctreeNode**> malloc(self.narrays*sizeof(OctreeNode*))
         for i from 0<i<self.narrays:
-            self.root[i] = <OctreeNode*> malloc(sizeof(OctreeNode))
-            self._initialize(self.root[i])
+            self.root[i] = new_node()
 
         self.radius_scale2 = radius_scale*radius_scale
 
@@ -2513,16 +2535,6 @@ cdef class OctreeNNPS(NNPS):
             min_length = self.cell_size
 
         self.update()
-
-    cdef inline void _initialize(self, OctreeNode* root):
-        cdef int i, j, k
-        root.is_leaf = False
-        root.num_particles = 0
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
-                    root.children[i][j][k] = NULL
-
 
     cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
             double* xmin, double* xmax, OctreeNode* root = NULL):
@@ -2547,34 +2559,28 @@ cdef class OctreeNNPS(NNPS):
         for i from 0<=i<2:
             for j from 0<=j<2:
                 for k from 0<=k<2:
-                    temp = root.children[i][j][k]
-                    temp = <OctreeNode*> malloc(sizeof(OctreeNode))
-                    self._initialize(temp)
+                    root.children[i][j][k] = new_node()
 
         cdef list new_indices = [UIntArray() for i in range(8)]
 
         for p from 0<=p<indices.length:
             q = indices.data[p]
-            if src_x_ptr[q] < xmin[0] + (x_length/2): i = 0
-            else: i = 1
-            if src_y_ptr[q] < xmin[1] + (y_length/2): j = 0
-            else: j = 1
-            if src_z_ptr[q] < xmin[2] + (z_length/2): k = 0
-            else: k = 1
+
+            i = real_to_int(src_x_ptr[q] - xmin[0], x_length/2)
+            j = real_to_int(src_y_ptr[q] - xmin[1], y_length/2)
+            k = real_to_int(src_z_ptr[q] - xmin[2], z_length/2)
 
             (<UIntArray> new_indices[k+2*j+4*i]).c_append(q)
 
             temp = root.children[i][j][k]
-            temp.indices.push_back(q)
-            temp.num_particles += 1
 
-            temp.x_length = x_length/2
-            temp.y_length = y_length/2
-            temp.z_length = z_length/2
+            if temp == NULL:
+                temp = new_node(xmin, x_length/2, y_length/2,
+                        z_length/2, 1, False)
 
-            temp.xmin[0] = xmin[0]
-            temp.xmin[1] = xmin[1]
-            temp.xmin[2] = xmin[2]
+            else:
+                temp.indices.push_back(q)
+                temp.num_particles += 1
 
         for i from 0<=i<2:
             for j from 0<=j<2:
@@ -2752,7 +2758,7 @@ cdef class OctreeNNPS(NNPS):
         cdef int i
         for i from 0<=i<self.narrays:
             self.delete_tree(self.root[i])
-            self.root[i] = <OctreeNode*> malloc(sizeof(OctreeNode))
+            self.root[i] = new_node()
         self.current_tree = self.root[self.src_index]
 
     cdef void _c_bin(self, int pa_index, UIntArray indices):

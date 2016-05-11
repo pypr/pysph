@@ -18,10 +18,16 @@ cdef extern from "spatial_hash.h":
         void add(int, int, int, int) nogil
         vector[unsigned int] *get(int, int, int) nogil
 
+ctypedef unsigned int U_INT
+
 cdef inline int real_to_int(double val, double step) nogil
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
+
+cdef inline OctreeNode* new_node(double* xmin = *, double x_length = *,
+        double y_length = *, double z_length = *, int num_particles = *,
+        bint is_leaf = *)
 
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
@@ -333,7 +339,6 @@ cdef struct OctreeNode:
     vector[unsigned int] indices
     OctreeNode* children[2][2][2];
 
-
 cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Data Attributes
@@ -348,8 +353,6 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
-    cdef inline void _initialize(self, OctreeNode* root)
-
     cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
             double* xmin, double* xmax, OctreeNode* root = *)
 
