@@ -14,7 +14,7 @@ import time
 from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS
+        ExtendedSpatialHashNNPS, CellIndexing
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
@@ -277,12 +277,13 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh'],
+                                choices=['box', 'll', 'sh', 'esh', 'ci'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
-                                     "the extended spatial hash algorithm ('esh')"
+                                     "the extended spatial hash algorithm ('esh')"\
+                                     "the cell indexing algorithm ('ci')"
                                 )
 
         nnps_options.add_argument("--sub-factor", dest="H",
@@ -596,6 +597,14 @@ class Application(object):
                     fixed_h=fixed_h, cache=cache, H=options.H,
                     table_size = options.table_size, sort_gids=options.sort_gids,
                     approximate = options.approximate
+                )
+
+            elif options.nnps == 'ci':
+                nnps = CellIndexing(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
                 )
 
             self.nnps = nnps
