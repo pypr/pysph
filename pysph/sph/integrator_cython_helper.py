@@ -150,11 +150,12 @@ class IntegratorCythonHelper(object):
         available_props = set(pa.properties.keys())
         if not props.issubset(available_props):
             diff = props.difference(available_props)
-            names = ', '.join([x for x in diff])
-            msg = "ERROR: Integrator requires the following properties:"\
+            integrator_name = self.object.steppers[dest].__class__.__name__
+            names = ', '.join([x for x in sorted(diff)])
+            msg = "ERROR: {integrator_name} requires the following properties:"\
                   "\n\t{names}\n"\
                   "Please add them to the particle array '{dest}'.".format(
-                      names=names, dest=dest
+                      integrator_name=integrator_name, names=names, dest=dest
                   )
             self._runtime_error(msg)
 
