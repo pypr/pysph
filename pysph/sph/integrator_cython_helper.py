@@ -22,6 +22,8 @@ class IntegratorCythonHelper(object):
     def __init__(self, integrator, acceleration_eval_helper):
         self.object = integrator
         self.acceleration_eval_helper = acceleration_eval_helper
+        pas = acceleration_eval_helper.object.particle_arrays
+        self._particle_arrays = dict((x.name, x) for x in pas)
 
     def get_code(self):
         if self.object is not None:
@@ -89,31 +91,15 @@ class IntegratorCythonHelper(object):
         arrays = set()
         for dest in self.object.steppers:
             s, d = get_array_names(self.get_args(dest, method))
+            self._check_arrays_for_properties(dest, s|d)
             arrays.update(s | d)
 
         known_types = self.acceleration_eval_helper.known_types
         decl = []
-        unknown = set()
         for arr in sorted(arrays):
-            if arr in known_types:
-                decl.append('cdef {type} {arr}'.format(
-                    type=known_types[arr].type, arr=arr
-                ))
-            else:
-                unknown.add(arr)
-                decl.append('cdef double* %s'%arr)
-
-        if len(unknown) > 0:
-            props = ', '.join([x[2:] for x in unknown])
-            msg = "ERROR: Integrator requires the following properties:"\
-                  "\n\t{props}\n"\
-                  "Please add them to the particle arrays.".format(
-                props=props
-            )
-            print('*'*70)
-            print(msg)
-            print('*'*70)
-            raise RuntimeError(msg)
+            decl.append('cdef {type} {arr}'.format(
+                type=known_types[arr].type, arr=arr
+            ))
 
         return '\n'.join(decl)
 
@@ -137,7 +123,8 @@ class IntegratorCythonHelper(object):
         """
         methods = set()
         for stepper in self.object.steppers.values():
-            stages = [x for x in dir(stepper) if x.startswith('stage') or x == 'initialize']
+            stages = [x for x in dir(stepper)
+                      if x.startswith('stage') or x == 'initialize']
             methods.update(stages)
         return list(sorted(methods))
 
@@ -146,3 +133,33 @@ class IntegratorCythonHelper(object):
         sourcelines = inspect.getsourcelines(method)[0]
         defn, lines = get_func_definition(sourcelines)
         return dedent(''.join(lines))
+
+    ##########################################################################
+    # Private interface.
+    ##########################################################################
+
+    def _check_arrays_for_properties(self, dest, args):
+        """Given a particle array name and a set of arguments used by an
+        integrator stepper method, check if the particle array has the
+        required props.
+        """
+
+        pa = self._particle_arrays[dest]
+        # Remove the 's_' or 'd_'
+        props = set([x[2:] for x in args])
+        available_props = set(pa.properties.keys())
+        if not props.issubset(available_props):
+            diff = props.difference(available_props)
+            names = ', '.join([x for x in diff])
+            msg = "ERROR: Integrator requires the following properties:"\
+                  "\n\t{names}\n"\
+                  "Please add them to the particle array '{dest}'.".format(
+                      names=names, dest=dest
+                  )
+            self._runtime_error(msg)
+
+    def _runtime_error(self, msg):
+        print('*'*70)
+        print(msg)
+        print('*'*70)
+        raise RuntimeError(msg)
