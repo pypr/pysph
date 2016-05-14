@@ -9,12 +9,12 @@ env:
 
 
 build:
+    cache: true
 
     ci:
         - "export BUILD_DIR=$HOME/build_$TRAVIS_PYTHON_VERSION"
         - env
 
-        # System dependencies via apt.
         - sudo apt-get update
         - sudo apt-get install -y build-essential python-dev libopenmpi-dev curl
         - |
@@ -23,22 +23,19 @@ build:
           sudo dpkg --remove --force-depends python-six;
           fi
         - |
-          if [[ $TRAVIS_PYTHON_VERSION == "3.4" ]]; then
+          if [[ $TRAVIS_PYTHON_VERSION == "3.5" ]]; then
           sudo apt-get install -y cython3 python3-numpy python3-mako python3-mpi4py python3-nose;
           fi
 
-        # Build zoltan.
         - ./build_zoltan.sh $ZOLTAN
 
-        # Setup the virtual env.
         - rm -rf $BUILD_DIR
         - mkdir -p $BUILD_DIR
         - virtualenv --system-site-packages -p /usr/bin/python$TRAVIS_PYTHON_VERSION $BUILD_DIR
         - source $BUILD_DIR/bin/activate
 
-        # We need a recent version of Cython.
         - pip install -r requirements.txt
-        # Build pysph.
+
         - make clean
         - python setup.py install
 
