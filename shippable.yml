@@ -2,7 +2,7 @@ language: python
 
 python:
     - 2.7
-    - 3.5
+    - 3.4
 
 env:
     - ZOLTAN=$HOME/zoltan
@@ -23,7 +23,7 @@ build:
           sudo dpkg --remove --force-depends python-six;
           fi
         - |
-          if [[ $TRAVIS_PYTHON_VERSION == "3.5" ]]; then
+          if [[ $TRAVIS_PYTHON_VERSION == "3.4" ]]; then
           sudo apt-get install -y cython3 python3-numpy python3-mako python3-mpi4py python3-nose;
           fi
 
