@@ -13,8 +13,11 @@ import time
 # PySPH imports.
 from pysph.base.config import get_config
 from pysph.base import utils
-from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS
+
+from pysph.base.linked_list import LinkedListNNPS
+from pysph.base.box_sort import BoxSortNNPS
+from pysph.base.spatial_hash import SpatialHashNNPS, ExtendedSpatialHashNNPS
+
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
@@ -285,7 +288,7 @@ class Application(object):
                                      "the extended spatial hash algorithm ('esh')"
                                 )
 
-        nnps_options.add_argument("--sub-factor", dest="H",
+        nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
                                 type=int, default=3,
                                 help="Sub division factor for ExtendedSpatialHashNNPS"
                                 )
@@ -294,7 +297,7 @@ class Application(object):
                                 action="store_true", default=False,
                                 help="Use for approximate")
 
-        nnps_options.add_argument("--table-size", dest="table_size",
+        nnps_options.add_argument("--spatial-hash-table-size", dest="table_size",
                                 type=int, default=131072,
                                 help="Table size for SpatialHashNNPS and \
                                         ExtendedSpatialHashNNPS"

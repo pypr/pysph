@@ -10,10 +10,10 @@ from numpy import random
 # PySPH imports
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
-from pysph.base import nnps
+from pysph.base import nnps, linked_list, spatial_hash, box_sort
 
 # Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
+from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
@@ -64,23 +64,23 @@ class SimpleNNPSTestCase(unittest.TestCase):
 
         pa = get_particle_array(x=x, y=y, z=z, h=h)
 
-        self.dict_box_sort_nnps = nnps.DictBoxSortNNPS(
+        self.dict_box_sort_nnps = box_sort.DictBoxSortNNPS(
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.box_sort_nnps = nnps.BoxSortNNPS(
+        self.box_sort_nnps = box_sort.BoxSortNNPS(
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.ll_nnps = nnps.LinkedListNNPS(
+        self.ll_nnps = linked_list.LinkedListNNPS(
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.sp_hash_nnps = nnps.SpatialHashNNPS(
+        self.sp_hash_nnps = spatial_hash.SpatialHashNNPS(
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.ext_sp_hash_nnps = nnps.ExtendedSpatialHashNNPS(
+        self.ext_sp_hash_nnps = spatial_hash.ExtendedSpatialHashNNPS(
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
@@ -200,7 +200,7 @@ class DictBoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.DictBoxSortNNPS(
+        self.nps = box_sort.DictBoxSortNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
@@ -221,7 +221,7 @@ class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.BoxSortNNPS(
+        self.nps = box_sort.BoxSortNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
@@ -229,7 +229,7 @@ class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Spatial Hash algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.SpatialHashNNPS(
+        self.nps = spatial_hash.SpatialHashNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
@@ -237,7 +237,7 @@ class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Spatial Hash algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.ExtendedSpatialHashNNPS(
+        self.nps = spatial_hash.ExtendedSpatialHashNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
@@ -245,7 +245,7 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.LinkedListNNPS(
+        self.nps = linked_list.LinkedListNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
@@ -288,14 +288,14 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
         pa = self._make_particles(20)
         # Then
         self.assertRaises(
-            RuntimeError, nnps.LinkedListNNPS, dim=3, particles=[pa], cache=True
+            RuntimeError, linked_list.LinkedListNNPS, dim=3, particles=[pa], cache=True
         )
 
     def test_box_sort_works_for_large_domain(self):
         # Given
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
-        nps = nnps.BoxSortNNPS(dim=3, particles=[pa], cache=True)
+        nps = box_sort.BoxSortNNPS(dim=3, particles=[pa], cache=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
@@ -311,7 +311,23 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
         # Given
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
-        nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nps = spatial_hash.SpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+    def test_extended_spatial_hash_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = spatial_hash.ExtendedSpatialHashNNPS(dim=3, particles=[pa], cache=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
@@ -330,7 +346,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         h = numpy.ones_like(x)/(nx-1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
-        nps = nnps.LinkedListNNPS(dim=1, particles=[pa], sort_gids=True)
+        nps = linked_list.LinkedListNNPS(dim=1, particles=[pa], sort_gids=True)
         return pa, nps
 
     def test_nnps_sorts_without_gids(self):
@@ -379,7 +395,7 @@ class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
         h = numpy.ones_like(x)/(nx-1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
-        nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
+        nps = spatial_hash.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
         return pa, nps
 
 def test_large_number_of_neighbors_linked_list():
@@ -389,7 +405,7 @@ def test_large_number_of_neighbors_linked_list():
     h = numpy.ones_like(x)
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
 
-    nps = nnps.LinkedListNNPS(dim=3, particles=[pa], cache=False)
+    nps = linked_list.LinkedListNNPS(dim=3, particles=[pa], cache=False)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
@@ -402,7 +418,7 @@ def test_large_number_of_neighbors_spatial_hash():
     h = numpy.ones_like(x)
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
 
-    nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=False)
+    nps = spatial_hash.SpatialHashNNPS(dim=3, particles=[pa], cache=False)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)

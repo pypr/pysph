@@ -4,7 +4,10 @@
 import numpy as np
 
 # PySPH imports
-from pysph.base.nnps import DomainManager, BoxSortNNPS, LinkedListNNPS
+from pysph.base.nnps import DomainManager
+from pysph.base.box_sort import BoxSortNNPS
+from pysph.base.linked_list import LinkedListNNPS
+from pysph.base.spatial_hash import SpatialHashNNPS, ExtendedSpatialHashNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.point import Point
 from pysph.base.kernels import Gaussian, get_compiled_kernel
@@ -159,6 +162,39 @@ class PeriodicChannel2DLinkedList(PeriodicChannel2DTestCase):
     def test_summation_density(self):
         "LinkedListNNPS :: test summation density"
         self._test_summation_density()
+
+class PeriodicChannel2DSpatialHash(PeriodicChannel2DTestCase):
+    def setUp(self):
+        PeriodicChannel2DTestCase.setUp(self)
+        self.nnps = SpatialHashNNPS(
+            dim=2, particles=self.particles,
+            domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_periodicity_flags(self):
+        "SpatialHashNNPS :: test periodicity flags"
+        self._test_periodicity_flags()
+
+    def test_summation_density(self):
+        "SpatialHashNNPS :: test summation density"
+        self._test_summation_density()
+
+class PeriodicChannel2DExtendedSpatialHash(PeriodicChannel2DTestCase):
+    def setUp(self):
+        PeriodicChannel2DTestCase.setUp(self)
+        self.nnps = ExtendedSpatialHashNNPS(
+            dim=2, particles=self.particles,
+            domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_periodicity_flags(self):
+        "ExtendedSpatialHashNNPS :: test periodicity flags"
+        self._test_periodicity_flags()
+
+    def test_summation_density(self):
+        "ExtendedSpatialHashNNPS :: test summation density"
+        self._test_summation_density()
+
 
 if __name__ == '__main__':
     unittest.main()

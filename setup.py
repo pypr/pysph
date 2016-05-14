@@ -274,6 +274,48 @@ def get_basic_extensions():
             language="c++"
         ),
 
+        Extension(
+            name="pysph.base.spatial_hash",
+            sources=["pysph/base/spatial_hash.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/particle_array",
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.linked_list",
+            sources=["pysph/base/linked_list.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/particle_array",
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.box_sort",
+            sources=["pysph/base/box_sort.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/particle_array",
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
         # kernels used for tests
         Extension(
             name="pysph.base.c_kernels",

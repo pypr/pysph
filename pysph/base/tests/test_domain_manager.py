@@ -5,7 +5,9 @@
 import numpy as np
 
 # PySPH imports
-from pysph.base.nnps import DomainManager, BoxSortNNPS, LinkedListNNPS
+from pysph.base.nnps import DomainManager
+from pysph.base.box_sort import BoxSortNNPS
+from pysph.base.linked_list import LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, get_compiled_kernel
 
