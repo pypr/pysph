@@ -266,7 +266,7 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
             self.assertTrue( cid.z > -1 )
 
 
-class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
+class TestNNPSOnLargeDomain(unittest.TestCase):
     def _make_particles(self, nx=20):
         x, y, z = numpy.random.random((3, nx, nx, nx))
         x = numpy.ravel(x)
