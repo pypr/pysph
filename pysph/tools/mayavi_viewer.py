@@ -2,7 +2,7 @@
 
 This code uses the :py:class:`MultiprocessingClient` solver interface to
 communicate with a running solver and displays the particles using
-Mayavi.  It can also display a list of supplied files.
+Mayavi.  It can also display a list of supplied files or a directory.
 """
 
 from functools import reduce
@@ -23,24 +23,26 @@ if not os.environ.get('ETS_TOOLKIT'):
     ETSConfig.toolkit = 'qt4'
 
 try:
-    from traits.api import (Any, Array, Dict, HasTraits, Instance, on_trait_change,
-                            List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Event, Password, Property, cached_property)
-    from traitsui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-                          TitleEditor, HGroup, ShellEditor, VSplit)
+    from traits.api import (Any, Array, Dict, HasTraits, Instance,
+        on_trait_change, List, Str, Int, Range, Float, Bool, Button,
+        Directory, Event, Password, Property, cached_property)
+    from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
+        EnumEditor, TitleEditor, HGroup, ShellEditor, VSplit)
     from mayavi.core.api import PipelineBase
     from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
     from pyface.timer.api import Timer, do_later
     from tvtk.api import tvtk
     from tvtk.array_handler import array2vtk
 except ImportError:
-    from enthought.traits.api import (Any, Array, Dict, HasTraits, Instance, on_trait_change,
-                            List, Str, Int, Range, Float, Bool, Button,
-                            Directory, Event, Password, Property, cached_property)
-    from enthought.traits.ui.api import (View, Item, Group, HSplit, ListEditor, EnumEditor,
-                          TitleEditor, HGroup, ShellEditor, VSplit)
+    from enthought.traits.api import (Any, Array, Dict, HasTraits,
+        Instance, on_trait_change, List, Str, Int, Range, Float, Bool, Button,
+        Directory, Event, Password, Property, cached_property)
+    from enthought.traits.ui.api import (View, Item, Group, Handler,
+        HSplit, ListEditor, EnumEditor, TitleEditor, HGroup, ShellEditor,
+        VSplit)
     from enthought.mayavi.core.api import PipelineBase
-    from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+    from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor,
+                                              MlabSceneModel)
     from enthought.pyface.timer.api import Timer, do_later
     from enthought.tvtk.api import tvtk
     from enthought.tvtk.array_handler import array2vtk
@@ -153,7 +155,7 @@ class InterpolatorView(HasTraits):
                 Item(name='show_legend'),
                 )
 
-    #### Private protocol  ####################################################
+    #### Private protocol  ###################################################
     def _change_bounds(self):
         interp = self.interpolator
         if interp is not None:
@@ -172,10 +174,11 @@ class InterpolatorView(HasTraits):
                 self.interpolator.update_particle_arrays(self.particle_arrays)
                 self._arrays_changed = False
 
-    #### Trait handlers  ######################################################
+    #### Trait handlers  #####################################################
     def _particle_arrays_changed(self, pas):
         if len(pas) > 0:
-            all_props = reduce(set.union, [set(x.properties.keys()) for x in pas])
+            all_props = reduce(set.union,
+                               [set(x.properties.keys()) for x in pas])
         else:
             all_props = set()
         self.scalar_list = list(all_props)
@@ -418,6 +421,14 @@ class PythonShellView(HasTraits):
     view = View(Item('ns', editor=ShellEditor(), show_label=False))
 
 
+class ViewerHandler(Handler):
+
+    def closed(self, info, is_ok):
+        """Call the viewer's on_close method when the UI is closed.
+        """
+        info.object.on_close()
+
+
 ##############################################################################
 # `MayaviViewer` class.
 ##############################################################################
@@ -459,11 +470,11 @@ class MayaviViewer(HasTraits):
     file_count = Range(low='_low', high='_n_files', value=0,
                        desc='the file counter')
     play = Bool(False, desc='if all files are played automatically')
+    play_delay = Float(0.2, desc='the delay between loading files')
     loop = Bool(False, desc='if the animation is looped')
     # This is len(files) - 1.
     _n_files = Int(0)
     _low = Int(0)
-    _play_count = Int(0)
 
     ########################################
     # Timer traits.
@@ -489,6 +500,7 @@ class MayaviViewer(HasTraits):
     _last_time = Float
     _solver_data = Any
     _file_name = Str
+    _particle_array_updated = Bool
 
     ########################################
     # The layout of the dialog created
@@ -501,9 +513,14 @@ class MayaviViewer(HasTraits):
                             Item(name='current_file'),
                             Item(name='file_count'),
                             HGroup(Item(name='play'),
-                                    Item(name='loop'),
-                                    Item(name='update_files', show_label=False),
-                                    ),
+                                   Item(name='play_delay',
+                                        label='Delay',
+                                        resizable=True),
+                                   Item(name='loop'),
+                                   Item(name='update_files',
+                                        show_label=False),
+                                   padding=0,
+                               ),
                             label='Saved Data',
                             selected=True,
                             enabled_when='not live_mode',
@@ -563,12 +580,16 @@ class MayaviViewer(HasTraits):
                 resizable=True,
                 title='PySPH Particle Viewer',
                 height=640,
-                width=1024
+                width=1024,
+                handler=ViewerHandler
                 )
 
     ######################################################################
     # `MayaviViewer` interface.
     ######################################################################
+    def on_close(self):
+        self._handle_particle_array_updates()
+
     @on_trait_change('scene:activated')
     def start_timer(self):
         if not self.live_mode:
@@ -614,6 +635,9 @@ class MayaviViewer(HasTraits):
         if self.record:
             self._do_snap()
 
+    ######################################################################
+    # Private interface.
+    ######################################################################
     def _do_snap(self):
         """Generate the animation."""
         p_arrays = self.particle_arrays
@@ -641,9 +665,6 @@ class MayaviViewer(HasTraits):
             self._last_time = self.current_time
         self._count += 1
 
-    ######################################################################
-    # Private interface.
-    ######################################################################
     @on_trait_change('host,port,authkey')
     def _mark_reconnect(self):
         if self.live_mode:
@@ -675,11 +696,15 @@ class MayaviViewer(HasTraits):
             self.host_changed = False
             try:
                 if MultiprocessingClient.is_available((self.host, self.port)):
-                    self.client = MultiprocessingClient(address=(self.host, self.port),
-                                                        authkey=self.authkey)
+                    self.client = MultiprocessingClient(
+                        address=(self.host, self.port),
+                        authkey=self.authkey
+                    )
                 else:
-                    logger.info('Could not connect: Multiprocessing Interface'\
-                                ' not available on %s:%s'%(self.host,self.port))
+                    logger.info(
+                        'Could not connect: Multiprocessing Interface'\
+                        ' not available on %s:%s'%(self.host,self.port)
+                    )
                     return None
             except Exception as e:
                 logger.info('Could not connect: check if solver is '\
@@ -768,6 +793,9 @@ class MayaviViewer(HasTraits):
                 t.Start(self.interval*1000)
 
     def _file_count_changed(self, value):
+        # Save out any updates for the previous file if needed.
+        self._handle_particle_array_updates()
+        # Load the new file.
         fname = self.files[value]
         self._file_name = fname
         self.current_file = os.path.basename(fname)
@@ -804,13 +832,16 @@ class MayaviViewer(HasTraits):
         if self.record:
             self._do_snap()
 
+    def _loop_changed(self, value):
+        if value and self.play:
+            self._play_changed(self.play)
+
     def _play_changed(self, value):
         t = self.timer
         if value:
-            self._play_count = 0
             t.Stop()
             t.callable = self._play_event
-            t.Start(1000*0.5)
+            t.Start(1000*self.play_delay)
         else:
             t.Stop()
             t.callable = self._timer_event
@@ -830,7 +861,11 @@ class MayaviViewer(HasTraits):
                 self.timer.Stop()
                 pc = nf
         self.file_count = pc
-        self._play_count = pc
+        self._handle_particle_array_updates()
+
+    def _play_delay_changed(self):
+        if self.play:
+            self._play_changed(self.play)
 
     def _scalar_changed(self, value):
         for pa in self.particle_arrays:
@@ -876,11 +911,15 @@ class MayaviViewer(HasTraits):
             self.timer.Stop()
 
     def _particle_array_helper_updated(self, value):
+        self._particle_array_updated = True
+
+    def _handle_particle_array_updates(self):
         # Called when the particle array helper fires an updated event.
-        if self._file_name:
+        if self._particle_array_updated and self._file_name:
             sd = self._solver_data
             arrays = [x.particle_array for x in self.particle_arrays]
             dump(self._file_name, arrays, sd)
+            self._particle_array_updated = False
 
     def _make_particle_array_helper(self, scene, name):
         pah = ParticleArrayHelper(scene=scene, name=name, scalar=self.scalar)
@@ -891,10 +930,10 @@ class MayaviViewer(HasTraits):
 ######################################################################
 def usage():
     print("""Usage:
-pysph view [-v] <trait1=value> <trait2=value> [files.npz]
+pysph view [-v] <trait1=value> <trait2=value> [directory or files.npz]
 
-If *.npz files are not supplied it will connect to a running solver, if not it
-will display the given files.
+If a directory or *.npz files are not supplied it will connect to a running
+solver, if not it will display the given files.
 
 The arguments <trait1=value> are optional settings like host, port and authkey
 etc.  The following traits are available:
