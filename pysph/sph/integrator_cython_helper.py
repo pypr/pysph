@@ -147,7 +147,7 @@ class IntegratorCythonHelper(object):
         pa = self._particle_arrays[dest]
         # Remove the 's_' or 'd_'
         props = set([x[2:] for x in args])
-        available_props = set(pa.properties.keys())
+        available_props = set(pa.properties.keys()).union(pa.constants.keys())
         if not props.issubset(available_props):
             diff = props.difference(available_props)
             integrator_name = self.object.steppers[dest].__class__.__name__
