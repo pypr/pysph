@@ -293,9 +293,9 @@ class Application(object):
                                 help="Sub division factor for ExtendedSpatialHashNNPS"
                                 )
 
-        nnps_options.add_argument("--approximate", dest="approximate",
+        nnps_options.add_argument("--approximate-nnps", dest="approximate_nnps",
                                 action="store_true", default=False,
-                                help="Use for approximate")
+                                help="Use for approximate NNPS")
 
         nnps_options.add_argument("--spatial-hash-table-size", dest="table_size",
                                 type=int, default=131072,
@@ -598,7 +598,7 @@ class Application(object):
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, H=options.H,
                     table_size = options.table_size, sort_gids=options.sort_gids,
-                    approximate = options.approximate
+                    approximate = options.approximate_nnps
                 )
 
             self.nnps = nnps
