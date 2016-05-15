@@ -279,7 +279,7 @@ def get_basic_extensions():
             sources=["pysph/base/spatial_hash.pyx"],
             depends=get_deps(
                 "pyzoltan/core/carray", "pysph/base/point",
-                "pysph/base/particle_array",
+                "pysph/base/particle_array", "pysph/base/nnps",
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
@@ -293,7 +293,7 @@ def get_basic_extensions():
             sources=["pysph/base/linked_list.pyx"],
             depends=get_deps(
                 "pyzoltan/core/carray", "pysph/base/point",
-                "pysph/base/particle_array",
+                "pysph/base/particle_array", "pysph/base/nnps",
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
@@ -307,7 +307,8 @@ def get_basic_extensions():
             sources=["pysph/base/box_sort.pyx"],
             depends=get_deps(
                 "pyzoltan/core/carray", "pysph/base/point",
-                "pysph/base/particle_array",
+                "pysph/base/particle_array", "pysph/base/nnps",
+                "pysph/base/linked_list",
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
