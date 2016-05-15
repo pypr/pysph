@@ -12,7 +12,12 @@ from nnps cimport *
 #############################################################################
 cdef class SpatialHashNNPS(NNPS):
 
-    """Nearest neighbor particle search using Spatial Hashing algorithm"""
+    """Nearest neighbor particle search using Spatial Hashing algorithm
+
+    Uses a hashtable to store particles according to cell it belongs to.
+
+    Ref. http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
+    """
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None,
@@ -229,7 +234,17 @@ cdef class SpatialHashNNPS(NNPS):
 #############################################################################
 cdef class ExtendedSpatialHashNNPS(NNPS):
 
-    """Finds nearest neighbors using Extended Spatial Hashing algorithm"""
+    """Finds nearest neighbors using Extended Spatial Hashing algorithm
+
+    Sub-divides each cell into smaller ones. Useful when particles cluster
+    in a cell.
+
+    For approximate Extended Spatial Hash, if the distance between a cell and
+    the cell of the query particle is greater than search radius, the entire cell
+    is ignored.
+
+    Ref. http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
+    """
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int H = 3, int ghost_layers = 1, domain=None, bint fixed_h = False,
