@@ -179,11 +179,11 @@ queries for a *list* of particle arrays:
 
 .. code-block:: python
 
-   >>> from pysph.base import nnps
+   >>> from pysph.base import linked_list
    >>> pa1 = get_particle_array(...)                    # create one particle array
    >>> pa2 = get_particle_array(...)                    # create another particle array
    >>> particles = [pa1, pa2]
-   >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
+   >>> nps = linked_list.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
 
 The above will create an :py:class:`NNPS` object that uses the classical
 *linked-list* algorithm for nearest neighbour searches. The radius of
@@ -197,7 +197,7 @@ computed.  This is useful if one needs to reuse the same set of
 neighbors.  To enable this, simply pass ``cache=True`` to the
 constructor::
 
-    >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, cache=True)
+    >>> nps = linked_list.LinkedListNNPS(dim=3, particles=particles, cache=True)
 
 Since we allow a list of particle arrays, we need to distinguish
 between *source* and *destination* particle arrays in the neighbor
@@ -427,7 +427,8 @@ distribution is given below
    from pyzoltan.core.carray import UIntArray
    from pysph.base.utils import utils
    from pysph.base.kernels import CubicSpline
-   from pysph.base.nnps import DomainManager, LinkedListNNPS
+   from pysph.base.nnps import DomainManager
+   from pysph.base.linked_list import LinkedListNNPS
 
    # NumPy
    import numpy
