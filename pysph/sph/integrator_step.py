@@ -453,14 +453,14 @@ class TwoStageRigidBodyStep(IntegratorStep):
         d_z0[d_idx] = d_z[d_idx]
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
                dt):
 
         dtb2 = 0.5*dt
 
-        d_u[d_idx] = d_u0[d_idx] + dtb2 * d_ax[d_idx]
-        d_v[d_idx] = d_v0[d_idx] + dtb2 * d_ay[d_idx]
-        d_w[d_idx] = d_w0[d_idx] + dtb2 * d_az[d_idx]
+        d_u[d_idx] = d_u0[d_idx] + dtb2 * d_au[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dtb2 * d_av[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dtb2 * d_aw[d_idx]
 
         # positions are updated based on the time centered velocity
         d_x[d_idx] = d_x0[d_idx] + dtb2 * 0.5 * (d_u[d_idx] + d_u0[d_idx])
@@ -468,12 +468,12 @@ class TwoStageRigidBodyStep(IntegratorStep):
         d_z[d_idx] = d_z0[d_idx] + dtb2 * 0.5 * (d_w[d_idx] + d_w0[d_idx])
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
+               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
                dt):
 
-        d_u[d_idx] = d_u0[d_idx] + dt * d_ax[d_idx]
-        d_v[d_idx] = d_v0[d_idx] + dt * d_ay[d_idx]
-        d_w[d_idx] = d_w0[d_idx] + dt * d_az[d_idx]
+        d_u[d_idx] = d_u0[d_idx] + dt * d_au[d_idx]
+        d_v[d_idx] = d_v0[d_idx] + dt * d_av[d_idx]
+        d_w[d_idx] = d_w0[d_idx] + dt * d_aw[d_idx]
 
         # positions are updated based on the time centered velocity
         d_x[d_idx] = d_x0[d_idx] + dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])
@@ -497,18 +497,18 @@ class OneStageRigidBodyStep(IntegratorStep):
         d_z0[d_idx] = d_z[d_idx]
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
-               dt):
+                d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
+                dt):
         pass
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_x0, d_y0, d_z0,
-               d_u, d_v, d_w, d_u0, d_v0, d_w0, d_ax, d_ay, d_az,
-               dt):
+                d_u, d_v, d_w, d_u0, d_v0, d_w0, d_au, d_av, d_aw,
+                dt):
 
         # update velocities
-        d_u[d_idx] += dt * d_ax[d_idx]
-        d_v[d_idx] += dt * d_ay[d_idx]
-        d_w[d_idx] += dt * d_az[d_idx]
+        d_u[d_idx] += dt * d_au[d_idx]
+        d_v[d_idx] += dt * d_av[d_idx]
+        d_w[d_idx] += dt * d_aw[d_idx]
 
         # upadte positions using time-centered velocity
         d_x[d_idx] += dt * 0.5 * (d_u[d_idx] + d_u0[d_idx])

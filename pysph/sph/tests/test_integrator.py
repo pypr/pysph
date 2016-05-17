@@ -1,4 +1,3 @@
-
 # Standard library imports.
 import unittest
 
@@ -6,14 +5,16 @@ import unittest
 import numpy as np
 
 # Local imports.
-from pysph.base.utils import get_particle_array
+from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.base.kernels import CubicSpline
 from pysph.base.linked_list import LinkedListNNPS
 from pysph.sph.sph_compiler import SPHCompiler
-from pysph.sph.integrator import LeapFrogIntegrator, PEFRLIntegrator
-from pysph.sph.integrator_step import LeapFrogStep, PEFRLStep
+from pysph.sph.integrator import (LeapFrogIntegrator, PECIntegrator,
+                                  PEFRLIntegrator)
+from pysph.sph.integrator_step import (LeapFrogStep, PEFRLStep,
+                                       TwoStageRigidBodyStep)
 
 class SHM(Equation):
     """Simple harmonic oscillator equation.
@@ -33,6 +34,29 @@ class TestIntegrator(unittest.TestCase):
 
         # When
         integrator = LeapFrogIntegrator(fluid=LeapFrogStep())
+        equations = [SHM(dest="fluid", sources=None)]
+        kernel = CubicSpline(dim=1)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel
+        )
+        comp = SPHCompiler(a_eval, integrator=integrator)
+
+        # Then
+        self.assertRaises(RuntimeError, comp.compile)
+
+    def test_detect_missing_arrays_for_many_particle_arrays(self):
+        # Given.
+        x = np.asarray([1.0])
+        u = np.asarray([0.0])
+        h = np.ones_like(x)
+        fluid = get_particle_array_wcsph(name='fluid', x=x, u=u, h=h, m=h)
+        solid = get_particle_array(name='solid', x=x, u=u, h=h, m=h)
+        arrays = [fluid, solid]
+
+        # When
+        integrator = PECIntegrator(
+            fluid=TwoStageRigidBodyStep(), solid=TwoStageRigidBodyStep()
+        )
         equations = [SHM(dest="fluid", sources=None)]
         kernel = CubicSpline(dim=1)
         a_eval = AccelerationEval(
@@ -197,4 +221,3 @@ class TestPEFRLIntegrator(TestIntegratorBase):
 
 if __name__ == '__main__':
     unittest.main()
-
