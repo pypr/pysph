@@ -7,8 +7,6 @@ from libcpp.vector cimport vector
 # Cython for compiler directives
 cimport cython
 
-from nnps cimport *
-
 #############################################################################
 cdef class SpatialHashNNPS(NNPS):
 

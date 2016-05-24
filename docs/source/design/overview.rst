@@ -147,11 +147,11 @@ object `nps` is available and can be used for neighbor queries:
 
 .. code-block:: python
 
-   from pysph.base import linked_list
+   from pysph.base import nnps
    fluid = get_particle_array_fluid(...)
    solid = get_particle_array_solid(...)
    particles = [fluid, solid]
-   nps = linked_list.LinkedListNNPS(dim=2, particles=particles, radius_scale=2.0)
+   nps = nnps.LinkedListNNPS(dim=2, particles=particles, radius_scale=2.0)
 
 The part of the code responsible for the interactions can be defined
 as

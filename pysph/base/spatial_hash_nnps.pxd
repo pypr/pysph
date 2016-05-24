@@ -1,5 +1,4 @@
 from libcpp.vector cimport vector
-from nnps cimport *
 
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":

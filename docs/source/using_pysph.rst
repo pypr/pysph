@@ -179,11 +179,11 @@ queries for a *list* of particle arrays:
 
 .. code-block:: python
 
-   >>> from pysph.base import linked_list
+   >>> from pysph.base import nnps
    >>> pa1 = get_particle_array(...)                    # create one particle array
    >>> pa2 = get_particle_array(...)                    # create another particle array
    >>> particles = [pa1, pa2]
-   >>> nps = linked_list.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
+   >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, radius_scale=3)
 
 The above will create an :py:class:`NNPS` object that uses the classical
 *linked-list* algorithm for nearest neighbour searches. The radius of
@@ -197,7 +197,7 @@ computed.  This is useful if one needs to reuse the same set of
 neighbors.  To enable this, simply pass ``cache=True`` to the
 constructor::
 
-    >>> nps = linked_list.LinkedListNNPS(dim=3, particles=particles, cache=True)
+    >>> nps = nnps.LinkedListNNPS(dim=3, particles=particles, cache=True)
 
 Since we allow a list of particle arrays, we need to distinguish
 between *source* and *destination* particle arrays in the neighbor
@@ -428,7 +428,7 @@ distribution is given below
    from pysph.base.utils import utils
    from pysph.base.kernels import CubicSpline
    from pysph.base.nnps import DomainManager
-   from pysph.base.linked_list import LinkedListNNPS
+   from pysph.base.nnps import LinkedListNNPS
 
    # NumPy
    import numpy

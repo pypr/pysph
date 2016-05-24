@@ -14,9 +14,8 @@ import time
 from pysph.base.config import get_config
 from pysph.base import utils
 
-from pysph.base.linked_list import LinkedListNNPS
-from pysph.base.box_sort import BoxSortNNPS
-from pysph.base.spatial_hash import SpatialHashNNPS, ExtendedSpatialHashNNPS
+from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
+        ExtendedSpatialHashNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager

@@ -10,7 +10,7 @@ from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.base.kernels import CubicSpline
-from pysph.base.linked_list import LinkedListNNPS
+from pysph.base.nnps import LinkedListNNPS
 from pysph.sph.sph_compiler import SPHCompiler
 from pysph.sph.integrator import LeapFrogIntegrator, PEFRLIntegrator
 from pysph.sph.integrator_step import LeapFrogStep, PEFRLStep

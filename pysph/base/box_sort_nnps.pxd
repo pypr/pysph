@@ -1,8 +1,5 @@
 from libcpp.map cimport map
 
-from nnps cimport *
-from linked_list cimport LinkedListNNPS
-
 # NNPS using the original gridding algorithm
 cdef class DictBoxSortNNPS(NNPS):
     cdef public dict cells               # lookup table for the cells

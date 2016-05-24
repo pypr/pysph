@@ -15,7 +15,7 @@ from pysph.sph.acceleration_eval import (AccelerationEval,
     check_equation_array_properties)
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
-from pysph.base.linked_list import LinkedListNNPS as NNPS
+from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.sph_compiler import SPHCompiler
 
 from pysph.base.reduce_array import serial_reduce_array

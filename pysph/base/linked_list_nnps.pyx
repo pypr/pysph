@@ -13,10 +13,6 @@ from libcpp.map cimport map
 from libcpp.pair cimport pair
 from libcpp.vector cimport vector
 
-cdef extern from "<algorithm>" namespace "std" nogil:
-    void sort[Iter, Compare](Iter first, Iter last, Compare comp)
-    void sort[Iter](Iter first, Iter last)
-
 # cpython
 from cpython.dict cimport PyDict_Clear, PyDict_Contains, PyDict_GetItem
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM

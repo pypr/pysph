@@ -7,7 +7,7 @@ import numpy as np
 # Package imports.
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian
-from pysph.base.linked_list import LinkedListNNPS as NNPS
+from pysph.base.nnps import LinkedListNNPS as NNPS
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
