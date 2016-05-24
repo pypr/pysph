@@ -265,7 +265,9 @@ def get_basic_extensions():
             sources=["pysph/base/nnps.pyx"],
             depends=get_deps(
                 "pyzoltan/core/carray", "pysph/base/point",
-                "pysph/base/particle_array",
+                "pysph/base/particle_array", "pysph/base/nnps_base",
+                "pysph/base/linked_list_nnps", "pysph/base/box_sort_nnps",
+                "pysph/base/spatial_hash_nnps"
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
