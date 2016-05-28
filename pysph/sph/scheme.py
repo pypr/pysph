@@ -443,7 +443,7 @@ class WCSPHScheme(Scheme):
 
 class TVFScheme(Scheme):
     def __init__(self, fluids, solids, dim, rho0, c0, nu, p0, pb, h0,
-                  gx=0.0, gy=0.0, gz=0.0):
+                  gx=0.0, gy=0.0, gz=0.0, alpha=0.0, tdamp=0.0):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -457,6 +457,8 @@ class TVFScheme(Scheme):
         self.gx = gx
         self.gy = gy
         self.gz = gz
+        self.alpha = alpha
+        self.tdamp = 0.0
 
     def get_timestep(self, cfl=0.25):
         dt_cfl = cfl * self.h0/self.c0
@@ -511,6 +513,7 @@ class TVFScheme(Scheme):
         from pysph.sph.equation import Group
         from pysph.sph.wc.transport_velocity import (SummationDensity,
             StateEquation, MomentumEquationPressureGradient,
+            MomentumEquationArtificialViscosity,
             MomentumEquationViscosity, MomentumEquationArtificialStress,
             SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity)
         equations = []
@@ -546,9 +549,16 @@ class TVFScheme(Scheme):
             g4.append(
                 MomentumEquationPressureGradient(
                     dest=fluid, sources=all, pb=self.pb, gx=self.gx,
-                    gy=self.gy, gz=self.gz
+                    gy=self.gy, gz=self.gz, tdamp=self.tdamp
                 )
             )
+            if self.alpha > 0.0:
+                g4.append(
+                    MomentumEquationArtificialViscosity(
+                        dest=fluid, sources=all, c0=self.c0,
+                        alpha=self.alpha
+                    )
+                )
             if self.nu > 0.0:
                 g4.append(
                     MomentumEquationViscosity(
@@ -589,6 +599,159 @@ class TVFScheme(Scheme):
             pa = particle_arrays[solid]
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)
+
+
+class AdamiHuAdamsScheme(TVFScheme):
+    """This is a scheme similiar to that in the paper:
+
+    Adami, S., Hu, X., Adams, N. A generalized wall boundary condition for
+    smoothed particle hydrodynamics.  Journal of Computational Physics
+    2012;231(21):7057-7075.
+
+    The major difference is in how the equations are integrated.  The paper
+    has a different scheme that does not quite fit in with how things are done
+    in PySPH readily so we simply use the WCSPHStep which works well.
+    """
+    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0,
+                  gx=0.0, gy=0.0, gz=0.0, p0=0.0, gamma=7.0,
+                  tdamp=0.0, alpha=0.0):
+        self.fluids = fluids
+        self.solids = solids
+        self.solver = None
+        self.rho0 = rho0
+        self.alpha = alpha
+        self.c0 = c0
+        self.h0 = h0
+        self.p0 = p0
+        self.nu = nu
+        self.dim = dim
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.gamma = float(gamma)
+        self.B = c0*c0*rho0/gamma
+        self.tdamp = tdamp
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                           extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import QuinticSpline
+        from pysph.sph.integrator_step import WCSPHStep
+        from pysph.sph.integrator import PECIntegrator
+        if kernel is None:
+            kernel = QuinticSpline(dim=self.dim)
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        step_cls = WCSPHStep
+        for fluid in self.fluids:
+            if fluid not in steppers:
+                steppers[fluid] = step_cls()
+
+        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        integrator = cls(**steppers)
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.wc.basic import TaitEOS
+        from pysph.sph.basic_equations import XSPHCorrection
+        from pysph.sph.wc.transport_velocity import (ContinuityEquation,
+            MomentumEquationPressureGradient,
+            MomentumEquationViscosity, MomentumEquationArtificialViscosity,
+            SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity,
+            VolumeSummation
+        )
+
+        equations = []
+        all = self.fluids + self.solids
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(VolumeSummation(dest=fluid, sources=all))
+            g2.append(TaitEOS(
+                dest=fluid, sources=None, rho0=self.rho0, c0=self.c0,
+                gamma=self.gamma, p0=self.p0
+            ))
+        for solid in self.solids:
+            g2.append(VolumeSummation(dest=solid, sources=all))
+            g2.append(SetWallVelocity(dest=solid, sources=self.fluids))
+
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for solid in self.solids:
+            for fluid in self.fluids:
+                g3.append(SolidWallPressureBC(
+                    dest=solid, sources=[fluid], b=1.0, rho0=self.rho0,
+                    p0=self.B, gx=self.gx, gy=self.gy, gz=self.gz
+                ))
+
+        equations.append(Group(equations=g3, real=False))
+
+        g4 = []
+        for fluid in self.fluids:
+            g4.append(
+                ContinuityEquation(dest=fluid, sources=all)
+            )
+            g4.append(
+                MomentumEquationPressureGradient(
+                    dest=fluid, sources=all, pb=0.0, gx=self.gx,
+                    gy=self.gy, gz=self.gz, tdamp=self.tdamp
+                )
+            )
+            if self.alpha > 0.0:
+                g4.append(
+                    MomentumEquationArtificialViscosity(
+                        dest=fluid, sources=all, c0=self.c0,
+                        alpha=self.alpha
+                    )
+                )
+            if self.nu > 0.0:
+                g4.append(
+                    MomentumEquationViscosity(
+                        dest=fluid, sources=self.fluids, nu=self.nu
+                    )
+                )
+                if len(self.solids) > 0:
+                    g4.append(
+                        SolidWallNoSlipBC(
+                            dest=fluid, sources=self.solids, nu=self.nu
+                        )
+                    )
+            g4.append(XSPHCorrection(dest=fluid, sources=[fluid]))
+
+        equations.append(Group(equations=g4))
+        return equations
+
+    def setup_properties(self, particles, clean=True):
+        super(AdamiHuAdamsScheme, self).setup_properties(particles, clean)
+        particle_arrays = dict([(p.name, p) for p in particles])
+        props = ['cs', 'arho', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
+                 'ax', 'ay', 'az']
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            for prop in props:
+                pa.add_property(prop)
 
 
 class GasDScheme(Scheme):

@@ -333,9 +333,14 @@ def get_particle_array_tvf_solid(constants=None, **props):
     tv_props = ['u0', 'v0', 'w0', 'V', 'wij', 'ax', 'ay', 'az',
                 'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
 
-    return get_particle_array(
+    pa = get_particle_array(
         constants=constants, additional_props=tv_props, **props
     )
+    pa.set_output_arrays(
+        ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h', 'm', 'V',
+         'pid', 'gid', 'tag']
+    )
+    return pa
 
 def get_particle_array_gasd(constants=None, **props):
     """Return a particle array for a Gas Dynamics problem.

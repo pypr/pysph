@@ -328,15 +328,15 @@ class AdamiVerletStep(IntegratorStep):
                d_rho, d_arho, d_vmag2, dt):
         dtb2 = 0.5*dt
 
-        # velocity corrector eqn (18)
-        d_u[d_idx] += dtb2*d_au[d_idx]
-        d_v[d_idx] += dtb2*d_av[d_idx]
-        d_w[d_idx] += dtb2*d_aw[d_idx]
-
         # position corrector eqn (17)
         d_x[d_idx] += dtb2*d_u[d_idx]
         d_y[d_idx] += dtb2*d_v[d_idx]
         d_z[d_idx] += dtb2*d_w[d_idx]
+
+        # velocity corrector eqn (18)
+        d_u[d_idx] += dtb2*d_au[d_idx]
+        d_v[d_idx] += dtb2*d_av[d_idx]
+        d_w[d_idx] += dtb2*d_aw[d_idx]
 
         # density corrector eqn (16)
         d_rho[d_idx] += dt * d_arho[d_idx]
