@@ -37,7 +37,7 @@ public:
         return this->key;
     }
 
-    inline vector <unsigned int> *get_value()
+    inline vector <unsigned int> *get_indices()
     {
         return &this->indices;
     } 
@@ -96,7 +96,7 @@ public:
         while(entry!=NULL)
         {
             if(entry->c_x==i && entry->c_y==j && entry->c_z==k)
-                return entry->get_value();
+                return entry->get_indices();
             entry = entry->next;
         }
         return NULL;
