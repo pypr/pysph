@@ -1,6 +1,8 @@
 from libcpp.map cimport map
 from libcpp.vector cimport vector
 
+from nnps_base cimport *
+
 # NNPS using the linked list approach
 cdef class LinkedListNNPS(NNPS):
     ############################################################################

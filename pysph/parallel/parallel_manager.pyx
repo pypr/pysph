@@ -15,7 +15,7 @@ from pyzoltan.czoltan.czoltan cimport Zoltan_Struct
 from pyzoltan.core import zoltan_utils
 
 # PySPH imports
-from pysph.base.nnps cimport DomainManager, Cell, find_cell_id, arange_uint
+from pysph.base.nnps_base cimport DomainManager, Cell, find_cell_id, arange_uint
 from pysph.base.utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
