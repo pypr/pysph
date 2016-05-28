@@ -399,6 +399,7 @@ class MomentumEquationArtificialViscosity(Equation):
         d_av[d_idx] += -piij * DWIJ[1]
         d_aw[d_idx] += -piij * DWIJ[2]
 
+
 class MomentumEquationArtificialStress(Equation):
     r"""**Artificial stress contribution to the Momentum Equation**
 
