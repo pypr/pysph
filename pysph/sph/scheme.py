@@ -8,7 +8,6 @@ class Scheme(object):
     """An API for an SPH scheme.
     """
 
-    #### Public protocol ###################################################
     def __init__(self, fluids, solids, dim):
         """
         Parameters
@@ -25,8 +24,17 @@ class Scheme(object):
         self.solids = solids
         self.dim = dim
         self.solver = None
+        self.attributes_changed()
 
+    #### Public protocol ###################################################
     def add_user_options(self, group):
+        pass
+
+    def attributes_changed(self):
+        """Overload this to compute any properties that depend on others.
+
+        This is automatically called when configure is called.
+        """
         pass
 
     def configure(self, **kw):
@@ -41,6 +49,7 @@ class Scheme(object):
                 )
                 raise RuntimeError(msg)
             setattr(self, k, v)
+        self.attributes_changed()
 
     def consume_user_options(self, options):
         pass
@@ -137,6 +146,9 @@ class SchemeChooser(Scheme):
             default=self.default, choices=choices,
             help="Specify scheme to use (one of %s)."%choices
         )
+
+    def attributes_changed(self):
+        self.scheme.attributes_changed()
 
     def configure(self, **kw):
         self.scheme.configure(**kw)
@@ -314,8 +326,8 @@ class WCSPHScheme(Scheme):
     def consume_user_options(self, options):
         vars = ['gamma', 'tensile_correction', 'hg_correction',
                 'update_h', 'delta_sph', 'alpha', 'beta']
-        for var in vars:
-            setattr(self, var, getattr(options, var))
+        data = dict((var, getattr(options, var)) for var in vars)
+        self.configure(**data)
 
     def get_timestep(self, cfl=0.5):
         return cfl*self.h0/self.c0
@@ -459,6 +471,23 @@ class TVFScheme(Scheme):
         self.gz = gz
         self.alpha = alpha
         self.tdamp = 0.0
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--alpha", action="store", type=float, dest="alpha",
+            default=self.alpha,
+            help="Alpha for the artificial viscosity."
+        )
+        group.add_argument(
+            "--tdamp", action="store", type=float, dest="tdamp",
+            default=self.tdamp,
+            help="Time for which the accelerations are damped."
+        )
+
+    def consume_user_options(self, options):
+        vars = ['alpha', 'tdamp']
+        data = dict((var, getattr(options, var)) for var in vars)
+        self.configure(**data)
 
     def get_timestep(self, cfl=0.25):
         dt_cfl = cfl * self.h0/self.c0
@@ -619,7 +648,6 @@ class AdamiHuAdamsScheme(TVFScheme):
         self.solids = solids
         self.solver = None
         self.rho0 = rho0
-        self.alpha = alpha
         self.c0 = c0
         self.h0 = h0
         self.p0 = p0
@@ -628,9 +656,26 @@ class AdamiHuAdamsScheme(TVFScheme):
         self.gx = gx
         self.gy = gy
         self.gz = gz
+        self.alpha = alpha
         self.gamma = float(gamma)
-        self.B = c0*c0*rho0/gamma
         self.tdamp = tdamp
+        self.attributes_changed()
+
+    def add_user_options(self, group):
+        super(AdamiHuAdamsScheme, self).add_user_options(group)
+        group.add_argument(
+            "--gamma", action="store", type=float, dest="gamma",
+            default=self.gamma,
+            help="Gamma for the state equation."
+        )
+
+    def attributes_changed(self):
+        self.B = self.c0*self.c0*self.rho0/self.gamma
+
+    def consume_user_options(self, options):
+        vars = ['alpha', 'tdamp', 'gamma']
+        data = dict((var, getattr(options, var)) for var in vars)
+        self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                            extra_steppers=None, **kw):
@@ -842,8 +887,8 @@ class GasDScheme(Scheme):
         self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
                 'update_alpha2']
-        for var in vars:
-            setattr(self, var, getattr(options, var))
+        data = dict((var, getattr(options, var)) for var in vars)
+        self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                            extra_steppers=None, **kw):

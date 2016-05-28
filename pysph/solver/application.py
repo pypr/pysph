@@ -404,11 +404,18 @@ class Application(object):
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-          # User options.
-        user_options = parser.add_argument_group("User",
-                 "User defined command line arguments")
+        # Scheme options.
         if self.scheme is not None:
-            self.scheme.add_user_options(user_options)
+            scheme_options = parser.add_argument_group(
+                "SPH Scheme options",
+                "Scheme related command line arguments",
+                conflict_handler="resolve"
+            )
+            self.scheme.add_user_options(scheme_options)
+        # User options.
+        user_options = parser.add_argument_group(
+            "User", "User defined command line arguments"
+        )
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
