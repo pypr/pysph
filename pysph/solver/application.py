@@ -186,6 +186,13 @@ class Application(object):
             "very large value)."
         )
 
+        # --n-damp
+        parser.add_argument(
+            "--n-damp", action="store", type=int, dest="n_damp",
+            default=None,
+            help="Number of iterations to damp timesteps initially."
+        )
+
         # --adaptive-timestep
         parser.add_argument("--adaptive-timestep", action="store_true",
                           dest="adaptive_timestep", default=None,
@@ -636,6 +643,8 @@ class Application(object):
             # set solver cfl number
             solver.set_cfl(options.cfl)
 
+        if options.n_damp is not None:
+            solver.set_n_damp(options.n_damp)
 
         # setup the solver. This is where the code is compiled
         solver.setup(
