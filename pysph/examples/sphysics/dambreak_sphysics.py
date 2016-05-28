@@ -65,7 +65,7 @@ class DamBreak3DSPhysics(Application):
             adaptive, n_damp = False, 0
         else:
             integrator = EPECIntegrator(fluid=WCSPHStep(),boundary=WCSPHStep())
-            adaptive, n_damp = True, 100
+            adaptive, n_damp = True, 0
 
         solver = Solver(dim=dim, kernel=kernel, integrator=integrator,
                         adaptive_timestep=adaptive, tf=tf, dt=dt,
