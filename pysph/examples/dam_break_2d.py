@@ -17,7 +17,7 @@ from pysph.sph.scheme import WCSPHScheme
 
 fluid_column_height = 2.0
 fluid_column_width = 1.0
-container_height = 3.0
+container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
 #h = 0.0156
@@ -29,6 +29,7 @@ alpha = 0.1
 beta = 0.0
 B = co*co*ro/gamma
 p0 = 1000.0
+
 
 class DamBreak2D(Application):
     def add_user_options(self, group):
@@ -49,9 +50,11 @@ class DamBreak2D(Application):
         self.scheme.configure(h0=self.h, hdx=self.hdx)
         kernel = WendlandQuintic(dim=2)
         tf = 2.5
-        from pysph.sph.integrator import TVDRK3Integrator
+        from pysph.sph.integrator import EPECIntegrator
         self.scheme.configure_solver(
-            kernel=kernel, integrator_cls=TVDRK3Integrator, tf=tf,
+            kernel=kernel,
+            integrator_cls=EPECIntegrator,
+            tf=tf,
             adaptive_timestep=True, n_damp=50, fixed_h=False
         )
 
@@ -70,7 +73,7 @@ class DamBreak2D(Application):
             fluid_column_width=fluid_column_width, dx=self.dx, dy=self.dx,
             nboundary_layers=1, ro=ro, co=co,
             with_obstacle=False,
-            beta=2.0, nfluid_offset=1, hdx=self.hdx)
+            beta=1.0, nfluid_offset=1, hdx=self.hdx)
         return geom.create_particles()
 
     def post_process(self, info_fname):

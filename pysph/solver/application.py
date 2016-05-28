@@ -189,6 +189,13 @@ class Application(object):
             "very large value)."
         )
 
+        # --n-damp
+        parser.add_argument(
+            "--n-damp", action="store", type=int, dest="n_damp",
+            default=None,
+            help="Number of iterations to damp timesteps initially."
+        )
+
         # --adaptive-timestep
         parser.add_argument("--adaptive-timestep", action="store_true",
                           dest="adaptive_timestep", default=None,
@@ -417,11 +424,18 @@ class Application(object):
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-          # User options.
-        user_options = parser.add_argument_group("User",
-                 "User defined command line arguments")
+        # Scheme options.
         if self.scheme is not None:
-            self.scheme.add_user_options(user_options)
+            scheme_options = parser.add_argument_group(
+                "SPH Scheme options",
+                "Scheme related command line arguments",
+                conflict_handler="resolve"
+            )
+            self.scheme.add_user_options(scheme_options)
+        # User options.
+        user_options = parser.add_argument_group(
+            "User", "User defined command line arguments"
+        )
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
@@ -674,6 +688,8 @@ class Application(object):
             # set solver cfl number
             solver.set_cfl(options.cfl)
 
+        if options.n_damp is not None:
+            solver.set_n_damp(options.n_damp)
 
         # setup the solver. This is where the code is compiled
         solver.setup(
