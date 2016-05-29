@@ -601,7 +601,7 @@ class Application(object):
                 nnps = SpatialHashNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, table_size = options.table_size,
+                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
                     sort_gids=options.sort_gids
                 )
 
@@ -610,8 +610,8 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, H=options.H,
-                    table_size = options.table_size, sort_gids=options.sort_gids,
-                    approximate = options.approximate_nnps
+                    table_size=options.table_size, sort_gids=options.sort_gids,
+                    approximate=options.approximate_nnps
                 )
 
             self.nnps = nnps

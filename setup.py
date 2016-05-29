@@ -284,7 +284,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-
             language="c++"
         ),
 
@@ -298,7 +297,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-
             language="c++"
         ),
 
@@ -312,7 +310,6 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-
             language="c++"
         ),
 
