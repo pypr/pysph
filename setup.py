@@ -261,11 +261,50 @@ def get_basic_extensions():
         ),
 
         Extension(
-            name="pysph.base.nnps",
-            sources=["pysph/base/nnps.pyx"],
+            name="pysph.base.nnps_base",
+            sources=["pysph/base/nnps_base.pyx"],
             depends=get_deps(
                 "pyzoltan/core/carray", "pysph/base/point",
                 "pysph/base/particle_array",
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.linked_list_nnps",
+            sources=["pysph/base/linked_list_nnps.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.box_sort_nnps",
+            sources=["pysph/base/box_sort_nnps.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base", "pysph/base/linked_list_nnps"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.spatial_hash_nnps",
+            sources=["pysph/base/spatial_hash_nnps.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,

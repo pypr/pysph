@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base import nnps
 
 # Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
+from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
@@ -76,9 +76,17 @@ class SimpleNNPSTestCase(unittest.TestCase):
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
+        self.sp_hash_nnps = nnps.SpatialHashNNPS(
+            dim=3, particles=[pa,], radius_scale=1.0
+        )
+
+        self.ext_sp_hash_nnps = nnps.ExtendedSpatialHashNNPS(
+                dim=3, particles=[pa,], radius_scale=1.0
+        )
+
         # these are the expected cells
         self.expected_cells = {
-            IntPoint(-2, 0, 0):[0,6], 
+            IntPoint(-2, 0, 0):[0,6],
             IntPoint(0, -1, 0):[1,8],
             IntPoint(1, -2, 1):[2,],
             IntPoint(0, 1, -1):[3, 7, 9],
@@ -94,6 +102,9 @@ class SimpleNNPSTestCase(unittest.TestCase):
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
         nnps = self.ll_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
+        nnps = self.sp_hash_nnps
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
     def test_cells(self):
@@ -214,6 +225,21 @@ class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.SpatialHashNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedSpatialHashNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
 
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
@@ -240,7 +266,7 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
             self.assertTrue( cid.z > -1 )
 
 
-class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
+class TestNNPSOnLargeDomain(unittest.TestCase):
     def _make_particles(self, nx=20):
         x, y, z = numpy.random.random((3, nx, nx, nx))
         x = numpy.ravel(x)
@@ -281,7 +307,40 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
             x.sort(); y.sort()
             assert numpy.all(x == y)
 
-class TestNNPSWithSorting(unittest.TestCase):
+    def test_spatial_hash_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+    def test_extended_spatial_hash_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.ExtendedSpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+
+class TestLinkedListNNPSWithSorting(unittest.TestCase):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
         h = numpy.ones_like(x)/(nx-1)
@@ -330,8 +389,16 @@ class TestNNPSWithSorting(unittest.TestCase):
             sorted_nbrs.sort()
             self.assertTrue(numpy.all(nb == sorted_nbrs))
 
+class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
+    def _make_particles(self, nx=20):
+        x = numpy.linspace(0, 1, nx)
+        h = numpy.ones_like(x)/(nx-1)
 
-def test_large_number_of_neighbors():
+        pa = get_particle_array(name='fluid', x=x, h=h)
+        nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
+        return pa, nps
+
+def test_large_number_of_neighbors_linked_list():
     x = numpy.random.random(1 << 14)*0.1
     y = x.copy()
     z = x.copy()
@@ -344,6 +411,18 @@ def test_large_number_of_neighbors():
     # print(nbrs.length)
     assert nbrs.length == len(x)
 
+def test_large_number_of_neighbors_spatial_hash():
+    x = numpy.random.random(1 << 14)*0.1
+    y = x.copy()
+    z = x.copy()
+    h = numpy.ones_like(x)
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
+
+    nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    # print(nbrs.length)
+    assert nbrs.length == len(x)
 
 def test_flatten_unflatten():
     # first consider the 2D case where we assume a 4 X 5 grid of cells
@@ -381,7 +460,7 @@ def test_1D_get_valid_cell_index():
     dim = 1
 
     # simulate a dummy distribution such that 10 cells are along the
-    # 'x' direction 
+    # 'x' direction
     n_cells = 10
     ncells_per_dim = IntArray(3)
 

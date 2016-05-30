@@ -13,7 +13,10 @@ import time
 # PySPH imports.
 from pysph.base.config import get_config
 from pysph.base import utils
-from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS
+
+from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
+        ExtendedSpatialHashNNPS
+
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
@@ -283,10 +286,27 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll'],
+                                choices=['box', 'll', 'sh', 'esh'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
-                                     "the linked list algorithm ('ll'). "
+                                     "the linked list algorithm ('ll') or "\
+                                     "the spatial hash algorithm ('sh') or "\
+                                     "the extended spatial hash algorithm ('esh')"
+                                )
+
+        nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
+                                type=int, default=3,
+                                help="Sub division factor for ExtendedSpatialHashNNPS"
+                                )
+
+        nnps_options.add_argument("--approximate-nnps", dest="approximate_nnps",
+                                action="store_true", default=False,
+                                help="Use for approximate NNPS")
+
+        nnps_options.add_argument("--spatial-hash-table-size", dest="table_size",
+                                type=int, default=131072,
+                                help="Table size for SpatialHashNNPS and \
+                                        ExtendedSpatialHashNNPS"
                                 )
 
         # --fixed-h
@@ -576,6 +596,24 @@ class Application(object):
                     fixed_h=fixed_h, cache=cache,
                     sort_gids=options.sort_gids
                 )
+
+            elif options.nnps == 'sh':
+                nnps = SpatialHashNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
+                    sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'esh':
+                nnps = ExtendedSpatialHashNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, H=options.H,
+                    table_size=options.table_size, sort_gids=options.sort_gids,
+                    approximate=options.approximate_nnps
+                )
+
             self.nnps = nnps
 
         nnps = self.nnps

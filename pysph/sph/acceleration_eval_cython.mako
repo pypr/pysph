@@ -124,7 +124,7 @@ from cython.parallel import parallel, prange, threadid
 % endif
 
 from pysph.base.particle_array cimport ParticleArray
-from pysph.base.nnps cimport NNPS
+from pysph.base.nnps_base cimport NNPS
 from pysph.base.reduce_array import serial_reduce_array
 % if helper.object.mode == 'serial':
 from pysph.base.reduce_array import dummy_reduce_array as parallel_reduce_array

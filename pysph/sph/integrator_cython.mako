@@ -9,7 +9,7 @@ ${' '*4*level}${l}
 from libc.math cimport *
 from libc.math cimport M_PI as pi
 
-from pysph.base.nnps cimport NNPS
+from pysph.base.nnps_base cimport NNPS
 
 
 ${helper.get_stepper_code()}
