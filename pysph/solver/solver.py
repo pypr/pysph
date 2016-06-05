@@ -307,6 +307,12 @@ class Solver(object):
         self.tf = tf
         self._epsilon = EPSILON*tf
 
+    def set_n_damp(self, ndamp):
+        """Set the number of timesteps for which the timestep should be
+        initially damped.
+        """
+        self.n_damp = ndamp
+
     def set_time_step(self, dt):
         """ Set the time step to use """
         self.dt = dt

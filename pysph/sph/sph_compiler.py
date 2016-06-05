@@ -25,9 +25,9 @@ class SPHCompiler(object):
         if self.ext_mod is not None:
             return
         code = self._get_code()
-        # Note, we do not add carray or particle_array as nnps would have
+        # Note, we do not add carray or particle_array as nnps_base would have
         # been rebuilt anyway if they changed.
-        depends = ["pysph.base.nnps"]
+        depends = ["pysph.base.nnps_base"]
         self.ext_mod = ExtModule(code, verbose=True, depends=depends)
         mod = self.ext_mod.load()
         self.module = mod

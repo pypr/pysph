@@ -8,6 +8,15 @@ from nose.plugins.attrib import attr
 
 from pysph.examples import run
 
+def check_output(*args, **kw):
+    """Simple hack to support Python 2.6 which does not have
+    subprocess.check_output.
+    """
+    if not hasattr(subprocess, 'check_output'):
+        subprocess.call(*args, **kw)
+    else:
+        subprocess.check_output(*args, **kw)
+
 _orig_ets_toolkit = None
 def setup_module():
     # Set the ETS_TOOLKIT to null to avoid errors when importing TVTK.
@@ -33,7 +42,7 @@ def run_example(module):
     env_vars = dict(os.environ)
     env_vars['ETS_TOOLKIT'] = 'null'
     try:
-        subprocess.check_output(cmd, env=env_vars)
+        check_output(cmd, env=env_vars)
     finally:
         shutil.rmtree(out_dir)
 

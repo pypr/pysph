@@ -193,6 +193,8 @@ class ExtModule(object):
                 if force or self.should_recompile():
                     self._message("Compiling code at:", self.src_path)
                     inc_dirs = [numpy.get_include()]
+                    # Add pysph/base directory to inc_dirs for including spatial_hash.h
+                    # for SpatialHashNNPS
                     inc_dirs.append(os.path.dirname(os.path.realpath(__file__)))
                     extra_compile_args, extra_link_args = self._get_extra_args()
 

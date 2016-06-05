@@ -427,7 +427,8 @@ distribution is given below
    from pyzoltan.core.carray import UIntArray
    from pysph.base.utils import utils
    from pysph.base.kernels import CubicSpline
-   from pysph.base.nnps import DomainManager, LinkedListNNPS
+   from pysph.base.nnps import DomainManager
+   from pysph.base.nnps import LinkedListNNPS
 
    # NumPy
    import numpy

@@ -436,7 +436,6 @@ class Group(object):
         self.equations = equations
         self.src_arrays = self.dest_arrays = None
 
-        self.context = Context()
         self.update()
 
     ##########################################################################
@@ -564,6 +563,7 @@ class Group(object):
     # Public interface.
     ##########################################################################
     def update(self):
+        self.context = Context()
         if not self.has_subgroups:
             self._setup_precomputed()
 

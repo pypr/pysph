@@ -13,7 +13,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base import nnps
 
 # Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, IntArray, DoubleArray
+from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
@@ -266,7 +266,7 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
             self.assertTrue( cid.z > -1 )
 
 
-class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
+class TestNNPSOnLargeDomain(unittest.TestCase):
     def _make_particles(self, nx=20):
         x, y, z = numpy.random.random((3, nx, nx, nx))
         x = numpy.ravel(x)
@@ -312,6 +312,22 @@ class TestBoxSortNNPSOnLargeDomain(unittest.TestCase):
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
         nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+    def test_extended_spatial_hash_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.ExtendedSpatialHashNNPS(dim=3, particles=[pa], cache=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)
