@@ -1,3 +1,21 @@
+#cython: embedsignature=True
+
+# malloc and friends
+from libc.stdlib cimport malloc, free
+from libcpp.vector cimport vector
+from libcpp.map cimport map
+
+from cython.operator cimport dereference as deref, preincrement as inc
+
+# Cython for compiler directives
+cimport cython
+
+cdef extern from "<algorithm>" namespace "std" nogil:
+    void sort[Iter, Compare](Iter first, Iter last, Compare comp)
+    void sort[Iter](Iter first, Iter last)
+
+
+#############################################################################
 
 cdef class CellIndexing(NNPS):
 
@@ -14,8 +32,7 @@ cdef class CellIndexing(NNPS):
         self.radius_scale2 = radius_scale*radius_scale
 
         self.keys = <LL_INT**> malloc(self.narrays*sizeof(LL_INT*))
-        self.key_indices = \
-                <key_to_idx_t**> malloc(self.narrays*sizeof(key_to_idx_t*))
+        self.key_indices = <key_to_idx_t**> malloc(self.narrays*sizeof(key_to_idx_t*))
 
         self.I = <LL_INT*> malloc(self.narrays*sizeof(LL_INT))
         self.J = <LL_INT*> malloc(self.narrays*sizeof(LL_INT))
@@ -124,33 +141,37 @@ cdef class CellIndexing(NNPS):
 
         cdef map[LL_INT, int].iterator it
 
+        cdef int x_boxes[27]
+        cdef int y_boxes[27]
+        cdef int z_boxes[27]
+        cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
+                x_boxes, y_boxes, z_boxes)
+
         cdef int n, idx
         cdef LL_INT next_cell
-        for i from -1<=i<2:
-            for j from -1<=j<2:
-                for k from -1<=k<2:
-                    next_cell = c_x+k
-                    it = self.current_indices.find(self.get_key(0, c_x+k, c_y+j, \
-                        c_z+i, self.src_index))
-                    if it == self.current_indices.end():
-                        continue
-                    n = deref(it).second
-                    while next_cell == c_x+k:
-                        idx = self._get_id(self.current_keys[n], self.src_index)
+        for i from 0<=i<num_boxes:
+            next_cell = x_boxes[i]
+            it = self.current_indices.find(self.get_key(0, x_boxes[i], y_boxes[i], \
+                z_boxes[i], self.src_index))
+            if it == self.current_indices.end():
+                continue
+            n = deref(it).second
+            while next_cell == x_boxes[i]:
+                idx = self._get_id(self.current_keys[n], self.src_index)
 
-                        hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
+                hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
 
-                        xij2 = norm2(
-                            src_x_ptr[idx] - x,
-                            src_y_ptr[idx] - y,
-                            src_z_ptr[idx] - z
-                            )
+                xij2 = norm2(
+                    src_x_ptr[idx] - x,
+                    src_y_ptr[idx] - y,
+                    src_z_ptr[idx] - z
+                    )
 
-                        if (xij2 < hi2) or (xij2 < hj2):
-                            nbrs.c_append(idx)
+                if (xij2 < hi2) or (xij2 < hj2):
+                    nbrs.c_append(idx)
 
-                        n += 1
-                        next_cell = self._get_x(self.current_keys[n], self.src_index)
+                n += 1
+                next_cell = self._get_x(self.current_keys[n], self.src_index)
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -231,6 +252,21 @@ cdef class CellIndexing(NNPS):
                 c_x = id_x
                 c_y = id_y
                 c_z = id_z
+
+    cdef inline int _neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil:
+        cdef int length = 0
+        cdef int p, q, r
+        for p from -1<=p<2:
+            for q from -1<=q<2:
+                for r from -1<=r<2:
+                    if i+r>=0 and j+q>=0 and k+p>=0:
+                        x[length] = i+r
+                        y[length] = j+q
+                        z[length] = k+p
+                        length += 1
+        return length
+
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper

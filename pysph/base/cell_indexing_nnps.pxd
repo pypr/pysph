@@ -1,8 +1,14 @@
 # cython: embedsignature=True
-from libcpp cimport map
+from libcpp.map cimport map
+from libcpp.pair cimport pair
+
+from nnps_base cimport *
 
 ctypedef long long int LL_INT
 ctypedef map[LL_INT, int] key_to_idx_t
+
+cdef extern from 'math.h':
+    double log2(double) nogil
 
 cdef class CellIndexing(NNPS):
     ############################################################################
@@ -35,6 +41,9 @@ cdef class CellIndexing(NNPS):
     cdef inline int _get_y(self, LL_INT key, int pa_index) nogil
 
     cdef inline int _get_z(self, LL_INT key, int pa_index) nogil
+
+    cdef inline int _neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z) nogil
 
     cpdef set_context(self, int src_index, int dst_index)
 
