@@ -102,6 +102,22 @@ public:
         return NULL;
     }
 
+    int number_of_particles()
+    {
+        HashEntry* curr = NULL;
+        int num_particles = 0;
+        for(int i=0; i<this->table_size; i++)
+        {
+            curr = this->hashtable[i];
+            while(curr!=NULL)
+            {
+                num_particles += curr->indices.size();
+                curr = curr->next;
+            }
+        }
+        return num_particles;
+    }
+
     ~HashTable()
     {
         for(int i=0; i<this->table_size; i++)

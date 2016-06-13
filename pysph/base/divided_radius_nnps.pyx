@@ -44,6 +44,7 @@ cdef class DividedRadiusNNPS(NNPS):
             long long int table_size = 131072):
 
         cdef int narrays = len(particles)
+        cdef HashTable** current_hash
 
         self.hashtable = <HashTable***> malloc(narrays*sizeof(HashTable**))
 
@@ -71,7 +72,13 @@ cdef class DividedRadiusNNPS(NNPS):
 
     cpdef int count_particles(self, int interval):
         """Count number of particles in at a level"""
-        pass
+        cdef int i
+        cdef int num_particles = 0
+        return self.current_hash[interval].number_of_particles()
+
+    cpdef double get_binning_size(self, int interval):
+        """Get bin size at a level"""
+        return self._get_cell_size(interval)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -167,7 +174,6 @@ cdef class DividedRadiusNNPS(NNPS):
             self._sort_neighbors(
                 &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
             )
-
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):

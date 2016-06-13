@@ -12,6 +12,7 @@ cdef extern from "spatial_hash.h":
         HashTable(long long int) nogil except +
         void add(int, int, int, int) nogil
         vector[u_int]* get(int, int, int) nogil
+        int number_of_particles() nogil
 
 # NNPS using Spatial Hashing algorithm
 cdef class DividedRadiusNNPS(NNPS):
@@ -36,6 +37,8 @@ cdef class DividedRadiusNNPS(NNPS):
     cpdef set_context(self, int src_index, int dst_index)
 
     cpdef int count_particles(self, int interval)
+
+    cpdef double get_binning_size(self, int interval)
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
