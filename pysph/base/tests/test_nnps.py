@@ -84,6 +84,10 @@ class SimpleNNPSTestCase(unittest.TestCase):
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
+        self.strat_radius_nnps = nnps.StratifiedRadiusNNPS(
+                dim=3, particles=[pa,], radius_scale=1.0
+        )
+
         # these are the expected cells
         self.expected_cells = {
             IntPoint(-2, 0, 0):[0,6],
@@ -105,6 +109,12 @@ class SimpleNNPSTestCase(unittest.TestCase):
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
         nnps = self.sp_hash_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
+        nnps = self.ext_sp_hash_nnps
+        self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
+
+        nnps = self.strat_radius_nnps
         self.assertAlmostEqual( nnps.cell_size, 1.0, 14 )
 
     def test_cells(self):
@@ -193,7 +203,12 @@ class NNPSTestCase(unittest.TestCase):
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
             # ensure that the neighbor lists are the same
-            self._assert_neighbors(nbrs1, nbrs2)
+            try:
+                self._assert_neighbors(nbrs1, nbrs2)
+            except:
+                print i
+                print nbrs1.get_npy_array()
+                print nbrs2.get_npy_array()
 
 
 class DictBoxSortNNPSTestCase(NNPSTestCase):
@@ -231,6 +246,23 @@ class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         self.nps = nnps.SpatialHashNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+class SingleLevelStratifiedRadiusNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Stratified Radius algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.StratifiedRadiusNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+class MultipleLevelsStratifiedRadiusNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Stratified Radius algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.StratifiedRadiusNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            num_levels=2
         )
 
 class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
@@ -396,6 +428,16 @@ class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
 
         pa = get_particle_array(name='fluid', x=x, h=h)
         nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
+        return pa, nps
+
+class TestMultipleLevelsSratifiedRadiusNNPSWithSorting(TestLinkedListNNPSWithSorting):
+    def _make_particles(self, nx=20):
+        x = numpy.linspace(0, 1, nx)
+        h = numpy.ones_like(x)/(nx-1)
+
+        pa = get_particle_array(name='fluid', x=x, h=h)
+        nps = nnps.StratifiedRadiusNNPS(dim=1, particles=[pa], num_levels=2,
+                sort_gids=True)
         return pa, nps
 
 def test_large_number_of_neighbors_linked_list():

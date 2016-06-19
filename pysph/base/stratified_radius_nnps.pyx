@@ -2,6 +2,7 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
+from libc.stdio cimport printf
 from libcpp.vector cimport vector
 
 from nnps_base cimport *
@@ -12,7 +13,7 @@ cimport cython
 DEF EPS = 1e-6
 
 #############################################################################
-cdef class DividedRadiusNNPS(NNPS):
+cdef class StratifiedRadiusNNPS(NNPS):
 
     """Finds nearest neighbors using Spatial Hashing with particles classified according
     to their support radii.
@@ -20,7 +21,7 @@ cdef class DividedRadiusNNPS(NNPS):
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int max_levels = 1,
+            bint cache = False, bint sort_gids = False, int num_levels = 1,
             long long int table_size = 131072):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
@@ -29,30 +30,33 @@ cdef class DividedRadiusNNPS(NNPS):
 
         self.table_size = table_size
         self.radius_scale2 = radius_scale*radius_scale
-        self.max_levels = max_levels
         self.interval_size = 0
 
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
-        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int max_levels = 1,
+            bint cache = False, bint sort_gids = False, int num_levels = 1,
             long long int table_size = 131072):
 
         cdef int narrays = len(particles)
         cdef HashTable** current_hash
 
+        if fixed_h:
+            self.num_levels = 1
+        else:
+            self.num_levels = num_levels
+
         self.hashtable = <HashTable***> malloc(narrays*sizeof(HashTable**))
 
         cdef int i, j
         for i from 0<=i<narrays:
-            self.hashtable[i] = <HashTable**> malloc(max_levels*sizeof(HashTable*))
+            self.hashtable[i] = <HashTable**> malloc(self.num_levels*sizeof(HashTable*))
             current_hash = self.hashtable[i]
-            for j from 0<=j<max_levels:
+            for j from 0<=j<self.num_levels:
                 current_hash[j] = NULL
 
         self.current_hash = NULL
@@ -62,7 +66,7 @@ cdef class DividedRadiusNNPS(NNPS):
         cdef int i, j
         for i from 0<=i<self.narrays:
             current_hash = self.hashtable[i]
-            for j from 0<=j<self.max_levels:
+            for j from 0<=j<self.num_levels:
                 if current_hash[j] != NULL:
                     del current_hash[j]
             free(self.hashtable[i])
@@ -141,7 +145,7 @@ cdef class DividedRadiusNNPS(NNPS):
 
         cdef HashTable* hash_level = NULL
 
-        for i from 0<=i<self.max_levels:
+        for i from 0<=i<self.num_levels:
             hash_level = self.current_hash[i]
             find_cell_id_raw(
                     x - xmin[0],
@@ -208,7 +212,7 @@ cdef class DividedRadiusNNPS(NNPS):
 
     @cython.cdivision(True)
     cdef inline int _get_hash_id(self, double h) nogil:
-        return <int> floor((h - self.hmin)/self.interval_size)
+        return <int> floor((self.radius_scale*h - self.hmin)/self.interval_size)
 
     cdef inline double _get_cell_size(self, int hash_id) nogil:
         return self.hmin + (1 + hash_id)*self.interval_size
@@ -229,13 +233,13 @@ cdef class DividedRadiusNNPS(NNPS):
 
     @cython.cdivision(True)
     cpdef _refresh(self):
-        self.interval_size = (self.cell_size - self.hmin)/self.max_levels + EPS
+        self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
 
         cdef HashTable** current_hash
         cdef int i, j
         for i from 0<=i<self.narrays:
             current_hash = self.hashtable[i]
-            for j from 0<=j<self.max_levels:
+            for j from 0<=j<self.num_levels:
                 if current_hash[j] != NULL:
                     del current_hash[j]
                 current_hash[j] = new HashTable(self.table_size)
@@ -257,12 +261,11 @@ cdef class DividedRadiusNNPS(NNPS):
         cdef int c_x, c_y, c_z
         cdef double cell_size
 
-        cdef HashTable** current_hash
+        cdef HashTable** current_hash = self.hashtable[pa_index]
 
         for i from 0<=i<indices.length:
             idx = indices.data[i]
             hash_id = self._get_hash_id(src_h_ptr[idx])
-            current_hash = self.hashtable[pa_index]
             cell_size = self._get_cell_size(hash_id)
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],

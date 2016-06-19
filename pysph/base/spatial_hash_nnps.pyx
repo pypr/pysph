@@ -30,7 +30,6 @@ cdef class SpatialHashNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
-        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
@@ -259,7 +258,6 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
-        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,

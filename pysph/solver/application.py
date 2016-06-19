@@ -15,7 +15,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS
+        ExtendedSpatialHashNNPS, StratifiedRadiusNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -286,12 +286,13 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh'],
+                                choices=['box', 'll', 'sh', 'esh', 'sr'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
-                                     "the extended spatial hash algorithm ('esh')"
+                                     "the extended spatial hash algorithm ('esh') or "\
+                                     "the stratified radius algorithm ('sr')"
                                 )
 
         nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
@@ -307,6 +308,11 @@ class Application(object):
                                 type=int, default=131072,
                                 help="Table size for SpatialHashNNPS and \
                                         ExtendedSpatialHashNNPS"
+                                )
+
+        nnps_options.add_argument("--stratified-radius-num-levels", dest="num_levels",
+                                type=int, default=1,
+                                help="Number of levels for StratifiedRadiusNNPS"
                                 )
 
         # --fixed-h
@@ -613,6 +619,15 @@ class Application(object):
                     table_size=options.table_size, sort_gids=options.sort_gids,
                     approximate=options.approximate_nnps
                 )
+
+            elif options.nnps == 'sr':
+                nnps = StratifiedRadiusNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
+                    sort_gids=options.sort_gids, num_levels=options.num_levels
+                )
+
 
             self.nnps = nnps
 

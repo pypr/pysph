@@ -314,8 +314,8 @@ def get_basic_extensions():
         ),
 
         Extension(
-            name="pysph.base.divided_radius_nnps",
-            sources=["pysph/base/divided_radius_nnps.pyx"],
+            name="pysph.base.stratified_radius_nnps",
+            sources=["pysph/base/stratified_radius_nnps.pyx"],
             depends=get_deps(
                 "pysph/base/nnps_base"
             ),

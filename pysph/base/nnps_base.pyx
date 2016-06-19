@@ -1041,6 +1041,7 @@ cdef class NNPS:
         cdef ParticleArray pa
         cdef UIntArray indices
 
+        self.domain.update()
         cdef DomainManager domain = self.domain
 
         # use cell sizes computed by the domain.

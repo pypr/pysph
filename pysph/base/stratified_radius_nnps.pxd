@@ -15,14 +15,14 @@ cdef extern from "spatial_hash.h":
         int number_of_particles() nogil
 
 # NNPS using Spatial Hashing algorithm
-cdef class DividedRadiusNNPS(NNPS):
+cdef class StratifiedRadiusNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
     cdef long long int table_size               # Size of hashtable
     cdef double radius_scale2
 
-    cdef public int max_levels
+    cdef public int num_levels
     cdef double interval_size
 
     cdef HashTable*** hashtable

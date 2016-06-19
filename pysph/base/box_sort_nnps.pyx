@@ -176,7 +176,6 @@ cdef class DictBoxSortNNPS(NNPS):
         # compute the intial box sort. First, the Domain Manager's
         # update method is called to comptue the maximum smoothing
         # length for particle binning.
-        self.domain.update()
         self.update()
 
         msg = """WARNING: The cache will currently work only if
