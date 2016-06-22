@@ -625,7 +625,8 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, table_size=options.table_size,
-                    sort_gids=options.sort_gids, num_levels=options.num_levels
+                    H=options.H, sort_gids=options.sort_gids,
+                    num_levels=options.num_levels
                 )
 
 

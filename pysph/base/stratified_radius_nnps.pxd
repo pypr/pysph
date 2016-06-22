@@ -4,6 +4,14 @@ from nnps_base cimport *
 
 ctypedef unsigned int u_int
 
+cdef extern from 'math.h':
+    int abs(int) nogil
+    double ceil(double) nogil
+    double floor(double) nogil
+    double fabs(double) nogil
+    double fmax(double, double) nogil
+    double fmin(double, double) nogil
+
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":
     cdef cppclass HashTable:
@@ -23,6 +31,8 @@ cdef class StratifiedRadiusNNPS(NNPS):
     cdef double radius_scale2
 
     cdef public int num_levels
+    cdef public int H
+
     cdef double interval_size
 
     cdef HashTable*** hashtable
@@ -45,12 +55,14 @@ cdef class StratifiedRadiusNNPS(NNPS):
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z, int H) nogil
+
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
+            int* x, int* y, int* z, int H) nogil
 
     cdef inline int _get_hash_id(self, double h) nogil
 
-    cdef inline double _get_cell_size(self, int hash_id) nogil
+    cdef inline double _get_h_max(self, int hash_id) nogil
 
     cpdef _refresh(self)
 

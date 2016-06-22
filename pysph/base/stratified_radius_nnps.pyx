@@ -21,8 +21,8 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int num_levels = 1,
-            long long int table_size = 131072):
+            bint cache = False, bint sort_gids = False, int H = 1,
+            int num_levels = 1, long long int table_size = 131072):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
@@ -31,6 +31,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
         self.table_size = table_size
         self.radius_scale2 = radius_scale*radius_scale
         self.interval_size = 0
+        self.H = H
 
         self.src_index = 0
         self.dst_index = 0
@@ -39,8 +40,8 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int num_levels = 1,
-            long long int table_size = 131072):
+            bint cache = False, bint sort_gids = False, int H = 1,
+            int num_levels = 1, long long int table_size = 131072):
 
         cdef int narrays = len(particles)
         cdef HashTable** current_hash
@@ -82,7 +83,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
     cpdef double get_binning_size(self, int interval):
         """Get bin size at a level"""
-        return self._get_cell_size(interval)
+        return self._get_h_max(interval)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -134,29 +135,41 @@ cdef class StratifiedRadiusNNPS(NNPS):
         cdef vector[unsigned int] *candidates
         cdef int candidate_size = 0
 
-        cdef int x_boxes[27]
-        cdef int y_boxes[27]
-        cdef int z_boxes[27]
-        cdef int num_boxes
-
         cdef double xij2 = 0
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
+        cdef double h_max
+        cdef int H, mask_len, num_boxes
+
+        cdef int* x_boxes
+        cdef int* y_boxes
+        cdef int* z_boxes
+
         cdef HashTable* hash_level = NULL
 
         for i from 0<=i<self.num_levels:
+
+            h_max = fmax(h, self._get_h_max(i))
+            H = <int> ceil(h_max*self.H/self._get_h_max(i))
+
+            mask_len = (2*H+1)*(2*H+1)*(2*H+1)
+
+            x_boxes = <int*> malloc(mask_len*sizeof(int))
+            y_boxes = <int*> malloc(mask_len*sizeof(int))
+            z_boxes = <int*> malloc(mask_len*sizeof(int))
+
             hash_level = self.current_hash[i]
             find_cell_id_raw(
                     x - xmin[0],
                     y - xmin[1],
                     z - xmin[2],
-                    self._get_cell_size(i),
+                    self._get_h_max(i)/self.H,
                     &c_x, &c_y, &c_z
                     )
 
             num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
-                    x_boxes, y_boxes, z_boxes)
+                    x_boxes, y_boxes, z_boxes, H)
 
             for j from 0<=j<num_boxes:
                 candidates = hash_level.get(x_boxes[j], y_boxes[j], z_boxes[j])
@@ -173,6 +186,10 @@ cdef class StratifiedRadiusNNPS(NNPS):
                             )
                     if (xij2 < hi2) or (xij2 < hj2):
                         nbrs.c_append(n)
+
+            free(x_boxes)
+            free(y_boxes)
+            free(z_boxes)
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -214,21 +231,51 @@ cdef class StratifiedRadiusNNPS(NNPS):
     cdef inline int _get_hash_id(self, double h) nogil:
         return <int> floor((self.radius_scale*h - self.hmin)/self.interval_size)
 
-    cdef inline double _get_cell_size(self, int hash_id) nogil:
+    cdef inline double _get_h_max(self, int hash_id) nogil:
         return self.hmin + (1 + hash_id)*self.interval_size
 
-    cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+    @cython.cdivision(True)
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z,
+            int H) nogil:
         cdef int length = 0
-        cdef int p, q, r
-        for p from -1<=p<2:
-            for q from -1<=q<2:
-                for r from -1<=r<2:
-                    if i+p>=0 and j+q>=0 and k+r>=0:
-                        x[length] = i+p
-                        y[length] = j+q
-                        z[length] = k+r
-                        length += 1
+        cdef int s, t, u
+
+        for s from -H<=s<=H:
+            for t from -H<=t<=H:
+                for u from -H<=u<=H:
+                    x[length] = s
+                    y[length] = t
+                    z[length] = u
+                    length += 1
+
+        return length
+
+    cdef inline int _neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z, int H) nogil:
+        cdef int length = 0
+        cdef int p
+
+        cdef int mask_len = (2*H+1)*(2*H+1)*(2*H+1)
+
+        cdef int* x_mask = <int*> malloc(mask_len*sizeof(int))
+        cdef int* y_mask = <int*> malloc(mask_len*sizeof(int))
+        cdef int* z_mask = <int*> malloc(mask_len*sizeof(int))
+
+        mask_len = self._h_mask_exact(x_mask, y_mask, z_mask, H)
+
+        for p from 0<=p<mask_len:
+            if (i + x_mask[p] >= 0 and
+                j + y_mask[p] >= 0 and
+                k + z_mask[p] >= 0):
+                    x[length] = i + x_mask[p]
+                    y[length] = j + y_mask[p]
+                    z[length] = k + z_mask[p]
+                    length += 1
+
+        free(x_mask)
+        free(y_mask)
+        free(z_mask)
+
         return length
 
     @cython.cdivision(True)
@@ -266,7 +313,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
         for i from 0<=i<indices.length:
             idx = indices.data[i]
             hash_id = self._get_hash_id(src_h_ptr[idx])
-            cell_size = self._get_cell_size(hash_id)
+            cell_size = self._get_h_max(hash_id)/self.H
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],
                     src_y_ptr[idx] - xmin[1],
