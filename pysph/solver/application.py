@@ -13,8 +13,10 @@ import time
 # PySPH imports.
 from pysph.base.config import get_config
 from pysph.base import utils
-from pysph.base.nnps import BoxSortNNPS, LinkedListNNPS, SpatialHashNNPS, \
+
+from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
         ExtendedSpatialHashNNPS
+
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
@@ -187,6 +189,13 @@ class Application(object):
             "very large value)."
         )
 
+        # --n-damp
+        parser.add_argument(
+            "--n-damp", action="store", type=int, dest="n_damp",
+            default=None,
+            help="Number of iterations to damp timesteps initially."
+        )
+
         # --adaptive-timestep
         parser.add_argument("--adaptive-timestep", action="store_true",
                           dest="adaptive_timestep", default=None,
@@ -285,16 +294,16 @@ class Application(object):
                                      "the extended spatial hash algorithm ('esh')"
                                 )
 
-        nnps_options.add_argument("--sub-factor", dest="H",
+        nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
                                 type=int, default=3,
                                 help="Sub division factor for ExtendedSpatialHashNNPS"
                                 )
 
-        nnps_options.add_argument("--approximate", dest="approximate",
+        nnps_options.add_argument("--approximate-nnps", dest="approximate_nnps",
                                 action="store_true", default=False,
-                                help="Use for approximate")
+                                help="Use for approximate NNPS")
 
-        nnps_options.add_argument("--table-size", dest="table_size",
+        nnps_options.add_argument("--spatial-hash-table-size", dest="table_size",
                                 type=int, default=131072,
                                 help="Table size for SpatialHashNNPS and \
                                         ExtendedSpatialHashNNPS"
@@ -415,11 +424,18 @@ class Application(object):
                               help=("Disable multiprocessing interface "
                                     "to the solver"))
 
-          # User options.
-        user_options = parser.add_argument_group("User",
-                 "User defined command line arguments")
+        # Scheme options.
         if self.scheme is not None:
-            self.scheme.add_user_options(user_options)
+            scheme_options = parser.add_argument_group(
+                "SPH Scheme options",
+                "Scheme related command line arguments",
+                conflict_handler="resolve"
+            )
+            self.scheme.add_user_options(scheme_options)
+        # User options.
+        user_options = parser.add_argument_group(
+            "User", "User defined command line arguments"
+        )
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
@@ -585,7 +601,7 @@ class Application(object):
                 nnps = SpatialHashNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, table_size = options.table_size,
+                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
                     sort_gids=options.sort_gids
                 )
 
@@ -594,8 +610,8 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, H=options.H,
-                    table_size = options.table_size, sort_gids=options.sort_gids,
-                    approximate = options.approximate
+                    table_size=options.table_size, sort_gids=options.sort_gids,
+                    approximate=options.approximate_nnps
                 )
 
             self.nnps = nnps
@@ -672,6 +688,8 @@ class Application(object):
             # set solver cfl number
             solver.set_cfl(options.cfl)
 
+        if options.n_damp is not None:
+            solver.set_n_damp(options.n_damp)
 
         # setup the solver. This is where the code is compiled
         solver.setup(

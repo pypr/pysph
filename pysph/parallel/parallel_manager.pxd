@@ -11,7 +11,7 @@ from pyzoltan.core.zoltan_comm cimport ZComm
 from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK
 
 # PySPH imports
-from pysph.base.nnps cimport NNPSParticleArrayWrapper
+from pysph.base.nnps_base cimport NNPSParticleArrayWrapper
 from pysph.base.particle_array cimport ParticleArray
 from pysph.base.point cimport *
 

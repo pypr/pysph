@@ -1,5 +1,6 @@
 # numpy
 cimport numpy as np
+cimport cython
 
 from libcpp.map cimport map
 from libcpp.vector cimport vector
@@ -11,23 +12,132 @@ from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from particle_array cimport ParticleArray
 from point cimport *
 
-#Imports for SpatialHashNNPS
-cdef extern from "spatial_hash.h":
-    cdef cppclass HashTable:
-        HashTable(long long int) nogil except +
-        void add(int, int, int, int) nogil
-        vector[unsigned int] *get(int, int, int) nogil
+cdef extern from 'math.h':
+    int abs(int) nogil
+    double ceil(double) nogil
+    double floor(double) nogil
+    double fabs(double) nogil
+    double fmax(double, double) nogil
+    double fmin(double, double) nogil
 
-ctypedef unsigned int U_INT
+cdef extern from 'limits.h':
+    cdef unsigned int UINT_MAX
+    cdef int INT_MAX
 
-cdef inline int real_to_int(double val, double step) nogil
+# ZOLTAN ID TYPE AND PTR
+ctypedef unsigned int ZOLTAN_ID_TYPE
+ctypedef unsigned int* ZOLTAN_ID_PTR
+
+cdef inline double norm2(double x, double y, double z) nogil:
+    return x*x + y*y + z*z
+
+@cython.cdivision(True)
+cdef inline int real_to_int(double real_val, double step) nogil:
+    """ Return the bin index to which the given position belongs.
+
+    Parameters
+    ----------
+    val -- The coordinate location to bin
+    step -- the bin size
+
+    Examples
+    --------
+    >>> real_to_int(1.5, 1.0)
+    1
+    >>> real_to_int(-0.5, 1.0)
+    -1
+    """
+    cdef int ret_val = <int>floor( real_val/step )
+
+    return ret_val
+
+cdef inline void find_cell_id_raw(double x, double y, double z, double
+                           cell_size, int *ix, int *iy, int *iz) nogil:
+    """ Find the cell index for the corresponding point
+
+    Parameters
+    ----------
+    x, y, z: double
+        the point for which the index is sought
+    cell_size : double
+        the cell size to use
+    ix, iy, iz : int*
+        output parameter holding the cell index
+
+    Notes
+    ------
+    Performs a box sort based on the point and cell size
+
+    Uses the function  `real_to_int`
+
+    """
+    ix[0] = real_to_int(x, cell_size)
+    iy[0] = real_to_int(y, cell_size)
+    iz[0] = real_to_int(z, cell_size)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline long flatten_raw(int x, int y, int z, int* ncells_per_dim,
+        int dim) nogil:
+    """Return a flattened index for a cell
+
+    The flattening is determined using the row-order indexing commonly
+    employed in SPH. This would need to be changed for hash functions
+    based on alternate orderings.
+
+    """
+    cdef long ncx = ncells_per_dim[0]
+    cdef long ncy = ncells_per_dim[1]
+
+    return <long>( x + ncx * y + ncx*ncy * z )
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
+    """Return a flattened index for a cell
+
+    The flattening is determined using the row-order indexing commonly
+    employed in SPH. This would need to be changed for hash functions
+    based on alternate orderings.
+
+    """
+    return flatten_raw(cid.x, cid.y, cid.z, ncells_per_dim.data, dim)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
+        int* ncells_per_dim, int dim, int n_cells) nogil:
+    """Return the flattened index for a valid cell"""
+    cdef long ncy = ncells_per_dim[1]
+    cdef long ncz = ncells_per_dim[2]
+
+    cdef long cell_index = -1
+
+    # basic test for valid indices. Since we bin the particles with
+    # respect to the origin, negative indices can never occur.
+    cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
+
+    # additional check for 1D. This is because we search in all 26
+    # neighboring cells for neighbors. In 1D this can be problematic
+    # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
+    # result in a valid cell with a flattened index < ncells
+    if dim == 1:
+        if ( (cid_y > ncy) or (cid_z > ncz) ):
+            is_valid = False
+
+    # Given the validity of the cells, return the flattened cell index
+    if is_valid:
+        cell_index = flatten_raw(cid_x, cid_y, cid_z, ncells_per_dim, dim)
+
+        if not (-1 < cell_index < n_cells):
+            cell_index = -1
+
+    return cell_index
+
 cdef cIntPoint find_cell_id(cPoint pnt, double cell_size)
 
 cpdef UIntArray arange_uint(int start, int stop=*)
-
-cdef inline OctreeNode* new_node(double* xmin = *, double x_length = *,
-        double y_length = *, double z_length = *, int num_particles = *,
-        bint is_leaf = *)
 
 # Basic particle array wrapper used for NNPS
 cdef class NNPSParticleArrayWrapper:
@@ -209,172 +319,4 @@ cdef class NNPS:
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
-
-
-# NNPS using the original gridding algorithm
-cdef class DictBoxSortNNPS(NNPS):
-    cdef public dict cells               # lookup table for the cells
-    cdef list _cell_keys
-
-
-# NNPS using the linked list approach
-cdef class LinkedListNNPS(NNPS):
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef public IntArray ncells_per_dim  # number of cells in each direction
-    cdef public int ncells_tot           # total number of cells
-    cdef public bint fixed_h             # Constant cell sizes
-    cdef public list heads               # Head arrays for the cells
-    cdef public list nexts               # Next arrays for the particles
-
-    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
-    cdef UIntArray next, head              # Current next and head arrays.
-
-    cpdef long _count_occupied_cells(self, long n_cells) except -1
-    cpdef long _get_number_of_cells(self) except -1
-    cdef long _get_flattened_cell_index(self, cPoint pnt, double cell_size)
-    cdef long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
-            int* ncells_per_dim, int dim, int n_cells) nogil
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
-
-
-# NNPS using the linked list approach
-cdef class BoxSortNNPS(LinkedListNNPS):
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef public map[long, int] cell_to_index  # Maps cell ID to an index
-
-# NNPS using Spatial Hashing algorithm
-cdef class SpatialHashNNPS(NNPS):
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef long long int table_size               # Size of hashtable
-    cdef double radius_scale2
-
-    cdef HashTable** hashtable
-    cdef HashTable* current_hash
-
-    cdef NNPSParticleArrayWrapper dst, src
-
-    ##########################################################################
-    # Member functions
-    ##########################################################################
-
-    cdef void c_set_context(self, int src_index, int dst_index)
-
-    cpdef set_context(self, int src_index, int dst_index)
-
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
-
-    cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
-            int i, int j, int k) nogil
-
-    cdef inline int neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
-
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
-    cpdef _refresh(self)
-
-    cdef void _c_bin(self, int pa_index, UIntArray indices)
-
-    cpdef _bin(self, int pa_index, UIntArray indices)
-
-cdef class ExtendedSpatialHashNNPS(NNPS):
-    ############################################################################
-    # Data Attributes
-    ############################################################################
-    cdef long long int table_size               # Size of hashtable
-    cdef double radius_scale2
-
-    cdef HashTable** hashtable
-    cdef HashTable* current_hash
-
-    cdef NNPSParticleArrayWrapper dst, src
-
-    cdef int H
-    cdef double h_sub
-    cdef bint approximate
-
-    ##########################################################################
-    # Member functions
-    ##########################################################################
-
-    cdef inline void c_set_context(self, int src_index, int dst_index)
-
-    cpdef set_context(self, int src_index, int dst_index)
-
-    cdef inline int h_mask_approx(self, int* x, int* y, int* z) nogil
-
-    cdef inline int h_mask_exact(self, int* x, int* y, int* z) nogil
-
-    cdef inline void add_to_hashtable(self, int hash_id, unsigned int pid,
-            int i, int j, int k) nogil
-
-    cdef inline int neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
-
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
-
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
-    cpdef _refresh(self)
-
-    cdef void _c_bin(self, int pa_index, UIntArray indices)
-
-    cpdef _bin(self, int pa_index, UIntArray indices)
-
-
-cdef struct OctreeNode:
-    bint is_leaf
-    double x_length, y_length, z_length
-    double xmin[3]
-    int num_particles
-
-    vector[unsigned int] indices
-    OctreeNode* children[2][2][2];
-
-cdef class OctreeNNPS(NNPS):
-    ##########################################################################
-    # Data Attributes
-    ##########################################################################
-    cdef OctreeNode** root
-    cdef OctreeNode* current_tree
-
-    cdef double radius_scale2
-    cdef NNPSParticleArrayWrapper dst, src
-    cdef double min_length
-
-    ##########################################################################
-    # Member functions
-    ##########################################################################
-    cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double* xmax, OctreeNode* root = *)
-
-    cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
-            double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, OctreeNode* root = *, double half_diagonal = *) nogil
-
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
-
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
-    cdef inline void c_set_context(self, int src_index, int dst_index)
-
-    cpdef set_context(self, int src_index, int dst_index)
-
-    cdef void delete_tree(self, OctreeNode* root = *)
-
-    cpdef _refresh(self)
-
-    cdef void _c_bin(self, int pa_index, UIntArray indices)
-
-    cpdef _bin(self, int pa_index, UIntArray indices)
-
 

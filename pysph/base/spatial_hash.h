@@ -5,6 +5,9 @@
 #include <algorithm>
 #include <cmath>
 
+ // p1, p2 and p3 are large primes used in the hash function
+ // Ref. http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
+
 #define p1 73856093
 #define p2 19349663
 #define p3 83492791
@@ -34,7 +37,7 @@ public:
         return this->key;
     }
 
-    inline vector <unsigned int> *get_value()
+    inline vector <unsigned int> *get_indices()
     {
         return &this->indices;
     } 
@@ -93,7 +96,7 @@ public:
         while(entry!=NULL)
         {
             if(entry->c_x==i && entry->c_y==j && entry->c_z==k)
-                return entry->get_value();
+                return entry->get_indices();
             entry = entry->next;
         }
         return NULL;

@@ -399,6 +399,7 @@ class MomentumEquationArtificialViscosity(Equation):
         d_av[d_idx] += -piij * DWIJ[1]
         d_aw[d_idx] += -piij * DWIJ[2]
 
+
 class MomentumEquationArtificialStress(Equation):
     r"""**Artificial stress contribution to the Momentum Equation**
 
@@ -645,14 +646,14 @@ class SolidWallPressureBC(Equation):
         d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_p, s_p, d_wij, s_rho,
-             d_ax, d_ay, d_az, WIJ, XIJ):
+             d_au, d_av, d_aw, WIJ, XIJ):
 
         # numerator of Eq. (27) ax, ay and az are the prescribed wall
         # accelerations which must be defined for the wall boundary
         # particle
-        gdotxij = (self.gx - d_ax[d_idx])*XIJ[0] + \
-            (self.gy - d_ay[d_idx])*XIJ[1] + \
-            (self.gz - d_az[d_idx])*XIJ[2]
+        gdotxij = (self.gx - d_au[d_idx])*XIJ[0] + \
+            (self.gy - d_av[d_idx])*XIJ[1] + \
+            (self.gz - d_aw[d_idx])*XIJ[2]
 
         d_p[d_idx] += s_p[s_idx]*WIJ + s_rho[s_idx]*gdotxij*WIJ
 

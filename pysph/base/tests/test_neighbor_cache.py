@@ -4,7 +4,7 @@
 import numpy as np
 import unittest
 
-from pysph.base.nnps import LinkedListNNPS, NeighborCache
+from pysph.base.nnps import NeighborCache, LinkedListNNPS
 from pysph.base.utils import get_particle_array
 from pyzoltan.core.carray import UIntArray
 

@@ -114,7 +114,7 @@ class TaylorGreen(Application):
         hdx = None
         wcsph = WCSPHScheme(
             ['fluid'], [], dim=2, rho0=rho0, c0=c0, h0=h0,
-            hdx=hdx, nu=None, gamma=7.0, alpha=0.1, beta=0.0
+            hdx=hdx, nu=None, gamma=7.0, alpha=0.0, beta=0.0
         )
         tvf = TVFScheme(
             ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
