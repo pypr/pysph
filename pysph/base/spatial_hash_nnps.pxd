@@ -4,10 +4,15 @@ from nnps_base cimport *
 
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":
+    cdef cppclass HashEntry:
+        double h_max
+
+        vector[unsigned int] *get_indices() nogil
+
     cdef cppclass HashTable:
         HashTable(long long int) nogil except +
-        void add(int, int, int, int) nogil
-        vector[unsigned int] *get(int, int, int) nogil
+        void add(int, int, int, int, double) nogil
+        HashEntry* get(int, int, int) nogil
 
 # NNPS using Spatial Hashing algorithm
 cdef class SpatialHashNNPS(NNPS):
@@ -33,7 +38,7 @@ cdef class SpatialHashNNPS(NNPS):
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
-    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid,
+    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
             int i, int j, int k) nogil
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
@@ -75,10 +80,10 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
 
-    cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
+    cdef int _neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z, double h) nogil
 
-    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid,
+    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
             int i, int j, int k) nogil
 
     cpdef _refresh(self)
