@@ -31,7 +31,7 @@ cdef class CellIndexing(NNPS):
     # Member functions
     ##########################################################################
 
-    cdef inline u_int get_key(self, u_int n, u_int i, u_int j,
+    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
             u_int k, int pa_index) nogil
 
     cdef inline int _get_id(self, u_int key, int pa_index) nogil

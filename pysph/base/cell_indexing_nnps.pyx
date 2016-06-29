@@ -31,12 +31,6 @@ cdef class CellIndexing(NNPS):
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-
-        self.keys = <u_int**> malloc(self.narrays*sizeof(u_int*))
-        self.key_indices = <key_to_idx_t**> malloc(self.narrays*sizeof(key_to_idx_t*))
-
-        self.I = <u_int*> malloc(self.narrays*sizeof(u_int))
-
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
@@ -55,7 +49,27 @@ cdef class CellIndexing(NNPS):
         self.domain.update()
         self.update()
 
-    cdef inline u_int get_key(self, u_int n, u_int i, u_int j,
+    def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
+            int ghost_layers = 1, domain=None, bint fixed_h = False,
+            bint cache = False, bint sort_gids = False):
+        cdef int narrays = len(particles)
+
+        self.keys = <u_int**> malloc(narrays*sizeof(u_int*))
+        self.key_indices = <key_to_idx_t**> malloc(narrays*sizeof(key_to_idx_t*))
+
+        self.I = <u_int*> malloc(narrays*sizeof(u_int))
+
+    def __dealloc__(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            free(self.keys[i])
+            del self.key_indices[i]
+        free(self.keys)
+        free(self.key_indices)
+        free(self.I)
+
+
+    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
             u_int k, int pa_index) nogil:
         return  n + \
                 (1 << self.I[pa_index])*i + \
@@ -149,10 +163,8 @@ cdef class CellIndexing(NNPS):
         cdef pair[u_int, u_int] candidate
 
         cdef u_int n, idx
-        cdef u_int next_cell
         for i from 0<=i<num_boxes:
-            next_cell = x_boxes[i]
-            it = self.current_indices.find(self.get_key(0, x_boxes[i], y_boxes[i],
+            it = self.current_indices.find(self._get_key(0, x_boxes[i], y_boxes[i],
                 z_boxes[i], self.src_index))
             if it == self.current_indices.end():
                 continue
@@ -228,7 +240,7 @@ cdef class CellIndexing(NNPS):
                     z_ptr[i] - xmin[2],
                     self.cell_size,
                     &c_x, &c_y, &c_z)
-            current_keys[i] = self.get_key(n, c_x, c_y, c_z, pa_index)
+            current_keys[i] = self._get_key(n, c_x, c_y, c_z, pa_index)
 
         sort(current_keys, current_keys + indices.length)
 
@@ -241,7 +253,7 @@ cdef class CellIndexing(NNPS):
         c_y = self._get_y(current_keys[0], pa_index)
         c_z = self._get_z(current_keys[0], pa_index)
 
-        temp.first = self.get_key(0, c_x, c_y, c_z, pa_index)
+        temp.first = self._get_key(0, c_x, c_y, c_z, pa_index)
         cell.first = 0
 
         cdef u_int length = 0
@@ -258,7 +270,7 @@ cdef class CellIndexing(NNPS):
                 temp.second = cell
                 current_indices.insert(temp)
 
-                temp.first = self.get_key(0, id_x, id_y, id_z, pa_index)
+                temp.first = self._get_key(0, id_x, id_y, id_z, pa_index)
                 cell.first = i
 
                 length = 0
@@ -320,14 +332,4 @@ cdef class CellIndexing(NNPS):
         cdef key_to_idx_t* current_indices = self.key_indices[pa_index]
 
         self.fill_array(pa_wrapper, pa_index, indices, current_keys, current_indices)
-
-    def __dealloc__(self):
-        cdef int i
-        for i from 0<=i<self.narrays:
-            free(self.keys[i])
-            del self.key_indices[i]
-        free(self.keys)
-        free(self.key_indices)
-        free(self.I)
-
 
