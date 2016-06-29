@@ -4,8 +4,8 @@ from libcpp.pair cimport pair
 
 from nnps_base cimport *
 
-ctypedef long long int LL_INT
-ctypedef map[LL_INT, int] key_to_idx_t
+ctypedef unsigned int u_int
+ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 
 cdef extern from 'math.h':
     double log2(double) nogil
@@ -14,15 +14,15 @@ cdef class CellIndexing(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef LL_INT** keys
-    cdef LL_INT* current_keys
+    cdef u_int** keys
+    cdef u_int* current_keys
 
     cdef key_to_idx_t** key_indices
     cdef key_to_idx_t* current_indices
 
-    cdef LL_INT* I
-    cdef LL_INT* J
-    cdef LL_INT* K
+    cdef u_int* I
+    cdef u_int J
+    cdef u_int K
 
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
@@ -31,16 +31,16 @@ cdef class CellIndexing(NNPS):
     # Member functions
     ##########################################################################
 
-    cdef inline LL_INT get_key(self, LL_INT n, LL_INT i, LL_INT j,
-            LL_INT k, int pa_index) nogil
+    cdef inline u_int get_key(self, u_int n, u_int i, u_int j,
+            u_int k, int pa_index) nogil
 
-    cdef inline int _get_id(self, LL_INT key, int pa_index) nogil
+    cdef inline int _get_id(self, u_int key, int pa_index) nogil
 
-    cdef inline int _get_x(self, LL_INT key, int pa_index) nogil
+    cdef inline int _get_x(self, u_int key, int pa_index) nogil
 
-    cdef inline int _get_y(self, LL_INT key, int pa_index) nogil
+    cdef inline int _get_y(self, u_int key, int pa_index) nogil
 
-    cdef inline int _get_z(self, LL_INT key, int pa_index) nogil
+    cdef inline int _get_z(self, u_int key, int pa_index) nogil
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
@@ -53,7 +53,7 @@ cdef class CellIndexing(NNPS):
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, LL_INT* current_keys, key_to_idx_t* current_indices) nogil
+            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil
 
     cpdef _refresh(self)
 

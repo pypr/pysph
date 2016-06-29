@@ -2,6 +2,7 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
+from libc.stdio cimport printf
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 
@@ -31,12 +32,10 @@ cdef class CellIndexing(NNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
 
-        self.keys = <LL_INT**> malloc(self.narrays*sizeof(LL_INT*))
+        self.keys = <u_int**> malloc(self.narrays*sizeof(u_int*))
         self.key_indices = <key_to_idx_t**> malloc(self.narrays*sizeof(key_to_idx_t*))
 
-        self.I = <LL_INT*> malloc(self.narrays*sizeof(LL_INT))
-        self.J = <LL_INT*> malloc(self.narrays*sizeof(LL_INT))
-        self.K = <LL_INT*> malloc(self.narrays*sizeof(LL_INT))
+        self.I = <u_int*> malloc(self.narrays*sizeof(u_int))
 
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
@@ -45,7 +44,7 @@ cdef class CellIndexing(NNPS):
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.keys[i] = <LL_INT*> malloc(num_particles*sizeof(LL_INT))
+            self.keys[i] = <u_int*> malloc(num_particles*sizeof(u_int))
             self.key_indices[i] = new key_to_idx_t()
 
         self.src_index = 0
@@ -56,28 +55,28 @@ cdef class CellIndexing(NNPS):
         self.domain.update()
         self.update()
 
-    cdef inline LL_INT get_key(self, LL_INT n, LL_INT i, LL_INT j,
-            LL_INT k, int pa_index) nogil:
+    cdef inline u_int get_key(self, u_int n, u_int i, u_int j,
+            u_int k, int pa_index) nogil:
         return  n + \
                 (1 << self.I[pa_index])*i + \
-                (1 << (self.I[pa_index] + self.J[pa_index]))*j + \
-                (1 << (self.I[pa_index] + self.J[pa_index] + self.K[pa_index]))*k
+                (1 << (self.I[pa_index] + self.J))*j + \
+                (1 << (self.I[pa_index] + self.J + self.K))*k
 
     @cython.cdivision(True)
-    cdef inline int _get_id(self, LL_INT key, int pa_index) nogil:
+    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
         return key % (1 << self.I[pa_index])
 
     @cython.cdivision(True)
-    cdef inline int _get_x(self, LL_INT key, int pa_index) nogil:
-        return (key >> self.I[pa_index]) % (1 << self.J[pa_index])
+    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
+        return (key >> self.I[pa_index]) % (1 << self.J)
 
     @cython.cdivision(True)
-    cdef inline int _get_y(self, LL_INT key, int pa_index) nogil:
-        return (key >> (self.I[pa_index] + self.J[pa_index])) % (1 << self.K[pa_index])
+    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
+        return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
 
     @cython.cdivision(True)
-    cdef inline int _get_z(self, LL_INT key, int pa_index) nogil:
-        return key >> (self.I[pa_index] + self.J[pa_index] + self.K[pa_index])
+    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
+        return key >> (self.I[pa_index] + self.J + self.K)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -125,7 +124,7 @@ cdef class CellIndexing(NNPS):
 
         cdef int c_x, c_y, c_z
         cdef double* xmin = self.xmin.data
-        cdef int i, j, k
+        cdef int i, j
 
         find_cell_id_raw(
                 x - xmin[0],
@@ -139,7 +138,7 @@ cdef class CellIndexing(NNPS):
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
-        cdef map[LL_INT, int].iterator it
+        cdef map[u_int, pair[u_int, u_int]].iterator it
 
         cdef int x_boxes[27]
         cdef int y_boxes[27]
@@ -147,17 +146,22 @@ cdef class CellIndexing(NNPS):
         cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
                 x_boxes, y_boxes, z_boxes)
 
-        cdef int n, idx
-        cdef LL_INT next_cell
+        cdef pair[u_int, u_int] candidate
+
+        cdef u_int n, idx
+        cdef u_int next_cell
         for i from 0<=i<num_boxes:
             next_cell = x_boxes[i]
-            it = self.current_indices.find(self.get_key(0, x_boxes[i], y_boxes[i], \
+            it = self.current_indices.find(self.get_key(0, x_boxes[i], y_boxes[i],
                 z_boxes[i], self.src_index))
             if it == self.current_indices.end():
                 continue
-            n = deref(it).second
-            while next_cell == x_boxes[i]:
-                idx = self._get_id(self.current_keys[n], self.src_index)
+            candidate = deref(it).second
+            n = candidate.first
+            candidate_length = candidate.second
+
+            for j from 0<=j<candidate_length:
+                idx = self._get_id(self.current_keys[n+j], self.src_index)
 
                 hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
 
@@ -169,9 +173,6 @@ cdef class CellIndexing(NNPS):
 
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(idx)
-
-                n += 1
-                next_cell = self._get_x(self.current_keys[n], self.src_index)
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -209,7 +210,7 @@ cdef class CellIndexing(NNPS):
 
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, LL_INT* current_keys, key_to_idx_t* current_indices) nogil:
+            UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil:
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
         cdef double* z_ptr = pa_wrapper.z.data
@@ -231,27 +232,44 @@ cdef class CellIndexing(NNPS):
 
         sort(current_keys, current_keys + indices.length)
 
-        c_x = -1
-        c_y = -1
-        c_z = -1
-
         cdef int id_x, id_y, id_z
 
-        cdef pair[LL_INT, int] temp
+        cdef pair[u_int, pair[u_int, u_int]] temp
+        cdef pair[u_int, u_int] cell
 
-        for i from 0<=i<indices.length:
+        c_x = self._get_x(current_keys[0], pa_index)
+        c_y = self._get_y(current_keys[0], pa_index)
+        c_z = self._get_z(current_keys[0], pa_index)
+
+        temp.first = self.get_key(0, c_x, c_y, c_z, pa_index)
+        cell.first = 0
+
+        cdef u_int length = 0
+
+        for i from 0<i<indices.length:
             id_x = self._get_x(current_keys[i], pa_index)
             id_y = self._get_y(current_keys[i], pa_index)
             id_z = self._get_z(current_keys[i], pa_index)
 
+            length += 1
+
             if(id_x != c_x or id_y != c_y or id_z != c_z):
-                temp.first = self.get_key(0, id_x, id_y, id_z, pa_index)
-                temp.second = i
+                cell.second = length
+                temp.second = cell
                 current_indices.insert(temp)
+
+                temp.first = self.get_key(0, id_x, id_y, id_z, pa_index)
+                cell.first = i
+
+                length = 0
 
                 c_x = id_x
                 c_y = id_y
                 c_z = id_z
+
+        cell.second = length + 1
+        temp.second = cell
+        current_indices.insert(temp)
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil:
@@ -280,7 +298,7 @@ cdef class CellIndexing(NNPS):
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.keys[i] = <LL_INT*> malloc(num_particles*sizeof(LL_INT))
+            self.keys[i] = <u_int*> malloc(num_particles*sizeof(u_int))
             self.key_indices[i] = new key_to_idx_t()
 
         self.current_keys = self.keys[self.src_index]
@@ -294,11 +312,11 @@ cdef class CellIndexing(NNPS):
         cdef double* xmax = self.xmax.data
         cdef double* xmin = self.xmin.data
 
-        self.I[pa_index] = <LL_INT> (1 + log2(pa_wrapper.get_number_of_particles()))
-        self.J[pa_index] = <LL_INT> (1 + log2(ceil((xmax[0] - xmin[0])/self.cell_size)))
-        self.K[pa_index] = <LL_INT> (1 + log2(ceil((xmax[1] - xmin[1])/self.cell_size)))
+        self.I[pa_index] = <u_int> (1 + log2(pa_wrapper.get_number_of_particles()))
+        self.J = <u_int> (1 + log2(ceil((xmax[0] - xmin[0])/self.cell_size)))
+        self.K = <u_int> (1 + log2(ceil((xmax[1] - xmin[1])/self.cell_size)))
 
-        cdef LL_INT* current_keys = self.keys[pa_index]
+        cdef u_int* current_keys = self.keys[pa_index]
         cdef key_to_idx_t* current_indices = self.key_indices[pa_index]
 
         self.fill_array(pa_wrapper, pa_index, indices, current_keys, current_indices)
@@ -310,9 +328,6 @@ cdef class CellIndexing(NNPS):
             del self.key_indices[i]
         free(self.keys)
         free(self.key_indices)
-
         free(self.I)
-        free(self.J)
-        free(self.K)
 
 
