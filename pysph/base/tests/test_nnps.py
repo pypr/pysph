@@ -84,7 +84,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.ci_nnps = nnps.CellIndexing(
+        self.ci_nnps = nnps.CellIndexingNNPS(
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
@@ -245,11 +245,11 @@ class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
-class CellIndexingTestCase(DictBoxSortNNPSTestCase):
+class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Spatial Hash algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.CellIndexing(
+        self.nps = nnps.CellIndexingNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
