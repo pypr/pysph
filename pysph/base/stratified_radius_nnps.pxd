@@ -38,6 +38,9 @@ cdef class StratifiedRadiusNNPS(NNPS):
     cdef HashTable*** hashtable
     cdef HashTable** current_hash
 
+    cdef double** cell_sizes
+    cdef double* current_cells
+
     cdef NNPSParticleArrayWrapper dst, src
 
     ##########################################################################
@@ -62,7 +65,10 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
     cdef inline int _get_hash_id(self, double h) nogil
 
-    cdef inline double _get_h_max(self, int hash_id) nogil
+    cdef inline void _set_h_max(self, double* current_cells, double* src_h_ptr,
+            int num_particles) nogil
+
+    cdef inline double _get_h_max(self, double* current_cells, int hash_id) nogil
 
     cpdef _refresh(self)
 

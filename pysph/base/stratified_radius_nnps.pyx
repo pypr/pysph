@@ -52,15 +52,18 @@ cdef class StratifiedRadiusNNPS(NNPS):
             self.num_levels = num_levels
 
         self.hashtable = <HashTable***> malloc(narrays*sizeof(HashTable**))
+        self.cell_sizes = <double**> malloc(narrays*sizeof(double*))
 
         cdef int i, j
         for i from 0<=i<narrays:
             self.hashtable[i] = <HashTable**> malloc(self.num_levels*sizeof(HashTable*))
+            self.cell_sizes[i] = <double*> malloc(self.num_levels*sizeof(double))
             current_hash = self.hashtable[i]
             for j from 0<=j<self.num_levels:
                 current_hash[j] = NULL
 
         self.current_hash = NULL
+        self.current_cells = NULL
 
     def __dealloc__(self):
         cdef HashTable** current_hash
@@ -71,7 +74,9 @@ cdef class StratifiedRadiusNNPS(NNPS):
                 if current_hash[j] != NULL:
                     del current_hash[j]
             free(self.hashtable[i])
+            free(self.cell_sizes[i])
         free(self.hashtable)
+        free(self.cell_sizes)
 
     #### Public protocol ################################################
 
@@ -83,7 +88,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
     cpdef double get_binning_size(self, int interval):
         """Get bin size at a level"""
-        return self._get_h_max(interval)
+        return self._get_h_max(self.current_cells, interval)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -99,6 +104,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
         """
         NNPS.set_context(self, src_index, dst_index)
         self.current_hash = self.hashtable[src_index]
+        self.current_cells = self.cell_sizes[src_index]
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -150,8 +156,8 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
         for i from 0<=i<self.num_levels:
 
-            h_max = fmax(h, self._get_h_max(i))
-            H = <int> ceil(h_max*self.H/self._get_h_max(i))
+            h_max = fmax(h, self._get_h_max(self.current_cells, i))
+            H = <int> ceil(h_max*self.H/self._get_h_max(self.current_cells, i))
 
             mask_len = (2*H+1)*(2*H+1)*(2*H+1)
 
@@ -164,7 +170,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
                     x - xmin[0],
                     y - xmin[1],
                     z - xmin[2],
-                    self._get_h_max(i)/self.H,
+                    self._get_h_max(self.current_cells, i)/self.H,
                     &c_x, &c_y, &c_z
                     )
 
@@ -231,8 +237,8 @@ cdef class StratifiedRadiusNNPS(NNPS):
     cdef inline int _get_hash_id(self, double h) nogil:
         return <int> floor((self.radius_scale*h - self.hmin)/self.interval_size)
 
-    cdef inline double _get_h_max(self, int hash_id) nogil:
-        return self.hmin + (1 + hash_id)*self.interval_size
+    cdef inline double _get_h_max(self, double* current_cells, int hash_id) nogil:
+        return self.radius_scale*current_cells[hash_id]
 
     @cython.cdivision(True)
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z,
@@ -278,6 +284,15 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
         return length
 
+    cdef inline void _set_h_max(self, double* current_cells, double* src_h_ptr,
+            int num_particles) nogil:
+        cdef double h
+        cdef int i, idx
+        for i from 0<=i<num_particles:
+            h = src_h_ptr[i]
+            idx = self._get_hash_id(h)
+            current_cells[idx] = fmax(h, current_cells[idx])
+
     @cython.cdivision(True)
     cpdef _refresh(self):
         self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
@@ -286,11 +301,14 @@ cdef class StratifiedRadiusNNPS(NNPS):
         cdef int i, j
         for i from 0<=i<self.narrays:
             current_hash = self.hashtable[i]
+            current_cells = self.cell_sizes[i]
             for j from 0<=j<self.num_levels:
                 if current_hash[j] != NULL:
                     del current_hash[j]
                 current_hash[j] = new HashTable(self.table_size)
+                current_cells[j] = 0
         self.current_hash = self.hashtable[self.src_index]
+        self.current_cells = self.cell_sizes[self.src_index]
 
     @cython.cdivision(True)
     cpdef _bin(self, int pa_index, UIntArray indices):
@@ -307,13 +325,15 @@ cdef class StratifiedRadiusNNPS(NNPS):
         cdef int hash_id
         cdef int c_x, c_y, c_z
         cdef double cell_size
+        cdef double* current_cells = self.cell_sizes[pa_index]
 
+        self._set_h_max(current_cells, src_h_ptr, pa_wrapper.get_number_of_particles())
         cdef HashTable** current_hash = self.hashtable[pa_index]
 
         for i from 0<=i<indices.length:
             idx = indices.data[i]
             hash_id = self._get_hash_id(src_h_ptr[idx])
-            cell_size = self._get_h_max(hash_id)/self.H
+            cell_size = self._get_h_max(current_cells, hash_id)/self.H
             find_cell_id_raw(
                     src_x_ptr[idx] - xmin[0],
                     src_y_ptr[idx] - xmin[1],
