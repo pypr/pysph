@@ -153,6 +153,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
         cdef int* z_boxes
 
         cdef HashTable* hash_level = NULL
+        cdef HashEntry* candidate_cell = NULL
 
         for i from 0<=i<self.num_levels:
 
@@ -178,9 +179,10 @@ cdef class StratifiedRadiusNNPS(NNPS):
                     x_boxes, y_boxes, z_boxes, H)
 
             for j from 0<=j<num_boxes:
-                candidates = hash_level.get(x_boxes[j], y_boxes[j], z_boxes[j])
-                if candidates == NULL:
+                candidate_cell = hash_level.get(x_boxes[j], y_boxes[j], z_boxes[j])
+                if candidate_cell == NULL:
                     continue
+                candidates = candidate_cell.get_indices()
                 candidate_size = candidates.size()
                 for k from 0<=k<candidate_size:
                     n = (candidates[0])[k]
@@ -341,5 +343,5 @@ cdef class StratifiedRadiusNNPS(NNPS):
                     cell_size,
                     &c_x, &c_y, &c_z
                     )
-            current_hash[hash_id].add(c_x, c_y, c_z, idx)
+            current_hash[hash_id].add(c_x, c_y, c_z, idx, src_h_ptr[idx])
 

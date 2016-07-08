@@ -14,12 +14,17 @@ cdef extern from 'math.h':
 
 #Imports for SpatialHashNNPS
 cdef extern from "spatial_hash.h":
+    cdef cppclass HashEntry:
+        double h_max
+
+        vector[unsigned int] *get_indices() nogil
+
     cdef cppclass HashTable:
         long long int table_size
 
         HashTable(long long int) nogil except +
-        void add(int, int, int, int) nogil
-        vector[u_int]* get(int, int, int) nogil
+        void add(int, int, int, int, double) nogil
+        HashEntry* get(int, int, int) nogil
         int number_of_particles() nogil
 
 # NNPS using Spatial Hashing algorithm

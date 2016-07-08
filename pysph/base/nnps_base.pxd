@@ -325,4 +325,3 @@ cdef class NNPS:
     # refresh any data structures needed for binning
     cpdef _refresh(self)
 
-

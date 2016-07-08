@@ -105,7 +105,10 @@ cdef class SpatialHashNNPS(NNPS):
         cdef int c_x, c_y, c_z
         cdef double* xmin = self.xmin.data
         cdef unsigned int i, j, k
+
+        cdef HashEntry* candidate_cell
         cdef vector[unsigned int] *candidates
+        
         find_cell_id_raw(
                 x - xmin[0],
                 y - xmin[1],
@@ -126,9 +129,10 @@ cdef class SpatialHashNNPS(NNPS):
         cdef double hj2 = 0
 
         for i from 0<=i<num_boxes:
-            candidates = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
-            if candidates == NULL:
+            candidate_cell = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
+            if candidate_cell == NULL:
                 continue
+            candidates = candidate_cell.get_indices()
             candidate_size = candidates.size()
             for j from 0<=j<candidate_size:
                 k = (candidates[0])[j]
@@ -177,9 +181,9 @@ cdef class SpatialHashNNPS(NNPS):
 
     #### Private protocol ################################################
 
-    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid,
+    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
             int i, int j, int k) nogil:
-        self.hashtable[hash_id].add(i,j,k,pid)
+        self.hashtable[hash_id].add(i,j,k,pid,h)
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil:
@@ -208,6 +212,7 @@ cdef class SpatialHashNNPS(NNPS):
         cdef double* src_x_ptr = pa_wrapper.x.data
         cdef double* src_y_ptr = pa_wrapper.y.data
         cdef double* src_z_ptr = pa_wrapper.z.data
+        cdef double* src_h_ptr = pa_wrapper.h.data
 
         cdef int num_indices = indices.length
 
@@ -225,7 +230,7 @@ cdef class SpatialHashNNPS(NNPS):
                     self.cell_size,
                     &c_x, &c_y, &c_z
                     )
-            self._add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
+            self._add_to_hashtable(pa_index, idx, src_h_ptr[idx], c_x, c_y, c_z)
 
 
 #############################################################################
@@ -333,6 +338,8 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef int c_x, c_y, c_z
         cdef double* xmin = self.xmin.data
         cdef unsigned int i, j, k
+
+        cdef HashEntry* candidate_cell
         cdef vector[unsigned int] *candidates
 
         find_cell_id_raw(
@@ -351,16 +358,17 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef int* z_boxes = <int*> malloc(mask_len*sizeof(int))
 
         cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
-                x_boxes, y_boxes, z_boxes)
+                x_boxes, y_boxes, z_boxes, h)
 
         cdef double xij2 = 0
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
         for i from 0<=i<num_boxes:
-            candidates = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
-            if candidates == NULL:
+            candidate_cell = self.current_hash.get(x_boxes[i], y_boxes[i], z_boxes[i])
+            if candidate_cell == NULL:
                 continue
+            candidates = candidate_cell.get_indices()
             candidate_size = candidates.size()
             for j from 0<=j<candidate_size:
                 k = (candidates[0])[j]
@@ -413,9 +421,9 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
     #### Private protocol ################################################
 
-    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid,
+    cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
             int i, int j, int k) nogil:
-        self.hashtable[hash_id].add(i,j,k,pid)
+        self.hashtable[hash_id].add(i,j,k,pid,h)
 
     cdef inline int _h_mask_approx(self, int* x, int* y, int* z) nogil:
         cdef int length = 0
@@ -440,6 +448,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         for s from -self.H<=s<=self.H:
             for t from -self.H<=t<=self.H:
                 for u from -self.H<=u<=self.H:
+
                     x[length] = s
                     y[length] = t
                     z[length] = u
@@ -447,10 +456,17 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
         return length
 
-    cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+    @cython.cdivision(True)
+    cdef int _neighbor_boxes(self, int i, int j, int k,
+            int* x, int* y, int* z, double h) nogil:
         cdef int length = 0
         cdef int p
+
+        cdef int x_temp, y_temp, z_temp
+
+        cdef HashEntry* cell
+        cdef double h_local
+        cdef int H
 
         cdef int mask_len = (2*self.H+1)*(2*self.H+1)*(2*self.H+1)
 
@@ -464,12 +480,23 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
             mask_len = self._h_mask_exact(x_mask, y_mask, z_mask)
 
         for p from 0<=p<mask_len:
-            if (i + x_mask[p] >= 0 and
-                j + y_mask[p] >= 0 and
-                k + z_mask[p] >= 0):
-                    x[length] = i + x_mask[p]
-                    y[length] = j + y_mask[p]
-                    z[length] = k + z_mask[p]
+            x_temp = i + x_mask[p]
+            y_temp = j + y_mask[p]
+            z_temp = k + z_mask[p]
+
+            if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
+                cell = self.current_hash.get(x_temp, y_temp, z_temp)
+                
+                if cell == NULL:
+                    continue
+                
+                h_local = self.radius_scale*fmax(cell.h_max, h)
+                H = <int> ceil(h_local/self.h_sub)
+
+                if fabs(x_mask[p]) <= H and fabs(y_mask[p]) <= H and fabs(z_mask[p]) <= H:
+                    x[length] = x_temp
+                    y[length] = y_temp
+                    z[length] = z_temp
                     length += 1
 
         free(x_mask)
@@ -492,6 +519,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         cdef double* src_x_ptr = pa_wrapper.x.data
         cdef double* src_y_ptr = pa_wrapper.y.data
         cdef double* src_z_ptr = pa_wrapper.z.data
+        cdef double* src_h_ptr = pa_wrapper.h.data
 
         cdef int num_indices = indices.length
 
@@ -511,5 +539,5 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                     self.h_sub,
                     &c_x, &c_y, &c_z
                     )
-            self._add_to_hashtable(pa_index, idx, c_x, c_y, c_z)
+            self._add_to_hashtable(pa_index, idx, src_h_ptr[idx], c_x, c_y, c_z)
 

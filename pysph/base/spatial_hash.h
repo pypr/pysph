@@ -20,12 +20,15 @@ private:
     long long int key;
 public:
     int c_x, c_y, c_z;
+    double h_max;
     HashEntry* next;
     vector <unsigned int> indices;
-    HashEntry(long long int key, int idx, int c_x, int c_y, int c_z)
+
+    HashEntry(long long int key, int idx, double h, int c_x, int c_y, int c_z)
     {
         this->key = key;
         this->indices.push_back(idx);
+        this->h_max = h;
         this->c_x = c_x;
         this->c_y = c_y;
         this->c_z = c_z;
@@ -41,6 +44,12 @@ public:
     {
         return &this->indices;
     } 
+
+    inline void add(unsigned int idx, double h)
+    {
+        this->indices.push_back(idx);
+        this->h_max = max(this->h_max, h);
+    }
 };
 
 class HashTable
@@ -65,7 +74,7 @@ public:
         return ((i*p1)^(j*p2)^(k*p3))%this->table_size;
     }
 
-    void add(int i, int j, int k, int idx)
+    void add(int i, int j, int k, int idx, double h)
     {
         long long int key = this->hash(i,j,k);
         HashEntry* prev = NULL;
@@ -78,10 +87,10 @@ public:
             entry = entry->next;
         }
         if(entry!=NULL)
-            entry->indices.push_back(idx);
+            entry->add(idx, h);
         else
         {
-            entry = new HashEntry(key, idx, i, j, k);
+            entry = new HashEntry(key, idx, h, i, j, k);
             if(prev==NULL)
                 this->hashtable[key] = entry;
             else
@@ -89,14 +98,14 @@ public:
         }
     }
 
-    vector <unsigned int> *get(int i, int j, int k)
+    HashEntry* get(int i, int j, int k)
     {
         long long int key = this->hash(i,j,k);
         HashEntry* entry = this->hashtable[key];
         while(entry!=NULL)
         {
             if(entry->c_x==i && entry->c_y==j && entry->c_z==k)
-                return entry->get_indices();
+                return entry;
             entry = entry->next;
         }
         return NULL;
