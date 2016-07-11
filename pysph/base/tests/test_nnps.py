@@ -207,13 +207,7 @@ class NNPSTestCase(unittest.TestCase):
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
             # ensure that the neighbor lists are the same
-            try:
-                self._assert_neighbors(nbrs1, nbrs2)
-            except:
-                print i
-                print nbrs1.get_npy_array()
-                print nbrs2.get_npy_array()
-
+            self._assert_neighbors(nbrs1, nbrs2)
 
 class DictBoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""

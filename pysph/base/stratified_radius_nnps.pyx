@@ -157,7 +157,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
 
         for i from 0<=i<self.num_levels:
 
-            h_max = fmax(h, self._get_h_max(self.current_cells, i))
+            h_max = fmax(self.radius_scale*h, self._get_h_max(self.current_cells, i))
             H = <int> ceil(h_max*self.H/self._get_h_max(self.current_cells, i))
 
             mask_len = (2*H+1)*(2*H+1)*(2*H+1)
