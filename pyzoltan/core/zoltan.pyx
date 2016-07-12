@@ -10,7 +10,7 @@ Zoltan works by calling user defined call back functions that have to
 be registered with Zoltan. These functions query a user defined data
 structure and provide the requisite information for Zoltan to proceed
 with the load balancing. The user defined data structures are defined
-as structs in the accompanying header (.pxd) file. 
+as structs in the accompanying header (.pxd) file.
 
 The user is responsible to populate this struct appropriately with
 application specific data and register the right query functions with
@@ -21,7 +21,6 @@ query functions, load balancing algorithms and auxiliary functions.
 
 """
 cimport mpi4py.MPI as mpi
-from mpi4py cimport mpi_c as mpic
 
 # Cython for pure mode
 cimport cython
@@ -192,7 +191,7 @@ cdef class PyZoltan:
             all objects have the same weight.
 
         edge_weight_dim : str, default "0"
-            Number of weights associated with an edge. The default value implies all 
+            Number of weights associated with an edge. The default value implies all
             edges have the same weight.
 
         debug_level : str, default "0"
@@ -288,7 +287,7 @@ cdef class PyZoltan:
         """Call the Zoltan load balancing function.
 
         After a call to this function, the import/export lists
-        required for load balancing are available as data attributes. 
+        required for load balancing are available as data attributes.
 
         The method returns an integer (1:True, 0:False) indicating
         whether a change in the assignment of the objects is
@@ -676,25 +675,25 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         _check_error(ierr)
 
         return proc
-    
+
     # Load balancing options
     def set_rcb_lock_directions(self, str flag):
         """Flag to fix the directions of the RCB cuts
 
         Legal values are:
-        
+
         0 : don't fix directions (default when using RCB)
         1 : fix directions
 
         Notes:
-        
+
         This option is only valid for the RCB based geometric
         partitioner. Setting this option to True (1) will mean the
         direction of the cuts used at the beginning is re-used for the
         duration of the simulation.
 
         """
-        self._check_lb_method('RCB')        
+        self._check_lb_method('RCB')
         self.Zoltan_Set_Param("RCB_LOCK_DIRECTIONS", flag)
 
     def set_rcb_reuse(self, str flag):
@@ -711,7 +710,7 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
     def set_rcb_rectilinear_blocks(self, str flag):
         """Flag controlling the shape of the RCB regions
-        
+
         This option will avoid any unwanted projections of the
         different partitions at the cost of a slight imbalance.
 
@@ -723,13 +722,13 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
         """Flag to group the cuts along a given direction
 
         Legal values (refer to the Zoltan User Guide):
-        
-        '0' = don't order cuts; 
-        '1' = xyz 
-        '2' = xzy 
-        '3' = yzx 
-        '4' = yxz 
-        '5' = zxy 
+
+        '0' = don't order cuts;
+        '1' = xyz
+        '2' = xzy
+        '3' = yzx
+        '4' = yxz
+        '5' = zxy
         '6' = zyx
 
         """
