@@ -1,3 +1,5 @@
+"""Simulate a 1D blast wave problem (30 seconds).
+"""
 import os
 import numpy
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
@@ -36,7 +38,7 @@ class Blastwave(ShockTubeSetup):
                 fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma, alpha=1,
                 beta=1, k=1.0, eps=0.5, g1=0.2, g2=0.4)
 
-        # Running this will need to implement boundary condtion first.  
+        # Running this will need to implement boundary condtion first.
         mpm = GasDScheme(
                 fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
                 kernel_factor=kernel_factor, alpha1=1.0, alpha2=0.1,

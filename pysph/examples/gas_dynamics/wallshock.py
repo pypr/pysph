@@ -1,3 +1,5 @@
+"""Wall-shock problem in 1D (40 seconds).
+"""
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
 import numpy
