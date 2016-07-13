@@ -1,3 +1,5 @@
+"""Simulate the Sjogreen problem in 1D (10 seconds).
+"""
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
 import numpy

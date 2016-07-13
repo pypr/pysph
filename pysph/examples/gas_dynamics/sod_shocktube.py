@@ -1,3 +1,5 @@
+"""Simulate the classical Sod Shocktube problem in 1D (5 seconds).
+"""
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
 import numpy
