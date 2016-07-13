@@ -65,7 +65,16 @@ class ShockTubeSetup(Application):
 
 
     def post_process(self):
-        from matplotlib import pyplot as plt
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            from matplotlib import pyplot as plt
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
+        if self.rank > 0 or len(self.output_files) == 0:
+            return
+
         last_output = self.output_files[-1]
         from pysph.solver.utils import load
         data = load(last_output)
@@ -110,5 +119,3 @@ class ShockTubeSetup(Application):
         elif self.options.scheme == 'adke':
             s.configure_solver(dt=self.dt, tf=self.tf,
                     adaptive_timestep=False, pfreq=50)
-
-
