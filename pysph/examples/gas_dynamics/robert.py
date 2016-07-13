@@ -22,12 +22,9 @@ h0 = kernel_factor*dxr
 
 class Robert(ShockTubeSetup):
     def create_particles(self):
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
-
         return self.generate_particles(xmin = -0.5, xmax=1, dxl=dxl, dxr=dxr,
                 m=dxr, pl=10.33, pr=1.0, h0=h0, bx=0.03, gamma1=gamma1,
-                ul=-0.39, ur=-3.02, constants=consts)
+                ul=-0.39, ur=-3.02)
 
     def create_scheme(self):
         s.configure_solver(dt=dt, tf=tf, adaptive_timestep=False, pfreq=50)

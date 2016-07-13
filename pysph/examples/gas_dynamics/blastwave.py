@@ -25,11 +25,9 @@ h0 = kernel_factor*dxr
 class Blastwave(ShockTubeSetup):
 
     def create_particles(self):
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
         return self.generate_particles(xmin = -0.5, xmax=0.5, dxl=dxl, dxr=dxr,
                 m=dxl, pl=1000.0, pr=0.01, h0=h0, bx=0.03,
-                gamma1=gamma1, constants=consts)
+                gamma1=gamma1)
 
     def create_scheme(self):
         self.dt = dt
@@ -39,8 +37,8 @@ class Blastwave(ShockTubeSetup):
                 beta=1, k=1.0, eps=0.5, g1=0.2, g2=0.4)
 
         # Running this will need to implement boundary condtion first.  
-        mpm = GasDScheme(  
-                fluids=['fluid'], dim=dim, gamma=gamma,
+        mpm = GasDScheme(
+                fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
                 kernel_factor=kernel_factor, alpha1=1.0, alpha2=0.1,
                 beta=2.0, update_alpha1=True, update_alpha2=True
                 )

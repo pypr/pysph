@@ -22,12 +22,9 @@ h0 = kernel_factor*dxr
 
 class SodShockTube(ShockTubeSetup):
     def create_particles(self):
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
-
         return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=dxl, dxr=dxr,
                 m=dxl, pl=1.0, pr=0.1, h0=h0, bx=0.03, gamma1=gamma1,
-                ul=0.0, ur=0.0, constants=consts)
+                ul=0.0, ur=0.0)
 
     def create_scheme(self):
         self.dt = dt
@@ -38,7 +35,7 @@ class SodShockTube(ShockTubeSetup):
 
 
         mpm = GasDScheme(
-                fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+                fluids=['fluid'], solids = [], dim=dim, gamma=gamma,
                 kernel_factor=kernel_factor, alpha1=1.0, alpha2=0.1,
                 beta=2.0, update_alpha1=True, update_alpha2=True
                 )

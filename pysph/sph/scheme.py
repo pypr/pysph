@@ -931,17 +931,14 @@ class ADKEScheme(Scheme):
         from pysph.base.utils import get_particle_array
         particle_arrays = dict([(p.name, p) for p in particles])
         import numpy
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
         required_props = [
                 'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
                 'e', 'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0',
                 'z0', 'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div',  'h0',
-                'wij', 'htmp']
+                'wij', 'htmp', 'logrho']
 
 
-        dummy = get_particle_array(constants=consts,
-                additional_props=required_props,
+        dummy = get_particle_array( additional_props=required_props,
                 name='junk')
         dummy.set_output_arrays(['x', 'y', 'u', 'v', 'rho', 'm', 'h',
             'cs', 'p', 'e','au', 'av', 'ae', 'pid', 'gid', 'tag'] )

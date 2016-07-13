@@ -1,5 +1,6 @@
 """Basic equations for Gas-dynamics"""
 
+from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 from pysph.sph.equation import Equation
 from math import sqrt, exp, log
 
@@ -33,10 +34,9 @@ class SummationDensityADKE(Equation):
         self.eps = eps
         super(SummationDensityADKE, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_arho, d_rho, d_lng, d_h, d_h0):
+    def initialize(self, d_idx, d_arho, d_rho, d_h, d_h0):
         d_rho[d_idx] = 0.0
         d_arho[d_idx] = 0.0
-        d_lng[0] = 0.0
         d_h[d_idx] = d_h0[d_idx]
 
     def loop(self, d_idx, d_rho, d_arho, s_idx, s_m,  VIJ, DWI, WIJ):
@@ -48,20 +48,19 @@ class SummationDensityADKE(Equation):
         d_arho[d_idx] += mj * vijdotdwij
 
 
-    def post_loop(self, d_idx, d_rho, d_arho, d_div):
+    def post_loop(self, d_idx, d_rho, d_arho, d_div, d_logrho):
         d_div[d_idx] = -d_arho[d_idx]/d_rho[d_idx]
         d_arho[d_idx] = 0
+        d_logrho[d_idx] = log(d_rho[d_idx]);
 
-    def reduce(self, d_lng, d_rho, d_h, d_h0,  dst):
+    def reduce(self,  d_rho, d_h, d_h0,  dst):
 
         n = declare('int')
         k = declare('int')
-        divFactor = 1.0/len(dst.x)
         n = len(dst.x)
-
-        for k in range(n):
-            d_lng[0] += log(d_rho[k])
-        g = exp(d_lng[0]*divFactor)
+        tmp_sum_logrho  = serial_reduce_array(dst.array.logrho, 'sum')
+        sum_logrho = parallel_reduce_array(tmp_sum_logrho, 'sum')
+        g = exp(sum_logrho/n);
 
         for k in range(n):
             lamda = self.k*pow(g/d_rho[k],self.eps)

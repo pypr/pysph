@@ -22,12 +22,9 @@ h0 = kernel_factor*dxr
 
 class WallShock(ShockTubeSetup):
     def create_particles(self):
-        lng = numpy.zeros(1, dtype=float)
-        consts ={ 'lng': lng}
-
         return self.generate_particles(xmin = -0.5, xmax=0.5, dxl=dxl, dxr=dxr,
                 m=dxl, pl=4e-6, pr=4e-6, h0=h0, bx=0.02, gamma1=gamma1, ul=1.0,
-                ur=-1.0, constants=consts)
+                ur=-1.0)
 
     def create_scheme(self):
         self.dt = dt
