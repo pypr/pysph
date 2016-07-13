@@ -850,40 +850,40 @@ class ADKEScheme(Scheme):
                 ))
         equations.append(Group(g2, update_nnps=True, iterate=False))
 
-        g7 = []
-        for solid in self.solids:
-            g7.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=g7))
-
-
-
         g3 = []
-        for fluid in self.fluids:
-            g3.append(SummationDensity(fluid, self.fluids+self.solids))
-        equations.append(Group(g3))
+        for solid in self.solids:
+            g3.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=g3))
 
 
 
         g4 = []
-        for solid in self.solids:
-            g4.append(WallBoundary(solid, sources=self.fluids))
-        equations.append(Group(equations=g4))
+        for fluid in self.fluids:
+            g4.append(SummationDensity(fluid, self.fluids+self.solids))
+        equations.append(Group(g4))
+
 
 
         g5 = []
-        for elem in self.fluids+self.solids:
-            g5.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
+        for solid in self.solids:
+            g5.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g5))
-        g6 = []
 
+
+        g6 = []
+        for elem in self.fluids+self.solids:
+            g6.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
+        equations.append(Group(equations=g6))
+        
+        g7 = []
         for fluid in self.fluids:
-            g6.append(ADKEAccelerations(
+            g7.append(ADKEAccelerations(
                 dest=fluid, sources = self.fluids + self.solids,
                 alpha=self.alpha, beta=self.beta, g1=self.g1, g2=self.g2,
                 k= self.k, eps=self.eps
                 ))
 
-        equations.append(Group(equations=g6))
+        equations.append(Group(equations=g7))
         return equations
 
     def configure_solver(self, kernel=None, integrator_cls=None,
