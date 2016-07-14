@@ -1,6 +1,9 @@
 """Cython Wrapper for Zoltan. """
 
-from mpi4py.mpi_c cimport MPI_Comm
+if MPI4PY_V2:
+   from mpi4py.libmpi cimport MPI_Comm
+else:
+   from mpi4py.mpi_c cimport MPI_Comm
 
 from czoltan_types cimport ZOLTAN_ID_PTR
 

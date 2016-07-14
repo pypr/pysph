@@ -8,8 +8,8 @@ from pysph.sph.equation import Equation
 
 class VonMisesPlasticity2D(Equation):
     def __init__(self, dest, sources, flow_stress):
-        self.flow_stress = flow_stress
-        self.factor = sqrt( 2.0 * flow_stress/3.0 )
+        self.flow_stress2 = flow_stress*flow_stress
+        self.factor = sqrt( 2.0/3.0 )*flow_stress
         super(VonMisesPlasticity2D,self).__init__(dest, sources)
 
     def loop(self, d_idx, d_s00, d_s01, d_s11):
@@ -20,7 +20,7 @@ class VonMisesPlasticity2D(Equation):
 
         J = s00a* s00a + 2.0 * s01a*s10a + s11a*s11a
         scale = 1.0
-        if (J > 2.0/3.0 * self.flow_stress):
+        if (J > 2.0/3.0 * self.flow_stress2):
             scale = self.factor/sqrt(J)
 
         # store the stresses

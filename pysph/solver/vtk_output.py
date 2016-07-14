@@ -161,7 +161,7 @@ def run(options):
             particles.append(pdata)
         filename = os.path.splitext(fname)[0]
         if options.outdir is not None:
-            filename = options.os_dir + os.path.split(filename)[1]
+            filename = options.outdir + os.path.split(filename)[1]
         dump_vtk(filename, particles, scalars=options.scalars,
                  V=['u', 'v', 'w'])
 

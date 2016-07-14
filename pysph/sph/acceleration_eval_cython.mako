@@ -116,6 +116,7 @@ from libc.math cimport *
 from libc.math cimport fabs as abs
 from libc.math cimport M_PI as pi
 cimport numpy
+import numpy
 % if not helper.config.use_openmp:
 from cython.parallel import threadid
 prange = range

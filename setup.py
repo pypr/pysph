@@ -368,6 +368,9 @@ def get_parallel_extensions():
     if not HAVE_MPI:
         return []
 
+    MPI4PY_V2 = False if mpi4py.__version__.startswith('1.') else True
+    cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
+
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -382,6 +385,7 @@ def get_parallel_extensions():
             libraries=['zoltan', 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
 
@@ -398,6 +402,7 @@ def get_parallel_extensions():
             libraries=['zoltan', 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
 
@@ -413,6 +418,7 @@ def get_parallel_extensions():
             libraries=['zoltan', 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
     ]
@@ -432,6 +438,7 @@ def get_parallel_extensions():
             libraries = ['zoltan', 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
     ]

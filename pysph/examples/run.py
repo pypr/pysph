@@ -44,7 +44,8 @@ def get_all_examples():
     basedir = HERE
     examples = []
     _ignore = [['run.py'], ['ghia_cavity_data.py'], ['db_exp_data.py'],
-              ['tests', 'test_examples.py']]
+               ['tests', 'test_examples.py'],
+               ['gas_dynamics', 'shocktube_setup.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]
     for dirpath, dirs, files in os.walk(basedir):
@@ -170,7 +171,10 @@ def main(argv=None):
         run_command(module, argv[1:])
     else:
         list_examples(examples)
-        ans = int(get_input("Enter example number you wish to run: "))
+        try:
+            ans = int(get_input("Enter example number you wish to run: "))
+        except ValueError:
+            ans = 0
         if ans < 1 or ans > len(examples):
             print("Invalid example number, exiting!")
             sys.exit()
