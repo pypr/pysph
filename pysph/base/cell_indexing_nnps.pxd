@@ -52,6 +52,8 @@ cdef class CellIndexingNNPS(NNPS):
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
             UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil
 

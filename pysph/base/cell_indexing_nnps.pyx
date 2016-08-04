@@ -220,6 +220,17 @@ cdef class CellIndexingNNPS(NNPS):
 
         self.find_nearest_neighbors(d_idx, nbrs)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        indices.reset()
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        cdef int num_particles = pa_wrapper.get_number_of_particles()
+
+        cdef u_int* current_keys = self.keys[pa_index]
+
+        cdef int j
+        for j from 0<=j<num_particles:
+            indices.c_append(<long>self._get_id(current_keys[j], pa_index))
+
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
             UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices) nogil:
