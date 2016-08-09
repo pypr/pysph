@@ -33,4 +33,4 @@ cdef extern from "zoltan_comm.h":
 
     int Zoltan_Comm_Invert_Plan(ZOLTAN_COMM_OBJ**)
 
-    int Zoltan_Comm_Resize(ZOLTAN_COMM_OBJ*, int*, int, int*);
+    int Zoltan_Comm_Resize(ZOLTAN_COMM_OBJ*, int*, int, int*)
