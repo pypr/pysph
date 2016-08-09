@@ -196,6 +196,35 @@ cdef class ZComm:
 
         _check_error(ierr)
 
+    def Comm_Resize(self, np.ndarray _sizes, int total_recv_size):
+        """Set the individual sizes for the communicated objects
+
+        Parameters:
+
+        _sizes : np.ndarray
+            An input array of length equal to the nsend argument in
+            the call to Zoltan_Comm_Create which generated the
+            plan. Each entry in the array is the size of the
+            corresponding object to be sent (c.f. Zoltan User Manual)
+
+        total_recv_size : int
+            Sum of the sizes of the incoming messages
+
+        Notes:
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef int* sizes = <int*>_sizes.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+        ierr = zcomm.Zoltan_Comm_Resize(
+           _zoltan_comm_obj,
+           sizes,
+           tag,
+           &total_recv_size)
+
+        _check_error(ierr)
+
     def Comm_Do_Reverse(self, np.ndarray _sendbuf, np.ndarray recvbuf):
         """Perform the reverse of the unstructured communication
         between processors
