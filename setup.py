@@ -124,13 +124,15 @@ def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
     if ( len(d) == 0 ):
-        USE_ZOLTAN=False
+        USE_ZOLTAN = False
         return ''
+    else:
+        USE_ZOLTAN = True
     if not path.exists(d):
         print("*"*80)
         print("%s incorrectly set to %s, not using ZOLTAN!"%(varname, d))
         print("*"*80)
-        USE_ZOLTAN=False
+        USE_ZOLTAN = False
         return ''
     return d
 
@@ -357,6 +359,10 @@ def get_parallel_extensions():
     MPI4PY_V2 = False if mpi4py.__version__.startswith('1.') else True
     cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
 
+    zoltan_lib = 'zoltan'
+    if os.environ.get('USE_TRILINOS', None) is not None:
+        zoltan_lib = 'trilinos_zoltan'
+
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -368,7 +374,7 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
@@ -385,7 +391,7 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
@@ -401,7 +407,7 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
@@ -421,7 +427,7 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries = ['zoltan', 'mpi'],
+            libraries = [zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
