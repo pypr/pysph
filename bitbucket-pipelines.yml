@@ -1,4 +1,4 @@
-image: pysph/base
+image: pysph/base:v1
 
 pipelines:
   default:
