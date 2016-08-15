@@ -9,8 +9,10 @@ build:
         pull: true
 
     ci:
+        - export LC_ALL=C
+        - env
         - rm -rf ~/.pysph/source
         - rm -rf ~/.cache
-        - mkdir -p $TRAVIS_BUILD_DIR/shippable/testresults
+        - mkdir -p $SHIPPABLE_BUILD_DIR/shippable/testresults
         - tox -e py27,py35
-        - cp .tox/*.xml $TRAVIS_BUILD_DIR/shippable/testresults
+        - cp $SHIPPABLE_BUILD_DIR/.tox/*.xml $SHIPPABLE_BUILD_DIR/shippable/testresults
