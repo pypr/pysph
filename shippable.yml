@@ -1,5 +1,3 @@
-language: python
-
 build:
     cache: false
 
