@@ -1,0 +1,7 @@
+image: pysph/base:v1
+
+pipelines:
+  default:
+    - step:
+        script:
+          - tox -e py27,py35

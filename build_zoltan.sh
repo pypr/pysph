@@ -3,7 +3,7 @@
 ZOLTAN_DIR=$1
 BUILD_DIR="/tmp"
 
-URL="http://www.cs.sandia.gov/~kddevin/Zoltan_Distributions/zoltan_distrib_v3.8.tar.gz"
+URL="http://www.cs.sandia.gov/~kddevin/Zoltan_Distributions/zoltan_distrib_v3.83.tar.gz"
 
 Check()
 {
@@ -37,7 +37,7 @@ Build()
 {
     cd $BUILD_DIR
     tar xzf zoltan_distrib*.tar.gz
-    cd Zoltan_v3.8
+    cd Zoltan_v3.83
     mkdir build
     cd build
     ../configure --with-cflags=-fPIC --enable-mpi --prefix=$ZOLTAN_DIR
