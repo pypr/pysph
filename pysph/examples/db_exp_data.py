@@ -63,6 +63,27 @@ ko_data = u"""
 3.096   3.624
 """
 
+ko_mps_data = u"""
+0.000   1.002
+0.227   1.019
+0.416   1.091
+0.591   1.205
+0.778   1.351
+0.958   1.512
+1.095   1.637
+1.226   1.771
+1.381   1.931
+1.536   2.100
+1.684   2.268
+1.858   2.480
+2.043   2.707
+2.278   3.004
+2.451   3.251
+2.604   3.481
+2.752   3.700
+2.943   3.997
+"""
+
 def get_martin_moyce_1():
     """Returns t*sqrt(2*g/a), z/a for the case where a = 1.125 inches
     """
@@ -81,4 +102,11 @@ def get_martin_moyce_2():
 def get_koshizuka_oka_data():
     # z/L vs t*np.sqrt(2*g/L)
     t, z = np.loadtxt(StringIO(ko_data), unpack=True)
+    return t, z
+
+def get_koshizuka_oka_mps_data():
+    """These are computational results using the MPS scheme.
+    """
+    # z/L vs t*np.sqrt(2*g/L)
+    t, z = np.loadtxt(StringIO(ko_mps_data), unpack=True)
     return t, z
