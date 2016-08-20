@@ -1,19 +1,18 @@
 # cython: embedsignature=True
 from libcpp.map cimport map
 from libcpp.pair cimport pair
-from libc.stdint cimport uint32_t
+from libc.stdint cimport uint64_t
 
 from nnps_base cimport *
 
 ctypedef unsigned int u_int
-ctypedef pair[u_int, uint32_t] pid_to_key_t
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 
 cdef extern from "math.h":
     double log2(double) nogil
 
 cdef extern from "z_order.h":
-    inline uint32_t get_key(uint32_t i, uint32_t j, uint32_t k) nogil
+    inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil
 
     cdef cppclass CompareSortWrapper:
         CompareSortWrapper() nogil except +
@@ -21,9 +20,6 @@ cdef extern from "z_order.h":
                 double* xmin, double cell_size, u_int* current_pids,
                 int length) nogil except +
         inline void compare_sort() nogil
-
-
-cdef bint compare_keys(pid_to_key_t a, pid_to_key_t b) nogil
 
 cdef class ZOrderNNPS(NNPS):
     ############################################################################

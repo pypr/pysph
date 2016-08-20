@@ -2,7 +2,6 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
-from libc.stdint cimport uint32_t
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 
@@ -14,9 +13,6 @@ cimport cython
 cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
-
-cdef bint compare_keys(pid_to_key_t a, pid_to_key_t b) nogil:
-    return a.second < b.second
 
 #############################################################################
 
