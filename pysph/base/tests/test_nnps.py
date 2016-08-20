@@ -253,6 +253,14 @@ class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):

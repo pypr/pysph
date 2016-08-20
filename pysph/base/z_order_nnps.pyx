@@ -2,6 +2,7 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
+from libc.stdint cimport uint32_t
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 
@@ -14,6 +15,8 @@ cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
 
+cdef bint compare_keys(pid_to_key_t a, pid_to_key_t b) nogil:
+    return a.second < b.second
 
 #############################################################################
 
@@ -33,16 +36,12 @@ cdef class ZOrderNNPS(NNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
-        self._pids_list = [NULL for i in range(self.narrays)]
-        self.pids = <void**> malloc(narrays*sizeof(void*))
-
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.pids[i] = NULL
-            self.keys[i] = <u_int*> malloc(num_particles*sizeof(u_int))
-            self.key_indices[i] = new key_to_idx_t()
+            self.pids[i] = <u_int*> malloc(num_particles*sizeof(u_int))
+            self.pid_indices[i] = new key_to_idx_t()
 
         self.src_index = 0
         self.dst_index = 0
@@ -55,43 +54,19 @@ cdef class ZOrderNNPS(NNPS):
             bint cache = False, bint sort_gids = False):
         cdef int narrays = len(particles)
 
-        self.keys = <u_int**> malloc(narrays*sizeof(u_int*))
-        self.key_indices = <key_to_idx_t**> malloc(narrays*sizeof(key_to_idx_t*))
+        self.pids = <u_int**> malloc(narrays*sizeof(u_int*))
+        self.pid_indices = <key_to_idx_t**> malloc(narrays*sizeof(key_to_idx_t*))
 
-        self.current_keys = NULL
+        self.current_pids = NULL
         self.current_indices = NULL
 
     def __dealloc__(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            free(self.keys[i])
-            del self.key_indices[i]
-        free(self.keys)
-        free(self.key_indices)
-
-
-    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil:
-        return  n + \
-                (1 << self.I[pa_index])*i + \
-                (1 << (self.I[pa_index] + self.J))*j + \
-                (1 << (self.I[pa_index] + self.J + self.K))*k
-
-    @cython.cdivision(True)
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
-        return (<UIntArray>self.pids[pa_index]).data[key]
-
-    @cython.cdivision(True)
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
-        return (key >> self.I[pa_index]) % (1 << self.J)
-
-    @cython.cdivision(True)
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
-        return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
-
-    @cython.cdivision(True)
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
-        return key >> (self.I[pa_index] + self.J + self.K)
+            free(self.pids[i])
+            del self.pid_indices[i]
+        free(self.pids)
+        free(self.pid_indices)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -106,8 +81,8 @@ cdef class ZOrderNNPS(NNPS):
 
         """
         NNPS.set_context(self, src_index, dst_index)
-        self.current_keys = self.keys[src_index]
-        self.current_indices = self.key_indices[src_index]
+        self.current_pids = self.pids[src_index]
+        self.current_indices = self.pid_indices[src_index]
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -165,8 +140,8 @@ cdef class ZOrderNNPS(NNPS):
 
         cdef u_int n, idx
         for i from 0<=i<num_boxes:
-            it = self.current_indices.find(self._get_key(0, x_boxes[i], y_boxes[i],
-                z_boxes[i], self.src_index))
+            it = self.current_indices.find(get_key(x_boxes[i], y_boxes[i],
+                z_boxes[i]))
             if it == self.current_indices.end():
                 continue
             candidate = deref(it).second
@@ -174,7 +149,7 @@ cdef class ZOrderNNPS(NNPS):
             candidate_length = candidate.second
 
             for j from 0<=j<candidate_length:
-                idx = self._get_id(self.current_keys[n+j], self.src_index)
+                idx = self.current_pids[n+j]
 
                 hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
 
@@ -191,7 +166,6 @@ cdef class ZOrderNNPS(NNPS):
             self._sort_neighbors(
                 &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
             )
-
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
@@ -221,52 +195,66 @@ cdef class ZOrderNNPS(NNPS):
 
         self.find_nearest_neighbors(d_idx, nbrs)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        indices.reset()
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        cdef int num_particles = pa_wrapper.get_number_of_particles()
+
+        cdef u_int* current_pids = self.pids[pa_index]
+
+        cdef int j
+        for j from 0<=j<num_particles:
+            indices.c_append(<long>current_pids[j])
+
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, u_int* current_keys, void* current_pids,
-            key_to_idx_t* current_indices):
+            UIntArray indices, u_int* current_pids, key_to_idx_t* current_indices):
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
         cdef double* z_ptr = pa_wrapper.z.data
 
         cdef double* xmin = self.xmin.data
 
-        self._pids_list[pa_index] = indices
-        current_pids = <void*>indices
+        cdef int id_x, id_y, id_z
+        cdef int c_x, c_y, c_z
 
         cdef int i, n
-        cdef int c_x, c_y, c_z
         for i from 0<=i<indices.length:
-            n = indices.data[i]
-            find_cell_id_raw(
-                    x_ptr[i] - xmin[0],
-                    y_ptr[i] - xmin[1],
-                    z_ptr[i] - xmin[2],
-                    self.cell_size,
-                    &c_x, &c_y, &c_z
-                    )
-            current_keys[i] = self._get_key(n, c_x, c_y, c_z, pa_index)
+            current_pids[i] = i
 
-        # sort pids according to keys
-        sort(current_keys, current_keys + indices.length)
+        cdef CompareSortWrapper sort_wrapper = \
+                CompareSortWrapper(x_ptr, y_ptr, z_ptr, xmin, self.cell_size,
+                        current_pids, indices.length)
 
-        cdef int id_x, id_y, id_z
+        sort_wrapper.compare_sort()
 
         cdef pair[u_int, pair[u_int, u_int]] temp
         cdef pair[u_int, u_int] cell
 
-        c_x = self._get_x(current_keys[0], pa_index)
-        c_y = self._get_y(current_keys[0], pa_index)
-        c_z = self._get_z(current_keys[0], pa_index)
+        cdef int j
+        j = current_pids[0]
 
-        temp.first = self._get_key(0, c_x, c_y, c_z, pa_index)
+        find_cell_id_raw(
+                x_ptr[j] - xmin[0],
+                y_ptr[j] - xmin[1],
+                z_ptr[j] - xmin[2],
+                self.cell_size,
+                &c_x, &c_y, &c_z
+                )
+
+        temp.first = get_key(c_x, c_y, c_z)
         cell.first = 0
 
         cdef u_int length = 0
 
         for i from 0<i<indices.length:
-            id_x = self._get_x(current_keys[i], pa_index)
-            id_y = self._get_y(current_keys[i], pa_index)
-            id_z = self._get_z(current_keys[i], pa_index)
+            j = current_pids[i]
+            find_cell_id_raw(
+                    x_ptr[j] - xmin[0],
+                    y_ptr[j] - xmin[1],
+                    z_ptr[j] - xmin[2],
+                    self.cell_size,
+                    &id_x, &id_y, &id_z
+                    )
 
             length += 1
 
@@ -275,7 +263,7 @@ cdef class ZOrderNNPS(NNPS):
                 temp.second = cell
                 current_indices.insert(temp)
 
-                temp.first = self._get_key(0, id_x, id_y, id_z, pa_index)
+                temp.first = get_key(id_x, id_y, id_z)
                 cell.first = i
 
                 length = 0
@@ -302,43 +290,34 @@ cdef class ZOrderNNPS(NNPS):
                         length += 1
         return length
 
-
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
 
-        # Only necessary if number of particles in a ParticleArray changes
         cdef int i, num_particles
 
         cdef double* xmax = self.xmax.data
         cdef double* xmin = self.xmin.data
 
-        cdef int J = <u_int> (1 + log2(ceil((xmax[0] - xmin[0])/self.cell_size)))
-        cdef int K = <u_int> (1 + log2(ceil((xmax[1] - xmin[1])/self.cell_size)))
-        cdef int L = <u_int> (1 + log2(ceil((xmax[2] - xmin[2])/self.cell_size)))
-
-        self.num_bits = fmax(fmax(J, K), L)
-
         for i from 0<=i<self.narrays:
-            free(self.keys[i])
-            del self.key_indices[i]
+            free(self.pids[i])
+            del self.pid_indices[i]
 
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.keys[i] = <u_int*> malloc(num_particles*sizeof(u_int))
-            self.key_indices[i] = new key_to_idx_t()
+            self.pids[i] = <u_int*> malloc(num_particles*sizeof(u_int))
+            self.pid_indices[i] = new key_to_idx_t()
 
-        self.current_keys = self.keys[self.src_index]
-        self.current_indices = self.key_indices[self.src_index]
+        self.current_pids = self.pids[self.src_index]
+        self.current_indices = self.pid_indices[self.src_index]
 
     @cython.cdivision(True)
     cpdef _bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
         cdef int num_particles = pa_wrapper.get_number_of_particles()
 
-        cdef u_int* current_keys = self.keys[pa_index]
         cdef u_int* current_pids = self.pids[pa_index]
-        cdef key_to_idx_t* current_indices = self.key_indices[pa_index]
+        cdef key_to_idx_t* current_indices = self.pid_indices[pa_index]
 
-        self.fill_array(pa_wrapper, pa_index, indices, current_keys, current_indices)
+        self.fill_array(pa_wrapper, pa_index, indices, current_pids, current_indices)
 

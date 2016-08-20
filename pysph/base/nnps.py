@@ -7,4 +7,5 @@ from pysph.base.linked_list_nnps import LinkedListNNPS
 from pysph.base.box_sort_nnps import BoxSortNNPS, DictBoxSortNNPS
 from pysph.base.spatial_hash_nnps import SpatialHashNNPS, ExtendedSpatialHashNNPS
 from pysph.base.cell_indexing_nnps import CellIndexingNNPS
+from pysph.base.z_order_nnps import ZOrderNNPS
 

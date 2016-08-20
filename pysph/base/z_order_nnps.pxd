@@ -1,30 +1,39 @@
 # cython: embedsignature=True
 from libcpp.map cimport map
 from libcpp.pair cimport pair
+from libc.stdint cimport uint32_t
 
 from nnps_base cimport *
 
 ctypedef unsigned int u_int
+ctypedef pair[u_int, uint32_t] pid_to_key_t
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 
-cdef extern from 'math.h':
+cdef extern from "math.h":
     double log2(double) nogil
+
+cdef extern from "z_order.h":
+    inline uint32_t get_key(uint32_t i, uint32_t j, uint32_t k) nogil
+
+    cdef cppclass CompareSortWrapper:
+        CompareSortWrapper() nogil except +
+        CompareSortWrapper(double* x_ptr, double* y_ptr, double* z_ptr,
+                double* xmin, double cell_size, u_int* current_pids,
+                int length) nogil except +
+        inline void compare_sort() nogil
+
+
+cdef bint compare_keys(pid_to_key_t a, pid_to_key_t b) nogil
 
 cdef class ZOrderNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef u_int** keys
-    cdef list _pids_list
-    cdef void** pids
+    cdef u_int** pids
+    cdef u_int* current_pids
 
-    cdef u_int* current_keys
-    cdef void* current_pids
-
-    cdef key_to_idx_t** key_indices
+    cdef key_to_idx_t** pid_indices
     cdef key_to_idx_t* current_indices
-
-    cdef u_int num_bits
 
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
@@ -32,17 +41,6 @@ cdef class ZOrderNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
-
-    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil
-
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil
-
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil
-
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil
-
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil
@@ -53,6 +51,8 @@ cdef class ZOrderNNPS(NNPS):
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
             UIntArray indices, u_int* current_keys, key_to_idx_t* current_indices)
