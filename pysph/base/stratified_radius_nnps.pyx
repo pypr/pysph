@@ -36,6 +36,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
+        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
@@ -298,6 +299,7 @@ cdef class StratifiedRadiusNNPS(NNPS):
     @cython.cdivision(True)
     cpdef _refresh(self):
         self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
+        self.domain.update()
 
         cdef HashTable** current_hash
         cdef int i, j
