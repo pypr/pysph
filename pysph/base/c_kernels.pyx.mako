@@ -1,14 +1,14 @@
 #cython: embedsignature=True
 <%
 from cython_generator import CythonGenerator
-from kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
+from kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, SuperGaussian
 generator = CythonGenerator(python_methods=True)
 %>
 
 from libc.math cimport *
 import numpy as np
 
-% for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline):
+% for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, SuperGaussian):
 <%
 generator.parse(cls())
 classname = cls.__name__
@@ -48,4 +48,3 @@ cdef class ${classname}Wrapper:
         return grad[0], grad[1], grad[2]
 
 % endfor
-
