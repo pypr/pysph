@@ -1,3 +1,14 @@
+1.0a5
+-----
+
+* Release date:  Still under development.
+* Add simple tests for all available kernels.  Add ``SuperGaussian`` kernel.
+* Add a basic dockerfile for pysph to help with the CI testing.
+* Update build so pysph can be built with a system zoltan installation that is
+  part of trilinos using the ``USE_TRILINOS`` environment variable.
+* Wrapping the ``Zoltan_Comm_Resize`` function in ``pyzoltan``.
+
+
 1.0a4
 ------
 
