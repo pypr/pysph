@@ -123,9 +123,14 @@ The following have contributed bug-fixes, features, documentation etc.
 Citing PySPH
 -------------
 
-We are in the process of writing up an article on the new PySPH
-framework as it stands today.  In the meanwhile, if you use PySPH and
-wish to cite it you may use this:
+You may use one of the following articles to formally refer to PySPH:
+
+ - Prabhu Ramachandran, *PySPH: a reproducible and high-performance framework
+   for smoothed particle hydrodynamics*, In Proceedings of the 15th Python in
+   Science Conference, pages 127--135, July 11th to 17th, 2016. `Link to paper
+   <http://conference.scipy.org/proceedings/scipy2016/prabhu_ramachandran_pysph.html>`_.
+
+The following is an older presentation:
 
  - Prabhu Ramachandran and Kunal Puri, *PySPH: A framework for parallel
    particle simulations*, In proceedings of the 3rd International
@@ -186,4 +191,3 @@ Changelog
 ----------
 
 .. include:: ../../CHANGES.rst
-

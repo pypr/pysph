@@ -5,7 +5,8 @@ except ImportError:
     quad = None
 from unittest import TestCase, main
 
-from pysph.base.kernels import CubicSpline, get_compiled_kernel
+from pysph.base.kernels import (CubicSpline, Gaussian, QuinticSpline,
+    SuperGaussian, WendlandQuintic, get_compiled_kernel)
 
 
 ###############################################################################
@@ -103,15 +104,9 @@ class TestKernelBase(TestCase):
         result = np.sum(vfunc(x, y, z))*vol
         return result
 
-###############################################################################
-# `TestCubicSpline1D` class.
-###############################################################################
-class TestCubicSpline1D(TestKernelBase):
-    kernel_factory = staticmethod(lambda: CubicSpline(dim=1))
-
-    def test_simple(self):
+    def check_kernel_at_origin(self, w_0):
         k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 2./3
+        expect = w_0
         self.assertAlmostEqual(k, expect,
                                msg='Kernel value %s != %s (expected)'%(k, expect))
         k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
@@ -128,32 +123,46 @@ class TestCubicSpline1D(TestKernelBase):
         self.assertAlmostEqual(g[0], expect,
                                msg='Kernel value %s != %s (expected)'%(g[0], expect))
 
+
+###############################################################################
+# `TestCubicSpline1D` class.
+###############################################################################
+class TestCubicSpline1D(TestKernelBase):
+    kernel_factory = staticmethod(lambda: CubicSpline(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(2./3)
+
     def test_zeroth_kernel_moments(self):
+        kh = self.wrapper.radius_scale
         # zero'th moment
-        r = self.check_kernel_moment_1d(-2.0, 2.0, 1.0, 0, xj=0)
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 0, xj=0)
         self.assertAlmostEqual(r, 1.0, 8)
         # Use a non-unit h.
-        r = self.check_kernel_moment_1d(-2.0, 2.0, 0.5, 0, xj=0)
+        r = self.check_kernel_moment_1d(-kh, kh, 0.5, 0, xj=0)
         self.assertAlmostEqual(r, 1.0, 8)
-        r = self.check_kernel_moment_1d(0.0, 4.0, 1.0, 0, xj=2.0)
+        r = self.check_kernel_moment_1d(0.0, 2*kh, 1.0, 0, xj=kh)
         self.assertAlmostEqual(r, 1.0, 8)
 
     def test_first_kernel_moment(self):
-        r = self.check_kernel_moment_1d(-2.0, 2.0, 1.0, 1, xj=0.0)
+        kh = self.wrapper.radius_scale
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 1, xj=0.0)
         self.assertAlmostEqual(r, 0.0, 8)
 
     def test_zeroth_grad_moments(self):
+        kh = self.wrapper.radius_scale
         # zero'th moment
-        r = self.check_grad_moment_1d(-2.0, 2.0, 1.0, 0, xj=0)
+        r = self.check_grad_moment_1d(-kh, kh, 1.0, 0, xj=0)
         self.assertAlmostEqual(r, 0.0, 8)
         # Use a non-unit h.
-        r = self.check_grad_moment_1d(-2.0, 2.0, 0.5, 0, xj=0)
+        r = self.check_grad_moment_1d(-kh, kh, 0.5, 0, xj=0)
         self.assertAlmostEqual(r, 0.0, 8)
-        r = self.check_grad_moment_1d(0.0, 4.0, 1.0, 0, xj=2.0)
+        r = self.check_grad_moment_1d(0.0, 2*kh, 1.0, 0, xj=kh)
         self.assertAlmostEqual(r, 0.0, 8)
 
     def test_first_grad_moment(self):
-        r = self.check_grad_moment_1d(0.0, 4.0, 1.0, 1, xj=2.0)
+        kh = self.wrapper.radius_scale
+        r = self.check_grad_moment_1d(0.0, 2*kh, 1.0, 1, xj=kh)
         self.assertAlmostEqual(r, -1.0, 8)
 
 ###############################################################################
@@ -163,23 +172,7 @@ class TestCubicSpline2D(TestKernelBase):
     kernel_factory = staticmethod(lambda: CubicSpline(dim=2))
 
     def test_simple(self):
-        k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 10./(7*np.pi)
-        self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)'%(k, expect))
-        k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)'%(k, expect))
-
-        g = self.gradient(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)'%(g[0], expect))
-        g = self.gradient(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)'%(g[0], expect))
+        self.check_kernel_at_origin(10./(7*np.pi))
 
     def test_zeroth_kernel_moments(self):
         r = self.check_kernel_moment_2d(0, 0)
@@ -217,23 +210,7 @@ class TestCubicSpline3D(TestKernelBase):
     kernel_factory = staticmethod(lambda: CubicSpline(dim=3))
 
     def test_simple(self):
-        k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 1./np.pi
-        self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)'%(k, expect))
-        k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)'%(k, expect))
-
-        g = self.gradient(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)'%(g[0], expect))
-        g = self.gradient(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
-        expect = 0.0
-        self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)'%(g[0], expect))
+        self.check_kernel_at_origin(1./np.pi)
 
     def test_zeroth_kernel_moments(self):
         r = self.check_kernel_moment_3d(0, 0, 0)
@@ -266,6 +243,185 @@ class TestCubicSpline3D(TestKernelBase):
         self.assertAlmostEqual(r[0], 0.0, 8)
         self.assertAlmostEqual(r[1], 0.0, 8)
         self.assertAlmostEqual(r[2], -1.0, 4)
+
+###############################################################################
+# Gaussian kernel
+class TestGaussian1D(TestCubicSpline1D):
+    kernel_factory = staticmethod(lambda: Gaussian(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(1.0/np.sqrt(np.pi))
+
+    def test_first_grad_moment(self):
+        kh = self.wrapper.radius_scale
+        r = self.check_grad_moment_1d(0.0, 2*kh, 1.0, 1, xj=kh)
+        self.assertAlmostEqual(r, -1.0, 3)
+
+    def test_zeroth_kernel_moments(self):
+        kh = self.wrapper.radius_scale
+        # zero'th moment
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 4)
+        # Use a non-unit h.
+        r = self.check_kernel_moment_1d(-kh, kh, 0.5, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 4)
+        r = self.check_kernel_moment_1d(0.0, 2*kh, 1.0, 0, xj=kh)
+        self.assertAlmostEqual(r, 1.0, 4)
+
+
+class TestGaussian2D(TestCubicSpline2D):
+    kernel_factory = staticmethod(lambda: Gaussian(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(1.0/np.pi)
+
+    def test_zeroth_kernel_moments(self):
+        r = self.check_kernel_moment_2d(0, 0)
+        self.assertAlmostEqual(r, 1.0, 3)
+
+    def test_first_grad_moment(self):
+        r = self.check_gradient_moment_2d(1, 0)
+        self.assertAlmostEqual(r[0], -1.0, 2)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        r = self.check_gradient_moment_2d(0, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], -1.0, 2)
+        r = self.check_gradient_moment_2d(1, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+
+
+class TestGaussian3D(TestCubicSpline3D):
+    kernel_factory = staticmethod(lambda: Gaussian(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(1.0/pow(np.pi, 1.5))
+
+    def test_zeroth_kernel_moments(self):
+        r = self.check_kernel_moment_3d(0, 0, 0)
+        self.assertAlmostEqual(r, 1.0, 2)
+
+    def test_first_grad_moment(self):
+        r = self.check_gradient_moment_3d(1, 0, 0)
+        self.assertAlmostEqual(r[0], -1.0, 2)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        self.assertAlmostEqual(r[2], 0.0, 8)
+        r = self.check_gradient_moment_3d(0, 1, 0)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], -1.0, 2)
+        self.assertAlmostEqual(r[2], 0.0, 6)
+        r = self.check_gradient_moment_3d(0, 0, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        self.assertAlmostEqual(r[2], -1.0, 2)
+
+
+###############################################################################
+# Quintic spline kernel
+class TestQuinticSpline1D(TestCubicSpline1D):
+    kernel_factory = staticmethod(lambda: QuinticSpline(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(0.55)
+
+class TestQuinticSpline2D(TestCubicSpline2D):
+    kernel_factory = staticmethod(lambda: QuinticSpline(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(66.0*7.0/(478.0*np.pi))
+
+class TestQuinticSpline3D(TestGaussian3D):
+    kernel_factory = staticmethod(lambda: QuinticSpline(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(66.0*3.0/(359.0*np.pi))
+
+
+###############################################################################
+# SuperGaussian kernel
+class TestSuperGaussian1D(TestGaussian1D):
+    kernel_factory = staticmethod(lambda: SuperGaussian(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(1.5/np.sqrt(np.pi))
+
+    def test_first_grad_moment(self):
+        kh = self.wrapper.radius_scale
+        r = self.check_grad_moment_1d(0.0, 2*kh, 1.0, 1, xj=kh)
+        self.assertAlmostEqual(r, -1.0, 2)
+
+    def test_zeroth_kernel_moments(self):
+        kh = self.wrapper.radius_scale
+        # zero'th moment
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 3)
+        # Use a non-unit h.
+        r = self.check_kernel_moment_1d(-kh, kh, 0.5, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 3)
+        r = self.check_kernel_moment_1d(0.0, 2*kh, 1.0, 0, xj=kh)
+        self.assertAlmostEqual(r, 1.0, 3)
+
+class TestSuperGaussian2D(TestGaussian2D):
+    kernel_factory = staticmethod(lambda: SuperGaussian(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(2.0/np.pi)
+
+    def test_zeroth_kernel_moments(self):
+        r = self.check_kernel_moment_2d(0, 0)
+        self.assertAlmostEqual(r, 1.0, 2)
+
+    def test_first_grad_moment(self):
+        r = self.check_gradient_moment_2d(1, 0)
+        self.assertAlmostEqual(r[0], -1.0, 1)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        r = self.check_gradient_moment_2d(0, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], -1.0, 1)
+        r = self.check_gradient_moment_2d(1, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+
+
+class TestSuperGaussian3D(TestGaussian3D):
+    kernel_factory = staticmethod(lambda: SuperGaussian(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(5.0/(2.0*pow(np.pi, 1.5)))
+
+    def test_first_grad_moment(self):
+        r = self.check_gradient_moment_3d(1, 0, 0)
+        self.assertAlmostEqual(r[0], -1.0, 1)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        self.assertAlmostEqual(r[2], 0.0, 8)
+        r = self.check_gradient_moment_3d(0, 1, 0)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], -1.0, 1)
+        self.assertAlmostEqual(r[2], 0.0, 6)
+        r = self.check_gradient_moment_3d(0, 0, 1)
+        self.assertAlmostEqual(r[0], 0.0, 8)
+        self.assertAlmostEqual(r[1], 0.0, 8)
+        self.assertAlmostEqual(r[2], -1.0, 1)
+
+###############################################################################
+# WendlandQuintic kernel
+class TestWendlandQuintic2D(TestCubicSpline2D):
+    kernel_factory = staticmethod(lambda: WendlandQuintic(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(7.0/(4.0*np.pi))
+
+    def test_zeroth_kernel_moments(self):
+        r = self.check_kernel_moment_2d(0, 0)
+        self.assertAlmostEqual(r, 1.0, 6)
+
+class TestWendlandQuintic3D(TestGaussian3D):
+    kernel_factory = staticmethod(lambda: WendlandQuintic(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(21.0/(16.0*np.pi))
+
+
 
 if __name__ == '__main__':
     main()

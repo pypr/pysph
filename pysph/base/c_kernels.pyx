@@ -8,10 +8,10 @@ import numpy as np
 
 cdef class CubicSpline:
     cdef public long dim
-    cdef public double radius_scale
     cdef public double fac
+    cdef public double radius_scale
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     cdef inline double get_deltap(self):
@@ -21,12 +21,12 @@ cdef class CubicSpline:
         return self.get_deltap()
 
     cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
-        cdef double tmp
-        cdef double val
+        cdef double fac
         cdef double h1
         cdef double q
-        cdef double fac
+        cdef double tmp
         cdef double tmp2
+        cdef double val
         h1 = 1./h
         q = rij*h1
 
@@ -59,14 +59,14 @@ cdef class CubicSpline:
         self.gradient(&xij[0], rij, h, &grad[0])
 
     cdef inline double gradient_h(self, double* xij, double rij, double h):
+        cdef double dw
+        cdef double fac
         cdef double h1
         cdef double q
-        cdef double w
-        cdef double fac
-        cdef double dw
         cdef double tmp2
+        cdef double w
         h1 = 1./h; q = rij * h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -80,7 +80,7 @@ cdef class CubicSpline:
         if ( q > 2.0 ):
             w = 0.0
             dw = 0.0
-            
+
         elif ( q > 1.0 ):
             w = 0.25 * tmp2 * tmp2 * tmp2
             dw = -0.75 * tmp2 * tmp2
@@ -94,11 +94,11 @@ cdef class CubicSpline:
         return self.gradient_h(&xij[0], rij, h)
 
     cdef inline double kernel(self, double* xij, double rij, double h):
-        cdef double q
         cdef double fac
         cdef double h1
-        cdef double val
+        cdef double q
         cdef double tmp2
+        cdef double val
         h1 = 1./h
         q = rij*h1
 
@@ -109,7 +109,7 @@ cdef class CubicSpline:
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-        
+
         tmp2 = 2. - q
         if ( q > 2.0 ):
             val = 0.0
@@ -162,10 +162,10 @@ cdef class CubicSplineWrapper:
 
 cdef class WendlandQuintic:
     cdef public long dim
-    cdef public double radius_scale
     cdef public double fac
+    cdef public double radius_scale
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     cdef inline double get_deltap(self):
@@ -175,14 +175,14 @@ cdef class WendlandQuintic:
         return self.get_deltap()
 
     cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
-        cdef double tmp
-        cdef double q
-        cdef double h1
-        cdef double val
         cdef double fac
+        cdef double h1
+        cdef double q
+        cdef double tmp
+        cdef double val
         h1 = 1./h
         q = rij*h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -207,12 +207,12 @@ cdef class WendlandQuintic:
         self.gradient(&xij[0], rij, h, &grad[0])
 
     cdef inline double gradient_h(self, double* xij, double rij, double h):
-        cdef double tmp
+        cdef double dw
+        cdef double fac
         cdef double h1
         cdef double q
+        cdef double tmp
         cdef double w
-        cdef double fac
-        cdef double dw
         h1 = 1./h; q = rij*h1
 
         # get the kernel normalizing factor
@@ -236,11 +236,11 @@ cdef class WendlandQuintic:
         return self.gradient_h(&xij[0], rij, h)
 
     cdef inline double kernel(self, double* xij, double rij, double h):
-        cdef double q
         cdef double fac
         cdef double h1
-        cdef double val
+        cdef double q
         cdef double tmp
+        cdef double val
         h1 = 1.0/h
         q = rij*h1
 
@@ -301,10 +301,10 @@ cdef class WendlandQuinticWrapper:
 
 cdef class Gaussian:
     cdef public long dim
-    cdef public double radius_scale
     cdef public double fac
+    cdef public double radius_scale
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     cdef inline double get_deltap(self):
@@ -318,11 +318,11 @@ cdef class Gaussian:
         return self.get_deltap()
 
     cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
-        cdef double tmp
-        cdef double q
-        cdef double h1
-        cdef double val
         cdef double fac
+        cdef double h1
+        cdef double q
+        cdef double tmp
+        cdef double val
         h1 = 1./h
         q = rij*h1
 
@@ -349,13 +349,13 @@ cdef class Gaussian:
         self.gradient(&xij[0], rij, h, &grad[0])
 
     cdef inline double gradient_h(self, double* xij, double rij, double h):
-        cdef double q
+        cdef double dw
         cdef double fac
         cdef double h1
+        cdef double q
         cdef double w
-        cdef double dw
         h1 = 1./h; q= rij*h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -369,16 +369,16 @@ cdef class Gaussian:
         if ( q < 3.0 ):
             w = exp(-q*q)
             dw = -2.0 * q * w
-            
+
         return -fac * h1 * ( dw*q + w*self.dim )
 
     cpdef double py_gradient_h(self, double[:] xij, double rij, double h):
         return self.gradient_h(&xij[0], rij, h)
 
     cdef inline double kernel(self, double* xij, double rij, double h):
-        cdef double q
         cdef double fac
         cdef double h1
+        cdef double q
         cdef double val
         h1 = 1./h
         q = rij*h1
@@ -390,7 +390,7 @@ cdef class Gaussian:
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-        
+
         val = 0.0
         if ( q < 3.0 ):
             val = exp(-q*q) * fac
@@ -438,10 +438,10 @@ cdef class GaussianWrapper:
 
 cdef class QuinticSpline:
     cdef public long dim
-    cdef public double radius_scale
     cdef public double fac
+    cdef public double radius_scale
     def __init__(self, **kwargs):
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
     cdef inline double get_deltap(self):
@@ -454,14 +454,14 @@ cdef class QuinticSpline:
         return self.get_deltap()
 
     cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
-        cdef double tmp
-        cdef double val
+        cdef double fac
         cdef double h1
         cdef double q
-        cdef double fac
+        cdef double tmp
         cdef double tmp1
-        cdef double tmp3
         cdef double tmp2
+        cdef double tmp3
+        cdef double val
         h1 = 1./h
         q = rij*h1
 
@@ -476,7 +476,7 @@ cdef class QuinticSpline:
         tmp3 = 3. - q
         tmp2 = 2. - q
         tmp1 = 1. - q
-        
+
         # compute the gradient
         if (rij > 1e-12):
             if ( q > 3.0 ):
@@ -507,14 +507,14 @@ cdef class QuinticSpline:
         self.gradient(&xij[0], rij, h, &grad[0])
 
     cdef inline double gradient_h(self, double* xij, double rij, double h):
+        cdef double dw
+        cdef double fac
         cdef double h1
         cdef double q
-        cdef double w
-        cdef double fac
-        cdef double dw
         cdef double tmp1
-        cdef double tmp3
         cdef double tmp2
+        cdef double tmp3
+        cdef double w
         h1 = 1./h; q = rij*h1
 
         # get the kernel normalizing factor
@@ -528,7 +528,7 @@ cdef class QuinticSpline:
         tmp3 = 3. - q
         tmp2 = 2. - q
         tmp1 = 1. - q
-        
+
         # compute the kernel & gradient at q
         if ( q > 3.0 ):
             w = 0.0
@@ -559,13 +559,13 @@ cdef class QuinticSpline:
         return self.gradient_h(&xij[0], rij, h)
 
     cdef inline double kernel(self, double* xij, double rij, double h):
-        cdef double val
+        cdef double fac
         cdef double h1
         cdef double q
-        cdef double fac
         cdef double tmp1
-        cdef double tmp3
         cdef double tmp2
+        cdef double tmp3
+        cdef double val
         h1 = 1./h
         q = rij*h1
 
@@ -634,4 +634,148 @@ cdef class QuinticSplineWrapper:
         self.kern.gradient(xij, rij, h, grad)
         return grad[0], grad[1], grad[2]
 
+
+
+cdef class SuperGaussian:
+    cdef public long dim
+    cdef public double fac
+    cdef public double radius_scale
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    cdef inline double get_deltap(self):
+        # Found inflection point using sympy.
+        if self.dim == 1:
+            return 0.584540507426389
+        elif self.dim == 2:
+            return 0.6021141014644256
+        else:
+            return 0.615369528365158
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double fac
+        cdef double h1
+        cdef double q
+        cdef double q2
+        cdef double tmp
+        cdef double val
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the gradient
+        val = 0.0
+        if (q < 3.0):
+            if (rij > 1e-12):
+                q2 = q*q
+                val = q * (2.0*q2 - self.dim - 4) * exp(-q2) * h1 /rij
+
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
+
+    cpdef py_gradient(self, double[:] xij, double rij, double h, double[:] grad):
+        self.gradient(&xij[0], rij, h, &grad[0])
+
+    cdef inline double gradient_h(self, double* xij, double rij, double h):
+        cdef double d
+        cdef double fac
+        cdef double h1
+        cdef double q
+        cdef double q2
+        cdef double val
+        h1 = 1./h; q= rij*h1
+        d = self.dim
+
+        # get the kernel normalizing factor
+        if d == 1:
+            fac = self.fac * h1
+        elif d == 2:
+            fac = self.fac * h1 * h1
+        elif d == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # kernel and gradient evaluated at q
+        val = 0.0
+        if ( q < 3.0 ):
+            q2 = q*q
+            val = (-d*d*0.5 + 2.0*d*q2 - d - 2.0*q2*q2 + 4*q2)*exp(-q2)
+
+        return -fac * h1 * val
+
+    cpdef double py_gradient_h(self, double[:] xij, double rij, double h):
+        return self.gradient_h(&xij[0], rij, h)
+
+    cdef inline double kernel(self, double* xij, double rij, double h):
+        cdef double fac
+        cdef double h1
+        cdef double q
+        cdef double q2
+        cdef double val
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        val = 0.0
+        if ( q < 3.0 ):
+            q2 = q*q
+            val = exp(-q2) * (1.0 + self.dim*0.5 - q2) * fac
+
+        return val
+
+    cpdef double py_kernel(self, double[:] xij, double rij, double h):
+        return self.kernel(&xij[0], rij, h)
+
+
+
+cdef class SuperGaussianWrapper:
+    """Reasonably high-performance convenience wrapper for Kernels.
+    """
+
+    cdef public SuperGaussian kern
+    cdef double[3] xij, grad
+    cdef public double radius_scale
+    cdef public double fac
+
+    def __init__(self, kern):
+        self.kern = kern
+        self.radius_scale = kern.radius_scale
+        self.fac = kern.fac
+
+    cpdef double kernel(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        return self.kern.kernel(xij, rij, h)
+
+    cpdef gradient(self, double xi, double yi, double zi, double xj, double yj, double zj, double h):
+        cdef double* xij = self.xij
+        xij[0] = xi-xj
+        xij[1] = yi-yj
+        xij[2] = zi-zj
+        cdef double rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] +xij[2]*xij[2])
+        cdef double* grad = self.grad
+        self.kern.gradient(xij, rij, h, grad)
+        return grad[0], grad[1], grad[2]
 
