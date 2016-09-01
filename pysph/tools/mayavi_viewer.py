@@ -280,10 +280,6 @@ class ParticleArrayHelper(HasTraits):
     # Show the time of the simulation on screen.
     show_time = Bool(False, desc='if the current time is displayed')
 
-    # Do we show the hidden arrays?
-    show_hidden_arrays = Bool(False,
-                              desc='if hidden arrays are to be listed')
-
     # Private attribute to store the Text module.
     _text = Instance(PipelineBase)
 
@@ -301,12 +297,12 @@ class ParticleArrayHelper(HasTraits):
                      editor=TitleEditor()),
                 Group(
                       Item(name='visible'),
-                      Item(name='show_hidden_arrays'),
                       Item(name='scalar',
                            editor=EnumEditor(name='scalar_list')
                           ),
                       Item(name='show_legend'),
                       Item(name='show_time'),
+                      scrollable=True,
                       ),
                 )
 
@@ -340,8 +336,8 @@ class ParticleArrayHelper(HasTraits):
     #######  Traits handlers #############################################
     def _particle_array_changed(self, pa):
         self.name = pa.name
-        # Setup the scalars.
-        self._show_hidden_arrays_changed(self.show_hidden_arrays)
+
+        self._setup_scalar_list(pa)
 
         # Update the plot.
         x, y, z = pa.x, pa.y, pa.z
@@ -378,18 +374,12 @@ class ParticleArrayHelper(HasTraits):
             )
             p.module_manager.scalar_lut_manager.data_name = value
 
-    def _show_hidden_arrays_changed(self, value):
-        pa = self.particle_array
+    def _setup_scalar_list(self, pa):
         sc_list = pa.properties.keys()
-        if value:
-            self.scalar_list = sorted(set(sc_list + self.extra_scalars))
+        if len(pa.output_property_arrays) > 0:
+            self.scalar_list = sorted(set(pa.output_property_arrays + self.extra_scalars))
         else:
-            self.scalar_list = sorted(
-                set(
-                    [x for x in sc_list if not x.startswith('_')] +
-                    self.extra_scalars
-                )
-            )
+            self.scalar_list = sorted(set(sc_list + self.extra_scalars))
 
     def _show_time_changed(self, value):
         txt = self._text
