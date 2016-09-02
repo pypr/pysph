@@ -277,6 +277,9 @@ class ParticleArrayHelper(HasTraits):
     # Sync'd trait with the scalar lut manager.
     show_legend = Bool(False, desc='if the scalar legend is to be displayed')
 
+    # Show all scalars.
+    list_all_scalars = Bool(False, desc='if all scalars should be listed')
+
     # Sync'd trait with the dataset to turn on/off visibility.
     visible = Bool(True, desc='if the particle array is to be displayed')
 
@@ -289,9 +292,13 @@ class ParticleArrayHelper(HasTraits):
     # Show vectors.
     show_vectors = Bool(False, desc='if vectors should be displayed')
 
+    vectors = Str('u, v, w', enter_set=True, auto_set=False,
+                  desc='the vectors to display')
+
     mask_on_ratio = Int(3, desc='mask one in specified points')
 
-    scale_factor = Float(1.0, desc='scale factor for vectors')
+    scale_factor = Float(1.0, desc='scale factor for vectors',
+                         enter_set=True, auto_set=False)
 
     edit_vectors = Button('More options ...')
 
@@ -313,18 +320,22 @@ class ParticleArrayHelper(HasTraits):
              editor=TitleEditor()),
         Group(
             Group(
-                Item(name='visible'),
-                Item(name='show_legend'),
-                Item(name='scalar',
-                     editor=EnumEditor(name='scalar_list')
+                Group(
+                    Item(name='visible'),
+                    Item(name='show_legend'),
+                    Item(name='scalar',
+                         editor=EnumEditor(name='scalar_list')
+                    ),
+                    Item(name='list_all_scalars'),
+                    Item(name='show_time'),
+                    columns=2,
                 ),
-                Item(name='show_time'),
                 Item(name='edit_scalars', show_label=False),
-                columns=2,
                 label='Scalars',
             ),
             Group(
                 Item(name='show_vectors'),
+                Item(name='vectors'),
                 Item(name='mask_on_ratio'),
                 Item(name='scale_factor'),
                 Item(name='edit_vectors', show_label=False),
@@ -371,7 +382,7 @@ class ParticleArrayHelper(HasTraits):
     def _particle_array_changed(self, pa):
         self.name = pa.name
 
-        self._setup_scalar_list(pa)
+        self._list_all_scalars_changed(self.list_all_scalars)
 
         # Update the plot.
         x, y, z = pa.x, pa.y, pa.z
@@ -397,7 +408,7 @@ class ParticleArrayHelper(HasTraits):
                 p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
 
         if self.plot_vectors:
-            self._update_vectors()
+            self._vectors_changed(self.vectors)
 
         # Setup the time.
         self._show_time_changed(self.show_time)
@@ -410,14 +421,19 @@ class ParticleArrayHelper(HasTraits):
             )
             p.module_manager.scalar_lut_manager.data_name = value
 
-    def _setup_scalar_list(self, pa):
-        sc_list = pa.properties.keys()
-        if len(pa.output_property_arrays) > 0:
-            self.scalar_list = sorted(
-                set(pa.output_property_arrays + self.extra_scalars)
-            )
-        else:
+    def _list_all_scalars_changed(self, list_all_scalars):
+        pa = self.particle_array
+        if list_all_scalars:
+            sc_list = pa.properties.keys()
             self.scalar_list = sorted(set(sc_list + self.extra_scalars))
+        else:
+            if len(pa.output_property_arrays) > 0:
+                self.scalar_list = sorted(
+                    set(pa.output_property_arrays + self.extra_scalars)
+                )
+            else:
+                sc_list = pa.properties.keys()
+                self.scalar_list = sorted(set(sc_list + self.extra_scalars))
 
     def _show_time_changed(self, value):
         txt = self._text
@@ -435,22 +451,28 @@ class ParticleArrayHelper(HasTraits):
             if txt is not None:
                 txt.visible = False
 
-    def _update_vectors(self):
+    def _vectors_changed(self, value):
         pa = self.particle_array
-        self.plot.mlab_source.vectors = numpy.c_[pa.u, pa.v, pa.w]
+        comps = [x.strip() for x in value.split(',')]
+        if len(comps) == 3:
+            try:
+                vec = [getattr(pa, x) for x in comps]
+            except AttributeError:
+                pass
+            else:
+                self.plot.mlab_source.vectors = numpy.c_[vec[0], vec[1], vec[2]]
 
     def _show_vectors_changed(self, value):
         pv = self.plot_vectors
         if pv is not None:
             pv.visible = value
         else:
-            self._update_vectors()
+            self._vectors_changed(self.vectors)
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
                 mask_points=self.mask_on_ratio,
                 scale_factor=self.scale_factor
             )
-            pv.glyph.mask_points.random_mode = False
             self.plot_vectors = pv
 
     def _mask_on_ratio_changed(self, value):
