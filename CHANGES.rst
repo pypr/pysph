@@ -2,7 +2,11 @@
 -----
 
 * Release date:  Still under development.
-* Add simple tests for all available kernels.  Add ``SuperGaussian`` kernel.
+* Improve the reference documentation a little.
+* Improve Mayavi viewer so one can view the velocity vectors and any other
+  vectors.
+* Viewer now has a button to edit the visualization properties easily.
+* Add simple tests for all available kernels. Add ``SuperGaussian`` kernel.
 * Add a basic dockerfile for pysph to help with the CI testing.
 * Update build so pysph can be built with a system zoltan installation that is
   part of trilinos using the ``USE_TRILINOS`` environment variable.
