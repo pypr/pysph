@@ -65,7 +65,82 @@ def list_all_kernels():
 # `Application` class.
 ##############################################################################
 class Application(object):
-    """ Class used by any SPH application.
+    """Subclass this to run any SPH simulation. There are several important
+    methods that this class provides. The application is typically used as
+    follows::
+
+        class EllipticalDrop(Application):
+            def create_particles(self):
+                # ...
+            def create_scheme(self):
+                # ...
+            ...
+        app = EllipticalDrop()
+        app.run()
+        app.post_process(app.info_filename)
+
+    .. py:currentmodule:: pysph.solver.application
+
+    The :py:meth:`post_process` method is entirely optional and typically
+    performs the post-processing. It is important to understand the correct
+    sequence of the method calls. When the ``Application`` instance is created,
+    the following methods are invoked by the :py:meth:`__init__` method:
+
+    1. :py:meth:`initialize()`: use this to setup any constants etc.
+
+    2. :py:meth:`create_scheme()`: this needs to be overridden if one wishes to
+       use a :py:class:`pysph.sph.scheme.Scheme`. If one does not want to use a
+       scheme, the :py:meth:`create_equations` and :py:meth:`create_solver`
+       methods must be overridden.
+
+    3. ``self.scheme.add_user_options()``: i.e. the scheme's command line
+       options are added, if there is a scheme.
+
+    4. :py:meth:`add_user_options()`: add any user specified command line
+       options.
+
+    When ``app.run()`` is called, the following methods are called in order:
+
+    1. ``_parse_command_line()``: this is a private method but it is important
+       to note that the command line arguments are first parsed.
+
+    2. :py:meth:`consume_user_options()`: this is called right after the
+       command line args are parsed.
+
+    3. :py:meth:`configure_scheme()`: This is where one may configure the
+       scheme according to the passed command line arguments.
+
+    4. :py:meth:`create_solver()`: Create the solver, note that this is needed
+       only if one has not used a scheme, otherwise, this will by default
+       return the solver created by the scheme chosen.
+
+    5. :py:meth:`create_equations()`: Create any equations. Defaults to letting
+       the scheme generate and return the desired equations.
+
+    6. :py:meth:`create_particles()`
+
+    7. :py:meth:`create_inlet_outlet()`
+
+    8. :py:meth:`create_domain()`:  Not needed for non-periodic domains.
+
+    9. :py:meth:`create_nnps()`: Not needed unless one wishes to override the
+       default NNPS.
+
+    10. :py:meth:`create_tools()`: Add any ``pysph.solver.tools.Tool``
+        instances.
+
+    Additionally, as the appliction runs there are several convenient optional
+    callbacks setup:
+
+    1. :py:meth:`pre_step`: Called before each time step.
+
+    2. :py:meth:`post_stage`: Called after every stage of the integration.
+
+    3. :py:meth:`post_step`: Called after each time step.
+
+    Finally, it is a good idea to overload the :py:meth:`post_process` method
+    to perform any post processing for the generated data.
+
     """
 
     def __init__(self, fname=None, domain=None):
@@ -75,7 +150,7 @@ class Application(object):
         ----------
         fname : str
             file name to use for the output files.
-        domain : pysph.nnps.DomainManager
+        domain : pysph.base.nnps_base.DomainManager
             A domain manager to use. This is used for periodic domains etc.
         """
         self.domain = domain
@@ -859,7 +934,8 @@ class Application(object):
     # Public interface.
     ######################################################################
     def add_tool(self, tool):
-        """Add a `Tool` instance to the application.
+        """Add a :py:class:`pysph.solver.tools.Tool` instance to the
+        application.
         """
         self._setup_solver_callbacks(tool)
         self.tools.append(tool)
@@ -974,7 +1050,7 @@ class Application(object):
         equations: list
             A list of Groups/Equations.
 
-        nnps: pysph.base.nnps.NNPS
+        nnps: pysph.base.nnps_base.NNPS
             Optional NNPS instance. If None is given a default NNPS is created.
 
         inlet_outlet_factory: callable or None
@@ -1043,7 +1119,7 @@ class Application(object):
         pass
 
     def configure_scheme(self):
-        """This is called after ``consume_user_options`` is called.  One can
+        """This is called after :py:meth:`consume_user_options` is called.  One can
         configure the SPH scheme here as at this point all the command line
         options are known.
         """
@@ -1062,10 +1138,11 @@ class Application(object):
         pass
 
     def create_domain(self):
-        """Create a `pysph.nnps.DomainManager` and return it if needed.
+        """Create a `pysph.base.nnps_base.DomainManager` and return it if needed.
 
         This is used for periodic domains etc.  Note that if the domain
-        is passed to ``__init__``, then this method is not called.
+        is passed to :py:meth:`__init__`, then this method is not called.
+
         """
         return None
 
@@ -1102,7 +1179,7 @@ class Application(object):
         """Create a suitable SPH scheme and return it.
 
         Note that this method is called after the arguments are all
-        processed and after `consume_user_options` is called.
+        processed and after :py:meth:`consume_user_options` is called.
         """
         return None
 
@@ -1132,8 +1209,10 @@ class Application(object):
         stage, i.e. if the integrator is a two stage integrator it will be
         called after the first and second stages.
 
-        The method is passed (current_time, dt, stage).  See the the
-        `Integrator.one_timestep` methods for examples of how this is called.
+        The method is passed (current_time, dt, stage). See the the
+        :py:meth:`pysph.sph.integrator.Integrator.one_timestep` methods for
+        examples of how this is called.
+
         """
         pass
 
@@ -1149,7 +1228,7 @@ class Application(object):
         overload the method to perform any processing.
 
         The info file has a few useful attributes and can be read using the
-        `read_info` method.
+        :py:meth:`read_info` method.
 
         The `output_files` property should provide the output files
         generated.

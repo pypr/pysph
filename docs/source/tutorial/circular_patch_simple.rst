@@ -458,8 +458,9 @@ methods:
  - ``create_inlet_outlet``:  Override this to return any inlet an outlet
    objects.  See the :py:class:`pysph.sph.simple_inlet_outlet` module.
 
-There are many others, please see the :py:class:`Application` class to see
-these.
+There are many others, please see the :py:class:`Application` class
+documentation to see these. The order of invocation of the various methods is
+also documented there.
 
 There are several `examples
 <https://bitbucket.org/pysph/pysph/src/master/pysph/examples/>`_ that

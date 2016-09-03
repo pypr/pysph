@@ -206,9 +206,10 @@ The example may be run the same way as the previous example::
 The resulting output can be analyzed or viewed the same way as in the previous
 example.
 
-In the previous example (:doc:`circular_patch_simple`), the equations and
-solver are created automatically by the ``WCSPHScheme``.  If the
-``create_scheme`` is overwritten and returns a scheme, the
-``create_equations`` and ``create_solver`` need not be implemented.
-Implementing other schemes can be done by either implementing the equations
-directly as done in this example or one could implement a new ``Scheme``.
+In the previous example (:doc:`circular_patch_simple`), the equations and solver
+are created automatically by the ``WCSPHScheme``. If the ``create_scheme`` is
+overwritten and returns a scheme, the ``create_equations`` and ``create_solver``
+need not be implemented. For more details on the various application methods,
+please see :py:class:`pysph.solver.application.Application`. Implementing other
+schemes can be done by either implementing the equations directly as done in
+this example or one could implement a new :py:class:`pysph.sph.scheme.Scheme`.
