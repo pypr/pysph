@@ -137,8 +137,9 @@ class CubicSpline(object):
         return -fac * h1 * ( dw*q + w*self.dim )
 
 class WendlandQuintic(object):
-    """The WendlandQuintic kernel, also called the Wendland C2 kernel. In PySPH
-    this is only implemented for 2D and 3D.
+    r"""The WendlandQuintic kernel, also called the Wendland C2 kernel.
+
+    In PySPH this is only implemented for 2D and 3D.
 
     .. math::
              W(q) = \ & \alpha_d (1-q/2)^4(2q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
@@ -147,10 +148,8 @@ class WendlandQuintic(object):
     where :math:`d` is the number of dimensions and
 
     .. math::
-
-             \sigma_2  = \ & \frac{7}{4\pi h^2}, \ & \textrm{for dim=2}, \\
-             \sigma_g  = \ & \frac{21}{16\pi h^3}, \ & \textrm{for dim=3}, \\
-
+             \alpha_d  = \ & \frac{7}{4\pi h^2}, \ & \textrm{for dim=2}, \\
+             \alpha_d  = \ & \frac{21}{16\pi h^3}, \ & \textrm{for dim=3}
 
     """
     def __init__(self, dim=2):
@@ -242,7 +241,7 @@ class Gaussian(object):
     function given by:
 
     .. math::
-             \sigma_g  = \ & \frac{1}{\pi^{1/2} h^1}, \ & \textrm{for dim=1}, \\
+             \sigma_g  = \ & \frac{1}{\pi^{1/2} h}, \ & \textrm{for dim=1}, \\
              \sigma_g  = \ & \frac{1}{\pi h^2}, \ & \textrm{for dim=2}, \\
              \sigma_g  = \ & \frac{1}{\pi^{3/2} h^3}, & \textrm{for dim=3}. \\
 
