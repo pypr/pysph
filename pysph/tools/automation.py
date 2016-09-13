@@ -2,9 +2,74 @@ import itertools
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
+import time
 import numpy as np
+
+
+class Task:
+    """Basic task to run.  Subclass this to do whatever is needed.
+
+    This class is very similar to luigi's Task but a little simpler.
+    """
+
+    def complete(self):
+        """Should return True/False indicating success of task.
+        """
+        return all([os.path.exists(x) for x in self.output()])
+
+    def output(self):
+        """Return list of output paths.
+        """
+        return []
+
+    def run(self):
+        pass
+
+    def requires(self):
+        """Return iterable of tasks this task requires.
+
+        It is important that one either return tasks that are idempotent or
+        return the same instance as this method is called repeateadly.
+
+        """
+        return []
+
+
+class TaskRunner:
+    def __init__(self, tasks):
+        self.tasks = tasks
+        self.todo = []
+        for task in tasks:
+            self.add_task(task)
+
+    def add_task(self, task):
+        if not task.complete():
+            self.todo.append(task)
+            for req in task.requires():
+                self.add_task(req)
+
+    def all_requires_are_done(self, task):
+        return all(x.complete() for x in task.requires())
+
+    def run(self, wait=5):
+        while len(self.todo) > 0:
+            to_remove = []
+            print("%d tasks pending"%len(self.todo))
+            for i in range(len(self.todo) - 1, -1, -1):
+                task = self.todo[i]
+                if self.all_requires_are_done(task):
+                    to_remove.append(task)
+                    print("Running task %s..."%task)
+                    task.run()
+            for task in to_remove:
+                self.todo.remove(task)
+
+            if len(self.todo) > 0:
+                print('Waiting...')
+                time.sleep(wait)
 
 
 class PySPHRunner(object):
@@ -14,9 +79,10 @@ class PySPHRunner(object):
     """
     def __init__(self, command, output_dir):
         if isinstance(command, str):
-            self.command = command.split()
+            self.command = shlex.split(command)
         else:
             self.command = command
+        self.command += ['-d', output_dir]
         self.output_dir = output_dir
 
     ###### Public protocol ###########################################
@@ -38,7 +104,7 @@ class PySPHRunner(object):
     def run(self):
         """Actually run the command.
         """
-        cmd = self._full_command()
+        cmd = self.command
         print("Running: %s"%' '.join(cmd))
         subprocess.call(cmd)
 
@@ -53,15 +119,61 @@ class PySPHRunner(object):
 
     ###### Private protocol ###########################################
 
-    def _full_command(self):
-        return self.command + ['-d', self.output_dir]
-
     def _get_info_filename(self):
         files = glob.glob(os.path.join(self.output_dir, '*.info'))
         if len(files) > 0:
             return files[0]
         else:
             return None
+
+
+class PySPHTask(Task):
+    scheduler = None
+
+    def __init__(self, pysph_runner):
+        self.pysph_runner = pysph_runner
+        self.job_proxy = None
+        self._copy_proc = None
+
+    def _check_if_copy_complete(self):
+        proc = self._copy_proc
+        if proc is None:
+            return True
+        else:
+            if proc.poll() is None:
+                return False
+            else:
+                return True
+
+    def _copy_output_and_check_status(self):
+        jp = self.job_proxy
+        status = jp.status()
+        if status == 'done':
+            if self._copy_proc is None:
+                self._copy_proc = jp.copy_output('.')
+            return self._check_if_copy_complete()
+        elif status == 'error':
+            cmd = ' '.join(self.pysph_runner.command)
+            print('Job %s failed!'%cmd)
+            print(jp.get_stderr())
+            raise RuntimeError('Job %s failed!'%cmd)
+        return False
+
+    def complete(self):
+        """Should return True/False indicating success of task.
+        """
+        job_proxy = self.job_proxy
+        if job_proxy is None:
+            return self.pysph_runner.is_done()
+        else:
+            return self._copy_output_and_check_status()
+
+    def run(self):
+        from pysph.tools.jobs import Job
+        runner = self.pysph_runner
+        # XXX: handle n_core properly
+        job = Job(command=runner.command, output_dir=runner.output_dir)
+        self.job_proxy = self.scheduler.submit(job)
 
 
 class Problem(object):
