@@ -3,6 +3,7 @@ import shlex
 import shutil
 import sys
 import tempfile
+import time
 import unittest
 
 try:
@@ -125,6 +126,14 @@ class TestJob(unittest.TestCase):
         self.assertTrue(n <= multiprocessing.cpu_count())
 
 
+def wait_until(cond, timeout=1, wait=0.1):
+    t = 0.0
+    while cond():
+        time.sleep(wait)
+        t += wait
+        if t > timeout:
+            break
+
 class TestLocalWorker(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
@@ -144,7 +153,7 @@ class TestLocalWorker(unittest.TestCase):
         proxy = s.submit(j)
 
         # Then
-        import time; time.sleep(0.1)
+        wait_until(lambda: proxy.status() != 'done')
         self.assertEqual(proxy.status(), 'done')
         self.assertEqual(proxy.get_stderr(), '')
         self.assertEqual(proxy.get_stdout().strip(), '1')
@@ -180,7 +189,7 @@ class TestRemoteWorker(unittest.TestCase):
         proxy = r.run(j)
 
         # Then
-        import time; time.sleep(0.1)
+        wait_until(lambda: proxy.status() != 'done')
         self.assertEqual(proxy.status(), 'done')
         self.assertEqual(proxy.get_stderr(), '')
         self.assertEqual(proxy.get_stdout().strip(), '1')

@@ -7,8 +7,8 @@ import unittest
 
 import numpy as np
 
-from pysph.tools.automation import (Problem, PySPHTask, Simulation, Task,
-                                    TaskRunner)
+from pysph.tools.automation import (Problem, PySPHTask, Simulation,
+    SolveProblem, Task, TaskRunner)
 try:
     from pysph.tools.jobs import Scheduler
 except ImportError:
@@ -62,22 +62,6 @@ class EllipticalDrop(Problem):
         output.close()
 
 
-class PlotTask(Task):
-    def __init__(self, problem):
-        self.problem = problem
-        self.reqs = [
-            task for name, task in self.problem.get_requires()
-        ]
-
-    def output(self):
-        return self.problem.get_outputs()
-
-    def requires(self):
-        return self.reqs
-
-    def run(self, scheduler):
-        self.problem.run()
-
 
 class TestLocalAutomation(unittest.TestCase):
     def setUp(self):
@@ -101,7 +85,7 @@ class TestLocalAutomation(unittest.TestCase):
         # Given.
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
         s = self._make_scheduler()
-        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
+        t = TaskRunner(tasks=[SolveProblem(problem=problem)], scheduler=s)
 
         # When.
         t.run(wait=1)
@@ -123,7 +107,7 @@ class TestLocalAutomation(unittest.TestCase):
 
         # When.
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
-        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
+        t = TaskRunner(tasks=[SolveProblem(problem=problem)], scheduler=s)
 
         # Then.
         self.assertEqual(len(t.todo), 0)
@@ -136,7 +120,7 @@ class TestLocalAutomation(unittest.TestCase):
 
         # When
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
-        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
+        t = TaskRunner(tasks=[SolveProblem(problem=problem)], scheduler=s)
 
         # Then.
         self.assertEqual(len(t.todo), 0)
