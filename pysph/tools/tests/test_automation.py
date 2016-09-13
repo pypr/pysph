@@ -35,6 +35,8 @@ class EllipticalDrop(Problem):
     def setup(self):
         # Two cases, one with update_h and one without.
         cmd = 'python -m pysph.examples.elliptical_drop --max-steps=5'
+
+        # If self.cases is set, the get_commands method will do the right thing.
         self.cases = [
             Simulation(
                 root=self.input_path('no_update_h'),
@@ -49,9 +51,6 @@ class EllipticalDrop(Problem):
                 no_update_h=None
             ),
         ]
-
-    def get_commands(self):
-        return [(x.name, x.command, x.job_info) for x in self.cases]
 
     def run(self):
         self.make_output_dir()

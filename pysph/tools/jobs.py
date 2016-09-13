@@ -289,9 +289,11 @@ class RemoteWorker(Worker):
             real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
             args = ['cp', '-a', src, real_dest]
         else:
-            src = '{host}:{path}'.format(host=self.host, path=job.output_dir)
+            src = '{host}:{path}'.format(
+                host=self.host, path=os.path.join(self.chdir, job.output_dir)
+            )
             real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
-            args = ['scp', '-r', src, real_dest]
+            args = ['scp', '-qr', src, real_dest]
 
         print(" ".join(args))
         proc = subprocess.Popen(args)
@@ -311,7 +313,6 @@ class Scheduler:
     def __init__(self, root='.', worker_config=()):
         self.workers = deque()
         self.root = os.path.abspath(os.path.expanduser(root))
-        self.config_fname = os.path.join(self.root, 'jobs.json')
         self._setup_workers(worker_config)
         self.jobs = dict()
 
@@ -319,10 +320,10 @@ class Scheduler:
         for conf in worker_config:
             self.add_worker(conf)
 
-    def save(self):
+    def save(self, fname):
         config = dict(root=self.root)
         config['workers'] = [w.get_config() for w in self.workers]
-        json.dump(config, open(self.config_fname, 'w'), indent=2)
+        json.dump(config, open(fname, 'w'), indent=2)
 
     def load(self, fname):
         config = json.load(open(fname))
