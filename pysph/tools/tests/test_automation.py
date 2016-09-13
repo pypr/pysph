@@ -146,7 +146,6 @@ class TestRemoteAutomation(TestLocalAutomation):
     def setUp(self):
         super(TestRemoteAutomation, self).setUp()
         self.other_dir = tempfile.mkdtemp()
-        print self.other_dir, self.sim_dir, self.output_dir
 
     def tearDown(self):
         super(TestRemoteAutomation, self).tearDown()
@@ -159,4 +158,8 @@ class TestRemoteAutomation(TestLocalAutomation):
             dict(host='test_remote',
                  python=sys.executable, chdir=self.other_dir, testing=True)
         ]
+        try:
+            import execnet
+        except ImportError:
+            raise unittest.SkipTest('This test requires execnet')
         return Scheduler(root=self.sim_dir, worker_config=workers)
