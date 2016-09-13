@@ -46,11 +46,13 @@ class TestJob(unittest.TestCase):
         self.assertEqual(j.status(), 'done')
         self.assertEqual(j.output_dir, self.root)
         self.assertEqual(j.n_core, 1)
+        self.assertEqual(j.n_thread, 1)
         self.assertEqual(j.get_stdout(), '1')
         self.assertEqual(j.get_stderr(), '2')
         state = j.to_dict()
         expect = dict(
-            command=command, output_dir=self.root, n_core=1, env=None
+            command=command, output_dir=self.root, n_core=1,
+            n_thread=1, env=None
         )
         expect['command'][0] = sys.executable
         self.assertDictEqual(state, expect)
@@ -104,9 +106,10 @@ class TestJob(unittest.TestCase):
 
     def test_that_job_sets_omp_var(self):
         j = jobs.Job(
-            [sys.executable, '-c', 'import os;print(os.environ.get("OMP_NUM_THREADS"))'],
+            [sys.executable, '-c',
+             'import os;print(os.environ.get("OMP_NUM_THREADS"))'],
             output_dir=self.root,
-            n_core=4
+            n_thread=4,
         )
         j.run()
         j.proc.wait()

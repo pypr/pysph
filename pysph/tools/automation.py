@@ -25,7 +25,9 @@ class Task:
         """
         return []
 
-    def run(self):
+    def run(self, scheduler):
+        """Run the task, using the given scheduler if needed.
+        """
         pass
 
     def requires(self):
@@ -39,8 +41,19 @@ class Task:
 
 
 class TaskRunner:
-    def __init__(self, tasks):
+    """Run given tasks using the given scheduler.
+    """
+    def __init__(self, tasks, scheduler):
+        """Constructor.
+
+        Parameters
+        ----------
+
+        tasks: iterable of `Task` instances.
+        scheduler: `pysph.tools.job.Scheduler` instance
+        """
         self.tasks = tasks
+        self.scheduler = scheduler
         self.todo = []
         for task in tasks:
             self.add_task(task)
@@ -63,7 +76,7 @@ class TaskRunner:
                 if self.all_requires_are_done(task):
                     to_remove.append(task)
                     print("Running task %s..."%task)
-                    task.run()
+                    task.run(self.scheduler)
             for task in to_remove:
                 self.todo.remove(task)
 
@@ -72,41 +85,42 @@ class TaskRunner:
                 time.sleep(wait)
 
 
-class PySPHRunner(object):
+class PySPHTask(Task):
     """Convenience class to run a PySPH simulation via an automation
     framework.  The class provides a method to run the simulation and
     also check if the simulation is completed.
+
     """
-    def __init__(self, command, output_dir):
+
+    def __init__(self, command, output_dir, job_info=None):
         if isinstance(command, str):
             self.command = shlex.split(command)
         else:
             self.command = command
         self.command += ['-d', output_dir]
         self.output_dir = output_dir
+        self.job_info = job_info if job_info is not None else {}
+        self.job_proxy = None
+        self._copy_proc = None
 
     ###### Public protocol ###########################################
 
-    def is_done(self, *ignored, **kw_ignored):
-        """Returns True if the simulation completed.
-
-        The extra arguments are not used but exist for compatibility
-        with automation toolkits.
+    def complete(self):
+        """Should return True/False indicating success of task.
         """
-        if not os.path.exists(self.output_dir):
-            return False
-        info_fname = self._get_info_filename()
-        if not info_fname or not os.path.exists(info_fname):
-            return False
-        d = json.load(open(info_fname))
-        return d.get('completed')
+        job_proxy = self.job_proxy
+        if job_proxy is None:
+            return self._is_done()
+        else:
+            return self._copy_output_and_check_status()
 
-    def run(self):
-        """Actually run the command.
-        """
-        cmd = self.command
-        print("Running: %s"%' '.join(cmd))
-        subprocess.call(cmd)
+    def run(self, scheduler):
+        from pysph.tools.jobs import Job
+        job = Job(
+            command=self.command, output_dir=self.output_dir,
+            **self.job_info
+        )
+        self.job_proxy = scheduler.submit(job)
 
     def clean(self):
         """Clean out any generated results.
@@ -119,21 +133,23 @@ class PySPHRunner(object):
 
     ###### Private protocol ###########################################
 
+    def _is_done(self):
+        """Returns True if the simulation completed.
+        """
+        if not os.path.exists(self.output_dir):
+            return False
+        info_fname = self._get_info_filename()
+        if not info_fname or not os.path.exists(info_fname):
+            return False
+        d = json.load(open(info_fname))
+        return d.get('completed')
+
     def _get_info_filename(self):
         files = glob.glob(os.path.join(self.output_dir, '*.info'))
         if len(files) > 0:
             return files[0]
         else:
             return None
-
-
-class PySPHTask(Task):
-    scheduler = None
-
-    def __init__(self, pysph_runner):
-        self.pysph_runner = pysph_runner
-        self.job_proxy = None
-        self._copy_proc = None
 
     def _check_if_copy_complete(self):
         proc = self._copy_proc
@@ -153,27 +169,11 @@ class PySPHTask(Task):
                 self._copy_proc = jp.copy_output('.')
             return self._check_if_copy_complete()
         elif status == 'error':
-            cmd = ' '.join(self.pysph_runner.command)
+            cmd = ' '.join(self.command)
             print('Job %s failed!'%cmd)
             print(jp.get_stderr())
             raise RuntimeError('Job %s failed!'%cmd)
         return False
-
-    def complete(self):
-        """Should return True/False indicating success of task.
-        """
-        job_proxy = self.job_proxy
-        if job_proxy is None:
-            return self.pysph_runner.is_done()
-        else:
-            return self._copy_output_and_check_status()
-
-    def run(self):
-        from pysph.tools.jobs import Job
-        runner = self.pysph_runner
-        # XXX: handle n_core properly
-        job = Job(command=runner.command, output_dir=runner.output_dir)
-        self.job_proxy = self.scheduler.submit(job)
 
 
 class Problem(object):
@@ -239,11 +239,11 @@ class Problem(object):
         """
         base = self.get_name()
         result = []
-        for name, cmd in self.get_commands():
+        for name, cmd, job_info in self.get_commands():
             sim_output_dir = self.input_path(name)
-            runner = PySPHRunner(cmd, sim_output_dir)
+            task = PySPHTask(cmd, sim_output_dir, job_info)
             task_name = '%s.%s'%(base, name)
-            result.append((task_name, runner))
+            result.append((task_name, task))
         return result
 
     def make_output_dir(self):
@@ -260,8 +260,17 @@ class Problem(object):
         raise NotImplementedError()
 
     def get_commands(self):
-        """Return a sequence of (name, command_string), where name
-        represents the command being run.
+        """Return a sequence of (name, command_string, job_info_dict).
+
+        The name represents the command being run and is used as
+        a subdirectory for generated output.
+
+        The command_string is the command that needs to be run.
+
+        The job_info_dict is a dictionary with any additional info to be used
+        by the job, these are additional arguments to the
+        `pysph.tools.jobs.Job` class. It may be None if nothing special need
+        be passed.
         """
         return []
 
@@ -351,12 +360,19 @@ class Simulation(object):
     simulations.  One can define additional plot methods for a particular
     subclass and use these to easily plot results for different cases.
 
+    One can also pass any additional parameters to the `pysph.tools.jobs.Job`
+    class via the job_info kwarg so as to run the command suitably. For
+    example::
+
+        >>> s = Simlation('outputs/sph', 'pysph run elliptical_drop',
+        ...               job_info=dict(n_thread=4))
+
     The object has other methods that are convenient when comparing plots.
     Along with the ``compare_cases``, ``filter_cases`` and ``filter_by_name``
     this is an extremely powerful way to automate and compare results.
 
     """
-    def __init__(self, root, base_command, **kw):
+    def __init__(self, root, base_command, job_info=None, **kw):
         """Constructor
 
         Parameters
@@ -366,12 +382,15 @@ class Simulation(object):
             Path to simulation output directory.
         base_command: str
             Base command to run.
+        job_info: dict
+            Extra arguments to the `pysph.tools.jobs.Job` class.
         **kw: dict
             Additional parameters to pass to command.
         """
         self.root = root
         self.name = os.path.basename(root)
         self.base_command = base_command
+        self.job_info = job_info
         self.params = dict(kw)
         self._results = None
 

@@ -21,7 +21,8 @@ class EllipticalDrop(Problem):
 
     In this case we run two variants of the elliptical drop problem.
 
-    The setup method defines the cases to run which are simply Simulation instances.
+    The setup method defines the cases to run which are simply Simulation
+    instances.
 
     The get_commands returns the actual commands to run.
 
@@ -37,16 +38,20 @@ class EllipticalDrop(Problem):
         self.cases = [
             Simulation(
                 root=self.input_path('no_update_h'),
-                base_command=cmd, update_h=None
+                base_command=cmd,
+                job_info=dict(n_core=1, n_thread=1),
+                update_h=None
             ),
             Simulation(
                 root=self.input_path('update_h'),
-                base_command=cmd, no_update_h=None
+                base_command=cmd,
+                job_info=dict(n_core=1, n_thread=1),
+                no_update_h=None
             ),
         ]
 
     def get_commands(self):
-        return [(x.name, x.command) for x in self.cases]
+        return [(x.name, x.command, x.job_info) for x in self.cases]
 
     def run(self):
         self.make_output_dir()
@@ -62,7 +67,7 @@ class PlotTask(Task):
     def __init__(self, problem):
         self.problem = problem
         self.reqs = [
-            PySPHTask(runner) for name, runner in self.problem.get_requires()
+            task for name, task in self.problem.get_requires()
         ]
 
     def output(self):
@@ -71,9 +76,8 @@ class PlotTask(Task):
     def requires(self):
         return self.reqs
 
-    def run(self):
+    def run(self, scheduler):
         self.problem.run()
-
 
 
 class TestLocalAutomation(unittest.TestCase):
@@ -89,29 +93,30 @@ class TestLocalAutomation(unittest.TestCase):
         if os.path.exists(self.root):
             shutil.rmtree(self.root)
 
-        PySPHTask.scheduler = None
-
-    def _setup_scheduler(self):
+    def _make_scheduler(self):
         worker = dict(host='localhost')
         s = Scheduler(root='.', worker_config=[worker])
-        PySPHTask.scheduler = s
+        return s
 
     def test_automation(self):
         # Given.
-        self._setup_scheduler()
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
-        t = TaskRunner(tasks=[PlotTask(problem=problem)])
+        s = self._make_scheduler()
+        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
 
         # When.
         t.run(wait=1)
 
         # Then.
-        sim1 = os.path.join(self.root, self.sim_dir, 'elliptical_drop', 'no_update_h')
+        sim1 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'no_update_h')
         self.assertTrue(os.path.exists(sim1))
-        sim2 = os.path.join(self.root, self.sim_dir, 'elliptical_drop', 'update_h')
+        sim2 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'update_h')
         self.assertTrue(os.path.exists(sim2))
 
-        results = os.path.join(self.root, self.output_dir, 'elliptical_drop', 'result.txt')
+        results = os.path.join(self.root, self.output_dir,
+                               'elliptical_drop', 'result.txt')
         self.assertTrue(os.path.exists(results))
         data = open(results).read()
         self.assertTrue('no_update_h' in data)
@@ -119,20 +124,20 @@ class TestLocalAutomation(unittest.TestCase):
 
         # When.
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
-        t = TaskRunner(tasks=[PlotTask(problem=problem)])
+        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
 
         # Then.
         self.assertEqual(len(t.todo), 0)
 
     def test_nothing_is_run_when_output_exists(self):
         # Given.
-        self._setup_scheduler()
+        s = self._make_scheduler()
         output = os.path.join(self.output_dir, 'elliptical_drop')
         os.makedirs(output)
 
         # When
         problem = EllipticalDrop(self.sim_dir, self.output_dir)
-        t = TaskRunner(tasks=[PlotTask(problem=problem)])
+        t = TaskRunner(tasks=[PlotTask(problem=problem)], scheduler=s)
 
         # Then.
         self.assertEqual(len(t.todo), 0)
@@ -149,12 +154,10 @@ class TestRemoteAutomation(TestLocalAutomation):
         if os.path.exists(self.other_dir):
             shutil.rmtree(self.other_dir)
 
-        PySPHTask.scheduler = None
-
-    def _setup_scheduler(self):
+    def _make_scheduler(self):
         workers = [
             dict(host='localhost'),
-            dict(host='xxx', python=sys.executable, chdir=self.other_dir, testing=True)
+            dict(host='test_remote',
+                 python=sys.executable, chdir=self.other_dir, testing=True)
         ]
-        s = Scheduler(root=self.sim_dir, worker_config=workers)
-        PySPHTask.scheduler = s
+        return Scheduler(root=self.sim_dir, worker_config=workers)

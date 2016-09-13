@@ -14,7 +14,13 @@ import psutil
 
 
 class Job:
-    def __init__(self, command, output_dir, n_core=1, env=None):
+    def __init__(self, command, output_dir, n_core=1, n_thread=1, env=None):
+        """Constructor
+
+        Note that `n_core` is used to schedule a task on a machine which has
+        that many free cores. `n_thread` is used to set the `OMP_NUM_THREADS`.
+
+        """
         if not isinstance(command, (list, tuple)):
             command = shlex.split(command)
         args = []
@@ -26,8 +32,9 @@ class Job:
         self.command = args
         self._given_env = env
         self.env = dict(env) if env is not None else dict(os.environ)
-        self.env['OMP_NUM_THREADS'] = str(n_core)
+        self.env['OMP_NUM_THREADS'] = str(n_thread)
         self.n_core = n_core
+        self.n_thread = n_thread
         self.output_dir = output_dir
         self.output_already_exists = os.path.exists(self.output_dir)
         self.stderr = os.path.join(self.output_dir, 'stderr.txt')
@@ -36,7 +43,7 @@ class Job:
 
     def to_dict(self):
         state = dict()
-        for key in ('command', 'output_dir', 'n_core'):
+        for key in ('command', 'output_dir', 'n_core', 'n_thread'):
             state[key] = getattr(self, key)
         state['env'] = self._given_env
         return state
