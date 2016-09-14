@@ -314,7 +314,7 @@ class Scheduler:
         self.workers = deque()
         self.root = os.path.abspath(os.path.expanduser(root))
         self._setup_workers(worker_config)
-        self.jobs = dict()
+        self.jobs = []
 
     def _setup_workers(self, worker_config):
         for conf in worker_config:
@@ -347,6 +347,7 @@ class Scheduler:
                 if worker.free_cores() >= job.n_core:
                     print("Job run by %s"%worker.host)
                     proxy = worker.run(job)
+                    self.jobs.append(proxy)
                     break
             else:
                 print("Waiting for available worker.")

@@ -169,11 +169,14 @@ class PySPHTask(Task):
     def _check_if_copy_complete(self):
         proc = self._copy_proc
         if proc is None:
+            # Local job so no copy needed.
             return True
         else:
             if proc.poll() is None:
                 return False
             else:
+                if self.job_proxy is not None:
+                    self.job_proxy.clean()
                 return True
 
     def _copy_output_and_check_status(self):
@@ -185,9 +188,10 @@ class PySPHTask(Task):
             return self._check_if_copy_complete()
         elif status == 'error':
             cmd = ' '.join(self.command)
-            print('Job %s failed!'%cmd)
+            msg = 'On host %s Job %s failed!'%(jp.worker.host, cmd)
+            print(msg)
             print(jp.get_stderr())
-            raise RuntimeError('Job %s failed!'%cmd)
+            raise RuntimeError(msg)
         return False
 
 
