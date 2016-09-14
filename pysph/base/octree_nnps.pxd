@@ -43,19 +43,19 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
-    cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, OctreeNode* root = *)
-
-    cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
-            double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, OctreeNode* root = *) nogil
-
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
     cpdef set_context(self, int src_index, int dst_index)
+
+    cdef void _build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
+            double* xmin, double length, OctreeNode* root)
+
+    cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
+            double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
+            UIntArray nbrs, OctreeNode* root) nogil
 
     cpdef _refresh(self)
 
