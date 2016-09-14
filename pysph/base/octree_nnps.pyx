@@ -8,6 +8,8 @@ from libc.stdlib cimport malloc, free
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
+DEF EPS = 1e-6
+
 cdef inline OctreeNode* new_node(double* xmin, double length,
         double hmax = 0, int num_particles = 0, bint is_leaf = False) nogil:
     cdef OctreeNode* node = <OctreeNode*> malloc(sizeof(OctreeNode))
@@ -86,6 +88,7 @@ cdef class OctreeNNPS(NNPS):
     cdef void build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
             double* xmin, double length, OctreeNode* root = NULL):
         """Build octree"""
+
         if root == NULL:
             root = self.root[self.src_index]
 
@@ -132,15 +135,15 @@ cdef class OctreeNNPS(NNPS):
             for j from 0<=j<2:
                 for k from 0<=k<2:
 
-                    xmin_new[0] = xmin[0] + i*length/2
-                    xmin_new[1] = xmin[1] + j*length/2
-                    xmin_new[2] = xmin[2] + k*length/2
+                    xmin_new[0] = (xmin[0] + i*length/2)*(1 - EPS)
+                    xmin_new[1] = (xmin[1] + j*length/2)*(1 - EPS)
+                    xmin_new[2] = (xmin[2] + k*length/2)*(1 - EPS)
 
-                    root.children[i][j][k] = new_node(xmin_new, length/2,
+                    root.children[i][j][k] = new_node(xmin_new, (length/2)*(1 + 2*EPS),
                             hmax=hmax_children[k+2*j+4*i])
 
                     self.build_tree(pa, <UIntArray>new_indices[k+2*j+4*i],
-                            xmin_new, length/2, root.children[i][j][k])
+                            xmin_new, (length/2)*(1 + 2*EPS), root.children[i][j][k])
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -269,11 +272,17 @@ cdef class OctreeNNPS(NNPS):
         cdef double* xmin = self.xmin.data
         cdef double* xmax = self.xmax.data
 
+        xmin[0] *= (1 - EPS)
+        xmin[1] *= (1 - EPS)
+        xmin[2] *= (1 - EPS)
+
         cdef double x_length = xmax[0] - xmin[0]
         cdef double y_length = xmax[1] - xmin[1]
         cdef double z_length = xmax[2] - xmin[2]
 
         cdef double length = fmax(x_length, fmax(y_length, z_length))
+
+        length *= (1 + 2*EPS)
 
         cdef int i
         for i from 0<=i<self.narrays:
