@@ -286,15 +286,11 @@ cdef class OctreeNNPS(NNPS):
 
         cdef double length = fmax(x_length, fmax(y_length, z_length))
 
-        cdef double x_centre = xmin[0] + length/2
-        cdef double y_centre = xmin[1] + length/2
-        cdef double z_centre = xmin[2] + length/2
+        xmin[0] = xmin[0] - length*EPS
+        xmin[1] = xmin[1] - length*EPS
+        xmin[2] = xmin[2] - length*EPS
 
         length *= (1 + 2*EPS)
-
-        xmin[0] = x_centre - length/2
-        xmin[1] = y_centre - length/2
-        xmin[2] = z_centre - length/2
 
         cdef int i
         for i from 0<=i<self.narrays:
