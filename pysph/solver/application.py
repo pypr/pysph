@@ -7,6 +7,7 @@ import os
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
     splitext)
+import socket
 import sys
 import time
 
@@ -559,6 +560,11 @@ class Application(object):
                                 filename=lfn, filemode='a')
         if options.print_log:
             logger.addHandler(logging.StreamHandler())
+
+        host = socket.gethostname()
+        logger.info('Running on {host} with address {ip}'.format(
+            host=host, ip=socket.gethostbyname(host)
+        ))
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
         """Create the inlets and outlets if needed.
