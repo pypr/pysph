@@ -190,7 +190,7 @@ class JobProxy:
         return self.worker.free_cores()
 
     def run(self):
-        print "JobProxy cannot be run"
+        print("JobProxy cannot be run")
 
     def status(self):
         return self.worker.status(self.job_id)
