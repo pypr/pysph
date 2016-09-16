@@ -75,7 +75,7 @@ def get_circular_patch(dx=0.025, **kwargs):
     x = x.ravel()
     y = y.ravel()
 
-    m = ones_like(x)*dx*dx
+    m = ones_like(x)*dx*dx*ro # mass = volume * density even though ro = 1 in this example
     h = ones_like(x)*hdx*dx
     rho = ones_like(x) * ro
 
