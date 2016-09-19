@@ -13,7 +13,7 @@ import time
 import psutil
 
 
-class Job:
+class Job(object):
     def __init__(self, command, output_dir, n_core=1, n_thread=1, env=None):
         """Constructor
 
@@ -102,7 +102,7 @@ def free_cores():
 
 ############################################
 # This class is meant to be used by execnet alone.
-class _RemoteManager:
+class _RemoteManager(object):
     def __init__(self):
         self.jobs = dict()
         self.job_count = 0
@@ -155,7 +155,7 @@ def serve(channel):
 ############################################
 
 
-class Worker:
+class Worker(object):
     def free_cores(self):
         return free_cores()
 
@@ -180,7 +180,7 @@ class Worker:
         raise NotImplementedError()
 
 
-class JobProxy:
+class JobProxy(object):
     def __init__(self, worker, job_id, job):
         self.worker = worker
         self.job_id = job_id
@@ -309,7 +309,7 @@ class RemoteWorker(Worker):
         return self._call_remote('get_stderr', job_id)
 
 
-class Scheduler:
+class Scheduler(object):
     def __init__(self, root='.', worker_config=()):
         self.workers = deque()
         self.root = os.path.abspath(os.path.expanduser(root))
@@ -350,19 +350,5 @@ class Scheduler:
                     self.jobs.append(proxy)
                     break
             else:
-                print("Waiting for available worker.")
                 time.sleep(wait)
         return proxy
-
-
-
-def make_sample_jobs():
-    cmd = ['python', '-c',
-           dedent('''\
-           import time
-           t1 = time.time()
-           while time.time() - t1 < 10:
-               pass
-           print("Hello!")
-           ''')]
-    return [Job(cmd, output_dir='/tmp/output%d'%i) for i in range(10)]

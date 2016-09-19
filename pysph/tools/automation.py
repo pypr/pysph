@@ -10,7 +10,7 @@ import time
 import numpy as np
 
 
-class Task:
+class Task(object):
     """Basic task to run.  Subclass this to do whatever is needed.
 
     This class is very similar to luigi's Task class.
@@ -49,7 +49,7 @@ class WrapperTask(Task):
         return all(r.complete() for r in self.requires())
 
 
-class TaskRunner:
+class TaskRunner(object):
     """Run given tasks using the given scheduler.
     """
     def __init__(self, tasks, scheduler):
