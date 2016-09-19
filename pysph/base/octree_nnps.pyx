@@ -8,10 +8,12 @@ from libc.stdlib cimport malloc, free
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
+# EPS should be atleast twice the machine epsilon
 DEF EPS = 1e-6
 
 cdef inline OctreeNode* new_node(double* xmin, double length,
         double hmax = 0, int num_particles = 0, bint is_leaf = False) nogil:
+    """Create a new OctreeNode"""
     cdef OctreeNode* node = <OctreeNode*> malloc(sizeof(OctreeNode))
 
     node.xmin[0] = xmin[0]
@@ -78,7 +80,11 @@ cdef class OctreeNNPS(NNPS):
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
             bint cache = False, bint sort_gids = False, int leaf_max_particles = 10):
-        self.root = <OctreeNode**> malloc(self.narrays*sizeof(OctreeNode*))
+        cdef int narrays = len(particles)
+        self.root = <OctreeNode**> malloc(narrays*sizeof(OctreeNode*))
+        cdef int i
+        for i from 0<=i<narrays:
+            self.root[i] = NULL
         self.current_tree = NULL
 
     def __dealloc__(self):
@@ -193,6 +199,7 @@ cdef class OctreeNNPS(NNPS):
             hmax_children[i] = 0
 
         cdef OctreeNode* temp = NULL
+        cdef int oct_id
 
         if indices.length < self.leaf_max_particles:
             root.indices.assign(indices.data, indices.data + indices.length)
@@ -213,8 +220,10 @@ cdef class OctreeNNPS(NNPS):
                     &i, &j, &k
                     )
 
-            (<UIntArray>new_indices[k+2*j+4*i]).c_append(q)
-            hmax_children[k+2*j+4*i] = fmax(hmax_children[k+2*j+4*i],
+            oct_id = k+2*j+4*i
+
+            (<UIntArray>new_indices[oct_id]).c_append(q)
+            hmax_children[oct_id] = fmax(hmax_children[oct_id],
                     self.radius_scale*src_h_ptr[q])
 
         cdef double length_padded = (length/2)*(1 + 2*EPS)
@@ -227,10 +236,12 @@ cdef class OctreeNNPS(NNPS):
                     xmin_new[1] = xmin[1] + (j - EPS)*length/2
                     xmin_new[2] = xmin[2] + (k - EPS)*length/2
 
-                    root.children[i][j][k] = new_node(xmin_new, length_padded,
-                            hmax=hmax_children[k+2*j+4*i])
+                    oct_id = k+2*j+4*i
 
-                    self._build_tree(pa, <UIntArray>new_indices[k+2*j+4*i],
+                    root.children[i][j][k] = new_node(xmin_new, length_padded,
+                            hmax=hmax_children[oct_id])
+
+                    self._build_tree(pa, <UIntArray>new_indices[oct_id],
                             xmin_new, length_padded, root.children[i][j][k])
 
 
@@ -239,6 +250,7 @@ cdef class OctreeNNPS(NNPS):
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
             UIntArray nbrs, OctreeNode* root) nogil:
         """Find neighbors recursively"""
+
         cdef double x_centre = root.xmin[0] + root.length/2
         cdef double y_centre = root.xmin[1] + root.length/2
         cdef double z_centre = root.xmin[2] + root.length/2
@@ -301,7 +313,6 @@ cdef class OctreeNNPS(NNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
-
         cdef OctreeNode* tree = self.root[pa_index]
 
         self._build_tree(pa_wrapper, indices, tree.xmin, tree.length,
