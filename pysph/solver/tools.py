@@ -37,7 +37,8 @@ class SimpleRemesher(Tool):
     """A simple tool to periodically remesh a given array of particles onto an
     initial set of points.
     """
-    def __init__(self, app, array_name, props, freq=100, xi=None, yi=None, zi=None):
+    def __init__(self, app, array_name, props, freq=100, xi=None, yi=None,
+                 zi=None, kernel=None):
         """Constructor.
 
         Parameters
@@ -54,6 +55,7 @@ class SimpleRemesher(Tool):
         xi, yi, zi : ndarray
             Positions to remesh the properties onto.  If not specified they
             are taken from the particle arrays at the time of construction.
+        kernel: any kernel from pysph.base.kernels
 
         """
         from pysph.solver.utils import get_array_by_name
@@ -70,9 +72,11 @@ class SimpleRemesher(Tool):
         self.xi, self.yi, self.zi = xi.copy(), yi.copy(), zi.copy()
         self.freq = freq
         from pysph.tools.interpolator import Interpolator
+        if kernel is None:
+            kernel = app.solver.kernel
         self.interp = Interpolator(
             self.particles, x=self.xi, y=self.yi, z=self.zi,
-            kernel=app.solver.kernel,
+            kernel=kernel,
             domain_manager=app.create_domain()
         )
 

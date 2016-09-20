@@ -69,7 +69,7 @@ class CubicSpline(object):
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-        
+
         tmp2 = 2. - q
         if ( q > 2.0 ):
             val = 0.0
@@ -112,7 +112,7 @@ class CubicSpline(object):
 
     def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1./h; q = rij * h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -126,7 +126,7 @@ class CubicSpline(object):
         if ( q > 2.0 ):
             w = 0.0
             dw = 0.0
-            
+
         elif ( q > 1.0 ):
             w = 0.25 * tmp2 * tmp2 * tmp2
             dw = -0.75 * tmp2 * tmp2
@@ -137,16 +137,31 @@ class CubicSpline(object):
         return -fac * h1 * ( dw*q + w*self.dim )
 
 class WendlandQuintic(object):
+    r"""The WendlandQuintic kernel, also called the Wendland C2 kernel.
+
+    In PySPH this is only implemented for 2D and 3D.
+
+    .. math::
+             W(q) = \ & \alpha_d (1-q/2)^4(2q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+                  = \ & 0, & \textrm{for} \ q>2,\\
+
+    where :math:`d` is the number of dimensions and
+
+    .. math::
+             \alpha_d  = \ & \frac{7}{4\pi h^2}, \ & \textrm{for dim=2}, \\
+             \alpha_d  = \ & \frac{21}{16\pi h^3}, \ & \textrm{for dim=3}
+
+    """
     def __init__(self, dim=2):
         self.radius_scale = 2.0
         if dim == 1:
             raise ValueError("WendlandQuintic: Dim %d not supported"%dim)
         self.dim = dim
 
-        if dim == 3:
-            self.fac = M_1_PI * 21.0/16.0
         if dim == 2:
             self.fac = 7.0 * M_1_PI/4.0
+        elif dim == 3:
+            self.fac = M_1_PI * 21.0/16.0
 
     def get_deltap(self):
         return 0.5
@@ -174,7 +189,7 @@ class WendlandQuintic(object):
     def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1./h
         q = rij*h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -222,11 +237,11 @@ class Gaussian(object):
              W(q) = \ &\sigma_g e^{-q^2}, \ & \textrm{for} \ 0\leq q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
-    where :math:`\sigma_g` is a dimensional normalizing factor for the gaussian function
-    given by:
+    where :math:`\sigma_g` is a dimensional normalizing factor for the gaussian
+    function given by:
 
     .. math::
-             \sigma_g  = \ & \frac{1}{\pi^{1/2} h^1}, \ & \textrm{for dim=1}, \\
+             \sigma_g  = \ & \frac{1}{\pi^{1/2} h}, \ & \textrm{for dim=1}, \\
              \sigma_g  = \ & \frac{1}{\pi h^2}, \ & \textrm{for dim=2}, \\
              \sigma_g  = \ & \frac{1}{\pi^{3/2} h^3}, & \textrm{for dim=3}. \\
 
@@ -265,7 +280,7 @@ class Gaussian(object):
             fac = self.fac * h1 * h1
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
-        
+
         val = 0.0
         if ( q < 3.0 ):
             val = exp(-q*q) * fac
@@ -297,7 +312,7 @@ class Gaussian(object):
 
     def gradient_h(self, xij=[0., 0., 0.], rij=1.0, h=1.0):
         h1 = 1./h; q= rij*h1
-        
+
         # get the kernel normalizing factor
         if self.dim == 1:
             fac = self.fac * h1
@@ -311,8 +326,102 @@ class Gaussian(object):
         if ( q < 3.0 ):
             w = exp(-q*q)
             dw = -2.0 * q * w
-            
+
         return -fac * h1 * ( dw*q + w*self.dim )
+
+
+class SuperGaussian(object):
+    r"""Super Gaussian Kernel: [Monaghan1992]_
+
+    .. math::
+             W(q) = \ &\frac{1}{h^{d}\pi^{d/2}} e^{-q^2} (d/2 + 1 - q^2), \ & \textrm{for} \ 0\leq q \leq 3,\\
+                  = \ & 0, & \textrm{for} \ q>3,\\
+
+    where :math:`d` is the number of dimensions.
+    """
+
+    def __init__(self, dim=2):
+        self.radius_scale = 3.0
+        self.dim = dim
+
+        self.fac = 0.5*M_2_SQRTPI
+        if dim > 1:
+            self.fac *= 0.5*M_2_SQRTPI
+        if dim > 2:
+            self.fac *= 0.5*M_2_SQRTPI
+
+    def get_deltap(self):
+        # Found inflection point using sympy.
+        if self.dim == 1:
+            return 0.584540507426389
+        elif self.dim == 2:
+            return 0.6021141014644256
+        else:
+            return 0.615369528365158
+
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        val = 0.0
+        if ( q < 3.0 ):
+            q2 = q*q
+            val = exp(-q2) * (1.0 + self.dim*0.5 - q2) * fac
+
+        return val
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0., 0, 0]):
+        h1 = 1./h
+        q = rij*h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the gradient
+        val = 0.0
+        if (q < 3.0):
+            if (rij > 1e-12):
+                q2 = q*q
+                val = q * (2.0*q2 - self.dim - 4) * exp(-q2) * h1 /rij
+
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0., 0.], rij=1.0, h=1.0):
+        h1 = 1./h; q= rij*h1
+        d = self.dim
+
+        # get the kernel normalizing factor
+        if d == 1:
+            fac = self.fac * h1
+        elif d == 2:
+            fac = self.fac * h1 * h1
+        elif d == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # kernel and gradient evaluated at q
+        val = 0.0
+        if ( q < 3.0 ):
+            q2 = q*q
+            val = (-d*d*0.5 + 2.0*d*q2 - d - 2.0*q2*q2 + 4*q2)*exp(-q2)
+
+        return -fac * h1 * val
+
 
 class QuinticSpline(object):
     r"""Quintic Spline SPH kernel: [Liu2010]_
@@ -327,22 +436,21 @@ class QuinticSpline(object):
     quintic spline function given by:
 
     .. math::
-             \sigma_5  = \ & \frac{120}{h^1}, & \textrm{for dim=1}, \\
+             \sigma_5  = \ & \frac{1}{120 h^1}, & \textrm{for dim=1}, \\
              \sigma_5  = \ & \frac{7}{478\pi h^2}, \ & \textrm{for dim=2}, \\
              \sigma_5  = \ & \frac{3}{359\pi h^3}, & \textrm{for dim=3}. \\
 
-    Raises
-    ------
-    NotImplementedError
-        Quintic spline currently only supports 2D kernels.
     """
     def __init__(self, dim=2):
         self.radius_scale = 3.0
-        if dim != 2:
-            raise NotImplementedError('Quintic spline currently only supports 2D kernels.')
         self.dim = dim
 
-        self.fac = M_1_PI * 7.0/478.0
+        if dim == 1:
+            self.fac = 1.0/120.0
+        elif dim == 2:
+            self.fac = M_1_PI * 7.0/478.0
+        elif dim == 3:
+            self.fac = M_1_PI * 3.0/359.0
 
     def get_deltap(self):
         # The inflection points for the polynomial are obtained as
@@ -397,7 +505,7 @@ class QuinticSpline(object):
         tmp3 = 3. - q
         tmp2 = 2. - q
         tmp1 = 1. - q
-        
+
         # compute the gradient
         if (rij > 1e-12):
             if ( q > 3.0 ):
@@ -438,7 +546,7 @@ class QuinticSpline(object):
         tmp3 = 3. - q
         tmp2 = 2. - q
         tmp1 = 1. - q
-        
+
         # compute the kernel & gradient at q
         if ( q > 3.0 ):
             w = 0.0

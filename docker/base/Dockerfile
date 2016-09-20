@@ -17,6 +17,7 @@ RUN apt-get update && \
     mayavi2 \
     python \
     python-dev \
+    python-execnet \
     python-h5py \
     python-mako \
     python-matplotlib \
@@ -25,6 +26,7 @@ RUN apt-get update && \
     python-nose \
     python-numpy \
     python-pip \
+    python-psutil \
     python-qt4 \
     python-setuptools \
     python-unittest2 \
@@ -36,6 +38,7 @@ RUN apt-get update && \
     python3-nose \
     python3-numpy \
     python3-pip \
+    python3-psutil \
     sudo \
     tox \
     vim \

@@ -475,7 +475,7 @@ def setup_package():
     exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
-    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=3.2']
+    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
             'ordereddict', 'importlib', 'unittest2'
@@ -484,7 +484,7 @@ def setup_package():
     extras_require = dict(
         mpi=['mpi4py>=1.2'],
         ui=['mayavi>=4.0'],
-        test=['nose>=1.0.0', 'mock>=1.0']
+        test=['nose>=1.0.0', 'mock>=1.0', 'execnet', 'psutil']
     )
 
     everything = set()

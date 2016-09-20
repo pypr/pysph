@@ -1,46 +1,141 @@
-import itertools
+from fnmatch import fnmatch
 import glob
+import itertools
 import json
 import os
+import shlex
 import shutil
 import subprocess
+import time
 import numpy as np
 
 
-class PySPHRunner(object):
+class Task:
+    """Basic task to run.  Subclass this to do whatever is needed.
+
+    This class is very similar to luigi's Task class.
+    """
+
+    def complete(self):
+        """Should return True/False indicating success of task.
+        """
+        return all([os.path.exists(x) for x in self.output()])
+
+    def output(self):
+        """Return list of output paths.
+        """
+        return []
+
+    def run(self, scheduler):
+        """Run the task, using the given scheduler if needed.
+        """
+        pass
+
+    def requires(self):
+        """Return iterable of tasks this task requires.
+
+        It is important that one either return tasks that are idempotent or
+        return the same instance as this method is called repeateadly.
+
+        """
+        return []
+
+
+class WrapperTask(Task):
+    """A task that wraps other tasks and is done when all its requirements
+    are done.
+    """
+    def complete(self):
+        return all(r.complete() for r in self.requires())
+
+
+class TaskRunner:
+    """Run given tasks using the given scheduler.
+    """
+    def __init__(self, tasks, scheduler):
+        """Constructor.
+
+        Parameters
+        ----------
+
+        tasks: iterable of `Task` instances.
+        scheduler: `pysph.tools.job.Scheduler` instance
+        """
+        self.tasks = tasks
+        self.scheduler = scheduler
+        self.todo = []
+        for task in tasks:
+            self.add_task(task)
+
+    def _show_remaining_tasks(self):
+        print("%d tasks pending"%len(self.todo))
+
+    def add_task(self, task):
+        if not task.complete():
+            self.todo.append(task)
+            for req in task.requires():
+                self.add_task(req)
+
+    def all_requires_are_done(self, task):
+        return all(x.complete() for x in task.requires())
+
+    def run(self, wait=5):
+        self._show_remaining_tasks()
+        while len(self.todo) > 0:
+            to_remove = []
+            for i in range(len(self.todo) - 1, -1, -1):
+                task = self.todo[i]
+                if self.all_requires_are_done(task):
+                    to_remove.append(task)
+                    print("Running task %s..."%task)
+                    task.run(self.scheduler)
+            for task in to_remove:
+                self.todo.remove(task)
+
+            if len(to_remove) > 0:
+                self._show_remaining_tasks()
+
+            if len(self.todo) > 0:
+                time.sleep(wait)
+        print("Finished!")
+
+
+class PySPHTask(Task):
     """Convenience class to run a PySPH simulation via an automation
     framework.  The class provides a method to run the simulation and
     also check if the simulation is completed.
+
     """
-    def __init__(self, command, output_dir):
+
+    def __init__(self, command, output_dir, job_info=None):
         if isinstance(command, str):
-            self.command = command.split()
+            self.command = shlex.split(command)
         else:
             self.command = command
+        self.command += ['-d', output_dir]
         self.output_dir = output_dir
+        self.job_info = job_info if job_info is not None else {}
+        self.job_proxy = None
+        self._copy_proc = None
 
     ###### Public protocol ###########################################
 
-    def is_done(self, *ignored, **kw_ignored):
-        """Returns True if the simulation completed.
-
-        The extra arguments are not used but exist for compatibility
-        with automation toolkits.
+    def complete(self):
+        """Should return True/False indicating success of task.
         """
-        if not os.path.exists(self.output_dir):
-            return False
-        info_fname = self._get_info_filename()
-        if not info_fname or not os.path.exists(info_fname):
-            return False
-        d = json.load(open(info_fname))
-        return d.get('completed')
+        job_proxy = self.job_proxy
+        if job_proxy is None:
+            return self._is_done()
+        else:
+            return self._copy_output_and_check_status()
 
-    def run(self):
-        """Actually run the command.
-        """
-        cmd = self._full_command()
-        print("Running: %s"%' '.join(cmd))
-        subprocess.call(cmd)
+    def run(self, scheduler):
+        from pysph.tools.jobs import Job
+        job = Job(
+            command=self.command, output_dir=self.output_dir,
+            **self.job_info
+        )
+        self.job_proxy = scheduler.submit(job)
 
     def clean(self):
         """Clean out any generated results.
@@ -53,8 +148,16 @@ class PySPHRunner(object):
 
     ###### Private protocol ###########################################
 
-    def _full_command(self):
-        return self.command + ['-d', self.output_dir]
+    def _is_done(self):
+        """Returns True if the simulation completed.
+        """
+        if not os.path.exists(self.output_dir):
+            return False
+        info_fname = self._get_info_filename()
+        if not info_fname or not os.path.exists(info_fname):
+            return False
+        d = json.load(open(info_fname))
+        return d.get('completed')
 
     def _get_info_filename(self):
         files = glob.glob(os.path.join(self.output_dir, '*.info'))
@@ -62,6 +165,34 @@ class PySPHRunner(object):
             return files[0]
         else:
             return None
+
+    def _check_if_copy_complete(self):
+        proc = self._copy_proc
+        if proc is None:
+            # Local job so no copy needed.
+            return True
+        else:
+            if proc.poll() is None:
+                return False
+            else:
+                if self.job_proxy is not None:
+                    self.job_proxy.clean()
+                return True
+
+    def _copy_output_and_check_status(self):
+        jp = self.job_proxy
+        status = jp.status()
+        if status == 'done':
+            if self._copy_proc is None:
+                self._copy_proc = jp.copy_output('.')
+            return self._check_if_copy_complete()
+        elif status == 'error':
+            cmd = ' '.join(self.command)
+            msg = 'On host %s Job %s failed!'%(jp.worker.host, cmd)
+            print(msg)
+            print(jp.get_stderr())
+            raise RuntimeError(msg)
+        return False
 
 
 class Problem(object):
@@ -100,6 +231,9 @@ class Problem(object):
         """
         self.out_dir = output_dir
         self.sim_dir = simulation_dir
+
+        # Setup the simulation instances in the cases.
+        self.cases = None
         self.setup()
 
     ###### Public protocol ###########################################
@@ -127,11 +261,11 @@ class Problem(object):
         """
         base = self.get_name()
         result = []
-        for name, cmd in self.get_commands():
+        for name, cmd, job_info in self.get_commands():
             sim_output_dir = self.input_path(name)
-            runner = PySPHRunner(cmd, sim_output_dir)
+            task = PySPHTask(cmd, sim_output_dir, job_info)
             task_name = '%s.%s'%(base, name)
-            result.append((task_name, runner))
+            result.append((task_name, task))
         return result
 
     def make_output_dir(self):
@@ -148,10 +282,22 @@ class Problem(object):
         raise NotImplementedError()
 
     def get_commands(self):
-        """Return a sequence of (name, command_string), where name
-        represents the command being run.
+        """Return a sequence of (name, command_string, job_info_dict).
+
+        The name represents the command being run and is used as
+        a subdirectory for generated output.
+
+        The command_string is the command that needs to be run.
+
+        The job_info_dict is a dictionary with any additional info to be used
+        by the job, these are additional arguments to the
+        `pysph.tools.jobs.Job` class. It may be None if nothing special need
+        be passed.
         """
-        return []
+        if self.cases is not None:
+            return [(x.name, x.command, x.job_info) for x in self.cases]
+        else:
+            return []
 
     def get_outputs(self):
         """Get a list of outputs generated by this problem.  By default it
@@ -239,12 +385,19 @@ class Simulation(object):
     simulations.  One can define additional plot methods for a particular
     subclass and use these to easily plot results for different cases.
 
+    One can also pass any additional parameters to the `pysph.tools.jobs.Job`
+    class via the job_info kwarg so as to run the command suitably. For
+    example::
+
+        >>> s = Simlation('outputs/sph', 'pysph run elliptical_drop',
+        ...               job_info=dict(n_thread=4))
+
     The object has other methods that are convenient when comparing plots.
     Along with the ``compare_cases``, ``filter_cases`` and ``filter_by_name``
     this is an extremely powerful way to automate and compare results.
 
     """
-    def __init__(self, root, base_command, **kw):
+    def __init__(self, root, base_command, job_info=None, **kw):
         """Constructor
 
         Parameters
@@ -254,12 +407,15 @@ class Simulation(object):
             Path to simulation output directory.
         base_command: str
             Base command to run.
+        job_info: dict
+            Extra arguments to the `pysph.tools.jobs.Job` class.
         **kw: dict
             Additional parameters to pass to command.
         """
         self.root = root
         self.name = os.path.basename(root)
         self.base_command = base_command
+        self.job_info = job_info
         self.params = dict(kw)
         self._results = None
 
@@ -351,3 +507,219 @@ def filter_by_name(cases, names):
         [x for x in cases if x.name in names],
         key=lambda x: names.index(x.name)
     )
+
+
+############################################################################
+# Convenient classes that can be used to easily automate a collection
+# of problems.
+
+class SolveProblem(Task):
+    """Solves a particular `Problem`. This runs all the commands that the
+    problem requires and then runs the problem instance's run method.
+
+    The match argument is a string which when provided helps run only a subset
+    of the requirements for the problem.
+    """
+
+    def __init__(self, problem, match=''):
+        self.problem = problem
+        self.match = match
+        self._requires = [
+            task
+            for name, task in self.problem.get_requires()
+            if len(match) == 0 or fnmatch(name, match)
+        ]
+
+    def output(self):
+        return self.problem.get_outputs()
+
+    def run(self, scheduler):
+        if len(self.match) == 0:
+            self.problem.run()
+
+    def requires(self):
+        return self._requires
+
+
+class RunAll(WrapperTask):
+    """Solves a given collection of problems.
+    """
+
+    def __init__(self, simulation_dir, output_dir, problem_classes,
+                 force=False, match=''):
+        self.simulation_dir = simulation_dir
+        self.output_dir = output_dir
+        self.force = force
+        self.match = match
+        self.problems = self._make_problems(problem_classes)
+        self._requires = [
+            SolveProblem(problem=x, match=self.match) for x in self.problems
+        ]
+
+    ##### Private protocol  ###############################################
+
+    def _make_problems(self, problem_classes):
+        problems = []
+        for klass in problem_classes:
+            problem = klass(self.simulation_dir, self.output_dir)
+            if self.force:
+                problem.clean()
+            problems.append(problem)
+        return problems
+
+    ##### Public protocol  ################################################
+
+    def requires(self):
+        return self._requires
+
+
+class Automator(object):
+    """Main class to automate a collection of problems.
+
+    This processess command line options and runs all tasks with a scheduler
+    that is configured using the ``config.json`` file if it is present. Here is
+    typical usage::
+
+        >>> all_problems = [EllipticalDrop]
+        >>> automator = Automator('outputs', 'figures', all_problems)
+        >>> automator.run()
+
+    The class also creates a `pysph.tools.cluster_manager.ClusterManager`
+    instance and integrates the cluster management features as well. This
+    allows a user to automate their results across a collection of remote
+    machines accessible only by ssh.
+
+    """
+    def __init__(self, simulation_dir, output_dir, all_problems,
+                 cluster_manager_factory=None):
+        """Constructor.
+
+        Parameters
+        ----------
+        simulation_dir : str
+            Root directory to generate simulation results in.
+        output_dir: str
+            Root directory where outputs will be generated by Problem instances.
+        all_problems: sequence of `Problem` classes.
+            Sequence of problem classes to automate.
+        cluster_manager_class: `pysph.tools.cluster_manager.ClusterManager` class
+            Specify a cluster manager factory (None will use the default one).
+        """
+        self.simulation_dir = simulation_dir
+        self.output_dir = output_dir
+        self.all_problems = all_problems
+        if cluster_manager_factory is None:
+            from pysph.tools.cluster_manager import ClusterManager
+            self.cluster_manager_factory = ClusterManager
+        self._setup_argparse()
+
+    #### Public Protocol ########################################
+
+    def run(self):
+        """Start the automation.
+        """
+        args = self.parser.parse_args()
+
+        self._check_positional_arguments(args.problem)
+
+        self.cluster_manager = self.cluster_manager_factory()
+
+        if len(args.host) > 0:
+            self.cluster_manager.add_worker(args.host, args.home)
+            return
+        elif len(args.host) == 0 and args.update_remote:
+            self.cluster_manager.update(not args.no_rebuild)
+
+        problem_classes = self._select_problem_classes(args.problem)
+        task = RunAll(
+            simulation_dir=self.simulation_dir,
+            output_dir=self.output_dir,
+            problem_classes=problem_classes,
+            force=args.force, match=args.match
+        )
+        scheduler = self._create_scheduler()
+        self.scheduler = scheduler
+        self.runner = TaskRunner([task], scheduler)
+        self.runner.run()
+
+    #### Private Protocol ########################################
+
+    def _create_scheduler(self):
+        from pysph.tools.jobs import Scheduler
+
+        scheduler = Scheduler(root='.')
+        if os.path.exists('config.json'):
+            with open('config.json') as f:
+                config = json.load(f)
+        else:
+            config = dict(workers=dict(), root='pysph_auto')
+
+        scheduler.add_worker(dict(host='localhost'))
+        root = config['root']
+        for host, home in config['workers'].items():
+            python = os.path.join(home, root, 'envs/pysph/bin/python')
+            curdir = os.path.basename(os.getcwd())
+            chdir = os.path.join(home, root, curdir)
+            scheduler.add_worker(
+                dict(host=host, python=python, chdir=chdir)
+            )
+        return scheduler
+
+    def _check_positional_arguments(self, problems):
+        names = [c.__name__ for c in self.all_problems]
+        lower_names = [x.lower() for x in names]
+        if problems != 'all':
+            for p in problems:
+                if p.lower() not in lower_names:
+                    print("ERROR: %s not a valid problem!"%p)
+                    print("Valid names are %s"%', '.join(names))
+                    self.parser.exit(1)
+
+    def _select_problem_classes(self, problems):
+        if problems == 'all':
+            return self.all_problems
+        else:
+            return [cls for cls in self.all_problems
+                    if cls.__name__.lower() in problems]
+
+    def _setup_argparse(self):
+        import argparse
+        desc = "Automation script to run simulations."
+        parser = argparse.ArgumentParser(
+            description=desc
+        )
+        all_problem_names = [c.__name__ for c in self.all_problems]
+        parser.add_argument(
+            'problem', nargs='*', default="all",
+            help="Specifies problem to run as a string (case-insensitive), "\
+            "valid names are %s.  Defaults to running all of them."%all_problem_names
+        )
+
+        parser.add_argument(
+            '-a', '--add-node', action="store", dest="host", type=str,
+            default='', help="Add a new remote worker."
+        )
+        parser.add_argument(
+            '--home', action="store", dest="home", type=str,
+            default='',
+            help='Home directory of the remote worker (to be used with -a)'
+        )
+        parser.add_argument(
+            '-f', '--force', action="store_true", default=False, dest='force',
+            help='Redo the plots even if they were already made.'
+        )
+        parser.add_argument(
+            '-m', '--match', action="store", type=str, default='', dest='match',
+            help="Name of the problem to run (uses fnmatch)"
+        )
+        parser.add_argument(
+            '--no-rebuild', action="store_true", dest="no_rebuild", default=False,
+            help="Do not rebuild the sources on update, just update the files."
+        )
+        parser.add_argument(
+            '-u', '--update-remote', action='store_true',
+            dest='update_remote', default=False,
+            help='Update remote worker machines.'
+        )
+
+        self.parser = parser

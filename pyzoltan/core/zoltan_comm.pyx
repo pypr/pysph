@@ -196,6 +196,84 @@ cdef class ZComm:
 
         _check_error(ierr)
 
+    def Comm_Do_Post(self, np.ndarray _sendbuf, np.ndarray _recvbuf):
+        """Initiate unstructured communication between processors
+
+        Parameters:
+
+        _sendbuf : np.ndarray
+            The array of data to be sent by this processor
+
+        _recvbuf : np.ndarray
+            The array of data to be received by this processor
+
+        Notes:
+
+        Internally, Zoltan_Comm_Do accepts char* buffers to move the
+        data between processors. The number of objects is determined
+        by the `nbytes` argument.
+
+        The `nsend` argument used to create the ZComm object and the
+        `nbytes` argument should be consistent to avoid strange
+        behaviour.
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef char* send_data = _sendbuf.data
+        cdef char* recv_data = _recvbuf.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+
+        # Note that this variant only "posts" the message for
+        # sending. Control should be returned back to the calling
+        # program instantly. The message can only be safely viewed
+        # after the Comm_Do_Wait which acts as a memory fence
+        ierr = zcomm.Zoltan_Comm_Do_Post(
+           _zoltan_comm_obj,
+           tag,
+           send_data,
+           nbytes,
+           recv_data)
+        
+        _check_error(ierr)
+
+    def Comm_Do_Wait(self, np.ndarray _sendbuf, np.ndarray _recvbuf):
+        """Mem fence for the unstructured communication between processors
+        initiated by Comm_Do_Post
+
+        Parameters:
+
+        _sendbuf : np.ndarray
+            The array of data to be sent by this processor
+
+        _recvbuf : np.ndarray
+            The array of data to be received by this processor
+
+        Notes:
+
+        Internally, Zoltan_Comm_Do accepts char* buffers to move the
+        data between processors. The number of objects is determined
+        by the `nbytes` argument.
+
+        The `nsend` argument used to create the ZComm object and the
+        `nbytes` argument should be consistent to avoid strange
+        behaviour.
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef char* send_data = _sendbuf.data
+        cdef char* recv_data = _recvbuf.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+        ierr = zcomm.Zoltan_Comm_Do_Wait(
+           _zoltan_comm_obj,
+           tag,
+           send_data,
+           nbytes,
+           recv_data)
+        
+        _check_error(ierr)
+
     def Comm_Resize(self, np.ndarray _sizes, int total_recv_size):
         """Set the individual sizes for the communicated objects
 
