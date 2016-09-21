@@ -7,6 +7,7 @@ import shlex
 import shutil
 import subprocess
 import time
+import traceback
 import numpy as np
 
 
@@ -61,34 +62,91 @@ class TaskRunner(object):
         tasks: iterable of `Task` instances.
         scheduler: `pysph.tools.job.Scheduler` instance
         """
-        self.tasks = tasks
         self.scheduler = scheduler
         self.todo = []
+        self.task_status = dict()
         for task in tasks:
             self.add_task(task)
 
+    ##### Private protocol  ##############################################
+
+    def _check_status_of_requires(self, task):
+        status = [self._check_status_of_task(t) for t in task.requires()]
+
+        if 'error' in status:
+            return 'error'
+        if all(x==True for x in status):
+            return 'done'
+        else:
+            return 'running'
+
+    def _check_status_of_task(self, task):
+        complete = False
+        try:
+            complete = task.complete()
+            self.task_status[task] = 'done' if complete else 'running'
+        except Exception:
+            complete = 'error'
+            self.task_status[task] = 'error'
+        return complete
+
+    def _get_tasks_with_status(self, status):
+        return [t for t, s in self.task_status.items() if s == status]
+
+    def _run(self, task):
+        try:
+            print("Running task %s..."%task)
+            self.task_status[task] = 'running'
+            task.run(self.scheduler)
+            status = 'running'
+        except Exception:
+            traceback.print_exc()
+            status = 'error'
+            self.task_status[task] = 'error'
+        return status
+
     def _show_remaining_tasks(self):
-        print("%d tasks pending"%len(self.todo))
+        running = self._get_tasks_with_status('running')
+        print("{pending} tasks pending and {running} tasks running".format(
+            pending=len(self.todo), running=len(running)
+        ))
+
+    def _wait_for_running_tasks(self, wait):
+        print("Waiting for already running tasks...")
+        running = self._get_tasks_with_status('running')
+        while len(running) > 0:
+            for t in running:
+                self._check_status_of_task(t)
+            time.sleep(wait)
+            running = self._get_tasks_with_status('running')
+        errors = self._get_tasks_with_status('error')
+        print("{n_err} jobs had errors.".format(n_err=len(errors)))
+
+    ##### Public protocol  ##############################################
 
     def add_task(self, task):
         if not task.complete():
             self.todo.append(task)
+            self.task_status[task] = 'not started'
             for req in task.requires():
                 self.add_task(req)
-
-    def all_requires_are_done(self, task):
-        return all(x.complete() for x in task.requires())
+        else:
+            self.task_status[task] = 'done'
 
     def run(self, wait=5):
         self._show_remaining_tasks()
-        while len(self.todo) > 0:
+        status = 'running'
+        while len(self.todo) > 0 and status != 'error':
             to_remove = []
             for i in range(len(self.todo) - 1, -1, -1):
                 task = self.todo[i]
-                if self.all_requires_are_done(task):
+                status = self._check_status_of_requires(task)
+                if status == 'error':
+                    break
+                elif status == 'done':
                     to_remove.append(task)
-                    print("Running task %s..."%task)
-                    task.run(self.scheduler)
+                    status = self._run(task)
+
             for task in to_remove:
                 self.todo.remove(task)
 
@@ -97,6 +155,9 @@ class TaskRunner(object):
 
             if len(self.todo) > 0:
                 time.sleep(wait)
+
+        if status == 'error':
+            self._wait_for_running_tasks(wait)
         print("Finished!")
 
 
@@ -117,6 +178,9 @@ class PySPHTask(Task):
         self.job_info = job_info if job_info is not None else {}
         self.job_proxy = None
         self._copy_proc = None
+        # This is a sentinel set to true when the job is finished
+        # the data is copied to a local machine and cleaned on the remote.
+        self._finished = False
 
     ###### Public protocol ###########################################
 
@@ -124,7 +188,7 @@ class PySPHTask(Task):
         """Should return True/False indicating success of task.
         """
         job_proxy = self.job_proxy
-        if job_proxy is None:
+        if job_proxy is None or self._finished:
             return self._is_done()
         else:
             return self._copy_output_and_check_status()
@@ -177,6 +241,7 @@ class PySPHTask(Task):
             else:
                 if self.job_proxy is not None:
                     self.job_proxy.clean()
+                    self._finished = True
                 return True
 
     def _copy_output_and_check_status(self):
@@ -191,6 +256,11 @@ class PySPHTask(Task):
             msg = 'On host %s Job %s failed!'%(jp.worker.host, cmd)
             print(msg)
             print(jp.get_stderr())
+            proc = jp.copy_output('.')
+            if proc is not None:
+                proc.wait()
+            jp.clean()
+            self._finished = True
             raise RuntimeError(msg)
         return False
 
