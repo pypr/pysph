@@ -122,7 +122,7 @@ class TestJob(unittest.TestCase):
 
     def test_free_cores(self):
         n = jobs.free_cores()
-        self.assertTrue(n > 0)
+        self.assertTrue(n >= 0)
         self.assertTrue(n <= multiprocessing.cpu_count())
 
 
@@ -175,7 +175,7 @@ class TestRemoteWorker(unittest.TestCase):
         r = jobs.RemoteWorker(host='localhost', python=sys.executable, testing=True)
         # Then.
         n = r.free_cores()
-        self.assertTrue(n > 0)
+        self.assertTrue(n >= 0)
         self.assertTrue(n <= multiprocessing.cpu_count())
 
     def test_simple(self):
