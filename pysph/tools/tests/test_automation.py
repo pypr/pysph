@@ -39,13 +39,13 @@ class EllipticalDrop(Problem):
         # If self.cases is set, the get_commands method will do the right thing.
         self.cases = [
             Simulation(
-                root=self.input_path('no_update_h'),
+                root=self.input_path('update_h'),
                 base_command=cmd,
                 job_info=dict(n_core=1, n_thread=1),
                 update_h=None
             ),
             Simulation(
-                root=self.input_path('update_h'),
+                root=self.input_path('no_update_h'),
                 base_command=cmd,
                 job_info=dict(n_core=1, n_thread=1),
                 no_update_h=None
@@ -147,3 +147,38 @@ class TestRemoteAutomation(TestLocalAutomation):
         except ImportError:
             raise unittest.SkipTest('This test requires execnet')
         return Scheduler(root=self.sim_dir, worker_config=workers)
+
+    def test_job_with_error_is_handled_correctly(self):
+        # Given.
+        problem = EllipticalDrop(self.sim_dir, self.output_dir)
+        problem.cases[0].base_command += ' --xxx'
+        s = self._make_scheduler()
+        t = TaskRunner(tasks=[SolveProblem(problem=problem)], scheduler=s)
+
+        # When.
+        try:
+            t.run(wait=1)
+        except RuntimeError:
+            pass
+
+        # Then.
+
+        # Ensure that the directories are copied over when they have errors.
+        sim1 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'no_update_h')
+        self.assertTrue(os.path.exists(sim1))
+        sim2 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'update_h')
+        self.assertTrue(os.path.exists(sim2))
+
+        # Ensure that all the correct but already scheduled jobs are completed.
+        task_status = t.task_status
+        status_values = list(task_status.values())
+        self.assertEqual(status_values.count('error'), 1)
+        self.assertEqual(status_values.count('done'), 1)
+        self.assertEqual(status_values.count('not started'), 1)
+        for t, s in task_status.items():
+            if s == 'done':
+                self.assertTrue(t.complete())
+            if s == 'error':
+                self.assertFalse(t.complete())

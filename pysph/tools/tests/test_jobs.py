@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 import shlex
 import shutil
@@ -120,7 +121,6 @@ class TestJob(unittest.TestCase):
         self.assertEqual(j.get_stdout().strip(), '4')
 
     def test_free_cores(self):
-        import multiprocessing
         n = jobs.free_cores()
         self.assertTrue(n > 0)
         self.assertTrue(n <= multiprocessing.cpu_count())
@@ -174,8 +174,9 @@ class TestRemoteWorker(unittest.TestCase):
         # Given
         r = jobs.RemoteWorker(host='localhost', python=sys.executable, testing=True)
         # Then.
-        self.assertEqual(jobs.free_cores(), r.free_cores())
-
+        n = r.free_cores()
+        self.assertTrue(n > 0)
+        self.assertTrue(n <= multiprocessing.cpu_count())
 
     def test_simple(self):
         # Given

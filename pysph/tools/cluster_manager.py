@@ -66,7 +66,10 @@ class ClusterManager(object):
     wish.
 
     The class creates a ``config.json`` in the current working directory that
-    may be edited by a user.
+    may be edited by a user. It also creates a directory called
+    ``.{self.root}`` which defaults to ``.pysph_auto``. The bootstrap and
+    update scripts are put here and may be edited by the user for any new
+    hosts.
 
     """
 
@@ -106,9 +109,12 @@ class ClusterManager(object):
         self.root = root
         self.workers = dict()
         self.sources = sources
+        self.scripts_dir = os.path.abspath('.' + self.root)
         # The config file will always trump any direct settings
         # unless there is no config file.
         self._read_config()
+        if not os.path.exists(self.scripts_dir):
+            os.makedirs(self.scripts_dir)
 
     #### Private Protocol ########################################
 
@@ -125,9 +131,6 @@ class ClusterManager(object):
             host=host, root=root, venv_script=venv_script
         )
         self._run_command(cmd)
-
-        os.remove(venv_script)
-        os.rmdir(os.path.dirname(venv_script))
 
         self._update_sources(host, home)
 
@@ -146,21 +149,26 @@ class ClusterManager(object):
 
             Once the bootstrap.sh script runs successfully, the worker can be
             used without any further steps.
+
+            The default bootstrap script is in
+                {scripts_dir}
+            and can be edited by you. These will be used for any new hosts
+            you add.
             ******************************************************************
-            """.format(root=root, host=host)
+            """.format(root=root, host=host, scripts_dir=self.scripts_dir)
             )
             print(msg)
         else:
             print("Bootstrapping {host} succeeded!".format(host=host))
 
     def _get_virtualenv(self):
-        tmpdir = tempfile.mkdtemp()
-        print("Downloading latest virtualenv.py")
-        url = 'https://raw.githubusercontent.com/pypa/virtualenv/master/virtualenv.py'
-        opener = urlopen(url)
-        script = os.path.join(tmpdir, 'virtualenv.py')
-        with open(script, 'wb') as f:
-            f.write(opener.read())
+        script = os.path.join(self.scripts_dir, 'virtualenv.py')
+        if not os.path.exists(script):
+            print("Downloading latest virtualenv.py")
+            url = 'https://raw.githubusercontent.com/pypa/virtualenv/master/virtualenv.py'
+            opener = urlopen(url)
+            with open(script, 'wb') as f:
+                f.write(opener.read())
         return script
 
     def _read_config(self):
@@ -172,13 +180,19 @@ class ClusterManager(object):
             self.workers = data['workers']
         else:
             if self.sources is None or len(self.sources) == 0:
-                pysph_dir = os.path.expanduser(
-                    prompt("Enter PySPH source directory: ")
-                )
                 project_dir = os.path.abspath(os.getcwd())
-                self.sources = [project_dir, pysph_dir]
+                sources = [project_dir]
+                pysph_dir = os.path.expanduser(
+                    prompt("Enter PySPH source directory (empty for none): ")
+                )
+                if len(pysph_dir) > 0 and os.path.exists(pysph_dir):
+                    sources.append(os.path.abspath(pysph_dir))
+                else:
+                    print("Invalid pysph directory, please edit config.json.")
+                self.sources = sources
             self.workers = dict()
             self._write_config()
+        self.scripts_dir = os.path.abspath('.' + self.root)
 
     def _rebuild(self, host, home):
         root = os.path.join(home, self.root)
@@ -213,13 +227,16 @@ class ClusterManager(object):
             remote_dir = os.path.join(home, self.root + '/')
             self._sync_dir(host, local_dir, remote_dir)
 
-        tmpdir = tempfile.mkdtemp()
+        scripts_dir = self.scripts_dir
         scripts = {'bootstrap.sh': self.BOOTSTRAP, 'update.sh': self.UPDATE}
         for script, code in scripts.items():
-            with open(os.path.join(tmpdir, script), 'w') as f:
-                f.write(code)
+            fname = os.path.join(scripts_dir, script)
+            if not os.path.exists(fname):
+                # Create the scripts if they don't exist.
+                with open(fname, 'w') as f:
+                    f.write(code)
 
-        script_files = [os.path.join(tmpdir, x) for x in scripts]
+        script_files = [os.path.join(scripts_dir, x) for x in scripts]
         for fname in script_files:
             mode = os.stat(fname).st_mode
             os.chmod(fname, mode | stat.S_IXUSR | stat.S_IXGRP)
@@ -228,10 +245,7 @@ class ClusterManager(object):
         cmd = "scp {script_files} {host}:{path}".format(
             host=host, path=path, script_files=' '.join(script_files)
         )
-        try:
-            self._run_command(cmd)
-        finally:
-            shutil.rmtree(tmpdir)
+        self._run_command(cmd)
 
     def _write_config(self):
         print("Writing config.json")
