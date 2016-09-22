@@ -181,7 +181,7 @@ cdef class OctreeNNPS(NNPS):
 
     @cython.cdivision(True)
     cdef void _build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, OctreeNode* root):
+            double* xmin, double length, OctreeNode* node):
         """Build octree"""
 
         cdef double* src_x_ptr = pa.x.data
@@ -202,9 +202,9 @@ cdef class OctreeNNPS(NNPS):
         cdef int oct_id
 
         if indices.length < self.leaf_max_particles:
-            root.indices.assign(indices.data, indices.data + indices.length)
-            root.num_particles = indices.length
-            root.is_leaf = True
+            node.indices.assign(indices.data, indices.data + indices.length)
+            node.num_particles = indices.length
+            node.is_leaf = True
             return
 
         cdef list new_indices = [UIntArray() for i in range(8)]
@@ -238,31 +238,31 @@ cdef class OctreeNNPS(NNPS):
 
                     oct_id = k+2*j+4*i
 
-                    root.children[i][j][k] = new_node(xmin_new, length_padded,
+                    node.children[i][j][k] = new_node(xmin_new, length_padded,
                             hmax=hmax_children[oct_id])
 
                     self._build_tree(pa, <UIntArray>new_indices[oct_id],
-                            xmin_new, length_padded, root.children[i][j][k])
+                            xmin_new, length_padded, node.children[i][j][k])
 
 
     @cython.cdivision(True)
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, OctreeNode* root) nogil:
+            UIntArray nbrs, OctreeNode* node) nogil:
         """Find neighbors recursively"""
 
-        cdef double x_centre = root.xmin[0] + root.length/2
-        cdef double y_centre = root.xmin[1] + root.length/2
-        cdef double z_centre = root.xmin[2] + root.length/2
+        cdef double x_centre = node.xmin[0] + node.length/2
+        cdef double y_centre = node.xmin[1] + node.length/2
+        cdef double z_centre = node.xmin[2] + node.length/2
 
         cdef u_int i, j, k
         cdef double hi2 = self.radius_scale2*q_h*q_h
         cdef double hj2 = 0
         cdef double xij2 = 0
 
-        if root.is_leaf:
-            for i from 0<=i<root.indices.size():
-                k = deref(root.indices)[i]
+        if node.is_leaf:
+            for i from 0<=i<node.indices.size():
+                k = deref(node.indices)[i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,
@@ -273,7 +273,7 @@ cdef class OctreeNNPS(NNPS):
                     nbrs.c_append(k)
             return
 
-        cdef double eff_radius = 0.5*(root.length) + fmax(self.radius_scale*q_h, root.hmax)
+        cdef double eff_radius = 0.5*(node.length) + fmax(self.radius_scale*q_h, node.hmax)
 
         if  fabs(x_centre - q_x) >= eff_radius or \
             fabs(y_centre - q_y) >= eff_radius or \
@@ -285,7 +285,7 @@ cdef class OctreeNNPS(NNPS):
                 for k from 0<=k<2:
                     self._get_neighbors(q_x, q_y, q_z, q_h,
                             src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
-                            nbrs, root.children[i][j][k])
+                            nbrs, node.children[i][j][k])
 
 
     cpdef _refresh(self):

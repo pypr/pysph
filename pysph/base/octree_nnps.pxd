@@ -51,11 +51,11 @@ cdef class OctreeNNPS(NNPS):
     cpdef set_context(self, int src_index, int dst_index)
 
     cdef void _build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, OctreeNode* root)
+            double* xmin, double length, OctreeNode* node)
 
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, OctreeNode* root) nogil
+            UIntArray nbrs, OctreeNode* node) nogil
 
     cpdef _refresh(self)
 
