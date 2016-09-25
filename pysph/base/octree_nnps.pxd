@@ -22,7 +22,7 @@ cdef struct OctreeNode:
     int num_particles
 
     void* indices
-    OctreeNode* children[2][2][2]
+    OctreeNode* children[8]
 
 cdef inline OctreeNode* new_node(double* xmin, double length,
         double hmax = *, int num_particles = *, bint is_leaf = *) nogil

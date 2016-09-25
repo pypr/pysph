@@ -27,27 +27,23 @@ cdef inline OctreeNode* new_node(double* xmin, double length,
     node.is_leaf = is_leaf
     node.indices = NULL
 
-    cdef int i, j, k
+    cdef int i
 
-    for i from 0<=i<2:
-        for j from 0<=j<2:
-            for k from 0<=k<2:
-                node.children[i][j][k] = NULL
+    for i from 0<=i<8:
+        node.children[i] = NULL
 
     return node
 
-cdef inline void delete_tree(OctreeNode* root):
+cdef inline void delete_tree(OctreeNode* node):
     """Delete octree"""
     cdef int i, j, k
     cdef OctreeNode* temp[8]
 
-    for i from 0<=i<2:
-        for j from 0<=j<2:
-            for k from 0<=k<2:
-                temp[k+2*j+4*i] = root.children[i][j][k]
+    for i from 0<=i<8:
+        temp[i] = node.children[i]
 
-    Py_XDECREF(<PyObject*>root.indices)
-    free(root)
+    Py_XDECREF(<PyObject*>node.indices)
+    free(node)
 
     for i from 0<=i<8:
         if temp[i] == NULL:
@@ -240,11 +236,11 @@ cdef class OctreeNNPS(NNPS):
 
                     oct_id = k+2*j+4*i
 
-                    node.children[i][j][k] = new_node(xmin_new, length_padded,
+                    node.children[oct_id] = new_node(xmin_new, length_padded,
                             hmax=hmax_children[oct_id])
 
                     self._build_tree(pa, <UIntArray>new_indices[oct_id],
-                            xmin_new, length_padded, node.children[i][j][k], 2*eps)
+                            xmin_new, length_padded, node.children[oct_id], 2*eps)
 
 
     @cython.cdivision(True)
@@ -282,12 +278,10 @@ cdef class OctreeNNPS(NNPS):
                     nbrs.c_append(k)
             return
 
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
-                    self._get_neighbors(q_x, q_y, q_z, q_h,
-                            src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
-                            nbrs, node.children[i][j][k])
+        for i from 0<=i<8:
+            self._get_neighbors(q_x, q_y, q_z, q_h,
+                    src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
+                    nbrs, node.children[i])
 
 
     cpdef _refresh(self):
