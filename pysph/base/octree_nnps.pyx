@@ -202,7 +202,7 @@ cdef class OctreeNNPS(NNPS):
         cdef OctreeNode* temp = NULL
         cdef int oct_id
 
-        if indices.length < self.leaf_max_particles:
+        if (indices.length < self.leaf_max_particles) or (eps > EPS_MAX):
             node.indices = <void*>indices
             Py_XINCREF(<PyObject*>indices)
             node.num_particles = indices.length
