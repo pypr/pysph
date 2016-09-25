@@ -7,9 +7,10 @@ from libc.stdlib cimport malloc, free
 
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
+from cpython cimport PyObject, Py_XINCREF, Py_XDECREF
 
-# EPS should be atleast twice the machine epsilon
-DEF EPS = 1e-6
+DEF EPS_MAX = 1e-3
+DEF MACHINE_EPS = 1e-14
 
 cdef inline OctreeNode* new_node(double* xmin, double length,
         double hmax = 0, int num_particles = 0, bint is_leaf = False) nogil:
@@ -24,7 +25,7 @@ cdef inline OctreeNode* new_node(double* xmin, double length,
     node.hmax = hmax
     node.num_particles = num_particles
     node.is_leaf = is_leaf
-    node.indices = new vector[u_int]()
+    node.indices = NULL
 
     cdef int i, j, k
 
@@ -35,7 +36,7 @@ cdef inline OctreeNode* new_node(double* xmin, double length,
 
     return node
 
-cdef inline void delete_tree(OctreeNode* root) nogil:
+cdef inline void delete_tree(OctreeNode* root):
     """Delete octree"""
     cdef int i, j, k
     cdef OctreeNode* temp[8]
@@ -45,7 +46,7 @@ cdef inline void delete_tree(OctreeNode* root) nogil:
             for k from 0<=k<2:
                 temp[k+2*j+4*i] = root.children[i][j][k]
 
-    del root.indices
+    Py_XDECREF(<PyObject*>root.indices)
     free(root)
 
     for i from 0<=i<8:
@@ -181,7 +182,7 @@ cdef class OctreeNNPS(NNPS):
 
     @cython.cdivision(True)
     cdef void _build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, OctreeNode* node):
+            double* xmin, double length, OctreeNode* node, double eps):
         """Build octree"""
 
         cdef double* src_x_ptr = pa.x.data
@@ -202,7 +203,8 @@ cdef class OctreeNNPS(NNPS):
         cdef int oct_id
 
         if indices.length < self.leaf_max_particles:
-            node.indices.assign(indices.data, indices.data + indices.length)
+            node.indices = <void*>indices
+            Py_XINCREF(<PyObject*>indices)
             node.num_particles = indices.length
             node.is_leaf = True
             return
@@ -226,15 +228,15 @@ cdef class OctreeNNPS(NNPS):
             hmax_children[oct_id] = fmax(hmax_children[oct_id],
                     self.radius_scale*src_h_ptr[q])
 
-        cdef double length_padded = (length/2)*(1 + 2*EPS)
+        cdef double length_padded = (length/2)*(1 + 2*eps)
 
         for i from 0<=i<2:
             for j from 0<=j<2:
                 for k from 0<=k<2:
 
-                    xmin_new[0] = xmin[0] + (i - EPS)*length/2
-                    xmin_new[1] = xmin[1] + (j - EPS)*length/2
-                    xmin_new[2] = xmin[2] + (k - EPS)*length/2
+                    xmin_new[0] = xmin[0] + (i - eps)*length/2
+                    xmin_new[1] = xmin[1] + (j - eps)*length/2
+                    xmin_new[2] = xmin[2] + (k - eps)*length/2
 
                     oct_id = k+2*j+4*i
 
@@ -242,7 +244,7 @@ cdef class OctreeNNPS(NNPS):
                             hmax=hmax_children[oct_id])
 
                     self._build_tree(pa, <UIntArray>new_indices[oct_id],
-                            xmin_new, length_padded, node.children[i][j][k])
+                            xmin_new, length_padded, node.children[i][j][k], 2*eps)
 
 
     @cython.cdivision(True)
@@ -260,9 +262,16 @@ cdef class OctreeNNPS(NNPS):
         cdef double hj2 = 0
         cdef double xij2 = 0
 
+        cdef double eff_radius = 0.5*(node.length) + fmax(self.radius_scale*q_h, node.hmax)
+
+        if  fabs(x_centre - q_x) >= eff_radius or \
+            fabs(y_centre - q_y) >= eff_radius or \
+            fabs(z_centre - q_z) >= eff_radius:
+            return
+
         if node.is_leaf:
-            for i from 0<=i<node.indices.size():
-                k = deref(node.indices)[i]
+            for i from 0<=i<(<UIntArray>node.indices).length:
+                k = (<UIntArray>node.indices).data[i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,
@@ -271,13 +280,6 @@ cdef class OctreeNNPS(NNPS):
                         )
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(k)
-            return
-
-        cdef double eff_radius = 0.5*(node.length) + fmax(self.radius_scale*q_h, node.hmax)
-
-        if  fabs(x_centre - q_x) >= eff_radius or \
-            fabs(y_centre - q_y) >= eff_radius or \
-            fabs(z_centre - q_z) >= eff_radius:
             return
 
         for i from 0<=i<2:
@@ -298,11 +300,21 @@ cdef class OctreeNNPS(NNPS):
 
         cdef double length = fmax(x_length, fmax(y_length, z_length))
 
-        xmin[0] = xmin[0] - length*EPS
-        xmin[1] = xmin[1] - length*EPS
-        xmin[2] = xmin[2] - length*EPS
+        cdef double eps = (MACHINE_EPS/length)*fmax(length,
+                fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
 
-        length *= (1 + 2*EPS)
+        xmin[0] = xmin[0] - length*eps
+        xmin[1] = xmin[1] - length*eps
+        xmin[2] = xmin[2] - length*eps
+
+        length *= (1 + 2*eps)
+
+        cdef double xmax_padded = xmin[0] + length
+        cdef double ymax_padded = xmin[1] + length
+        cdef double zmax_padded = xmin[2] + length
+
+        self._eps0 = (2*MACHINE_EPS/length)*fmax(length,
+                fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
 
         cdef int i
         for i from 0<=i<self.narrays:
@@ -316,6 +328,6 @@ cdef class OctreeNNPS(NNPS):
         cdef OctreeNode* tree = self.root[pa_index]
 
         self._build_tree(pa_wrapper, indices, tree.xmin, tree.length,
-                tree)
+                tree, self._eps0)
 
 
