@@ -1,56 +1,13 @@
 #cython: embedsignature=True
 
 from nnps_base cimport *
+from octree cimport Octree, OctreeNode
 
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
 
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
-from cpython cimport PyObject, Py_XINCREF, Py_XDECREF
-
-DEF EPS_MAX = 1e-3
-DEF MACHINE_EPS = 1e-14
-
-cdef inline OctreeNode* new_node(double* xmin, double length,
-        double hmax = 0, int num_particles = 0, bint is_leaf = False) nogil:
-    """Create a new OctreeNode"""
-    cdef OctreeNode* node = <OctreeNode*> malloc(sizeof(OctreeNode))
-
-    node.xmin[0] = xmin[0]
-    node.xmin[1] = xmin[1]
-    node.xmin[2] = xmin[2]
-
-    node.length = length
-    node.hmax = hmax
-    node.num_particles = num_particles
-    node.is_leaf = is_leaf
-    node.indices = NULL
-
-    cdef int i
-
-    for i from 0<=i<8:
-        node.children[i] = NULL
-
-    return node
-
-cdef inline void delete_tree(OctreeNode* node):
-    """Delete octree"""
-    cdef int i, j, k
-    cdef OctreeNode* temp[8]
-
-    for i from 0<=i<8:
-        temp[i] = node.children[i]
-
-    Py_XDECREF(<PyObject*>node.indices)
-    free(node)
-
-    for i from 0<=i<8:
-        if temp[i] == NULL:
-            return
-        else:
-            delete_tree(temp[i])
-
 
 #############################################################################
 cdef class OctreeNNPS(NNPS):
@@ -63,6 +20,10 @@ cdef class OctreeNNPS(NNPS):
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
         )
+
+        cdef int i
+        self.root = [Octree(leaf_max_particles, radius_scale) for i in range(self.narrays)]
+
         self.radius_scale2 = radius_scale*radius_scale
 
         self.src_index = 0
@@ -73,22 +34,6 @@ cdef class OctreeNNPS(NNPS):
         self.domain.update()
 
         self.update()
-
-    def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
-            int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10):
-        cdef int narrays = len(particles)
-        self.root = <OctreeNode**> malloc(narrays*sizeof(OctreeNode*))
-        cdef int i
-        for i from 0<=i<narrays:
-            self.root[i] = NULL
-        self.current_tree = NULL
-
-    def __dealloc__(self):
-        cdef int i
-        for i from 0<=i<self.narrays:
-            delete_tree(self.root[i])
-        free(self.root)
 
 
     #### Public protocol ################################################
@@ -107,7 +52,7 @@ cdef class OctreeNNPS(NNPS):
         """
 
         NNPS.set_context(self, src_index, dst_index)
-        self.current_tree = self.root[src_index]
+        self.current_tree = <Octree>self.root[src_index]
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -138,7 +83,7 @@ cdef class OctreeNNPS(NNPS):
         cdef int orig_length = nbrs.length
 
         self._get_neighbors(x, y, z, h, src_x_ptr, src_y_ptr, src_z_ptr,
-                src_h_ptr, nbrs, self.root[self.src_index])
+                src_h_ptr, nbrs, self.current_tree.tree)
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -175,73 +120,6 @@ cdef class OctreeNNPS(NNPS):
 
 
     #### Private protocol ################################################
-
-    @cython.cdivision(True)
-    cdef void _build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, OctreeNode* node, double eps):
-        """Build octree"""
-
-        cdef double* src_x_ptr = pa.x.data
-        cdef double* src_y_ptr = pa.y.data
-        cdef double* src_z_ptr = pa.z.data
-        cdef double* src_h_ptr = pa.h.data
-
-        cdef double xmin_new[3]
-        cdef double hmax_children[8]
-
-        cdef int i, j, k
-        cdef u_int p, q
-
-        for i from 0<=i<8:
-            hmax_children[i] = 0
-
-        cdef OctreeNode* temp = NULL
-        cdef int oct_id
-
-        if (indices.length < self.leaf_max_particles) or (eps > EPS_MAX):
-            node.indices = <void*>indices
-            Py_XINCREF(<PyObject*>indices)
-            node.num_particles = indices.length
-            node.is_leaf = True
-            return
-
-        cdef list new_indices = [UIntArray() for i in range(8)]
-
-        for p from 0<=p<indices.length:
-            q = indices.data[p]
-
-            find_cell_id_raw(
-                    src_x_ptr[q] - xmin[0],
-                    src_y_ptr[q] - xmin[1],
-                    src_z_ptr[q] - xmin[2],
-                    length/2,
-                    &i, &j, &k
-                    )
-
-            oct_id = k+2*j+4*i
-
-            (<UIntArray>new_indices[oct_id]).c_append(q)
-            hmax_children[oct_id] = fmax(hmax_children[oct_id],
-                    self.radius_scale*src_h_ptr[q])
-
-        cdef double length_padded = (length/2)*(1 + 2*eps)
-
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
-
-                    xmin_new[0] = xmin[0] + (i - eps)*length/2
-                    xmin_new[1] = xmin[1] + (j - eps)*length/2
-                    xmin_new[2] = xmin[2] + (k - eps)*length/2
-
-                    oct_id = k+2*j+4*i
-
-                    node.children[oct_id] = new_node(xmin_new, length_padded,
-                            hmax=hmax_children[oct_id])
-
-                    self._build_tree(pa, <UIntArray>new_indices[oct_id],
-                            xmin_new, length_padded, node.children[oct_id], 2*eps)
-
 
     @cython.cdivision(True)
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
@@ -283,45 +161,12 @@ cdef class OctreeNNPS(NNPS):
                     src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
                     nbrs, node.children[i])
 
-
     cpdef _refresh(self):
-        cdef double* xmin = self.xmin.data
-        cdef double* xmax = self.xmax.data
-
-        cdef double x_length = xmax[0] - xmin[0]
-        cdef double y_length = xmax[1] - xmin[1]
-        cdef double z_length = xmax[2] - xmin[2]
-
-        cdef double length = fmax(x_length, fmax(y_length, z_length))
-
-        cdef double eps = (MACHINE_EPS/length)*fmax(length,
-                fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
-
-        xmin[0] = xmin[0] - length*eps
-        xmin[1] = xmin[1] - length*eps
-        xmin[2] = xmin[2] - length*eps
-
-        length *= (1 + 2*eps)
-
-        cdef double xmax_padded = xmin[0] + length
-        cdef double ymax_padded = xmin[1] + length
-        cdef double zmax_padded = xmin[2] + length
-
-        self._eps0 = (2*MACHINE_EPS/length)*fmax(length,
-                fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
-
         cdef int i
         for i from 0<=i<self.narrays:
-            if self.root[i] != NULL:
-                delete_tree(self.root[i])
-            self.root[i] = new_node(xmin, length, hmax=self.cell_size)
-        self.current_tree = self.root[self.src_index]
+            (<Octree>self.root[i]).c_build_tree(self.pa_wrappers[i])
+        self.current_tree = <Octree>self.root[self.src_index]
 
     cpdef _bin(self, int pa_index, UIntArray indices):
-        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
-        cdef OctreeNode* tree = self.root[pa_index]
-
-        self._build_tree(pa_wrapper, indices, tree.xmin, tree.length,
-                tree, self._eps0)
-
+        pass
 
