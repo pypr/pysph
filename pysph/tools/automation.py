@@ -749,8 +749,9 @@ class Automator(object):
         if problems == 'all':
             return self.all_problems
         else:
+            lower_names = [x.lower() for x in problems]
             return [cls for cls in self.all_problems
-                    if cls.__name__.lower() in problems]
+                    if cls.__name__.lower() in lower_names]
 
     def _setup_argparse(self):
         import argparse
