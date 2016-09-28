@@ -1,7 +1,7 @@
 #cython: embedsignature=True
 
 from nnps_base cimport *
-from octree cimport Octree, OctreeNode
+from octree cimport Octree, cOctreeNode
 
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
@@ -124,7 +124,7 @@ cdef class OctreeNNPS(NNPS):
     @cython.cdivision(True)
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
-            UIntArray nbrs, OctreeNode* node) nogil:
+            UIntArray nbrs, cOctreeNode* node) nogil:
         """Find neighbors recursively"""
 
         cdef double x_centre = node.xmin[0] + node.length/2
