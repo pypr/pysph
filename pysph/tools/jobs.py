@@ -8,7 +8,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-from textwrap import dedent
 import time
 
 # External module imports.
@@ -101,7 +100,6 @@ def free_cores():
     return round(ncore, 0)
 
 
-
 ############################################
 # This class is meant to be used by execnet alone.
 class _RemoteManager(object):
@@ -129,13 +127,13 @@ class _RemoteManager(object):
         if job_id in self.jobs:
             return self.jobs[job_id].status()
         else:
-            return 'invalid job id %d'%job_id
+            return 'invalid job id %d' % job_id
 
     def clean(self, job_id, force=False):
         if job_id in self.jobs:
             return self.jobs[job_id].clean(force)
         else:
-            return 'invalid job id %d'%job_id
+            return 'invalid job id %d' % job_id
 
     def get_stdout(self, job_id):
         return self.jobs[job_id].get_stdout()
@@ -221,7 +219,7 @@ class LocalWorker(Worker):
 
     def run(self, job):
         count = self.job_count
-        print("Running %s"%job.pretty_command())
+        print("Running %s" % job.pretty_command())
         self.jobs[count] = job
         job.run()
         self.job_count += 1
@@ -253,7 +251,9 @@ class RemoteWorker(Worker):
         if testing:
             spec = 'popen//python={python}'.format(python=python)
         else:
-            spec = 'ssh={host}//python={python}'.format(host=host, python=python)
+            spec = 'ssh={host}//python={python}'.format(
+                host=host, python=python
+            )
         if chdir is not None:
             spec += '//chdir={chdir}'.format(chdir=chdir)
 
@@ -276,7 +276,7 @@ class RemoteWorker(Worker):
         return self._call_remote('free_cores', None)
 
     def run(self, job):
-        print("Running %s"%job.pretty_command())
+        print("Running %s" % job.pretty_command())
         job_id = self._call_remote('run', job.to_dict())
         self.jobs[job_id] = job
         return JobProxy(self, job_id, job)
@@ -347,7 +347,7 @@ class Scheduler(object):
                 worker = self.workers[0]
                 self.workers.rotate(-1)
                 if worker.free_cores() >= job.n_core:
-                    print("Job run by %s"%worker.host)
+                    print("Job run by %s" % worker.host)
                     proxy = worker.run(job)
                     self.jobs.append(proxy)
                     break

@@ -9,10 +9,8 @@ This is currently only tested on Linux machines.
 import json
 import os
 import shlex
-import shutil
 import stat
 import subprocess
-import tempfile
 from textwrap import dedent
 
 try:
@@ -91,8 +89,7 @@ class ClusterManager(object):
         pip install execnet psutil h5py matplotlib
         python setup.py develop
         cd ..
-        """
-    )
+        """)
 
     UPDATE = dedent("""\
          #!/bin/bash
@@ -101,22 +98,23 @@ class ClusterManager(object):
          source envs/pysph/bin/activate
          cd pysph
          python setup.py develop
-         """
-    )
+         """)
     #######################################################
 
-    def __init__(self, root='pysph_auto', sources=None):
+    def __init__(self, root='pysph_auto', sources=None,
+                 config_fname='config.json'):
         self.root = root
         self.workers = dict()
         self.sources = sources
         self.scripts_dir = os.path.abspath('.' + self.root)
         # The config file will always trump any direct settings
         # unless there is no config file.
+        self.config_fname = config_fname
         self._read_config()
         if not os.path.exists(self.scripts_dir):
             os.makedirs(self.scripts_dir)
 
-    #### Private Protocol ########################################
+    # ### Private Protocol ########################################
 
     def _bootstrap(self, host, home):
         venv_script = self._get_virtualenv()
@@ -172,8 +170,8 @@ class ClusterManager(object):
         return script
 
     def _read_config(self):
-        if os.path.exists('config.json'):
-            with open('config.json') as f:
+        if os.path.exists(self.config_fname):
+            with open(self.config_fname) as f:
                 data = json.load(f)
             self.root = data['root']
             self.sources = data['sources']
@@ -188,7 +186,8 @@ class ClusterManager(object):
                 if len(pysph_dir) > 0 and os.path.exists(pysph_dir):
                     sources.append(os.path.abspath(pysph_dir))
                 else:
-                    print("Invalid pysph directory, please edit config.json.")
+                    print("Invalid pysph directory, please edit "
+                          "%s." % self.config_fname)
                 self.sources = sources
             self.workers = dict()
             self._write_config()
@@ -203,18 +202,20 @@ class ClusterManager(object):
 
     def _run_command(self, cmd, **kw):
         print(cmd)
-        output = subprocess.check_call(shlex.split(cmd), **kw)
+        subprocess.check_call(shlex.split(cmd), **kw)
 
     def _sync_dir(self, host, src, dest):
         options = ""
         exclude = ""
         kwargs = dict()
         if os.path.isdir(os.path.join(src, '.git')):
-            exclude = 'git -C {src} ls-files --exclude-standard -oi --directory '.format(
-                src=src
-            )
+            exclude = 'git -C {src} ls-files --exclude-standard -oi '\
+                      '--directory '.format(src=src)
             options = '--exclude-from=-'
-            proc = subprocess.Popen(shlex.split(exclude), stdout=subprocess.PIPE)
+            proc = subprocess.Popen(
+                shlex.split(exclude),
+                stdout=subprocess.PIPE
+            )
             kwargs['stdin'] = proc.stdout
 
         command = "rsync -a {options} {src} {host}:{dest} ".format(
@@ -248,14 +249,14 @@ class ClusterManager(object):
         self._run_command(cmd)
 
     def _write_config(self):
-        print("Writing config.json")
+        print("Writing %s" % self.config_fname)
         data = dict(
             root=self.root, sources=self.sources, workers=self.workers
         )
-        with open('config.json', 'w') as f:
+        with open(self.config_fname, 'w') as f:
             json.dump(data, f, indent=2)
 
-    #### Public Protocol ########################################
+    # ### Public Protocol ########################################
 
     def add_worker(self, host, home):
         self.workers[host] = home
@@ -284,8 +285,8 @@ class ClusterManager(object):
             help='Home directory of the remote worker (to be use with -a)'
         )
         parser.add_argument(
-            '--no-rebuild', action="store_true", dest="no_rebuild", default=False,
-            help="Do not rebuild the sources on sync."
+            '--no-rebuild', action="store_true", dest="no_rebuild",
+            default=False, help="Do not rebuild the sources on sync."
         )
 
         args = parser.parse_args()
