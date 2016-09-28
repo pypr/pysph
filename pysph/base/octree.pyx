@@ -12,6 +12,48 @@ from cpython cimport PyObject, Py_XINCREF, Py_XDECREF
 DEF EPS_MAX = 1e-3
 DEF MACHINE_EPS = 1e-14
 
+cdef class OctreeNode:
+    def __init__(self):
+        pass
+
+    cdef void wrap_node(self, cOctreeNode* node):
+        self._node = node
+
+    property hmax:
+        def __get__(self):
+            return self._node.hmax
+
+    property length:
+        def __get__(self):
+            return self._node.length
+
+    property is_leaf:
+        def __get__(self):
+            return self._node.is_leaf
+
+    property xmin:
+        def __get__(self):
+            cdef DoubleArray py_xmin = DoubleArray(3)
+            py_xmin.data[0] = self._node.xmin[0]
+            py_xmin.data[1] = self._node.xmin[1]
+            py_xmin.data[2] = self._node.xmin[2]
+            return py_xmin
+
+    property indices:
+        def __get__(self):
+            if self._node.is_leaf:
+                return <UIntArray>self._node.indices
+            else:
+                return UIntArray()
+
+    property children:
+        def __get__(self):
+            cdef int i
+            cdef list py_children = [OctreeNode() for i in range(8)]
+            for i from 0<=i<8:
+                (<OctreeNode>py_children).wrap_node(self._node.children[i])
+            return py_children
+
 cdef class Octree:
     def __init__(self, int leaf_max_particles, double radius_scale):
         self.leaf_max_particles = leaf_max_particles
@@ -246,5 +288,11 @@ cdef class Octree:
     cpdef build_linear_index(self):
         self.c_build_linear_index()
 
+    cpdef OctreeNode get_node(self, uint64_t key):
+        if self.linear_tree == NULL:
+            raise Exception("Linear index not built")
+        cdef OctreeNode py_node = OctreeNode()
+        py_node.wrap_node(self.linear_tree[key])
+        return py_node
 
 

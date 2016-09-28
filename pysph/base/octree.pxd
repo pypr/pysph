@@ -28,6 +28,18 @@ cdef struct cOctreeNode:
     void* indices
     cOctreeNode* children[8]
 
+cdef class OctreeNode:
+    ##########################################################################
+    # Data Attributes
+    ##########################################################################
+    cdef cOctreeNode* _node
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+
+    cdef void wrap_node(self, cOctreeNode* node)
+
 cdef class Octree:
     ##########################################################################
     # Data Attributes
@@ -68,4 +80,6 @@ cdef class Octree:
     cpdef int build_tree(self, ParticleArray pa)
 
     cpdef build_linear_index(self)
+
+    cpdef OctreeNode get_node(self, uint64_t key)
 
