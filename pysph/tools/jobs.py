@@ -1,4 +1,6 @@
 # Standard libraray imports
+from __future__ import print_function
+
 from collections import deque
 import json
 import os
@@ -351,4 +353,5 @@ class Scheduler(object):
                     break
             else:
                 time.sleep(wait)
+                print("\rWaiting for free worker ...", end='')
         return proxy

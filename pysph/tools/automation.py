@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from fnmatch import fnmatch
 import glob
 import itertools
@@ -6,6 +8,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 import time
 import traceback
 import numpy as np
@@ -105,11 +108,15 @@ class TaskRunner(object):
             self.task_status[task] = 'error'
         return status
 
-    def _show_remaining_tasks(self):
+    def _show_remaining_tasks(self, replace_line=False):
+        start, end = ('\r', '') if replace_line else ('', '\n')
         running = self._get_tasks_with_status('running')
-        print("{pending} tasks pending and {running} tasks running".format(
-            pending=len(self.todo), running=len(running)
-        ))
+        print("{start}{pending} tasks pending and {running} tasks running".\
+            format(
+                start=start, pending=len(self.todo), running=len(running)
+            ), end=end
+        )
+        sys.stdout.flush()
 
     def _wait_for_running_tasks(self, wait):
         print("Waiting for already running tasks...")
@@ -154,6 +161,7 @@ class TaskRunner(object):
                 self._show_remaining_tasks()
 
             if len(self.todo) > 0:
+                self._show_remaining_tasks(replace_line=True)
                 time.sleep(wait)
 
         if status == 'error':
