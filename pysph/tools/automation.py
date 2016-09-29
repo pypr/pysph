@@ -97,7 +97,7 @@ class TaskRunner(object):
 
     def _run(self, task):
         try:
-            print("Running task %s..." % task)
+            print("\nRunning task %s..." % task)
             self.task_status[task] = 'running'
             task.run(self.scheduler)
             status = 'running'
@@ -117,7 +117,7 @@ class TaskRunner(object):
         sys.stdout.flush()
 
     def _wait_for_running_tasks(self, wait):
-        print("Waiting for already running tasks...")
+        print("\nWaiting for already running tasks...")
         running = self._get_tasks_with_status('running')
         while len(running) > 0:
             for t in running:
@@ -154,9 +154,6 @@ class TaskRunner(object):
 
             for task in to_remove:
                 self.todo.remove(task)
-
-            if len(to_remove) > 0:
-                self._show_remaining_tasks()
 
             if len(self.todo) > 0:
                 self._show_remaining_tasks(replace_line=True)
@@ -259,13 +256,15 @@ class PySPHTask(Task):
             return self._check_if_copy_complete()
         elif status == 'error':
             cmd = ' '.join(self.command)
-            msg = 'On host %s Job %s failed!' % (jp.worker.host, cmd)
+            msg = '\n***************** ERROR *********************\n'
+            msg += 'On host %s Job %s failed!' % (jp.worker.host, cmd)
             print(msg)
             print(jp.get_stderr())
             proc = jp.copy_output('.')
             if proc is not None:
                 proc.wait()
             jp.clean()
+            print('***************** ERROR **********************')
             self._finished = True
             raise RuntimeError(msg)
         return False

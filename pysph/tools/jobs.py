@@ -297,7 +297,7 @@ class RemoteWorker(Worker):
             real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
             args = ['scp', '-qr', src, real_dest]
 
-        print(" ".join(args))
+        print("\n" + " ".join(args))
         proc = subprocess.Popen(args)
         return proc
 
