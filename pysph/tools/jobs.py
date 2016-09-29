@@ -314,44 +314,90 @@ class RemoteWorker(Worker):
 class Scheduler(object):
     def __init__(self, root='.', worker_config=()):
         self.workers = deque()
+        self.worker_config = list(worker_config)
         self.root = os.path.abspath(os.path.expanduser(root))
-        self._setup_workers(worker_config)
+        self._completed_jobs = []
         self.jobs = []
 
-    def _setup_workers(self, worker_config):
-        for conf in worker_config:
-            self.add_worker(conf)
+    def _create_worker(self):
+        conf = self.worker_config[len(self.workers)]
+        host = conf.get('host')
+        print("Starting worker on %s." % host)
+        if host == 'localhost':
+            w = LocalWorker()
+        else:
+            w = RemoteWorker(**conf)
+        self.workers.append(w)
+        return w
+
+    def _get_active_workers(self):
+        completed = []
+        workers = set()
+        for job in self.jobs:
+            if job.status() in ['error', 'done']:
+                completed.append(job)
+            else:
+                workers.add(job.worker.host)
+
+        for job in completed:
+            self.jobs.remove(job)
+            self._completed_jobs.append(job)
+
+        return workers
+
+    def _rotate_existing_workers(self):
+        worker = self.workers[0]
+        self.workers.rotate(-1)
+        return worker
+
+    def _get_worker(self, n_core):
+        n_configs = len(self.worker_config)
+        n_running = len(self.workers)
+        if n_running == n_configs:
+            worker = self._rotate_existing_workers()
+        else:
+            active_workers = self._get_active_workers()
+            if n_running > len(active_workers):
+                for w in self.workers:
+                    if (w.host not in active_workers) and \
+                       (w.free_cores() >= n_core):
+                        worker = w
+                        break
+                else:
+                    worker = self._create_worker()
+            else:
+                worker = self._create_worker()
+        return worker
 
     def save(self, fname):
         config = dict(root=self.root)
-        config['workers'] = [w.get_config() for w in self.workers]
+        config['workers'] = self.worker_config
         json.dump(config, open(fname, 'w'), indent=2)
 
     def load(self, fname):
         config = json.load(open(fname))
         self.root = config.get('root')
-        for conf in config.get('workers'):
-            self.add_worker(conf)
+        self.worker_config = config.get('workers')
 
     def add_worker(self, conf):
-        if conf['host'] == 'localhost':
-            w = LocalWorker()
-        else:
-            w = RemoteWorker(**conf)
-        self.workers.append(w)
+        self.worker_config.append(conf)
 
     def submit(self, job, wait=5):
         proxy = None
+        slept = False
         while proxy is None:
-            for i in range(len(self.workers)):
-                worker = self.workers[0]
-                self.workers.rotate(-1)
+            for i in range(len(self.worker_config)):
+                worker = self._get_worker(job.n_core)
                 if worker.free_cores() >= job.n_core:
+                    if slept:
+                        print()
+                        slept = False
                     print("Job run by %s" % worker.host)
                     proxy = worker.run(job)
                     self.jobs.append(proxy)
                     break
             else:
                 time.sleep(wait)
+                slept = True
                 print("\rWaiting for free worker ...", end='')
         return proxy
