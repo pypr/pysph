@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 from fnmatch import fnmatch
 import glob
 import itertools
@@ -5,7 +7,7 @@ import json
 import os
 import shlex
 import shutil
-import subprocess
+import sys
 import time
 import traceback
 import numpy as np
@@ -68,14 +70,14 @@ class TaskRunner(object):
         for task in tasks:
             self.add_task(task)
 
-    ##### Private protocol  ##############################################
+    # #### Private protocol  ##############################################
 
     def _check_status_of_requires(self, task):
         status = [self._check_status_of_task(t) for t in task.requires()]
 
         if 'error' in status:
             return 'error'
-        if all(x==True for x in status):
+        if all(x is True for x in status):
             return 'done'
         else:
             return 'running'
@@ -95,7 +97,7 @@ class TaskRunner(object):
 
     def _run(self, task):
         try:
-            print("Running task %s..."%task)
+            print("\nRunning task %s..." % task)
             self.task_status[task] = 'running'
             task.run(self.scheduler)
             status = 'running'
@@ -105,14 +107,17 @@ class TaskRunner(object):
             self.task_status[task] = 'error'
         return status
 
-    def _show_remaining_tasks(self):
+    def _show_remaining_tasks(self, replace_line=False):
+        start, end = ('\r', '') if replace_line else ('', '\n')
         running = self._get_tasks_with_status('running')
-        print("{pending} tasks pending and {running} tasks running".format(
-            pending=len(self.todo), running=len(running)
-        ))
+        print("{start}{pending} tasks pending and {running} tasks running".
+              format(
+                start=start, pending=len(self.todo), running=len(running)
+              ), end=end)
+        sys.stdout.flush()
 
     def _wait_for_running_tasks(self, wait):
-        print("Waiting for already running tasks...")
+        print("\nWaiting for already running tasks...")
         running = self._get_tasks_with_status('running')
         while len(running) > 0:
             for t in running:
@@ -122,7 +127,7 @@ class TaskRunner(object):
         errors = self._get_tasks_with_status('error')
         print("{n_err} jobs had errors.".format(n_err=len(errors)))
 
-    ##### Public protocol  ##############################################
+    # #### Public protocol  ##############################################
 
     def add_task(self, task):
         if not task.complete():
@@ -150,10 +155,8 @@ class TaskRunner(object):
             for task in to_remove:
                 self.todo.remove(task)
 
-            if len(to_remove) > 0:
-                self._show_remaining_tasks()
-
             if len(self.todo) > 0:
+                self._show_remaining_tasks(replace_line=True)
                 time.sleep(wait)
 
         if status == 'error':
@@ -182,7 +185,7 @@ class PySPHTask(Task):
         # the data is copied to a local machine and cleaned on the remote.
         self._finished = False
 
-    ###### Public protocol ###########################################
+    # #### Public protocol ###########################################
 
     def complete(self):
         """Should return True/False indicating success of task.
@@ -210,7 +213,7 @@ class PySPHTask(Task):
         if os.path.exists(self.output_dir):
             shutil.rmtree(self.output_dir)
 
-    ###### Private protocol ###########################################
+    # #### Private protocol ###########################################
 
     def _is_done(self):
         """Returns True if the simulation completed.
@@ -253,13 +256,15 @@ class PySPHTask(Task):
             return self._check_if_copy_complete()
         elif status == 'error':
             cmd = ' '.join(self.command)
-            msg = 'On host %s Job %s failed!'%(jp.worker.host, cmd)
+            msg = '\n***************** ERROR *********************\n'
+            msg += 'On host %s Job %s failed!' % (jp.worker.host, cmd)
             print(msg)
             print(jp.get_stderr())
             proc = jp.copy_output('.')
             if proc is not None:
                 proc.wait()
             jp.clean()
+            print('***************** ERROR **********************')
             self._finished = True
             raise RuntimeError(msg)
         return False
@@ -306,7 +311,7 @@ class Problem(object):
         self.cases = None
         self.setup()
 
-    ###### Public protocol ###########################################
+    # #### Public protocol ###########################################
 
     def input_path(self, *args):
         """Given any arguments, relative to the simulation dir, return
@@ -334,7 +339,7 @@ class Problem(object):
         for name, cmd, job_info in self.get_commands():
             sim_output_dir = self.input_path(name)
             task = PySPHTask(cmd, sim_output_dir, job_info)
-            task_name = '%s.%s'%(base, name)
+            task_name = '%s.%s' % (base, name)
             result.append((task_name, task))
         return result
 
@@ -398,6 +403,7 @@ def key_to_option(key):
     replaces underscores with dashes.
     """
     return key.replace('_', '-')
+
 
 def kwargs_to_command_line(kwargs):
     """Convert a dictionary of keyword arguments to a list of command-line
@@ -527,9 +533,9 @@ class Simulation(object):
             return ''
         value = self.params[param]
         if value is None:
-            return r'%s'%param
+            return r'%s' % param
         else:
-            return r'%s=%s'%(param, self.params[param])
+            return r'%s=%s' % (param, self.params[param])
 
 
 def compare_runs(sims, method, labels, exact=None):
@@ -556,6 +562,7 @@ def compare_runs(sims, method, labels, exact=None):
         m = getattr(s, method)
         m(label=s.get_labels(labels), **next(ls))
 
+
 def filter_cases(runs, **params):
     """Given a sequence of simulations and any additional parameters, filter
     out all the cases having exactly those parameters and return a list of
@@ -568,6 +575,7 @@ def filter_cases(runs, **params):
         return True
 
     return list(filter(_check_match, runs))
+
 
 def filter_by_name(cases, names):
     """Filter a sequence of Simulations by their names.  That is, if the case
@@ -626,7 +634,7 @@ class RunAll(WrapperTask):
             SolveProblem(problem=x, match=self.match) for x in self.problems
         ]
 
-    ##### Private protocol  ###############################################
+    # #### Private protocol  ###############################################
 
     def _make_problems(self, problem_classes):
         problems = []
@@ -637,7 +645,7 @@ class RunAll(WrapperTask):
             problems.append(problem)
         return problems
 
-    ##### Public protocol  ################################################
+    # #### Public protocol  ################################################
 
     def requires(self):
         return self._requires
@@ -669,10 +677,11 @@ class Automator(object):
         simulation_dir : str
             Root directory to generate simulation results in.
         output_dir: str
-            Root directory where outputs will be generated by Problem instances.
+            Root directory where outputs will be generated by Problem
+            instances.
         all_problems: sequence of `Problem` classes.
             Sequence of problem classes to automate.
-        cluster_manager_class: `pysph.tools.cluster_manager.ClusterManager` class
+        cluster_manager_class: `cluster_manager.ClusterManager` class
             Specify a cluster manager factory (None will use the default one).
         """
         self.simulation_dir = simulation_dir
@@ -683,7 +692,7 @@ class Automator(object):
             self.cluster_manager_factory = ClusterManager
         self._setup_argparse()
 
-    #### Public Protocol ########################################
+    # #### Public Protocol ########################################
 
     def run(self):
         """Start the automation.
@@ -692,7 +701,9 @@ class Automator(object):
 
         self._check_positional_arguments(args.problem)
 
-        self.cluster_manager = self.cluster_manager_factory()
+        self.cluster_manager = self.cluster_manager_factory(
+            config_fname=args.config
+        )
 
         if len(args.host) > 0:
             self.cluster_manager.add_worker(args.host, args.home)
@@ -707,33 +718,12 @@ class Automator(object):
             problem_classes=problem_classes,
             force=args.force, match=args.match
         )
-        scheduler = self._create_scheduler()
-        self.scheduler = scheduler
-        self.runner = TaskRunner([task], scheduler)
+
+        self.scheduler = self.cluster_manager.create_scheduler()
+        self.runner = TaskRunner([task], self.scheduler)
         self.runner.run()
 
-    #### Private Protocol ########################################
-
-    def _create_scheduler(self):
-        from pysph.tools.jobs import Scheduler
-
-        scheduler = Scheduler(root='.')
-        if os.path.exists('config.json'):
-            with open('config.json') as f:
-                config = json.load(f)
-        else:
-            config = dict(workers=dict(), root='pysph_auto')
-
-        scheduler.add_worker(dict(host='localhost'))
-        root = config['root']
-        for host, home in config['workers'].items():
-            python = os.path.join(home, root, 'envs/pysph/bin/python')
-            curdir = os.path.basename(os.getcwd())
-            chdir = os.path.join(home, root, curdir)
-            scheduler.add_worker(
-                dict(host=host, python=python, chdir=chdir)
-            )
-        return scheduler
+    # #### Private Protocol ########################################
 
     def _check_positional_arguments(self, problems):
         names = [c.__name__ for c in self.all_problems]
@@ -741,16 +731,17 @@ class Automator(object):
         if problems != 'all':
             for p in problems:
                 if p.lower() not in lower_names:
-                    print("ERROR: %s not a valid problem!"%p)
-                    print("Valid names are %s"%', '.join(names))
+                    print("ERROR: %s not a valid problem!" % p)
+                    print("Valid names are %s" % ', '.join(names))
                     self.parser.exit(1)
 
     def _select_problem_classes(self, problems):
         if problems == 'all':
             return self.all_problems
         else:
+            lower_names = [x.lower() for x in problems]
             return [cls for cls in self.all_problems
-                    if cls.__name__.lower() in problems]
+                    if cls.__name__.lower() in lower_names]
 
     def _setup_argparse(self):
         import argparse
@@ -761,13 +752,18 @@ class Automator(object):
         all_problem_names = [c.__name__ for c in self.all_problems]
         parser.add_argument(
             'problem', nargs='*', default="all",
-            help="Specifies problem to run as a string (case-insensitive), "\
-            "valid names are %s.  Defaults to running all of them."%all_problem_names
+            help="Specifies problem to run as a string (case-insensitive), "
+            "valid names are %s.  Defaults to running all of them."
+            % all_problem_names
         )
 
         parser.add_argument(
             '-a', '--add-node', action="store", dest="host", type=str,
             default='', help="Add a new remote worker."
+        )
+        parser.add_argument(
+            '-c', '--config', action="store", dest="config",
+            default="config.json", help="Configuration file to use."
         )
         parser.add_argument(
             '--home', action="store", dest="home", type=str,
@@ -779,11 +775,12 @@ class Automator(object):
             help='Redo the plots even if they were already made.'
         )
         parser.add_argument(
-            '-m', '--match', action="store", type=str, default='', dest='match',
-            help="Name of the problem to run (uses fnmatch)"
+            '-m', '--match', action="store", type=str, default='',
+            dest='match', help="Name of the problem to run (uses fnmatch)"
         )
         parser.add_argument(
-            '--no-rebuild', action="store_true", dest="no_rebuild", default=False,
+            '--no-rebuild', action="store_true",
+            dest="no_rebuild", default=False,
             help="Do not rebuild the sources on update, just update the files."
         )
         parser.add_argument(

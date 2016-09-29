@@ -50,8 +50,9 @@ class MonaghanSignalViscosityFluids(Equation):
         d_av[d_idx] += -mb * force * DWIJ[1]
         d_aw[d_idx] += -mb * force * DWIJ[2]
 
+
 class ClearyArtificialViscosity(Equation):
-    """Artificial viscosity proposed By P. Cleary:
+    r"""Artificial viscosity proposed By P. Cleary:
 
     .. math::
 
@@ -96,11 +97,11 @@ class ClearyArtificialViscosity(Equation):
 
         # \boldsymbol{v}_{ab} \cdot \boldsymbol{r}_{ab}
         dot = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
-        
+
         # Pi_ab term. Eq. (8.9) in [JM05]
         rhoa = d_rho[d_idx]; rhob = s_rho[s_idx]
         piab = -s_m[s_idx] * self.factor*mua*mub/(rhoa*rhob*(mua + mub)) * (dot/(R2IJ + EPS))
-        
+
         # accelerations due to viscosity Eq. (8.2) in [JM05]
         d_au[d_idx] += piab * DWIJ[0]
         d_av[d_idx] += piab * DWIJ[1]

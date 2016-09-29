@@ -65,7 +65,11 @@ class PBar(object):
             widgets = [progressbar.Percentage(), ' ', progressbar.Bar(),
                        progressbar.ETA()]
             bar = progressbar.ProgressBar(widgets=widgets,
-                                          maxval=maxval).start()
+                                          maxval=maxval, fd=sys.stdout).start()
+        elif show:
+            sys.stdout.write('\r0%')
+        if show:
+            sys.stdout.flush()
         self.bar = bar
 
     def update(self, delta=1):
@@ -73,16 +77,17 @@ class PBar(object):
         if self.bar is not None:
             self.bar.update(self.count)
         elif self.show:
-            sys.stderr.write('\r%d%%'%int(self.count*100/self.maxval))
-            sys.stderr.flush()
+            sys.stdout.write('\r%d%%'%int(self.count*100/self.maxval))
+        if self.show:
+            sys.stdout.flush()
 
     def finish(self):
         if self.bar is not None:
             self.bar.finish()
         elif self.show:
-            sys.stderr.write('\r100%\n')
-
-            sys.stderr.flush()
+            sys.stdout.write('\r100%\n')
+        if self.show:
+            sys.stdout.flush()
 
 
 class FloatPBar(object):
@@ -446,4 +451,3 @@ def remove_irrelevant_files(files):
         else:
             result.append(f)
     return result
-
