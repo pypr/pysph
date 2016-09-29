@@ -104,7 +104,7 @@ class ClusterManager(object):
     def __init__(self, root='pysph_auto', sources=None,
                  config_fname='config.json'):
         self.root = root
-        self.workers = dict()
+        self.workers = []
         self.sources = sources
         self.scripts_dir = os.path.abspath('.' + self.root)
         # The config file will always trump any direct settings
@@ -189,7 +189,7 @@ class ClusterManager(object):
                     print("Invalid pysph directory, please edit "
                           "%s." % self.config_fname)
                 self.sources = sources
-            self.workers = dict(localhost='')
+            self.workers = [dict(host='localhost', home='')]
             self._write_config()
         self.scripts_dir = os.path.abspath('.' + self.root)
 
@@ -259,17 +259,19 @@ class ClusterManager(object):
     # ### Public Protocol ########################################
 
     def add_worker(self, host, home):
-        self.workers[host] = home
+        self.workers.append(dict(host=host, home=home))
         self._write_config()
         if host != 'localhost':
             self._bootstrap(host, home)
 
     def update(self, rebuild=True):
-        for host, root in self.workers.items():
+        for worker in self.workers:
+            host = worker.get('host')
+            home = worker.get('home')
             if host != 'localhost':
-                self._update_sources(host, root)
+                self._update_sources(host, home)
                 if rebuild:
-                    self._rebuild(host, root)
+                    self._rebuild(host, home)
 
     def create_scheduler(self):
         """Return a `pysph.tools.jobs.Scheduler` from the configuration.
@@ -279,7 +281,9 @@ class ClusterManager(object):
         scheduler = Scheduler(root='.')
 
         root = self.root
-        for host, home in self.workers.items():
+        for worker in self.workers:
+            host = worker.get('host')
+            home = worker.get('home')
             if host == 'localhost':
                 scheduler.add_worker(dict(host='localhost'))
             else:
