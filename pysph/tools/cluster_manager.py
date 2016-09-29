@@ -189,7 +189,7 @@ class ClusterManager(object):
                     print("Invalid pysph directory, please edit "
                           "%s." % self.config_fname)
                 self.sources = sources
-            self.workers = dict()
+            self.workers = dict(localhost='')
             self._write_config()
         self.scripts_dir = os.path.abspath('.' + self.root)
 
@@ -261,13 +261,35 @@ class ClusterManager(object):
     def add_worker(self, host, home):
         self.workers[host] = home
         self._write_config()
-        self._bootstrap(host, home)
+        if host != 'localhost':
+            self._bootstrap(host, home)
 
     def update(self, rebuild=True):
         for host, root in self.workers.items():
-            self._update_sources(host, root)
-            if rebuild:
-                self._rebuild(host, root)
+            if host != 'localhost':
+                self._update_sources(host, root)
+                if rebuild:
+                    self._rebuild(host, root)
+
+    def create_scheduler(self):
+        """Return a `pysph.tools.jobs.Scheduler` from the configuration.
+        """
+        from pysph.tools.jobs import Scheduler
+
+        scheduler = Scheduler(root='.')
+
+        root = self.root
+        for host, home in self.workers.items():
+            if host == 'localhost':
+                scheduler.add_worker(dict(host='localhost'))
+            else:
+                python = os.path.join(home, root, 'envs/pysph/bin/python')
+                curdir = os.path.basename(os.getcwd())
+                chdir = os.path.join(home, root, curdir)
+                scheduler.add_worker(
+                    dict(host=host, python=python, chdir=chdir)
+                )
+        return scheduler
 
     def cli(self):
         """This is just a demonstration of how this class could be used.

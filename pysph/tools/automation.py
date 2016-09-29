@@ -702,7 +702,9 @@ class Automator(object):
 
         self._check_positional_arguments(args.problem)
 
-        self.cluster_manager = self.cluster_manager_factory()
+        self.cluster_manager = self.cluster_manager_factory(
+            config_fname=args.config
+        )
 
         if len(args.host) > 0:
             self.cluster_manager.add_worker(args.host, args.home)
@@ -717,33 +719,12 @@ class Automator(object):
             problem_classes=problem_classes,
             force=args.force, match=args.match
         )
-        scheduler = self._create_scheduler()
-        self.scheduler = scheduler
-        self.runner = TaskRunner([task], scheduler)
+
+        self.scheduler = self.cluster_manager.create_scheduler()
+        self.runner = TaskRunner([task], self.scheduler)
         self.runner.run()
 
     # #### Private Protocol ########################################
-
-    def _create_scheduler(self):
-        from pysph.tools.jobs import Scheduler
-
-        scheduler = Scheduler(root='.')
-        if os.path.exists('config.json'):
-            with open('config.json') as f:
-                config = json.load(f)
-        else:
-            config = dict(workers=dict(), root='pysph_auto')
-
-        scheduler.add_worker(dict(host='localhost'))
-        root = config['root']
-        for host, home in config['workers'].items():
-            python = os.path.join(home, root, 'envs/pysph/bin/python')
-            curdir = os.path.basename(os.getcwd())
-            chdir = os.path.join(home, root, curdir)
-            scheduler.add_worker(
-                dict(host=host, python=python, chdir=chdir)
-            )
-        return scheduler
 
     def _check_positional_arguments(self, problems):
         names = [c.__name__ for c in self.all_problems]
@@ -780,6 +761,10 @@ class Automator(object):
         parser.add_argument(
             '-a', '--add-node', action="store", dest="host", type=str,
             default='', help="Add a new remote worker."
+        )
+        parser.add_argument(
+            '-c', '--config', action="store", dest="config",
+            default="config.json", help="Configuration file to use."
         )
         parser.add_argument(
             '--home', action="store", dest="home", type=str,
