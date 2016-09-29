@@ -565,6 +565,8 @@ precomputed quantites are available and may be passed into any equation:
       ``VIJ[1] = d_v[d_idx] - s_v[s_idx]``
       ``VIJ[2] = d_w[d_idx] - s_w[s_idx]``
 
+    - ``EPS = 0.01 * HIJ * HIJ``
+
     - ``DT_ADAPT``: is an array of three doubles that stores an adaptive
       time-step, the first element is the CFL based time-step limit, the
       second is the force-based limit and the third a viscosity based limit.
