@@ -4,3 +4,6 @@ Cython>=0.20
 mako
 nose>=1.0.0
 mock>=1.0
+progressbar
+execnet
+psutil
