@@ -126,6 +126,7 @@ cdef class OctreeNNPS(NNPS):
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
             UIntArray nbrs, cOctreeNode* node) nogil:
         """Find neighbors recursively"""
+        cdef vector[u_int] indices_ref
 
         cdef double x_centre = node.xmin[0] + node.length/2
         cdef double y_centre = node.xmin[1] + node.length/2
@@ -144,8 +145,9 @@ cdef class OctreeNNPS(NNPS):
             return
 
         if node.is_leaf:
-            for i from 0<=i<(<UIntArray>node.indices).length:
-                k = (<UIntArray>node.indices).data[i]
+            indices_ref = deref(node.indices)
+            for i from 0<=i<node.indices.size():
+                k = indices_ref[i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,

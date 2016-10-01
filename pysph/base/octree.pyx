@@ -4,6 +4,7 @@ from nnps_base cimport *
 
 from libc.stdlib cimport malloc, free
 from libc.stdint cimport uint64_t
+from libcpp.vector cimport vector
 
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
@@ -18,41 +19,40 @@ cdef class OctreeNode:
 
     cdef void wrap_node(self, cOctreeNode* node):
         self._node = node
+        self.hmax = node.hmax
+        self.length = node.length
+        self.is_leaf = node.is_leaf
 
-    property hmax:
-        def __get__(self):
-            return self._node.hmax
+        cdef DoubleArray py_xmin = DoubleArray(3)
+        py_xmin.data[0] = self._node.xmin[0]
+        py_xmin.data[1] = self._node.xmin[1]
+        py_xmin.data[2] = self._node.xmin[2]
+        self.xmin = py_xmin
 
-    property length:
-        def __get__(self):
-            return self._node.length
+    cpdef UIntArray get_indices(self):
+        if not self._node.is_leaf:
+            return UIntArray()
+        cdef vector[u_int] indices_ref = deref(self._node.indices)
+        cdef UIntArray py_indices = UIntArray()
+        py_indices.c_set_view(&indices_ref[0], indices_ref.size())
+        return py_indices
 
-    property is_leaf:
-        def __get__(self):
-            return self._node.is_leaf
+    cpdef OctreeNode get_parent(self):
+        if self._node.parent == NULL:
+            return None
+        cdef OctreeNode parent = OctreeNode()
+        parent.wrap_node(self._node.parent)
+        return parent
 
-    property xmin:
-        def __get__(self):
-            cdef DoubleArray py_xmin = DoubleArray(3)
-            py_xmin.data[0] = self._node.xmin[0]
-            py_xmin.data[1] = self._node.xmin[1]
-            py_xmin.data[2] = self._node.xmin[2]
-            return py_xmin
+    cpdef list get_children(self):
+        if self._node.is_leaf:
+            return []
+        cdef int i
+        cdef list py_children = [OctreeNode() for i in range(8)]
+        for i from 0<=i<8:
+            (<OctreeNode>py_children).wrap_node(self._node.children[i])
+        return py_children
 
-    property indices:
-        def __get__(self):
-            if self._node.is_leaf:
-                return <UIntArray>self._node.indices
-            else:
-                return UIntArray()
-
-    property children:
-        def __get__(self):
-            cdef int i
-            cdef list py_children = [OctreeNode() for i in range(8)]
-            for i from 0<=i<8:
-                (<OctreeNode>py_children).wrap_node(self._node.children[i])
-            return py_children
 
 cdef class Octree:
     def __init__(self, int leaf_max_particles, double radius_scale):
@@ -103,7 +103,8 @@ cdef class Octree:
         self.hmax = hmax
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
-            double hmax = 0, int num_particles = 0, bint is_leaf = False) nogil:
+            double hmax = 0, cOctreeNode* parent = NULL, int num_particles = 0,
+            bint is_leaf = False) nogil:
         """Create a new cOctreeNode"""
         cdef cOctreeNode* node = <cOctreeNode*> malloc(sizeof(cOctreeNode))
 
@@ -115,6 +116,7 @@ cdef class Octree:
         node.hmax = hmax
         node.num_particles = num_particles
         node.is_leaf = is_leaf
+        node.parent = parent
         node.indices = NULL
 
         cdef int i
@@ -132,7 +134,8 @@ cdef class Octree:
         for i from 0<=i<8:
             temp[i] = node.children[i]
 
-        Py_XDECREF(<PyObject*>node.indices)
+        if node.indices != NULL:
+            del node.indices
         free(node)
 
         for i from 0<=i<8:
@@ -141,8 +144,10 @@ cdef class Octree:
             else:
                 self._delete_tree(temp[i])
 
-    cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa, UIntArray indices,
-            double* xmin, double length, cOctreeNode* node, double eps):
+    cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
+            vector[u_int]* indices_ptr, double* xmin, double length,
+            cOctreeNode* node, double eps):
+        cdef vector[u_int] indices = deref(indices_ptr)
 
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
@@ -163,17 +168,19 @@ cdef class Octree:
         cdef cOctreeNode* temp = NULL
         cdef int oct_id
 
-        if (indices.length < self.leaf_max_particles) or (eps > EPS_MAX):
-            node.indices = <void*>indices
-            Py_XINCREF(<PyObject*>indices)
-            node.num_particles = indices.length
+        if (indices_ptr.size() < self.leaf_max_particles) or (eps > EPS_MAX):
+            node.indices = indices_ptr
+            node.num_particles = indices_ptr.size()
             node.is_leaf = True
             return 1
 
-        cdef list new_indices = [UIntArray() for i in range(8)]
+        cdef vector[u_int]* new_indices[8]
 
-        for p from 0<=p<indices.length:
-            q = indices.data[p]
+        for i from 0<=i<8:
+            new_indices[i] = new vector[u_int]()
+
+        for p from 0<=p<indices_ptr.size():
+            q = indices[p]
 
             find_cell_id_raw(
                     src_x_ptr[q] - xmin[0],
@@ -185,9 +192,11 @@ cdef class Octree:
 
             oct_id = k+2*j+4*i
 
-            (<UIntArray>new_indices[oct_id]).c_append(q)
+            new_indices[oct_id].push_back(q)
             hmax_children[oct_id] = fmax(hmax_children[oct_id],
                     self.radius_scale*src_h_ptr[q])
+
+        del indices_ptr
 
         cdef double length_padded = (length/2)*(1 + 2*eps)
 
@@ -202,9 +211,9 @@ cdef class Octree:
                     oct_id = k+2*j+4*i
 
                     node.children[oct_id] = self._new_node(xmin_new, length_padded,
-                            hmax=hmax_children[oct_id])
+                            hmax=hmax_children[oct_id], parent=node)
 
-                    depth_child = self._c_build_tree(pa, <UIntArray>new_indices[oct_id],
+                    depth_child = self._c_build_tree(pa, new_indices[oct_id],
                             xmin_new, length_padded, node.children[oct_id], 2*eps)
 
                     depth_max = <int>fmax(depth_max, depth_child)
@@ -238,61 +247,28 @@ cdef class Octree:
                 fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
 
         cdef int num_particles = pa_wrapper.get_number_of_particles()
-        cdef UIntArray indices = UIntArray()
-        indices.c_reserve(num_particles)
+        cdef vector[u_int]* indices_ptr = new vector[u_int]()
+        cdef vector[u_int] indices = deref(indices_ptr)
 
         cdef int i
         for i from 0<=i<num_particles:
-            indices.c_append(i)
+            indices_ptr.push_back(i)
 
         if self.tree != NULL:
             self._delete_tree(self.tree)
         self.tree = self._new_node(self.xmin, length, hmax=self.radius_scale*self.hmax)
 
-        self.depth = self._c_build_tree(pa_wrapper, indices, self.tree.xmin,
+        self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
                 self.tree.length, self.tree, self._eps0)
 
         return self.depth
-
-    cdef void _c_build_linear_index(self, cOctreeNode* node, uint64_t parent_key) nogil:
-        cdef uint64_t child_base = parent_key << 3
-        cdef uint64_t child_key
-        cdef cOctreeNode* current_node
-
-        cdef int i, j, k, oct_id
-        for i from 0<=i<2:
-            for j from 0<=j<2:
-                for k from 0<=k<2:
-                    oct_id = k+2*j+4*i
-                    current_node = node.children[oct_id]
-                    if current_node == NULL:
-                        return
-                    child_key = child_base + oct_id
-                    self.linear_tree[child_key] = current_node
-                    self._c_build_linear_index(current_node, child_key)
-
-    cdef void c_build_linear_index(self):
-        if self.depth > 22:
-            raise ValueError("Depth of tree too large for a linear index")
-        cdef uint64_t length_array = (1 << (3*self.depth-2)) - 1
-        if self.linear_tree != NULL:
-            free(self.linear_tree)
-        self.linear_tree = <cOctreeNode**> malloc(length_array*sizeof(cOctreeNode*))
-        self.linear_tree[1] = self.tree
-        self._c_build_linear_index(self.tree, 1)
 
     cpdef int build_tree(self, ParticleArray pa):
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
-    cpdef build_linear_index(self):
-        self.c_build_linear_index()
-
-    cpdef OctreeNode get_node(self, uint64_t key):
-        if self.linear_tree == NULL:
-            raise Exception("Linear index not built")
+    cpdef OctreeNode get_root(self):
         cdef OctreeNode py_node = OctreeNode()
-        py_node.wrap_node(self.linear_tree[key])
+        py_node.wrap_node(self.tree)
         return py_node
-
 
