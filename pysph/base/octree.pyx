@@ -102,6 +102,28 @@ cdef class Octree:
 
         self.hmax = hmax
 
+        cdef double x_length = self.xmax[0] - self.xmin[0]
+        cdef double y_length = self.xmax[1] - self.xmin[1]
+        cdef double z_length = self.xmax[2] - self.xmin[2]
+
+        self.length = fmax(x_length, fmax(y_length, z_length))
+
+        cdef double eps = (MACHINE_EPS/self.length)*fmax(self.length,
+                fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
+
+        self.xmin[0] -= self.length*eps
+        self.xmin[1] -= self.length*eps
+        self.xmin[2] -= self.length*eps
+
+        self.length *= (1 + 2*eps)
+
+        cdef double xmax_padded = self.xmin[0] + self.length
+        cdef double ymax_padded = self.xmin[1] + self.length
+        cdef double zmax_padded = self.xmin[2] + self.length
+
+        self._eps0 = (2*MACHINE_EPS/self.length)*fmax(self.length,
+                fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
+
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, cOctreeNode* parent = NULL, int num_particles = 0,
             bint is_leaf = False) nogil:
@@ -224,28 +246,6 @@ cdef class Octree:
 
         self._calculate_domain(pa_wrapper)
 
-        cdef double x_length = self.xmax[0] - self.xmin[0]
-        cdef double y_length = self.xmax[1] - self.xmin[1]
-        cdef double z_length = self.xmax[2] - self.xmin[2]
-
-        cdef double length = fmax(x_length, fmax(y_length, z_length))
-
-        cdef double eps = (MACHINE_EPS/length)*fmax(length,
-                fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
-
-        self.xmin[0] -= length*eps
-        self.xmin[1] -= length*eps
-        self.xmin[2] -= length*eps
-
-        length *= (1 + 2*eps)
-
-        cdef double xmax_padded = self.xmin[0] + length
-        cdef double ymax_padded = self.xmin[1] + length
-        cdef double zmax_padded = self.xmin[2] + length
-
-        self._eps0 = (2*MACHINE_EPS/length)*fmax(length,
-                fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
-
         cdef int num_particles = pa_wrapper.get_number_of_particles()
         cdef vector[u_int]* indices_ptr = new vector[u_int]()
         cdef vector[u_int] indices = deref(indices_ptr)
@@ -256,7 +256,7 @@ cdef class Octree:
 
         if self.tree != NULL:
             self._delete_tree(self.tree)
-        self.tree = self._new_node(self.xmin, length, hmax=self.radius_scale*self.hmax)
+        self.tree = self._new_node(self.xmin, self.length, hmax=self.radius_scale*self.hmax)
 
         self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
                 self.tree.length, self.tree, self._eps0)

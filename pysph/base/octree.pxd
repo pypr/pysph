@@ -66,6 +66,7 @@ cdef class Octree:
     cdef double xmin[3]
     cdef double xmax[3]
     cdef double hmax
+    cdef double length
     cdef int depth
 
     cdef double _eps0
