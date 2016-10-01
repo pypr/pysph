@@ -50,8 +50,40 @@ cdef class OctreeNode:
         cdef int i
         cdef list py_children = [OctreeNode() for i in range(8)]
         for i from 0<=i<8:
-            (<OctreeNode>py_children).wrap_node(self._node.children[i])
+            (<OctreeNode>py_children[i]).wrap_node(self._node.children[i])
         return py_children
+
+    cpdef plot(self, ax):
+        cdef int i, j, k
+        cdef double x, y, z
+        cdef list ax_points = [0,0]
+
+        for i from 0<=i<2:
+            for j from 0<=j<2:
+                x = self.xmin[0] + i*self.length
+                y = self.xmin[1] + j*self.length
+                for k from 0<=k<2:
+                    ax_points[k] = self.xmin[2] + k*self.length
+
+                ax.plot([x,x], [y,y], zs=ax_points, color="k")
+
+        for i from 0<=i<2:
+            for k from 0<=k<2:
+                x = self.xmin[0] + i*self.length
+                z = self.xmin[2] + k*self.length
+                for j from 0<=j<2:
+                    ax_points[j] = self.xmin[1] + j*self.length
+
+                ax.plot([x,x], ax_points, zs=[z,z], color="k")
+
+        for j from 0<=j<2:
+            for k from 0<=k<2:
+                y = self.xmin[1] + j*self.length
+                z = self.xmin[2] + k*self.length
+                for i from 0<=i<2:
+                    ax_points[i] = self.xmin[0] + i*self.length
+
+                ax.plot(ax_points, [y,y], zs=[z,z], color="k")
 
 
 cdef class Octree:
@@ -271,4 +303,17 @@ cdef class Octree:
         cdef OctreeNode py_node = OctreeNode()
         py_node.wrap_node(self.tree)
         return py_node
+
+    cdef void _plot_tree(self, OctreeNode node, ax):
+        node.plot(ax)
+
+        cdef OctreeNode child
+        cdef list children = node.get_children()
+
+        for child in children:
+            self._plot_tree(child, ax)
+
+    cpdef plot(self, ax):
+        cdef OctreeNode root = self.get_root()
+        self._plot_node(root, ax)
 

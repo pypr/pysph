@@ -53,6 +53,8 @@ cdef class OctreeNode:
 
     cpdef list get_children(self)
 
+    cpdef plot(self, ax)
+
 cdef class Octree:
     ##########################################################################
     # Data Attributes
@@ -92,4 +94,8 @@ cdef class Octree:
     cpdef int build_tree(self, ParticleArray pa)
 
     cpdef OctreeNode get_root(self)
+
+    cdef void _plot_tree(self, OctreeNode node, ax)
+
+    cpdef plot(self, ax)
 
