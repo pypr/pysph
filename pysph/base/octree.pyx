@@ -60,31 +60,30 @@ cdef class OctreeNode:
 
         for i from 0<=i<2:
             for j from 0<=j<2:
-                x = self.xmin[0] + i*self.length
-                y = self.xmin[1] + j*self.length
+                x = self.xmin.data[0] + i*self.length
+                y = self.xmin.data[1] + j*self.length
                 for k from 0<=k<2:
-                    ax_points[k] = self.xmin[2] + k*self.length
+                    ax_points[k] = self.xmin.data[2] + k*self.length
 
-                ax.plot([x,x], [y,y], zs=ax_points, color="k")
+                ax.plot([x,x], [y,y], zs=ax_points[:], color="k")
 
         for i from 0<=i<2:
             for k from 0<=k<2:
-                x = self.xmin[0] + i*self.length
-                z = self.xmin[2] + k*self.length
+                x = self.xmin.data[0] + i*self.length
+                z = self.xmin.data[2] + k*self.length
                 for j from 0<=j<2:
-                    ax_points[j] = self.xmin[1] + j*self.length
+                    ax_points[j] = self.xmin.data[1] + j*self.length
 
-                ax.plot([x,x], ax_points, zs=[z,z], color="k")
+                ax.plot([x,x], ax_points[:], zs=[z,z], color="k")
 
         for j from 0<=j<2:
             for k from 0<=k<2:
-                y = self.xmin[1] + j*self.length
-                z = self.xmin[2] + k*self.length
+                y = self.xmin.data[1] + j*self.length
+                z = self.xmin.data[2] + k*self.length
                 for i from 0<=i<2:
-                    ax_points[i] = self.xmin[0] + i*self.length
+                    ax_points[i] = self.xmin.data[0] + i*self.length
 
-                ax.plot(ax_points, [y,y], zs=[z,z], color="k")
-
+                ax.plot(ax_points[:], [y,y], zs=[z,z], color="k")
 
 cdef class Octree:
     def __init__(self, int leaf_max_particles, double radius_scale):
@@ -315,5 +314,5 @@ cdef class Octree:
 
     cpdef plot(self, ax):
         cdef OctreeNode root = self.get_root()
-        self._plot_node(root, ax)
+        self._plot_tree(root, ax)
 
