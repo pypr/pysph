@@ -55,7 +55,7 @@ cdef class OctreeNode:
 
     cpdef list get_children(self)
 
-    cpdef plot(self, ax)
+    cpdef plot(self, ax, color = *)
 
 cdef class Octree:
     ##########################################################################
@@ -96,11 +96,15 @@ cdef class Octree:
 
     cdef void c_get_leaf_cells(self, OctreeNode node, list leaf_cells)
 
+    cdef cOctreeNode* c_find_point(self, double x, double y, double z)
+
     cpdef int build_tree(self, ParticleArray pa)
 
     cpdef OctreeNode get_root(self)
 
     cpdef list get_leaf_cells(self)
+
+    cpdef OctreeNode find_point(self, double x, double y, double z)
 
     cpdef plot(self, ax)
 

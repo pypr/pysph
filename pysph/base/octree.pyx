@@ -51,7 +51,7 @@ cdef class OctreeNode:
             (<OctreeNode>py_children[i]).wrap_node(self._node.children[i])
         return py_children
 
-    cpdef plot(self, ax):
+    cpdef plot(self, ax, color="k"):
         cdef int i, j, k
         cdef double x, y, z
         cdef list ax_points = [0,0]
@@ -63,7 +63,7 @@ cdef class OctreeNode:
                 for k from 0<=k<2:
                     ax_points[k] = self.xmin.data[2] + k*self.length
 
-                ax.plot([x,x], [y,y], zs=ax_points[:], color="k")
+                ax.plot([x,x], [y,y], zs=ax_points[:], color=color)
 
         for i from 0<=i<2:
             for k from 0<=k<2:
@@ -72,7 +72,7 @@ cdef class OctreeNode:
                 for j from 0<=j<2:
                     ax_points[j] = self.xmin.data[1] + j*self.length
 
-                ax.plot([x,x], ax_points[:], zs=[z,z], color="k")
+                ax.plot([x,x], ax_points[:], zs=[z,z], color=color)
 
         for j from 0<=j<2:
             for k from 0<=k<2:
@@ -81,7 +81,7 @@ cdef class OctreeNode:
                 for i from 0<=i<2:
                     ax_points[i] = self.xmin.data[0] + i*self.length
 
-                ax.plot(ax_points[:], [y,y], zs=[z,z], color="k")
+                ax.plot(ax_points[:], [y,y], zs=[z,z], color=color)
 
 cdef class Octree:
     def __init__(self, int leaf_max_particles, double radius_scale):
@@ -194,6 +194,7 @@ cdef class Octree:
             else:
                 self._delete_tree(temp[i])
 
+    @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             UIntArray indices, double* xmin, double length,
             cOctreeNode* node, int level, double eps):
@@ -304,6 +305,27 @@ cdef class Octree:
         for child in children:
             self.c_get_leaf_cells(child, leaf_cells)
 
+    @cython.cdivision(True)
+    cdef cOctreeNode* c_find_point(self, double x, double y, double z):
+        cdef cOctreeNode* node = self.tree
+        cdef cOctreeNode* prev = self.tree
+
+        cdef int i, j, k, oct_id
+        while node != NULL:
+            find_cell_id_raw(
+                    x - node.xmin[0],
+                    y - node.xmin[1],
+                    z - node.xmin[2],
+                    node.length/2,
+                    &i, &j, &k
+                    )
+
+            oct_id = k+2*j+4*i
+            prev = node
+            node = node.children[oct_id]
+
+        return prev
+
     cpdef int build_tree(self, ParticleArray pa):
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
@@ -318,6 +340,12 @@ cdef class Octree:
         cdef list leaf_cells = []
         self.c_get_leaf_cells(root, leaf_cells)
         return leaf_cells
+
+    cpdef OctreeNode find_point(self, double x, double y, double z):
+        cdef cOctreeNode* node = self.c_find_point(x, y, z)
+        cdef OctreeNode py_node = OctreeNode()
+        py_node.wrap_node(node)
+        return py_node
 
     cpdef plot(self, ax):
         cdef OctreeNode root = self.get_root()
