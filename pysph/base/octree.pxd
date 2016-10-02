@@ -62,7 +62,6 @@ cdef class Octree:
     # Data Attributes
     ##########################################################################
     cdef cOctreeNode* tree
-    cdef cOctreeNode** linear_tree
 
     cdef int leaf_max_particles
     cdef double radius_scale

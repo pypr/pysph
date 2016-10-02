@@ -92,14 +92,12 @@ cdef class Octree:
         self.radius_scale = radius_scale
         self.depth = 0
         self.tree = NULL
-        self.linear_tree = NULL
 
     def __dealloc__(self):
-        if self.linear_tree != NULL:
-            free(self.linear_tree)
         self._delete_tree(self.tree)
 
 
+    @cython.cdivision(True)
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa):
         cdef int num_particles = pa.get_number_of_particles()
 
