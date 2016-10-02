@@ -288,7 +288,7 @@ class RemoteWorker(Worker):
         job = self.jobs[job_id]
         if self.testing:
             src = os.path.join(self.chdir, job.output_dir)
-            real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
+            real_dest = os.path.join(dest, job.output_dir)
             args = [
                 sys.executable, '-c',
                 'import sys,shutil; shutil.copytree(sys.argv[1], sys.argv[2])',
