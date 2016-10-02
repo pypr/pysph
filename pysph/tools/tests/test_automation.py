@@ -1,14 +1,15 @@
+from __future__ import print_function
+
 import os
 import shutil
 import sys
 import tempfile
-import time
 import unittest
 
-import numpy as np
 
-from pysph.tools.automation import (Problem, PySPHTask, Simulation,
-    SolveProblem, Task, TaskRunner)
+from pysph.tools.automation import (
+    Problem, Simulation, SolveProblem, TaskRunner
+)
 try:
     from pysph.tools.jobs import Scheduler
 except ImportError:
@@ -36,7 +37,8 @@ class EllipticalDrop(Problem):
         # Two cases, one with update_h and one without.
         cmd = 'python -m pysph.examples.elliptical_drop --max-steps=5'
 
-        # If self.cases is set, the get_commands method will do the right thing.
+        # If self.cases is set, the get_commands method will do the right
+        # thing.
         self.cases = [
             Simulation(
                 root=self.input_path('update_h'),
@@ -57,10 +59,9 @@ class EllipticalDrop(Problem):
         no_update = self.cases[0].data
         update = self.cases[1].data
         output = open(self.output_path('result.txt'), 'w')
-        output.write('no_update_h: %s\n'%no_update['major'])
-        output.write('update_h: %s\n'%update['major'])
+        output.write('no_update_h: %s\n' % no_update['major'])
+        output.write('update_h: %s\n' % update['major'])
         output.close()
-
 
 
 class TestLocalAutomation(unittest.TestCase):
