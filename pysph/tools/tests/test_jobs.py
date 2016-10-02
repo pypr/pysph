@@ -241,6 +241,9 @@ class TestScheduler(unittest.TestCase):
 
     @mock.patch('pysph.tools.jobs.LocalWorker')
     def test_scheduler_starts_worker_on_submit(self, mock_lw):
+        attrs = {'host': 'localhost', 'free_cores.return_value': 2}
+        mock_lw.return_value = mock.MagicMock(**attrs)
+
         # Given
         config = [dict(host='localhost')]
         s = jobs.Scheduler(worker_config=config)
