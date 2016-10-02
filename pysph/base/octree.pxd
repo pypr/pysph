@@ -24,6 +24,7 @@ cdef struct cOctreeNode:
     double xmin[3]
     double hmax
     int num_particles
+    int level
 
     vector[u_int]* indices
     cOctreeNode* children[8]
@@ -40,6 +41,7 @@ cdef class OctreeNode:
     cdef public DoubleArray xmin
     cdef public double hmax
     cdef public int num_particles
+    cdef public int level
 
     ##########################################################################
     # Member functions
@@ -80,22 +82,26 @@ cdef class Octree:
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa)
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
-            double hmax = *, cOctreeNode* parent = *, int num_particles = *,
-            bint is_leaf = *) nogil
+            double hmax = *, int level = *, cOctreeNode* parent = *,
+            int num_particles = *, bint is_leaf = *) nogil
 
     cdef inline void _delete_tree(self, cOctreeNode* node)
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices_ptr, double* xmin, double length,
-            cOctreeNode* node, double eps)
+            cOctreeNode* node, int level, double eps)
+
+    cdef void _plot_tree(self, OctreeNode node, ax)
 
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
+
+    cdef void c_get_leaf_cells(self, OctreeNode node, list leaf_cells)
 
     cpdef int build_tree(self, ParticleArray pa)
 
     cpdef OctreeNode get_root(self)
 
-    cdef void _plot_tree(self, OctreeNode node, ax)
+    cpdef list get_leaf_cells(self)
 
     cpdef plot(self, ax)
 

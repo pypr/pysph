@@ -22,6 +22,7 @@ cdef class OctreeNode:
         self.hmax = node.hmax
         self.length = node.length
         self.is_leaf = node.is_leaf
+        self.level = node.level
 
         cdef DoubleArray py_xmin = DoubleArray(3)
         py_xmin.data[0] = self._node.xmin[0]
@@ -156,8 +157,8 @@ cdef class Octree:
                 fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
-            double hmax = 0, cOctreeNode* parent = NULL, int num_particles = 0,
-            bint is_leaf = False) nogil:
+            double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
+            int num_particles = 0, bint is_leaf = False) nogil:
         """Create a new cOctreeNode"""
         cdef cOctreeNode* node = <cOctreeNode*> malloc(sizeof(cOctreeNode))
 
@@ -169,6 +170,8 @@ cdef class Octree:
         node.hmax = hmax
         node.num_particles = num_particles
         node.is_leaf = is_leaf
+        node.level = level
+
         node.parent = parent
         node.indices = NULL
 
@@ -199,7 +202,7 @@ cdef class Octree:
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices_ptr, double* xmin, double length,
-            cOctreeNode* node, double eps):
+            cOctreeNode* node, int level, double eps):
         cdef vector[u_int] indices = deref(indices_ptr)
 
         cdef double* src_x_ptr = pa.x.data
@@ -264,14 +267,23 @@ cdef class Octree:
                     oct_id = k+2*j+4*i
 
                     node.children[oct_id] = self._new_node(xmin_new, length_padded,
-                            hmax=hmax_children[oct_id], parent=node)
+                            hmax=hmax_children[oct_id], level=level+1, parent=node)
 
                     depth_child = self._c_build_tree(pa, new_indices[oct_id],
-                            xmin_new, length_padded, node.children[oct_id], 2*eps)
+                            xmin_new, length_padded, node.children[oct_id], level+1, 2*eps)
 
                     depth_max = <int>fmax(depth_max, depth_child)
 
         return 1 + depth_max
+
+    cdef void _plot_tree(self, OctreeNode node, ax):
+        node.plot(ax)
+
+        cdef OctreeNode child
+        cdef list children = node.get_children()
+
+        for child in children:
+            self._plot_tree(child, ax)
 
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper):
 
@@ -287,12 +299,22 @@ cdef class Octree:
 
         if self.tree != NULL:
             self._delete_tree(self.tree)
-        self.tree = self._new_node(self.xmin, self.length, hmax=self.radius_scale*self.hmax)
+        self.tree = self._new_node(self.xmin, self.length,
+                hmax=self.radius_scale*self.hmax, level=0)
 
         self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
-                self.tree.length, self.tree, self._eps0)
+                self.tree.length, self.tree, 0, self._eps0)
 
         return self.depth
+
+    cdef void c_get_leaf_cells(self, OctreeNode node, list leaf_cells):
+        if node.is_leaf:
+            leaf_cells.append(node)
+
+        cdef OctreeNode child
+        cdef list children = node.get_children()
+        for child in children:
+            self.c_get_leaf_cells(child, leaf_cells)
 
     cpdef int build_tree(self, ParticleArray pa):
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
@@ -303,14 +325,11 @@ cdef class Octree:
         py_node.wrap_node(self.tree)
         return py_node
 
-    cdef void _plot_tree(self, OctreeNode node, ax):
-        node.plot(ax)
-
-        cdef OctreeNode child
-        cdef list children = node.get_children()
-
-        for child in children:
-            self._plot_tree(child, ax)
+    cpdef list get_leaf_cells(self):
+        cdef OctreeNode root = self.get_root()
+        cdef list leaf_cells = []
+        self.c_get_leaf_cells(root, leaf_cells)
+        return leaf_cells
 
     cpdef plot(self, ax):
         cdef OctreeNode root = self.get_root()
