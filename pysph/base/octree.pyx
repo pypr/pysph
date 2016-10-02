@@ -33,10 +33,7 @@ cdef class OctreeNode:
     cpdef UIntArray get_indices(self):
         if not self._node.is_leaf:
             return UIntArray()
-        cdef vector[u_int] indices_ref = deref(self._node.indices)
-        cdef UIntArray py_indices = UIntArray()
-        py_indices.c_set_view(&indices_ref[0], indices_ref.size())
-        return py_indices
+        return <UIntArray>self._node.indices
 
     cpdef OctreeNode get_parent(self):
         if self._node.parent == NULL:
@@ -188,8 +185,7 @@ cdef class Octree:
         for i from 0<=i<8:
             temp[i] = node.children[i]
 
-        if node.indices != NULL:
-            del node.indices
+        Py_XDECREF(<PyObject*>node.indices)
         free(node)
 
         for i from 0<=i<8:
@@ -199,10 +195,8 @@ cdef class Octree:
                 self._delete_tree(temp[i])
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
-            vector[u_int]* indices_ptr, double* xmin, double length,
+            UIntArray indices, double* xmin, double length,
             cOctreeNode* node, int level, double eps):
-        cdef vector[u_int] indices = deref(indices_ptr)
-
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -222,19 +216,17 @@ cdef class Octree:
         cdef cOctreeNode* temp = NULL
         cdef int oct_id
 
-        if (indices_ptr.size() < self.leaf_max_particles) or (eps > EPS_MAX):
-            node.indices = indices_ptr
-            node.num_particles = indices_ptr.size()
+        if (indices.length < self.leaf_max_particles) or (eps > EPS_MAX):
+            node.indices = <void*>indices
+            Py_XINCREF(<PyObject*>indices)
+            node.num_particles = indices.length
             node.is_leaf = True
             return 1
 
-        cdef vector[u_int]* new_indices[8]
+        cdef list new_indices = [UIntArray() for i in range(8)]
 
-        for i from 0<=i<8:
-            new_indices[i] = new vector[u_int]()
-
-        for p from 0<=p<indices_ptr.size():
-            q = indices[p]
+        for p from 0<=p<indices.length:
+            q = indices.data[p]
 
             find_cell_id_raw(
                     src_x_ptr[q] - xmin[0],
@@ -246,11 +238,9 @@ cdef class Octree:
 
             oct_id = k+2*j+4*i
 
-            new_indices[oct_id].push_back(q)
+            (<UIntArray>new_indices[oct_id]).c_append(q)
             hmax_children[oct_id] = fmax(hmax_children[oct_id],
                     self.radius_scale*src_h_ptr[q])
-
-        del indices_ptr
 
         cdef double length_padded = (length/2)*(1 + 2*eps)
 
@@ -267,7 +257,7 @@ cdef class Octree:
                     node.children[oct_id] = self._new_node(xmin_new, length_padded,
                             hmax=hmax_children[oct_id], level=level+1, parent=node)
 
-                    depth_child = self._c_build_tree(pa, new_indices[oct_id],
+                    depth_child = self._c_build_tree(pa, <UIntArray>new_indices[oct_id],
                             xmin_new, length_padded, node.children[oct_id], level+1, 2*eps)
 
                     depth_max = <int>fmax(depth_max, depth_child)
@@ -288,19 +278,19 @@ cdef class Octree:
         self._calculate_domain(pa_wrapper)
 
         cdef int num_particles = pa_wrapper.get_number_of_particles()
-        cdef vector[u_int]* indices_ptr = new vector[u_int]()
-        cdef vector[u_int] indices = deref(indices_ptr)
+        cdef UIntArray indices = UIntArray()
+        indices.c_reserve(num_particles)
 
         cdef int i
         for i from 0<=i<num_particles:
-            indices_ptr.push_back(i)
+            indices.c_append(i)
 
         if self.tree != NULL:
             self._delete_tree(self.tree)
         self.tree = self._new_node(self.xmin, self.length,
                 hmax=self.radius_scale*self.hmax, level=0)
 
-        self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
+        self.depth = self._c_build_tree(pa_wrapper, indices, self.tree.xmin,
                 self.tree.length, self.tree, 0, self._eps0)
 
         return self.depth
