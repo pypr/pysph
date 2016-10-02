@@ -310,7 +310,7 @@ class TestScheduler(unittest.TestCase):
         # Then
         self.assertEqual(len(s.workers), 2)
         count = 0
-        while proxy.status() != 'done' and count < 10:
+        while proxy1.status() != 'done' and count < 10:
             time.sleep(0.1)
             count += 1
 

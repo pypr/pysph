@@ -135,7 +135,14 @@ class TestRemoteAutomation(TestLocalAutomation):
     def tearDown(self):
         super(TestRemoteAutomation, self).tearDown()
         if os.path.exists(self.other_dir):
-            shutil.rmtree(self.other_dir)
+            if sys.platform.startswith('win'):
+                from exceptions import WindowsError
+                try:
+                    shutil.rmtree(self.other_dir)
+                except WindowsError:
+                    pass
+            else:
+                shutil.rmtree(self.other_dir)
 
     def _make_scheduler(self):
         workers = [
