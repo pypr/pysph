@@ -1,3 +1,4 @@
+#cython: embedsignature=True
 
 from nnps_base cimport *
 from libcpp.vector cimport vector

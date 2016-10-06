@@ -8,7 +8,6 @@ from libcpp.vector cimport vector
 
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
-from cpython cimport PyObject, Py_XINCREF, Py_XDECREF
 
 DEF EPS_MAX = 1e-3
 DEF MACHINE_EPS = 1e-14
@@ -230,10 +229,8 @@ cdef class Octree:
         for i from 0<=i<8:
             new_indices[i] = new vector[u_int]()
 
-        cdef vector[u_int] indices_ref = deref(indices)
-
         for p from 0<=p<indices.size():
-            q = indices_ref[p]
+            q = deref(indices)[p]
 
             find_cell_id_raw(
                     src_x_ptr[q] - xmin[0],
