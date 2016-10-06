@@ -143,8 +143,8 @@ cdef class OctreeNNPS(NNPS):
             return
 
         if node.is_leaf:
-            for i from 0<=i<(<UIntArray>node.indices).length:
-                k = (<UIntArray>node.indices).data[i]
+            for i from 0<=i<node.num_particles:
+                k = deref(node.indices)[i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,
