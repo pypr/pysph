@@ -26,7 +26,7 @@ cdef struct cOctreeNode:
     int num_particles
     int level
 
-    void* indices
+    vector[u_int]* indices
     cOctreeNode* children[8]
     cOctreeNode* parent
 
@@ -87,7 +87,7 @@ cdef class Octree:
     cdef inline void _delete_tree(self, cOctreeNode* node)
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
-            UIntArray indices, double* xmin, double length,
+            vector[u_int]* indices, double* xmin, double length,
             cOctreeNode* node, int level, double eps)
 
     cdef void _plot_tree(self, OctreeNode node, ax)

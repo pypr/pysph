@@ -142,9 +142,12 @@ cdef class OctreeNNPS(NNPS):
             fabs(z_centre - q_z) >= eff_radius:
             return
 
+        cdef vector[u_int] indices_ref
+
         if node.is_leaf:
-            for i from 0<=i<(<UIntArray>node.indices).length:
-                k = (<UIntArray>node.indices).data[i]
+            for i from 0<=i<node.indices.size():
+                indices_ref = deref(node.indices)
+                k = indices_ref[i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,
