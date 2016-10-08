@@ -63,6 +63,7 @@ cdef class Octree:
     # Data Attributes
     ##########################################################################
     cdef cOctreeNode* tree
+    cdef vector[cOctreeNode*]* leaf_cells
 
     cdef int leaf_max_particles
     cdef double radius_scale
@@ -95,7 +96,9 @@ cdef class Octree:
 
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper)
 
-    cdef void c_get_leaf_cells(self, OctreeNode node, list leaf_cells)
+    cdef void _c_get_leaf_cells(self, cOctreeNode* node)
+
+    cdef void c_get_leaf_cells(self)
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
 

@@ -90,9 +90,13 @@ cdef class Octree:
         self.radius_scale = radius_scale
         self.depth = 0
         self.tree = NULL
+        self.leaf_cells = NULL
 
     def __dealloc__(self):
-        self._delete_tree(self.tree)
+        if self.tree != NULL:
+            self._delete_tree(self.tree)
+        if self.leaf_cells != NULL:
+            del self.leaf_cells
 
 
     @cython.cdivision(True)
@@ -291,6 +295,9 @@ cdef class Octree:
 
         if self.tree != NULL:
             self._delete_tree(self.tree)
+        if self.leaf_cells != NULL:
+            del self.leaf_cells
+
         self.tree = self._new_node(self.xmin, self.length,
                 hmax=self.radius_scale*self.hmax, level=0)
 
@@ -299,14 +306,22 @@ cdef class Octree:
 
         return self.depth
 
-    cdef void c_get_leaf_cells(self, OctreeNode node, list leaf_cells):
+    cdef void _c_get_leaf_cells(self, cOctreeNode* node):
         if node.is_leaf:
-            leaf_cells.append(node)
+            self.leaf_cells.push_back(node)
+            return
 
-        cdef OctreeNode child
-        cdef list children = node.get_children()
-        for child in children:
-            self.c_get_leaf_cells(child, leaf_cells)
+        cdef int i
+        for i from 0<=i<8:
+            if node.children[i] != NULL:
+                self._c_get_leaf_cells(node.children[i])
+
+    cdef void c_get_leaf_cells(self):
+        if self.leaf_cells != NULL:
+            return
+
+        self.leaf_cells = new vector[cOctreeNode*]()
+        self._c_get_leaf_cells(self.tree)
 
     @cython.cdivision(True)
     cdef cOctreeNode* c_find_point(self, double x, double y, double z):
@@ -339,10 +354,12 @@ cdef class Octree:
         return py_node
 
     cpdef list get_leaf_cells(self):
-        cdef OctreeNode root = self.get_root()
-        cdef list leaf_cells = []
-        self.c_get_leaf_cells(root, leaf_cells)
-        return leaf_cells
+        self.c_get_leaf_cells()
+        cdef int i
+        cdef list py_leaf_cells = [OctreeNode() for i in range(self.leaf_cells.size())]
+        for i from 0<=i<self.leaf_cells.size():
+            (<OctreeNode>py_leaf_cells[i]).wrap_node(deref(self.leaf_cells)[i])
+        return py_leaf_cells
 
     cpdef OctreeNode find_point(self, double x, double y, double z):
         cdef cOctreeNode* node = self.c_find_point(x, y, z)
