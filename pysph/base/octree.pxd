@@ -2,7 +2,6 @@
 
 from nnps_base cimport *
 from libcpp.vector cimport vector
-from libcpp.map cimport map, pair
 from libc.stdint cimport uint64_t
 cimport cython
 
@@ -65,15 +64,14 @@ cdef class Octree:
     cdef cOctreeNode* tree
     cdef vector[cOctreeNode*]* leaf_cells
 
-    cdef int leaf_max_particles
-    cdef double radius_scale
+    cdef public int leaf_max_particles
+    cdef public double radius_scale
+    cdef public double hmax
+    cdef public double length
+    cdef public int depth
 
     cdef double xmin[3]
     cdef double xmax[3]
-    cdef double hmax
-    cdef double length
-    cdef int depth
-
     cdef double _eps0
 
     ##########################################################################
@@ -86,11 +84,11 @@ cdef class Octree:
             double hmax = *, int level = *, cOctreeNode* parent = *,
             int num_particles = *, bint is_leaf = *) nogil
 
-    cdef inline void _delete_tree(self, cOctreeNode* node)
+    cdef inline void _delete_tree(self, cOctreeNode* node) nogil
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level, double eps)
+            cOctreeNode* node, int level, double eps) nogil
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 

@@ -14,7 +14,27 @@ DEF MACHINE_EPS = 1e-14
 
 cdef class OctreeNode:
     def __init__(self):
-        pass
+        self.xmin = DoubleArray(3)
+
+    def __richcmp__(self, OctreeNode other, int op):
+        cdef bint equal_xmin, equal_length
+        equal_xmin = True
+        equal_length = (self.length == other.length)
+
+        cdef int i
+        for i from 0<=i<3:
+            if self.xmin[i] != other.xmin[i]:
+                equal_xmin = False
+
+        if equal_xmin and equal_length and op == 2:
+            return True
+        if op == 3:
+            return False
+
+        return NotImplemented
+
+
+    #### Public protocol ################################################
 
     cdef void wrap_node(self, cOctreeNode* node):
         self._node = node
@@ -23,11 +43,9 @@ cdef class OctreeNode:
         self.is_leaf = node.is_leaf
         self.level = node.level
 
-        cdef DoubleArray py_xmin = DoubleArray(3)
-        py_xmin.data[0] = self._node.xmin[0]
-        py_xmin.data[1] = self._node.xmin[1]
-        py_xmin.data[2] = self._node.xmin[2]
-        self.xmin = py_xmin
+        self.xmin.data[0] = self._node.xmin[0]
+        self.xmin.data[1] = self._node.xmin[1]
+        self.xmin.data[2] = self._node.xmin[2]
 
     cpdef UIntArray get_indices(self):
         if not self._node.is_leaf:
@@ -98,6 +116,8 @@ cdef class Octree:
         if self.leaf_cells != NULL:
             del self.leaf_cells
 
+
+    #### Private protocol ################################################
 
     @cython.cdivision(True)
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa):
@@ -182,7 +202,7 @@ cdef class Octree:
 
         return node
 
-    cdef inline void _delete_tree(self, cOctreeNode* node):
+    cdef inline void _delete_tree(self, cOctreeNode* node) nogil:
         """Delete octree"""
         cdef int i, j, k
         cdef cOctreeNode* temp[8]
@@ -203,7 +223,7 @@ cdef class Octree:
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level, double eps):
+            cOctreeNode* node, int level, double eps) nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -282,6 +302,19 @@ cdef class Octree:
         for child in children:
             self._plot_tree(child, ax)
 
+    cdef void _c_get_leaf_cells(self, cOctreeNode* node):
+        if node.is_leaf:
+            self.leaf_cells.push_back(node)
+            return
+
+        cdef int i
+        for i from 0<=i<8:
+            if node.children[i] != NULL:
+                self._c_get_leaf_cells(node.children[i])
+
+
+    #### Public protocol ################################################
+
     cdef int c_build_tree(self, NNPSParticleArrayWrapper pa_wrapper):
 
         self._calculate_domain(pa_wrapper)
@@ -305,16 +338,6 @@ cdef class Octree:
                 self.tree.length, self.tree, 0, self._eps0)
 
         return self.depth
-
-    cdef void _c_get_leaf_cells(self, cOctreeNode* node):
-        if node.is_leaf:
-            self.leaf_cells.push_back(node)
-            return
-
-        cdef int i
-        for i from 0<=i<8:
-            if node.children[i] != NULL:
-                self._c_get_leaf_cells(node.children[i])
 
     cdef void c_get_leaf_cells(self):
         if self.leaf_cells != NULL:
@@ -343,6 +366,9 @@ cdef class Octree:
             node = node.children[oct_id]
 
         return prev
+
+
+    ######################################################################
 
     cpdef int build_tree(self, ParticleArray pa):
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
