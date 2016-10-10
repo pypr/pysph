@@ -32,9 +32,6 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
     cpdef set_context(self, int src_index, int dst_index)
 
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
