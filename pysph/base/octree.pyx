@@ -26,10 +26,12 @@ cdef class OctreeNode:
             if self.xmin[i] != other.xmin[i]:
                 equal_xmin = False
 
-        if equal_xmin and equal_length and op == 2:
-            return True
+        cdef bint equal = equal_xmin and equal_length
+
+        if op == 2:
+            return equal
         if op == 3:
-            return False
+            return not equal
 
         return NotImplemented
 
