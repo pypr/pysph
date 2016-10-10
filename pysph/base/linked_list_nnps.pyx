@@ -192,41 +192,6 @@ cdef class LinkedListNNPS(NNPS):
                 &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
             )
 
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-                            size_t d_idx, UIntArray nbrs, bint prealloc):
-        """Utility function to get near-neighbors for a particle.
-
-        Parameters
-        ----------
-
-        src_index : int
-            Index of the source particle array in the particles list
-
-        dst_index : int
-            Index of the destination particle array in the particles list
-
-        d_idx : int (input)
-            Destination particle for which neighbors are sought.
-
-        nbrs : UIntArray (output)
-            Neighbors for the requested particle are stored here.
-
-        prealloc : bool
-            Specifies if the neighbor array already has pre-allocated space
-            for the neighbor list.  In this case the neighbors are directly set
-            in the given array without resetting or appending to the array.
-            This improves performance when the neighbors are cached.
-        """
-        self.set_context(src_index, dst_index)
-
-        # reset the length of the nbr array
-        if prealloc:
-            nbrs.length = 0
-        else:
-            nbrs.reset()
-
-        self.find_nearest_neighbors(d_idx, nbrs)
-
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
         cdef UIntArray head = self.heads[pa_index]
         cdef UIntArray next = self.nexts[pa_index]

@@ -35,9 +35,6 @@ cdef class SpatialHashNNPS(NNPS):
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
     cdef inline void _add_to_hashtable(self, int hash_id, unsigned int pid, double h,
             int i, int j, int k) nogil
 
