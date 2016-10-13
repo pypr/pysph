@@ -27,8 +27,7 @@ cdef extern from "spatial_hash.h":
         HashEntry* get(int, int, int) nogil
         int number_of_particles() nogil
 
-# NNPS using Spatial Hashing algorithm
-cdef class StratifiedRadiusNNPS(NNPS):
+cdef class StratifiedHashNNPS(NNPS):
     ############################################################################
     # Data Attributes
     ############################################################################

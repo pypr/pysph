@@ -16,7 +16,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, StratifiedRadiusNNPS, OctreeNNPS
+        ExtendedSpatialHashNNPS, StratifiedHashNNPS, OctreeNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -389,7 +389,7 @@ class Application(object):
 
         nnps_options.add_argument("--stratified-radius-num-levels", dest="num_levels",
                                 type=int, default=1,
-                                help="Number of levels for StratifiedRadiusNNPS"
+                                help="Number of levels for StratifiedHashNNPS"
                                 )
 
         nnps_options.add_argument("--tree-leaf-max-particles", dest="leaf_max_particles",
@@ -708,7 +708,7 @@ class Application(object):
                 )
 
             elif options.nnps == 'sr':
-                nnps = StratifiedRadiusNNPS(
+                nnps = StratifiedHashNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, table_size=options.table_size,

@@ -13,7 +13,7 @@ cimport cython
 DEF EPS = 1e-6
 
 #############################################################################
-cdef class StratifiedRadiusNNPS(NNPS):
+cdef class StratifiedHashNNPS(NNPS):
 
     """Finds nearest neighbors using Spatial Hashing with particles classified according
     to their support radii.

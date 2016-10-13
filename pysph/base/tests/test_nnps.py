@@ -84,7 +84,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.strat_radius_nnps = nnps.StratifiedRadiusNNPS(
+        self.strat_radius_nnps = nnps.StratifiedHashNNPS(
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
@@ -246,19 +246,19 @@ class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
-class SingleLevelStratifiedRadiusNNPSTestCase(DictBoxSortNNPSTestCase):
+class SingleLevelStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified Radius algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.StratifiedRadiusNNPS(
+        self.nps = nnps.StratifiedHashNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
-class MultipleLevelsStratifiedRadiusNNPSTestCase(DictBoxSortNNPSTestCase):
+class MultipleLevelsStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified Radius algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.StratifiedRadiusNNPS(
+        self.nps = nnps.StratifiedHashNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
             num_levels=2
         )
@@ -452,13 +452,13 @@ class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
         nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
         return pa, nps
 
-class TestMultipleLevelsSratifiedRadiusNNPSWithSorting(TestLinkedListNNPSWithSorting):
+class TestMultipleLevelsStratifiedHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
         h = numpy.ones_like(x)/(nx-1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
-        nps = nnps.StratifiedRadiusNNPS(dim=1, particles=[pa], num_levels=2,
+        nps = nnps.StratifiedHashNNPS(dim=1, particles=[pa], num_levels=2,
                 sort_gids=True)
         return pa, nps
 
