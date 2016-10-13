@@ -858,6 +858,8 @@ class MayaviViewer(HasTraits):
             self.movie_directory = os.path.join(d, 'movie')
             self.set(directory=d, trait_change_notify=False)
         self._n_files = len(value) - 1
+        self._frame_count = 0
+        self._count = 0
         self.frame_interval = 1
         fc = self.file_count
         self.file_count = 0

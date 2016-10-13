@@ -1,4 +1,6 @@
 # Standard libraray imports
+from __future__ import print_function
+
 from collections import deque
 import json
 import os
@@ -6,14 +8,13 @@ import shlex
 import shutil
 import subprocess
 import sys
-from textwrap import dedent
 import time
 
 # External module imports.
 import psutil
 
 
-class Job:
+class Job(object):
     def __init__(self, command, output_dir, n_core=1, n_thread=1, env=None):
         """Constructor
 
@@ -99,10 +100,9 @@ def free_cores():
     return round(ncore, 0)
 
 
-
 ############################################
 # This class is meant to be used by execnet alone.
-class _RemoteManager:
+class _RemoteManager(object):
     def __init__(self):
         self.jobs = dict()
         self.job_count = 0
@@ -127,13 +127,13 @@ class _RemoteManager:
         if job_id in self.jobs:
             return self.jobs[job_id].status()
         else:
-            return 'invalid job id %d'%job_id
+            return 'invalid job id %d' % job_id
 
     def clean(self, job_id, force=False):
         if job_id in self.jobs:
             return self.jobs[job_id].clean(force)
         else:
-            return 'invalid job id %d'%job_id
+            return 'invalid job id %d' % job_id
 
     def get_stdout(self, job_id):
         return self.jobs[job_id].get_stdout()
@@ -155,7 +155,7 @@ def serve(channel):
 ############################################
 
 
-class Worker:
+class Worker(object):
     def free_cores(self):
         return free_cores()
 
@@ -180,7 +180,7 @@ class Worker:
         raise NotImplementedError()
 
 
-class JobProxy:
+class JobProxy(object):
     def __init__(self, worker, job_id, job):
         self.worker = worker
         self.job_id = job_id
@@ -219,7 +219,7 @@ class LocalWorker(Worker):
 
     def run(self, job):
         count = self.job_count
-        print("Running %s"%job.pretty_command())
+        print("Running %s" % job.pretty_command())
         self.jobs[count] = job
         job.run()
         self.job_count += 1
@@ -251,7 +251,9 @@ class RemoteWorker(Worker):
         if testing:
             spec = 'popen//python={python}'.format(python=python)
         else:
-            spec = 'ssh={host}//python={python}'.format(host=host, python=python)
+            spec = 'ssh={host}//python={python}'.format(
+                host=host, python=python
+            )
         if chdir is not None:
             spec += '//chdir={chdir}'.format(chdir=chdir)
 
@@ -274,7 +276,7 @@ class RemoteWorker(Worker):
         return self._call_remote('free_cores', None)
 
     def run(self, job):
-        print("Running %s"%job.pretty_command())
+        print("Running %s" % job.pretty_command())
         job_id = self._call_remote('run', job.to_dict())
         self.jobs[job_id] = job
         return JobProxy(self, job_id, job)
@@ -286,8 +288,12 @@ class RemoteWorker(Worker):
         job = self.jobs[job_id]
         if self.testing:
             src = os.path.join(self.chdir, job.output_dir)
-            real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
-            args = ['cp', '-a', src, real_dest]
+            real_dest = os.path.join(dest, job.output_dir)
+            args = [
+                sys.executable, '-c',
+                'import sys,shutil; shutil.copytree(sys.argv[1], sys.argv[2])',
+                src, real_dest
+            ]
         else:
             src = '{host}:{path}'.format(
                 host=self.host, path=os.path.join(self.chdir, job.output_dir)
@@ -295,7 +301,7 @@ class RemoteWorker(Worker):
             real_dest = os.path.join(dest, os.path.dirname(job.output_dir))
             args = ['scp', '-qr', src, real_dest]
 
-        print(" ".join(args))
+        print("\n" + " ".join(args))
         proc = subprocess.Popen(args)
         return proc
 
@@ -309,60 +315,93 @@ class RemoteWorker(Worker):
         return self._call_remote('get_stderr', job_id)
 
 
-class Scheduler:
+class Scheduler(object):
     def __init__(self, root='.', worker_config=()):
         self.workers = deque()
+        self.worker_config = list(worker_config)
         self.root = os.path.abspath(os.path.expanduser(root))
-        self._setup_workers(worker_config)
+        self._completed_jobs = []
         self.jobs = []
 
-    def _setup_workers(self, worker_config):
-        for conf in worker_config:
-            self.add_worker(conf)
+    def _create_worker(self):
+        conf = self.worker_config[len(self.workers)]
+        host = conf.get('host')
+        print("Starting worker on %s." % host)
+        if host == 'localhost':
+            w = LocalWorker()
+        else:
+            w = RemoteWorker(**conf)
+        self.workers.append(w)
+        return w
+
+    def _get_active_workers(self):
+        completed = []
+        workers = set()
+        for job in self.jobs:
+            if job.status() in ['error', 'done']:
+                completed.append(job)
+            else:
+                workers.add(job.worker.host)
+
+        for job in completed:
+            self.jobs.remove(job)
+            self._completed_jobs.append(job)
+
+        return workers
+
+    def _rotate_existing_workers(self):
+        worker = self.workers[0]
+        self.workers.rotate(-1)
+        return worker
+
+    def _get_worker(self, n_core):
+        n_configs = len(self.worker_config)
+        n_running = len(self.workers)
+        if n_running == n_configs:
+            worker = self._rotate_existing_workers()
+        else:
+            active_workers = self._get_active_workers()
+            if n_running > len(active_workers):
+                for w in self.workers:
+                    if (w.host not in active_workers) and \
+                       (w.free_cores() >= n_core):
+                        worker = w
+                        break
+                else:
+                    worker = self._create_worker()
+            else:
+                worker = self._create_worker()
+        return worker
 
     def save(self, fname):
         config = dict(root=self.root)
-        config['workers'] = [w.get_config() for w in self.workers]
+        config['workers'] = self.worker_config
         json.dump(config, open(fname, 'w'), indent=2)
 
     def load(self, fname):
         config = json.load(open(fname))
         self.root = config.get('root')
-        for conf in config.get('workers'):
-            self.add_worker(conf)
+        self.worker_config = config.get('workers')
 
     def add_worker(self, conf):
-        if conf['host'] == 'localhost':
-            w = LocalWorker()
-        else:
-            w = RemoteWorker(**conf)
-        self.workers.append(w)
+        self.worker_config.append(conf)
 
     def submit(self, job, wait=5):
         proxy = None
+        slept = False
         while proxy is None:
-            for i in range(len(self.workers)):
-                worker = self.workers[0]
-                self.workers.rotate(-1)
+            for i in range(len(self.worker_config)):
+                worker = self._get_worker(job.n_core)
                 if worker.free_cores() >= job.n_core:
-                    print("Job run by %s"%worker.host)
+                    if slept:
+                        print()
+                        slept = False
+                    print("Job run by %s" % worker.host)
                     proxy = worker.run(job)
                     self.jobs.append(proxy)
                     break
             else:
-                print("Waiting for available worker.")
                 time.sleep(wait)
+                slept = True
+                print("\rWaiting for free worker ...", end='')
         return proxy
-
-
-
-def make_sample_jobs():
-    cmd = ['python', '-c',
-           dedent('''\
-           import time
-           t1 = time.time()
-           while time.time() - t1 < 10:
-               pass
-           print("Hello!")
-           ''')]
-    return [Job(cmd, output_dir='/tmp/output%d'%i) for i in range(10)]

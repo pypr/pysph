@@ -15,7 +15,7 @@ equations.
 from __future__ import print_function
 
 import os
-from numpy import array, ones_like, mgrid, sqrt
+from numpy import ones_like, mgrid, sqrt
 import numpy as np
 
 # PySPH base and carray imports
@@ -30,14 +30,16 @@ from pysph.sph.scheme import WCSPHScheme
 
 def _derivative(x, t):
     A, a = x
-    Anew = A*A*(a**4 -1)/(a**4 + 1)
+    Anew = A*A*(a**4 - 1)/(a**4 + 1)
     anew = -a*A
-    return array((Anew, anew))
+    return np.array((Anew, anew))
+
 
 def _scipy_integrate(y0, tf, dt):
     from scipy.integrate import odeint
     result = odeint(_derivative, y0, [0.0, tf])
     return result[-1]
+
 
 def _numpy_integrate(y0, tf, dt):
     t = 0.0
@@ -46,6 +48,7 @@ def _numpy_integrate(y0, tf, dt):
         t += dt
         y += dt*_derivative(y, t)
     return y
+
 
 def exact_solution(tf=0.0075, dt=1e-6, n=101):
     """Exact solution for the locus of the circular patch.
@@ -58,7 +61,7 @@ def exact_solution(tf=0.0075, dt=1e-6, n=101):
     """
     import numpy
 
-    y0 = array([100.0, 1.0])
+    y0 = np.array([100.0, 1.0])
 
     try:
         from scipy.integrate import odeint
@@ -70,7 +73,7 @@ def exact_solution(tf=0.0075, dt=1e-6, n=101):
     dadt = _derivative([Anew, anew], tf)[0]
     po = 0.5*-anew**2 * (dadt - Anew**2)
 
-    theta = numpy.linspace(0,2*numpy.pi, n)
+    theta = numpy.linspace(0, 2*numpy.pi, n)
 
     return anew, Anew, po, anew*numpy.cos(theta), 1/anew*numpy.sin(theta)
 
@@ -128,33 +131,40 @@ class EllipticalDrop(Application):
                                 cs=cs, name=name)
         pa.remove_particles(indices)
 
-        print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
+        print("Elliptical drop :: %d particles"
+              % (pa.get_number_of_particles()))
         mu = ro*self.alpha*hdx*dx*co/8.0
-        print("Effective viscosity: rho*alpha*h*c/8 = %s"%mu)
+        print("Effective viscosity: rho*alpha*h*c/8 = %s" % mu)
 
         self.scheme.setup_properties([pa])
         return [pa]
 
     def _make_final_plot(self):
-        from matplotlib import pyplot as plt
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            from matplotlib import pyplot as plt
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
         last_output = self.output_files[-1]
         from pysph.solver.utils import load
         data = load(last_output)
         pa = data['arrays']['fluid']
         tf = data['solver_data']['t']
         a, A, po, xe, ye = exact_solution(tf)
-        print("At tf=%s"%tf)
+        print("At tf=%s" % tf)
         print("Semi-major axis length (exact, computed) = %s, %s"
-                %(1.0/a, max(pa.y)))
+              % (1.0/a, max(pa.y)))
         plt.plot(xe, ye)
         plt.scatter(pa.x, pa.y, marker='.')
         plt.ylim(-2, 2)
         plt.xlim(plt.ylim())
-        plt.title("Particles at %s secs"%tf)
+        plt.title("Particles at %s secs" % tf)
         plt.xlabel('x'); plt.ylabel('y')
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
-        print("Figure written to %s."%fig)
+        print("Figure written to %s." % fig)
 
     def _compute_results(self):
         from pysph.solver.utils import iter_output
@@ -178,13 +188,6 @@ class EllipticalDrop(Application):
         np.savez(fname, **data)
 
     def post_process(self, info_file_or_dir):
-        try:
-            import matplotlib
-            matplotlib.use('Agg')
-            from matplotlib import pyplot as plt
-        except ImportError:
-            print("Post processing requires matplotlib.")
-            return
         if self.rank > 0:
             return
         info = self.read_info(info_file_or_dir)

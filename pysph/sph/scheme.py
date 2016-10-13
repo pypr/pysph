@@ -397,24 +397,31 @@ class WCSPHScheme(Scheme):
             if self.delta_sph:
                 other = all[:]
                 other.remove(name)
-                g2.extend([
+                g2.append(
                     ContinuityEquationDeltaSPH(
                         dest=name, sources=[name], c0=self.c0,
                         delta=self.delta
-                    ),
-                    ContinuityEquation(dest=name, sources=other),
+                    )
+                )
+                if len(other) > 0:
+                    g2.append(ContinuityEquation(dest=name, sources=other))
+                g2.append(
                     MomentumEquationDeltaSPH(
                         dest=name, sources=[name], rho0=self.rho0, c0=self.c0,
                         alpha=self.alpha, gx=self.gx, gy=self.gy, gz=self.gz,
-                    ),
-                    MomentumEquation(
-                        dest=name, sources=other, c0=self.c0,
-                        alpha=self.alpha, beta=self.beta,
-                        gx=self.gx, gy=self.gy, gz=self.gz,
-                        tensile_correction=self.tensile_correction
-                    ),
-                    XSPHCorrection(dest=name, sources=[name])
-                ])
+                    )
+                )
+                if len(other) > 0:
+                    g2.append(
+                        MomentumEquation(
+                            dest=name, sources=other, c0=self.c0,
+                            alpha=self.alpha, beta=self.beta,
+                            gx=self.gx, gy=self.gy, gz=self.gz,
+                            tensile_correction=self.tensile_correction
+                        )
+                    )
+
+                g2.append(XSPHCorrection(dest=name, sources=[name]))
             else:
                 g2.extend([
                     ContinuityEquation(dest=name, sources=all),
@@ -1082,7 +1089,7 @@ class ADKEScheme(Scheme):
         for elem in self.fluids+self.solids:
             g6.append(IdealGasEOS(elem, sources=None, gamma=self.gamma))
         equations.append(Group(equations=g6))
-        
+
         g7 = []
         for fluid in self.fluids:
             g7.append(ADKEAccelerations(

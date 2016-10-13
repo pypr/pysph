@@ -9,10 +9,8 @@ This is currently only tested on Linux machines.
 import json
 import os
 import shlex
-import shutil
 import stat
 import subprocess
-import tempfile
 from textwrap import dedent
 
 try:
@@ -66,7 +64,10 @@ class ClusterManager(object):
     wish.
 
     The class creates a ``config.json`` in the current working directory that
-    may be edited by a user.
+    may be edited by a user. It also creates a directory called
+    ``.{self.root}`` which defaults to ``.pysph_auto``. The bootstrap and
+    update scripts are put here and may be edited by the user for any new
+    hosts.
 
     """
 
@@ -88,8 +89,7 @@ class ClusterManager(object):
         pip install execnet psutil h5py matplotlib
         python setup.py develop
         cd ..
-        """
-    )
+        """)
 
     UPDATE = dedent("""\
          #!/bin/bash
@@ -98,19 +98,23 @@ class ClusterManager(object):
          source envs/pysph/bin/activate
          cd pysph
          python setup.py develop
-         """
-    )
+         """)
     #######################################################
 
-    def __init__(self, root='pysph_auto', sources=None):
+    def __init__(self, root='pysph_auto', sources=None,
+                 config_fname='config.json'):
         self.root = root
-        self.workers = dict()
+        self.workers = []
         self.sources = sources
+        self.scripts_dir = os.path.abspath('.' + self.root)
         # The config file will always trump any direct settings
         # unless there is no config file.
+        self.config_fname = config_fname
         self._read_config()
+        if not os.path.exists(self.scripts_dir):
+            os.makedirs(self.scripts_dir)
 
-    #### Private Protocol ########################################
+    # ### Private Protocol ########################################
 
     def _bootstrap(self, host, home):
         venv_script = self._get_virtualenv()
@@ -125,9 +129,6 @@ class ClusterManager(object):
             host=host, root=root, venv_script=venv_script
         )
         self._run_command(cmd)
-
-        os.remove(venv_script)
-        os.rmdir(os.path.dirname(venv_script))
 
         self._update_sources(host, home)
 
@@ -146,39 +147,51 @@ class ClusterManager(object):
 
             Once the bootstrap.sh script runs successfully, the worker can be
             used without any further steps.
+
+            The default bootstrap script is in
+                {scripts_dir}
+            and can be edited by you. These will be used for any new hosts
+            you add.
             ******************************************************************
-            """.format(root=root, host=host)
+            """.format(root=root, host=host, scripts_dir=self.scripts_dir)
             )
             print(msg)
         else:
             print("Bootstrapping {host} succeeded!".format(host=host))
 
     def _get_virtualenv(self):
-        tmpdir = tempfile.mkdtemp()
-        print("Downloading latest virtualenv.py")
-        url = 'https://raw.githubusercontent.com/pypa/virtualenv/master/virtualenv.py'
-        opener = urlopen(url)
-        script = os.path.join(tmpdir, 'virtualenv.py')
-        with open(script, 'wb') as f:
-            f.write(opener.read())
+        script = os.path.join(self.scripts_dir, 'virtualenv.py')
+        if not os.path.exists(script):
+            print("Downloading latest virtualenv.py")
+            url = 'https://raw.githubusercontent.com/pypa/virtualenv/master/virtualenv.py'
+            opener = urlopen(url)
+            with open(script, 'wb') as f:
+                f.write(opener.read())
         return script
 
     def _read_config(self):
-        if os.path.exists('config.json'):
-            with open('config.json') as f:
+        if os.path.exists(self.config_fname):
+            with open(self.config_fname) as f:
                 data = json.load(f)
             self.root = data['root']
             self.sources = data['sources']
             self.workers = data['workers']
         else:
             if self.sources is None or len(self.sources) == 0:
-                pysph_dir = os.path.expanduser(
-                    prompt("Enter PySPH source directory: ")
-                )
                 project_dir = os.path.abspath(os.getcwd())
-                self.sources = [project_dir, pysph_dir]
-            self.workers = dict()
+                sources = [project_dir]
+                pysph_dir = os.path.expanduser(
+                    prompt("Enter PySPH source directory (empty for none): ")
+                )
+                if len(pysph_dir) > 0 and os.path.exists(pysph_dir):
+                    sources.append(os.path.abspath(pysph_dir))
+                else:
+                    print("Invalid pysph directory, please edit "
+                          "%s." % self.config_fname)
+                self.sources = sources
+            self.workers = [dict(host='localhost', home='')]
             self._write_config()
+        self.scripts_dir = os.path.abspath('.' + self.root)
 
     def _rebuild(self, host, home):
         root = os.path.join(home, self.root)
@@ -189,18 +202,20 @@ class ClusterManager(object):
 
     def _run_command(self, cmd, **kw):
         print(cmd)
-        output = subprocess.check_call(shlex.split(cmd), **kw)
+        subprocess.check_call(shlex.split(cmd), **kw)
 
     def _sync_dir(self, host, src, dest):
         options = ""
         exclude = ""
         kwargs = dict()
         if os.path.isdir(os.path.join(src, '.git')):
-            exclude = 'git -C {src} ls-files --exclude-standard -oi --directory '.format(
-                src=src
-            )
+            exclude = 'git -C {src} ls-files --exclude-standard -oi '\
+                      '--directory '.format(src=src)
             options = '--exclude-from=-'
-            proc = subprocess.Popen(shlex.split(exclude), stdout=subprocess.PIPE)
+            proc = subprocess.Popen(
+                shlex.split(exclude),
+                stdout=subprocess.PIPE
+            )
             kwargs['stdin'] = proc.stdout
 
         command = "rsync -a {options} {src} {host}:{dest} ".format(
@@ -213,13 +228,16 @@ class ClusterManager(object):
             remote_dir = os.path.join(home, self.root + '/')
             self._sync_dir(host, local_dir, remote_dir)
 
-        tmpdir = tempfile.mkdtemp()
+        scripts_dir = self.scripts_dir
         scripts = {'bootstrap.sh': self.BOOTSTRAP, 'update.sh': self.UPDATE}
         for script, code in scripts.items():
-            with open(os.path.join(tmpdir, script), 'w') as f:
-                f.write(code)
+            fname = os.path.join(scripts_dir, script)
+            if not os.path.exists(fname):
+                # Create the scripts if they don't exist.
+                with open(fname, 'w') as f:
+                    f.write(code)
 
-        script_files = [os.path.join(tmpdir, x) for x in scripts]
+        script_files = [os.path.join(scripts_dir, x) for x in scripts]
         for fname in script_files:
             mode = os.stat(fname).st_mode
             os.chmod(fname, mode | stat.S_IXUSR | stat.S_IXGRP)
@@ -228,31 +246,54 @@ class ClusterManager(object):
         cmd = "scp {script_files} {host}:{path}".format(
             host=host, path=path, script_files=' '.join(script_files)
         )
-        try:
-            self._run_command(cmd)
-        finally:
-            shutil.rmtree(tmpdir)
+        self._run_command(cmd)
 
     def _write_config(self):
-        print("Writing config.json")
+        print("Writing %s" % self.config_fname)
         data = dict(
             root=self.root, sources=self.sources, workers=self.workers
         )
-        with open('config.json', 'w') as f:
+        with open(self.config_fname, 'w') as f:
             json.dump(data, f, indent=2)
 
-    #### Public Protocol ########################################
+    # ### Public Protocol ########################################
 
     def add_worker(self, host, home):
-        self.workers[host] = home
+        self.workers.append(dict(host=host, home=home))
         self._write_config()
-        self._bootstrap(host, home)
+        if host != 'localhost':
+            self._bootstrap(host, home)
 
     def update(self, rebuild=True):
-        for host, root in self.workers.items():
-            self._update_sources(host, root)
-            if rebuild:
-                self._rebuild(host, root)
+        for worker in self.workers:
+            host = worker.get('host')
+            home = worker.get('home')
+            if host != 'localhost':
+                self._update_sources(host, home)
+                if rebuild:
+                    self._rebuild(host, home)
+
+    def create_scheduler(self):
+        """Return a `pysph.tools.jobs.Scheduler` from the configuration.
+        """
+        from pysph.tools.jobs import Scheduler
+
+        scheduler = Scheduler(root='.')
+
+        root = self.root
+        for worker in self.workers:
+            host = worker.get('host')
+            home = worker.get('home')
+            if host == 'localhost':
+                scheduler.add_worker(dict(host='localhost'))
+            else:
+                python = os.path.join(home, root, 'envs/pysph/bin/python')
+                curdir = os.path.basename(os.getcwd())
+                chdir = os.path.join(home, root, curdir)
+                scheduler.add_worker(
+                    dict(host=host, python=python, chdir=chdir)
+                )
+        return scheduler
 
     def cli(self):
         """This is just a demonstration of how this class could be used.
@@ -270,8 +311,8 @@ class ClusterManager(object):
             help='Home directory of the remote worker (to be use with -a)'
         )
         parser.add_argument(
-            '--no-rebuild', action="store_true", dest="no_rebuild", default=False,
-            help="Do not rebuild the sources on sync."
+            '--no-rebuild', action="store_true", dest="no_rebuild",
+            default=False, help="Do not rebuild the sources on sync."
         )
 
         args = parser.parse_args()
