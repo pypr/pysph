@@ -299,7 +299,7 @@ cdef class StratifiedHashNNPS(NNPS):
     @cython.cdivision(True)
     cpdef _refresh(self):
         self.interval_size = (self.cell_size - self.hmin)/self.num_levels + EPS
-        self.domain.update()
+        #self.domain.update()
 
         cdef HashTable** current_hash
         cdef int i, j

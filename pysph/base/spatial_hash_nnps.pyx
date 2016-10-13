@@ -30,6 +30,7 @@ cdef class SpatialHashNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
+        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
@@ -235,6 +236,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.sort_gids = sort_gids
+        self.domain.update()
         self.update()
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
@@ -458,10 +460,10 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
             if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
                 cell = self.current_hash.get(x_temp, y_temp, z_temp)
-                
+
                 if cell == NULL:
                     continue
-                
+
                 h_local = self.radius_scale*fmax(cell.h_max, h)
                 H = <int> ceil(h_local/self.h_sub)
 

@@ -81,6 +81,7 @@ cdef class LinkedListNNPS(NNPS):
         # compute the intial box sort for all local particles. The
         # DomainManager.setup_domain method is called to compute the
         # cell size.
+        self.domain.update()
         self.update()
 
     #### Public protocol ################################################
