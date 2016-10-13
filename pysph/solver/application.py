@@ -387,7 +387,7 @@ class Application(object):
                                         ExtendedSpatialHashNNPS"
                                 )
 
-        nnps_options.add_argument("--stratified-radius-num-levels", dest="num_levels",
+        nnps_options.add_argument("--stratified-hash-num-levels", dest="num_levels",
                                 type=int, default=1,
                                 help="Number of levels for StratifiedHashNNPS"
                                 )
