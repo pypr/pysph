@@ -5,9 +5,12 @@ try:
 except ImportError:
     # check_output does not exist in Python-2.6
     from subprocess import Popen, PIPE, CalledProcessError
+
     def check_output(*popenargs, **kwargs):
         if 'stdout' in kwargs:
-            raise ValueError('stdout argument not allowed, it will be overridden.')
+            raise ValueError(
+                'stdout argument not allowed, it will be overridden.'
+            )
         process = Popen(stdout=PIPE, *popenargs, **kwargs)
         output, unused_err = process.communicate()
         retcode = process.poll()
@@ -21,9 +24,10 @@ except ImportError:
 import sys
 
 MODE = 'normal'
-if len(sys.argv) >= 2 and ('--help' in sys.argv[1:] or
-        sys.argv[1] in ('--help-commands', 'egg_info', '--version',
-                        'clean', 'sdist')):
+if len(sys.argv) >= 2 and \
+   ('--help' in sys.argv[1:] or
+    sys.argv[1] in ('--help-commands', 'egg_info', '--version',
+                    'clean', 'sdist')):
     MODE = 'info'
 
 HAVE_MPI = True
@@ -32,10 +36,10 @@ try:
 except ImportError:
     HAVE_MPI = False
 
-USE_ZOLTAN=True
+USE_ZOLTAN = True
 
 compiler = 'gcc'
-#compiler = 'intel'
+# compiler = 'intel'
 if compiler == 'intel':
     extra_compile_args = ['-O3']
 else:
@@ -53,6 +57,7 @@ def get_deps(*args):
             if path.exists(f):
                 result.append(f)
     return result
+
 
 def get_openmp_flags():
     """Returns any OpenMP related flags if OpenMP is avaiable on the system.
@@ -97,7 +102,7 @@ def get_openmp_flags():
     )
     has_omp = True
     try:
-        mod = pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
+        pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
         print("-"*70)
         print("Using OpenMP.")
         print("-"*70)
@@ -123,14 +128,14 @@ def get_openmp_flags():
 def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
-    if ( len(d) == 0 ):
+    if len(d) == 0:
         USE_ZOLTAN = False
         return ''
     else:
         USE_ZOLTAN = True
     if not path.exists(d):
         print("*"*80)
-        print("%s incorrectly set to %s, not using ZOLTAN!"%(varname, d))
+        print("%s incorrectly set to %s, not using ZOLTAN!" % (varname, d))
         print("*"*80)
         USE_ZOLTAN = False
         return ''
@@ -205,13 +210,13 @@ def get_zoltan_args():
         HAVE_MPI = False
     else:
         print('-'*70)
-        print("Using Zoltan from:\n%s\n%s"%(inc, lib))
+        print("Using Zoltan from:\n%s\n%s" % (inc, lib))
         print('-'*70)
-        zoltan_include_dirs = [ inc ]
-        zoltan_library_dirs = [ lib ]
+        zoltan_include_dirs = [inc]
+        zoltan_library_dirs = [lib]
 
         # PyZoltan includes
-        zoltan_cython_include = [ os.path.abspath('./pyzoltan/czoltan') ]
+        zoltan_cython_include = [os.path.abspath('./pyzoltan/czoltan')]
         zoltan_include_dirs += zoltan_cython_include
 
     return zoltan_include_dirs, zoltan_library_dirs
@@ -362,6 +367,7 @@ def get_basic_extensions():
     ]
     return ext_modules
 
+
 def get_parallel_extensions():
     if not HAVE_MPI:
         return []
@@ -399,8 +405,8 @@ def get_parallel_extensions():
                 "pyzoltan/czoltan/czoltan",
                 "pyzoltan/czoltan/czoltan_types",
             ),
-            include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
-            library_dirs = zoltan_library_dirs,
+            include_dirs=include_dirs+zoltan_include_dirs+mpi_inc_dirs,
+            library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
@@ -416,8 +422,8 @@ def get_parallel_extensions():
                 "pyzoltan/czoltan/czoltan_dd",
                 "pyzoltan/czoltan/czoltan_types"
             ),
-            include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-            library_dirs = zoltan_library_dirs,
+            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+            library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
@@ -432,8 +438,8 @@ def get_parallel_extensions():
                 "pyzoltan/core/carray",
                 "pyzoltan/czoltan/zoltan_comm"
             ),
-            include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-            library_dirs = zoltan_library_dirs,
+            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
+            library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
@@ -447,14 +453,15 @@ def get_parallel_extensions():
         Extension(
             name="pysph.parallel.parallel_manager",
             sources=["pysph/parallel/parallel_manager.pyx"],
-            depends=get_deps("pyzoltan/core/carray",
+            depends=get_deps(
+                "pyzoltan/core/carray",
                 "pyzoltan/core/zoltan", "pyzoltan/core/zoltan_comm",
                 "pysph/base/point", "pysph/base/particle_array",
                 "pysph/base/nnps_base"
             ),
-            include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
-            library_dirs = zoltan_library_dirs,
-            libraries = [zoltan_lib, 'mpi'],
+            include_dirs=include_dirs + mpi_inc_dirs + zoltan_include_dirs,
+            library_dirs=zoltan_library_dirs,
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
@@ -465,7 +472,8 @@ def get_parallel_extensions():
 
 
 def create_sources():
-    if 'build_ext' in sys.argv or 'develop' in sys.argv or 'install' in sys.argv:
+    argv = sys.argv
+    if 'build_ext' in argv or 'develop' in sys.argv or 'install' in argv:
         generator = path.join('pyzoltan', 'core', 'generator.py')
         for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
             cmd = [sys.executable, generator, path.abspath(pth)]
@@ -488,16 +496,22 @@ def setup_package():
     exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
-    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0']
+    install_requires = [
+        'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
+        'nose>=1.0.0', 'execnet', 'psutil',
+    ]
     if sys.version_info[:2] == (2, 6):
         install_requires += [
             'ordereddict', 'importlib', 'unittest2'
+        ]
+    if sys.version_info[0] < 3:
+        install_requires += [
+            'mock>=1.0'
         ]
 
     extras_require = dict(
         mpi=['mpi4py>=1.2'],
         ui=['mayavi>=4.0'],
-        test=['nose>=1.0.0', 'mock>=1.0', 'execnet', 'psutil']
     )
 
     everything = set()
@@ -507,38 +521,38 @@ def setup_package():
 
     ext_modules = get_basic_extensions() + get_parallel_extensions()
 
-
     setup(name='PySPH',
-          version = info['__version__'],
-          author = 'PySPH Developers',
-          author_email = 'pysph-dev@googlegroups.com',
-          description = "A general purpose Smoothed Particle Hydrodynamics framework",
-          long_description = open('README.rst').read(),
-          url = 'http://pysph.bitbucket.org',
-          license = "BSD",
-          keywords = "SPH simulation computational fluid dynamics",
-          test_suite = "nose.collector",
-          packages = find_packages(),
-          package_data = {
+          version=info['__version__'],
+          author='PySPH Developers',
+          author_email='pysph-dev@googlegroups.com',
+          description="A general purpose Smoothed Particle Hydrodynamics "
+          "framework",
+          long_description=open('README.rst').read(),
+          url='http://pysph.bitbucket.org',
+          license="BSD",
+          keywords="SPH simulation computational fluid dynamics",
+          test_suite="nose.collector",
+          packages=find_packages(),
+          package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',
-                  '*.rst', 'ndspmhd-sedov-initial-conditions.npz']
+                   '*.rst', 'ndspmhd-sedov-initial-conditions.npz']
           },
           # exclude package data in installation.
-          exclude_package_data = {
-              '' : ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
+          exclude_package_data={
+            '': ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
           },
-          ext_modules = ext_modules,
-          include_package_data = True,
-          cmdclass = cmdclass,
-          install_requires = install_requires,
-          extras_require = extras_require,
-          zip_safe = False,
-          entry_points = """
+          ext_modules=ext_modules,
+          include_package_data=True,
+          cmdclass=cmdclass,
+          install_requires=install_requires,
+          extras_require=extras_require,
+          zip_safe=False,
+          entry_points="""
               [console_scripts]
               pysph = pysph.tools.cli:main
               """,
           platforms=['Linux', 'Mac OS-X', 'Unix', 'Windows'],
-          classifiers = [c.strip() for c in """\
+          classifiers=[c.strip() for c in """\
             Development Status :: 3 - Alpha
             Environment :: Console
             Intended Audience :: Developers

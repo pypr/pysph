@@ -1,14 +1,15 @@
+from __future__ import print_function
+
 import os
 import shutil
 import sys
 import tempfile
-import time
 import unittest
 
-import numpy as np
 
-from pysph.tools.automation import (Problem, PySPHTask, Simulation,
-    SolveProblem, Task, TaskRunner)
+from pysph.tools.automation import (
+    Problem, Simulation, SolveProblem, TaskRunner
+)
 try:
     from pysph.tools.jobs import Scheduler
 except ImportError:
@@ -36,16 +37,17 @@ class EllipticalDrop(Problem):
         # Two cases, one with update_h and one without.
         cmd = 'python -m pysph.examples.elliptical_drop --max-steps=5'
 
-        # If self.cases is set, the get_commands method will do the right thing.
+        # If self.cases is set, the get_commands method will do the right
+        # thing.
         self.cases = [
             Simulation(
-                root=self.input_path('no_update_h'),
+                root=self.input_path('update_h'),
                 base_command=cmd,
                 job_info=dict(n_core=1, n_thread=1),
                 update_h=None
             ),
             Simulation(
-                root=self.input_path('update_h'),
+                root=self.input_path('no_update_h'),
                 base_command=cmd,
                 job_info=dict(n_core=1, n_thread=1),
                 no_update_h=None
@@ -57,10 +59,9 @@ class EllipticalDrop(Problem):
         no_update = self.cases[0].data
         update = self.cases[1].data
         output = open(self.output_path('result.txt'), 'w')
-        output.write('no_update_h: %s\n'%no_update['major'])
-        output.write('update_h: %s\n'%update['major'])
+        output.write('no_update_h: %s\n' % no_update['major'])
+        output.write('update_h: %s\n' % update['major'])
         output.close()
-
 
 
 class TestLocalAutomation(unittest.TestCase):
@@ -134,7 +135,14 @@ class TestRemoteAutomation(TestLocalAutomation):
     def tearDown(self):
         super(TestRemoteAutomation, self).tearDown()
         if os.path.exists(self.other_dir):
-            shutil.rmtree(self.other_dir)
+            if sys.platform.startswith('win'):
+                from exceptions import WindowsError
+                try:
+                    shutil.rmtree(self.other_dir)
+                except WindowsError:
+                    pass
+            else:
+                shutil.rmtree(self.other_dir)
 
     def _make_scheduler(self):
         workers = [
@@ -147,3 +155,38 @@ class TestRemoteAutomation(TestLocalAutomation):
         except ImportError:
             raise unittest.SkipTest('This test requires execnet')
         return Scheduler(root=self.sim_dir, worker_config=workers)
+
+    def test_job_with_error_is_handled_correctly(self):
+        # Given.
+        problem = EllipticalDrop(self.sim_dir, self.output_dir)
+        problem.cases[0].base_command += ' --xxx'
+        s = self._make_scheduler()
+        t = TaskRunner(tasks=[SolveProblem(problem=problem)], scheduler=s)
+
+        # When.
+        try:
+            t.run(wait=1)
+        except RuntimeError:
+            pass
+
+        # Then.
+
+        # Ensure that the directories are copied over when they have errors.
+        sim1 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'no_update_h')
+        self.assertTrue(os.path.exists(sim1))
+        sim2 = os.path.join(self.root, self.sim_dir,
+                            'elliptical_drop', 'update_h')
+        self.assertTrue(os.path.exists(sim2))
+
+        # Ensure that all the correct but already scheduled jobs are completed.
+        task_status = t.task_status
+        status_values = list(task_status.values())
+        self.assertEqual(status_values.count('error'), 1)
+        self.assertEqual(status_values.count('done'), 1)
+        self.assertEqual(status_values.count('not started'), 1)
+        for t, s in task_status.items():
+            if s == 'done':
+                self.assertTrue(t.complete())
+            if s == 'error':
+                self.assertFalse(t.complete())
