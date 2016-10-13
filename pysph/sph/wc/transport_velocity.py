@@ -36,6 +36,14 @@ class SummationDensity(Equation):
 
     Notes
     -----
+
+    Note that in the pysph implementation, V is the inverse volume of a particle,
+    i.e. the equation computes V as follows:
+
+    .. math::
+
+       \mathcal{V}_a = \sum_b W_{ab}
+
     For this equation, the destination particle array must define the
     variable `V` for particle volume.
     """
@@ -52,6 +60,10 @@ class VolumeSummation(Equation):
     """**Number density for volume computation**
 
     See `SummationDensity`
+
+    Note that the quantity `V` is really :math:`\sigma` of the original paper,
+    i.e. inverse of the particle volume.
+
     """
 
     def initialize(self, d_idx, d_V):
@@ -251,7 +263,7 @@ class MomentumEquationPressureGradient(Equation):
         pij = rhoj * pi + rhoi * pj
         pij /= (rhoj + rhoi)
 
-        # particle volumes
+        # particle volumes; d_V is inverse volume
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
@@ -329,7 +341,7 @@ class MomentumEquationViscosity(Equation):
         # scalar part of the kernel gradient
         Fij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
 
-        # particle volumes
+        # particle volumes, d_V is inverse volume.
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
@@ -436,7 +448,7 @@ class MomentumEquationArtificialStress(Equation):
         vj = s_v[s_idx]; vhatj = s_vhat[s_idx]
         wj = s_w[s_idx]; whatj = s_what[s_idx]
 
-        # particle volumes
+        # particle volumes; d_V is inverse volume.
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 
@@ -556,7 +568,7 @@ class SolidWallNoSlipBC(Equation):
 
         etaij = 2 * (etai * etaj)/(etai + etaj)
 
-        # particle volumes
+        # particle volumes; d_V inverse volume.
         Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
         Vi2 = Vi * Vi; Vj2 = Vj * Vj
 

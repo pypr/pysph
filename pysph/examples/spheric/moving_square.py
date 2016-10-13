@@ -74,14 +74,14 @@ class SPHERICBenchmarkAcceleration(Equation):
     This equation must be instantiated with no sources
 
     """
-    def loop(self, d_idx, d_ax, t=0.0):
+    def loop(self, d_idx, d_au, t=0.0):
         a = 2.8209512
         b = 0.525652151
         c = 0.14142151
         d = -2.55580905e-08
 
         # compute the acceleration and set it for the destination
-        d_ax[d_idx] = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
+        d_au[d_idx] = a*exp( -(t-b)*(t-b)/(2.0*c*c) ) + d
 
 
 def _get_interior(x, y):
@@ -176,7 +176,7 @@ class MovingSquare(Application):
                                   'V', 'm', 'h'] )
 
         solid.set_output_arrays( ['x', 'y', 'rho', 'p'] )
-        obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p'] )
+        obstacle.set_output_arrays( ['x', 'y', 'u0', 'rho', 'p', 'u'] )
 
         particles = [fluid, solid, obstacle]
         return particles
@@ -258,7 +258,8 @@ class MovingSquare(Application):
             Group(
                 equations=[
                     SPHERICBenchmarkAcceleration(dest='obstacle', sources=None),
-                    ], real=False),
+                    ], real=False
+            ),
 
             # Summation density along with volume summation for the fluid
             # phase. This is done for all local and remote particles. At the
@@ -268,7 +269,8 @@ class MovingSquare(Application):
             Group(
                 equations=[
                     SummationDensity(dest='fluid', sources=['fluid','solid','obstacle']),
-                    ], real=False),
+                    ], real=False
+            ),
 
             # Once the fluid density is computed, we can use the EOS to set
             # the fluid pressure. Additionally, the dummy velocity for the
@@ -278,7 +280,8 @@ class MovingSquare(Application):
                     StateEquation(dest='fluid', sources=None, p0=p0, rho0=rho0, b=1.0),
                     SetWallVelocity(dest='solid', sources=['fluid']),
                     SetWallVelocity(dest='obstacle', sources=['fluid']),
-                    ], real=False),
+                    ], real=False
+            ),
 
             # Once the pressure for the fluid phase has been updated, we can
             # extrapolate the pressure to the ghost particles. After this
@@ -288,7 +291,8 @@ class MovingSquare(Application):
                 equations=[
                     SolidWallPressureBC(dest='obstacle', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
                     SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, rho0=rho0, p0=p0),
-                    ], real=False),
+                    ], real=False
+            ),
 
             # The main accelerations block. The acceleration arrays for the
             # fluid phase are upadted in this stage for all local particles.
@@ -311,7 +315,8 @@ class MovingSquare(Application):
                     # Artificial stress for the fluid phase
                     MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
 
-                    ], real=True),
+                    ], real=True
+            ),
         ]
         return equations
 

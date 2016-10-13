@@ -1,9 +1,22 @@
+1.0a5
+-----
+
+* Release date:  Still under development.
+* Improve the reference documentation a little.
+* Improve Mayavi viewer so one can view the velocity vectors and any other
+  vectors.
+* Viewer now has a button to edit the visualization properties easily.
+* Add simple tests for all available kernels. Add ``SuperGaussian`` kernel.
+* Add a basic dockerfile for pysph to help with the CI testing.
+* Update build so pysph can be built with a system zoltan installation that is
+  part of trilinos using the ``USE_TRILINOS`` environment variable.
+* Wrapping the ``Zoltan_Comm_Resize`` function in ``pyzoltan``.
+
+
 1.0a4
 ------
 
-* Release date: not yet released.
-* Fixed major bug with TVF implementation and add support for 3D simulations
-  with the TVF.
+* Release date: 14th July, 2016.
 * Improve many examples to make it easier to make comparisons.
 * Many equation parameters no longer have defaults to prevent accidental
   errors from not specifying important parameters.
@@ -12,7 +25,8 @@
   with the appropriate parameters to simulate a problem.
 * Add support to easily handle multiple rigid bodies.
 * Add support to dump HDF5 files if h5py_ is installed.
-* Add support to directly dump VTK files using either Mayavi_ or PyVisfile_.
+* Add support to directly dump VTK files using either Mayavi_ or PyVisfile_,
+  see ``pysph dump_vtk``
 * Improved the nearest neighbor code, which gives about 30% increase in
   performance in 3D.
 * Remove the need for the ``windows_env.bat`` script on Windows.  This is
@@ -25,6 +39,12 @@
 * Use argparse instead of optparse as it is deprecated in Python 3.x.
 * Add ``pysph.tools.automation`` to facilitate easier automation and
   reproducibility of PySPH simulations.
+* Add spatial hash and extended spatial hash NNPS algorithms for comparison.
+* Refactor and cleanup the NNPS related code.
+* Add several gas-dynamics examples and the ``ADEKEScheme``.
+* Work with mpi4py_ version 2.0.0 and older versions.
+* Fixed major bug with TVF implementation and add support for 3D simulations
+  with the TVF.
 * Fix bug with uploaded tarballs that breaks ``pip install pysph`` on Windows.
 * Fix the viewer UI to continue playing files when refresh is pushed.
 * Fix bugs with the timestep values dumped in the outputs.
@@ -34,7 +54,7 @@
 .. _h5py: http://www.h5py.org
 .. _PyVisfile: http://github.com/inducer/pyvisfile
 .. _Mayavi: http://code.enthought.com/projects/mayavi/
-
+.. _mpi4py: https://pypi.python.org/pypi/mpi4py
 
 1.0a3
 ------

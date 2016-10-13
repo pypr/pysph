@@ -2,14 +2,17 @@
 
 The Unstructured Communication utilities simplifies some common
 point-to-point message passing paradigms required for dynamic
-applications. 
+applications.
 
 The main wrapper object for this package is the ZComm object which is
 described below.
 
 """
 cimport mpi4py.MPI as mpi
-from mpi4py cimport mpi_c as mpic
+if MPI4PY_V2:
+   from mpi4py cimport libmpi as mpic
+else:
+   from mpi4py cimport mpi_c as mpic
 
 # Cython for pure mode
 cimport cython
@@ -42,13 +45,13 @@ cdef class ZComm:
     >>> nsend = sendbuf.size
 
     >>> zcomm = ZComm(comm, tag=0, nsend=nsend, proclist=proclist)
-    
+
     """
     def __init__(self, object comm, int tag, int nsend, np.ndarray proclist):
         """Constructor for the ZComm object
 
         Parameters:
-        
+
         comm : MPI Comm
             MPI communicator (mpi4py.MPI.COMM_WORLD)
 
@@ -59,13 +62,13 @@ cdef class ZComm:
             Number of objects this processor has to send
 
         proclist : numpy.ndarray
-            Array of size 'nsend' indicating where each object in the 
+            Array of size 'nsend' indicating where each object in the
             sendbuf (to be defined) will be sent.
 
         Notes:
-        
+
         In the general case, every processor has some data it knows it
-        must share with remote processors. 
+        must share with remote processors.
 
         As an example, we may have that processor 2 sends 4 ojects of
         data to processors to [0, 3, 1, 0]. In this example, the first
@@ -94,7 +97,7 @@ cdef class ZComm:
         (uints). The same plan can be used in this case with the
         provision to alter the number of bytes per object with the
         method `ZComm.set_nbytes`
-        
+
         """
         self.comm = comm
         self.rank = comm.Get_rank()
@@ -127,7 +130,7 @@ cdef class ZComm:
 
         Upon return, each processor knows the number of objects that
         are to be received through the data attribute `nreturn`
-        
+
         """
         cdef zcomm.ZOLTAN_COMM_OBJ** zoltan_comm_obj = &self._zoltan_comm_obj
 
@@ -161,7 +164,7 @@ cdef class ZComm:
         """Perform an unstructured communication between processors
 
         Parameters:
-        
+
         _sendbuf : np.ndarray
             The array of data to be sent by this processor
 
@@ -169,10 +172,10 @@ cdef class ZComm:
             The array of data to be received by this processor
 
         Notes:
-        
+
         Internally, Zoltan_Comm_Do accepts char* buffers to move the
         data between processors. The number of objects is determined
-        by the `nbytes` argument. 
+        by the `nbytes` argument.
 
         The `nsend` argument used to create the ZComm object and the
         `nbytes` argument should be consistent to avoid strange
@@ -193,20 +196,127 @@ cdef class ZComm:
 
         _check_error(ierr)
 
+    def Comm_Do_Post(self, np.ndarray _sendbuf, np.ndarray _recvbuf):
+        """Initiate unstructured communication between processors
+
+        Parameters:
+
+        _sendbuf : np.ndarray
+            The array of data to be sent by this processor
+
+        _recvbuf : np.ndarray
+            The array of data to be received by this processor
+
+        Notes:
+
+        Internally, Zoltan_Comm_Do accepts char* buffers to move the
+        data between processors. The number of objects is determined
+        by the `nbytes` argument.
+
+        The `nsend` argument used to create the ZComm object and the
+        `nbytes` argument should be consistent to avoid strange
+        behaviour.
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef char* send_data = _sendbuf.data
+        cdef char* recv_data = _recvbuf.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+
+        # Note that this variant only "posts" the message for
+        # sending. Control should be returned back to the calling
+        # program instantly. The message can only be safely viewed
+        # after the Comm_Do_Wait which acts as a memory fence
+        ierr = zcomm.Zoltan_Comm_Do_Post(
+           _zoltan_comm_obj,
+           tag,
+           send_data,
+           nbytes,
+           recv_data)
+        
+        _check_error(ierr)
+
+    def Comm_Do_Wait(self, np.ndarray _sendbuf, np.ndarray _recvbuf):
+        """Mem fence for the unstructured communication between processors
+        initiated by Comm_Do_Post
+
+        Parameters:
+
+        _sendbuf : np.ndarray
+            The array of data to be sent by this processor
+
+        _recvbuf : np.ndarray
+            The array of data to be received by this processor
+
+        Notes:
+
+        Internally, Zoltan_Comm_Do accepts char* buffers to move the
+        data between processors. The number of objects is determined
+        by the `nbytes` argument.
+
+        The `nsend` argument used to create the ZComm object and the
+        `nbytes` argument should be consistent to avoid strange
+        behaviour.
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef char* send_data = _sendbuf.data
+        cdef char* recv_data = _recvbuf.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+        ierr = zcomm.Zoltan_Comm_Do_Wait(
+           _zoltan_comm_obj,
+           tag,
+           send_data,
+           nbytes,
+           recv_data)
+        
+        _check_error(ierr)
+
+    def Comm_Resize(self, np.ndarray _sizes, int total_recv_size):
+        """Set the individual sizes for the communicated objects
+
+        Parameters:
+
+        _sizes : np.ndarray
+            An input array of length equal to the nsend argument in
+            the call to Zoltan_Comm_Create which generated the
+            plan. Each entry in the array is the size of the
+            corresponding object to be sent (c.f. Zoltan User Manual)
+
+        total_recv_size : int
+            Sum of the sizes of the incoming messages
+
+        Notes:
+
+        """
+        cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj
+        cdef int* sizes = <int*>_sizes.data
+        cdef int ierr, tag = self.tag, nbytes = self.nbytes
+
+        ierr = zcomm.Zoltan_Comm_Resize(
+           _zoltan_comm_obj,
+           sizes,
+           tag,
+           &total_recv_size)
+
+        _check_error(ierr)
+
     def Comm_Do_Reverse(self, np.ndarray _sendbuf, np.ndarray recvbuf):
         """Perform the reverse of the unstructured communication
         between processors
 
         Parameters:
-        
+
         _sendbuf : np.ndarray
             The array of data to be sent by this processor
 
         Notes:
-        
+
         Internally, Zoltan_Comm_Do accepts char* buffers to move the
         data between processors. The number of objects is determined
-        by the `nbytes` argument. 
+        by the `nbytes` argument.
 
         """
         cdef zcomm.ZOLTAN_COMM_OBJ* _zoltan_comm_obj = self._zoltan_comm_obj

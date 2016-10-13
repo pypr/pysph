@@ -263,8 +263,11 @@ class ParticleArrayHelper(HasTraits):
     # The active scalar to view.
     scalar = Str('rho', desc='name of the active scalar to view')
 
-    # The mlab plot for this particle array.
+    # The mlab scalar plot for this particle array.
     plot = Instance(PipelineBase)
+
+    # The mlab vectors plot for this particle array.
+    plot_vectors = Instance(PipelineBase)
 
     # List of available scalars in the particle array.
     scalar_list = List(Str)
@@ -274,15 +277,30 @@ class ParticleArrayHelper(HasTraits):
     # Sync'd trait with the scalar lut manager.
     show_legend = Bool(False, desc='if the scalar legend is to be displayed')
 
+    # Show all scalars.
+    list_all_scalars = Bool(False, desc='if all scalars should be listed')
+
     # Sync'd trait with the dataset to turn on/off visibility.
     visible = Bool(True, desc='if the particle array is to be displayed')
 
     # Show the time of the simulation on screen.
     show_time = Bool(False, desc='if the current time is displayed')
 
-    # Do we show the hidden arrays?
-    show_hidden_arrays = Bool(False,
-                              desc='if hidden arrays are to be listed')
+    # Edit the scalars.
+    edit_scalars = Button('More options ...')
+
+    # Show vectors.
+    show_vectors = Bool(False, desc='if vectors should be displayed')
+
+    vectors = Str('u, v, w', enter_set=True, auto_set=False,
+                  desc='the vectors to display')
+
+    mask_on_ratio = Int(3, desc='mask one in specified points')
+
+    scale_factor = Float(1.0, desc='scale factor for vectors',
+                         enter_set=True, auto_set=False)
+
+    edit_vectors = Button('More options ...')
 
     # Private attribute to store the Text module.
     _text = Instance(PipelineBase)
@@ -296,19 +314,36 @@ class ParticleArrayHelper(HasTraits):
 
     ########################################
     # View related code.
-    view = View(Item(name='name',
-                     show_label=False,
-                     editor=TitleEditor()),
+    view = View(
+        Item(name='name',
+             show_label=False,
+             editor=TitleEditor()),
+        Group(
+            Group(
                 Group(
-                      Item(name='visible'),
-                      Item(name='show_hidden_arrays'),
-                      Item(name='scalar',
-                           editor=EnumEditor(name='scalar_list')
-                          ),
-                      Item(name='show_legend'),
-                      Item(name='show_time'),
-                      ),
-                )
+                    Item(name='visible'),
+                    Item(name='show_legend'),
+                    Item(name='scalar',
+                         editor=EnumEditor(name='scalar_list')
+                    ),
+                    Item(name='list_all_scalars'),
+                    Item(name='show_time'),
+                    columns=2,
+                ),
+                Item(name='edit_scalars', show_label=False),
+                label='Scalars',
+            ),
+            Group(
+                Item(name='show_vectors'),
+                Item(name='vectors'),
+                Item(name='mask_on_ratio'),
+                Item(name='scale_factor'),
+                Item(name='edit_vectors', show_label=False),
+                label='Vectors',
+            ),
+            layout='tabbed'
+        )
+    )
 
     #######  Private protocol ############################################
     def _add_vmag(self, pa):
@@ -338,10 +373,16 @@ class ParticleArrayHelper(HasTraits):
         return getattr(pa, scalar)
 
     #######  Traits handlers #############################################
+    def _edit_scalars_fired(self):
+        self.plot.edit_traits()
+
+    def _edit_vectors_fired(self):
+        self.plot_vectors.edit_traits()
+
     def _particle_array_changed(self, pa):
         self.name = pa.name
-        # Setup the scalars.
-        self._show_hidden_arrays_changed(self.show_hidden_arrays)
+
+        self._list_all_scalars_changed(self.list_all_scalars)
 
         # Update the plot.
         x, y, z = pa.x, pa.y, pa.z
@@ -356,8 +397,7 @@ class ParticleArrayHelper(HasTraits):
             scm.set(show_legend=self.show_legend,
                     use_default_name=False,
                     data_name=self.scalar)
-            self.sync_trait('visible', p.mlab_source.m_data,
-                             mutual=True)
+            self.sync_trait('visible', p, mutual=True)
             self.sync_trait('show_legend', scm, mutual=True)
             #set_arrays(p.mlab_source.m_data, pa)
             self.plot = p
@@ -366,6 +406,9 @@ class ParticleArrayHelper(HasTraits):
                 p.mlab_source.set(x=x, y=y, z=z, scalars=s)
             else:
                 p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
+
+        if self.plot_vectors:
+            self._vectors_changed(self.vectors)
 
         # Setup the time.
         self._show_time_changed(self.show_time)
@@ -378,18 +421,19 @@ class ParticleArrayHelper(HasTraits):
             )
             p.module_manager.scalar_lut_manager.data_name = value
 
-    def _show_hidden_arrays_changed(self, value):
+    def _list_all_scalars_changed(self, list_all_scalars):
         pa = self.particle_array
-        sc_list = pa.properties.keys()
-        if value:
+        if list_all_scalars:
+            sc_list = pa.properties.keys()
             self.scalar_list = sorted(set(sc_list + self.extra_scalars))
         else:
-            self.scalar_list = sorted(
-                set(
-                    [x for x in sc_list if not x.startswith('_')] +
-                    self.extra_scalars
+            if len(pa.output_property_arrays) > 0:
+                self.scalar_list = sorted(
+                    set(pa.output_property_arrays + self.extra_scalars)
                 )
-            )
+            else:
+                sc_list = pa.properties.keys()
+                self.scalar_list = sorted(set(sc_list + self.extra_scalars))
 
     def _show_time_changed(self, value):
         txt = self._text
@@ -406,6 +450,40 @@ class ParticleArrayHelper(HasTraits):
         else:
             if txt is not None:
                 txt.visible = False
+
+    def _vectors_changed(self, value):
+        pa = self.particle_array
+        comps = [x.strip() for x in value.split(',')]
+        if len(comps) == 3:
+            try:
+                vec = [getattr(pa, x) for x in comps]
+            except AttributeError:
+                pass
+            else:
+                self.plot.mlab_source.vectors = numpy.c_[vec[0], vec[1], vec[2]]
+
+    def _show_vectors_changed(self, value):
+        pv = self.plot_vectors
+        if pv is not None:
+            pv.visible = value
+        else:
+            self._vectors_changed(self.vectors)
+            pv = self.scene.mlab.pipeline.vectors(
+                self.plot.mlab_source.m_data,
+                mask_points=self.mask_on_ratio,
+                scale_factor=self.scale_factor
+            )
+            self.plot_vectors = pv
+
+    def _mask_on_ratio_changed(self, value):
+        pv = self.plot_vectors
+        if pv is not None:
+            pv.glyph.mask_points.on_ratio = value
+
+    def _scale_factor_changed(self, value):
+        pv = self.plot_vectors
+        if pv is not None:
+            pv.glyph.glyph.scale_factor = value
 
     def _time_changed(self, value):
         txt = self._text
@@ -506,7 +584,6 @@ class MayaviViewer(HasTraits):
     # The layout of the dialog created
     view = View(HSplit(
                   Group(
-                    Item(name='live_mode'),
                     Group(
                         Group(
                             Item(name='directory'),
@@ -521,19 +598,23 @@ class MayaviViewer(HasTraits):
                                         show_label=False),
                                    padding=0,
                                ),
+                            padding=0,
                             label='Saved Data',
                             selected=True,
                             enabled_when='not live_mode',
                             ),
                         Group(
-                            Item(name='host'),
-                            Item(name='port'),
-                            Item(name='authkey'),
-                            label='Connection',
-                            enabled_when='live_mode',
+                            Item(name='live_mode'),
+                            Group(
+                                Item(name='host'),
+                                Item(name='port'),
+                                Item(name='authkey'),
+                                enabled_when='live_mode',
                             ),
-                        layout='tabbed'
+                            label='Connection',
                         ),
+                        layout='tabbed'
+                    ),
                     Group(
                         Group(
                               Item(name='current_time'),

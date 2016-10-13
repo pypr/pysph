@@ -124,13 +124,15 @@ def get_zoltan_directory(varname):
     global USE_ZOLTAN
     d = os.environ.get(varname, '')
     if ( len(d) == 0 ):
-        USE_ZOLTAN=False
+        USE_ZOLTAN = False
         return ''
+    else:
+        USE_ZOLTAN = True
     if not path.exists(d):
         print("*"*80)
         print("%s incorrectly set to %s, not using ZOLTAN!"%(varname, d))
         print("*"*80)
-        USE_ZOLTAN=False
+        USE_ZOLTAN = False
         return ''
     return d
 
@@ -327,6 +329,19 @@ def get_basic_extensions():
         ),
 
         Extension(
+            name="pysph.base.octree",
+            sources=["pysph/base/octree.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
             name="pysph.base.octree_nnps",
             sources=["pysph/base/octree_nnps.pyx"],
             depends=get_deps(
@@ -381,6 +396,13 @@ def get_parallel_extensions():
     if not HAVE_MPI:
         return []
 
+    MPI4PY_V2 = False if mpi4py.__version__.startswith('1.') else True
+    cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
+
+    zoltan_lib = 'zoltan'
+    if os.environ.get('USE_TRILINOS', None) is not None:
+        zoltan_lib = 'trilinos_zoltan'
+
     zoltan_modules = [
         Extension(
             name="pyzoltan.core.zoltan",
@@ -392,9 +414,10 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs+zoltan_include_dirs+mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
 
@@ -408,9 +431,10 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
 
@@ -423,9 +447,10 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries=['zoltan', 'mpi'],
+            libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
     ]
@@ -442,9 +467,10 @@ def get_parallel_extensions():
             ),
             include_dirs = include_dirs + mpi_inc_dirs + zoltan_include_dirs,
             library_dirs = zoltan_library_dirs,
-            libraries = ['zoltan', 'mpi'],
+            libraries = [zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
+            cython_compile_time_env=cython_compile_time_env,
             language="c++"
         ),
     ]
@@ -475,7 +501,7 @@ def setup_package():
     exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
-    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=3.2']
+    install_requires = ['numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
             'ordereddict', 'importlib', 'unittest2'
@@ -484,7 +510,7 @@ def setup_package():
     extras_require = dict(
         mpi=['mpi4py>=1.2'],
         ui=['mayavi>=4.0'],
-        test=['nose>=1.0.0', 'mock>=1.0']
+        test=['nose>=1.0.0', 'mock>=1.0', 'execnet', 'psutil']
     )
 
     everything = set()

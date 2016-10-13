@@ -969,6 +969,34 @@ cdef class NNPS:
             nbrs.c_reset()
             self.find_nearest_neighbors(d_idx, nbrs)
 
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc):
+        """Find nearest neighbors for particle id 'd_idx' without cache
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        d_idx: size_t
+            Index of the query point in the destination particle array
+
+        nbrs: UIntArray
+            Array to be populated by nearest neighbors of 'd_idx'
+
+        """
+        self.set_context(src_index, dst_index)
+
+        if prealloc:
+            nbrs.length = 0
+        else:
+            nbrs.c_reset()
+
+        self.find_nearest_neighbors(d_idx, nbrs)
+
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         cdef int idx = dst_index*self.narrays + src_index
@@ -981,10 +1009,6 @@ cdef class NNPS:
             return self.get_nearest_particles_no_cache(
                 src_index, dst_index, d_idx, nbrs, False
             )
-
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-                            size_t d_idx, UIntArray nbrs, bint prealloc):
-        raise NotImplementedError("NNPS :: get_nearest_particles_no_cache called")
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
         raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")

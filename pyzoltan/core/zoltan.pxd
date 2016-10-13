@@ -1,5 +1,8 @@
 cimport mpi4py.MPI as mpi
-from mpi4py cimport mpi_c as mpic
+if MPI4PY_V2:
+   from mpi4py cimport libmpi as mpic
+else:
+   from mpi4py cimport mpi_c as mpic
 
 # Zoltan imports
 from pyzoltan.czoltan cimport czoltan
@@ -126,4 +129,3 @@ cdef class ZoltanGeometricPartitioner(PyZoltan):
 
     # ZOLTAN parameters for Geometric partitioners
     cdef public str keep_cuts
-
