@@ -368,7 +368,7 @@ class Application(object):
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
                                      "the extended spatial hash algorithm ('esh') or "\
-                                     "the stratified radius algorithm ('sr') or"\
+                                     "the stratified hash algorithm ('sr') or"\
                                      "the octree algorithm ('tree')"
                                 )
 
