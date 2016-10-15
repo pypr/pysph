@@ -62,7 +62,6 @@ cdef class Octree:
     cdef vector[cOctreeNode*]* leaf_cells
 
     cdef public int leaf_max_particles
-    cdef public double radius_scale
     cdef public double hmax
     cdef public double length
     cdef public int depth

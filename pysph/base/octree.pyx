@@ -139,9 +139,8 @@ cdef class OctreeNode:
                 ax.plot(ax_points[:], [y,y], zs=[z,z], color=color)
 
 cdef class Octree:
-    def __init__(self, int leaf_max_particles, double radius_scale):
+    def __init__(self, int leaf_max_particles):
         self.leaf_max_particles = leaf_max_particles
-        self.radius_scale = radius_scale
         self.depth = 0
         self.tree = NULL
         self.leaf_cells = NULL
@@ -279,11 +278,10 @@ cdef class Octree:
             oct_id = k+2*j+4*i
 
             (new_indices[oct_id]).push_back(q)
-            hmax_children[oct_id] = fmax(hmax_children[oct_id],
-                    self.radius_scale*src_h_ptr[q])
+            hmax_children[oct_id] = fmax(hmax_children[oct_id], src_h_ptr[q])
 
         cdef double length_padded = (length/2)*(1 + 2*eps)
-        cdef double eps_new
+        cdef double eps_new = 0
 
         del indices
 
@@ -349,7 +347,7 @@ cdef class Octree:
             del self.leaf_cells
 
         self.tree = self._new_node(self.xmin, self.length,
-                hmax=self.radius_scale*self.hmax, level=0)
+                hmax=self.hmax, level=0)
 
         self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
                 self.tree.length, self.tree, 0, self._eps0)

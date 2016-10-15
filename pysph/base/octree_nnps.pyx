@@ -22,7 +22,7 @@ cdef class OctreeNNPS(NNPS):
         )
 
         cdef int i
-        self.root = [Octree(leaf_max_particles, radius_scale) for i in range(self.narrays)]
+        self.root = [Octree(leaf_max_particles) for i in range(self.narrays)]
 
         self.radius_scale2 = radius_scale*radius_scale
 
@@ -107,7 +107,8 @@ cdef class OctreeNNPS(NNPS):
         cdef double hj2 = 0
         cdef double xij2 = 0
 
-        cdef double eff_radius = 0.5*(node.length) + fmax(self.radius_scale*q_h, node.hmax)
+        cdef double eff_radius = 0.5*(node.length) + \
+                fmax(self.radius_scale*q_h, self.radius_scale*node.hmax)
 
         if  fabs(x_centre - q_x) >= eff_radius or \
             fabs(y_centre - q_y) >= eff_radius or \
