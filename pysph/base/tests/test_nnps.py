@@ -80,14 +80,6 @@ class SimpleNNPSTestCase(unittest.TestCase):
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.ext_sp_hash_nnps = nnps.ExtendedSpatialHashNNPS(
-                dim=3, particles=[pa,], radius_scale=1.0
-        )
-
-        self.octree_nnps = nnps.OctreeNNPS(
-                dim=3, particles=[pa,], radius_scale=1.0
-        )
-
         # these are the expected cells
         self.expected_cells = {
             IntPoint(-2, 0, 0):[0,6],
