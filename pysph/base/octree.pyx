@@ -287,6 +287,8 @@ cdef class Octree:
                     self.radius_scale*src_h_ptr[q])
 
         cdef double length_padded = (length/2)*(1 + 2*eps)
+        cdef double eps_new
+
         del indices
 
         for i from 0<=i<2:
@@ -297,13 +299,16 @@ cdef class Octree:
                     xmin_new[1] = xmin[1] + (j - eps)*length/2
                     xmin_new[2] = xmin[2] + (k - eps)*length/2
 
+                    eps_new = (2*MACHINE_EPS/length_padded)*fmax(length_padded,
+                            fmax(fmax(fabs(xmin_new[0]), fabs(xmin_new[1])), fabs(xmin_new[2])))
+
                     oct_id = k+2*j+4*i
 
                     node.children[oct_id] = self._new_node(xmin_new, length_padded,
                             hmax=hmax_children[oct_id], level=level+1, parent=node)
 
                     depth_child = self._c_build_tree(pa, new_indices[oct_id],
-                            xmin_new, length_padded, node.children[oct_id], level+1, 2*eps)
+                            xmin_new, length_padded, node.children[oct_id], level+1, eps_new)
 
                     depth_max = <int>fmax(depth_max, depth_child)
 
