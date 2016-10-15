@@ -15,9 +15,6 @@ cdef extern from 'math.h':
     double fmax(double, double) nogil
     double fmin(double, double) nogil
 
-cdef extern from 'float.h':
-    cdef double DBL_MAX
-
 cdef struct cOctreeNode:
     bint is_leaf
     double length

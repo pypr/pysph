@@ -50,6 +50,14 @@ cdef class OctreeNode:
         self.xmin.data[2] = self._node.xmin[2]
 
     cpdef UIntArray get_indices(self):
+        """ Get the indices in a node.
+
+        Returns
+        -------
+
+        indices : UIntArray
+
+        """
         if not self._node.is_leaf:
             return UIntArray()
         cdef UIntArray py_indices = UIntArray()
@@ -57,6 +65,14 @@ cdef class OctreeNode:
         return py_indices
 
     cpdef OctreeNode get_parent(self):
+        """ Get parent of the node.
+
+        Returns
+        -------
+
+        parent : OctreeNode
+
+        """
         if self._node.parent == NULL:
             return None
         cdef OctreeNode parent = OctreeNode()
@@ -64,6 +80,14 @@ cdef class OctreeNode:
         return parent
 
     cpdef list get_children(self):
+        """ Get the children of a node.
+
+        Returns
+        -------
+
+        children : list
+
+        """
         if self._node.is_leaf:
             return []
         cdef int i
@@ -73,6 +97,16 @@ cdef class OctreeNode:
         return py_children
 
     cpdef plot(self, ax, color="k"):
+        """ Plots a node.
+
+        Parameters
+        ----------
+
+        ax : mpl_toolkits.mplot3d.Axes3D instance
+
+        color : color hex string/letter, default ("k")
+
+        """
         cdef int i, j, k
         cdef double x, y, z
         cdef list ax_points = [0,0]
@@ -122,39 +156,19 @@ cdef class Octree:
     #### Private protocol ################################################
 
     @cython.cdivision(True)
-    cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa):
-        cdef int num_particles = pa.get_number_of_particles()
+    cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa_wrapper):
+        cdef int num_particles = pa_wrapper.get_number_of_particles()
+        pa_wrapper.pa.update_min_max()
 
-        cdef double xmin = DBL_MAX
-        cdef double ymin = DBL_MAX
-        cdef double zmin = DBL_MAX
+        self.xmin[0] = pa_wrapper.x.minimum
+        self.xmin[1] = pa_wrapper.y.minimum
+        self.xmin[2] = pa_wrapper.z.minimum
 
-        cdef double xmax = -DBL_MAX
-        cdef double ymax = -DBL_MAX
-        cdef double zmax = -DBL_MAX
+        self.xmax[0] = pa_wrapper.x.maximum
+        self.xmax[1] = pa_wrapper.y.maximum
+        self.xmax[2] = pa_wrapper.z.maximum
 
-        cdef double hmax = 0
-
-        for i from 0<=i<num_particles:
-            xmax = fmax(xmax, pa.x.data[i])
-            ymax = fmax(ymax, pa.y.data[i])
-            zmax = fmax(zmax, pa.z.data[i])
-
-            xmin = fmin(xmin, pa.x.data[i])
-            ymin = fmin(ymin, pa.y.data[i])
-            zmin = fmin(zmin, pa.z.data[i])
-
-            hmax = fmax(hmax, pa.h.data[i])
-
-        self.xmin[0] = xmin
-        self.xmin[1] = ymin
-        self.xmin[2] = zmin
-
-        self.xmax[0] = xmax
-        self.xmax[1] = ymax
-        self.xmax[2] = zmax
-
-        self.hmax = hmax
+        self.hmax = pa_wrapper.h.maximum
 
         cdef double x_length = self.xmax[0] - self.xmin[0]
         cdef double y_length = self.xmax[1] - self.xmin[1]
@@ -373,15 +387,47 @@ cdef class Octree:
     ######################################################################
 
     cpdef int build_tree(self, ParticleArray pa):
+        """ Build tree.
+
+        Parameters
+        ----------
+
+        pa : ParticleArray
+
+        Returns
+        -------
+
+        depth : int
+        Maximum depth of the tree
+
+        """
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
     cpdef OctreeNode get_root(self):
+        """ Get root of the tree
+
+        Returns
+        -------
+
+        root : OctreeNode
+        Root of the tree
+
+        """
         cdef OctreeNode py_node = OctreeNode()
         py_node.wrap_node(self.tree)
         return py_node
 
     cpdef list get_leaf_cells(self):
+        """ Get all leaf cells in the tree
+
+        Returns
+        -------
+
+        leaf_cells : list
+        List of leaf cells in the tree
+
+        """
         self.c_get_leaf_cells()
         cdef int i
         cdef list py_leaf_cells = [OctreeNode() for i in range(self.leaf_cells.size())]
@@ -390,12 +436,35 @@ cdef class Octree:
         return py_leaf_cells
 
     cpdef OctreeNode find_point(self, double x, double y, double z):
+        """Get the leaf node to which a point belongs
+
+        Parameters
+        ----------
+
+        x, y, z : double
+        Co-ordinates of the point
+
+        Returns
+        -------
+
+        node : OctreeNode
+        Leaf node to which the point belongs
+
+        """
         cdef cOctreeNode* node = self.c_find_point(x, y, z)
         cdef OctreeNode py_node = OctreeNode()
         py_node.wrap_node(node)
         return py_node
 
     cpdef plot(self, ax):
+        """Plots the tree
+
+        Parameters
+        ----------
+
+        ax : mpl_toolkits.mplot3d.Axes3D instance
+
+        """
         cdef OctreeNode root = self.get_root()
         self._plot_tree(root, ax)
 
