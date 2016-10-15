@@ -185,12 +185,8 @@ cdef class Octree:
 
         self.length *= (1 + 2*eps)
 
-        cdef double xmax_padded = self.xmin[0] + self.length
-        cdef double ymax_padded = self.xmin[1] + self.length
-        cdef double zmax_padded = self.xmin[2] + self.length
-
         self._eps0 = (2*MACHINE_EPS/self.length)*fmax(self.length,
-                fmax(fmax(fabs(xmax_padded), fabs(ymax_padded)), fabs(zmax_padded)))
+                fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
