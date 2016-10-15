@@ -9,6 +9,8 @@ from libcpp.vector cimport vector
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
+# MACHINE_EPS is slightly larger than the machine epsilon
+# EPS_MAX is maximum value of eps in tree building
 DEF EPS_MAX = 1e-3
 DEF MACHINE_EPS = 1e-14
 
@@ -184,6 +186,8 @@ cdef class Octree:
 
         self.length *= (1 + 2*eps)
 
+        # This is required to fix floating point errors. One such case
+        # is mentioned in the pysph.base.tests.test_octree
         self._eps0 = (2*MACHINE_EPS/self.length)*fmax(self.length,
                 fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
 
