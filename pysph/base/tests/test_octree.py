@@ -23,7 +23,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
     """Simple test case for Octree
     """
     def setUp(self):
-        N = 100
+        N = 50
         x, y, z = numpy.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
         x = x.ravel()
         y = y.ravel()
@@ -31,8 +31,6 @@ class SimpleOctreeTestCase(unittest.TestCase):
         h = numpy.ones_like(x)
 
         self.pa = get_particle_array(x=x, y=y, z=z, h=h)
-        self.tree = Octree(10)
-        self.tree.build_tree(self.pa)
 
     def test_single_level_tree(self):
         # For maximum leaf particles greater that total number
@@ -43,7 +41,9 @@ class SimpleOctreeTestCase(unittest.TestCase):
         self.assertTrue(tree.depth == 1)
 
     def test_levels_in_tree(self):
-        root = self.tree.get_root()
+        tree = Octree(10)
+        tree.build_tree(self.pa)
+        root = tree.get_root()
 
         def _check_levels(node, level):
             # Test that levels for nodes are correctly set
@@ -56,7 +56,9 @@ class SimpleOctreeTestCase(unittest.TestCase):
         _check_levels(root, 0)
 
     def test_parent_for_node(self):
-        root = self.tree.get_root()
+        tree = Octree(10)
+        tree.build_tree(self.pa)
+        root = tree.get_root()
         # Test that parent of root is 'None'
         self.assertTrue(root.get_parent() == None)
 
@@ -70,7 +72,9 @@ class SimpleOctreeTestCase(unittest.TestCase):
         _check_parent(root)
 
     def test_sum_of_indices_lengths_equals_total_number_of_particles(self):
-        root = self.tree.get_root()
+        tree = Octree(10)
+        tree.build_tree(self.pa)
+        root = tree.get_root()
         sum_indices = [0]
 
         def _calculate_sum(node, sum_indices):
@@ -89,33 +93,29 @@ class TestOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset
     """
     def setUp(self):
-        N = 1000
+        N = 500
         x, y = numpy.mgrid[0:1:N*1j, 0:1:N*1j]
         x = x.ravel()
         y = y.ravel()
         h = numpy.ones_like(x)
 
         self.pa = get_particle_array(x=x, y=y, h=h)
-        self.tree = Octree(10)
-        self.tree.build_tree(self.pa)
 
 class TestOctreeFor1DDataset(SimpleOctreeTestCase):
     """Test Octree for 1D dataset
     """
     def setUp(self):
-        N = 1e6
+        N = 1e5
         x = numpy.linspace(0, 1, num=N)
         h = numpy.ones_like(x)
 
         self.pa = get_particle_array(x=x, h=h)
-        self.tree = Octree(10)
-        self.tree.build_tree(self.pa)
 
 class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
     """Test Octree for floating point error
     """
     def setUp(self):
-        N = 100
+        N = 50
         x, y, z = numpy.mgrid[-1:1:N*1j, -1:1:N*1j, -1:1:N*1j]
         x = x.ravel()
         y = y.ravel()
@@ -129,6 +129,4 @@ class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
         z1 = numpy.array([1e-20])
 
         self.pa.add_particles(x=x1, y=y1, z=z1)
-        self.tree = Octree(10)
-        self.tree.build_tree(self.pa)
 
