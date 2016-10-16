@@ -446,7 +446,8 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                 h_local = self.radius_scale*fmax(cell.h_max, h)
                 H = <int> ceil(h_local/self.h_sub)
 
-                if fabs(x_mask[p]) <= H and fabs(y_mask[p]) <= H and fabs(z_mask[p]) <= H:
+                if fabs(<double>x_mask[p]) <= H and fabs(<double>y_mask[p]) <= H and \
+                        fabs(<double>z_mask[p]) <= H:
                     x[length] = x_temp
                     y[length] = y_temp
                     z[length] = z_temp
