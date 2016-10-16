@@ -164,7 +164,7 @@ cdef class Octree:
 
     @cython.cdivision(True)
     cdef inline double _get_eps(self, double length, double* xmin) nogil:
-        return (2*self.machine_eps/length)*fmax(length,
+        return (self.machine_eps/length)*fmax(length,
                 fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
 
     @cython.cdivision(True)
