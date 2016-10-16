@@ -320,6 +320,33 @@ def get_basic_extensions():
             language="c++"
         ),
 
+        Extension(
+            name="pysph.base.octree",
+            sources=["pysph/base/octree.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
+            name="pysph.base.octree_nnps",
+            sources=["pysph/base/octree_nnps.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+
         # kernels used for tests
         Extension(
             name="pysph.base.c_kernels",

@@ -16,7 +16,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS
+        ExtendedSpatialHashNNPS, OctreeNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -362,12 +362,13 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh'],
+                                choices=['box', 'll', 'sh', 'esh', 'tree'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
-                                     "the extended spatial hash algorithm ('esh')"
+                                     "the extended spatial hash algorithm ('esh') or "\
+                                     "the octree algorithm ('tree')"
                                 )
 
         nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
@@ -383,6 +384,11 @@ class Application(object):
                                 type=int, default=131072,
                                 help="Table size for SpatialHashNNPS and \
                                         ExtendedSpatialHashNNPS"
+                                )
+
+        nnps_options.add_argument("--tree-leaf-max-particles", dest="leaf_max_particles",
+                                type=int, default=10,
+                                help="Maximum number of particles in leaf of octree"
                                 )
 
         # --fixed-h
@@ -693,6 +699,14 @@ class Application(object):
                     fixed_h=fixed_h, cache=cache, H=options.H,
                     table_size=options.table_size, sort_gids=options.sort_gids,
                     approximate=options.approximate_nnps
+                )
+
+            elif options.nnps == 'tree':
+                nnps = OctreeNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
+                    sort_gids=options.sort_gids
                 )
 
             self.nnps = nnps

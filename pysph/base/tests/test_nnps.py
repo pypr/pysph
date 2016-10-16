@@ -80,10 +80,6 @@ class SimpleNNPSTestCase(unittest.TestCase):
             dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.ext_sp_hash_nnps = nnps.ExtendedSpatialHashNNPS(
-                dim=3, particles=[pa,], radius_scale=1.0
-        )
-
         # these are the expected cells
         self.expected_cells = {
             IntPoint(-2, 0, 0):[0,6],
@@ -241,6 +237,14 @@ class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.OctreeNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
@@ -339,6 +343,22 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
             x.sort(); y.sort()
             assert numpy.all(x == y)
 
+    def test_octree_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
 
 class TestLinkedListNNPSWithSorting(unittest.TestCase):
     def _make_particles(self, nx=20):
@@ -419,6 +439,19 @@ def test_large_number_of_neighbors_spatial_hash():
     pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
 
     nps = nnps.SpatialHashNNPS(dim=3, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    # print(nbrs.length)
+    assert nbrs.length == len(x)
+
+def test_large_number_of_neighbors_octree():
+    x = numpy.random.random(1 << 14)*0.1
+    y = x.copy()
+    z = x.copy()
+    h = numpy.ones_like(x)
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
+
+    nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=False)
     nbrs = UIntArray()
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
