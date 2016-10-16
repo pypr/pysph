@@ -7,6 +7,13 @@ from libcpp.vector cimport vector
 # Cython for compiler directives
 cimport cython
 
+IF UNAME_SYSNAME == "Windows":
+    cdef inline double fmin(double x, double y) nogil:
+        return x if x < y else y
+    cdef inline double fmax(double x, double y) nogil:
+        return x if x > y else y
+
+
 #############################################################################
 cdef class SpatialHashNNPS(NNPS):
 
