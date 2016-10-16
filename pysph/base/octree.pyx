@@ -9,15 +9,18 @@ from libcpp.vector cimport vector
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
-# MACHINE_EPS is slightly larger than the machine epsilon
+import numpy as np
+cimport numpy as np
+
 # EPS_MAX is maximum value of eps in tree building
 DEF EPS_MAX = 1e-3
-DEF MACHINE_EPS = 1e-14
 
 cdef class OctreeNode:
     def __init__(self):
-        self.xmin = DoubleArray(3)
+        self.xmin = np.zeros(3, dtype=np.float64)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def __richcmp__(self, OctreeNode other, int op):
         cdef bint equal_xmin, equal_length
         equal_xmin = True
@@ -40,6 +43,8 @@ cdef class OctreeNode:
 
     #### Public protocol ################################################
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     cdef void wrap_node(self, cOctreeNode* node):
         self._node = node
         self.hmax = node.hmax
@@ -47,9 +52,9 @@ cdef class OctreeNode:
         self.is_leaf = node.is_leaf
         self.level = node.level
 
-        self.xmin.data[0] = self._node.xmin[0]
-        self.xmin.data[1] = self._node.xmin[1]
-        self.xmin.data[2] = self._node.xmin[2]
+        self.xmin[0] = self._node.xmin[0]
+        self.xmin[1] = self._node.xmin[1]
+        self.xmin[2] = self._node.xmin[2]
 
     cpdef UIntArray get_indices(self):
         """ Get the indices in a node.
@@ -146,6 +151,7 @@ cdef class Octree:
         self.depth = 0
         self.tree = NULL
         self.leaf_cells = NULL
+        self.machine_eps = np.finfo(float).eps
 
     def __dealloc__(self):
         if self.tree != NULL:
@@ -155,6 +161,11 @@ cdef class Octree:
 
 
     #### Private protocol ################################################
+
+    @cython.cdivision(True)
+    cdef inline double _get_eps(self, double length, double* xmin) nogil:
+        return (2*self.machine_eps/length)*fmax(length,
+                fmax(fmax(fabs(xmin[0]), fabs(xmin[1])), fabs(xmin[2])))
 
     @cython.cdivision(True)
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa_wrapper):
@@ -177,8 +188,7 @@ cdef class Octree:
 
         self.length = fmax(x_length, fmax(y_length, z_length))
 
-        cdef double eps = (MACHINE_EPS/self.length)*fmax(self.length,
-                fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
+        cdef double eps = self._get_eps(self.length, self.xmin)
 
         self.xmin[0] -= self.length*eps
         self.xmin[1] -= self.length*eps
@@ -187,9 +197,8 @@ cdef class Octree:
         self.length *= (1 + 2*eps)
 
         # This is required to fix floating point errors. One such case
-        # is mentioned in the pysph.base.tests.test_octree
-        self._eps0 = (2*MACHINE_EPS/self.length)*fmax(self.length,
-                fmax(fmax(fabs(self.xmin[0]), fabs(self.xmin[1])), fabs(self.xmin[2])))
+        # is mentioned in pysph.base.tests.test_octree
+        self._eps0 = 2*self._get_eps(self.length, self.xmin)
 
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
@@ -297,8 +306,7 @@ cdef class Octree:
                     xmin_new[1] = xmin[1] + (j - eps)*length/2
                     xmin_new[2] = xmin[2] + (k - eps)*length/2
 
-                    eps_new = (2*MACHINE_EPS/length_padded)*fmax(length_padded,
-                            fmax(fmax(fabs(xmin_new[0]), fabs(xmin_new[1])), fabs(xmin_new[2])))
+                    eps_new = 2*self._get_eps(length_padded, xmin_new)
 
                     oct_id = k+2*j+4*i
 

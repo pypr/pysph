@@ -5,6 +5,9 @@ from libcpp.vector cimport vector
 from libc.stdint cimport uint64_t
 cimport cython
 
+import numpy as np
+cimport numpy as np
+
 ctypedef unsigned int u_int
 
 cdef extern from 'math.h':
@@ -35,7 +38,7 @@ cdef class OctreeNode:
 
     cdef public bint is_leaf
     cdef public double length
-    cdef public DoubleArray xmin
+    cdef public np.ndarray xmin
     cdef public double hmax
     cdef public int num_particles
     cdef public int level
@@ -66,6 +69,8 @@ cdef class Octree:
     cdef public double length
     cdef public int depth
 
+    cdef double machine_eps
+
     cdef double xmin[3]
     cdef double xmax[3]
     cdef double _eps0
@@ -73,6 +78,8 @@ cdef class Octree:
     ##########################################################################
     # Member functions
     ##########################################################################
+
+    cdef inline double _get_eps(self, double length, double* xmin) nogil
 
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa)
 
