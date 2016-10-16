@@ -15,6 +15,15 @@ cimport numpy as np
 # EPS_MAX is maximum value of eps in tree building
 DEF EPS_MAX = 1e-3
 
+IF UNAME_SYSNAME == "Windows":
+    cdef inline double fmin(double x, double y) nogil:
+        return x if x < y else y
+    cdef inline double fmax(double x, double y) nogil:
+        return x if x > y else y
+
+
+########################################################################
+
 cdef class OctreeNode:
     def __init__(self):
         self.xmin = np.zeros(3, dtype=np.float64)
