@@ -2,7 +2,6 @@
 
 from nnps_base cimport *
 from libcpp.vector cimport vector
-from libc.stdint cimport uint64_t
 cimport cython
 
 import numpy as np
@@ -112,4 +111,3 @@ cdef class Octree:
     cpdef OctreeNode find_point(self, double x, double y, double z)
 
     cpdef plot(self, ax)
-

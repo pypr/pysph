@@ -3,7 +3,6 @@
 from nnps_base cimport *
 
 from libc.stdlib cimport malloc, free
-from libc.stdint cimport uint64_t
 from libcpp.vector cimport vector
 
 cimport cython
@@ -487,4 +486,3 @@ cdef class Octree:
         """
         cdef OctreeNode root = self.get_root()
         self._plot_tree(root, ax)
-
