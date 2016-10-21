@@ -337,7 +337,7 @@ def get_basic_extensions():
             name="pysph.base.octree_nnps",
             sources=["pysph/base/octree_nnps.pyx"],
             depends=get_deps(
-                "pysph/base/nnps_base"
+                "pysph/base/nnps_base", "pysph/base/octree"
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
