@@ -129,28 +129,28 @@ cdef class OctreeNode:
 
         for i from 0<=i<2:
             for j from 0<=j<2:
-                x = self.xmin.data[0] + i*self.length
-                y = self.xmin.data[1] + j*self.length
+                x = self.xmin[0] + i*self.length
+                y = self.xmin[1] + j*self.length
                 for k from 0<=k<2:
-                    ax_points[k] = self.xmin.data[2] + k*self.length
+                    ax_points[k] = self.xmin[2] + k*self.length
 
                 ax.plot([x,x], [y,y], zs=ax_points[:], color=color)
 
         for i from 0<=i<2:
             for k from 0<=k<2:
-                x = self.xmin.data[0] + i*self.length
-                z = self.xmin.data[2] + k*self.length
+                x = self.xmin[0] + i*self.length
+                z = self.xmin[2] + k*self.length
                 for j from 0<=j<2:
-                    ax_points[j] = self.xmin.data[1] + j*self.length
+                    ax_points[j] = self.xmin[1] + j*self.length
 
                 ax.plot([x,x], ax_points[:], zs=[z,z], color=color)
 
         for j from 0<=j<2:
             for k from 0<=k<2:
-                y = self.xmin.data[1] + j*self.length
-                z = self.xmin.data[2] + k*self.length
+                y = self.xmin[1] + j*self.length
+                z = self.xmin[2] + k*self.length
                 for i from 0<=i<2:
-                    ax_points[i] = self.xmin.data[0] + i*self.length
+                    ax_points[i] = self.xmin[0] + i*self.length
 
                 ax.plot(ax_points[:], [y,y], zs=[z,z], color=color)
 
