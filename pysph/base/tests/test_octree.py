@@ -18,6 +18,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
+from nose.plugins.skip import SkipTest
 
 class SimpleOctreeTestCase(unittest.TestCase):
     """Simple test case for Octree
@@ -88,6 +89,32 @@ class SimpleOctreeTestCase(unittest.TestCase):
         # Test that sum of lengths of all indices is equal to total
         # number of particles
         self.assertTrue(self.pa.get_number_of_particles() == sum_indices[0])
+
+    def test_plot_root(self):
+        tree = Octree(10)
+        tree.build_tree(self.pa)
+        root = tree.get_root()
+        try:
+            import matplotlib as mpl
+            mpl.use('Agg')
+            import matplotlib.pyplot as plt
+            from mpl_toolkits.mplot3d import Axes3D
+        except:
+            msg = "matplotlib is not present"
+            raise SkipTest(msg)
+        fig = plt.figure()
+        ax = Axes3D(fig)
+
+        root.plot(ax)
+
+        for line in ax.lines:
+            xs = line.get_xdata()
+            ys = line.get_ydata()
+            line_length = (xs[0] - xs[1])**2 + (ys[0] - ys[1])**2
+            # Test that the lengths of sides 2D projection of the node
+            # is equal to the length of the side of the node
+            self.assertTrue(line_length == root.length**2 or \
+                    line_length == 0)
 
 class TestOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset
