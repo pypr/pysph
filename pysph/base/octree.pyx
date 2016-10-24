@@ -205,10 +205,6 @@ cdef class Octree:
 
         self.length *= (1 + 2*eps)
 
-        # This is required to fix floating point errors. One such case
-        # is mentioned in pysph.base.tests.test_octree
-        self._eps0 = 2*self._get_eps(self.length, self.xmin)
-
     cdef inline cOctreeNode* _new_node(self, double* xmin, double length,
             double hmax = 0, int level = 0, cOctreeNode* parent = NULL,
             int num_particles = 0, bint is_leaf = False) nogil:
@@ -256,7 +252,7 @@ cdef class Octree:
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level, double eps) nogil:
+            cOctreeNode* node, int level) nogil:
         cdef double* src_x_ptr = pa.x.data
         cdef double* src_y_ptr = pa.y.data
         cdef double* src_z_ptr = pa.z.data
@@ -273,8 +269,11 @@ cdef class Octree:
         for i from 0<=i<8:
             hmax_children[i] = 0
 
-        cdef cOctreeNode* temp = NULL
         cdef int oct_id
+
+        # This is required to fix floating point errors. One such case
+        # is mentioned in pysph.base.tests.test_octree
+        cdef double eps = 2*self._get_eps(length, xmin)
 
         if (indices.size() < self.leaf_max_particles) or (eps > EPS_MAX):
             node.indices = indices
@@ -303,7 +302,6 @@ cdef class Octree:
             hmax_children[oct_id] = fmax(hmax_children[oct_id], src_h_ptr[q])
 
         cdef double length_padded = (length/2)*(1 + 2*eps)
-        cdef double eps_new = 0
 
         del indices
 
@@ -323,7 +321,7 @@ cdef class Octree:
                             hmax=hmax_children[oct_id], level=level+1, parent=node)
 
                     depth_child = self._c_build_tree(pa, new_indices[oct_id],
-                            xmin_new, length_padded, node.children[oct_id], level+1, eps_new)
+                            xmin_new, length_padded, node.children[oct_id], level+1)
 
                     depth_max = <int>fmax(depth_max, depth_child)
 
@@ -371,7 +369,7 @@ cdef class Octree:
                 hmax=self.hmax, level=0)
 
         self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
-                self.tree.length, self.tree, 0, self._eps0)
+                self.tree.length, self.tree, 0)
 
         return self.depth
 
@@ -403,6 +401,13 @@ cdef class Octree:
 
         return prev
 
+    cdef void _get_number_of_nodes(self, cOctreeNode* node, int* num_nodes):
+        num_nodes[0] += 1
+        if node.is_leaf:
+            return
+        cdef int i
+        for i from 0<=i<8:
+            self._get_number_of_nodes(node.children[i], num_nodes)
 
     ######################################################################
 
@@ -423,6 +428,11 @@ cdef class Octree:
         """
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
+
+    cpdef int get_number_of_nodes(self):
+        cdef int num_nodes = 0
+        self._get_number_of_nodes(self.tree, &num_nodes)
+        return num_nodes
 
     cpdef OctreeNode get_root(self):
         """ Get root of the tree
@@ -456,7 +466,7 @@ cdef class Octree:
         return py_leaf_cells
 
     cpdef OctreeNode find_point(self, double x, double y, double z):
-        """Get the leaf node to which a point belongs
+        """ Get the leaf node to which a point belongs
 
         Parameters
         ----------
@@ -477,7 +487,7 @@ cdef class Octree:
         return py_node
 
     cpdef plot(self, ax):
-        """Plots the tree
+        """ Plots the tree
 
         Parameters
         ----------
@@ -487,4 +497,114 @@ cdef class Octree:
         """
         cdef OctreeNode root = self.get_root()
         self._plot_tree(root, ax)
+
+cdef class CompressedOctree(Octree):
+    def __init__(self, int leaf_max_particles):
+        Octree.__init__(self, leaf_max_particles)
+        self.dbl_max = np.finfo(float).max
+
+    @cython.cdivision(True)
+    cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
+            vector[u_int]* indices, double* xmin, double length,
+            cOctreeNode* node, int level) nogil:
+        cdef double* src_x_ptr = pa.x.data
+        cdef double* src_y_ptr = pa.y.data
+        cdef double* src_z_ptr = pa.z.data
+        cdef double* src_h_ptr = pa.h.data
+
+        cdef double xmin_new[8][3]
+        cdef double xmax_new[8][3]
+        cdef double length_new[8]
+        cdef double hmax_children[8]
+
+        cdef int depth_child = 0
+        cdef int depth_max = 0
+
+        cdef int i, j, k
+        cdef u_int p, q
+
+        for i from 0<=i<8:
+            hmax_children[i] = 0
+            length_new[i] = 0
+            for j from 0<=j<3:
+                xmin_new[i][j] = self.dbl_max
+                xmax_new[i][j] = -self.dbl_max
+
+        cdef int oct_id
+
+        if (indices.size() < self.leaf_max_particles):
+            node.indices = indices
+            node.num_particles = indices.size()
+            node.is_leaf = True
+            return 1
+
+        cdef vector[u_int]* new_indices[8]
+        for i from 0<=i<8:
+            new_indices[i] = new vector[u_int]()
+
+        cdef double* xmin_current
+        cdef double* xmax_current
+
+        for p from 0<=p<indices.size():
+            q = deref(indices)[p]
+
+            find_cell_id_raw(
+                    src_x_ptr[q] - xmin[0],
+                    src_y_ptr[q] - xmin[1],
+                    src_z_ptr[q] - xmin[2],
+                    length/2,
+                    &i, &j, &k
+                    )
+
+            oct_id = k+2*j+4*i
+
+            (new_indices[oct_id]).push_back(q)
+
+            xmin_current = xmin_new[oct_id]
+            xmax_current = xmax_new[oct_id]
+
+            hmax_children[oct_id] = fmax(hmax_children[oct_id], src_h_ptr[q])
+            xmin_current[0] = fmin(xmin_current[0], src_x_ptr[q])
+            xmin_current[1] = fmin(xmin_current[1], src_y_ptr[q])
+            xmin_current[2] = fmin(xmin_current[2], src_z_ptr[q])
+
+            xmax_current[0] = fmax(xmax_current[0], src_x_ptr[q])
+            xmax_current[1] = fmax(xmax_current[1], src_y_ptr[q])
+            xmax_current[2] = fmax(xmax_current[2], src_z_ptr[q])
+
+        cdef double x_length, y_length, z_length
+        cdef double length_padded
+        cdef double eps
+
+        del indices
+
+        for i from 0<=i<8:
+            xmin_current = xmin_new[i]
+            xmax_current = xmax_new[i]
+
+            x_length = xmax_current[0] - xmin_current[0]
+            y_length = xmax_current[1] - xmin_current[1]
+            z_length = xmax_current[2] - xmin_current[2]
+
+            length_new[i] = fmax(x_length, fmax(y_length, z_length))
+
+            eps = self._get_eps(length_new[i], xmin_current)
+
+            length_padded = length_new[i]*(1 + 2*eps)
+
+            xmin_current[0] -= length_new[i]*eps
+            xmin_current[1] -= length_new[i]*eps
+            xmin_current[2] -= length_new[i]*eps
+
+            node.children[i] = self._new_node(xmin_current, length_padded,
+                    hmax=hmax_children[i], level=level+1, parent=node)
+
+            depth_child = self._c_build_tree(pa, new_indices[i],
+                    xmin_current, length_padded, node.children[i], level+1)
+
+            depth_max = <int>fmax(depth_max, depth_child)
+
+
+        return 1 + depth_max
+
 
