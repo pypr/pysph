@@ -1,7 +1,7 @@
 #cython: embedsignature=True
 
 from nnps_base cimport *
-from octree cimport Octree, cOctreeNode
+from octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 cimport cython
@@ -21,7 +21,7 @@ cdef class OctreeNNPS(NNPS):
     # Data Attributes
     ##########################################################################
     cdef list root
-    cdef Octree current_tree
+    cdef cOctreeNode* current_tree
 
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
@@ -41,5 +41,16 @@ cdef class OctreeNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
+
+cdef class CompressedOctreeNNPS(OctreeNNPS):
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+    cpdef set_context(self, int src_index, int dst_index)
+
+    cpdef _refresh(self)
+
+    cpdef _bin(self, int pa_index, UIntArray indices)
+
 
 

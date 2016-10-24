@@ -37,6 +37,33 @@ def test_single_level_octree():
     # Test that depth of the tree is 1
     assert tree.depth == 1
 
+def test_compressed_octree_has_lesser_depth_than_octree():
+    N = 50
+    x, y, z = numpy.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]
+    x = x.ravel()
+    y = y.ravel()
+    z = z.ravel()
+    h = numpy.ones_like(x)
+
+    pa = get_particle_array(x=x, y=y, z=z, h=h)
+
+    x1 = numpy.array([20])
+    y1 = numpy.array([20])
+    z1 = numpy.array([20])
+
+    # For a dataset where one particle is far away from a
+    # cluster of particles
+    pa.add_particles(x=x1, y=y1, z=z1)
+    tree = Octree(10)
+    comp_tree = CompressedOctree(10)
+
+    depth_tree = tree.build_tree(pa)
+    depth_comp_tree = comp_tree.build_tree(pa)
+
+    # Test that the depth of compressed octree for the same
+    # leaf_max_particles is lesser than that of octree
+    assert depth_comp_tree < depth_tree
+
 def test_single_level_compressed_octree():
     N = 50
     x, y, z = numpy.mgrid[0:1:N*1j, 0:1:N*1j, 0:1:N*1j]

@@ -401,14 +401,6 @@ cdef class Octree:
 
         return prev
 
-    cdef void _get_number_of_nodes(self, cOctreeNode* node, int* num_nodes):
-        num_nodes[0] += 1
-        if node.is_leaf:
-            return
-        cdef int i
-        for i from 0<=i<8:
-            self._get_number_of_nodes(node.children[i], num_nodes)
-
     ######################################################################
 
     cpdef int build_tree(self, ParticleArray pa):
@@ -428,11 +420,6 @@ cdef class Octree:
         """
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
-
-    cpdef int get_number_of_nodes(self):
-        cdef int num_nodes = 0
-        self._get_number_of_nodes(self.tree, &num_nodes)
-        return num_nodes
 
     cpdef OctreeNode get_root(self):
         """ Get root of the tree

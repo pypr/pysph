@@ -102,11 +102,7 @@ cdef class Octree:
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
 
-    cdef void _get_number_of_nodes(self, cOctreeNode* node, int* num_nodes)
-
     cpdef int build_tree(self, ParticleArray pa)
-
-    cpdef int get_number_of_nodes(self)
 
     cpdef OctreeNode get_root(self)
 
