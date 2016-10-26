@@ -480,6 +480,20 @@ def create_sources():
             print(check_output(cmd).decode())
 
 
+def _is_cythonize_default():
+    import warnings
+    result = True
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            # old_build_ext was introduced in Cython 0.25 and this is when
+            # cythonize was made the default.
+            from Cython.Distutils import old_build_ext  # noqa: F401
+        except ImportError:
+            result = False
+    return result
+
+
 def setup_package():
     from setuptools import find_packages, setup
     if MODE == 'info':
@@ -497,7 +511,7 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'Cython>=0.22', 'setuptools>=6.0',
+        'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
         'nose>=1.0.0', 'execnet', 'psutil',
     ]
     if sys.version_info[:2] == (2, 6):
@@ -520,7 +534,7 @@ def setup_package():
     extras_require['all'] = everything
 
     ext_modules = get_basic_extensions() + get_parallel_extensions()
-    if MODE != 'info':
+    if MODE != 'info' and _is_cythonize_default():
         # Cython >= 0.25 uses cythonize to compile the extensions. This
         # requires the compile_time_env to be set explicitly to work.
         compile_env = {}
