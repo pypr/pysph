@@ -497,7 +497,7 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
+        'numpy', 'mako', 'Cython>=0.22', 'setuptools>=6.0',
         'nose>=1.0.0', 'execnet', 'psutil',
     ]
     if sys.version_info[:2] == (2, 6):
@@ -531,7 +531,8 @@ def setup_package():
         from Cython.Build import cythonize
         ext_modules = cythonize(
             ext_modules, compile_time_env=compile_env,
-            include_path=list(include_path)
+            include_path=list(include_path),
+            language="c++"
         )
 
     setup(name='PySPH',
