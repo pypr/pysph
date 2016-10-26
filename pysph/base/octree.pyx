@@ -112,6 +112,8 @@ cdef class OctreeNode:
             (<OctreeNode>py_children[i]).wrap_node(self._node.children[i])
         return py_children
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     cpdef plot(self, ax, color="k"):
         """ Plots a node.
 
@@ -575,7 +577,7 @@ cdef class CompressedOctree(Octree):
 
             length_new[i] = fmax(x_length, fmax(y_length, z_length))
 
-            eps = self._get_eps(length_new[i], xmin_current)
+            eps = 2*self._get_eps(length_new[i], xmin_current)
 
             length_padded = length_new[i]*(1 + 2*eps)
 
