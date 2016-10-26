@@ -524,10 +524,15 @@ def setup_package():
         # Cython >= 0.25 uses cythonize to compile the extensions. This
         # requires the compile_time_env to be set explicitly to work.
         compile_env = {}
+        include_path = set()
         for mod in ext_modules:
             compile_env.update(mod.cython_compile_time_env or {})
+            include_path.update(mod.include_dirs)
         from Cython.Build import cythonize
-        ext_modules = cythonize(ext_modules, compile_time_env=compile_env)
+        ext_modules = cythonize(
+            ext_modules, compile_time_env=compile_env,
+            include_path=list(include_path)
+        )
 
     setup(name='PySPH',
           version=info['__version__'],
