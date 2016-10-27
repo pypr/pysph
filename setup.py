@@ -480,6 +480,20 @@ def create_sources():
             print(check_output(cmd).decode())
 
 
+def _is_cythonize_default():
+    import warnings
+    result = True
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            # old_build_ext was introduced in Cython 0.25 and this is when
+            # cythonize was made the default.
+            from Cython.Distutils import old_build_ext  # noqa: F401
+        except ImportError:
+            result = False
+    return result
+
+
 def setup_package():
     from setuptools import find_packages, setup
     if MODE == 'info':
@@ -520,6 +534,20 @@ def setup_package():
     extras_require['all'] = everything
 
     ext_modules = get_basic_extensions() + get_parallel_extensions()
+    if MODE != 'info' and _is_cythonize_default():
+        # Cython >= 0.25 uses cythonize to compile the extensions. This
+        # requires the compile_time_env to be set explicitly to work.
+        compile_env = {}
+        include_path = set()
+        for mod in ext_modules:
+            compile_env.update(mod.cython_compile_time_env or {})
+            include_path.update(mod.include_dirs)
+        from Cython.Build import cythonize
+        ext_modules = cythonize(
+            ext_modules, compile_time_env=compile_env,
+            include_path=list(include_path),
+            language="c++"
+        )
 
     setup(name='PySPH',
           version=info['__version__'],
