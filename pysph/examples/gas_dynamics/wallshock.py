@@ -14,36 +14,65 @@ dt = 1e-4
 tf = 0.4
 
 # domain size and discretization parameters
-xmin = -0.2; xmax = 0.2
-nl = 500; nr = 500
-dxl = 0.5/nl; dxr = dxl
-
-kernel_factor = 1.5
-h0 = kernel_factor*dxr
+xmin = -0.2
+xmax = 0.2
 
 
 class WallShock(ShockTubeSetup):
+
+    def initialize(self):
+        self.xmin = -0.2
+        self.xmax = 0.2
+        self.x0 = 0.0
+        self.rhol = 1.0
+        self.rhor = 1.0
+        self.pl = 4e-6
+        self.pr = 4e-6
+        self.ul = 1.0
+        self.ur = -1.0
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--kernel_factor", action="store", type=float,
+            dest="kernel_factor", default=1.5,
+            help="Kernel_factor (default 2.5)"
+        )
+        group.add_argument(
+            "--nl", action="store", type=float, dest="nl", default=500,
+            help="Number of particles in left region"
+        )
+
+    def consume_user_options(self):
+        self.nl = self.options.nl
+        self.kernel_factor = self.options.kernel_factor
+        ratio = self.rhor/self.rhol
+        self.nr = ratio*self.nl
+        self.dxl = 0.5/self.nl
+        self.dxr = 0.5/self.nr
+        self.h0 = self.kernel_factor * self.dxr
+        self.hdx = self.kernel_factor
+
     def create_particles(self):
-        return self.generate_particles(xmin = -0.5, xmax=0.5, dxl=dxl, dxr=dxr,
-                m=dxl, pl=4e-6, pr=4e-6, h0=h0, bx=0.02, gamma1=gamma1, ul=1.0,
-                ur=-1.0)
+        return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=self.dxl, dxr=self.dxr,
+                                       m=self.dxl, pl=self.pl, pr=self.pr, h0=self.h0,
+                                       bx=0.02, gamma1=gamma1, ul=self.ul,
+                                       ur=self.ur)
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
 
         adke = ADKEScheme(
-            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma, alpha=1,
-            beta=1, k=0.7, eps=0.5, g1=0.5, g2=1.0)
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            alpha=1, beta=1, k=0.7, eps=0.5, g1=0.5, g2=1.0)
 
         mpm = GasDScheme(
-                fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-                kernel_factor=kernel_factor, alpha1=1.0, alpha2=0.1,
-                beta=2.0, update_alpha1=True, update_alpha2=True
-                )
+            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            kernel_factor=None, alpha1=1.0, alpha2=0.1,
+            beta=2.0, update_alpha1=True, update_alpha2=True
+        )
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
         return s
-
 
 
 if __name__ == '__main__':
