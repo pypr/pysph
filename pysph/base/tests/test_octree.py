@@ -109,6 +109,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
                 _check_levels(child, level + 1)
 
         _check_levels(root, 0)
+        self.tree.delete_tree()
 
     def test_parent_for_node(self):
         self.tree.build_tree(self.pa)
@@ -124,6 +125,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
                 _check_parent(child)
 
         _check_parent(root)
+        self.tree.delete_tree()
 
     def test_sum_of_indices_lengths_equals_total_number_of_particles(self):
         self.tree.build_tree(self.pa)
@@ -141,6 +143,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
         # Test that sum of lengths of all indices is equal to total
         # number of particles
         self.assertTrue(self.pa.get_number_of_particles() == sum_indices[0])
+        self.tree.delete_tree()
 
     def test_plot_root(self):
         self.tree.build_tree(self.pa)
@@ -166,6 +169,8 @@ class SimpleOctreeTestCase(unittest.TestCase):
             # is equal to the length of the side of the node
             self.assertTrue(line_length == root.length**2 or \
                     line_length == 0)
+
+        self.tree.delete_tree()
 
 class TestOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset

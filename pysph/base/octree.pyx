@@ -422,6 +422,15 @@ cdef class Octree:
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
+    cpdef delete_tree(self):
+        """ Delete tree"""
+        if self.root != NULL:
+            self._delete_tree(self.root)
+        if self.leaf_cells != NULL:
+            del self.leaf_cells
+        self.root = NULL
+        self.leaf_cells = NULL
+
     cpdef OctreeNode get_root(self):
         """ Get root of the tree
 
