@@ -59,6 +59,7 @@ cdef class OctreeNode:
         self.length = node.length
         self.is_leaf = node.is_leaf
         self.level = node.level
+        self.num_particles = node.num_particles
 
         self.xmin[0] = self._node.xmin[0]
         self.xmin[1] = self._node.xmin[1]
