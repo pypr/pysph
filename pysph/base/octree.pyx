@@ -486,6 +486,7 @@ cdef class Octree:
         cdef OctreeNode root = self.get_root()
         self._plot_tree(root, ax)
 
+
 cdef class CompressedOctree(Octree):
     def __init__(self, int leaf_max_particles):
         Octree.__init__(self, leaf_max_particles)
