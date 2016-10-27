@@ -245,6 +245,14 @@ class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.CompressedOctreeNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
     def setUp(self):
@@ -348,6 +356,22 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
         pa = self._make_particles(20)
         # We turn on cache so it computes all the neighbors quickly for us.
         nps = nnps.OctreeNNPS(dim=3, particles=[pa], cache=True)
+        nbrs = UIntArray()
+        direct = UIntArray()
+        nps.set_context(0, 0)
+        for i in range(pa.get_number_of_particles()):
+            nps.get_nearest_particles(0, 0, i, nbrs)
+            nps.brute_force_neighbors(0, 0, i, direct)
+            x = nbrs.get_npy_array()
+            y = direct.get_npy_array()
+            x.sort(); y.sort()
+            assert numpy.all(x == y)
+
+    def test_compressed_octree_works_for_large_domain(self):
+        # Given
+        pa = self._make_particles(20)
+        # We turn on cache so it computes all the neighbors quickly for us.
+        nps = nnps.CompressedOctreeNNPS(dim=3, particles=[pa], cache=True)
         nbrs = UIntArray()
         direct = UIntArray()
         nps.set_context(0, 0)

@@ -2,7 +2,6 @@
 
 from nnps_base cimport *
 from libcpp.vector cimport vector
-from libc.stdint cimport uint64_t
 cimport cython
 
 import numpy as np
@@ -61,7 +60,7 @@ cdef class Octree:
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef cOctreeNode* tree
+    cdef cOctreeNode* root
     cdef vector[cOctreeNode*]* leaf_cells
 
     cdef public int leaf_max_particles
@@ -73,7 +72,6 @@ cdef class Octree:
 
     cdef double xmin[3]
     cdef double xmax[3]
-    cdef double _eps0
 
     ##########################################################################
     # Member functions
@@ -91,7 +89,7 @@ cdef class Octree:
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level, double eps) nogil
+            cOctreeNode* node, int level) nogil
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
@@ -105,6 +103,8 @@ cdef class Octree:
 
     cpdef int build_tree(self, ParticleArray pa)
 
+    cpdef delete_tree(self)
+
     cpdef OctreeNode get_root(self)
 
     cpdef list get_leaf_cells(self)
@@ -112,4 +112,19 @@ cdef class Octree:
     cpdef OctreeNode find_point(self, double x, double y, double z)
 
     cpdef plot(self, ax)
+
+cdef class CompressedOctree(Octree):
+    ##########################################################################
+    # Data Attributes
+    ##########################################################################
+    cdef double dbl_max
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+
+    cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
+            vector[u_int]* indices, double* xmin, double length,
+            cOctreeNode* node, int level) nogil
+
 

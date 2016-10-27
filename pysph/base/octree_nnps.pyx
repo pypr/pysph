@@ -1,7 +1,7 @@
 #cython: embedsignature=True
 
 from nnps_base cimport *
-from octree cimport Octree, cOctreeNode
+from octree cimport Octree, CompressedOctree, cOctreeNode
 
 from libcpp.vector cimport vector
 from libc.stdlib cimport malloc, free
@@ -29,7 +29,7 @@ cdef class OctreeNNPS(NNPS):
         )
 
         cdef int i
-        self.root = [Octree(leaf_max_particles) for i in range(self.narrays)]
+        self.tree = [Octree(leaf_max_particles) for i in range(self.narrays)]
 
         self.radius_scale2 = radius_scale*radius_scale
 
@@ -59,7 +59,7 @@ cdef class OctreeNNPS(NNPS):
         """
 
         NNPS.set_context(self, src_index, dst_index)
-        self.current_tree = <Octree>self.root[src_index]
+        self.current_tree = (<Octree>self.tree[src_index]).root
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -90,7 +90,7 @@ cdef class OctreeNNPS(NNPS):
         cdef int orig_length = nbrs.length
 
         self._get_neighbors(x, y, z, h, src_x_ptr, src_y_ptr, src_z_ptr,
-                src_h_ptr, nbrs, self.current_tree.tree)
+                src_h_ptr, nbrs, self.current_tree)
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -143,8 +143,68 @@ cdef class OctreeNNPS(NNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<Octree>self.root[i]).c_build_tree(self.pa_wrappers[i])
-        self.current_tree = <Octree>self.root[self.src_index]
+            (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+        self.current_tree = (<Octree>self.tree[self.src_index]).root
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        pass
+
+#############################################################################
+cdef class CompressedOctreeNNPS(OctreeNNPS):
+    """Nearest neighbor search using Compressed Octree.
+    """
+    def __init__(self, int dim, list particles, double radius_scale = 2.0,
+            int ghost_layers = 1, domain=None, bint fixed_h = False,
+            bint cache = False, bint sort_gids = False, int leaf_max_particles = 10):
+        NNPS.__init__(
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
+        )
+
+        cdef int i
+        self.tree = [CompressedOctree(leaf_max_particles) for i in range(self.narrays)]
+
+        self.radius_scale2 = radius_scale*radius_scale
+
+        self.src_index = 0
+        self.dst_index = 0
+        self.leaf_max_particles = leaf_max_particles
+
+        self.sort_gids = sort_gids
+        self.domain.update()
+
+        self.update()
+
+
+    #### Public protocol ################################################
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Set context for nearest neighbor searches.
+
+        Parameters
+        ----------
+        src_index: int
+            Index in the list of particle arrays to which the neighbors belong
+
+        dst_index: int
+            Index in the list of particle arrays to which the query point belongs
+
+        """
+
+        NNPS.set_context(self, src_index, dst_index)
+        self.current_tree = (<CompressedOctree>self.tree[src_index]).root
+
+        self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
+        self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
+
+
+    #### Private protocol ################################################
+
+    cpdef _refresh(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+        self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
