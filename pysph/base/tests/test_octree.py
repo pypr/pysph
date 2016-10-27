@@ -189,7 +189,7 @@ class TestOctreeFor1DDataset(SimpleOctreeTestCase):
         h = numpy.ones_like(x)
 
         self.pa = get_particle_array(x=x, h=h)
-        self.tree = Octree(10)
+        self.tree = Octree(100)
 
 class TestOctreeForFloatingPointError(SimpleOctreeTestCase):
     """Test Octree for floating point error
@@ -234,7 +234,7 @@ class TestCompressedOctreeFor1DDataset(SimpleOctreeTestCase):
         h = numpy.ones_like(x)
 
         self.pa = get_particle_array(x=x, h=h)
-        self.tree = CompressedOctree(10)
+        self.tree = CompressedOctree(100)
 
 class TestCompressedOctreeFor2DDataset(SimpleOctreeTestCase):
     """Test Octree for 2D dataset

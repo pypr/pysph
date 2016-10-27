@@ -2,7 +2,6 @@
 
 from nnps_base cimport *
 from libcpp.vector cimport vector
-from libc.stdint cimport uint64_t
 cimport cython
 
 import numpy as np
@@ -61,7 +60,7 @@ cdef class Octree:
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef cOctreeNode* tree
+    cdef cOctreeNode* root
     cdef vector[cOctreeNode*]* leaf_cells
 
     cdef public int leaf_max_particles

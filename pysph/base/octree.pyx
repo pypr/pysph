@@ -3,7 +3,6 @@
 from nnps_base cimport *
 
 from libc.stdlib cimport malloc, free
-from libc.stdint cimport uint64_t
 from libcpp.vector cimport vector
 
 cimport cython
@@ -160,13 +159,13 @@ cdef class Octree:
     def __init__(self, int leaf_max_particles):
         self.leaf_max_particles = leaf_max_particles
         self.depth = 0
-        self.tree = NULL
+        self.root = NULL
         self.leaf_cells = NULL
         self.machine_eps = np.finfo(float).eps
 
     def __dealloc__(self):
-        if self.tree != NULL:
-            self._delete_tree(self.tree)
+        if self.root != NULL:
+            self._delete_tree(self.root)
         if self.leaf_cells != NULL:
             del self.leaf_cells
 
@@ -362,16 +361,16 @@ cdef class Octree:
         for i from 0<=i<num_particles:
             indices_ptr.push_back(i)
 
-        if self.tree != NULL:
-            self._delete_tree(self.tree)
+        if self.root != NULL:
+            self._delete_tree(self.root)
         if self.leaf_cells != NULL:
             del self.leaf_cells
 
-        self.tree = self._new_node(self.xmin, self.length,
+        self.root = self._new_node(self.xmin, self.length,
                 hmax=self.hmax, level=0)
 
-        self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.tree.xmin,
-                self.tree.length, self.tree, 0)
+        self.depth = self._c_build_tree(pa_wrapper, indices_ptr, self.root.xmin,
+                self.root.length, self.root, 0)
 
         return self.depth
 
@@ -380,12 +379,12 @@ cdef class Octree:
             return
 
         self.leaf_cells = new vector[cOctreeNode*]()
-        self._c_get_leaf_cells(self.tree)
+        self._c_get_leaf_cells(self.root)
 
     @cython.cdivision(True)
     cdef cOctreeNode* c_find_point(self, double x, double y, double z):
-        cdef cOctreeNode* node = self.tree
-        cdef cOctreeNode* prev = self.tree
+        cdef cOctreeNode* node = self.root
+        cdef cOctreeNode* prev = self.root
 
         cdef int i, j, k, oct_id
         while node != NULL:
@@ -434,7 +433,7 @@ cdef class Octree:
 
         """
         cdef OctreeNode py_node = OctreeNode()
-        py_node.wrap_node(self.tree)
+        py_node.wrap_node(self.root)
         return py_node
 
     cpdef list get_leaf_cells(self):

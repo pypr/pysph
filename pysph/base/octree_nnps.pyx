@@ -29,7 +29,7 @@ cdef class OctreeNNPS(NNPS):
         )
 
         cdef int i
-        self.root = [Octree(leaf_max_particles) for i in range(self.narrays)]
+        self.tree = [Octree(leaf_max_particles) for i in range(self.narrays)]
 
         self.radius_scale2 = radius_scale*radius_scale
 
@@ -59,7 +59,7 @@ cdef class OctreeNNPS(NNPS):
         """
 
         NNPS.set_context(self, src_index, dst_index)
-        self.current_tree = (<Octree>self.root[src_index]).tree
+        self.current_tree = (<Octree>self.tree[src_index]).root
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -143,8 +143,8 @@ cdef class OctreeNNPS(NNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<Octree>self.root[i]).c_build_tree(self.pa_wrappers[i])
-        self.current_tree = (<Octree>self.root[self.src_index]).tree
+            (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+        self.current_tree = (<Octree>self.tree[self.src_index]).root
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
@@ -162,7 +162,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
         )
 
         cdef int i
-        self.root = [CompressedOctree(leaf_max_particles) for i in range(self.narrays)]
+        self.tree = [CompressedOctree(leaf_max_particles) for i in range(self.narrays)]
 
         self.radius_scale2 = radius_scale*radius_scale
 
@@ -192,7 +192,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
         """
 
         NNPS.set_context(self, src_index, dst_index)
-        self.current_tree = (<CompressedOctree>self.root[src_index]).tree
+        self.current_tree = (<CompressedOctree>self.tree[src_index]).root
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -203,8 +203,8 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
-            (<CompressedOctree>self.root[i]).c_build_tree(self.pa_wrappers[i])
-        self.current_tree = (<CompressedOctree>self.root[self.src_index]).tree
+            (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
+        self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass

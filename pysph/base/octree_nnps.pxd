@@ -20,7 +20,7 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef list root
+    cdef list tree
     cdef cOctreeNode* current_tree
 
     cdef double radius_scale2
