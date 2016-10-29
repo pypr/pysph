@@ -103,6 +103,8 @@ cdef class Octree:
 
     cpdef int build_tree(self, ParticleArray pa)
 
+    cpdef delete_tree(self)
+
     cpdef OctreeNode get_root(self)
 
     cpdef list get_leaf_cells(self)
