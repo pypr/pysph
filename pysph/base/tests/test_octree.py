@@ -8,13 +8,8 @@ import numpy as np
 from numpy import random
 
 # PySPH imports
-from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
-from pysph.base import nnps
 from pysph.base.octree import Octree, CompressedOctree
-
-# Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
@@ -106,6 +101,8 @@ class SimpleOctreeTestCase(unittest.TestCase):
             self.assertTrue(node.level == level)
             children = node.get_children()
             for child in children:
+                if child == None:
+                    continue
                 _check_levels(child, level + 1)
 
         _check_levels(root, 0)
@@ -121,6 +118,8 @@ class SimpleOctreeTestCase(unittest.TestCase):
         def _check_parent(node):
             children = node.get_children()
             for child in children:
+                if child == None:
+                    continue
                 # Test that the parent is set correctly for all nodes
                 self.assertTrue(child.get_parent() == node)
                 _check_parent(child)
@@ -139,6 +138,8 @@ class SimpleOctreeTestCase(unittest.TestCase):
             sum_indices[0] += indices.length
             children = node.get_children()
             for child in children:
+                if child == None:
+                    continue
                 _calculate_sum(child, sum_indices)
 
         _calculate_sum(root, sum_indices)
