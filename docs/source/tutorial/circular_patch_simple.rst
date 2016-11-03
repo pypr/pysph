@@ -23,8 +23,8 @@ The tutorials address each of the steps in this flowchart for problems
 with increasing complexity.
 
 The first example we consider is a "patch" test for SPH formulations for
-incompressible fluids in `elliptical_drop.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop.py>`_.
+incompressible fluids in `elliptical_drop_simple.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_.
 This problem simulates the evolution of a 2D circular patch of fluid under the
 influence of an initial velocity field given by:
 
@@ -41,21 +41,16 @@ which makes it an ideal test to verify codes.
 Imports
 ~~~~~~~~~~~~~
 
-Taking a look at the example (see `elliptical_drop.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop.py>`_),
+Taking a look at the example (see `elliptical_drop_simple.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_),
 the first several lines are imports of various modules:
 
 .. code-block:: python
 
-    import os
-    from numpy import array, ones_like, mgrid, sqrt
-    import numpy as np
+    from numpy import ones_like, mgrid, sqrt
 
     from pysph.base.utils import get_particle_array
-    from pysph.base.kernels import Gaussian
-
     from pysph.solver.application import Application
-    from pysph.sph.integrator import EPECIntegrator
     from pysph.sph.scheme import WCSPHScheme
 
 .. note::
@@ -66,6 +61,40 @@ the first several lines are imports of various modules:
     related objects like the solver and integrator are imported from the
     ``solver`` subpackage. Finally, we import from the ``sph`` subpackage, the
     physics related part for this problem.
+
+The organization of the ``pysph`` package is given below.
+
+Organization of the ``pysph`` package
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+PySPH is organized into several sub-packages.  These are:
+
+  - ``pysph.base``: This subpackage defines the
+    :py:class:`pysph.base.particle_array.ParticleArray`, the various
+    :doc:`../reference/kernels`, the nearest neighbor particle search (NNPS)
+    code, and the Cython code generation utilities.
+
+  - ``pysph.sph``: Contains the various :doc:`../reference/equations`, the
+    :doc:`../reference/integrator` and associated integration steppers, and the
+    code generation for the SPH looping. ``pysph.sph.wc`` contains the
+    equations for the weakly compressible formulation.
+    ``pysph.sph.solid_mech`` contains the equations for solid mechanics and
+    ``pysph.sph.misc`` has miscellaneous equations.
+
+  - ``pysph.solver``: Provides the :py:class:`pysph.solver.solver.Solver`, the
+    :py:class:`pysph.solver.application.Application` and a convenient way to
+    interact with the solver as it is running.
+
+  - ``pysph.parallel``: Provides the parallel functionality.
+
+  - ``pysph.tools``: Provides some useful tools including the ``pysph``
+    script CLI and also the data viewer which is based on Mayavi_.
+
+  - ``pysph.examples``: Provides many standard SPH examples.  These examples
+    are meant to be extended by users where needed.  This is extremely handy
+    to reproduce and compare SPH schemes.
+
+
 
 Functions for loading/generating the particles
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -87,8 +116,6 @@ methods implemented on this class:
  - ``create_particles``: this method is where one creates the particles to be
    simulated.
 
- - ``post_process``: optionally post-process the results generated.
-
 Of these, ``create_particles`` and ``create_scheme`` are mandatory for without
 them SPH would be impossible.  The rest (and other methods) are optional.  To
 see a complete listing of possible methods that one can subclass see
@@ -104,7 +131,6 @@ The ``create_particles`` method looks like:
             """Create the circular patch of fluid."""
             dx = self.dx
             hdx = self.hdx
-            co = self.co
             ro = self.ro
             name = 'fluid'
             x, y = mgrid[-1.05:1.05+1e-4:dx, -1.05:1.05+1e-4:dx]
@@ -114,10 +140,6 @@ The ``create_particles`` method looks like:
             m = ones_like(x)*dx*dx
             h = ones_like(x)*hdx*dx
             rho = ones_like(x) * ro
-
-            p = ones_like(x) * 1./7.0 * co**2
-            cs = ones_like(x) * co
-
             u = -100*x
             v = 100*y
 
@@ -127,15 +149,15 @@ The ``create_particles`` method looks like:
                 if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
                     indices.append(i)
 
-            pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-                                    cs=cs, name=name)
+            pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, u=u, v=v,
+                                    name=name)
             pa.remove_particles(indices)
 
-            print("Elliptical drop :: %d particles"%(pa.get_number_of_particles()))
+            print("Elliptical drop :: %d particles"
+                  % (pa.get_number_of_particles()))
+
             self.scheme.setup_properties([pa])
-
             return [pa]
-
 
 .. py:currentmodule:: pysph.base.particle_array
 
@@ -216,15 +238,10 @@ particle properties.  Various solver related parametes are also setup.
                 ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
                 h0=self.dx*self.hdx, hdx=self.hdx, gamma=7.0, alpha=0.1, beta=0.0
             )
-            kernel = Gaussian(dim=2)
-            dt = 5e-6; tf = 0.0076
-            s.configure_solver(
-                kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
-                adaptive_timestep=True, cfl=0.3, n_damp=50,
-                output_at_times=[0.0008, 0.0038]
-            )
+            dt = 5e-6
+            tf = 0.0076
+            s.configure_solver(dt=dt, tf=tf)
             return s
-
 
 As can be seen, various options are configured for the solver, including
 initial damping etc.  The scheme is responsible for:
@@ -233,7 +250,8 @@ initial damping etc.  The scheme is responsible for:
    particles (see :doc:`../reference/equations`),
 
  - setting up the kernel (:doc:`../reference/kernels`) and integrator
-   (:doc:`../reference/integrator`) to use for the simulation.
+   (:doc:`../reference/integrator`) to use for the simulation. In this case a
+   default cubic spline kernel is used.
 
  - setting up the Solver (:doc:`../reference/solver`), which marshalls the
    entire simulation.
@@ -270,22 +288,19 @@ class and run it:
         app = EllipticalDrop()
         app.run()
 
-There is an additional ``post_process`` call in the code which is entirely
-optional and will generate some data for comparison with the exact solution.
-
 The :py:class:`Application` takes care of creating the particles, creating the
 solver, handling command line arguments etc.  Many parameters can be
 configured via the command line, and these will override any parameters setup
 in the respective ``create_*`` methods.  For example one may do the following
 to find out the various options::
 
-    $ pysph run elliptical_drop -h
+    $ pysph run elliptical_drop_simple -h
 
 If we run the example without any arguments it will run until a final time of
 0.0075 seconds.  We can change this example to 0.005 by the
 following::
 
-    $ pysph run elliptical_drop --tf=0.005
+    $ pysph run elliptical_drop_simple --tf=0.005
 
 When this is run, PySPH will generate Cython code from the equations and
 integrators that have been provided, compiles that code and runs the
@@ -298,12 +313,12 @@ intervention.  By default, output files will be generated in the directory
 
 If we wish to utilize multiple cores we could do::
 
-    $ pysph run elliptical_drop --openmp
+    $ pysph run elliptical_drop_simple --openmp
 
 If we wish to run the code in parallel (and have compiled PySPH with Zoltan_
 and mpi4py_) we can do::
 
-    $ mpirun -np 4 pysph run elliptical_drop
+    $ mpirun -np 4 pysph run elliptical_drop_simple
 
 This will automatically parallelize the run using 4 processors. In this example
 doing this will only slow it down as the number of particles is extremely
@@ -316,7 +331,7 @@ You can view the data generated by the simulation (after the simulation
 is complete or during the simulation) by running the ``pysph view``
 command.  To view the simulated data you may do::
 
-    $ pysph view elliptical_drop_output
+    $ pysph view elliptical_drop_simple_output
 
 If you have Mayavi_ installed this should show a UI that looks like:
 
@@ -434,6 +449,35 @@ For more details on the class and the available methods, see
 
 In addition to this there are other useful pre and post-processing utilities
 described in :doc:`../reference/tools`.
+
+A slightly more complex example
+-------------------------------
+
+The first example was very simple. In particular there was no post-processing
+of the results. Many pysph examples also include post processing code in the
+example. This makes it easy to reproduce results and also easily compare
+different schemes. A complete version of the elliptical drop example is
+available at `elliptical_drop.py
+<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop.py>`_.
+
+There are a few things that this example does a bit differently:
+
+ - It some useful code to generate the exact solution for comparison.
+
+ - It uses a ``Gaussian`` kernel and also uses a variety of different options
+   for the solver (see how the ``configure_solver`` is called) for various
+   other options see :py:class:`pysph.solver.solver.Solver`.
+
+ - The ``EllipticalDrop`` class has a ``post_process`` method which optionally
+   post-process the results generated. This in turn uses a couple of private
+   methods ``_compute_results`` and ``_make_final_plot``.
+
+ - The last line of the code has a call to ``app.post_process(...)``, which
+   actually post-processes the data.
+
+This example is therefore a complete example and shows how one could write a
+useful and re-usable PySPH example.
+
 
 Doing more
 ~~~~~~~~~~~
