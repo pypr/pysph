@@ -246,7 +246,7 @@ cdef class Octree:
 
         return node
 
-    cdef int _delete_tree(self, cOctreeNode* node) nogil:
+    cdef int _delete_tree(self, cOctreeNode* node):
         """Delete octree"""
         cdef int i
         cdef cOctreeNode* temp[8]
@@ -334,6 +334,7 @@ cdef class Octree:
                     oct_id = k+2*j+4*i
 
                     if new_indices[oct_id].empty():
+                        del new_indices[oct_id]
                         continue
 
                     xmin_new[0] = xmin[0] + (i - eps)*length/2
@@ -606,6 +607,7 @@ cdef class CompressedOctree(Octree):
 
         for i from 0<=i<8:
             if new_indices[i].empty():
+                del new_indices[i]
                 continue
 
             xmin_current = xmin_new[i]

@@ -85,7 +85,7 @@ cdef class Octree:
             double hmax = *, int level = *, cOctreeNode* parent = *,
             int num_particles = *, bint is_leaf = *) nogil
 
-    cdef int _delete_tree(self, cOctreeNode* node) nogil
+    cdef int _delete_tree(self, cOctreeNode* node)
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
