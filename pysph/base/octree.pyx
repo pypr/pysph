@@ -246,10 +246,12 @@ cdef class Octree:
 
         return node
 
-    cdef inline void _delete_tree(self, cOctreeNode* node) nogil:
+    cdef int _delete_tree(self, cOctreeNode* node) nogil:
         """Delete octree"""
         cdef int i
         cdef cOctreeNode* temp[8]
+        cdef bint is_leaf = node.is_leaf
+        cdef int depth_max = 0
 
         for i from 0<=i<8:
             temp[i] = node.children[i]
@@ -258,13 +260,16 @@ cdef class Octree:
             del node.indices
         free(node)
 
-        if node.is_leaf:
-            return
+        if is_leaf:
+            return 1
 
         for i from 0<=i<8:
             if temp[i] == NULL:
                 continue
-            self._delete_tree(temp[i])
+            depth_max = <int>fmax(self._delete_tree(temp[i]),
+                    depth_max)
+
+        return 1 + depth_max
 
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
@@ -443,14 +448,16 @@ cdef class Octree:
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
-    cpdef delete_tree(self):
+    cpdef int delete_tree(self):
         """ Delete tree"""
+        cdef int depth = 0
         if self.root != NULL:
-            self._delete_tree(self.root)
+            depth = self._delete_tree(self.root)
         if self.leaf_cells != NULL:
             del self.leaf_cells
         self.root = NULL
         self.leaf_cells = NULL
+        return depth
 
     cpdef OctreeNode get_root(self):
         """ Get root of the tree
