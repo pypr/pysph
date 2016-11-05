@@ -30,7 +30,10 @@ cdef class OctreeNode:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def __richcmp__(self, other, int op):
-
+        # Checks if two nodes are the same.
+        # Two nodes are equal if xmin and length are equal.
+        # op = 2 corresponds to "=="
+        # op = 3 corresponds to "!="
         if type(other) != OctreeNode:
             if op == 2:
                 return False
@@ -246,12 +249,10 @@ cdef class Octree:
 
         return node
 
-    cdef int _delete_tree(self, cOctreeNode* node):
+    cdef inline void _delete_tree(self, cOctreeNode* node):
         """Delete octree"""
         cdef int i
         cdef cOctreeNode* temp[8]
-        cdef bint is_leaf = node.is_leaf
-        cdef int depth_max = 0
 
         for i from 0<=i<8:
             temp[i] = node.children[i]
@@ -260,16 +261,10 @@ cdef class Octree:
             del node.indices
         free(node)
 
-        if is_leaf:
-            return 1
-
         for i from 0<=i<8:
             if temp[i] == NULL:
                 continue
-            depth_max = <int>fmax(self._delete_tree(temp[i]),
-                    depth_max)
-
-        return 1 + depth_max
+            self._delete_tree(temp[i])
 
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
@@ -449,16 +444,14 @@ cdef class Octree:
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
-    cpdef int delete_tree(self):
+    cpdef delete_tree(self):
         """ Delete tree"""
-        cdef int depth = 0
         if self.root != NULL:
-            depth = self._delete_tree(self.root)
+            self._delete_tree(self.root)
         if self.leaf_cells != NULL:
             del self.leaf_cells
         self.root = NULL
         self.leaf_cells = NULL
-        return depth
 
     cpdef OctreeNode get_root(self):
         """ Get root of the tree
