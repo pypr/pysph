@@ -136,6 +136,8 @@ cdef class OctreeNNPS(NNPS):
             return
 
         for i from 0<=i<8:
+            if node.children[i] == NULL:
+                continue
             self._get_neighbors(q_x, q_y, q_z, q_h,
                     src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
                     nbrs, node.children[i])

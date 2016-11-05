@@ -29,7 +29,15 @@ cdef class OctreeNode:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def __richcmp__(self, OctreeNode other, int op):
+    def __richcmp__(self, other, int op):
+
+        if type(other) != OctreeNode:
+            if op == 2:
+                return False
+            if op == 3:
+                return True
+            return NotImplemented
+
         cdef bint equal_xmin, equal_length
         equal_xmin = True
         equal_length = (self.length == other.length)
@@ -77,7 +85,8 @@ cdef class OctreeNode:
         if not self._node.is_leaf:
             return UIntArray()
         cdef UIntArray py_indices = UIntArray()
-        py_indices.c_set_view(&self._node.indices.front(), self._node.num_particles)
+        py_indices.c_set_view(&self._node.indices.front(),
+                self._node.num_particles)
         return py_indices
 
     cpdef OctreeNode get_parent(self):
@@ -107,9 +116,13 @@ cdef class OctreeNode:
         if self._node.is_leaf:
             return []
         cdef int i
-        cdef list py_children = [OctreeNode() for i in range(8)]
+        cdef list py_children = [None for i in range(8)]
+        cdef OctreeNode py_node
         for i from 0<=i<8:
-            (<OctreeNode>py_children[i]).wrap_node(self._node.children[i])
+            if self._node.children[i] != NULL:
+                py_node = OctreeNode()
+                py_node.wrap_node(self._node.children[i])
+                py_children[i] = py_node
         return py_children
 
     @cython.boundscheck(False)
@@ -233,10 +246,12 @@ cdef class Octree:
 
         return node
 
-    cdef inline void _delete_tree(self, cOctreeNode* node) nogil:
+    cdef int _delete_tree(self, cOctreeNode* node):
         """Delete octree"""
-        cdef int i, j, k
+        cdef int i
         cdef cOctreeNode* temp[8]
+        cdef bint is_leaf = node.is_leaf
+        cdef int depth_max = 0
 
         for i from 0<=i<8:
             temp[i] = node.children[i]
@@ -245,11 +260,16 @@ cdef class Octree:
             del node.indices
         free(node)
 
+        if is_leaf:
+            return 1
+
         for i from 0<=i<8:
             if temp[i] == NULL:
-                return
-            else:
-                self._delete_tree(temp[i])
+                continue
+            depth_max = <int>fmax(self._delete_tree(temp[i]),
+                    depth_max)
+
+        return 1 + depth_max
 
     @cython.cdivision(True)
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
@@ -311,13 +331,17 @@ cdef class Octree:
             for j from 0<=j<2:
                 for k from 0<=k<2:
 
+                    oct_id = k+2*j+4*i
+
+                    if new_indices[oct_id].empty():
+                        del new_indices[oct_id]
+                        continue
+
                     xmin_new[0] = xmin[0] + (i - eps)*length/2
                     xmin_new[1] = xmin[1] + (j - eps)*length/2
                     xmin_new[2] = xmin[2] + (k - eps)*length/2
 
                     eps_new = 2*self._get_eps(length_padded, xmin_new)
-
-                    oct_id = k+2*j+4*i
 
                     node.children[oct_id] = self._new_node(xmin_new, length_padded,
                             hmax=hmax_children[oct_id], level=level+1, parent=node)
@@ -336,6 +360,8 @@ cdef class Octree:
         cdef list children = node.get_children()
 
         for child in children:
+            if child == None:
+                continue
             self._plot_tree(child, ax)
 
     cdef void _c_get_leaf_cells(self, cOctreeNode* node):
@@ -423,14 +449,16 @@ cdef class Octree:
         cdef NNPSParticleArrayWrapper pa_wrapper = NNPSParticleArrayWrapper(pa)
         return self.c_build_tree(pa_wrapper)
 
-    cpdef delete_tree(self):
+    cpdef int delete_tree(self):
         """ Delete tree"""
+        cdef int depth = 0
         if self.root != NULL:
-            self._delete_tree(self.root)
+            depth = self._delete_tree(self.root)
         if self.leaf_cells != NULL:
             del self.leaf_cells
         self.root = NULL
         self.leaf_cells = NULL
+        return depth
 
     cpdef OctreeNode get_root(self):
         """ Get root of the tree
@@ -578,6 +606,10 @@ cdef class CompressedOctree(Octree):
         del indices
 
         for i from 0<=i<8:
+            if new_indices[i].empty():
+                del new_indices[i]
+                continue
+
             xmin_current = xmin_new[i]
             xmax_current = xmax_new[i]
 
@@ -602,7 +634,6 @@ cdef class CompressedOctree(Octree):
                     xmin_current, length_padded, node.children[i], level+1)
 
             depth_max = <int>fmax(depth_max, depth_child)
-
 
         return 1 + depth_max
 
