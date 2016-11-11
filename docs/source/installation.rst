@@ -272,8 +272,9 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  $ edm install mayavi pyside cython matplotlib jupyter nose mock
+  $ edm install mayavi pyside cython matplotlib jupyter nose mock pip psutil
   $ edm shell
+  $ pip install mako execnet
 
 - With this done, you should be able to install PySPH relatively easily, see
   :ref:`building-pysph`.
@@ -390,8 +391,9 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  > edm install mayavi pyside cython matplotlib jupyter nose mock
+  > edm install mayavi pyside cython matplotlib jupyter nose mock pip psutil
   > edm shell
+  > pip install mako execnet
 
 Once you are done with this, please skip ahead to
 :ref:`installing-visual-c++`.
@@ -473,16 +475,16 @@ Installing Visual C++ Compiler for Python 2.7
 
 For all of the above Python distributions, it is highly recommended that you
 build PySPH with `Microsoft's Visual C++ for Python 2.7
-<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_.  We
+<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_. We
 recommend that you download and install the ``VCForPython27.msi`` available
 from the `link
-<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_.  **Make sure
-you install the system requirements specified on that page**.  For example, on
-Windows 7 you will need to install the Microsoft Visual C++ 2008 SP1
-Redistributable Package for your platform (x86 for 32 bit or x64 for 64 bit)
-and on Windows 8 you will need to install the .NET framework 3.5.  Please look
-at the link given above, it should be fairly straightforward.  Note that doing
-this will also get OpenMP_ working for you.
+<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_. **Make sure
+you install the system requirements specified on that page**. For example, you
+will need to install the Microsoft Visual C++ 2008 SP1 Redistributable Package
+for your platform (x86 for 32 bit or x64 for 64 bit) and on Windows 8 and
+above you will need to install the .NET framework 3.5. Please look at the link
+given above, it should be fairly straightforward. Note that doing this will
+also get OpenMP_ working for you.
 
 After you do this, you will find a "Microsoft Visual C++ Compiler Package for
 Python 2.7" in your Start menu.  Choose a suitable command prompt from this
