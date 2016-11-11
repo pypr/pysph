@@ -6,10 +6,10 @@ Installation and getting started
 
 To install PySPH, you need a working Python environment with the required
 dependencies installed. You may use any of the available Python distributions.
-PySPH is currently tested with Python-2.6.x, 2.7.x and 3.4.x.  If you are new
-to Python we recommend `Enthought Canopy`_. PySPH will work fine with Anaconda_
-or other environments like WinPython_.  The following instructions should help
-you get started.
+PySPH is currently tested with Python-2.6.x, 2.7.x and 3.4.x. If you are new
+to Python we recommend `Enthought Canopy`_ or EDM_. PySPH will work fine with
+Anaconda_ or other environments like WinPython_. The following instructions
+should help you get started.
 
 Since there is a lot of information here, we suggest that you skim the section
 on :ref:`dependencies` and then directly jump to one of the "Installing the
@@ -20,6 +20,12 @@ and links referred therein.
 .. contents::
     :local:
     :depth: 1
+
+
+.. _Enthought Canopy: https://www.enthought.com/products/canopy/
+.. _EDM: https://www.enthought.com/products/edm/
+.. _Anaconda: http://continuum.io/downloads
+
 
 .. _quick-install:
 
@@ -94,12 +100,10 @@ equivalent compiler.  More details are available below.
 
 
 .. _NumPy: http://numpy.scipy.org
-.. _Enthought Canopy: https://www.enthought.com/products/canopy/
 .. _Cython: http://www.cython.org
 .. _nose: https://pypi.python.org/pypi/nose
 .. _Mako: https://pypi.python.org/pypi/Mako
 .. _pip: http://www.pip-installer.org
-.. _Anaconda: http://continuum.io/downloads
 
 ^^^^^^^^^^^^^^^^^^^^^^
 Optional dependencies
@@ -168,6 +172,12 @@ be compiled and available.
 Installing the dependencies on GNU/Linux
 -----------------------------------------
 
+If you are using `Enthought Canopy`_ EDM_ or Anaconda_ the instructions in the
+section :ref:`installing-deps-osx` will be useful as the instructions are
+similar. The following are for the case where you wish to use the native
+Python packages distributed with the Linux distribution you are using.
+
+
 GNU/Linux is probably the easiest platform to install PySPH. On Ubuntu one may
 install the dependencies using::
 
@@ -196,10 +206,6 @@ short do the following::
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
 
-If you are using `Enthought Canopy`_ or Anaconda_ the instructions in the
-section :ref:`installing-deps-osx` will be useful as the instructions are
-similar.
-
 .. note::
 
     If you wish to see a working build/test script please see our
@@ -219,9 +225,9 @@ similar.
 Installing the dependencies on Mac OS X
 ------------------------------------------
 
-On OS X, your best bet is to install `Enthought Canopy`_ or Anaconda_ or some
-other Python distribution.  Ensure that you have gcc or clang installed by
-installing XCode.  See `this
+On OS X, your best bet is to install `Enthought Canopy`_, EDM_, or Anaconda_
+or some other Python distribution. Ensure that you have gcc or clang installed
+by installing XCode. See `this
 <http://stackoverflow.com/questions/12228382/after-install-xcode-where-is-clang>`_
 if you installed XCode but can't find clang or gcc.
 
@@ -231,7 +237,7 @@ OpenMP on OSX
 
 If you need to use OpenMP_, the default clang compiler on OSX does not support
 it.  There are some experimental versions available.  One easy to install
-option is to use brew to install gcc.  For example you can try::
+option is to use brew_ to install gcc.  For example you can try::
 
     $ sudo brew install gcc
 
@@ -247,6 +253,30 @@ the Python to use this by setting::
     $ export CC=gcc-4.9
     $ export CXX=g++-4.9
 
+.. _brew: http://brew.sh/
+
+
+.. _using_edm_osx:
+
+^^^^^^^^^^^
+Using EDM
+^^^^^^^^^^^
+
+It is very easy to install all the dependencies with the Enthought Deployment
+Manager (EDM_).
+
+- `Download the EDM installer
+  <https://www.enthought.com/products/edm/installers>`_ if you do not already
+  have it installed. Install the appropriate installer package for your
+  system.
+
+- Once you have installed EDM, run the following::
+
+  $ edm install mayavi pyside cython matplotlib jupyter nose mock
+  $ edm shell
+
+- With this done, you should be able to install PySPH relatively easily, see
+  :ref:`building-pysph`.
 
 
 ^^^^^^^^^^^^^
@@ -275,19 +305,29 @@ If you need parallel support, please see :ref:`installing-mpi-osx`, otherwise,
 skip to :ref:`downloading-pysph` and :ref:`building-pysph`.
 
 
+.. _using_conda_osx:
+
 ^^^^^^^^^^^^^^^
 Using Anaconda
 ^^^^^^^^^^^^^^^
 
-After installing Anaconda, you will need to make sure the dependencies are
-installed::
+After installing Anaconda or miniconda_, you will need to make sure the
+dependencies are installed. You can create a separate environment as follows::
 
-    $ conda install cython mayavi
-    $ pip install mako
+    $ conda create -n pysph_env
+    $ source activate pysph_env
+
+Now you can install the necessary packages::
+
+    $ conda install -c conda-forge cython mako matplotlib jupyter pyside nose mock
+    $ conda install -c menpo mayavi
+
 
 If you need parallel support, please see :ref:`installing-mpi-osx`, otherwise,
 skip to :ref:`downloading-pysph` and :ref:`building-pysph`.
 
+
+.. _miniconda: http://conda.pydata.org/miniconda.html
 
 .. _installing-mpi-osx:
 
@@ -335,6 +375,27 @@ While it should be possible to use mpi4py and Zoltan on Windows, we do not at
 this point have much experience with this. Feel free to experiment and let us
 know if you'd like to share your instructions.  The following instructions
 are all without parallel support.
+
+^^^^^^^^^^^
+Using EDM
+^^^^^^^^^^^
+
+It is very easy to install all the dependencies with the Enthought Deployment
+Manager (EDM_).
+
+- `Download the EDM installer
+  <https://www.enthought.com/products/edm/installers>`_ if you do not already
+  have it installed. Install the appropriate installer package for your
+  system.
+
+- Once you have installed EDM, run the following::
+
+  > edm install mayavi pyside cython matplotlib jupyter nose mock
+  > edm shell
+
+Once you are done with this, please skip ahead to
+:ref:`installing-visual-c++`.
+
 
 ^^^^^^^^^^^^^^
 Using Canopy
