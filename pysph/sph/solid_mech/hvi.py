@@ -28,6 +28,21 @@ class VonMisesPlasticity2D(Equation):
         d_s01[d_idx] = scale * s01a
         d_s11[d_idx] = scale * s11a
 
+# Stiffened-gas EOS from "A Free Lagrange Augmented Godunov Method for the
+# Simulation of Elastic-Plastic Solids", B. P. Howell and G. J. Ball, JCP
+# (2002)
+class StiffenedGasEOS(Equation):
+    def __init__(self, dest, sources, gamma, r0, c0):
+        self.gamma = gamma # Gruneisen gamma
+        self.c0    = c0    # unshocked sound speed
+        self.r0    = r0    # reference density
+
+        super(StiffenedGasEOS,self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_e, d_rho, d_p, d_cs):
+        d_p[ d_idx] = self.c0*self.c0 * (d_rho[d_idx] - self.r0) + (self.gamma - 1.0)*d_rho[d_idx]*d_e[d_idx] # Eq. (17)
+        d_cs[d_idx] = sqrt( self.c0*self.c0 + (self.gamma-1.0)*(d_e[d_idx] + d_p[d_idx]/d_rho[d_idx]) )       # Eq. (21)
+
 class MieGruneisenEOS(Equation):
     def __init__(self, dest, sources, gamma,r0, c0, S):
 
