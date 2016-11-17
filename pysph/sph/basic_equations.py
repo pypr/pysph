@@ -84,6 +84,54 @@ class VelocityGradient2D(Equation):
         d_v10[d_idx] += tmp * -VIJ[1] * DWIJ[0]
         d_v11[d_idx] += tmp * -VIJ[1] * DWIJ[1]
 
+class VelocityGradient3D(Equation):
+    r""" Compute the SPH evaluation for the velocity gradient tensor in 2D.
+
+    The expression for the velocity gradient is:
+
+    :math:`\frac{\partial v^i}{\partial x^j} = \sum_{b}\frac{m_b}{\rho_b}(v_b
+    - v_a)\frac{\partial W_{ab}}{\partial x_a^j}`
+
+    Notes
+    -----
+    The tensor properties are stored in the variables v_ij where 'i'
+    refers to the velocity component and 'j' refers to the spatial
+    component. Thus v_21 is :math:`\frac{\partial v}{\partial x}`
+
+    """
+    def initialize(self, d_idx, d_v00, d_v01, d_v02, d_v10, d_v11, d_v12, d_v20, d_v21, d_v22):
+        d_v00[d_idx] = 0.0
+        d_v01[d_idx] = 0.0
+        d_v02[d_idx] = 0.0
+
+        d_v10[d_idx] = 0.0
+        d_v11[d_idx] = 0.0
+        d_v12[d_idx] = 0.0
+
+        d_v20[d_idx] = 0.0
+        d_v21[d_idx] = 0.0
+        d_v22[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_m, s_rho,
+             d_v00, d_v01, d_v02, 
+             d_v10, d_v11, d_v12,
+             d_v20, d_v21, d_v22,
+             DWIJ, VIJ):
+
+        tmp = s_m[s_idx]/s_rho[s_idx]
+
+        d_v00[d_idx] += tmp * -VIJ[0] * DWIJ[0]
+        d_v01[d_idx] += tmp * -VIJ[0] * DWIJ[1]
+        d_v02[d_idx] += tmp * -VIJ[0] * DWIJ[2]
+
+        d_v10[d_idx] += tmp * -VIJ[1] * DWIJ[0]
+        d_v11[d_idx] += tmp * -VIJ[1] * DWIJ[1]
+        d_v12[d_idx] += tmp * -VIJ[1] * DWIJ[2]
+
+        d_v20[d_idx] += tmp * -VIJ[2] * DWIJ[0]
+        d_v21[d_idx] += tmp * -VIJ[2] * DWIJ[1]
+        d_v22[d_idx] += tmp * -VIJ[2] * DWIJ[2]
+
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 

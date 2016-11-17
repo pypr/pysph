@@ -12,11 +12,18 @@ class VonMisesPlasticity2D(Equation):
         self.factor = sqrt( 2.0/3.0 )*flow_stress
         super(VonMisesPlasticity2D,self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_s00, d_s01, d_s11):
+    def loop(self, d_idx, d_s00, d_s01, d_s02, d_s11, d_s12, d_s22):
         s00a = d_s00[d_idx]
         s01a = d_s01[d_idx]
+        s02a = d_s02[d_idx]
+
         s10a = d_s01[d_idx]
         s11a = d_s11[d_idx]
+        s12a = d_s12[d_idx]
+
+        s20a = d_s02[d_idx]
+        s21a = d_s12[d_idx]
+        s22a = d_s22[d_idx]
 
         J = s00a* s00a + 2.0 * s01a*s10a + s11a*s11a
         scale = 1.0
@@ -26,7 +33,12 @@ class VonMisesPlasticity2D(Equation):
         # store the stresses
         d_s00[d_idx] = scale * s00a
         d_s01[d_idx] = scale * s01a
+        d_s02[d_idx] = scale * s02a
+
         d_s11[d_idx] = scale * s11a
+        d_s12[d_idx] = scale * s12a
+
+        d_s22[d_idx] = scale * s22a
 
 # Stiffened-gas EOS from "A Free Lagrange Augmented Godunov Method for the
 # Simulation of Elastic-Plastic Solids", B. P. Howell and G. J. Ball, JCP

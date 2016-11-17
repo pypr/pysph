@@ -16,8 +16,8 @@ from pysph.sph.basic_equations import ContinuityEquation, \
     MonaghanArtificialViscosity, XSPHCorrection, VelocityGradient2D
 
 # baic stress equations
-from pysph.sph.solid_mech.basic import HookesDeviatoricStressRate2D,\
-    MomentumEquationWithStress2D, EnergyEquationWithStress2D
+from pysph.sph.solid_mech.basic import HookesDeviatoricStressRate,\
+    MomentumEquationWithStress, EnergyEquationWithStress
 
 # plasticity model and eos
 from pysph.sph.solid_mech.hvi import VonMisesPlasticity2D, MieGruneisenEOS
@@ -96,7 +96,7 @@ class TaylorBar(Application):
         # add requisite properties
 
         # velocity gradient for the bar
-        for name in ('v00', 'v01', 'v10', 'v11'):
+        for name in ('v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20', 'v21', 'v22'):
             bar.add_property(name)
 
         # deviatoric stress components
@@ -114,7 +114,7 @@ class TaylorBar(Application):
         bar.add_property('e0')
 
         # artificial stress properties
-        for name in ('r00', 'r01', 'r11'):
+        for name in ('r00', 'r01', 'r02', 'r11', 'r12', 'r22'):
             bar.add_property(name)
 
         # standard acceleration variables and initial values.
@@ -164,7 +164,7 @@ class TaylorBar(Application):
                     ContinuityEquation(dest='bar', sources=['bar']),
 
                     # au, av
-                    MomentumEquationWithStress2D(
+                    MomentumEquationWithStress(
                         dest='bar', sources=['bar'], n=4, wdeltap=self.wdeltap),
 
                     # au, av
@@ -176,11 +176,11 @@ class TaylorBar(Application):
                         dest='bar', sources=['plate'], deltap=dx),
 
                     # ae
-                    EnergyEquationWithStress2D(dest='bar', sources=['bar'],
+                    EnergyEquationWithStress(dest='bar', sources=['bar'],
                                                alpha=0.5, beta=0.5, eta=0.01),
 
                     # a_s00, a_s01, a_s11
-                    HookesDeviatoricStressRate2D(
+                    HookesDeviatoricStressRate(
                         dest='bar', sources=None, shear_mod=G),
 
                     # ax, ay, az

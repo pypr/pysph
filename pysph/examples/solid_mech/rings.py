@@ -7,7 +7,7 @@ import numpy
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import IsothermalEOS, ContinuityEquation, MonaghanArtificialViscosity,\
      XSPHCorrection, VelocityGradient2D
-from pysph.sph.solid_mech.basic import MomentumEquationWithStress2D, HookesDeviatoricStressRate2D,\
+from pysph.sph.solid_mech.basic import MomentumEquationWithStress, HookesDeviatoricStressRate,\
     MonaghanArtificialStress
 
 from pysph.base.utils import get_particle_array
@@ -92,7 +92,7 @@ class Rings(Application):
         add_properties(pa, 'cs', 'e' )
 
         # velocity gradient properties
-        add_properties(pa, 'v00', 'v01', 'v10', 'v11')
+        add_properties(pa, 'v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20', 'v21', 'v22')
 
         # artificial stress properties
         add_properties(pa, 'r00', 'r01', 'r02', 'r11', 'r12', 'r22')
@@ -160,7 +160,7 @@ class Rings(Application):
                     ContinuityEquation(dest='solid', sources=['solid',]),
 
                     # au, av
-                    MomentumEquationWithStress2D(
+                    MomentumEquationWithStress(
                         dest='solid', sources=['solid',], n=4, wdeltap=self.wdeltap),
 
                     # au, av
@@ -168,7 +168,7 @@ class Rings(Application):
                         dest='solid', sources=['solid',], alpha=1.0, beta=1.0),
 
                     # a_s00, a_s01, a_s11
-                    HookesDeviatoricStressRate2D(
+                    HookesDeviatoricStressRate(
                         dest='solid', sources=None, shear_mod=G),
 
                     # ax, ay, az

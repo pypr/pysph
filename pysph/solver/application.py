@@ -738,7 +738,7 @@ class Application(object):
         tf = options.final_time
         if tf is not None:
             solver.set_final_time(tf)
-
+            
         solver.set_max_steps(self.options.max_steps)
 
         # Setup the solver output file name

@@ -6,7 +6,7 @@ import numpy
 from pysph.sph.equation import Group
 
 from pysph.sph.basic_equations import IsothermalEOS, ContinuityEquation, MonaghanArtificialViscosity,\
-     XSPHCorrection, VelocityGradient2D
+     XSPHCorrection, VelocityGradient3D
 
 from pysph.sph.solid_mech.basic import MomentumEquationWithStress, HookesDeviatoricStressRate,\
     MonaghanArtificialStress, EnergyEquationWithStress
@@ -27,7 +27,7 @@ def add_properties(pa, *props):
         pa.add_property(name=prop)
 
 # Parameters
-dx = dy = 0.0001 # m
+dx = dy = dz = 0.0005 # m
 hdx = 1.3
 h = hdx*dx
 r = 0.005
@@ -86,28 +86,28 @@ eps = 0.5
 # Particle creation rouintes
 def get_projectile_particles():
 
-    x,y = numpy.mgrid[-r:r:dx, -r:r:dx]
+    x, y, z = numpy.mgrid[-r:r+1e-6:dx, -r:r+1e-6:dx, -r:r+1e-6:dx]
     x = x.ravel()
     y = y.ravel()
+    z = z.ravel()
     
-    d = (x*x+y*y)
+    d = (x*x+y*y+z*z)
     keep = numpy.flatnonzero(d<=r*r)
     x = x[keep]
     y = y[keep]
+    z = z[keep]
 
     x = x-(r+2*dx)
     print('%d Projectile particles'%len(x))
 
     hf = numpy.ones_like(x) * h
-    mf = numpy.ones_like(x) * dx * dy * ro2 
+    mf = numpy.ones_like(x) * dx * dy * dz * ro2 
     rhof = numpy.ones_like(x) * ro2
-    csf = numpy.ones_like(x) * cs2
-    z = numpy.zeros_like(x)
-
-    u = numpy.ones_like(x) * v_s
+    csf  = numpy.ones_like(x) * cs2
+    u    = numpy.ones_like(x) * v_s
 
     pa = projectile = get_particle_array(
-        name="projectile", x=x, y=y, h=hf, m=mf, rho=rhof, cs=csf, u=u)
+        name="projectile", x=x, y=y, z=z, h=hf, m=mf, rho=rhof, cs=csf, u=u)
 
     # add requisite properties
     # sound speed etc.
@@ -142,19 +142,21 @@ def get_projectile_particles():
 def get_plate_particles():
     xarr = numpy.arange(0, 0.002+dx, dx)
     yarr = numpy.arange(-0.020, 0.02+dx, dx)
-    
-    x,y = numpy.meshgrid( xarr, yarr )
-    x, y = x.ravel(), y.ravel()                    
+    zarr = numpy.arange(-0.02, 0.02+dx, dx)
+
+    x, y, z = numpy.mgrid[0:0.002+dx:dx, -0.02:0.02+dx:dx, -0.02:0.02+dx:dx]
+    x = x.ravel()
+    y = y.ravel()
+    z = z.ravel()                          
 
     print('%d Target particles'%len(x))
 
     hf = numpy.ones_like(x) * h
-    mf = numpy.ones_like(x) * dx * dy * ro1 
+    mf = numpy.ones_like(x) * dx * dy * dz * ro1 
     rhof = numpy.ones_like(x) * ro1
     csf = numpy.ones_like(x) * cs1
-    z = numpy.zeros_like(x)
     pa = plate = get_particle_array(name="plate",
-                                    x=x, y=y, h=hf, m=mf, rho=rhof, cs=csf)
+                                    x=x, y=y, z=z, h=hf, m=mf, rho=rhof, cs=csf)
 
     # add requisite properties
     # sound speed etc.
@@ -196,13 +198,14 @@ class Impact(Application):
         return [plate, projectile]
 
     def create_solver(self):
-        kernel = Gaussian(dim=2)
-        #kernel = WendlandQuintic(dim=2)
+        dim=3
+        kernel = Gaussian(dim=dim)
+        #kernel = WendlandQuintic(dim=dim)
 
         self.wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
 
         integrator = EPECIntegrator(projectile=SolidMechStep(), plate=SolidMechStep())
-        solver     = Solver(kernel=kernel, dim=2, integrator=integrator)
+        solver     = Solver(kernel=kernel, dim=dim, integrator=integrator)
 
         dt = 1e-9
         tf = 8e-6
@@ -217,8 +220,8 @@ class Impact(Application):
             # update smoothing length
             # Group(
             #     equations = [
-            #         UpdateSmoothingLengthFromVolume(dest='plate',      sources=['plate', 'projectile'], dim=2, k=hdx),
-            #         UpdateSmoothingLengthFromVolume(dest='projectile', sources=['plate', 'projectile'], dim=2, k=hdx),
+            #         UpdateSmoothingLengthFromVolume(dest='plate',      sources=['plate', 'projectile'], dim=dim, k=hdx),
+            #         UpdateSmoothingLengthFromVolume(dest='projectile', sources=['plate', 'projectile'], dim=dim, k=hdx),
             #     ],
             #     update_nnps=True,
             # ),
@@ -235,14 +238,14 @@ class Impact(Application):
                     StiffenedGasEOS(dest='projectile', sources=None, gamma=gamma2, r0=ro2 , c0=C2),
 
                     # compute the velocity gradient tensor
-                    VelocityGradient2D(dest='plate',      sources=['plate']),
-                    VelocityGradient2D(dest='projectile', sources=['projectile']),
+                    VelocityGradient3D(dest='plate',      sources=['plate']),
+                    VelocityGradient3D(dest='projectile', sources=['projectile']),
 
-                    # stress
+                    # # stress
                     VonMisesPlasticity2D(dest='plate',      sources=None, flow_stress=Yo1),
                     VonMisesPlasticity2D(dest='projectile', sources=None, flow_stress=Yo2),
 
-                    # artificial stress to avoid clumping
+                    # # artificial stress to avoid clumping
                     MonaghanArtificialStress(dest='plate',      sources=None, eps=0.3),
                     MonaghanArtificialStress(dest='projectile', sources=None, eps=0.3),
 
@@ -268,18 +271,18 @@ class Impact(Application):
                     EnergyEquationWithStress(dest='projectile', sources=['projectile','plate',], 
                                                alpha=avisc_alpha, beta=avisc_beta,  eta=avisc_eta),
                                                
-                    # avisc
+                    #avisc
                     MonaghanArtificialViscosity(dest='plate',     sources=['projectile','plate'], 
                                                 alpha=avisc_alpha, beta=avisc_beta),
 
                     MonaghanArtificialViscosity(dest='projectile', sources=['projectile','plate'], 
                                                alpha=avisc_alpha, beta=avisc_beta),
                     
-                    # updates to the stress term
+                    #updates to the stress term
                     HookesDeviatoricStressRate(dest='plate',      sources=None, shear_mod=G1),
                     HookesDeviatoricStressRate(dest='projectile', sources=None, shear_mod=G2),
 
-                    # position stepping
+                    #position stepping
                     XSPHCorrection(dest='plate',      sources=['plate'],      eps=xsph_eps),
                     XSPHCorrection(dest='projectile', sources=['projectile'], eps=xsph_eps),
                     
