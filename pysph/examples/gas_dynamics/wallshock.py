@@ -33,8 +33,8 @@ class WallShock(ShockTubeSetup):
 
     def add_user_options(self, group):
         group.add_argument(
-            "--kernel_factor", action="store", type=float,
-            dest="kernel_factor", default=1.5,
+            "--hdx", action="store", type=float,
+            dest="hdx", default=1.5,
             help="Kernel_factor (default 2.5)"
         )
         group.add_argument(
@@ -44,19 +44,19 @@ class WallShock(ShockTubeSetup):
 
     def consume_user_options(self):
         self.nl = self.options.nl
-        self.kernel_factor = self.options.kernel_factor
+        self.hdx = self.options.hdx
         ratio = self.rhor/self.rhol
         self.nr = ratio*self.nl
         self.dxl = 0.5/self.nl
         self.dxr = 0.5/self.nr
-        self.h0 = self.kernel_factor * self.dxr
-        self.hdx = self.kernel_factor
+        self.h0 = self.hdx * self.dxr
+        self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=self.dxl, dxr=self.dxr,
-                                       m=self.dxl, pl=self.pl, pr=self.pr, h0=self.h0,
-                                       bx=0.02, gamma1=gamma1, ul=self.ul,
-                                       ur=self.ur)
+        return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=self.dxl,
+                                       dxr=self.dxr, m=self.dxl, pl=self.pl,
+                                       pr=self.pr, h0=self.h0, bx=0.02,
+                                       gamma1=gamma1, ul=self.ul, ur=self.ur)
 
     def create_scheme(self):
         self.dt = dt

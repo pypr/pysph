@@ -29,9 +29,9 @@ class SodShockTube(ShockTubeSetup):
 
     def add_user_options(self, group):
         group.add_argument(
-            "--kernel_factor", action="store", type=float,
-            dest="kernel_factor", default=1.2,
-            help="Kernel_factor (default 2.5)"
+            "--hdx", action="store", type=float,
+            dest="hdx", default=1.2,
+            help="Kernel-factor"
         )
         group.add_argument(
             "--nl", action="store", type=float, dest="nl", default=320,
@@ -40,13 +40,13 @@ class SodShockTube(ShockTubeSetup):
 
     def consume_user_options(self):
         self.nl = self.options.nl
-        self.kernel_factor = self.options.kernel_factor
+        self.hdx = self.options.hdx
         ratio = self.rhor/self.rhol
         self.nr = ratio*self.nl
         self.dxl = 0.5/self.nl
         self.dxr = 0.5/self.nr
-        self.h0 = self.kernel_factor * self.dxr
-        self.hdx = self.kernel_factor
+        self.h0 = self.hdx * self.dxr
+        self.hdx = self.hdx
 
     def create_particles(self):
         return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=self.dxl,

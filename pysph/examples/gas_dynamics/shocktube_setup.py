@@ -138,7 +138,7 @@ class ShockTubeSetup(Application):
         ratio = self.rhor/self.rhol
         nr = ratio*self.nl
         dxr = 0.5/self.nr
-        h0 = self.kernel_factor * self.dxr
+        h0 = self.hdx * self.dxr
         if self.options.scheme == 'mpm':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)

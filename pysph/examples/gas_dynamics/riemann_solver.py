@@ -16,10 +16,8 @@ def set_gamma(g):
     gp1 = gamma + 1.0
 
 
-def solve(
-        x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0,
-        p_r=0.1, rho_l=1.0, rho_r=0.125, u_l=0.0, u_r=0.0, N=101
-        ):
+def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
+          rho_r=0.125, u_l=0.0, u_r=0.0, N=101):
     """ Computes the exact solution to Riemann problem.
     References
     ----------
@@ -34,6 +32,7 @@ def solve(
     p_l, u_l, rho_l -- pressure, velocity, density in the left region
     p_r, u_r, rho_r -- pressure, velocity, density in the right region
     N -- number of points under study
+    The default arguments mentioned correspond to the Sod shock tube
     """
     c_l = sqrt(gamma * p_l / rho_l)
     c_r = sqrt(gamma * p_r / rho_r)
@@ -66,7 +65,7 @@ def solve(
     return map(numpy.asarray, [density, velocity, pressure, energy, x])
 
 
-def __flux_fsolve(pressure, rho1, c1, p1):
+def _flux_fsolve(pressure, rho1, c1, p1):
     if pressure <= p1:  # Rarefaction
         return lambda p: (2 / gm1) * c1 * ((p / p1)**gm1_2g - 1.0)
     else:  # Shock
@@ -78,41 +77,41 @@ def __flux_fsolve(pressure, rho1, c1, p1):
 def star_pu_fsolve(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
     p_min = min(p_l, p_r)
     p_max = max(p_l, p_r)
-    f_min = __flux_fsolve(p_min, rho_l, c_l, p_l)(p_min) + \
-        __flux_fsolve(p_min, rho_r, c_r, p_r)(p_min) + u_r - u_l
-    f_max = __flux_fsolve(p_max, rho_l, c_l, p_l)(p_max) + \
-        __flux_fsolve(p_max, rho_r, c_r, p_r)(p_max) + u_r - u_l
+    f_min = _flux_fsolve(p_min, rho_l, c_l, p_l)(p_min) + \
+        _flux_fsolve(p_min, rho_r, c_r, p_r)(p_min) + u_r - u_l
+    f_max = _flux_fsolve(p_max, rho_l, c_l, p_l)(p_max) + \
+        _flux_fsolve(p_max, rho_r, c_r, p_r)(p_max) + u_r - u_l
     if (f_min > 0 and f_max > 0):
         p_guess = 0.5 * (0 + p_min)
-        p_star, u_star = __star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                   u_r, p_r, c_r, p_guess)
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
+                                  u_r, p_r, c_r, p_guess)
     elif(f_min <= 0 and f_max >= 0):
         p_guess = (p_l + p_r) * 0.5
-        p_star, u_star = __star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                   u_r, p_r, c_r, p_guess)
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
+                                  u_r, p_r, c_r, p_guess)
     else:
         p_guess = 2 * p_max
-        p_star, u_star = __star_pu(rho_l, u_l, p_l, c_l, rho_r,
-                                   u_r, p_r, c_r, p_guess)
+        p_star, u_star = _star_pu(rho_l, u_l, p_l, c_l, rho_r,
+                                  u_r, p_r, c_r, p_guess)
     return p_star, u_star
 
 
-def __star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r, p_guess):
+def _star_pu(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r, p_guess):
     """Computes the pressure and velocity in the star region using fsolve
        from scipy module"""
-    fl = __flux_fsolve(p_guess, rho_l, c_l, p_l)
-    fr = __flux_fsolve(p_guess, rho_r, c_r, p_r)
+    fl = _flux_fsolve(p_guess, rho_l, c_l, p_l)
+    fr = _flux_fsolve(p_guess, rho_r, c_r, p_r)
     f = lambda p: fl(p) + fr(p) + u_r - u_l
     from scipy.optimize import fsolve
     p_star = fsolve(f, 0.0)
     u_star = (
-        0.5 * (u_l + u_r + __flux_fsolve(p_star, rho_r, c_r, p_r)(p_star) -
-               __flux_fsolve(p_star, rho_l, c_l, p_l)(p_star))
+        0.5 * (u_l + u_r + _flux_fsolve(p_star, rho_r, c_r, p_r)(p_star) -
+               _flux_fsolve(p_star, rho_l, c_l, p_l)(p_star))
     )
     return p_star, u_star
 
 
-def __flux_newton(pressure, rho1, c1, p1):
+def _flux_newton(pressure, rho1, c1, p1):
     if pressure <= p1:  # Rarefaction
         flux = (2 / gm1) * c1 * ((pressure / p1)**gm1_2g - 1.0)
         flux_derivative = (1.0 / (rho1 * c1)) * \
@@ -133,12 +132,12 @@ def __flux_newton(pressure, rho1, c1, p1):
 def star_pu_newton_raphson(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
     tol_pre = 1.0e-06
     nr_iter = 20
-    p_start = __compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r)
+    p_start = _compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r)
     p_old = p_start
     u_diff = u_r - u_l
     for i in range(nr_iter):
-        fL, fLd = __flux_newton(p_old, rho_l, c_l, p_l)
-        fR, fRd = __flux_newton(p_old, rho_r, c_r, p_r)
+        fL, fLd = _flux_newton(p_old, rho_l, c_l, p_l)
+        fR, fRd = _flux_newton(p_old, rho_r, c_r, p_r)
         p = p_old - (fL + fR + u_diff) / (fLd + fRd)
         change = 2.0 * abs((p - p_old) / (p + p_old))
         if change <= tol_pre:
@@ -150,7 +149,7 @@ def star_pu_newton_raphson(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
     return p, u
 
 
-def __compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
+def _compute_guess_p(rho_l, u_l, p_l, c_l, rho_r, u_r, p_r, c_r):
     """ Computes the initial guess for pressure.
     References
     ----------
