@@ -37,7 +37,7 @@ class Blastwave(ShockTubeSetup):
         group.add_argument(
             "--hdx", action="store", type=float,
             dest="hdx", default=1.5,
-            help="Kernel_factor"
+            help="Ratio h/dx."
         )
         group.add_argument(
             "--nl", action="store", type=float, dest="nl", default=200,
