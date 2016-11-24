@@ -35,7 +35,7 @@ class WallShock(ShockTubeSetup):
         group.add_argument(
             "--hdx", action="store", type=float,
             dest="hdx", default=1.5,
-            help="Kernel_factor (default 2.5)"
+            help="Ratio h/dx."
         )
         group.add_argument(
             "--nl", action="store", type=float, dest="nl", default=500,
