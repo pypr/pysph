@@ -88,7 +88,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
-        self.octree_nnps = nnps.OctreeNNPS(
+        self.ci_nnps = nnps.CellIndexingNNPS(
                 dim=3, particles=[pa,], radius_scale=1.0
         )
 
@@ -276,6 +276,22 @@ class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.OctreeNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.CellIndexingNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Spatial Hash algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ZOrderNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 

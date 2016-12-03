@@ -16,7 +16,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, StratifiedHashNNPS, OctreeNNPS
+        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, OctreeNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -362,12 +362,13 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh', 'sr', 'tree'],
+                                choices=['box', 'll', 'sh', 'esh', 'ci', 'sr', 'tree'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
                                      "the extended spatial hash algorithm ('esh') or "\
+                                     "the cell indexing algorithm ('ci') or"\
                                      "the stratified hash algorithm ('sr') or"\
                                      "the octree algorithm ('tree')"
                                 )
@@ -721,6 +722,14 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
+                    sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'ci':
+                nnps = CellIndexing(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache,
                     sort_gids=options.sort_gids
                 )
 

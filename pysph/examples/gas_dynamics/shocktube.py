@@ -30,7 +30,7 @@ tf = 0.0075
 
 # domain size
 xmin = -0.75; xmax = 0.75
-dx = 0.01
+dx = 0.001
 ymin = 0; ymax = 30*dx
 
 # scheme constants
