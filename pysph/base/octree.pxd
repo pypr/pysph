@@ -2,8 +2,10 @@
 
 from nnps_base cimport *
 from libcpp.vector cimport vector
-from libc.stdint cimport uint64_t
 cimport cython
+
+import numpy as np
+cimport numpy as np
 
 ctypedef unsigned int u_int
 
@@ -14,9 +16,6 @@ cdef extern from 'math.h':
     double fabs(double) nogil
     double fmax(double, double) nogil
     double fmin(double, double) nogil
-
-cdef extern from 'float.h':
-    cdef double DBL_MAX
 
 cdef struct cOctreeNode:
     bint is_leaf
@@ -38,7 +37,7 @@ cdef class OctreeNode:
 
     cdef public bint is_leaf
     cdef public double length
-    cdef public DoubleArray xmin
+    cdef public np.ndarray xmin
     cdef public double hmax
     cdef public int num_particles
     cdef public int level
@@ -61,22 +60,24 @@ cdef class Octree:
     ##########################################################################
     # Data Attributes
     ##########################################################################
-    cdef cOctreeNode* tree
+    cdef cOctreeNode* root
     cdef vector[cOctreeNode*]* leaf_cells
 
     cdef public int leaf_max_particles
-    cdef public double radius_scale
     cdef public double hmax
     cdef public double length
     cdef public int depth
 
+    cdef double machine_eps
+
     cdef double xmin[3]
     cdef double xmax[3]
-    cdef double _eps0
 
     ##########################################################################
     # Member functions
     ##########################################################################
+
+    cdef inline double _get_eps(self, double length, double* xmin) nogil
 
     cdef inline void _calculate_domain(self, NNPSParticleArrayWrapper pa)
 
@@ -84,11 +85,11 @@ cdef class Octree:
             double hmax = *, int level = *, cOctreeNode* parent = *,
             int num_particles = *, bint is_leaf = *) nogil
 
-    cdef inline void _delete_tree(self, cOctreeNode* node) nogil
+    cdef inline void _delete_tree(self, cOctreeNode* node)
 
     cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
             vector[u_int]* indices, double* xmin, double length,
-            cOctreeNode* node, int level, double eps) nogil
+            cOctreeNode* node, int level) nogil
 
     cdef void _plot_tree(self, OctreeNode node, ax)
 
@@ -102,6 +103,8 @@ cdef class Octree:
 
     cpdef int build_tree(self, ParticleArray pa)
 
+    cpdef delete_tree(self)
+
     cpdef OctreeNode get_root(self)
 
     cpdef list get_leaf_cells(self)
@@ -109,4 +112,19 @@ cdef class Octree:
     cpdef OctreeNode find_point(self, double x, double y, double z)
 
     cpdef plot(self, ax)
+
+cdef class CompressedOctree(Octree):
+    ##########################################################################
+    # Data Attributes
+    ##########################################################################
+    cdef double dbl_max
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+
+    cdef int _c_build_tree(self, NNPSParticleArrayWrapper pa,
+            vector[u_int]* indices, double* xmin, double length,
+            cOctreeNode* node, int level) nogil
+
 

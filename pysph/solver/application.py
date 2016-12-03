@@ -16,7 +16,8 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, OctreeNNPS
+        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, OctreeNNPS, \
+        CompressedOctreeNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -362,7 +363,7 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh', 'ci', 'sr', 'tree'],
+                                choices=['box', 'll', 'sh', 'esh', 'ci', 'comp_tree', 'sr', 'tree'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
@@ -370,7 +371,8 @@ class Application(object):
                                      "the extended spatial hash algorithm ('esh') or "\
                                      "the cell indexing algorithm ('ci') or"\
                                      "the stratified hash algorithm ('sr') or"\
-                                     "the octree algorithm ('tree')"
+                                     "the octree algorithm ('tree') or "\
+                                     "the compressed octree algorithm ('comp_tree')"
                                 )
 
         nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
@@ -730,6 +732,14 @@ class Application(object):
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'comp_tree':
+                nnps = CompressedOctreeNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
                     sort_gids=options.sort_gids
                 )
 

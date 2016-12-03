@@ -7,6 +7,13 @@ from libcpp.vector cimport vector
 # Cython for compiler directives
 cimport cython
 
+IF UNAME_SYSNAME == "Windows":
+    cdef inline double fmin(double x, double y) nogil:
+        return x if x < y else y
+    cdef inline double fmax(double x, double y) nogil:
+        return x if x > y else y
+
+
 #############################################################################
 cdef class SpatialHashNNPS(NNPS):
 
@@ -364,34 +371,6 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                 &nbrs.data[orig_length], nbrs.length - orig_length, s_gid
             )
 
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc):
-        """Find nearest neighbors for particle id 'd_idx' without cache
-
-        Parameters
-        ----------
-        src_index: int
-            Index in the list of particle arrays to which the neighbors belong
-
-        dst_index: int
-            Index in the list of particle arrays to which the query point belongs
-
-        d_idx: size_t
-            Index of the query point in the destination particle array
-
-        nbrs: UIntArray
-            Array to be populated by nearest neighbors of 'd_idx'
-
-        """
-        self.set_context(src_index, dst_index)
-
-        if prealloc:
-            nbrs.length = 0
-        else:
-            nbrs.c_reset()
-
-        self.find_nearest_neighbors(d_idx, nbrs)
-
 
     #### Private protocol ################################################
 
@@ -467,7 +446,7 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
                 h_local = self.radius_scale*fmax(cell.h_max, h)
                 H = <int> ceil(h_local/self.h_sub)
 
-                if fabs(x_mask[p]) <= H and fabs(y_mask[p]) <= H and fabs(z_mask[p]) <= H:
+                if abs(x_mask[p]) <= H and abs(y_mask[p]) <= H and abs(z_mask[p]) <= H:
                     x[length] = x_temp
                     y[length] = y_temp
                     z[length] = z_temp

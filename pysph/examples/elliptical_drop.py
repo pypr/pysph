@@ -111,13 +111,9 @@ class EllipticalDrop(Application):
         x = x.ravel()
         y = y.ravel()
 
-        m = ones_like(x)*dx*dx
+        m = ones_like(x)*dx*dx*ro
         h = ones_like(x)*hdx*dx
         rho = ones_like(x) * ro
-
-        p = ones_like(x) * 1./7.0 * co**2
-        cs = ones_like(x) * co
-
         u = -100*x
         v = 100*y
 
@@ -127,8 +123,8 @@ class EllipticalDrop(Application):
             if sqrt(x[i]*x[i] + y[i]*y[i]) - 1 > 1e-10:
                 indices.append(i)
 
-        pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, p=p, u=u, v=v,
-                                cs=cs, name=name)
+        pa = get_particle_array(x=x, y=y, m=m, rho=rho, h=h, u=u, v=v,
+                                name=name)
         pa.remove_particles(indices)
 
         print("Elliptical drop :: %d particles"

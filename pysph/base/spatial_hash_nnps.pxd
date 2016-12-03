@@ -70,9 +70,6 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
-            size_t d_idx, UIntArray nbrs, bint prealloc)
-
     cdef inline int _h_mask_approx(self, int* x, int* y, int* z) nogil
 
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
@@ -86,6 +83,5 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
     cpdef _refresh(self)
 
     cpdef _bin(self, int pa_index, UIntArray indices)
-
 
 
