@@ -69,28 +69,7 @@ cdef class CellIndexingNNPS(NNPS):
         free(self.I)
 
 
-    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
-            u_int k, int pa_index) nogil:
-        return  n + \
-                (1 << self.I[pa_index])*i + \
-                (1 << (self.I[pa_index] + self.J))*j + \
-                (1 << (self.I[pa_index] + self.J + self.K))*k
-
-    @cython.cdivision(True)
-    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
-        return key % (1 << self.I[pa_index])
-
-    @cython.cdivision(True)
-    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
-        return (key >> self.I[pa_index]) % (1 << self.J)
-
-    @cython.cdivision(True)
-    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
-        return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
-
-    @cython.cdivision(True)
-    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
-        return key >> (self.I[pa_index] + self.J + self.K)
+    #### Public protocol ################################################
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -294,6 +273,31 @@ cdef class CellIndexingNNPS(NNPS):
         temp.second = cell
         current_indices.insert(temp)
 
+    #### Private protocol ################################################
+
+    cdef inline u_int _get_key(self, u_int n, u_int i, u_int j,
+            u_int k, int pa_index) nogil:
+        return  n + \
+                (1 << self.I[pa_index])*i + \
+                (1 << (self.I[pa_index] + self.J))*j + \
+                (1 << (self.I[pa_index] + self.J + self.K))*k
+
+    @cython.cdivision(True)
+    cdef inline int _get_id(self, u_int key, int pa_index) nogil:
+        return key % (1 << self.I[pa_index])
+
+    @cython.cdivision(True)
+    cdef inline int _get_x(self, u_int key, int pa_index) nogil:
+        return (key >> self.I[pa_index]) % (1 << self.J)
+
+    @cython.cdivision(True)
+    cdef inline int _get_y(self, u_int key, int pa_index) nogil:
+        return (key >> (self.I[pa_index] + self.J)) % (1 << self.K)
+
+    @cython.cdivision(True)
+    cdef inline int _get_z(self, u_int key, int pa_index) nogil:
+        return key >> (self.I[pa_index] + self.J + self.K)
+
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
             int* x, int* y, int* z) nogil:
         cdef int length = 0
@@ -307,7 +311,6 @@ cdef class CellIndexingNNPS(NNPS):
                         z[length] = k+p
                         length += 1
         return length
-
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper

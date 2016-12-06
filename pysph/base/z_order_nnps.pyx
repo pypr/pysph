@@ -18,7 +18,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 cdef class ZOrderNNPS(NNPS):
 
-    """Find nearest neighbors using cell indexing"""
+    """Find nearest neighbors using Z-Order space filling curve"""
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
