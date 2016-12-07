@@ -16,8 +16,8 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, OctreeNNPS, \
-        CompressedOctreeNNPS
+        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, \
+        StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -363,14 +363,16 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh', 'ci', 'comp_tree', 'sr', 'tree'],
+                                choices=['box', 'll', 'sh', 'esh', 'ci', 'comp_tree', \
+                                        'strat_hash', 'strat_sfc', 'tree'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
                                      "the extended spatial hash algorithm ('esh') or "\
                                      "the cell indexing algorithm ('ci') or"\
-                                     "the stratified hash algorithm ('sr') or"\
+                                     "the stratified hash algorithm ('strat_hash') or "\
+                                     "the stratified sfc algorithm ('strat_sfc') or "\
                                      "the octree algorithm ('tree') or "\
                                      "the compressed octree algorithm ('comp_tree')"
                                 )
@@ -390,9 +392,10 @@ class Application(object):
                                         ExtendedSpatialHashNNPS"
                                 )
 
-        nnps_options.add_argument("--stratified-hash-num-levels", dest="num_levels",
+        nnps_options.add_argument("--stratified-grid-num-levels", dest="num_levels",
                                 type=int, default=1,
-                                help="Number of levels for StratifiedHashNNPS"
+                                help="Number of levels for StratifiedHashNNPS and \
+                                        StratifiedSFCNNPS"
                                 )
 
         nnps_options.add_argument("--tree-leaf-max-particles", dest="leaf_max_particles",
@@ -710,12 +713,19 @@ class Application(object):
                     approximate=options.approximate_nnps
                 )
 
-            elif options.nnps == 'sr':
+            elif options.nnps == 'strat_hash':
                 nnps = StratifiedHashNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, table_size=options.table_size,
-                    H=options.H, sort_gids=options.sort_gids,
+                    sort_gids=options.sort_gids, num_levels=options.num_levels
+                )
+
+            elif options.nnps == 'strat_sfc':
+                nnps = StratifiedSFCNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, sort_gids=options.sort_gids,
                     num_levels=options.num_levels
                 )
 

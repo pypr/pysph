@@ -335,6 +335,19 @@ def get_basic_extensions():
 
 
         Extension(
+            name="pysph.base.z_order_nnps",
+            sources=["pysph/base/z_order_nnps.pyx"],
+            depends=get_deps(
+                "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
             name="pysph.base.stratified_hash_nnps",
             sources=["pysph/base/stratified_hash_nnps.pyx"],
             depends=get_deps(
@@ -348,10 +361,10 @@ def get_basic_extensions():
         ),
 
         Extension(
-            name="pysph.base.z_order_nnps",
-            sources=["pysph/base/z_order_nnps.pyx"],
+            name="pysph.base.stratified_sfc_nnps",
+            sources=["pysph/base/stratified_sfc_nnps.pyx"],
             depends=get_deps(
-                "pysph/base/nnps_base"
+                "pysph/base/nnps_base", "pysph/base/z_order_nnps"
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
@@ -359,7 +372,6 @@ def get_basic_extensions():
             cython_compile_time_env={'OPENMP': openmp_env},
             language="c++"
         ),
-
 
         Extension(
             name="pysph.base.octree",

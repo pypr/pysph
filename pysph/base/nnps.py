@@ -9,5 +9,6 @@ from pysph.base.spatial_hash_nnps import SpatialHashNNPS, ExtendedSpatialHashNNP
 from pysph.base.cell_indexing_nnps import CellIndexingNNPS
 from pysph.base.z_order_nnps import ZOrderNNPS
 from pysph.base.stratified_hash_nnps import StratifiedHashNNPS
+from pysph.base.stratified_sfc_nnps import StratifiedSFCNNPS
 from pysph.base.octree_nnps import OctreeNNPS, CompressedOctreeNNPS
 
