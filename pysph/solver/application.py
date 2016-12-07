@@ -16,7 +16,7 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, CellIndexing, StratifiedHashNNPS, \
+        ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
         StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS
 
 from pysph.base import kernels
@@ -738,7 +738,7 @@ class Application(object):
                 )
 
             elif options.nnps == 'ci':
-                nnps = CellIndexing(
+                nnps = CellIndexingNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache,
