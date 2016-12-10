@@ -19,7 +19,9 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 cdef class CellIndexingNNPS(NNPS):
 
-    """Find nearest neighbors using cell indexing"""
+    """Find nearest neighbors using cell indexing
+    Ref. http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
+    """
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
