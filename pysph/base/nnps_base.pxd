@@ -24,9 +24,6 @@ cdef extern from 'limits.h':
     cdef unsigned int UINT_MAX
     cdef int INT_MAX
 
-cdef extern from 'float.h':
-    cdef double DBL_MAX
-
 # ZOLTAN ID TYPE AND PTR
 ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
@@ -174,6 +171,8 @@ cdef class DomainManager:
     cdef public double hmin             # minimum h
     cdef bint in_parallel               # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
+
+    cdef double dbl_max                 # Maximum value of double
 
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)

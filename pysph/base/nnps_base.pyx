@@ -278,6 +278,8 @@ cdef class DomainManager:
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
 
+        self.dbl_max = np.finfo(float).max
+
     #### Public protocol ################################################
     def set_pa_wrappers(self, wrappers):
         self.pa_wrappers = wrappers
@@ -546,7 +548,7 @@ cdef class DomainManager:
         cdef DoubleArray h
         cdef double cell_size
         cdef double _hmax, hmax = -1.0
-        cdef double _hmin, hmin = DBL_MAX
+        cdef double _hmin, hmin = self.dbl_max
 
         for pa_wrapper in pa_wrappers:
             h = pa_wrapper.h
