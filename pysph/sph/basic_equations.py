@@ -51,6 +51,7 @@ class BodyForce(Equation):
         d_av[d_idx] += self.fy
         d_aw[d_idx] += self.fz
 
+
 class VelocityGradient2D(Equation):
     r""" Compute the SPH evaluation for the velocity gradient tensor in 2D.
 
@@ -63,7 +64,7 @@ class VelocityGradient2D(Equation):
     -----
     The tensor properties are stored in the variables v_ij where 'i'
     refers to the velocity component and 'j' refers to the spatial
-    component. Thus v_21 is :math:`\frac{\partial v}{\partial x}`
+    component. Thus v_10 is :math:`\frac{\partial v}{\partial x}`
 
     """
     def initialize(self, d_idx, d_v00, d_v01, d_v10, d_v11):
@@ -113,7 +114,7 @@ class VelocityGradient3D(Equation):
         d_v22[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, s_m, s_rho,
-             d_v00, d_v01, d_v02, 
+             d_v00, d_v01, d_v02,
              d_v10, d_v11, d_v12,
              d_v20, d_v21, d_v22,
              DWIJ, VIJ):

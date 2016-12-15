@@ -738,7 +738,7 @@ class Application(object):
         tf = options.final_time
         if tf is not None:
             solver.set_final_time(tf)
-            
+
         solver.set_max_steps(self.options.max_steps)
 
         # Setup the solver output file name
@@ -775,11 +775,11 @@ class Application(object):
 
         # solver output behaviour in parallel
         if options.output_dump_remote:
-            solver.set_output_only_real( False )
+            solver.set_output_only_real(False)
 
         # output directory
         solver.set_output_directory(abspath(options.output_dir))
-        self._message("Generating output in %s"%self.output_dir)
+        self._message("Generating output in %s" % self.output_dir)
 
         # set parallel output mode
         if options.parallel_output_mode is not None:
