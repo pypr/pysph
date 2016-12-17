@@ -19,8 +19,14 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 
 cdef class CellIndexingNNPS(NNPS):
 
-    """Find nearest neighbors using cell indexing
-    Ref. http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
+    """Find nearest neighbors using cell indexing.
+
+    Uses a sorted array to access particles in a cell. Gives better cache performance
+    than spatial hash.
+
+    Ref: J. Onderik, R. Durikovic, Efficient Neighbor Search for Particle-based Fluids,
+    Journal of the Applied Mathematics, Statistics and Informatics 4 (1) (2008) 29–43.
+    http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.105.6732&rep=rep1&type=pdf
     """
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
