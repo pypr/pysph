@@ -5,7 +5,6 @@ from libcpp.pair cimport pair
 from nnps_base cimport *
 
 ctypedef unsigned int u_int
-ctypedef unsigned long long uint64_t
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 ctypedef vector[u_int] u_int_vector_t
 
@@ -18,6 +17,7 @@ cdef extern from 'math.h':
     double fmin(double, double) nogil
 
 cdef extern from "z_order.h":
+    ctypedef unsigned long long uint64_t
     inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil
 
     cdef cppclass CompareSortWrapper:
