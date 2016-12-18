@@ -8,6 +8,7 @@ ctypedef unsigned int u_int
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 
 cdef extern from 'math.h':
+    double log(double) nogil
     double log2(double) nogil
 
 cdef class CellIndexingNNPS(NNPS):

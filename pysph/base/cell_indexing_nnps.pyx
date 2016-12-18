@@ -14,6 +14,10 @@ cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
 
+IF UNAME_SYSNAME == "Windows":
+    @cython.cdivision(True)
+    cdef inline double log2(double n) nogil:
+        return log(n)/log(2)
 
 #############################################################################
 
