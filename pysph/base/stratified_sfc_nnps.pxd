@@ -1,11 +1,11 @@
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 from libcpp.pair cimport pair
-from libc.stdint cimport uint64_t
 
 from nnps_base cimport *
 
 ctypedef unsigned int u_int
+ctypedef unsigned long long uint64_t
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t
 ctypedef vector[u_int] u_int_vector_t
 
