@@ -16,7 +16,8 @@ from pysph.base.config import get_config
 from pysph.base import utils
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, OctreeNNPS, CompressedOctreeNNPS
+        ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
+        StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -362,12 +363,17 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh', 'tree', 'comp_tree'],
+                                choices=['box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree', \
+                                        'strat_hash', 'strat_sfc', 'tree'],
                                 default='ll',
                                 help="Use one of box-sort ('box') or "\
                                      "the linked list algorithm ('ll') or "\
                                      "the spatial hash algorithm ('sh') or "\
                                      "the extended spatial hash algorithm ('esh') or "\
+                                     "the cell indexing algorithm ('ci') or "\
+                                     "the z-order space filling curve based algorithm ('sfc') or "\
+                                     "the stratified hash algorithm ('strat_hash') or "\
+                                     "the stratified sfc algorithm ('strat_sfc') or "\
                                      "the octree algorithm ('tree') or "\
                                      "the compressed octree algorithm ('comp_tree')"
                                 )
@@ -385,6 +391,12 @@ class Application(object):
                                 type=int, default=131072,
                                 help="Table size for SpatialHashNNPS and \
                                         ExtendedSpatialHashNNPS"
+                                )
+
+        nnps_options.add_argument("--stratified-grid-num-levels", dest="num_levels",
+                                type=int, default=1,
+                                help="Number of levels for StratifiedHashNNPS and \
+                                        StratifiedSFCNNPS"
                                 )
 
         nnps_options.add_argument("--tree-leaf-max-particles", dest="leaf_max_particles",
@@ -702,11 +714,43 @@ class Application(object):
                     approximate=options.approximate_nnps
                 )
 
+            elif options.nnps == 'strat_hash':
+                nnps = StratifiedHashNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
+                    sort_gids=options.sort_gids, num_levels=options.num_levels
+                )
+
+            elif options.nnps == 'strat_sfc':
+                nnps = StratifiedSFCNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache, sort_gids=options.sort_gids,
+                    num_levels=options.num_levels
+                )
+
             elif options.nnps == 'tree':
                 nnps = OctreeNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
                     fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
+                    sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'ci':
+                nnps = CellIndexingNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache,
+                    sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'sfc':
+                nnps = ZOrderNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    fixed_h=fixed_h, cache=cache,
                     sort_gids=options.sort_gids
                 )
 

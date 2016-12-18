@@ -534,7 +534,7 @@ cdef class CompressedOctree(Octree):
 
         cdef double xmin_new[8][3]
         cdef double xmax_new[8][3]
-        cdef double length_new[8]
+        cdef double length_new = 0
         cdef double hmax_children[8]
 
         cdef int depth_child = 0
@@ -545,7 +545,6 @@ cdef class CompressedOctree(Octree):
 
         for i from 0<=i<8:
             hmax_children[i] = 0
-            length_new[i] = 0
             for j from 0<=j<3:
                 xmin_new[i][j] = self.dbl_max
                 xmax_new[i][j] = -self.dbl_max
@@ -610,15 +609,15 @@ cdef class CompressedOctree(Octree):
             y_length = xmax_current[1] - xmin_current[1]
             z_length = xmax_current[2] - xmin_current[2]
 
-            length_new[i] = fmax(x_length, fmax(y_length, z_length))
+            length_new = fmax(x_length, fmax(y_length, z_length))
 
-            eps = 2*self._get_eps(length_new[i], xmin_current)
+            eps = 2*self._get_eps(length_new, xmin_current)
 
-            length_padded = length_new[i]*(1 + 2*eps)
+            length_padded = length_new*(1 + 2*eps)
 
-            xmin_current[0] -= length_new[i]*eps
-            xmin_current[1] -= length_new[i]*eps
-            xmin_current[2] -= length_new[i]*eps
+            xmin_current[0] -= length_new*eps
+            xmin_current[1] -= length_new*eps
+            xmin_current[2] -= length_new*eps
 
             node.children[i] = self._new_node(xmin_current, length_padded,
                     hmax=hmax_children[i], level=level+1, parent=node)

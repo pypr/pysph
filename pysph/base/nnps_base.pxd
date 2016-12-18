@@ -168,8 +168,11 @@ cdef class DomainManager:
     cdef public list pa_wrappers        # NNPS particle array wrappers
     cdef public int narrays             # number of arrays
     cdef public double cell_size        # distance to create ghosts
+    cdef public double hmin             # minimum h
     cdef bint in_parallel               # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
+
+    cdef double dbl_max                 # Maximum value of double
 
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
@@ -263,6 +266,7 @@ cdef class NNPS:
     cdef public DoubleArray xmin      # co-ordinate min values
     cdef public DoubleArray xmax      # co-ordinate max values
     cdef public double cell_size      # Cell size for binning
+    cdef public double hmin           # Minimum h
     cdef public double radius_scale   # Radius scale for kernel
     cdef IntArray cell_shifts         # cell shifts
     cdef public int n_cells           # number of cells
