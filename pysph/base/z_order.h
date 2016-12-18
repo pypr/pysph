@@ -4,10 +4,14 @@
 #include <algorithm>
 #include <cmath>
 
-using namespace std;
+#ifdef _WIN32
+    typedef unsigned int uint32_t;
+    typedef unsigned long long uint64_t;
+#else
+    #include <stdint.h>
+#endif
 
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
+using namespace std;
 
 inline void find_cell_id(double x, double y, double z, double h,
         int &c_x, int &c_y, int &c_z)
