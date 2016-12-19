@@ -12,6 +12,12 @@ cimport cython
 
 DEF EPS = 1e-6
 
+IF UNAME_SYSNAME == "Windows":
+    cdef inline double fmin(double x, double y) nogil:
+        return x if x < y else y
+    cdef inline double fmax(double x, double y) nogil:
+        return x if x > y else y
+
 #############################################################################
 cdef class StratifiedHashNNPS(NNPS):
 

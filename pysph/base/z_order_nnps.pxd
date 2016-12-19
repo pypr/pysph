@@ -1,7 +1,6 @@
 # cython: embedsignature=True
 from libcpp.map cimport map
 from libcpp.pair cimport pair
-from libc.stdint cimport uint64_t
 
 from nnps_base cimport *
 
@@ -12,6 +11,7 @@ cdef extern from "math.h":
     double log2(double) nogil
 
 cdef extern from "z_order.h":
+    ctypedef unsigned long long uint64_t
     inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil
 
     cdef cppclass CompareSortWrapper:
