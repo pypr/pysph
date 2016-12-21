@@ -573,7 +573,7 @@ class Application(object):
             filename = self.fname + '.log'
 
         if len(filename) > 0:
-            lfn = os.path.join(self.output_dir,filename)
+            lfn = os.path.join(self.output_dir, filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
             logging.basicConfig(level=level, format=format,
                                 filename=lfn, filemode='a')
@@ -581,8 +581,12 @@ class Application(object):
             logger.addHandler(logging.StreamHandler())
 
         host = socket.gethostname()
+        try:
+            ip = socket.gethostbyname(host)
+        except socket.gaierror:
+            ip = host
         logger.info('Running on {host} with address {ip}'.format(
-            host=host, ip=socket.gethostbyname(host)
+            host=host, ip=ip
         ))
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
