@@ -36,10 +36,11 @@ cdef class OctreeNNPS(NNPS):
         self.src_index = 0
         self.dst_index = 0
         self.leaf_max_particles = leaf_max_particles
+        self.current_tree = NULL
+        self.current_pids = NULL
 
         self.sort_gids = sort_gids
         self.domain.update()
-
         self.update()
 
 
@@ -60,6 +61,7 @@ cdef class OctreeNNPS(NNPS):
 
         NNPS.set_context(self, src_index, dst_index)
         self.current_tree = (<Octree>self.tree[src_index]).root
+        self.current_pids = (<Octree>self.tree[src_index]).pids
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -124,7 +126,7 @@ cdef class OctreeNNPS(NNPS):
 
         if node.is_leaf:
             for i from 0<=i<node.num_particles:
-                k = deref(node.indices)[i]
+                k = self.current_pids[node.index + i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,
@@ -142,11 +144,21 @@ cdef class OctreeNNPS(NNPS):
                     src_x_ptr, src_y_ptr, src_z_ptr, src_h_ptr,
                     nbrs, node.children[i])
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        indices.reset()
+        cdef int num_particles = (<Octree>self.tree[pa_index]).num_particles
+        cdef u_int* current_pids = (<Octree>self.tree[pa_index]).pids
+
+        cdef int i
+        for i from 0<=i<num_particles:
+            indices.c_append(<long>current_pids[i])
+
     cpdef _refresh(self):
         cdef int i
         for i from 0<=i<self.narrays:
             (<Octree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
         self.current_tree = (<Octree>self.tree[self.src_index]).root
+        self.current_pids = (<Octree>self.tree[self.src_index]).pids
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
@@ -171,10 +183,11 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
         self.src_index = 0
         self.dst_index = 0
         self.leaf_max_particles = leaf_max_particles
+        self.current_tree = NULL
+        self.current_pids = NULL
 
         self.sort_gids = sort_gids
         self.domain.update()
-
         self.update()
 
 
@@ -195,6 +208,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
         NNPS.set_context(self, src_index, dst_index)
         self.current_tree = (<CompressedOctree>self.tree[src_index]).root
+        self.current_pids = (<CompressedOctree>self.tree[src_index]).pids
 
         self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
         self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
@@ -207,6 +221,7 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
         for i from 0<=i<self.narrays:
             (<CompressedOctree>self.tree[i]).c_build_tree(self.pa_wrappers[i])
         self.current_tree = (<CompressedOctree>self.tree[self.src_index]).root
+        self.current_pids = (<CompressedOctree>self.tree[self.src_index]).pids
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass

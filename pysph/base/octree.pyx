@@ -76,22 +76,6 @@ cdef class OctreeNode:
         self.xmin[1] = self._node.xmin[1]
         self.xmin[2] = self._node.xmin[2]
 
-    cpdef UIntArray get_indices(self):
-        """ Get the indices in a node.
-
-        Returns
-        -------
-
-        indices : UIntArray
-
-        """
-        if not self._node.is_leaf:
-            return UIntArray()
-        cdef UIntArray py_indices = UIntArray()
-        py_indices.c_set_view(&self._node.indices.front(),
-                self._node.num_particles)
-        return py_indices
-
     cpdef OctreeNode get_parent(self):
         """ Get parent of the node.
 
@@ -179,10 +163,13 @@ cdef class Octree:
         self.root = NULL
         self.leaf_cells = NULL
         self.machine_eps = np.finfo(float).eps
+        self.pids = NULL
 
     def __dealloc__(self):
         if self.root != NULL:
             self._delete_tree(self.root)
+        if self.pids != NULL:
+            free(self.pids)
         if self.leaf_cells != NULL:
             del self.leaf_cells
 
@@ -238,9 +225,9 @@ cdef class Octree:
         node.num_particles = num_particles
         node.is_leaf = is_leaf
         node.level = level
+        node.index = -1
 
         node.parent = parent
-        node.indices = NULL
 
         cdef int i
 
@@ -257,8 +244,6 @@ cdef class Octree:
         for i from 0<=i<8:
             temp[i] = node.children[i]
 
-        if node.indices != NULL:
-            del node.indices
         free(node)
 
         for i from 0<=i<8:
@@ -293,8 +278,12 @@ cdef class Octree:
         cdef double eps = 2*self._get_eps(length, xmin)
 
         if (indices.size() < self.leaf_max_particles) or (eps > EPS_MAX):
-            node.indices = indices
+            copy(indices.begin(), indices.end(), self.pids + self.next_pid)
+            node.index = self.next_pid
+            self.next_pid += indices.size()
             node.num_particles = indices.size()
+            del indices
+            #node.indices = indices
             node.is_leaf = True
             return 1
 
@@ -379,14 +368,21 @@ cdef class Octree:
         cdef int num_particles = pa_wrapper.get_number_of_particles()
         cdef vector[u_int]* indices_ptr = new vector[u_int]()
 
+        self.num_particles = num_particles
+
         cdef int i
         for i from 0<=i<num_particles:
             indices_ptr.push_back(i)
 
         if self.root != NULL:
             self._delete_tree(self.root)
+        if self.pids != NULL:
+            free(self.pids)
         if self.leaf_cells != NULL:
             del self.leaf_cells
+
+        self.pids = <u_int*> malloc(num_particles*sizeof(u_int))
+        self.next_pid = 0
 
         self.root = self._new_node(self.xmin, self.length,
                 hmax=self.hmax, level=0)
@@ -425,6 +421,13 @@ cdef class Octree:
         return prev
 
     ######################################################################
+
+    cpdef np.ndarray get_indices(self):
+        cdef np.ndarray indices = np.empty(self.num_particles, dtype=int)
+        cdef int i
+        for i from 0<=i<self.num_particles:
+            indices[i] = self.pids[i]
+        return indices
 
     cpdef int build_tree(self, ParticleArray pa):
         """ Build tree.
@@ -552,8 +555,12 @@ cdef class CompressedOctree(Octree):
         cdef int oct_id
 
         if (indices.size() < self.leaf_max_particles):
-            node.indices = indices
+            copy(indices.begin(), indices.end(), self.pids + self.next_pid)
+            node.index = self.next_pid
+            self.next_pid += indices.size()
             node.num_particles = indices.size()
+            del indices
+            #node.indices = indices
             node.is_leaf = True
             return 1
 
