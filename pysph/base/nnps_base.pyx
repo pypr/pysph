@@ -273,9 +273,12 @@ cdef class DomainManager:
 
         # default value for the cell size
         self.cell_size = 1.0
+        self.hmin = 1.0
 
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
+
+        self.dbl_max = np.finfo(float).max
 
     #### Public protocol ################################################
     def set_pa_wrappers(self, wrappers):
@@ -545,16 +548,21 @@ cdef class DomainManager:
         cdef DoubleArray h
         cdef double cell_size
         cdef double _hmax, hmax = -1.0
+        cdef double _hmin, hmin = self.dbl_max
 
         for pa_wrapper in pa_wrappers:
             h = pa_wrapper.h
             h.update_min_max()
 
             _hmax = h.maximum
+            _hmin = h.minimum
             if _hmax > hmax:
                 hmax = _hmax
+            if _hmin < hmin:
+                hmin = _hmin
 
         cell_size = self.radius_scale * hmax
+        self.hmin = self.radius_scale * hmin
 
         if cell_size < 1e-6:
             cell_size = 1.0
@@ -1063,6 +1071,7 @@ cdef class NNPS:
 
         # use cell sizes computed by the domain.
         self.cell_size = domain.cell_size
+        self.hmin = domain.hmin
 
         # compute bounds and refresh the data structure
         self._compute_bounds()

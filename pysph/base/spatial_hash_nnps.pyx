@@ -439,10 +439,10 @@ cdef class ExtendedSpatialHashNNPS(NNPS):
 
             if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
                 cell = self.current_hash.get(x_temp, y_temp, z_temp)
-                
+
                 if cell == NULL:
                     continue
-                
+
                 h_local = self.radius_scale*fmax(cell.h_max, h)
                 H = <int> ceil(h_local/self.h_sub)
 
