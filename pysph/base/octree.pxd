@@ -54,6 +54,8 @@ cdef class OctreeNode:
 
     cpdef OctreeNode get_parent(self)
 
+    cpdef UIntArray get_indices(self, Octree tree)
+
     cpdef list get_children(self)
 
     cpdef plot(self, ax, color = *)
@@ -107,7 +109,7 @@ cdef class Octree:
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
 
-    cpdef np.ndarray get_indices(self)
+    cdef u_int* get_indices(self)
 
     cpdef int build_tree(self, ParticleArray pa)
 

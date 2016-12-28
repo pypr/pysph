@@ -91,6 +91,14 @@ cdef class OctreeNode:
         parent.wrap_node(self._node.parent)
         return parent
 
+    cpdef UIntArray get_indices(self, Octree tree):
+        cdef int idx = self._node.index
+        cdef UIntArray node_indices = UIntArray()
+        cdef u_int* indices = tree.get_indices()
+        node_indices.c_set_view(indices + idx,
+                self._node.num_particles)
+        return node_indices
+
     cpdef list get_children(self):
         """ Get the children of a node.
 
@@ -422,12 +430,9 @@ cdef class Octree:
 
     ######################################################################
 
-    cpdef np.ndarray get_indices(self):
-        cdef np.ndarray indices = np.empty(self.num_particles, dtype=int)
-        cdef int i
-        for i from 0<=i<self.num_particles:
-            indices[i] = self.pids[i]
-        return indices
+    cdef u_int* get_indices(self):
+        """ Returns indices array"""
+        return self.pids
 
     cpdef int build_tree(self, ParticleArray pa):
         """ Build tree.
