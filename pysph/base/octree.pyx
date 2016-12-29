@@ -92,6 +92,17 @@ cdef class OctreeNode:
         return parent
 
     cpdef UIntArray get_indices(self, Octree tree):
+        """ Get indices of a node. Returns empty UIntArray
+        if node is not a leaf.
+
+        Returns
+        -------
+
+        indices : UIntArray
+
+        """
+        if not self._node.is_leaf:
+            return UIntArray()
         cdef int idx = self._node.index
         cdef UIntArray node_indices = UIntArray()
         cdef u_int* indices = tree.get_indices()
