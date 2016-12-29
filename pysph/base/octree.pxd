@@ -29,7 +29,6 @@ cdef struct cOctreeNode:
     int level
 
     int index
-    #vector[u_int]* indices
     cOctreeNode* children[8]
     cOctreeNode* parent
 
@@ -108,8 +107,6 @@ cdef class Octree:
     cdef void c_get_leaf_cells(self)
 
     cdef cOctreeNode* c_find_point(self, double x, double y, double z)
-
-    cdef u_int* get_indices(self)
 
     cpdef int build_tree(self, ParticleArray pa)
 

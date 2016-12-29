@@ -105,7 +105,7 @@ cdef class OctreeNode:
             return UIntArray()
         cdef int idx = self._node.index
         cdef UIntArray node_indices = UIntArray()
-        cdef u_int* indices = tree.get_indices()
+        cdef u_int* indices = tree.pids
         node_indices.c_set_view(indices + idx,
                 self._node.num_particles)
         return node_indices
@@ -302,7 +302,6 @@ cdef class Octree:
             self.next_pid += indices.size()
             node.num_particles = indices.size()
             del indices
-            #node.indices = indices
             node.is_leaf = True
             return 1
 
@@ -441,10 +440,6 @@ cdef class Octree:
 
     ######################################################################
 
-    cdef u_int* get_indices(self):
-        """ Returns indices array"""
-        return self.pids
-
     cpdef int build_tree(self, ParticleArray pa):
         """ Build tree.
 
@@ -576,7 +571,6 @@ cdef class CompressedOctree(Octree):
             self.next_pid += indices.size()
             node.num_particles = indices.size()
             del indices
-            #node.indices = indices
             node.is_leaf = True
             return 1
 
