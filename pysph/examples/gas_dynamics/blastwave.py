@@ -70,7 +70,7 @@ class Blastwave(ShockTubeSetup):
         # Running this will need to implement boundary condtion first.
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=None, alpha1=1.0, alpha2=0.1,
+            kernel_factor=1.5, alpha1=1.0, alpha2=0.1,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
 
