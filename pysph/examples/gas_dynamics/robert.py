@@ -72,7 +72,7 @@ class Robert(ShockTubeSetup):
 
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=None, alpha1=1.0, alpha2=0.1,
+            kernel_factor=2.0, alpha1=1.0, alpha2=0.1,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
