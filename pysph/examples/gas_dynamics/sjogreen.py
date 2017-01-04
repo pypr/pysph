@@ -74,7 +74,7 @@ class SjoGreen(ShockTubeSetup):
             alpha=0, beta=0.0, k=1.0, eps=1.0, g1=0.0, g2=0.0)
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=None, alpha1=0, alpha2=0,
+            kernel_factor=2.5, alpha1=0, alpha2=0,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
