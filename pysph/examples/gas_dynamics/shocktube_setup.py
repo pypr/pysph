@@ -139,7 +139,9 @@ class ShockTubeSetup(Application):
         nr = ratio*self.nl
         dxr = 0.5/self.nr
         h0 = self.hdx * self.dxr
+        kernel_factor = self.options.hdx
         if self.options.scheme == 'mpm':
+            s.configure(kernel_factor=kernel_factor)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
         elif self.options.scheme == 'adke':
