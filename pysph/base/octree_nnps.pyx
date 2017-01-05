@@ -126,7 +126,7 @@ cdef class OctreeNNPS(NNPS):
 
         if node.is_leaf:
             for i from 0<=i<node.num_particles:
-                k = self.current_pids[node.index + i]
+                k = self.current_pids[node.start_index + i]
                 hj2 = self.radius_scale2*src_h_ptr[k]*src_h_ptr[k]
                 xij2 = norm2(
                         src_x_ptr[k] - q_x,

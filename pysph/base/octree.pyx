@@ -103,7 +103,7 @@ cdef class OctreeNode:
         """
         if not self._node.is_leaf:
             return UIntArray()
-        cdef int idx = self._node.index
+        cdef int idx = self._node.start_index
         cdef UIntArray node_indices = UIntArray()
         cdef u_int* indices = tree.pids
         node_indices.c_set_view(indices + idx,
@@ -244,7 +244,7 @@ cdef class Octree:
         node.num_particles = num_particles
         node.is_leaf = is_leaf
         node.level = level
-        node.index = -1
+        node.start_index = -1
 
         node.parent = parent
 
@@ -297,9 +297,9 @@ cdef class Octree:
         cdef double eps = 2*self._get_eps(length, xmin)
 
         if (indices.size() < self.leaf_max_particles) or (eps > EPS_MAX):
-            copy(indices.begin(), indices.end(), self.pids + self.next_pid)
-            node.index = self.next_pid
-            self.next_pid += indices.size()
+            copy(indices.begin(), indices.end(), self.pids + self._next_pid)
+            node.start_index = self._next_pid
+            self._next_pid += indices.size()
             node.num_particles = indices.size()
             del indices
             node.is_leaf = True
@@ -400,7 +400,7 @@ cdef class Octree:
             del self.leaf_cells
 
         self.pids = <u_int*> malloc(num_particles*sizeof(u_int))
-        self.next_pid = 0
+        self._next_pid = 0
 
         self.root = self._new_node(self.xmin, self.length,
                 hmax=self.hmax, level=0)
@@ -566,9 +566,9 @@ cdef class CompressedOctree(Octree):
         cdef int oct_id
 
         if (indices.size() < self.leaf_max_particles):
-            copy(indices.begin(), indices.end(), self.pids + self.next_pid)
-            node.index = self.next_pid
-            self.next_pid += indices.size()
+            copy(indices.begin(), indices.end(), self.pids + self._next_pid)
+            node.start_index = self._next_pid
+            self._next_pid += indices.size()
             node.num_particles = indices.size()
             del indices
             node.is_leaf = True

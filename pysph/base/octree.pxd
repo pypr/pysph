@@ -28,7 +28,7 @@ cdef struct cOctreeNode:
     int num_particles
     int level
 
-    int index
+    int start_index
     cOctreeNode* children[8]
     cOctreeNode* parent
 
@@ -67,7 +67,7 @@ cdef class Octree:
     cdef vector[cOctreeNode*]* leaf_cells
     cdef u_int* pids
 
-    cdef int next_pid
+    cdef int _next_pid
     cdef public int num_particles
 
     cdef public int leaf_max_particles
