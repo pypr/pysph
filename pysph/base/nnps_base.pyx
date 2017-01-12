@@ -23,6 +23,7 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 
 # Cython for compiler directives
 cimport cython
+import pyopencl as cl
 
 IF OPENMP:
     cimport openmp
@@ -232,6 +233,11 @@ cdef class NNPSParticleArrayWrapper:
         cdef ParticleArray pa = self.pa
         pa.remove_tagged_particles(tag)
 
+    cpdef copy_to_gpu(self, queue):
+        self.gpu_x = cl.array.to_device(queue, self.x)
+        self.gpu_y = cl.array.to_device(queue, self.y)
+        self.gpu_z = cl.array.to_device(queue, self.z)
+        self.gpu_h = cl.array.to_device(queue, self.h)
 
 ##############################################################################
 cdef class DomainManager:
@@ -1173,5 +1179,208 @@ cdef class NNPS:
         # store the minimum and maximum of physical coordinates
         self.xmin.set_data(np.asarray([xmin, ymin, zmin]))
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
+
+cdef class GPUNeighborCache:
+    def __init__(self, NNPS nnps, int dst_index, int src_index):
+        self._dst_index = dst_index
+        self._src_index = src_index
+        self._nnps = nnps
+        self._particles = nnps.particles
+        self._narrays = nnps.narrays
+        cdef long n_p = self._particles[dst_index].get_number_of_particles()
+        cdef size_t i
+
+        self._cached = False
+
+        self.ctx = cl.create_some_context()
+        self.queue = cl.CommandQueue(self.ctx)
+
+        # self._neighbors_cpu -> np.ndarray
+        # self._neighbors_gpu -> cl.array.Array
+
+        self._neighbor_lengths = np.zeros(n_p, dtype=np.uint32)
+        self._start_idx = np.empty(n_p, dtype=np.uint32)
+
+    #### Public protocol ################################################
+
+    cdef void get_neighbors_raw_gpu(self, size_t d_idx, UIntArray nbrs):
+        if not self._cached:
+            self._find_neighbors()
+
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs):
+        self.get_neighbors_raw_gpu(d_idx, nbrs)
+        self.copy_to_cpu()
+
+    #### Private protocol ################################################
+
+    cdef void _find_neighbors(self):
+        cdef int total_size = self._nnps.find_neighbor_lengths(self._neighbor_lengths)
+
+        # Allocate _neighbors_cpu and neighbors_gpu
+        self._neighbors_cpu = np.empty(total_size, int)
+        self._neighbors_gpu = cl.array.empty(self.queue, total_size, int)
+
+        self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu)
+
+        # Do prefix sum on self._neighbor_lengths for the self._start_idx
+        self._cached = True
+
+    cdef void copy_to_cpu(self):
+        self._neighbors_cpu = self._neighbors_gpu.get()
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
+        self.get_neighbors_raw(d_idx, nbrs)
+
+    cpdef update(self):
+        pass
+
+cdef class GPUNNPS(NNPS):
+    """Nearest neighbor query class using the box-sort algorithm.
+
+    NNPS bins all local particles using the box sort algorithm in
+    Cells. The cells are stored in a dictionary 'cells' which is keyed
+    on the spatial index (IntPoint) of the cell.
+
+    """
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+                 int ghost_layers=1, domain=None, bint cache=False,
+                 bint sort_gids=False):
+        """Constructor for NNPS
+
+        Parameters
+        ----------
+
+        dim : int
+            Dimension (fixme: Not sure if this is really needed)
+
+        particles : list
+            The list of particle arrays we are working on.
+
+        radius_scale : double, default (2)
+            Optional kernel radius scale. Defaults to 2
+
+        domain : DomainManager, default (None)
+            Optional limits for the domain
+
+        cache : bint
+            Flag to set if we want to cache neighbor calls. This costs
+            storage but speeds up neighbor calculations.
+
+        sort_gids : bint, default (False)
+            Flag to sort neighbors using gids (if they are available).
+            This is useful when comparing parallel results with those
+            from a serial run.
+        """
+        # store the list of particles and number of arrays
+        self.particles = particles
+        self.narrays = len( particles )
+
+        # create the particle array wrappers
+        self.pa_wrappers = [NNPSParticleArrayWrapper(pa) for pa in particles]
+
+        # radius scale and problem dimensionality.
+        self.radius_scale = radius_scale
+        self.dim = dim
+
+        self.domain = domain
+        if domain is None:
+            self.domain = DomainManager()
+
+        # set the particle array wrappers for the domain manager
+        self.domain.set_pa_wrappers(self.pa_wrappers)
+
+        # set the radius scale to determine the cell size
+        self.domain.set_radius_scale(self.radius_scale)
+
+        # periodicity
+        self.is_periodic = self.domain.is_periodic
+
+        # The total number of cells.
+        self.n_cells = 0
+
+        # cell shifts. Indicates the shifting value for cell indices
+        # in each co-ordinate direction.
+        self.cell_shifts = IntArray(3)
+        self.cell_shifts.data[0] = -1
+        self.cell_shifts.data[1] = 0
+        self.cell_shifts.data[2] = 1
+
+        # min and max coordinate values
+        self.xmin = DoubleArray(3)
+        self.xmax = DoubleArray(3)
+
+        # The cache.
+        self.use_cache = cache
+        _cache = []
+        for d_idx in range(len(particles)):
+            for s_idx in range(len(particles)):
+                _cache.append(GPUNeighborCache(self, d_idx, s_idx))
+        self.cache = _cache
+
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs):
+        cdef int idx = dst_index*self.narrays + src_index
+        if self.src_index != src_index \
+                or self.dst_index != dst_index:
+            self.set_context(src_index, dst_index)
+        return self.cache[idx].get_neighbors(src_index, d_idx, nbrs)
+
+    cdef int find_neighbor_lengths(self, int* lengths):
+        raise NotImplementedError("NNPS :: find_neighbor_lengths called")
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs):
+        raise NotImplementedError("NNPS :: find_nearest_neighbors called")
+
+    cpdef brute_force_neighbors_gpu(self):
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[dst_index]
+
+        src.copy_to_gpu(self.current_cache.queue)
+        dst.copy_to_gpu(self.current_cache.queue)
+
+cdef class BruteForceNNPS(GPUNNPS):
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+            int ghost_layers=1, domain=None, bint cache=False,
+            bint sort_gids=False):
+        GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
+                domain, cache, sort_gids)
+
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        for pa_wrapper in pa_wrappers:
+            pa_wrapper.copy_to_gpu()
+
+    cdef int find_neighbor_lengths(self, np.ndarray nbrs_lengths):
+        arguments = \
+                "double* s_x, double* s_y, double* s_z, double* s_h,\
+                double* d_x, double* d_y, double* d_z, double* d_h,\
+                int num_particles, unsigned int* nbrs_lengths"
+        src = \
+                "\
+                int j;\
+                double dist, dist_x, dist_y, dist_z;\
+                double h_i = d_h[i]*d_h[i];\
+                double h_j;\
+                for(j=0; j<num_particles; j++)\
+                {\
+                    h_j = s_h[j]*s_h[j];\
+                    \
+                    dist_x = d_x[i] - s_x[j];\
+                    dist_y = d_y[i] - s_y[j];\
+                    dist_z = d_z[i] - s_z[j];\
+                    \
+                    dist = dist_x*dist_x + dist_y*dist_y + dist_z*dist_z;\
+                    \
+                    if(dist < h_i || dist < h_j)\
+                        nbrs_lengths[i]++;\
+                }\
+                "
+
+        brute_force_nbr_lengths = ElementwiseKernel(self.current_cache.ctx,
+                arguments, src, "brute_force_nbr_lengths")
+
+        brute_force_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.dst.get_number_of_particles(),
+                nbr_lengths)
 
 

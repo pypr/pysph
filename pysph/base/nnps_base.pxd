@@ -5,6 +5,9 @@ cimport cython
 from libcpp.map cimport map
 from libcpp.vector cimport vector
 
+import pyopencl as cl
+import pyopencl.array
+
 # PyZoltan CArrays
 from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
@@ -150,6 +153,7 @@ cdef class NNPSParticleArrayWrapper:
 
     # get the number of particles
     cdef int get_number_of_particles(self)
+    cpdef copy_to_gpu(self, queue)
 
 # Domain limits for the simulation
 cdef class DomainManager:
@@ -323,4 +327,38 @@ cdef class NNPS:
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
+
+cdef class GPUNeighborCache:
+
+    cdef int _dst_index
+    cdef int _src_index
+    cdef GPUNNPS _nnps
+    cdef bint _cached
+    #cdef void **_neighbors
+    #cdef list _neighbor_arrays
+
+    #cdef cl.array.Array _neighbors_gpu
+    cdef np.ndarray _neighbors_cpu
+    cdef np.ndarray _neighbor_lengths
+    cdef np.ndarray _start_idx
+
+    cdef int _narrays
+    cdef list _particles
+
+    cdef void copy_to_cpu(self)
+    cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs)
+    cdef void get_neighbors_raw_gpu(self, size_t d_idx, UIntArray nbrs)
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+    cpdef update(self)
+
+    cdef void _find_neighbors(self)
+
+cdef class GPUNNPS(NNPS):
+
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs)
+
+    cdef int find_neighbor_lengths(self, int* lengths)
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs)
 
