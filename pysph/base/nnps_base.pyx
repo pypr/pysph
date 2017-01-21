@@ -1344,6 +1344,7 @@ cdef class BruteForceNNPS(GPUNNPS):
         GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
+        self.radius_scale2 = radius_scale*radius_scale
         cdef NNPSParticleArrayWrapper pa_wrapper
         for pa_wrapper in self.pa_wrappers:
             pa_wrapper.copy_to_gpu(self.queue)
@@ -1368,16 +1369,17 @@ cdef class BruteForceNNPS(GPUNNPS):
         arguments = \
                 """double* s_x, double* s_y, double* s_z, double* s_h,
                 double* d_x, double* d_y, double* d_z, double* d_h,
-                unsigned int num_particles, unsigned int* nbr_lengths"""
+                unsigned int num_particles, unsigned int* nbr_lengths,
+                double radius_scale2"""
 
         src = """
                 unsigned int j;
                 double dist;
-                double h_i = d_h[i]*d_h[i];
+                double h_i = radius_scale2*d_h[i]*d_h[i];
                 double h_j;
                 for(j=0; j<num_particles; j++)
                 {
-                    h_j = s_h[j]*s_h[j];
+                    h_j = radius_scale2*s_h[j]*s_h[j];
                     dist = NORM2(d_x[i] - s_x[j], d_y[i] - s_y[j], d_z[i] - s_z[j]);
                     if(dist < h_i || dist < h_j)
                         nbr_lengths[i] += 1;
@@ -1394,24 +1396,24 @@ cdef class BruteForceNNPS(GPUNNPS):
         brute_force_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
                 self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
                 self.dst.gpu_h, self.src.get_number_of_particles(),
-                nbr_lengths)
+                nbr_lengths, self.radius_scale2)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
                 """double* s_x, double* s_y, double* s_z, double* s_h,
                 double* d_x, double* d_y, double* d_z, double* d_h,
                 unsigned int num_particles, unsigned int* start_indices,
-                unsigned int* nbrs"""
+                unsigned int* nbrs, double radius_scale2"""
 
         src = """
                 unsigned int j, k = 0;
                 double dist;
-                double h_i = d_h[i]*d_h[i];
+                double h_i = radius_scale2*d_h[i]*d_h[i];
                 double h_j;
                 unsigned int idx = start_indices[i];
                 for(j=0; j<num_particles; j++)
                 {
-                    h_j = s_h[j]*s_h[j];
+                    h_j = radius_scale2*s_h[j]*s_h[j];
                     dist = NORM2(d_x[i] - s_x[j], d_y[i] - s_y[j], d_z[i] - s_z[j]);
                     if(dist < h_i || dist < h_j)
                     {
@@ -1431,6 +1433,6 @@ cdef class BruteForceNNPS(GPUNNPS):
         brute_force_nbrs(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
                 self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
                 self.dst.gpu_h, self.src.get_number_of_particles(),
-                start_indices, nbrs)
+                start_indices, nbrs, self.radius_scale2)
 
 

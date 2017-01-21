@@ -390,6 +390,7 @@ cdef class GPUNNPS(NNPSBase):
     cdef object ctx
     cdef object queue
 
+    cdef public double radius_scale2
     cdef public GPUNeighborCache current_cache  # The current cache
     cdef public bint sort_gids        # Sort neighbors by their gids.
 
