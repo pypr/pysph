@@ -17,6 +17,9 @@ cdef extern from 'math.h':
     double fmax(double, double) nogil
     double fmin(double, double) nogil
 
+cdef extern from "<algorithm>" namespace "std" nogil:
+    OutputIter copy[InputIter,OutputIter](InputIter,InputIter,OutputIter)
+
 cdef struct cOctreeNode:
     bint is_leaf
     double length
@@ -25,7 +28,7 @@ cdef struct cOctreeNode:
     int num_particles
     int level
 
-    vector[u_int]* indices
+    int start_index
     cOctreeNode* children[8]
     cOctreeNode* parent
 
@@ -48,9 +51,9 @@ cdef class OctreeNode:
 
     cdef void wrap_node(self, cOctreeNode* node)
 
-    cpdef UIntArray get_indices(self)
-
     cpdef OctreeNode get_parent(self)
+
+    cpdef UIntArray get_indices(self, Octree tree)
 
     cpdef list get_children(self)
 
@@ -62,6 +65,10 @@ cdef class Octree:
     ##########################################################################
     cdef cOctreeNode* root
     cdef vector[cOctreeNode*]* leaf_cells
+    cdef u_int* pids
+
+    cdef int _next_pid
+    cdef public int num_particles
 
     cdef public int leaf_max_particles
     cdef public double hmax
