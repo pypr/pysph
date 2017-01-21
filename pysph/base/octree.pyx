@@ -181,7 +181,7 @@ cdef class Octree:
         self.depth = 0
         self.root = NULL
         self.leaf_cells = NULL
-        self.machine_eps = np.finfo(float).eps
+        self.machine_eps = 16*np.finfo(float).eps
         self.pids = NULL
 
     def __dealloc__(self):
@@ -628,7 +628,7 @@ cdef class CompressedOctree(Octree):
 
             length_new = fmax(x_length, fmax(y_length, z_length))
 
-            eps = 2*self._get_eps(length_new, xmin_current)
+            eps = self._get_eps(length_new, xmin_current)
 
             length_padded = length_new*(1 + 2*eps)
 
