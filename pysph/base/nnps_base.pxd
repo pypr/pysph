@@ -148,6 +148,12 @@ cdef class NNPSParticleArrayWrapper:
     cdef public UIntArray gid
     cdef public IntArray tag
     cdef public ParticleArray pa
+
+    cdef public object gpu_x
+    cdef public object gpu_y
+    cdef public object gpu_z
+    cdef public object gpu_h
+
     cdef str name
     cdef int np
 
@@ -226,11 +232,12 @@ cdef class Cell:
     cdef _compute_bounding_box(self, double cell_size,
                                int layers)
 
-
 cdef class NeighborCache:
-
     cdef int _dst_index
     cdef int _src_index
+    cdef int _narrays
+    cdef list _particles
+
     cdef int _n_threads
     cdef NNPS _nnps
     cdef UIntArray _pid_to_tid
@@ -238,8 +245,6 @@ cdef class NeighborCache:
     cdef IntArray _cached
     cdef void **_neighbors
     cdef list _neighbor_arrays
-    cdef int _narrays
-    cdef list _particles
     cdef int _last_avg_nbr_size
 
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
@@ -250,8 +255,7 @@ cdef class NeighborCache:
     cdef void _update_last_avg_nbr_size(self)
     cdef void _find_neighbors(self, long d_idx) nogil
 
-# Nearest neighbor locator
-cdef class NNPS:
+cdef class NNPSBase:
     ##########################################################################
     # Data Attributes
     ##########################################################################
@@ -260,7 +264,6 @@ cdef class NNPS:
     cdef public int narrays           # Number of particle arrays
     cdef public bint use_cache        # Use cache or not.
     cdef list cache                   # The neighbor cache.
-    cdef public NeighborCache current_cache  # The current cache
     cdef int src_index, dst_index     # The current source and dest indices
 
     cdef public DomainManager domain  # Domain manager
@@ -274,6 +277,30 @@ cdef class NNPS:
     cdef public double radius_scale   # Radius scale for kernel
     cdef IntArray cell_shifts         # cell shifts
     cdef public int n_cells           # number of cells
+    #cdef public bint sort_gids        # Sort neighbors by their gids.
+
+    cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
+            size_t d_idx, UIntArray nbrs, bint prealloc)
+
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+
+    cpdef get_nearest_particles(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs)
+    cpdef set_context(self, int src_index, int dst_index)
+    cpdef spatially_order_particles(self, int pa_index)
+    cdef _compute_bounds(self)
+    cpdef _bin(self, int pa_index, UIntArray indices)
+    cpdef _refresh(self)
+
+# Nearest neighbor locator
+cdef class NNPS(NNPSBase):
+    ##########################################################################
+    # Data Attributes
+    ##########################################################################
+    cdef public NeighborCache current_cache  # The current cache
+
     cdef public bint sort_gids        # Sort neighbors by their gids.
 
     ##########################################################################
@@ -329,36 +356,59 @@ cdef class NNPS:
     cpdef _refresh(self)
 
 cdef class GPUNeighborCache:
-
     cdef int _dst_index
     cdef int _src_index
-    cdef GPUNNPS _nnps
-    cdef bint _cached
-    #cdef void **_neighbors
-    #cdef list _neighbor_arrays
-
-    #cdef cl.array.Array _neighbors_gpu
-    cdef np.ndarray _neighbors_cpu
-    cdef np.ndarray _neighbor_lengths
-    cdef np.ndarray _start_idx
-
     cdef int _narrays
     cdef list _particles
 
+    cdef bint _cached
+    cdef bint _copied_to_cpu
+    #cdef void **_neighbors
+    #cdef list _neighbor_arrays
+    cdef GPUNNPS _nnps
+
+    cdef object _neighbors_gpu
+    cdef object _nbr_lengths_gpu
+    cdef object _start_idx_gpu
+
+    cdef np.ndarray _neighbors_cpu
+    cdef np.ndarray _nbr_lengths
+    cdef np.ndarray _start_idx
+
+
     cdef void copy_to_cpu(self)
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs)
-    cdef void get_neighbors_raw_gpu(self, size_t d_idx, UIntArray nbrs)
-    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+    cdef void get_neighbors_raw_gpu(self)
+    #cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
     cpdef update(self)
 
     cdef void _find_neighbors(self)
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
 
-cdef class GPUNNPS(NNPS):
+cdef class GPUNNPS(NNPSBase):
+
+    cdef object ctx
+    cdef object queue
+
+    cdef public GPUNeighborCache current_cache  # The current cache
+    cdef public bint sort_gids        # Sort neighbors by their gids.
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs)
 
-    cdef int find_neighbor_lengths(self, int* lengths)
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs)
 
-    cdef void find_nearest_neighbors_gpu(self, nbrs)
+    cdef void find_neighbor_lengths(self, nbr_lengths)
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
+
+cdef class BruteForceNNPS(GPUNNPS):
+    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+
+    cpdef set_context(self, int src_index, int dst_index)
+
+    cdef void find_neighbor_lengths(self, nbr_lengths)
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
+
 
