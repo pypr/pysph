@@ -1337,6 +1337,33 @@ cdef class GPUNNPS(NNPSBase):
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         raise NotImplementedError("NNPS :: find_nearest_neighbors called")
 
+    cpdef update(self):
+        cdef int i, num_particles
+        cdef ParticleArray pa
+
+        cdef DomainManager domain = self.domain
+
+        # use cell sizes computed by the domain.
+        self.cell_size = domain.cell_size
+        self.hmin = domain.hmin
+
+        # compute bounds and refresh the data structure
+        self._compute_bounds()
+        self._refresh()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin(pa_index=i)
+
+        if self.use_cache:
+            for cache in self.cache:
+                cache.update()
+
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
@@ -1345,6 +1372,12 @@ cdef class BruteForceNNPS(GPUNNPS):
                 domain, cache, sort_gids)
 
         self.radius_scale2 = radius_scale*radius_scale
+        self.src_index = 0
+        self.dst_index = 0
+        self.sort_gids = sort_gids
+        self.domain.update()
+        self.update()
+
         cdef NNPSParticleArrayWrapper pa_wrapper
         for pa_wrapper in self.pa_wrappers:
             pa_wrapper.copy_to_gpu(self.queue)

@@ -317,3 +317,99 @@ cdef class ZOrderNNPS(NNPS):
 
         self.fill_array(pa_wrapper, pa_index, indices, current_pids, current_indices)
 
+
+cdef class ZOrderGPUNNPS(GPUNNPS):
+    def __init__(self, int dim, list particles, double radius_scale = 2.0,
+            int ghost_layers = 1, domain=None, bint fixed_h = False,
+            bint cache = False, bint sort_gids = False):
+        NNPS.__init__(
+            self, dim, particles, radius_scale, ghost_layers, domain,
+            cache, sort_gids
+        )
+
+        self.radius_scale2 = radius_scale*radius_scale
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int i, num_particles
+
+        self.pids = []
+        self.pid_keys = []
+
+        for i from 0<=i<self.narrays:
+            pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
+            pa_wrapper.copy_to_gpu(self.queue)
+            num_particles = pa_wrapper.get_number_of_particles()
+
+            self.pids.append(cl.array.empty(num_particles))
+            self.pid_keys.append(cl.array.empty(num_particles))
+
+        self.src_index = 0
+        self.dst_index = 0
+        self.sort_gids = sort_gids
+        self.domain.update()
+        self.update()
+
+    cpdef _bin(self, int pa_index):
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        current_keys = self.pid_keys[pa_index]
+        current_indices = self.pids[pa_index]
+
+        arguments = """
+                    double* x, double* y, double* z, double* h,
+                    double xmin, double ymin, double zmin,
+                    uint64_t* pid_keys, unsigned int* indices
+                    """
+
+        pids_src =  """
+                    uint64_t c_x, c_y, c_z;
+                    FIND_CELL_ID(
+                        x[i] - xmin,
+                        y[i] - ymin,
+                        z[i] = zmin,
+                        h[i], c_x, c_y, c_z
+                        );
+                    uint64_t key;
+                    INTERLEAVE(c_x, c_y, c_z, key);
+                    pid_keys[i] = key;
+                    indices[i] = i;
+                    """
+
+        bit_interleaving =  """
+                            #define INTERLEAVE(x, y, z, key) \
+                            int i = x; int j = y; int k = z;\
+                            i = (i | (i << 32)) & 0x1f00000000ffff;\
+                            i = (i | (i << 16)) & 0x1f0000ff0000ff;\
+                            i = (i | (i <<  8)) & 0x100f00f00f00f00f;\
+                            i = (i | (i <<  4)) & 0x10c30c30c30c30c3;\
+                            i = (i | (i <<  2)) & 0x1249249249249249;\
+                            \
+                            j = (j | (j << 32)) & 0x1f00000000ffff;\
+                            j = (j | (j << 16)) & 0x1f0000ff0000ff;\
+                            j = (j | (j <<  8)) & 0x100f00f00f00f00f;\
+                            j = (j | (j <<  4)) & 0x10c30c30c30c30c3;\
+                            j = (j | (j <<  2)) & 0x1249249249249249;\
+                            \
+                            k = (k | (k << 32)) & 0x1f00000000ffff;\
+                            k = (k | (k << 16)) & 0x1f0000ff0000ff;\
+                            k = (k | (k <<  8)) & 0x100f00f00f00f00f;\
+                            k = (k | (k <<  4)) & 0x10c30c30c30c30c3;\
+                            k = (k | (k <<  2)) & 0x1249249249249249;\
+                            \
+                            key = (i | (j << 1) | (k << 2))
+
+                            #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
+                            c_x = ceil(x/h); c_y = ceil(y/h); c_z = ceil(z/h)
+
+                            typedef unsigned long long uint64_t;
+                            """
+
+        fill_pids = ElementwiseKernel(self.ctx,
+                arguments, pids_src, "fill_pids", preamble=bit_interleaving)
+
+        fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z,
+                pa_wrapper.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+                current_keys, current_indices)
+
+        radix_sort = cl.algorithm.RadixSort(self.context,
+                "unsigned int* indices, unsigned long long* keys", key_expr="keys[i]",
+                sort_arg_names="indices")
+
