@@ -22,6 +22,7 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     cdef list tree
     cdef cOctreeNode* current_tree
+    cdef u_int* current_pids
 
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
@@ -37,6 +38,8 @@ cdef class OctreeNNPS(NNPS):
     cdef void _get_neighbors(self, double q_x, double q_y, double q_z, double q_h,
             double* src_x_ptr, double* src_y_ptr, double* src_z_ptr, double* src_h_ptr,
             UIntArray nbrs, cOctreeNode* node) nogil
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
     cpdef _refresh(self)
 

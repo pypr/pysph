@@ -5,7 +5,6 @@ You can run the tests like so:
     $ nosetests -v test_octree.py
 """
 import numpy as np
-from numpy import random
 
 # PySPH imports
 from pysph.base.utils import get_particle_array
@@ -134,7 +133,7 @@ class SimpleOctreeTestCase(unittest.TestCase):
         sum_indices = [0]
 
         def _calculate_sum(node, sum_indices):
-            indices = node.get_indices()
+            indices = node.get_indices(self.tree)
             sum_indices[0] += indices.length
             children = node.get_children()
             for child in children:
