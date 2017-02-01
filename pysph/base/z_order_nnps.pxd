@@ -58,6 +58,22 @@ cdef class ZOrderNNPS(NNPS):
     cpdef _bin(self, int pa_index, UIntArray indices)
 
 cdef class ZOrderGPUNNPS(GPUNNPS):
+    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+    cdef str bit_interleaving
+    cdef str find_cell_id
     cdef list pids
+    cdef list pid_keys
+    cdef list key_to_idx
 
+    cdef object current_pids
+    cdef object current_keys
+    cdef object current_key_to_idx
+
+    cpdef _bin(self, int pa_index)
+
+    cpdef _refresh(self)
+
+    cdef void find_neighbor_lengths(self, nbr_lengths)
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
 

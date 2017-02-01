@@ -10,6 +10,15 @@ from cython.operator cimport dereference as deref, preincrement as inc
 # Cython for compiler directives
 cimport cython
 
+import pyopencl as cl
+import pyopencl.array
+import pyopencl.algorithm
+from pyopencl.scan import GenericScanKernel
+from pyopencl.elementwise import ElementwiseKernel
+
+import numpy as np
+cimport numpy as np
+
 cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
@@ -319,28 +328,47 @@ cdef class ZOrderNNPS(NNPS):
 
 
 cdef class ZOrderGPUNNPS(GPUNNPS):
-    def __init__(self, int dim, list particles, double radius_scale = 2.0,
-            int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False):
-        NNPS.__init__(
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+            int ghost_layers=1, domain=None, bint fixed_h=False,
+            bint cache=False, bint sort_gids=False):
+        GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef int i, num_particles
 
-        self.pids = []
-        self.pid_keys = []
+        self.bit_interleaving = """
+                                #define INTERLEAVE(x, y, z, key) \
+                                unsigned long p = x, q = y, r = z;\
+                                p = (p | (p << 32)) & 0x1f00000000ffff;\
+                                p = (p | (p << 16)) & 0x1f0000ff0000ff;\
+                                p = (p | (p <<  8)) & 0x100f00f00f00f00f;\
+                                p = (p | (p <<  4)) & 0x10c30c30c30c30c3;\
+                                p = (p | (p <<  2)) & 0x1249249249249249;\
+                                \
+                                q = (q | (q << 32)) & 0x1f00000000ffff;\
+                                q = (q | (q << 16)) & 0x1f0000ff0000ff;\
+                                q = (q | (q <<  8)) & 0x100f00f00f00f00f;\
+                                q = (q | (q <<  4)) & 0x10c30c30c30c30c3;\
+                                q = (q | (q <<  2)) & 0x1249249249249249;\
+                                \
+                                r = (r | (r << 32)) & 0x1f00000000ffff;\
+                                r = (r | (r << 16)) & 0x1f0000ff0000ff;\
+                                r = (r | (r <<  8)) & 0x100f00f00f00f00f;\
+                                r = (r | (r <<  4)) & 0x10c30c30c30c30c3;\
+                                r = (r | (r <<  2)) & 0x1249249249249249;\
+                                \
+                                key = (p | (q << 1) | (r << 2))
 
-        for i from 0<=i<self.narrays:
-            pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
-            pa_wrapper.copy_to_gpu(self.queue)
-            num_particles = pa_wrapper.get_number_of_particles()
+                                #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
+                                c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
+                                """
 
-            self.pids.append(cl.array.empty(num_particles))
-            self.pid_keys.append(cl.array.empty(num_particles))
+        self.find_cell_id = """
+                            #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
+                            c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
+                            """
 
         self.src_index = 0
         self.dst_index = 0
@@ -350,66 +378,283 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
-        current_keys = self.pid_keys[pa_index]
-        current_indices = self.pids[pa_index]
-
         arguments = """
-                    double* x, double* y, double* z, double* h,
+                    double* x, double* y, double* z, double cell_size,
                     double xmin, double ymin, double zmin,
-                    uint64_t* pid_keys, unsigned int* indices
+                    unsigned long* keys, unsigned int* pids
                     """
 
         pids_src =  """
-                    uint64_t c_x, c_y, c_z;
+                    unsigned long c_x, c_y, c_z;
                     FIND_CELL_ID(
                         x[i] - xmin,
                         y[i] - ymin,
-                        z[i] = zmin,
-                        h[i], c_x, c_y, c_z
+                        z[i] - zmin,
+                        cell_size, c_x, c_y, c_z
                         );
-                    uint64_t key;
+                    unsigned long key;
                     INTERLEAVE(c_x, c_y, c_z, key);
-                    pid_keys[i] = key;
-                    indices[i] = i;
+                    keys[i] = key;
+                    pids[i] = i;
                     """
 
-        bit_interleaving =  """
-                            #define INTERLEAVE(x, y, z, key) \
-                            int i = x; int j = y; int k = z;\
-                            i = (i | (i << 32)) & 0x1f00000000ffff;\
-                            i = (i | (i << 16)) & 0x1f0000ff0000ff;\
-                            i = (i | (i <<  8)) & 0x100f00f00f00f00f;\
-                            i = (i | (i <<  4)) & 0x10c30c30c30c30c3;\
-                            i = (i | (i <<  2)) & 0x1249249249249249;\
-                            \
-                            j = (j | (j << 32)) & 0x1f00000000ffff;\
-                            j = (j | (j << 16)) & 0x1f0000ff0000ff;\
-                            j = (j | (j <<  8)) & 0x100f00f00f00f00f;\
-                            j = (j | (j <<  4)) & 0x10c30c30c30c30c3;\
-                            j = (j | (j <<  2)) & 0x1249249249249249;\
-                            \
-                            k = (k | (k << 32)) & 0x1f00000000ffff;\
-                            k = (k | (k << 16)) & 0x1f0000ff0000ff;\
-                            k = (k | (k <<  8)) & 0x100f00f00f00f00f;\
-                            k = (k | (k <<  4)) & 0x10c30c30c30c30c3;\
-                            k = (k | (k <<  2)) & 0x1249249249249249;\
-                            \
-                            key = (i | (j << 1) | (k << 2))
-
-                            #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
-                            c_x = ceil(x/h); c_y = ceil(y/h); c_z = ceil(z/h)
-
-                            typedef unsigned long long uint64_t;
-                            """
+        macros = "\n".join((self.bit_interleaving, self.find_cell_id))
 
         fill_pids = ElementwiseKernel(self.ctx,
-                arguments, pids_src, "fill_pids", preamble=bit_interleaving)
+                arguments, pids_src, "fill_pids", preamble=macros)
 
         fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z,
-                pa_wrapper.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
-                current_keys, current_indices)
+                self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.pid_keys[pa_index], self.pids[pa_index])
 
-        radix_sort = cl.algorithm.RadixSort(self.context,
-                "unsigned int* indices, unsigned long long* keys", key_expr="keys[i]",
-                sort_arg_names="indices")
+        radix_sort = cl.algorithm.RadixSort(self.ctx,
+                "unsigned int* pids, unsigned long* keys", key_expr="keys[i]",
+                sort_arg_names=["pids", "keys"])
+
+        (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index],
+                self.pid_keys[pa_index], key_bits=64)
+        self.pids[pa_index] = sorted_indices
+        self.pid_keys[pa_index] = sorted_keys
+
+        self.key_to_idx[pa_index] = -1 + cl.array.zeros(self.queue,
+                1 + <unsigned long>(sorted_indices[-1].get()), dtype=np.int32)
+
+        arguments = """
+                    unsigned long* keys, int* key_to_idx
+                    """
+
+        make_map_src =  """
+                        if(i == 0)
+                        {
+                            key_to_idx[keys[i]] = i;
+                            PYOPENCL_ELWISE_CONTINUE;
+                        }
+                        if(keys[i-1] != keys[i])
+                            key_to_idx[keys[i]] = i;
+                        """
+
+        make_map = ElementwiseKernel(self.ctx, arguments, make_map_src, "make_map")
+
+        make_map(self.pid_keys[pa_index], self.key_to_idx[pa_index])
+
+    cpdef _refresh(self):
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int i, num_particles
+        self.pids = []
+        self.pid_keys = []
+        self.key_to_idx = [None for i in range(self.narrays)]
+
+        for i from 0<=i<self.narrays:
+            pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
+            pa_wrapper.copy_to_gpu(self.queue)
+            num_particles = pa_wrapper.get_number_of_particles()
+
+            self.pids.append(cl.array.empty(self.queue, num_particles, dtype=np.uint32))
+            self.pid_keys.append(cl.array.empty(self.queue, num_particles, dtype=np.uint64))
+
+    cpdef set_context(self, int src_index, int dst_index):
+        """Setup the context before asking for neighbors.  The `dst_index`
+        represents the particles for whom the neighbors are to be determined
+        from the particle array with index `src_index`.
+
+        Parameters
+        ----------
+
+         src_index: int: the source index of the particle array.
+         dst_index: int: the destination index of the particle array.
+        """
+        GPUNNPS.set_context(self, src_index, dst_index)
+
+        self.src = self.pa_wrappers[ src_index ]
+        self.dst = self.pa_wrappers[ dst_index ]
+
+        self.current_keys = self.pid_keys[src_index]
+        self.current_pids = self.pids[src_index]
+        self.current_key_to_idx = self.key_to_idx[src_index]
+
+    cdef void find_neighbor_lengths(self, nbr_lengths):
+        arguments = \
+                """double* s_x, double* s_y, double* s_z, double* s_h,
+                double* d_x, double* d_y, double* d_z, double* d_h,
+                double xmin, double ymin, double zmin,
+                unsigned int num_particles, unsigned long* keys,
+                unsigned int* pids, int* key_to_idx,
+                unsigned int* nbr_lengths, double radius_scale2,
+                double cell_size, unsigned long max_key"""
+
+        src = """
+                double q_x = d_x[i];
+                double q_y = d_y[i];
+                double q_z = d_z[i];
+                double q_h = d_h[i];
+
+                int c_x, c_y, c_z;
+
+                FIND_CELL_ID(
+                    q_x - xmin,
+                    q_y - ymin,
+                    q_z - zmin,
+                    cell_size, c_x, c_y, c_z
+                    );
+
+                int idx;
+                int j, k, m;
+                double dist;
+                double h_i = radius_scale2*q_h*q_h;
+                double h_j;
+
+                unsigned long nbr_boxes[27];
+                int nbr_boxes_length = 0;
+                unsigned long key;
+                unsigned int pid;
+
+                for(j=-1; j<2; j++)
+                {
+                    for(k=-1; k<2; k++)
+                    {
+                        for(m=-1; m<2; m++)
+                        {
+                            if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
+                            {
+                                INTERLEAVE(c_x+j, c_y+k, c_z+m, key);
+                                if(key > max_key)
+                                    continue;
+                                nbr_boxes[nbr_boxes_length] = key;
+                                nbr_boxes_length++;
+                            }
+                        }
+                    }
+                }
+
+                for(j=0; j<nbr_boxes_length; j++)
+                {
+                    key = nbr_boxes[j];
+                    //PROBABLY FIXED: The next step could go out of range
+                    idx = key_to_idx[key];
+                    if(idx == -1)
+                        continue;
+
+                    while(keys[idx] == key)
+                    {
+                        pid = pids[idx];
+                        h_j = radius_scale2*s_h[pid]*s_h[pid];
+                        dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], q_z - s_z[pid]);
+                        if(dist < h_i || dist < h_j)
+                            nbr_lengths[i] += 1;
+                        idx++;
+                    }
+                }
+                """
+
+        norm2 = """
+                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+                """
+
+        macros = "\n".join((self.bit_interleaving, self.find_cell_id, norm2))
+
+        z_order_nbr_lengths = ElementwiseKernel(self.ctx,
+                arguments, src, "z_order_nbr_lengths", preamble=macros)
+
+        z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.src.get_number_of_particles(), self.current_keys, self.current_pids,
+                self.current_key_to_idx, nbr_lengths, self.radius_scale2, self.cell_size,
+                <unsigned long> self.current_key_to_idx.size - 1)
+
+    cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
+        arguments = \
+                """double* s_x, double* s_y, double* s_z, double* s_h,
+                double* d_x, double* d_y, double* d_z, double* d_h,
+                double xmin, double ymin, double zmin,
+                unsigned int num_particles, unsigned long* keys,
+                unsigned int* pids, int* key_to_idx,
+                unsigned int* start_indices, unsigned int* nbrs,
+                double radius_scale2, double cell_size, unsigned long max_key"""
+
+        src = """
+                double q_x = d_x[i];
+                double q_y = d_y[i];
+                double q_z = d_z[i];
+                double q_h = d_h[i];
+
+                int c_x, c_y, c_z;
+
+                FIND_CELL_ID(
+                    q_x - xmin,
+                    q_y - ymin,
+                    q_z - zmin,
+                    cell_size, c_x, c_y, c_z
+                    );
+
+                int idx;
+                int j, k, m;
+                double dist;
+                double h_i = radius_scale2*q_h*q_h;
+                double h_j;
+
+                unsigned long nbr_boxes[27];
+                int nbr_boxes_length = 0;
+                unsigned long key;
+                unsigned int pid;
+
+                for(j=-1; j<2; j++)
+                {
+                    for(k=-1; k<2; k++)
+                    {
+                        for(m=-1; m<2; m++)
+                        {
+                            if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
+                            {
+                                INTERLEAVE(c_x+j, c_y+k, c_z+m, key);
+                                if(key > max_key)
+                                    continue;
+                                nbr_boxes[nbr_boxes_length] = key;
+                                nbr_boxes_length++;
+                            }
+                        }
+                    }
+                }
+
+                unsigned long start_idx = (unsigned long) start_indices[i];
+                unsigned long curr_idx = 0;
+                for(j=0; j<nbr_boxes_length; j++)
+                {
+                    key = nbr_boxes[j];
+                    //PROBABLY FIXED: The next step could go out of range
+                    idx = key_to_idx[key];
+                    if(idx == -1)
+                        continue;
+
+                    while(keys[idx] == key)
+                    {
+                        pid = pids[idx];
+                        h_j = radius_scale2*s_h[pid]*s_h[pid];
+                        dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], q_z - s_z[pid]);
+                        if(dist < h_i || dist < h_j)
+                        {
+                            nbrs[start_idx + curr_idx] = pid;
+                            curr_idx++;
+                        }
+                        idx++;
+                    }
+                }
+                """
+
+        norm2 = """
+                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+                """
+
+        macros = "\n".join((self.bit_interleaving, self.find_cell_id, norm2))
+
+        z_order_nbrs = ElementwiseKernel(self.ctx,
+                arguments, src, "z_order_nbrs", preamble=macros)
+
+        z_order_nbrs(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.src.get_number_of_particles(), self.current_keys, self.current_pids,
+                self.current_key_to_idx, start_indices, nbrs, self.radius_scale2,
+                self.cell_size, <unsigned long> self.current_key_to_idx.size - 1)
+
 

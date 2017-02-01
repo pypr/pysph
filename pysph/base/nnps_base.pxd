@@ -291,8 +291,6 @@ cdef class NNPSBase:
     cpdef set_context(self, int src_index, int dst_index)
     cpdef spatially_order_particles(self, int pa_index)
     cdef _compute_bounds(self)
-    cpdef _bin(self, int pa_index, UIntArray indices)
-    cpdef _refresh(self)
 
 # Nearest neighbor locator
 cdef class NNPS(NNPSBase):
@@ -403,6 +401,12 @@ cdef class GPUNNPS(NNPSBase):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
 
+    cpdef update(self)
+
+    cpdef _bin(self, int pa_index)
+
+    cpdef _refresh(self)
+
 cdef class BruteForceNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
 
@@ -412,4 +416,5 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
 
+    cpdef _refresh(self)
 

@@ -1035,12 +1035,6 @@ cdef class NNPSBase:
         self.xmin.set_data(np.asarray([xmin, ymin, zmin]))
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
 
-    cpdef _bin(self, int pa_index, UIntArray indices):
-        raise NotImplementedError("NNPS :: _bin called")
-
-    cpdef _refresh(self):
-        raise NotImplementedError("NNPS :: _refresh called")
-
 
 cdef class NNPS(NNPSBase):
     """Nearest neighbor query class using the box-sort algorithm.
@@ -1193,6 +1187,12 @@ cdef class NNPS(NNPSBase):
             for i in range(length):
                 nbrs[i] = _data[i].first
 
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        raise NotImplementedError("NNPS :: _bin called")
+
+    cpdef _refresh(self):
+        raise NotImplementedError("NNPS :: _refresh called")
+
 cdef class GPUNeighborCache:
     def __init__(self, GPUNNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
@@ -1235,7 +1235,7 @@ cdef class GPUNeighborCache:
     cdef void _find_neighbors(self):
         self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu)
         total_size_gpu = cl.array.sum(self._nbr_lengths_gpu)
-        cdef int total_size = <int>(total_size_gpu.get())
+        cdef unsigned long total_size = <unsigned long>(total_size_gpu.get())
 
         # Allocate _neighbors_cpu and neighbors_gpu
         self._neighbors_cpu = np.empty(total_size, dtype=np.uint32)
@@ -1364,6 +1364,12 @@ cdef class GPUNNPS(NNPSBase):
             for cache in self.cache:
                 cache.update()
 
+    cpdef _bin(self, int pa_index):
+        raise NotImplementedError("NNPS :: _bin called")
+
+    cpdef _refresh(self):
+        raise NotImplementedError("NNPS :: _refresh called")
+
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
@@ -1468,4 +1474,9 @@ cdef class BruteForceNNPS(GPUNNPS):
                 self.dst.gpu_h, self.src.get_number_of_particles(),
                 start_indices, nbrs, self.radius_scale2)
 
+    cpdef _bin(self, int pa_index):
+        pass
+
+    cpdef _refresh(self):
+        pass
 
