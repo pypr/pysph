@@ -339,30 +339,29 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.radius_scale2 = radius_scale*radius_scale
 
         self.bit_interleaving = """
-                                #define INTERLEAVE(x, y, z, key) \
-                                unsigned long p = x, q = y, r = z;\
-                                p = (p | (p << 32)) & 0x1f00000000ffff;\
-                                p = (p | (p << 16)) & 0x1f0000ff0000ff;\
-                                p = (p | (p <<  8)) & 0x100f00f00f00f00f;\
-                                p = (p | (p <<  4)) & 0x10c30c30c30c30c3;\
-                                p = (p | (p <<  2)) & 0x1249249249249249;\
-                                \
-                                q = (q | (q << 32)) & 0x1f00000000ffff;\
-                                q = (q | (q << 16)) & 0x1f0000ff0000ff;\
-                                q = (q | (q <<  8)) & 0x100f00f00f00f00f;\
-                                q = (q | (q <<  4)) & 0x10c30c30c30c30c3;\
-                                q = (q | (q <<  2)) & 0x1249249249249249;\
-                                \
-                                r = (r | (r << 32)) & 0x1f00000000ffff;\
-                                r = (r | (r << 16)) & 0x1f0000ff0000ff;\
-                                r = (r | (r <<  8)) & 0x100f00f00f00f00f;\
-                                r = (r | (r <<  4)) & 0x10c30c30c30c30c3;\
-                                r = (r | (r <<  2)) & 0x1249249249249249;\
-                                \
-                                key = (p | (q << 1) | (r << 2))
+                                inline unsigned long interleave(unsigned long p, \
+                                        unsigned long q, unsigned long r)
+                                {
+                                    p = (p | (p << 32)) & 0x1f00000000ffff;
+                                    p = (p | (p << 16)) & 0x1f0000ff0000ff;
+                                    p = (p | (p <<  8)) & 0x100f00f00f00f00f;
+                                    p = (p | (p <<  4)) & 0x10c30c30c30c30c3;
+                                    p = (p | (p <<  2)) & 0x1249249249249249;
 
-                                #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
-                                c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
+                                    q = (q | (q << 32)) & 0x1f00000000ffff;
+                                    q = (q | (q << 16)) & 0x1f0000ff0000ff;
+                                    q = (q | (q <<  8)) & 0x100f00f00f00f00f;
+                                    q = (q | (q <<  4)) & 0x10c30c30c30c30c3;
+                                    q = (q | (q <<  2)) & 0x1249249249249249;
+
+                                    r = (r | (r << 32)) & 0x1f00000000ffff;
+                                    r = (r | (r << 16)) & 0x1f0000ff0000ff;
+                                    r = (r | (r <<  8)) & 0x100f00f00f00f00f;
+                                    r = (r | (r <<  4)) & 0x10c30c30c30c30c3;
+                                    r = (r | (r <<  2)) & 0x1249249249249249;
+
+                                    return (p | (q << 1) | (r << 2));
+                                }
                                 """
 
         self.find_cell_id = """
@@ -393,7 +392,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         cell_size, c_x, c_y, c_z
                         );
                     unsigned long key;
-                    INTERLEAVE(c_x, c_y, c_z, key);
+                    key = interleave(c_x, c_y, c_z);
                     keys[i] = key;
                     pids[i] = i;
                     """
@@ -449,8 +448,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             pa_wrapper.copy_to_gpu(self.queue)
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.pids.append(cl.array.empty(self.queue, num_particles, dtype=np.uint32))
-            self.pid_keys.append(cl.array.empty(self.queue, num_particles, dtype=np.uint64))
+            self.pids.append(cl.array.empty(self.queue,
+                num_particles, dtype=np.uint32))
+            self.pid_keys.append(cl.array.empty(self.queue,
+                num_particles, dtype=np.uint64))
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -465,8 +466,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         """
         GPUNNPS.set_context(self, src_index, dst_index)
 
-        self.src = self.pa_wrappers[ src_index ]
-        self.dst = self.pa_wrappers[ dst_index ]
+        self.src = self.pa_wrappers[src_index]
+        self.dst = self.pa_wrappers[dst_index]
 
         self.current_keys = self.pid_keys[src_index]
         self.current_pids = self.pids[src_index]
@@ -516,7 +517,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         {
                             if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
                             {
-                                INTERLEAVE(c_x+j, c_y+k, c_z+m, key);
+                                key = interleave(c_x+j, c_y+k, c_z+m);
                                 if(key > max_key)
                                     continue;
                                 nbr_boxes[nbr_boxes_length] = key;
@@ -572,7 +573,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned int* start_indices, unsigned int* nbrs,
                 double radius_scale2, double cell_size, unsigned long max_key"""
 
-        src = """
+        src =   """
                 double q_x = d_x[i];
                 double q_y = d_y[i];
                 double q_z = d_z[i];
@@ -606,7 +607,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         {
                             if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
                             {
-                                INTERLEAVE(c_x+j, c_y+k, c_z+m, key);
+                                key = interleave(c_x+j, c_y+k, c_z+m);
                                 if(key > max_key)
                                     continue;
                                 nbr_boxes[nbr_boxes_length] = key;
