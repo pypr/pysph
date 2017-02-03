@@ -59,8 +59,7 @@ cdef class ZOrderNNPS(NNPS):
 
 cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
-    cdef str bit_interleaving
-    cdef str find_cell_id
+    cdef str preamble
     cdef list pids
     cdef list pid_keys
     cdef list key_to_idx

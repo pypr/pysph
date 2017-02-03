@@ -338,36 +338,81 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
 
-        self.bit_interleaving = """
+        cdef str prototypes =   """
                                 inline unsigned long interleave(unsigned long p, \
-                                        unsigned long q, unsigned long r)
-                                {
-                                    p = (p | (p << 32)) & 0x1f00000000ffff;
-                                    p = (p | (p << 16)) & 0x1f0000ff0000ff;
-                                    p = (p | (p <<  8)) & 0x100f00f00f00f00f;
-                                    p = (p | (p <<  4)) & 0x10c30c30c30c30c3;
-                                    p = (p | (p <<  2)) & 0x1249249249249249;
+                                        unsigned long q, unsigned long r);
 
-                                    q = (q | (q << 32)) & 0x1f00000000ffff;
-                                    q = (q | (q << 16)) & 0x1f0000ff0000ff;
-                                    q = (q | (q <<  8)) & 0x100f00f00f00f00f;
-                                    q = (q | (q <<  4)) & 0x10c30c30c30c30c3;
-                                    q = (q | (q <<  2)) & 0x1249249249249249;
-
-                                    r = (r | (r << 32)) & 0x1f00000000ffff;
-                                    r = (r | (r << 16)) & 0x1f0000ff0000ff;
-                                    r = (r | (r <<  8)) & 0x100f00f00f00f00f;
-                                    r = (r | (r <<  4)) & 0x10c30c30c30c30c3;
-                                    r = (r | (r <<  2)) & 0x1249249249249249;
-
-                                    return (p | (q << 1) | (r << 2));
-                                }
+                                inline int neighbor_boxes(int c_x, int c_y, int c_z, \
+                                        unsigned long* nbr_boxes, unsigned long max_key);
                                 """
 
-        self.find_cell_id = """
-                            #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
-                            c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
+        cdef str bit_interleaving = """
+                                    inline unsigned long interleave(unsigned long p, \
+                                            unsigned long q, unsigned long r)
+                                    {
+                                        p = (p | (p << 32)) & 0x1f00000000ffff;
+                                        p = (p | (p << 16)) & 0x1f0000ff0000ff;
+                                        p = (p | (p <<  8)) & 0x100f00f00f00f00f;
+                                        p = (p | (p <<  4)) & 0x10c30c30c30c30c3;
+                                        p = (p | (p <<  2)) & 0x1249249249249249;
+
+                                        q = (q | (q << 32)) & 0x1f00000000ffff;
+                                        q = (q | (q << 16)) & 0x1f0000ff0000ff;
+                                        q = (q | (q <<  8)) & 0x100f00f00f00f00f;
+                                        q = (q | (q <<  4)) & 0x10c30c30c30c30c3;
+                                        q = (q | (q <<  2)) & 0x1249249249249249;
+
+                                        r = (r | (r << 32)) & 0x1f00000000ffff;
+                                        r = (r | (r << 16)) & 0x1f0000ff0000ff;
+                                        r = (r | (r <<  8)) & 0x100f00f00f00f00f;
+                                        r = (r | (r <<  4)) & 0x10c30c30c30c30c3;
+                                        r = (r | (r <<  2)) & 0x1249249249249249;
+
+                                        return (p | (q << 1) | (r << 2));
+                                    }
+                                    """
+
+        cdef str find_cell_id = """
+                                #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
+                                c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
+                                """
+
+        cdef str neighbor_boxes =   """
+                                    inline int neighbor_boxes(int c_x, int c_y, int c_z, \
+                                            unsigned long* nbr_boxes, unsigned long max_key)
+                                    {
+                                        int j, k, m;
+                                        unsigned long key;
+                                        int nbr_boxes_length = 0;
+                                        for(j=-1; j<2; j++)
+                                        {
+                                            for(k=-1; k<2; k++)
+                                            {
+                                                for(m=-1; m<2; m++)
+                                                {
+                                                    if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
+                                                    {
+                                                        key = interleave(c_x+j, c_y+k, c_z+m);
+                                                        if(key > max_key)
+                                                            continue;
+                                                        nbr_boxes[nbr_boxes_length] = key;
+                                                        nbr_boxes_length++;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        return nbr_boxes_length;
+                                    }
+
+                                    """
+
+        cdef str norm2 =    """
+                            #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
                             """
+
+        self.preamble = "\n".join((norm2, find_cell_id, prototypes,
+                bit_interleaving, neighbor_boxes))
 
         self.src_index = 0
         self.dst_index = 0
@@ -397,10 +442,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     pids[i] = i;
                     """
 
-        macros = "\n".join((self.bit_interleaving, self.find_cell_id))
-
         fill_pids = ElementwiseKernel(self.ctx,
-                arguments, pids_src, "fill_pids", preamble=macros)
+                arguments, pids_src, "fill_pids", preamble=self.preamble)
 
         fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z,
                 self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
@@ -483,7 +526,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned int* nbr_lengths, double radius_scale2,
                 double cell_size, unsigned long max_key"""
 
-        src = """
+        src =   """
                 double q_x = d_x[i];
                 double q_y = d_y[i];
                 double q_z = d_z[i];
@@ -498,34 +541,17 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     cell_size, c_x, c_y, c_z
                     );
 
-                int idx;
-                int j, k, m;
+                int idx, j;
                 double dist;
                 double h_i = radius_scale2*q_h*q_h;
                 double h_j;
 
                 unsigned long nbr_boxes[27];
-                int nbr_boxes_length = 0;
                 unsigned long key;
                 unsigned int pid;
 
-                for(j=-1; j<2; j++)
-                {
-                    for(k=-1; k<2; k++)
-                    {
-                        for(m=-1; m<2; m++)
-                        {
-                            if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
-                            {
-                                key = interleave(c_x+j, c_y+k, c_z+m);
-                                if(key > max_key)
-                                    continue;
-                                nbr_boxes[nbr_boxes_length] = key;
-                                nbr_boxes_length++;
-                            }
-                        }
-                    }
-                }
+                int nbr_boxes_length = neighbor_boxes(c_x, c_y, c_z, \
+                        nbr_boxes, max_key);
 
                 for(j=0; j<nbr_boxes_length; j++)
                 {
@@ -551,10 +577,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
                 """
 
-        macros = "\n".join((self.bit_interleaving, self.find_cell_id, norm2))
-
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
-                arguments, src, "z_order_nbr_lengths", preamble=macros)
+                arguments, src, "z_order_nbr_lengths", preamble=self.preamble)
 
         z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
                 self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
@@ -588,34 +612,17 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     cell_size, c_x, c_y, c_z
                     );
 
-                int idx;
-                int j, k, m;
+                int idx, j;
                 double dist;
                 double h_i = radius_scale2*q_h*q_h;
                 double h_j;
 
                 unsigned long nbr_boxes[27];
-                int nbr_boxes_length = 0;
                 unsigned long key;
                 unsigned int pid;
 
-                for(j=-1; j<2; j++)
-                {
-                    for(k=-1; k<2; k++)
-                    {
-                        for(m=-1; m<2; m++)
-                        {
-                            if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
-                            {
-                                key = interleave(c_x+j, c_y+k, c_z+m);
-                                if(key > max_key)
-                                    continue;
-                                nbr_boxes[nbr_boxes_length] = key;
-                                nbr_boxes_length++;
-                            }
-                        }
-                    }
-                }
+                int nbr_boxes_length = neighbor_boxes(c_x, c_y, c_z, \
+                        nbr_boxes, max_key);
 
                 unsigned long start_idx = (unsigned long) start_indices[i];
                 unsigned long curr_idx = 0;
@@ -646,10 +653,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
                 """
 
-        macros = "\n".join((self.bit_interleaving, self.find_cell_id, norm2))
-
         z_order_nbrs = ElementwiseKernel(self.ctx,
-                arguments, src, "z_order_nbrs", preamble=macros)
+                arguments, src, "z_order_nbrs", preamble=self.preamble)
 
         z_order_nbrs(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
                 self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
