@@ -26,7 +26,7 @@ cimport cython
 
 import pyopencl as cl
 import pyopencl.array
-from pyopencl.scan import GenericScanKernel
+from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 IF OPENMP:
@@ -1245,12 +1245,8 @@ cdef class GPUNeighborCache:
         self._start_idx_gpu = self._nbr_lengths_gpu.copy()
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
-        get_start_indices = GenericScanKernel(
-                self._nnps.ctx, np.uint32,
-                arguments="__global unsigned int* nbr_lengths",
-                input_expr="nbr_lengths[i]", scan_expr="a+b", neutral="0",
-                output_statement="""nbr_lengths[i+1] = item;
-                                    if(i == 0) nbr_lengths[i] = 0;""")
+        get_start_indices = ExclusiveScanKernel( self._nnps.ctx,
+                np.uint32, scan_expr="a+b", neutral="0")
 
         get_start_indices(self._start_idx_gpu)
         self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu,

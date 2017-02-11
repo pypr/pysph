@@ -330,13 +330,20 @@ cdef class ZOrderNNPS(NNPS):
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=False, bint sort_gids=False):
+            bint cache=True, bint sort_gids=False, bint if_double=True):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
         )
 
         self.radius_scale2 = radius_scale*radius_scale
+
+        cdef str datatype
+
+        if if_double:
+            datatype = "typedef data_t double"
+        else:
+            datatype = "typedef data_t float"
 
         cdef str prototypes =   """
                                 inline unsigned long interleave(unsigned long p, \
@@ -414,8 +421,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.preamble = "\n".join((norm2, find_cell_id, prototypes,
                 bit_interleaving, neighbor_boxes))
 
-        self.src_index = 0
-        self.dst_index = 0
+        self.src_index = -1
+        self.dst_index = -1
         self.sort_gids = sort_gids
         self.domain.update()
         self.update()
@@ -573,10 +580,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 }
                 """
 
-        norm2 = """
-                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-                """
-
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbr_lengths", preamble=self.preamble)
 
@@ -647,10 +650,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         idx++;
                     }
                 }
-                """
-
-        norm2 = """
-                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
                 """
 
         z_order_nbrs = ElementwiseKernel(self.ctx,
