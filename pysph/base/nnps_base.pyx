@@ -229,6 +229,8 @@ cdef class NNPSParticleArrayWrapper:
 
         self.np = pa.get_number_of_particles()
 
+        self._copied_to_gpu = False
+
     cdef int get_number_of_particles(self):
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
@@ -237,11 +239,14 @@ cdef class NNPSParticleArrayWrapper:
         cdef ParticleArray pa = self.pa
         pa.remove_tagged_particles(tag)
 
-    cpdef copy_to_gpu(self, queue):
-        self.gpu_x = cl.array.to_device(queue, self.x.get_npy_array())
-        self.gpu_y = cl.array.to_device(queue, self.y.get_npy_array())
-        self.gpu_z = cl.array.to_device(queue, self.z.get_npy_array())
-        self.gpu_h = cl.array.to_device(queue, self.h.get_npy_array())
+    cpdef copy_to_gpu(self, queue, dtype):
+        if self._copied_to_gpu:
+            return
+        self.gpu_x = cl.array.to_device(queue, (self.x.get_npy_array()).astype(dtype))
+        self.gpu_y = cl.array.to_device(queue, (self.y.get_npy_array()).astype(dtype))
+        self.gpu_z = cl.array.to_device(queue, (self.z.get_npy_array()).astype(dtype))
+        self.gpu_h = cl.array.to_device(queue, (self.h.get_npy_array()).astype(dtype))
+        self._copied_to_gpu = True
 
 ##############################################################################
 cdef class DomainManager:
@@ -1226,9 +1231,8 @@ cdef class GPUNeighborCache:
         if not self._copied_to_cpu:
             self.copy_to_cpu()
         nbrs.c_reset()
-        nbrs.c_resize(self._nbr_lengths[d_idx])
-        nbrs.set_data(self._neighbors_cpu[self._start_idx[d_idx]: \
-                self._start_idx[d_idx] + self._nbr_lengths[d_idx]])
+        nbrs.c_set_view(self._neighbors_cpu_ptr + self._start_idx_ptr[d_idx],
+                self._nbr_lengths_ptr[d_idx])
 
     #### Private protocol ################################################
 
@@ -1245,7 +1249,7 @@ cdef class GPUNeighborCache:
         self._start_idx_gpu = self._nbr_lengths_gpu.copy()
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
-        get_start_indices = ExclusiveScanKernel( self._nnps.ctx,
+        get_start_indices = ExclusiveScanKernel(self._nnps.ctx,
                 np.uint32, scan_expr="a+b", neutral="0")
 
         get_start_indices(self._start_idx_gpu)
@@ -1256,8 +1260,11 @@ cdef class GPUNeighborCache:
     cdef void copy_to_cpu(self):
         self._copied_to_cpu = True
         self._neighbors_cpu = self._neighbors_gpu.get()
+        self._neighbors_cpu_ptr = <unsigned int*> self._neighbors_cpu.data
         self._nbr_lengths = self._nbr_lengths_gpu.get()
+        self._nbr_lengths_ptr = <unsigned int*> self._nbr_lengths.data
         self._start_idx = self._start_idx_gpu.get()
+        self._start_idx_ptr = <unsigned int*> self._start_idx.data
 
     cpdef update(self):
         self._cached = False
@@ -1268,6 +1275,9 @@ cdef class GPUNeighborCache:
 
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
         self.get_neighbors_raw(d_idx, nbrs)
+
+    cpdef get_neighbors_gpu(self):
+        self.get_neighbors_raw_gpu()
 
 cdef class GPUNNPS(NNPSBase):
     """Nearest neighbor query class using the box-sort algorithm.
@@ -1327,6 +1337,13 @@ cdef class GPUNNPS(NNPSBase):
             nbrs.c_reset()
             self.find_nearest_neighbors(d_idx, nbrs)
 
+    cpdef get_nearest_particles_gpu(self, int src_index, int dst_index):
+        cdef int idx = dst_index*self.narrays + src_index
+        if self.src_index != src_index \
+            or self.dst_index != dst_index:
+            self.set_context(src_index, dst_index)
+        self.cache[idx].get_neighbors_gpu()
+
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
 
@@ -1369,10 +1386,11 @@ cdef class GPUNNPS(NNPSBase):
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
-            bint sort_gids=False):
+            bint sort_gids=False, bint if_double=True):
         GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
+        self.if_double = if_double
         self.radius_scale2 = radius_scale*radius_scale
         self.src_index = 0
         self.dst_index = 0
@@ -1380,9 +1398,18 @@ cdef class BruteForceNNPS(GPUNNPS):
         self.domain.update()
         self.update()
 
+        cdef str norm2 =    """
+                            #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+                            """
+
+        self.preamble = norm2
+
         cdef NNPSParticleArrayWrapper pa_wrapper
         for pa_wrapper in self.pa_wrappers:
-            pa_wrapper.copy_to_gpu(self.queue)
+            if if_double:
+                pa_wrapper.copy_to_gpu(self.queue, np.float64)
+            else:
+                pa_wrapper.copy_to_gpu(self.queue, np.float32)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -1402,16 +1429,17 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
-                """double* s_x, double* s_y, double* s_z, double* s_h,
-                double* d_x, double* d_y, double* d_z, double* d_h,
+                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
+                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
                 unsigned int num_particles, unsigned int* nbr_lengths,
-                double radius_scale2"""
+                %(data_t)s radius_scale2
+                """ % {"data_t" : ("double" if self.if_double else "float")}
 
         src = """
                 unsigned int j;
-                double dist;
-                double h_i = radius_scale2*d_h[i]*d_h[i];
-                double h_j;
+                %(data_t)s dist;
+                %(data_t)s h_i = radius_scale2*d_h[i]*d_h[i];
+                %(data_t)s h_j;
                 for(j=0; j<num_particles; j++)
                 {
                     h_j = radius_scale2*s_h[j]*s_h[j];
@@ -1419,11 +1447,7 @@ cdef class BruteForceNNPS(GPUNNPS):
                     if(dist < h_i || dist < h_j)
                         nbr_lengths[i] += 1;
                 }
-                """
-
-        norm2 = """
-                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-                """
+                """ % {"data_t" : ("double" if self.if_double else "float")}
 
         brute_force_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "brute_force_nbr_lengths", preamble=norm2)
@@ -1435,16 +1459,17 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
-                """double* s_x, double* s_y, double* s_z, double* s_h,
-                double* d_x, double* d_y, double* d_z, double* d_h,
+                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
+                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
                 unsigned int num_particles, unsigned int* start_indices,
-                unsigned int* nbrs, double radius_scale2"""
+                unsigned int* nbrs, %(data_t)s radius_scale2
+                """ % {"data_t" : ("double" if self.if_double else "float")}
 
         src = """
                 unsigned int j, k = 0;
-                double dist;
-                double h_i = radius_scale2*d_h[i]*d_h[i];
-                double h_j;
+                %(data_t)s dist;
+                %(data_t)s h_i = radius_scale2*d_h[i]*d_h[i];
+                %(data_t)s h_j;
                 unsigned int idx = start_indices[i];
                 for(j=0; j<num_particles; j++)
                 {
@@ -1456,7 +1481,7 @@ cdef class BruteForceNNPS(GPUNNPS):
                         k += 1;
                     }
                 }
-                """
+                """ % {"data_t" : ("double" if self.if_double else "float")}
 
         norm2 = """
                 #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))

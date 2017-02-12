@@ -27,6 +27,15 @@ cdef extern from 'limits.h':
     cdef unsigned int UINT_MAX
     cdef int INT_MAX
 
+cdef extern from "numpy/arrayobject.h":
+    ctypedef int intp
+    ctypedef extern class numpy.ndarray [object PyArrayObject]:
+        cdef char *data
+        cdef int nd
+        cdef intp *dimensions
+        cdef intp *strides
+        cdef int flags
+
 # ZOLTAN ID TYPE AND PTR
 ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
@@ -156,10 +165,11 @@ cdef class NNPSParticleArrayWrapper:
 
     cdef str name
     cdef int np
+    cdef bint _copied_to_gpu
 
     # get the number of particles
     cdef int get_number_of_particles(self)
-    cpdef copy_to_gpu(self, queue)
+    cpdef copy_to_gpu(self, queue, dtype)
 
 # Domain limits for the simulation
 cdef class DomainManager:
@@ -373,6 +383,9 @@ cdef class GPUNeighborCache:
     cdef np.ndarray _nbr_lengths
     cdef np.ndarray _start_idx
 
+    cdef unsigned int* _neighbors_cpu_ptr
+    cdef unsigned int* _nbr_lengths_ptr
+    cdef unsigned int* _start_idx_ptr
 
     cdef void copy_to_cpu(self)
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs)
@@ -382,6 +395,7 @@ cdef class GPUNeighborCache:
 
     cdef void _find_neighbors(self)
     cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
+    cpdef get_neighbors_gpu(self)
 
 cdef class GPUNNPS(NNPSBase):
 
@@ -394,6 +408,8 @@ cdef class GPUNNPS(NNPSBase):
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs)
+
+    cpdef get_nearest_particles_gpu(self, int src_index, int dst_index)
 
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs)
 
@@ -409,6 +425,8 @@ cdef class GPUNNPS(NNPSBase):
 
 cdef class BruteForceNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+    cdef bint if_double
+    cdef str preamble
 
     cpdef set_context(self, int src_index, int dst_index)
 
