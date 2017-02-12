@@ -62,11 +62,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef str preamble
     cdef list pids
     cdef list pid_keys
-    cdef list key_to_idx
 
     cdef object current_pids
     cdef object current_keys
-    cdef object current_key_to_idx
 
     cdef bint if_double
 

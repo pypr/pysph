@@ -380,42 +380,42 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                                 c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
                                 """
 
-        cdef str neighbor_boxes =   """
-                                    inline int neighbor_boxes(int c_x, int c_y, int c_z, \
-                                            unsigned long* nbr_boxes, unsigned long max_key)
+        cdef str find_idx = """
+                            inline int find_idx(__global unsigned long* keys, \
+                                    int num_particles, unsigned long key)
+                            {
+                                int first = 0;
+                                int last = num_particles - 1;
+                                int middle = (first + last) / 2;
+
+                                while(first <= last)
+                                {
+                                    if(keys[middle] < key)
+                                        first = middle + 1;
+                                    else if(keys[middle] > key)
+                                        last = middle - 1;
+                                    else if(keys[middle] == key)
                                     {
-                                        int j, k, m;
-                                        unsigned long key;
-                                        int nbr_boxes_length = 0;
-                                        for(j=-1; j<2; j++)
-                                        {
-                                            for(k=-1; k<2; k++)
-                                            {
-                                                for(m=-1; m<2; m++)
-                                                {
-                                                    if(c_x+j >= 0 && c_y+k >= 0 && c_z+m >=0)
-                                                    {
-                                                        key = interleave(c_x+j, c_y+k, c_z+m);
-                                                        if(key > max_key)
-                                                            continue;
-                                                        nbr_boxes[nbr_boxes_length] = key;
-                                                        nbr_boxes_length++;
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        return nbr_boxes_length;
+                                        if(middle == 0)
+                                            return 0;
+                                        if(keys[middle - 1] != key)
+                                            return middle;
+                                        else
+                                            last = middle - 1;
                                     }
+                                    middle = (first + last) / 2;
+                                }
 
-                                    """
+                                return -1;
+                            }
+                            """
 
         cdef str norm2 =    """
                             #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
                             """
 
         self.preamble = "\n".join((norm2, find_cell_id, prototypes,
-                bit_interleaving, neighbor_boxes))
+                bit_interleaving, find_idx))
 
         self.src_index = -1
         self.dst_index = -1
@@ -462,33 +462,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pids[pa_index] = sorted_indices
         self.pid_keys[pa_index] = sorted_keys
 
-        self.key_to_idx[pa_index] = -1 + cl.array.zeros(self.queue,
-                1 + <unsigned long>(sorted_indices[-1].get()), dtype=np.int32)
-
-        arguments = """
-                    unsigned long* keys, int* key_to_idx
-                    """
-
-        make_map_src =  """
-                        if(i == 0)
-                        {
-                            key_to_idx[keys[i]] = i;
-                            PYOPENCL_ELWISE_CONTINUE;
-                        }
-                        if(keys[i-1] != keys[i])
-                            key_to_idx[keys[i]] = i;
-                        """
-
-        make_map = ElementwiseKernel(self.ctx, arguments, make_map_src, "make_map")
-
-        make_map(self.pid_keys[pa_index], self.key_to_idx[pa_index])
-
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
         self.pids = []
         self.pid_keys = []
-        self.key_to_idx = [None for i in range(self.narrays)]
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -523,7 +501,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.current_keys = self.pid_keys[src_index]
         self.current_pids = self.pids[src_index]
-        self.current_key_to_idx = self.key_to_idx[src_index]
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
@@ -531,9 +508,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
                 unsigned int num_particles, unsigned long* keys,
-                unsigned int* pids, int* key_to_idx,
-                unsigned int* nbr_lengths, %(data_t)s radius_scale2,
-                %(data_t)s cell_size, unsigned long max_key
+                unsigned int* pids, unsigned int* nbr_lengths, %(data_t)s radius_scale2,
+                %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.if_double else "float")}
 
 
@@ -552,34 +528,39 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     cell_size, c_x, c_y, c_z
                     );
 
-                int idx, j;
+                int idx, j, k, m;
                 %(data_t)s dist;
                 %(data_t)s h_i = radius_scale2*q_h*q_h;
                 %(data_t)s h_j;
 
-                unsigned long nbr_boxes[27];
                 unsigned long key;
                 unsigned int pid;
 
-                int nbr_boxes_length = neighbor_boxes(c_x, c_y, c_z, \
-                        nbr_boxes, max_key);
-
-                for(j=0; j<nbr_boxes_length; j++)
+                for(j=-1; j<2; j++)
                 {
-                    key = nbr_boxes[j];
-                    //PROBABLY FIXED: The next step could go out of range
-                    idx = key_to_idx[key];
-                    if(idx == -1)
-                        continue;
-
-                    while(keys[idx] == key)
+                    for(k=-1; k<2; k++)
                     {
-                        pid = pids[idx];
-                        h_j = radius_scale2*s_h[pid]*s_h[pid];
-                        dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], q_z - s_z[pid]);
-                        if(dist < h_i || dist < h_j)
-                            nbr_lengths[i] += 1;
-                        idx++;
+                        for(m=-1; m<2; m++)
+                        {
+                            if(c_x+m >= 0 && c_y+k >= 0 && c_z+j >=0)
+                            {
+                                key = interleave(c_x+m, c_y+k, c_z+j);
+                                idx = find_idx(keys, num_particles, key);
+                                if(idx == -1)
+                                    continue;
+
+                                while(keys[idx] == key)
+                                {
+                                    pid = pids[idx];
+                                    h_j = radius_scale2*s_h[pid]*s_h[pid];
+                                    dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], \
+                                            q_z - s_z[pid]);
+                                    if(dist < h_i || dist < h_j)
+                                        nbr_lengths[i] += 1;
+                                    idx++;
+                                }
+                            }
+                        }
                     }
                 }
                 """ % {"data_t" : ("double" if self.if_double else "float")}
@@ -588,12 +569,14 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbr_lengths", preamble=self.preamble)
 
-        z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
-                self.src.get_number_of_particles(), self.current_keys, self.current_pids,
-                self.current_key_to_idx, nbr_lengths, self.radius_scale2, self.cell_size,
-                <unsigned long> self.current_key_to_idx.size - 1)
+        try:
+            z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                    self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                    self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+                    self.src.get_number_of_particles(), self.current_keys, self.current_pids,
+                    nbr_lengths, self.radius_scale2, self.cell_size)
+        except Exception as e:
+            print e
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
@@ -601,9 +584,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
                 unsigned int num_particles, unsigned long* keys,
-                unsigned int* pids, int* key_to_idx,
-                unsigned int* start_indices, unsigned int* nbrs,
-                %(data_t)s radius_scale2, %(data_t)s cell_size, unsigned long max_key
+                unsigned int* pids, unsigned int* start_indices, unsigned int* nbrs,
+                %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.if_double else "float")}
 
         src =   """
@@ -621,42 +603,49 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     cell_size, c_x, c_y, c_z
                     );
 
-                int idx, j;
+                int idx, j, k, m;
                 %(data_t)s dist;
                 %(data_t)s h_i = radius_scale2*q_h*q_h;
                 %(data_t)s h_j;
 
-                unsigned long nbr_boxes[27];
                 unsigned long key;
                 unsigned int pid;
 
-                int nbr_boxes_length = neighbor_boxes(c_x, c_y, c_z, \
-                        nbr_boxes, max_key);
-
                 unsigned long start_idx = (unsigned long) start_indices[i];
                 unsigned long curr_idx = 0;
-                for(j=0; j<nbr_boxes_length; j++)
-                {
-                    key = nbr_boxes[j];
-                    //PROBABLY FIXED: The next step could go out of range
-                    idx = key_to_idx[key];
-                    if(idx == -1)
-                        continue;
 
-                    while(keys[idx] == key)
+                for(j=-1; j<2; j++)
+                {
+                    for(k=-1; k<2; k++)
                     {
-                        pid = pids[idx];
-                        h_j = radius_scale2*s_h[pid]*s_h[pid];
-                        dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], q_z - s_z[pid]);
-                        if(dist < h_i || dist < h_j)
+                        for(m=-1; m<2; m++)
                         {
-                            nbrs[start_idx + curr_idx] = pid;
-                            curr_idx++;
+                            if(c_x+m >= 0 && c_y+k >= 0 && c_z+j >=0)
+                            {
+                                key = interleave(c_x+m, c_y+k, c_z+j);
+                                idx = find_idx(keys, num_particles, key);
+                                if(idx == -1)
+                                    continue;
+
+                                while(keys[idx] == key)
+                                {
+                                    pid = pids[idx];
+                                    h_j = radius_scale2*s_h[pid]*s_h[pid];
+                                    dist = NORM2(q_x - s_x[pid], q_y - s_y[pid], \
+                                            q_z - s_z[pid]);
+                                    if(dist < h_i || dist < h_j)
+                                    {
+                                        nbrs[start_idx + curr_idx] = pid;
+                                        curr_idx++;
+                                    }
+                                    idx++;
+                                }
+                            }
                         }
-                        idx++;
                     }
                 }
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+
+               """ % {"data_t" : ("double" if self.if_double else "float")}
 
 
         z_order_nbrs = ElementwiseKernel(self.ctx,
@@ -666,7 +655,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
                 self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
                 self.src.get_number_of_particles(), self.current_keys, self.current_pids,
-                self.current_key_to_idx, start_indices, nbrs, self.radius_scale2,
-                self.cell_size, <unsigned long> self.current_key_to_idx.size - 1)
+                start_indices, nbrs, self.radius_scale2, self.cell_size)
 
 
