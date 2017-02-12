@@ -569,14 +569,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbr_lengths", preamble=self.preamble)
 
-        try:
-            z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                    self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                    self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
-                    self.src.get_number_of_particles(), self.current_keys, self.current_pids,
-                    nbr_lengths, self.radius_scale2, self.cell_size)
-        except Exception as e:
-            print e
+        z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.src.get_number_of_particles(), self.current_keys, self.current_pids,
+                nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
