@@ -289,6 +289,11 @@ cdef class NNPSBase:
     cdef public int n_cells           # number of cells
     #cdef public bint sort_gids        # Sort neighbors by their gids.
 
+    # Testing function for brute force neighbor search. The return
+    # list is of the same type of the local and global ids (uint)
+    cpdef brute_force_neighbors(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs)
+
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc)
 
@@ -350,11 +355,6 @@ cdef class NNPS(NNPSBase):
                                 size_t d_idx, UIntArray nbrs)
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
-
-    # Testing function for brute force neighbor search. The return
-    # list is of the same type of the local and global ids (uint)
-    cpdef brute_force_neighbors(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs)
 
     cpdef set_context(self, int src_index, int dst_index)
 

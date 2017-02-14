@@ -917,6 +917,49 @@ cdef class NNPSBase:
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
 
+    cpdef brute_force_neighbors(self, int src_index, int dst_index,
+                                size_t d_idx, UIntArray nbrs):
+        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
+        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[dst_index]
+
+        cdef DoubleArray s_x = src.x
+        cdef DoubleArray s_y = src.y
+        cdef DoubleArray s_z = src.z
+        cdef DoubleArray s_h = src.h
+
+        cdef DoubleArray d_x = dst.x
+        cdef DoubleArray d_y = dst.y
+        cdef DoubleArray d_z = dst.z
+        cdef DoubleArray d_h = dst.h
+
+        cdef double cell_size = self.cell_size
+        cdef double radius_scale = self.radius_scale
+
+        cdef size_t num_particles, j
+
+        num_particles = s_x.length
+        cdef double xi = d_x.data[d_idx]
+        cdef double yi = d_y.data[d_idx]
+        cdef double zi = d_z.data[d_idx]
+
+        cdef double hi = d_h.data[d_idx] * radius_scale # gather radius
+        cdef double xj, yj, hj, xij2, xij
+
+        # reset the neighbors
+        nbrs.reset()
+
+        for j in range(num_particles):
+            xj = s_x.data[j]; yj = s_y.data[j]; zj = s_z.data[j];
+            hj = radius_scale * s_h.data[j] # scatter radius
+
+            xij2 = (xi - xj)*(xi - xj) + \
+                   (yi - yj)*(yi - yj) + \
+                   (zi - zj)*(zi - zj)
+            xij = sqrt(xij2)
+
+            if ( (xij < hi) or (xij < hj) ):
+                nbrs.append( <ZOLTAN_ID_TYPE> j )
+
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
         """Find nearest neighbors for particle id 'd_idx' without cache
@@ -1063,49 +1106,6 @@ cdef class NNPS(NNPSBase):
         self.cache = _cache
 
     #### Public protocol #################################################
-
-    cpdef brute_force_neighbors(self, int src_index, int dst_index,
-                                size_t d_idx, UIntArray nbrs):
-        cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
-        cdef NNPSParticleArrayWrapper dst = self.pa_wrappers[dst_index]
-
-        cdef DoubleArray s_x = src.x
-        cdef DoubleArray s_y = src.y
-        cdef DoubleArray s_z = src.z
-        cdef DoubleArray s_h = src.h
-
-        cdef DoubleArray d_x = dst.x
-        cdef DoubleArray d_y = dst.y
-        cdef DoubleArray d_z = dst.z
-        cdef DoubleArray d_h = dst.h
-
-        cdef double cell_size = self.cell_size
-        cdef double radius_scale = self.radius_scale
-
-        cdef size_t num_particles, j
-
-        num_particles = s_x.length
-        cdef double xi = d_x.data[d_idx]
-        cdef double yi = d_y.data[d_idx]
-        cdef double zi = d_z.data[d_idx]
-
-        cdef double hi = d_h.data[d_idx] * radius_scale # gather radius
-        cdef double xj, yj, hj, xij2, xij
-
-        # reset the neighbors
-        nbrs.reset()
-
-        for j in range(num_particles):
-            xj = s_x.data[j]; yj = s_y.data[j]; zj = s_z.data[j];
-            hj = radius_scale * s_h.data[j] # scatter radius
-
-            xij2 = (xi - xj)*(xi - xj) + \
-                   (yi - yj)*(yi - yj) + \
-                   (zi - zj)*(zi - zj)
-            xij = sqrt(xij2)
-
-            if ( (xij < hi) or (xij < hj) ):
-                nbrs.append( <ZOLTAN_ID_TYPE> j )
 
     def set_in_parallel(self, bint in_parallel):
         self.domain.in_parallel = in_parallel
