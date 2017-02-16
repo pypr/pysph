@@ -504,8 +504,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
-                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
+                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
+                %(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
                 unsigned int num_particles, unsigned long* keys,
                 unsigned int* pids, unsigned int* nbr_lengths, %(data_t)s radius_scale2,
@@ -549,6 +549,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                                 if(idx == -1)
                                     continue;
 
+                                // FIXED: keys[idx] can go out of bounds
                                 while(keys[idx] == key)
                                 {
                                     pid = pids[idx];
@@ -558,6 +559,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                                     if(dist < h_i || dist < h_j)
                                         nbr_lengths[i] += 1;
                                     idx++;
+
+                                    if(idx == num_particles)
+                                        break;
                                 }
                             }
                         }
@@ -569,16 +573,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbr_lengths", preamble=self.preamble)
 
-        z_order_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+        z_order_nbr_lengths(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
                 self.src.get_number_of_particles(), self.current_keys, self.current_pids,
                 nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
-                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
+                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
+                %(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
                 unsigned int num_particles, unsigned long* keys,
                 unsigned int* pids, unsigned int* start_indices, unsigned int* nbrs,
@@ -636,6 +640,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                                         curr_idx++;
                                     }
                                     idx++;
+
+                                    if(idx == num_particles)
+                                        break;
                                 }
                             }
                         }
@@ -648,9 +655,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbrs = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbrs", preamble=self.preamble)
 
-        z_order_nbrs(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
+        z_order_nbrs(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
+                self.src.gpu_h, self.xmin[0], self.xmin[1], self.xmin[2],
                 self.src.get_number_of_particles(), self.current_keys, self.current_pids,
                 start_indices, nbrs, self.radius_scale2, self.cell_size)
 
