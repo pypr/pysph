@@ -425,7 +425,7 @@ cdef class GPUNNPS(NNPSBase):
 
 cdef class BruteForceNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
-    cdef bint if_double
+    cdef bint use_double
     cdef str preamble
 
     cpdef set_context(self, int src_index, int dst_index)

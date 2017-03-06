@@ -1242,7 +1242,6 @@ cdef class GPUNeighborCache:
         cdef unsigned long total_size = <unsigned long>(total_size_gpu.get())
 
         # Allocate _neighbors_cpu and neighbors_gpu
-        self._neighbors_cpu = np.empty(total_size, dtype=np.uint32)
         self._neighbors_gpu = cl.array.empty(self._nnps.queue, (total_size,),
                 dtype=np.uint32)
 
@@ -1289,7 +1288,7 @@ cdef class GPUNNPS(NNPSBase):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint cache=True,
-                 bint sort_gids=False):
+                 bint sort_gids=False, ctx=None):
         """Constructor for NNPS
 
         Parameters
@@ -1315,11 +1314,17 @@ cdef class GPUNNPS(NNPSBase):
             Flag to sort neighbors using gids (if they are available).
             This is useful when comparing parallel results with those
             from a serial run.
+
+        ctx : pyopencl.Context
+            For testing purpose
         """
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
-        self.ctx = cl.create_some_context()
+        if ctx is None:
+            self.ctx = cl.create_some_context()
+        else:
+            self.ctx = ctx
         self.queue = cl.CommandQueue(self.ctx)
 
         # The cache.
@@ -1386,11 +1391,11 @@ cdef class GPUNNPS(NNPSBase):
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
-            bint sort_gids=False, bint if_double=True):
+            bint sort_gids=False, bint use_double=True):
         GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
-        self.if_double = if_double
+        self.use_double = use_double
         self.radius_scale2 = radius_scale*radius_scale
         self.src_index = 0
         self.dst_index = 0
@@ -1398,15 +1403,16 @@ cdef class BruteForceNNPS(GPUNNPS):
         self.domain.update()
         self.update()
 
-        cdef str norm2 =    """
-                            #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-                            """
+        cdef str norm2 = \
+                """
+                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+                """
 
         self.preamble = norm2
 
         cdef NNPSParticleArrayWrapper pa_wrapper
         for pa_wrapper in self.pa_wrappers:
-            if if_double:
+            if use_double:
                 pa_wrapper.copy_to_gpu(self.queue, np.float64)
             else:
                 pa_wrapper.copy_to_gpu(self.queue, np.float32)
@@ -1429,11 +1435,11 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
-                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
-                unsigned int num_particles, unsigned int* nbr_lengths,
-                %(data_t)s radius_scale2
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z,
+                %(data_t)s* s_h, %(data_t)s* d_x, %(data_t)s* d_y,
+                %(data_t)s* d_z, %(data_t)s* d_h, unsigned int num_particles,
+                unsigned int* nbr_lengths, %(data_t)s radius_scale2
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
         src = """
                 unsigned int j;
@@ -1447,7 +1453,7 @@ cdef class BruteForceNNPS(GPUNNPS):
                     if(dist < h_i || dist < h_j)
                         nbr_lengths[i] += 1;
                 }
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
         brute_force_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "brute_force_nbr_lengths", preamble=norm2)
@@ -1459,11 +1465,12 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
-                %(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
-                unsigned int num_particles, unsigned int* start_indices,
-                unsigned int* nbrs, %(data_t)s radius_scale2
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z,
+                %(data_t)s* s_h, %(data_t)s* d_x, %(data_t)s* d_y,
+                %(data_t)s* d_z, %(data_t)s* d_h, unsigned int num_particles,
+                unsigned int* start_indices, unsigned int* nbrs,
+                %(data_t)s radius_scale2
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
         src = """
                 unsigned int j, k = 0;
@@ -1481,7 +1488,7 @@ cdef class BruteForceNNPS(GPUNNPS):
                         k += 1;
                     }
                 }
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
         norm2 = """
                 #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))

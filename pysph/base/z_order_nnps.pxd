@@ -66,7 +66,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object current_pids
     cdef object current_keys
 
-    cdef bint if_double
+    cdef bint use_double
 
     cpdef _bin(self, int pa_index)
 

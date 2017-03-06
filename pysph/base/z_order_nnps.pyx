@@ -331,15 +331,16 @@ cdef class ZOrderNNPS(NNPS):
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, bint if_double=True):
+            bint cache=True, bint sort_gids=False, bint use_double=True,
+            ctx=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids
+            cache, sort_gids, ctx
         )
 
         self.radius_scale2 = radius_scale*radius_scale
 
-        self.if_double = if_double
+        self.use_double = use_double
 
         cdef str prototypes =   """
                                 inline unsigned long interleave(unsigned long p, \
@@ -429,7 +430,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     %(data_t)s* x, %(data_t)s* y, %(data_t)s* z, %(data_t)s cell_size,
                     %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
                     unsigned long* keys, unsigned int* pids
-                    """ % {"data_t" : ("double" if self.if_double else "float")}
+                    """ % {"data_t" : ("double" if self.use_double else "float")}
 
         pids_src =  """
                     unsigned long c_x, c_y, c_z;
@@ -471,7 +472,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
 
-            if self.if_double:
+            if self.use_double:
                 pa_wrapper.copy_to_gpu(self.queue, np.float64)
             else:
                 pa_wrapper.copy_to_gpu(self.queue, np.float32)
@@ -510,7 +511,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned int num_particles, unsigned long* keys,
                 unsigned int* pids, unsigned int* nbr_lengths, %(data_t)s radius_scale2,
                 %(data_t)s cell_size
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
 
         src =   """
@@ -567,7 +568,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         }
                     }
                 }
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
 
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
@@ -587,7 +588,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned int num_particles, unsigned long* keys,
                 unsigned int* pids, unsigned int* start_indices, unsigned int* nbrs,
                 %(data_t)s radius_scale2, %(data_t)s cell_size
-                """ % {"data_t" : ("double" if self.if_double else "float")}
+                """ % {"data_t" : ("double" if self.use_double else "float")}
 
         src =   """
                 %(data_t)s q_x = d_x[i];
@@ -649,7 +650,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     }
                 }
 
-               """ % {"data_t" : ("double" if self.if_double else "float")}
+               """ % {"data_t" : ("double" if self.use_double else "float")}
 
 
         z_order_nbrs = ElementwiseKernel(self.ctx,
