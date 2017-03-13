@@ -411,6 +411,8 @@ cdef class GPUNNPS(NNPSBase):
 
     cpdef get_nearest_particles_gpu(self, int src_index, int dst_index)
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs)
 
     cdef void find_neighbor_lengths(self, nbr_lengths)

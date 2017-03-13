@@ -424,6 +424,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.domain.update()
         self.update()
 
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        cdef np.ndarray current_pids = (self.pids[pa_index].get()).astype(np.int64)
+        indices.resize(current_pids.size)
+        indices.set_data(current_pids)
+
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
         arguments = """
@@ -505,12 +510,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
-                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
-                %(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
+                """const %(data_t)s* d_x, const %(data_t)s* d_y, const %(data_t)s* d_z,
+                const %(data_t)s* d_h, const %(data_t)s* s_x, const %(data_t)s* s_y,
+                const %(data_t)s* s_z, const %(data_t)s* s_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
-                unsigned int num_particles, unsigned long* keys,
-                unsigned int* pids, unsigned int* nbr_lengths, %(data_t)s radius_scale2,
-                %(data_t)s cell_size
+                unsigned int num_particles, const unsigned long* keys,
+                const unsigned int* pids, unsigned int* nbr_lengths,
+                %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
 
@@ -582,12 +588,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
-                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z, %(data_t)s* d_h,
-                %(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z, %(data_t)s* s_h,
+                """const %(data_t)s* d_x, const %(data_t)s* d_y, const %(data_t)s* d_z,
+                const %(data_t)s* d_h, const %(data_t)s* s_x, const %(data_t)s* s_y,
+                const %(data_t)s* s_z, const %(data_t)s* s_h,
                 %(data_t)s xmin, %(data_t)s ymin, %(data_t)s zmin,
-                unsigned int num_particles, unsigned long* keys,
-                unsigned int* pids, unsigned int* start_indices, unsigned int* nbrs,
-                %(data_t)s radius_scale2, %(data_t)s cell_size
+                unsigned int num_particles, const unsigned long* keys,
+                const unsigned int* pids, const unsigned int* start_indices,
+                unsigned int* nbrs, %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
         src =   """

@@ -66,7 +66,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object current_pids
     cdef object current_keys
 
-    cdef bint use_double
+    cdef public bint use_double
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
     cpdef _bin(self, int pa_index)
 

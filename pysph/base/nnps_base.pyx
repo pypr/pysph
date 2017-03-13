@@ -242,10 +242,10 @@ cdef class NNPSParticleArrayWrapper:
     cpdef copy_to_gpu(self, queue, dtype):
         if self._copied_to_gpu:
             return
-        self.gpu_x = cl.array.to_device(queue, (self.x.get_npy_array()).astype(dtype))
-        self.gpu_y = cl.array.to_device(queue, (self.y.get_npy_array()).astype(dtype))
-        self.gpu_z = cl.array.to_device(queue, (self.z.get_npy_array()).astype(dtype))
-        self.gpu_h = cl.array.to_device(queue, (self.h.get_npy_array()).astype(dtype))
+        self.gpu_x = cl.array.to_device(queue, self.pa.x.astype(dtype))
+        self.gpu_y = cl.array.to_device(queue, self.pa.y.astype(dtype))
+        self.gpu_z = cl.array.to_device(queue, self.pa.z.astype(dtype))
+        self.gpu_h = cl.array.to_device(queue, self.pa.h.astype(dtype))
         self._copied_to_gpu = True
 
 ##############################################################################
@@ -1348,6 +1348,21 @@ cdef class GPUNNPS(NNPSBase):
             or self.dst_index != dst_index:
             self.set_context(src_index, dst_index)
         self.cache[idx].get_neighbors_gpu()
+
+    cpdef spatially_order_particles(self, int pa_index):
+        """Spatially order particles such that nearby particles have indices
+        nearer each other.  This may improve pre-fetching on the CPU.
+        """
+        cdef LongArray indices = LongArray()
+        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
+        self.get_spatially_ordered_indices(pa_index, indices)
+        cdef BaseArray arr
+
+        for arr in pa.properties.values():
+            arr.c_align_array(indices)
+
+        self.pa_wrappers[pa_index].copy_to_gpu(self.queue,
+                (np.float64 if self.use_double else np.float32))
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
