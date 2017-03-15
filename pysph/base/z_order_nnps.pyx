@@ -583,7 +583,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     if(idx == -1)
                         continue;
 
-                    while(keys[idx] == key && idx < num_particles)
+                    while(idx < num_particles && keys[idx] == key)
                     {
                         pid = pids[idx];
                         h_j = radius_scale2*s_h[pid]*s_h[pid];
@@ -656,7 +656,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     if(idx == -1)
                         continue;
 
-                    while(keys[idx] == key && idx < num_particles)
+                    while(idx < num_particles && keys[idx] == key)
                     {
                         pid = pids[idx];
                         h_j = radius_scale2*s_h[pid]*s_h[pid];
