@@ -421,7 +421,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         unsigned int num_particles, unsigned long* nbr_boxes)
                 {
                     int nbr_boxes_length = 0;
-                    int j, k, m, idx;
+                    int j, k, m;
                     unsigned long key;
                     #pragma unroll
                     for(j=-1; j<2; j++)
@@ -499,11 +499,103 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pids[pa_index] = sorted_indices
         self.pid_keys[pa_index] = sorted_keys
 
+        curr_cid = 1 + cl.array.zeros(self.queue, 1, dtype=np.uint32)
+
+        arguments = """
+                    unsigned long* keys, unsigned int* cids, unsigned int* curr_cid
+                    """
+
+        fill_unique_cids_src = \
+                """
+                cids[i] = (i != 0 && keys[i] != keys[i-1]) ? \
+                        atomic_inc(&curr_cid[0]) : 0;
+                """
+
+        fill_unique_cids = ElementwiseKernel(self.ctx,
+                arguments, fill_unique_cids_src, "fill_unique_cids", preamble=self.preamble)
+
+        fill_unique_cids(self.pid_keys[pa_index], self.cids[pa_index], curr_cid)
+
+        fill_cids_src = \
+                """
+                unsigned int cid = cids[i];
+                if(cid == 0)
+                    PYOPENCL_ELWISE_CONTINUE;
+                unsigned int j = i + 1;
+                while(j < num_particles && cids[j] == 0)
+                {
+                    cids[j] = cid;
+                    j++;
+                }
+                """
+
+        fill_cids = ElementwiseKernel(self.ctx,
+                "unsigned int* cids, int num_particles", fill_cids_src,
+                "fill_cids", preamble=self.preamble)
+
+        fill_cids(self.cids[pa_index], pa_wrapper.get_number_of_particles())
+
+        cdef unsigned int num_cids = <unsigned int> (curr_cid.get())
+        self.cid_to_idx[pa_index] = cl.array.empty(self.queue,
+                27*num_cids, dtype=np.int32)
+
+        arguments = """
+                    %(data_t)s* x, %(data_t)s* y, %(data_t)s* z, int num_particles,
+                    %(data_t)s cell_size, %(data_t)s3 min, unsigned long* keys,
+                    unsigned int* cids, int* cid_to_idx
+                    """ % {"data_t" : ("double" if self.use_double else "float")}
+
+        map_cid_to_idx_src = \
+                """
+                unsigned int j;
+                int idx;
+                unsigned long key;
+                int nbr_boxes_length;
+                %(data_t)s3 c;
+
+                unsigned int cid = cids[i];
+
+                FIND_CELL_ID(
+                    x[i] - min.x,
+                    y[i] - min.y,
+                    z[i] - min.z,
+                    cell_size, c.x, c.y, c.z
+                    );
+
+                unsigned long* nbr_boxes[27];
+
+                nbr_boxes_length = neighbor_boxes(c.x, c.y, c.z,
+                    num_particles, nbr_boxes);
+
+                #pragma unroll
+                for(j=0; j<nbr_boxes_length; j++)
+                {
+                    key = nbr_boxes[j];
+                    idx = find_idx(keys, num_particles, key);
+                    cid_to_idx[27*cid + j] = idx;
+                }
+                """ % {"data_t" : ("double" if self.use_double else "float")}
+
+        map_cid_to_idx = ElementwiseKernel(self.ctx,
+                arguments, map_cid_to_idx_src, "map_cid_to_idx", preamble=self.preamble)
+
+        make_vec = cl.array.vec.make_double3 if self.use_double \
+                else cl.array.vec.make_float3
+
+        map_cid_to_idx(pa_wrapper.gpu_x, pa_wrapper.gpu_y,
+                pa_wrapper.gpu_z, pa_wrapper.get_number_of_particles(), self.cell_size,
+                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+                self.pid_keys[pa_index], self.cids[pa_index], self.cid_to_idx[pa_index])
+
+        print self.cids[pa_index]
+
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
         self.pids = []
         self.pid_keys = []
+        self.cids = []
+        self.cid_to_idx = [None for i in range(self.narrays)]
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -519,6 +611,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 num_particles, dtype=np.uint32))
             self.pid_keys.append(cl.array.empty(self.queue,
                 num_particles, dtype=np.uint64))
+            self.cids.append(cl.array.empty(self.queue,
+                num_particles, dtype=np.uint32))
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -538,6 +632,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.current_keys = self.pid_keys[src_index]
         self.current_pids = self.pids[src_index]
+        self.current_cids = self.cids[src_index]
+        self.current_cid_to_idx = self.cid_to_idx[src_index]
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
@@ -545,8 +641,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 const %(data_t)s* d_h, const %(data_t)s* s_x, const %(data_t)s* s_y,
                 const %(data_t)s* s_z, const %(data_t)s* s_h,
                 %(data_t)s3 min, unsigned int num_particles, const unsigned long* keys,
-                const unsigned int* pids, unsigned int* nbr_lengths,
-                %(data_t)s radius_scale2, %(data_t)s cell_size
+                const unsigned int* pids, unsigned int* cids, int* cid_to_idx,
+                unsigned int* nbr_lengths, %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
 
@@ -554,6 +650,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 %(data_t)s4 q = (%(data_t)s4)(d_x[i], d_y[i], d_z[i], d_h[i]);
 
                 int3 c;
+                unsigned int cid = cids[i];
 
                 FIND_CELL_ID(
                     q.x - min.x,
@@ -571,17 +668,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned long key;
                 unsigned int pid;
 
-                unsigned long nbr_boxes[27];
-                int nbr_boxes_length = neighbor_boxes(c.x, c.y, c.z,
-                    num_particles, nbr_boxes);
-
                 #pragma unroll
-                for(j=0; j<nbr_boxes_length; j++)
+                for(j=0; j<27; j++)
                 {
-                    key = nbr_boxes[j];
-                    idx = find_idx(keys, num_particles, key);
+                    idx = cid_to_idx[27*cid + j];
                     if(idx == -1)
                         continue;
+                    key = keys[idx];
 
                     while(idx < num_particles && keys[idx] == key)
                     {
@@ -609,7 +702,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.src.gpu_h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.current_keys,
-                self.current_pids, nbr_lengths, self.radius_scale2, self.cell_size)
+                self.current_pids, self.current_cids, self.current_cid_to_idx,
+                nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         arguments = \
@@ -617,14 +711,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 const %(data_t)s* d_h, const %(data_t)s* s_x, const %(data_t)s* s_y,
                 const %(data_t)s* s_z, const %(data_t)s* s_h,
                 %(data_t)s3 min, unsigned int num_particles, const unsigned long* keys,
-                const unsigned int* pids, const unsigned int* start_indices,
-                unsigned int* nbrs, %(data_t)s radius_scale2, %(data_t)s cell_size
+                const unsigned int* pids, unsigned int* cids, int* cid_to_idx,
+                const unsigned int* start_indices, unsigned int* nbrs,
+                %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
         src =   """
                 %(data_t)s4 q = (%(data_t)s4)(d_x[i], d_y[i], d_z[i], d_h[i]);
 
                 int3 c;
+                unsigned int cid = cids[i];
 
                 FIND_CELL_ID(
                     q.x - min.x,
@@ -644,17 +740,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned long start_idx = (unsigned long) start_indices[i];
                 unsigned long curr_idx = 0;
 
-                unsigned long nbr_boxes[27];
-                int nbr_boxes_length = neighbor_boxes(c.x, c.y, c.z,
-                    num_particles, nbr_boxes);
-
                 #pragma unroll
-                for(j=0; j<nbr_boxes_length; j++)
+                for(j=0; j<27; j++)
                 {
-                    key = nbr_boxes[j];
-                    idx = find_idx(keys, num_particles, key);
+                    idx = cid_to_idx[27*cid + j];
                     if(idx == -1)
                         continue;
+                    key = keys[idx];
 
                     while(idx < num_particles && keys[idx] == key)
                     {
@@ -686,6 +778,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.src.gpu_h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.current_keys, self.current_pids,
-                start_indices, nbrs, self.radius_scale2, self.cell_size)
+                self.current_cids, self.current_cid_to_idx,start_indices, nbrs,
+                self.radius_scale2, self.cell_size)
 
 
