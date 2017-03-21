@@ -71,6 +71,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object current_cid_to_idx
 
     cdef public bint use_double
+    cdef bint _sorted
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 

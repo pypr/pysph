@@ -20,6 +20,8 @@ from pyopencl.elementwise import ElementwiseKernel
 import numpy as np
 cimport numpy as np
 
+from mako.template import Template
+
 cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
@@ -342,7 +344,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.use_double = use_double
 
-        cdef str prototypes =   """
+        cdef str prototypes =   """//CL//
                                 inline unsigned long interleave(unsigned long p, \
                                         unsigned long q, unsigned long r);
 
@@ -350,7 +352,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                                         unsigned int num_particles, unsigned long* nbr_boxes);
                                 """
 
-        cdef str bit_interleaving = """
+        cdef str bit_interleaving = """//CL//
                                     inline unsigned long interleave(unsigned long p, \
                                             unsigned long q, unsigned long r)
                                     {
@@ -459,6 +461,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         cdef np.ndarray current_pids = (self.pids[pa_index].get()).astype(np.int64)
         indices.resize(current_pids.size)
         indices.set_data(current_pids)
+        self._sorted = True
 
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
@@ -502,7 +505,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         curr_cid = 1 + cl.array.zeros(self.queue, 1, dtype=np.uint32)
 
         arguments = """
-                    unsigned long* keys, unsigned int* cids, unsigned int* curr_cid
+                    unsigned long* keys, unsigned int* cids,
+                    unsigned int* curr_cid
                     """
 
         fill_unique_cids_src = \
@@ -512,53 +516,41 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 """
 
         fill_unique_cids = ElementwiseKernel(self.ctx,
-                arguments, fill_unique_cids_src, "fill_unique_cids", preamble=self.preamble)
+                arguments, fill_unique_cids_src,
+                "fill_unique_cids", preamble=self.preamble)
 
-        fill_unique_cids(self.pid_keys[pa_index], self.cids[pa_index], curr_cid)
-
-        fill_cids_src = \
-                """
-                unsigned int cid = cids[i];
-                if(cid == 0)
-                    PYOPENCL_ELWISE_CONTINUE;
-                unsigned int j = i + 1;
-                while(j < num_particles && cids[j] == 0)
-                {
-                    cids[j] = cid;
-                    j++;
-                }
-                """
-
-        fill_cids = ElementwiseKernel(self.ctx,
-                "unsigned int* cids, int num_particles", fill_cids_src,
-                "fill_cids", preamble=self.preamble)
-
-        fill_cids(self.cids[pa_index], pa_wrapper.get_number_of_particles())
+        fill_unique_cids(self.pid_keys[pa_index], self.cids[pa_index],
+                curr_cid)
 
         cdef unsigned int num_cids = <unsigned int> (curr_cid.get())
-        self.cid_to_idx[pa_index] = cl.array.empty(self.queue,
+        self.cid_to_idx[pa_index] = -1 + cl.array.zeros(self.queue,
                 27*num_cids, dtype=np.int32)
 
         arguments = """
                     %(data_t)s* x, %(data_t)s* y, %(data_t)s* z, int num_particles,
-                    %(data_t)s cell_size, %(data_t)s3 min, unsigned long* keys,
-                    unsigned int* cids, int* cid_to_idx
+                    %(data_t)s cell_size, %(data_t)s3 min, unsigned int* pids,
+                    unsigned long* keys, unsigned int* cids, int* cid_to_idx
                     """ % {"data_t" : ("double" if self.use_double else "float")}
 
         map_cid_to_idx_src = \
                 """
+                unsigned int cid = cids[i];
+
+                if(i != 0 && cid == 0)
+                    PYOPENCL_ELWISE_CONTINUE;
+
                 unsigned int j;
                 int idx;
                 unsigned long key;
                 int nbr_boxes_length;
                 %(data_t)s3 c;
 
-                unsigned int cid = cids[i];
+                unsigned int pid = pids[i];
 
                 FIND_CELL_ID(
-                    x[i] - min.x,
-                    y[i] - min.y,
-                    z[i] - min.z,
+                    x[pid] - min.x,
+                    y[pid] - min.y,
+                    z[pid] - min.z,
                     cell_size, c.x, c.y, c.z
                     );
 
@@ -585,9 +577,34 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         map_cid_to_idx(pa_wrapper.gpu_x, pa_wrapper.gpu_y,
                 pa_wrapper.gpu_z, pa_wrapper.get_number_of_particles(), self.cell_size,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.pid_keys[pa_index], self.cids[pa_index], self.cid_to_idx[pa_index])
+                self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
+                self.cid_to_idx[pa_index])
 
-        print self.cids[pa_index]
+        arguments = """
+                    unsigned long* keys, unsigned int* cids,
+                    unsigned int num_particles
+                    """
+
+        fill_cids_src = \
+                """
+                unsigned int cid = cids[i];
+                if(cid == 0)
+                    PYOPENCL_ELWISE_CONTINUE;
+                unsigned int j = i + 1;
+                while(j < num_particles && cids[j] == 0)
+                {
+                    cids[j] = cid;
+                    j++;
+                }
+                """
+
+        fill_cids = ElementwiseKernel(self.ctx,
+                arguments, fill_cids_src,
+                "fill_cids", preamble=self.preamble)
+
+        fill_cids(self.pid_keys[pa_index], self.cids[pa_index],
+                pa_wrapper.get_number_of_particles())
+
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
@@ -596,6 +613,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pid_keys = []
         self.cids = []
         self.cid_to_idx = [None for i in range(self.narrays)]
+        self._sorted = False
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -645,9 +663,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned int* nbr_lengths, %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
+        src = \
+                r"""
+                unsigned int qid = %(qid_expr)s;
 
-        src =   """
-                %(data_t)s4 q = (%(data_t)s4)(d_x[i], d_y[i], d_z[i], d_h[i]);
+                %(data_t)s4 q = (%(data_t)s4)(d_x[qid], d_y[qid], d_z[qid], d_h[qid]);
 
                 int3 c;
                 unsigned int cid = cids[i];
@@ -683,12 +703,12 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                         dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
                                 q.z - s_z[pid]);
                         if(dist < h_i || dist < h_j)
-                            nbr_lengths[i] += 1;
+                            nbr_lengths[qid] += 1;
                         idx++;
                     }
                 }
-                """ % {"data_t" : ("double" if self.use_double else "float")}
-
+                """ % { "data_t" : "double" if self.use_double else "float",
+                        "qid_expr" : "i" if self._sorted else "pids[i]"}
 
         z_order_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbr_lengths", preamble=self.preamble,
@@ -716,8 +736,11 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 %(data_t)s radius_scale2, %(data_t)s cell_size
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
-        src =   """
-                %(data_t)s4 q = (%(data_t)s4)(d_x[i], d_y[i], d_z[i], d_h[i]);
+        src = \
+                r"""
+                unsigned int qid = %(qid_expr)s;
+
+                %(data_t)s4 q = (%(data_t)s4)(d_x[qid], d_y[qid], d_z[qid], d_h[qid]);
 
                 int3 c;
                 unsigned int cid = cids[i];
@@ -729,7 +752,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     cell_size, c.x, c.y, c.z
                     );
 
-                int idx, j;
+                int idx;
+                unsigned int j;
                 %(data_t)s dist;
                 %(data_t)s h_i = radius_scale2*q.w*q.w;
                 %(data_t)s h_j;
@@ -737,7 +761,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 unsigned long key;
                 unsigned int pid;
 
-                unsigned long start_idx = (unsigned long) start_indices[i];
+                unsigned long start_idx = (unsigned long) start_indices[qid];
                 unsigned long curr_idx = 0;
 
                 #pragma unroll
@@ -763,8 +787,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     }
                 }
 
-               """ % {"data_t" : ("double" if self.use_double else "float")}
-
+                """ % { "data_t" : "double" if self.use_double else "float",
+                        "qid_expr" : "i" if self._sorted else "pids[i]"}
 
         z_order_nbrs = ElementwiseKernel(self.ctx,
                 arguments, src, "z_order_nbrs", preamble=self.preamble,
@@ -780,5 +804,4 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.src.get_number_of_particles(), self.current_keys, self.current_pids,
                 self.current_cids, self.current_cid_to_idx,start_indices, nbrs,
                 self.radius_scale2, self.cell_size)
-
 
