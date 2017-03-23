@@ -29,21 +29,21 @@ from pysph.sph.boundary_equations import MonaghanBoundaryForce
 dx = dy = 0.000384848
 hdx = 2.0
 h = hdx * dx
-r0 = 7850
+r0 = 7850.0
 m0 = dx * dy * r0
-v_s = 200
-ss = 4699
-C = 3630
-S = 1800
+v_s = 200.0
+ss = 4699.0
+C = 3630.0
+S = 1800.0
 gamma = 1.81
 alpha = 0.5
 beta = 0.5
 eta = 0.01
 eps = 0.5
-bar_width=0.0076
+bar_width = 0.0076
 G = 8*1e10
 Yo = 6*1e8
-ro2= 2750
+ro2 = 2750.0
 plate_start = -2.0*bar_width
 plate_end = 2.0*bar_width
 

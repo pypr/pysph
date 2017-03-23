@@ -8,7 +8,7 @@ from pysph.sph.equation import Equation
 
 class VonMisesPlasticity2D(Equation):
     def __init__(self, dest, sources, flow_stress):
-        self.flow_stress2 = flow_stress*flow_stress
+        self.flow_stress2 = float(flow_stress*flow_stress)
         self.factor = sqrt( 2.0/3.0 )*flow_stress
         super(VonMisesPlasticity2D,self).__init__(dest, sources)
 
@@ -49,9 +49,9 @@ class StiffenedGasEOS(Equation):
     """
 
     def __init__(self, dest, sources, gamma, r0, c0):
-        self.gamma = gamma # Gruneisen gamma
-        self.c0    = c0    # unshocked sound speed
-        self.r0    = r0    # reference density
+        self.gamma = float(gamma) # Gruneisen gamma
+        self.c0    = float(c0)    # unshocked sound speed
+        self.r0    = float(r0)    # reference density
 
         super(StiffenedGasEOS,self).__init__(dest, sources)
 
@@ -70,12 +70,12 @@ class StiffenedGasEOS(Equation):
 class MieGruneisenEOS(Equation):
     def __init__(self, dest, sources, gamma,r0, c0, S):
 
-        self.gamma = gamma
-        self.r0 = r0
-        self.c0 = c0
-        self.S = S
+        self.gamma = float(gamma)
+        self.r0 = float(r0)
+        self.c0 = float(c0)
+        self.S = float(S)
 
-        self.a0 = a0 = r0 * c0 * c0
+        self.a0 = a0 = float(r0 * c0 * c0)
         self.b0 = a0 * ( 1 + 2.0*(S - 1.0) )
         self.c0 = a0 * ( 2*(S - 1.0) + 3*(S - 1.0)*(S - 1.0) )
 
