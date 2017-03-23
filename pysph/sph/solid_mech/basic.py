@@ -4,7 +4,7 @@ Basic Equations for Solid Mechanics
 
 References
 ----------
-.. [Gray2001] J. P. Gray et al., "SPH elastic dynamics", Computer Methods 
+.. [Gray2001] J. P. Gray et al., "SPH elastic dynamics", Computer Methods
     in Applied Mechanics and Engineering, 190 (2001), pp 6641 - 6662.
 """
 
@@ -13,52 +13,52 @@ from textwrap import dedent
 
 class MonaghanArtificialStress(Equation):
     r"""**Artificial stress to remove tensile instability**
-    
-    The dispersion relations in [Gray2001] are used to determine the 
+
+    The dispersion relations in [Gray2001] are used to determine the
     different components of :math:`R`.
-    
+
     Angle of rotation for particle :math:`a`
-    
+
     .. math::
-    
+
         \tan{2 \theta_a} = \frac{2\sigma_a^{xy}}{\sigma_a^{xx} - \sigma_a^{yy}}
-        
+
     In rotated frame, the new components of the stress tensor are
-    
+
     .. math::
-    
+
         \bar{\sigma}_a^{xx} = \cos^2{\theta_a} \sigma_a^{xx} + 2\sin{\theta_a}
         \cos{\theta_a}\sigma_a^{xy} + \sin^2{\theta_a}\sigma_a^{yy}\\
-        
+
         \bar{\sigma}_a^{yy} = \sin^2{\theta_a} \sigma_a^{xx} + 2\sin{\theta_a}
         \cos{\theta_a}\sigma_a^{xy} + \cos^2{\theta_a}\sigma_a^{yy}
-        
+
     Components of :math:`R` in rotated frame:
-    
+
     .. math::
-        
+
         \bar{R}_{a}^{xx}=\begin{cases}-\epsilon\frac{\bar{\sigma}_{a}^{xx}}
         {\rho^{2}} & \bar{\sigma}_{a}^{xx}>0\\0 & \bar{\sigma}_{a}^{xx}\leq0
         \end{cases}\\
-        
+
         \bar{R}_{a}^{yy}=\begin{cases}-\epsilon\frac{\bar{\sigma}_{a}^{yy}}
         {\rho^{2}} & \bar{\sigma}_{a}^{yy}>0\\0 & \bar{\sigma}_{a}^{yy}\leq0
         \end{cases}
-    
+
     Components of :math:`R` in original frame:
-    
+
     .. math::
-    
-        R_a^{xx} = \cos^2{\theta_a} \bar{R}_a^{xx} + 
+
+        R_a^{xx} = \cos^2{\theta_a} \bar{R}_a^{xx} +
         \sin^2{\theta_a} \bar{R}_a^{yy}\\
-        
-        R_a^{yy} = \sin^2{\theta_a} \bar{R}_a^{xx} + 
+
+        R_a^{yy} = \sin^2{\theta_a} \bar{R}_a^{xx} +
         \cos^2{\theta_a} \bar{R}_a^{yy}\\
 
-        R_a^{xy} = \sin{\theta_a} \cos{\theta_a}\left(\bar{R}_a^{xx} - 
+        R_a^{xy} = \sin{\theta_a} \cos{\theta_a}\left(\bar{R}_a^{xx} -
         \bar{R}_a^{yy}\right)
     """
-    
+
     def __init__(self, dest, sources, eps=0.3):
         r"""
         Parameters
@@ -141,18 +141,18 @@ class MonaghanArtificialStress(Equation):
 
 class MomentumEquationWithStress(Equation):
     r"""**Momentum Equation with Artificial Stress**
-    
+
     .. math::
-    
-        \frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2} 
+
+        \frac{D\vec{v_a}^i}{Dt} = \sum_b m_b\left(\frac{\sigma_a^{ij}}{\rho_a^2}
         +\frac{\sigma_b^{ij}}{\rho_b^2} + R_{ab}^{ij}f^n \right)\nabla_a W_{ab}
-    
+
     where
-    
+
     .. math::
-    
+
         f_{ab} = \frac{W(r_{ab})}{W(\Delta p)}\\
-        
+
         R_{ab}^{ij} = R_{a}^{ij} + R_{b}^{ij}
     """
     def __init__(self, dest, sources, wdeltap=-1, n=1):
@@ -166,7 +166,7 @@ class MomentumEquationWithStress(Equation):
         with_correction : bool
             switch for using tensile instability correction
         """
-        
+
         self.wdeltap = wdeltap
         self.n = n
         self.with_correction = True
@@ -180,7 +180,7 @@ class MomentumEquationWithStress(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p,
-             d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, 
+             d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
              s_s00, s_s01, s_s02, s_s11, s_s12, s_s22,
              d_r00, d_r01, d_r02, d_r11, d_r12, d_r22,
              s_r00, s_r01, s_r02, s_r11, s_r12, s_r22,
@@ -222,7 +222,7 @@ class MomentumEquationWithStress(Equation):
         r00a = d_r00[d_idx]
         r01a = d_r01[d_idx]
         r02a = d_r02[d_idx]
-        
+
         r10a = d_r01[d_idx]
         r11a = d_r11[d_idx]
         r12a = d_r12[d_idx]
@@ -300,18 +300,18 @@ class MomentumEquationWithStress(Equation):
 class HookesDeviatoricStressRate(Equation):
     r""" **Rate of change of stress **
 
-    .. math:: 
+    .. math::
         \frac{dS^{ij}}{dt} = 2\mu\left(\epsilon^{ij} - \frac{1}{3}\delta^{ij}
         \epsilon^{ij}\right) + S^{ik}\Omega^{jk} + \Omega^{ik}S^{kj}
 
     where
 
-    .. math:: 
-    
+    .. math::
+
         \epsilon^{ij} = \frac{1}{2}\left(\frac{\partial v^i}{\partial x^j} +
         \frac{\partial v^j}{\partial x^i}\right)\\
-        
-        \Omega^{ij} = \frac{1}{2}\left(\frac{\partial v^i}{\partial x^j} - 
+
+        \Omega^{ij} = \frac{1}{2}\left(\frac{\partial v^i}{\partial x^j} -
            \frac{\partial v^j}{\partial x^i} \right)
 
     """
@@ -322,8 +322,8 @@ class HookesDeviatoricStressRate(Equation):
         shear_mod : float
             shear modulus (:math:`\mu`)
         """
-        
-        self.shear_mod = shear_mod
+
+        self.shear_mod = float(shear_mod)
         super(HookesDeviatoricStressRate, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_as00, d_as01, d_as02, d_as11, d_as12, d_as22):
@@ -336,11 +336,11 @@ class HookesDeviatoricStressRate(Equation):
 
         d_as22[d_idx] = 0.0
 
-    def loop(self, d_idx, 
+    def loop(self, d_idx,
              d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-             d_v00, d_v01, d_v02, 
+             d_v00, d_v01, d_v02,
              d_v10, d_v11, d_v12,
-             d_v20, d_v21, d_v22,             
+             d_v20, d_v21, d_v22,
              d_as00, d_as01, d_as02,
              d_as11, d_as12,
              d_as22):
@@ -403,7 +403,7 @@ class HookesDeviatoricStressRate(Equation):
                         ( s00*omega00 + s01*omega01 + s02*omega02) + \
                         ( s00*omega00 + s10*omega01 + s20*omega02)
 
-        # S_01         
+        # S_01
         d_as01[d_idx] = tmp*(eps01) + \
                         ( s00*omega10 + s01*omega11 + s02*omega12) + \
                         ( s01*omega00 + s11*omega01 + s21*omega02)
@@ -413,11 +413,11 @@ class HookesDeviatoricStressRate(Equation):
                         (s00*omega20 + s01*omega21 + s02*omega22) + \
                         (s02*omega00 + s12*omega01 + s22*omega02)
 
-        # S_11      
+        # S_11
         d_as11[d_idx] = tmp*( eps11 - trace ) + \
                         (s10*omega10 + s11*omega11 + s12*omega12) + \
                         (s01*omega10 + s11*omega11 + s21*omega12)
-        
+
         # S_12
         d_as12[d_idx] = tmp*eps12 + \
                         (s10*omega20 + s11*omega21 + s12*omega22) + \
@@ -431,9 +431,9 @@ class HookesDeviatoricStressRate(Equation):
 class EnergyEquationWithStress(Equation):
     def __init__(self, dest, sources, alpha=1.0, beta=1.0,
                  eta=0.01):
-        self.alpha = alpha
-        self.beta = beta
-        self.eta = eta
+        self.alpha = float(alpha)
+        self.beta = float(beta)
+        self.eta = float(eta)
         super(EnergyEquationWithStress,self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_ae):
@@ -473,9 +473,9 @@ class EnergyEquationWithStress(Equation):
         d_ae[d_idx] += 0.5 * mb * (pa*rhoa2 + pb*rhob2 + piij)
 
     def post_loop(self, d_idx, d_rho,
-                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, 
+                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
                   s_s00, s_s01, s_s02, s_s11, s_s12, s_s22,
-                  d_v00, d_v01, d_v02, 
+                  d_v00, d_v01, d_v02,
                   d_v10, d_v11, d_v12,
                   d_v20, d_v21, d_v22,
                   d_ae):
