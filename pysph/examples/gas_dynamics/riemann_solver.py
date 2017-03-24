@@ -1,4 +1,5 @@
-"""Exact solution to Riemann problems.
+"""
+Exact solution to Riemann problems.
 """
 import os
 import numpy
@@ -18,28 +19,37 @@ def set_gamma(g):
 
 def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
           rho_r=0.125, u_l=0.0, u_r=0.0, N=101):
-    """ 
-    Computes the exact solution to Riemann problem. The function returns
-    the exact solution in the order of density, velocity, pressure, 
-    energy and x-coordinates of the points under study.
+
+    r"""
+    Parameters
+    ----------
+    x_min : float
+        the leftmost point of domain
+    x_max : float
+        the rightmost point of domain
+    x_0 : float
+        the position of the diaphgram
+    t : float
+        total time of simulation
+    p_l, u_l, rho_l : float
+        pressure, velocity, density in the left region
+    p_r, u_r, rho_r : float
+        pressure, velocity, density in the right region
+    N : int
+        number of points under study
     
+    The default arguments mentioned correspond to the Sod shock tube case.
+
+    Notes
+    -----
+    The function returns the exact solution in the order of density, velocity,
+    pressure, energy and x-coordinates of the points under study.
+
     References
     ----------
-    E.F. Toro, Riemann Solvers and Numerical Methods for Fluid Dynamics,
-    Springer (2009), Chapter 4, pp. 115-138
+    .. E.F. Toro, Riemann Solvers and Numerical Methods for Fluid Dynamics,
+        Springer (2009), Chapter 4, pp. 115-138
 
-    Keyword arguments
-    -----------------
-    
-    x_min: the leftmost point of domain
-    x_max: the rightmost point of domain
-    x_0: the position of the diaphgram
-    t: total time of simualtion
-    p_l, u_l, rho_l: pressure, velocity, density in the left region
-    p_r, u_r, rho_r: pressure, velocity, density in the right region
-    N: number of points under study
-    
-    The default arguments mentioned correspond to the Sod shock tube
     """
     c_l = sqrt(gamma * p_l / rho_l)
     c_r = sqrt(gamma * p_r / rho_r)
