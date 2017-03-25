@@ -59,7 +59,10 @@ cdef class ZOrderNNPS(NNPS):
 
 cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
+
     cdef str preamble
+    cdef str data_t
+
     cdef list pids
     cdef list pid_keys
     cdef list cids
@@ -69,6 +72,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object current_keys
     cdef object current_cids
     cdef object current_cid_to_idx
+
+    cdef object src_tpl
 
     cdef public bint use_double
     cdef bint _sorted
