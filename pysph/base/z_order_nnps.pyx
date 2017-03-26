@@ -23,6 +23,8 @@ cimport numpy as np
 from mako.template import Template
 import os
 
+from pysph.base.gpu_nnps_helper import GPUNNPSHelper
+
 cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
@@ -344,12 +346,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.radius_scale2 = radius_scale*radius_scale
         self.use_double = use_double
 
-        self.src_tpl = Template(filename = \
-                os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                    "z_order_nnps.mako"), disable_unicode=True)
-
-        self.preamble = self.src_tpl.get_def("preamble").render()
-        self.data_t = "double" if self.use_double else "float"
+        self.helper = GPUNNPSHelper(self.ctx, "z_order_nnps.mako", use_double)
 
         self.src_index = -1
         self.dst_index = -1
@@ -366,16 +363,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
 
-        arguments = \
-                self.src_tpl.get_def("fill_pids_arguments").render(
-                        data_t = self.data_t)
-
-        pids_src = \
-                self.src_tpl.get_def("fill_pids_source").render(
-                        data_t = self.data_t)
-
-        fill_pids = ElementwiseKernel(self.ctx,
-                arguments, pids_src, "fill_pids", preamble=self.preamble)
+        fill_pids = self.helper.get_kernel("fill_pids")
 
         fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z,
                 self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
@@ -393,17 +381,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         curr_cid = 1 + cl.array.zeros(self.queue, 1, dtype=np.uint32)
 
-        arguments = \
-                self.src_tpl.get_def("fill_unique_cids_arguments").render(
-                        data_t = self.data_t)
-
-        fill_unique_cids_src = \
-                self.src_tpl.get_def("fill_unique_cids_source").render(
-                        data_t = self.data_t)
-
-        fill_unique_cids = ElementwiseKernel(self.ctx,
-                arguments, fill_unique_cids_src,
-                "fill_unique_cids", preamble=self.preamble)
+        fill_unique_cids = self.helper.get_kernel("fill_unique_cids")
 
         fill_unique_cids(self.pid_keys[pa_index], self.cids[pa_index],
                 curr_cid)
@@ -412,16 +390,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.cid_to_idx[pa_index] = -1 + cl.array.zeros(self.queue,
                 27*num_cids, dtype=np.int32)
 
-        arguments = \
-                self.src_tpl.get_def("map_cid_to_idx_arguments").render(
-                        data_t = self.data_t)
-
-        map_cid_to_idx_src = \
-                self.src_tpl.get_def("map_cid_to_idx_source").render(
-                        data_t = self.data_t)
-
-        map_cid_to_idx = ElementwiseKernel(self.ctx,
-                arguments, map_cid_to_idx_src, "map_cid_to_idx", preamble=self.preamble)
+        map_cid_to_idx = self.helper.get_kernel("map_cid_to_idx")
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
@@ -432,17 +401,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
                 self.cid_to_idx[pa_index])
 
-        arguments = \
-                self.src_tpl.get_def("fill_cids_arguments").render(
-                        data_t = self.data_t)
-
-        fill_cids_src = \
-                self.src_tpl.get_def("fill_cids_source").render(
-                        data_t = self.data_t)
-
-        fill_cids = ElementwiseKernel(self.ctx,
-                arguments, fill_cids_src,
-                "fill_cids", preamble=self.preamble)
+        fill_cids = self.helper.get_kernel("fill_cids")
 
         fill_cids(self.pid_keys[pa_index], self.cids[pa_index],
                 pa_wrapper.get_number_of_particles())
@@ -496,17 +455,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.current_cid_to_idx = self.cid_to_idx[src_index]
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        arguments = \
-                self.src_tpl.get_def("find_neighbor_lengths_arguments").render(
-                        data_t = self.data_t)
-
-        src = \
-                self.src_tpl.get_def("find_neighbor_lengths_source").render(
-                        data_t = self.data_t, sorted = self._sorted)
-
-        z_order_nbr_lengths = ElementwiseKernel(self.ctx,
-                arguments, src, "z_order_nbr_lengths", preamble=self.preamble,
-                options=['-w', '-cl-unsafe-math-optimizations'])
+        z_order_nbr_lengths = self.helper.get_kernel("z_order_nbr_lengths",
+                sorted=self._sorted)
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
@@ -520,17 +470,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        arguments = \
-                self.src_tpl.get_def("find_neighbors_arguments").render(
-                        data_t = self.data_t)
-
-        src = \
-                self.src_tpl.get_def("find_neighbors_source").render(
-                        data_t = self.data_t, sorted = self._sorted)
-
-        z_order_nbrs = ElementwiseKernel(self.ctx,
-                arguments, src, "z_order_nbrs", preamble=self.preamble,
-                options=['-w', '-cl-unsafe-math-optimizations'])
+        z_order_nbrs = self.helper.get_kernel("z_order_nbrs",
+                sorted=self._sorted)
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
