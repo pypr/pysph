@@ -15,10 +15,10 @@ class GPUNNPSHelper(object):
         self.ctx = ctx
 
     def _get_code(self, kernel_name, **kwargs):
-        arguments = self.src_tpl.get_def("%s_arguments" % kernel_name).render(
+        arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
                 data_t=self.data_t, **kwargs)
 
-        src = self.src_tpl.get_def("%s_source" % kernel_name).render(
+        src = self.src_tpl.get_def("%s_src" % kernel_name).render(
                 data_t=self.data_t, **kwargs)
 
         return arguments, src

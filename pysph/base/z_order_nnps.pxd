@@ -63,17 +63,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef list pids
     cdef list pid_keys
     cdef list cids
-    cdef list cid_to_idx
-
-    cdef object current_pids
-    cdef object current_keys
-    cdef object current_cids
-    cdef object current_cid_to_idx
+    cdef public list cid_to_idx
+    cdef list max_cid
+    cdef public object dst_to_src
+    cdef public object overflow_cid_to_idx
 
     cdef object helper
 
     cdef public bint use_double
     cdef bint _sorted
+    cdef bint dst_src
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
