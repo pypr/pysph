@@ -30,9 +30,20 @@ def check_equation_array_properties(equation, particle_arrays):
     """Given an equation and the particle arrays, check if the particle arrays
     have the necessary properties.
     """
-    #p_arrays = {x.name:x for x in particle_arrays}
     p_arrays = dict((x.name, x) for x in particle_arrays)
     _src, _dest = get_arrays_used_in_equation(equation)
+    if equation.dest not in p_arrays:
+        msg = "ERROR: Equation {eq_name} has invalid dest: '{dest}'".format(
+            eq_name=equation.name, dest=equation.dest
+        )
+        raise RuntimeError(msg)
+    if not equation.no_source:
+        for src in equation.sources:
+            if src not in p_arrays:
+                msg = "ERROR: Equation {eq_name} has invalid "\
+                      "source: '{src}'".format(eq_name=equation.name, src=src)
+                raise RuntimeError(msg)
+
     eq_src = set([x[2:] for x in _src])
     eq_dest = set([x[2:] for x in _dest])
 

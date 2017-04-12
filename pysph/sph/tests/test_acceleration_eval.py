@@ -44,6 +44,31 @@ class FindTotalMass(Equation):
 
 class TestCheckEquationArrayProps(unittest.TestCase):
 
+    def test_should_raise_runtime_error_when_invalid_dest_source(self):
+        # Given
+        f = get_particle_array(name='f')
+
+        # When
+        eq = SummationDensity(dest='fluid', sources=['f'])
+
+        # Then
+        self.assertRaises(
+            RuntimeError,
+            check_equation_array_properties,
+            eq, [f]
+        )
+
+        # When
+        eq = SummationDensity(dest='f', sources=['fluid'])
+
+        # Then
+        self.assertRaises(
+            RuntimeError,
+            check_equation_array_properties,
+            eq, [f]
+        )
+
+
     def test_should_pass_when_properties_exist(self):
         # Given
         f = get_particle_array(name='f')

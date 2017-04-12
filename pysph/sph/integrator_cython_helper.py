@@ -24,7 +24,8 @@ class IntegratorCythonHelper(object):
         self.acceleration_eval_helper = acceleration_eval_helper
         pas = acceleration_eval_helper.object.particle_arrays
         self._particle_arrays = dict((x.name, x) for x in pas)
-        self._check_integrator_steppers()
+        if self.object is not None:
+            self._check_integrator_steppers()
 
     def get_code(self):
         if self.object is not None:
