@@ -24,6 +24,7 @@ class IntegratorCythonHelper(object):
         self.acceleration_eval_helper = acceleration_eval_helper
         pas = acceleration_eval_helper.object.particle_arrays
         self._particle_arrays = dict((x.name, x) for x in pas)
+        self._check_integrator_steppers()
 
     def get_code(self):
         if self.object is not None:
@@ -158,6 +159,17 @@ class IntegratorCythonHelper(object):
                       integrator_name=integrator_name, names=names, dest=dest
                   )
             self._runtime_error(msg)
+
+    def _check_integrator_steppers(self):
+        for name, stepper in self.object.steppers.items():
+            if name not in self._particle_arrays:
+                msg = "ERROR: Integrator keyword arguments must correspond "\
+                      "to particle array names.\n"\
+                      "Given keyword: '{name}' not a valid particle array.\n"\
+                      "Valid particle array names: {valid}".format(
+                          name=name, valid=sorted(self._particle_arrays.keys())
+                      )
+                self._runtime_error(msg)
 
     def _runtime_error(self, msg):
         print('*'*70)
