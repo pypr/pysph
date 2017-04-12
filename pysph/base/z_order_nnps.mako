@@ -206,7 +206,7 @@
     ${data_t}* y, ${data_t}* z, int num_particles_src,
     ${data_t} cell_size, ${data_t}3 min, unsigned long* keys_src,
     unsigned int* pids_dst, int* overflow_cid_to_idx,
-    unsigned int max_cid_src, unsigned long* overflow_keys
+    unsigned int max_cid_src
 </%def>
 
 <%def name="fill_overflow_map_src(data_t)" cached="True">
