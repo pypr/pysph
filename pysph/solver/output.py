@@ -35,7 +35,8 @@ class Output(object):
                     self.all_array_data, mpi_comm
                     )
         self.solver_data = solver_data
-        self._dump(fname)
+        if mpi_comm is None or mpi_comm.Get_rank() == 0:
+            self._dump(fname)
 
     def load(self, fname):
         return self._load(fname)
