@@ -509,3 +509,61 @@ also documented there.
 There are several `examples
 <https://bitbucket.org/pysph/pysph/src/master/pysph/examples/>`_ that
 ship with PySPH, explore these to get a better idea of what is possible.
+
+
+Debugging when things go wrong
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you attempt to run your own simulations you may run into a variety of
+errors. Some errors in setting up equations and the like are easy to detect
+and PySPH will provide an error message that should usually be helpful. If
+this is a Python related error you should get a traceback and debug it as you
+would debug any Python program.
+
+PySPH writes out a log file in the output directory, looking at that is
+sometimes useful.
+
+Things get harder to debug when you get a segmentation fault or your code just
+crashes. Even though PySPH is implemented in Python you can get one of these
+if your timestep is too large or your equations are doing strange things
+(divide by zero, taking a square root of a negative number). This happens
+because PySPH translates your code into a lower-level language for
+performance.  The following are the most common causes of a crash/segfault:
+
+- The particles have "blown up", this can happen when the accelerations are
+  very large.  This can also happen when your timestep is very large.
+- There are mistakes in your equations or integrator step. Divide by zero,
+  or some quantity was not properly initialized -- for example if the particle
+  masses were not correctly initialized and were set to zero you might get
+  these errors. It is also possible that you have made some indexing errors in
+  your arrays, check all your array accesses in your equations.
+
+
+Let us see how we can debug these. Let us say your code is in ``example.py``,
+you can do the following::
+
+   $ python example.py --pfreq 1 --detailed-output
+
+In this case, the ``--pfreq 1`` asks pysph to dump output at every timestep.
+By default only specific properties that the user has requested are saved.
+Using ``--detailed-output`` dumps every property of every array. This includes
+all accelerations as well. Viewing this data with the ``pysph view`` command
+makes it easy to see which acceleration is causing a problem.
+
+Sometimes even this is not enough as the particles diverge or the code blows
+up at the very first step of a multi-stage integrator. In this case, no output
+would be generated. To debug the accelerations in this situation one may
+define a method called ``pre_step`` in your
+:py:class:`pysph.solver.application.Application` subclass as follows::
+
+    class EllipticalDrop(Application):
+        # ...
+        def pre_step(self, solver):
+            solver.dump_output()
+
+
+What this does is to ask the solver to dump the output right before each
+timestep is taken. At the start of the simulations the first accelerations
+have been calculated and since this output is now saved, one should be able to
+debug the accelerations. Again, use ``--detailed-output`` with this to look at
+the accelerations right at the start.
