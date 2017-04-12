@@ -346,178 +346,220 @@ class Application(object):
 
         # Restart options
         restart = parser.add_argument_group("Restart options",
-                              "Restart options for PySPH")
+                                            "Restart options for PySPH")
 
-        restart.add_argument("--restart-file", action="store", dest="restart_file",
-                           default=None,
-                           help=("""Restart a PySPH simulation using a specified file """)),
+        restart.add_argument(
+            "--restart-file", action="store", dest="restart_file",
+            default=None,
+            help=("""Restart a PySPH simulation using a specified file """)
+        )
 
-        restart.add_argument("--rescale-dt", action="store", dest="rescale_dt",
-                           default=1.0, type=float,
-                           help=("Scale dt upon restarting by a numerical constant"))
-
+        restart.add_argument(
+            "--rescale-dt", action="store", dest="rescale_dt",
+            default=1.0, type=float,
+            help=("Scale dt upon restarting by a numerical constant")
+        )
 
         # NNPS options
         nnps_options = parser.add_argument_group("NNPS",
-                "Nearest Neighbor searching")
+                                                 "Nearest Neighbor searching")
 
         # --nnps
-        nnps_options.add_argument("--nnps", dest="nnps",
-                                choices=['box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree', \
-                                        'strat_hash', 'strat_sfc', 'tree'],
-                                default='ll',
-                                help="Use one of box-sort ('box') or "\
-                                     "the linked list algorithm ('ll') or "\
-                                     "the spatial hash algorithm ('sh') or "\
-                                     "the extended spatial hash algorithm ('esh') or "\
-                                     "the cell indexing algorithm ('ci') or "\
-                                     "the z-order space filling curve based algorithm ('sfc') or "\
-                                     "the stratified hash algorithm ('strat_hash') or "\
-                                     "the stratified sfc algorithm ('strat_sfc') or "\
-                                     "the octree algorithm ('tree') or "\
-                                     "the compressed octree algorithm ('comp_tree')"
-                                )
+        nnps_options.add_argument(
+            "--nnps", dest="nnps",
+            choices=['box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree',
+                     'strat_hash', 'strat_sfc', 'tree'],
+            default='ll',
+            help="Use one of box-sort ('box') or "
+            "the linked list algorithm ('ll') or "
+            "the spatial hash algorithm ('sh') or "
+            "the extended spatial hash algorithm ('esh') or "
+            "the cell indexing algorithm ('ci') or "
+            "the z-order space filling curve based algorithm ('sfc') or "
+            "the stratified hash algorithm ('strat_hash') or "
+            "the stratified sfc algorithm ('strat_sfc') or "
+            "the octree algorithm ('tree') or "
+            "the compressed octree algorithm ('comp_tree')"
+        )
 
-        nnps_options.add_argument("--spatial-hash-sub-factor", dest="H",
-                                type=int, default=3,
-                                help="Sub division factor for ExtendedSpatialHashNNPS"
-                                )
+        nnps_options.add_argument(
+            "--spatial-hash-sub-factor", dest="H",
+            type=int, default=3,
+            help="Sub division factor for ExtendedSpatialHashNNPS"
+        )
 
-        nnps_options.add_argument("--approximate-nnps", dest="approximate_nnps",
-                                action="store_true", default=False,
-                                help="Use for approximate NNPS")
+        nnps_options.add_argument(
+            "--approximate-nnps", dest="approximate_nnps",
+            action="store_true", default=False,
+            help="Use for approximate NNPS"
+        )
 
-        nnps_options.add_argument("--spatial-hash-table-size", dest="table_size",
-                                type=int, default=131072,
-                                help="Table size for SpatialHashNNPS and \
-                                        ExtendedSpatialHashNNPS"
-                                )
+        nnps_options.add_argument(
+            "--spatial-hash-table-size", dest="table_size",
+            type=int, default=131072,
+            help="Table size for SpatialHashNNPS and ExtendedSpatialHashNNPS"
+        )
 
-        nnps_options.add_argument("--stratified-grid-num-levels", dest="num_levels",
-                                type=int, default=1,
-                                help="Number of levels for StratifiedHashNNPS and \
-                                        StratifiedSFCNNPS"
-                                )
+        nnps_options.add_argument(
+            "--stratified-grid-num-levels", dest="num_levels",
+            type=int, default=1,
+            help="Number of levels for StratifiedHashNNPS and \
+            StratifiedSFCNNPS"
+        )
 
-        nnps_options.add_argument("--tree-leaf-max-particles", dest="leaf_max_particles",
-                                type=int, default=10,
-                                help="Maximum number of particles in leaf of octree"
-                                )
+        nnps_options.add_argument(
+            "--tree-leaf-max-particles", dest="leaf_max_particles",
+            type=int, default=10,
+            help="Maximum number of particles in leaf of octree"
+        )
 
         # --fixed-h
-        nnps_options.add_argument("--fixed-h", dest="fixed_h",
-                                action="store_true", default=False,
-                                help="Option for fixed smoothing lengths")
+        nnps_options.add_argument(
+            "--fixed-h", dest="fixed_h",
+            action="store_true", default=False,
+            help="Option for fixed smoothing lengths"
+        )
 
-        nnps_options.add_argument("--cache-nnps", dest="cache_nnps",
-                                action="store_true", default=False,
-                        help="Option to enable the use of neighbor caching.")
+        nnps_options.add_argument(
+            "--cache-nnps", dest="cache_nnps",
+            action="store_true", default=False,
+            help="Option to enable the use of neighbor caching."
+        )
 
         nnps_options.add_argument(
             "--sort-gids", dest="sort_gids", action="store_true",
-            default=False, help="Sort neighbors by the GIDs to get "\
+            default=False, help="Sort neighbors by the GIDs to get " +
             "consistent results in serial and parallel (slows down a bit)."
         )
 
-
         # Zoltan Options
         zoltan = parser.add_argument_group("PyZoltan",
-                             "Zoltan load balancing options")
+                                           "Zoltan load balancing options")
 
-        zoltan.add_argument("--with-zoltan", action="store_true",
-                          dest="with_zoltan", default=True,
-                          help=("""Use PyZoltan for dynamic load balancing """))
+        zoltan.add_argument(
+            "--with-zoltan", action="store_true",
+            dest="with_zoltan", default=True,
+            help="Use PyZoltan for dynamic load balancing"
+        )
 
-        zoltan.add_argument("--zoltan-lb-method", action="store",
-                          dest="zoltan_lb_method", default="RCB",
-                          help=("""Choose the Zoltan load balancnig method"""))
+        zoltan.add_argument(
+            "--zoltan-lb-method", action="store",
+            dest="zoltan_lb_method", default="RCB",
+            help="Choose the Zoltan load balancnig method"
+        )
 
-        # --rcb-lock
-        zoltan.add_argument("--rcb-lock", action="store_true", dest="zoltan_rcb_lock_directions",
-                          default=False,
-                          help=("Lock the directions of the RCB cuts"))
+        zoltan.add_argument(
+            "--rcb-lock", action="store_true",
+            dest="zoltan_rcb_lock_directions",
+            default=False,
+            help="Lock the directions of the RCB cuts"
+        )
 
-        # rcb--reuse
-        zoltan.add_argument("--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
-                          default=False,
-                          help=("Reuse previous RCB cuts"))
+        zoltan.add_argument(
+            "--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
+            default=False,
+            help="Reuse previous RCB cuts"
+        )
 
-        # rcb-rectilinear
-        zoltan.add_argument("--rcb-rectilinear", action="store_true", dest='zoltan_rcb_rectilinear',
-                          default=False,
-                          help=("Produce nice rectilinear blocks without projections"))
+        zoltan.add_argument(
+            "--rcb-rectilinear", action="store_true",
+            dest='zoltan_rcb_rectilinear',
+            default=False,
+            help="Produce nice rectilinear blocks without projections"
+        )
 
-        # rcb-set-direction
-        zoltan.add_argument("--rcb-set-direction", action='store', dest="zoltan_rcb_set_direction",
-                          default=0, type=int,
-                          help=("Set the order of the RCB cuts"))
+        zoltan.add_argument(
+            "--rcb-set-direction", action='store',
+            dest="zoltan_rcb_set_direction",
+            default=0, type=int,
+            help="Set the order of the RCB cuts"
+        )
 
-        zoltan.add_argument("--zoltan-weights", action="store_false",
-                          dest="zoltan_weights", default=True,
-                          help=("""Switch between using weights for input to Zoltan.
-                          defaults to True"""))
+        zoltan.add_argument(
+            "--zoltan-weights", action="store_false",
+            dest="zoltan_weights", default=True,
+            help=("""Switch between using weights for input to Zoltan.
+            defaults to True""")
+        )
 
-        zoltan.add_argument("--ghost-layers", action='store', dest='ghost_layers',
-                          default=3.0, type=float,
-                          help=('Number of ghost cells to share for remote neighbors'))
+        zoltan.add_argument(
+            "--ghost-layers", action='store', dest='ghost_layers',
+            default=3.0, type=float,
+            help=('Number of ghost cells to share for remote neighbors')
+        )
 
-        zoltan.add_argument("--lb-freq", action='store', dest='lb_freq',
-                          default=10, type=int,
-                          help=('The frequency for load balancing'))
+        zoltan.add_argument(
+            "--lb-freq", action='store', dest='lb_freq',
+            default=10, type=int,
+            help=('The frequency for load balancing')
+        )
 
-        zoltan.add_argument("--zoltan-debug-level", action="store",
-                          dest="zoltan_debug_level", default="0",
-                          help=("""Zoltan debugging level"""))
-
+        zoltan.add_argument(
+            "--zoltan-debug-level", action="store",
+            dest="zoltan_debug_level", default="0",
+            help=("""Zoltan debugging level""")
+        )
 
         # Options to control parallel execution
-        parallel_options=parser.add_argument_group("Parallel Options")
+        parallel_options = parser.add_argument_group("Parallel Options")
 
         # --update-cell-sizes
-        parallel_options.add_argument("--update-cell-sizes", action='store_true',
-                                    dest='update_cell_sizes', default=False,
-                                    help=("Recompute cell sizes for binning in parallel"))
+        parallel_options.add_argument(
+            "--update-cell-sizes", action='store_true',
+            dest='update_cell_sizes', default=False,
+            help=("Recompute cell sizes for binning in parallel")
+        )
 
         # --parallel-scale-factor
-        parallel_options.add_argument("--parallel-scale-factor", action="store",
-                                    dest="parallel_scale_factor", default=2.0, type=float,
-                                    help=("""Kernel scale factor for the parallel update"""))
+        parallel_options.add_argument(
+            "--parallel-scale-factor", action="store",
+            dest="parallel_scale_factor", default=2.0, type=float,
+            help=("""Kernel scale factor for the parallel update""")
+        )
 
         # --parallel-output-mode
-        parallel_options.add_argument("--parallel-output-mode", action="store",
-                            dest="parallel_output_mode", default=None,
-                            help="""Use 'collected' to dump one output at
-                          root or 'distributed' for every processor. """)
-
-
+        parallel_options.add_argument(
+            "--parallel-output-mode", action="store",
+            dest="parallel_output_mode", default='collected',
+            choices=['collected', 'distributed'],
+            help="""Use 'collected' to dump one output at
+            root or 'distributed' for every processor. """
+        )
 
         # solver interfaces
         interfaces = parser.add_argument_group("Interfaces",
-                                 "Add interfaces to the solver")
+                                               "Add interfaces to the solver")
 
-        interfaces.add_argument("--interactive", action="store_true",
-                              dest="cmd_line", default=False,
-                              help=("Add an interactive commandline interface "
-                                    "to the solver"))
+        interfaces.add_argument(
+            "--interactive", action="store_true",
+            dest="cmd_line", default=False,
+            help=("Add an interactive commandline interface to the solver")
+        )
 
-        interfaces.add_argument("--xml-rpc", action="store",
-                dest="xml_rpc", metavar="[HOST:] PORT",
-                              help=("Add an XML-RPC interface to the solver;"
-                                      "HOST=0.0.0.0 by default"))
+        interfaces.add_argument(
+            "--xml-rpc", action="store",
+            dest="xml_rpc", metavar="[HOST:] PORT",
+            help=("Add an XML-RPC interface to the solver;"
+                  "HOST=0.0.0.0 by default")
+        )
 
-        interfaces.add_argument("--multiproc", action="store",
-                              dest="multiproc", metavar='[[AUTHKEY@] HOST:] PORT[+] ',
-                              default="pysph@0.0.0.0:8800+",
-                              help=("Add a python multiprocessing interface "
-                                    "to the solver; "
-                                    "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
-                                    " default (8800+ means first available port "
-                                    "number 8800 onwards)"))
+        interfaces.add_argument(
+            "--multiproc", action="store",
+            dest="multiproc", metavar='[[AUTHKEY@] HOST:] PORT[+] ',
+            default="pysph@0.0.0.0:8800+",
+            help=("Add a python multiprocessing interface "
+                  "to the solver; "
+                  "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
+                  " default (8800+ means first available port "
+                  "number 8800 onwards)")
+        )
 
-        interfaces.add_argument("--no-multiproc", action="store_const",
-                              dest="multiproc", const=None,
-                              help=("Disable multiprocessing interface "
-                                    "to the solver"))
+        interfaces.add_argument(
+            "--no-multiproc", action="store_const",
+            dest="multiproc", const=None,
+            help=("Disable multiprocessing interface "
+                  "to the solver")
+        )
 
         # Scheme options.
         if self.scheme is not None:
@@ -830,8 +872,7 @@ class Application(object):
         self._message("Generating output in %s" % self.output_dir)
 
         # set parallel output mode
-        if options.parallel_output_mode is not None:
-            solver.set_parallel_output_mode(options.parallel_output_mode)
+        solver.set_parallel_output_mode(options.parallel_output_mode)
 
         # Set the adaptive timestep
         if options.adaptive_timestep is not None:
