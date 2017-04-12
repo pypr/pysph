@@ -405,8 +405,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         np_cid_to_idx = self.cid_to_idx[pa_index].get()
 
-        #print np_cid_to_idx[[27*i + 13 for i in range(self.max_cid[pa_index])]]
-
         fill_cids = self.helper.get_kernel("fill_cids")
 
         fill_cids(self.pid_keys[pa_index], self.cids[pa_index],
@@ -486,7 +484,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.src.get_number_of_particles(), self.cell_size,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.pid_keys[src_index], self.pids[dst_index], self.overflow_cid_to_idx,
-                <unsigned int> self.max_cid[src_index], overflow_keys, num_threads)
+                <unsigned int> self.max_cid[src_index])
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         z_order_nbr_lengths = self.helper.get_kernel("z_order_nbr_lengths",
@@ -494,10 +492,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
-
-        overflow = -1 + cl.array.zeros(self.queue, 50, dtype=np.int32)
-
-        head = cl.array.zeros(self.queue, 1, dtype=np.int32)
 
         z_order_nbr_lengths(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
                 self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
@@ -507,8 +501,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.pids[self.dst_index], self.pids[self.src_index],
                 self.max_cid[self.src_index], self.cids[self.dst_index],
                 self.cid_to_idx[self.src_index], self.overflow_cid_to_idx,
-                self.dst_to_src, nbr_lengths, self.radius_scale2, self.cell_size,
-                overflow, head)
+                self.dst_to_src, nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         z_order_nbrs = self.helper.get_kernel("z_order_nbrs",
