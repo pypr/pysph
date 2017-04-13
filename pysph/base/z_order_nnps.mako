@@ -1,8 +1,6 @@
 //CL//
 
 <%def name="preamble()" cached="True">
-    #define ULLONG_MAX (1 << 62)
-
     #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
 
     #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
@@ -193,9 +191,7 @@
 </%def>
 
 <%def name="map_dst_to_src_src(data_t)" cached="True">
-    // ENH: number of work items can be set using dst_to_src
     int idx = cid_to_idx_dst[27*i];
-    //unsigned int cid_dst = i;
     unsigned long key = keys_dst[idx];
     int idx_src = find_idx(keys_src, num_particles_src, key);
     dst_to_src[i] = (idx_src == -1) ? atomic_inc(&max_cid_src[0]) : cids_src[idx_src];

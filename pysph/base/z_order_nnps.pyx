@@ -457,34 +457,46 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.dst_src = src_index != dst_index
 
-        map_dst_to_src = self.helper.get_kernel("map_dst_to_src")
+        cdef unsigned int overflow_size = 0
 
-        max_cid_src = self.max_cid[src_index] + \
-                cl.array.zeros(self.queue, 1, dtype=np.int32)
+        self.dst_to_src = cl.array.zeros(self.queue,
+                self.max_cid[dst_index], dtype=np.uint32)
 
-        # What if src has an empty cell filled in dst
-        self.dst_to_src = cl.array.zeros(self.queue, self.max_cid[dst_index], dtype=np.uint32)
+        if self.dst_src:
 
-        map_dst_to_src(self.dst_to_src, self.cids[dst_index], self.cid_to_idx[dst_index],
-                self.pid_keys[dst_index], self.pid_keys[src_index], self.cids[src_index],
-                self.src.get_number_of_particles(), max_cid_src)
+            map_dst_to_src = self.helper.get_kernel("map_dst_to_src")
 
-        cdef unsigned int overflow_size = <unsigned int>(max_cid_src.get()) - self.max_cid[src_index]
+            max_cid_src = self.max_cid[src_index] + \
+                    cl.array.zeros(self.queue, 1, dtype=np.int32)
 
-        self.overflow_cid_to_idx = -1 + cl.array.zeros(self.queue,
-                max(1, 27*overflow_size), dtype=np.int32)
+            map_dst_to_src(self.dst_to_src, self.cids[dst_index],
+                    self.cid_to_idx[dst_index], self.pid_keys[dst_index],
+                    self.pid_keys[src_index], self.cids[src_index],
+                    self.src.get_number_of_particles(), max_cid_src)
 
-        fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
+            overflow_size = <unsigned int>(max_cid_src.get()) - \
+                    self.max_cid[src_index]
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+            self.overflow_cid_to_idx = -1 + cl.array.zeros(self.queue,
+                    max(1, 27*overflow_size), dtype=np.int32)
 
-        fill_overflow_map(self.dst_to_src, self.cid_to_idx[dst_index],
-                self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.src.get_number_of_particles(), self.cell_size,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.pid_keys[src_index], self.pids[dst_index], self.overflow_cid_to_idx,
-                <unsigned int> self.max_cid[src_index])
+            fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
+
+            make_vec = cl.array.vec.make_double3 if self.use_double \
+                    else cl.array.vec.make_float3
+
+            fill_overflow_map(self.dst_to_src, self.cid_to_idx[dst_index],
+                    self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                    self.src.get_number_of_particles(), self.cell_size,
+                    make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+                    self.pid_keys[src_index], self.pids[dst_index],
+                    self.overflow_cid_to_idx, <unsigned int> self.max_cid[src_index])
+
+        else:
+
+            self.overflow_cid_to_idx = -1 + cl.array.zeros(self.queue,
+                    1, dtype=np.int32)
+
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         z_order_nbr_lengths = self.helper.get_kernel("z_order_nbr_lengths",
