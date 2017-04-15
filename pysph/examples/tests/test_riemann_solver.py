@@ -16,18 +16,6 @@ class RiemannSolverTestCase(unittest.TestCase):
     def setUp(self):
         riemann_solver.set_gamma(1.4)
 
-    def tearDown(self):
-        ok = self.currentResult.wasSuccessful()
-        errors = self.currentResult.errors
-        failures = self.currentResult.failures
-        print ' All tests passed so far!' if ok else \
-            ' %d errors and %d failures so far' % \
-            (len(errors), len(failures))
-
-    def run(self, result=None):
-        self.currentResult = result
-        unittest.TestCase.run(self, result)
-
     def assert_error(self, given, expected, precision):
         return npt.assert_almost_equal(np.ravel(given), expected, precision)
 

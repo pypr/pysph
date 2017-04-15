@@ -13,20 +13,24 @@ import sys
 
 HERE = os.path.dirname(__file__)
 
+
 def _exec_file(filename):
-    ns = {'__name__':'__main__', '__file__': filename}
+    ns = {'__name__': '__main__', '__file__': filename}
     if sys.version_info[0] > 2:
         co = compile(open(filename, 'rb').read(), filename, 'exec')
         exec(co, ns)
     else:
         execfile(filename, ns)
 
+
 def _extract_full_doc(filename):
     p = ast.parse(open(filename, 'rb').read())
     return ast.get_docstring(p)
 
+
 def _extract_short_doc(dirname, fname):
     return open(os.path.join(dirname, fname)).readline()[3:].strip()
+
 
 def _get_module(fname):
     start = fname
@@ -36,15 +40,18 @@ def _get_module(fname):
         parts.append(dirname)
     return '.'.join(parts + [start[:-3]])
 
+
 def example_info(module, filename):
-    print("Information for example: %s"%module)
+    print("Information for example: %s" % module)
     print(_extract_full_doc(filename))
+
 
 def get_all_examples():
     basedir = HERE
     examples = []
     _ignore = [['run.py'], ['ghia_cavity_data.py'], ['db_exp_data.py'],
                ['tests', 'test_examples.py'],
+               ['tests', 'test_riemann_solver.py'],
                ['gas_dynamics', 'shocktube_setup.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]
@@ -66,11 +73,13 @@ def get_all_examples():
         examples.extend(data)
     return examples
 
+
 def get_input(prompt):
     if sys.version_info[0] > 2:
         return input(prompt)
     else:
         return raw_input(prompt)
+
 
 def get_path(module):
     """Return the path to the module filename given the module.
@@ -78,6 +87,7 @@ def get_path(module):
     x = module[len('pysph.examples.'):].split('.')
     x[-1] = x[-1] + '.py'
     return os.path.join(HERE, *x)
+
 
 def guess_correct_module(example):
     """Given some form of the example name guess and return a reasonable
@@ -106,18 +116,21 @@ def guess_correct_module(example):
         module = example
     return module
 
+
 def cat_example(module):
     filename = get_path(module)
-    print("# File: %s"%filename)
+    print("# File: %s" % filename)
     print(open(filename).read())
+
 
 def list_examples(examples):
     for idx, (module, doc) in enumerate(examples):
-        print("%d. %s"%(idx+1, module[len('pysph.examples.'):]))
-        print("   %s"%doc)
+        print("%d. %s" % (idx+1, module[len('pysph.examples.'):]))
+        print("   %s" % doc)
+
 
 def run_command(module, args):
-    print("Running example %s.\n"%module)
+    print("Running example %s.\n" % module)
     filename = get_path(module)
     if '-h' not in args and '--help' not in args:
         example_info(module, filename)
@@ -130,6 +143,7 @@ def run_command(module, args):
 
     sys.argv = [filename] + args
     _exec_file(filename)
+
 
 def main(argv=None):
     if argv is None:
@@ -179,7 +193,9 @@ def main(argv=None):
             print("Invalid example number, exiting!")
             sys.exit()
 
-        args = str(get_input("Enter additional arguments (leave blank to skip): "))
+        args = str(get_input(
+            "Enter additional arguments (leave blank to skip): "
+        ))
         module, doc = examples[ans-1]
         print("-"*80)
         run_command(module, args.split())

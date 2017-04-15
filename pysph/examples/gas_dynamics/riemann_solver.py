@@ -1,7 +1,7 @@
 """
 Exact solution to Riemann problems.
 """
-import os
+
 import numpy
 from math import sqrt
 
@@ -37,7 +37,7 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
         pressure, velocity, density in the right region
     N : int
         number of points under study
-    
+
     The default arguments mentioned correspond to the Sod shock tube case.
 
     Notes
@@ -64,8 +64,8 @@ def solve(x_min=-0.5, x_max=0.5, x_0=0.0, t=0.1, p_l=1.0, p_r=0.1, rho_l=1.0,
         p_star, u_star = star_pu_newton_raphson(rho_l, u_l, p_l, c_l,
                                                 rho_r, u_r, p_r, c_r)
 
-    print 'p_star=' + str(p_star)
-    print 'u_star=' + str(u_star)
+    print('p_star=' + str(p_star))
+    print('u_star=' + str(u_star))
     x = numpy.linspace(x_min, x_max, N)
     density = []
     pressure = []
