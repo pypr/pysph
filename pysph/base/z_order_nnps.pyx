@@ -403,8 +403,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
                 self.cid_to_idx[pa_index])
 
-        np_cid_to_idx = self.cid_to_idx[pa_index].get()
-
         fill_cids = self.helper.get_kernel("fill_cids")
 
         fill_cids(self.pid_keys[pa_index], self.cids[pa_index],

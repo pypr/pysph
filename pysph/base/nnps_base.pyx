@@ -1325,7 +1325,7 @@ cdef class GPUNNPS(NNPSBase):
             self.ctx = cl.create_some_context()
         else:
             self.ctx = ctx
-        self.queue = cl.CommandQueue(self.ctx)
+        self.queue = cl.CommandQueue(self.ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
 
         # The cache.
         self.use_cache = cache

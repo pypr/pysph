@@ -185,9 +185,9 @@
 </%def>
 
 <%def name="map_dst_to_src_args(data_t)" cached="True">
-    unsigned int* dst_to_src, unsigned int* cids_dst, int* cid_to_idx_dst, unsigned long* keys_dst,
-    unsigned long* keys_src, unsigned int* cids_src, unsigned int num_particles_src,
-    int* max_cid_src
+    unsigned int* dst_to_src, unsigned int* cids_dst, int* cid_to_idx_dst,
+    unsigned long* keys_dst, unsigned long* keys_src, unsigned int* cids_src,
+    unsigned int num_particles_src, int* max_cid_src
 </%def>
 
 <%def name="map_dst_to_src_src(data_t)" cached="True">

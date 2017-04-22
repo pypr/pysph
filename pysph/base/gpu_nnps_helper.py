@@ -11,7 +11,8 @@ class GPUNNPSHelper(object):
                     tpl_filename), disable_unicode=True)
 
         self.data_t = "double" if use_double else "float"
-        self.preamble = self.src_tpl.get_def("preamble").render()
+        self.preamble = self.src_tpl.get_def("preamble").render(
+                data_t=self.data_t)
         self.ctx = ctx
 
     def _get_code(self, kernel_name, **kwargs):
