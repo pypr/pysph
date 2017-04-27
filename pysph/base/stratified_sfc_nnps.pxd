@@ -82,13 +82,14 @@ cdef class StratifiedSFCNNPS(NNPS):
 cdef class StratifiedSFCGPUNNPS(GPUNNPS):
     cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
 
-    cdef list pids
-    cdef list pid_keys
-    cdef list start_idx_levels
-    cdef object cell_sizes
-    cdef int max_num_bits
+    cdef public list pids
+    cdef public list pid_keys
+    cdef public list start_idx_levels
+    cdef public list num_particles_levels
+    cdef public int max_num_bits
     cdef int num_levels
     cdef double interval_size
+    cdef double eps
 
     cdef object helper
 

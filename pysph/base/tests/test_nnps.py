@@ -17,6 +17,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
+import cPickle as pickle
 
 class SimpleNNPSTestCase(unittest.TestCase):
     """Simplified NNPS test case
@@ -159,6 +160,9 @@ class NNPSTestCase(unittest.TestCase):
         # the list of particles
         self.particles = [pa1, pa2]
 
+        with open("data", "wb") as f:
+            pickle.dump(self.particles, f)
+
     def _create_random(self, numPoints):
         # average particle spacing and volume in the unit cube
         dx = pow( 1.0/numPoints, 1./3. )
@@ -205,6 +209,7 @@ class NNPSTestCase(unittest.TestCase):
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
             # ensure that the neighbor lists are the same
+
             self._assert_neighbors(nbrs1, nbrs2)
 
 class DictBoxSortNNPSTestCase(NNPSTestCase):
@@ -320,7 +325,16 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            if_double=False
+            use_double=False
+        )
+
+class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Stratified SFC based OpenCL algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.StratifiedSFCGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_double=False, num_levels=2
         )
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
