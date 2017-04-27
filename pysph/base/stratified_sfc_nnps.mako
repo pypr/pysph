@@ -175,8 +175,7 @@
 
     int3 c;
 
-    int idx;
-    uint j;
+    int idx, j, k, m;
     ${data_t} dist;
     ${data_t} h_i = radius_scale2*q.w*q.w;
     ${data_t} h_j;
@@ -188,8 +187,6 @@
     int H, level;
 
     ulong mask;
-    int mask_len, nbr_boxes_length;
-
 </%def>
 
 <%def name="find_nbr_lengths_args(data_t)" cached="True">
@@ -223,32 +220,37 @@
         H = ceil(h_max/cell_size_level);
 
         mask = level << max_num_bits;
-        mask_len = (2*H+1)*(2*H+1)*(2*H+1);
-
-        ulong nbr_boxes[mask_len];
-
-        nbr_boxes_length = neighbor_boxes(c.x, c.y, c.z, nbr_boxes, H);
 
         #pragma unroll
-        for(j=0; j<nbr_boxes_length; j++)
+        for(j=-H; j<H+1; j++)
         {
-            key = mask + nbr_boxes[j];
-            idx = find_idx(keys + start_idx_levels[level],
-                num_particles_levels[level], key);
-            if(idx == -1)
-                continue;
-            idx += start_idx_levels[level];
-            //key = keys[idx];
-
-            while(idx < num_particles && keys[idx] == key)
+            #pragma unroll
+            for(k=-H; k<H+1; k++)
             {
-                pid = pids_src[idx];
-                h_j = radius_scale2*s_h[pid]*s_h[pid];
-                dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
-                        q.z - s_z[pid]);
-                if(dist < h_i || dist < h_j)
-                    nbr_lengths[qid] += 1;
-                idx++;
+                #pragma unroll
+                for(m=-H; m<H+1; m++)
+                {
+                    if(c.x+m < 0 || c.y+k < 0 || c.z+j < 0)
+                        continue;
+                    key = mask + interleave(c.x+m, c.y+k, c.z+j);
+                    idx = find_idx(keys + start_idx_levels[level],
+                        num_particles_levels[level], key);
+                    if(idx == -1)
+                        continue;
+                    idx += start_idx_levels[level];
+                    //key = keys[idx];
+
+                    while(idx < num_particles && keys[idx] == key)
+                    {
+                        pid = pids_src[idx];
+                        h_j = radius_scale2*s_h[pid]*s_h[pid];
+                        dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
+                                q.z - s_z[pid]);
+                        if(dist < h_i || dist < h_j)
+                            nbr_lengths[qid] += 1;
+                        idx++;
+                    }
+                }
             }
         }
     }
@@ -291,39 +293,43 @@
         H = ceil(h_max/cell_size_level);
 
         mask = level << max_num_bits;
-        mask_len = (2*H+1)*(2*H+1)*(2*H+1);
-
-        ulong nbr_boxes[mask_len];
-
-        nbr_boxes_length = neighbor_boxes(c.x, c.y, c.z, nbr_boxes, H);
 
         #pragma unroll
-        for(j=0; j<nbr_boxes_length; j++)
+        for(j=-H; j<H+1; j++)
         {
-            key = mask + nbr_boxes[j];
-            idx = find_idx(keys + start_idx_levels[level],
-                num_particles_levels[level], key);
-            if(idx == -1)
-                continue;
-            idx += start_idx_levels[level];
-            //key = keys[idx];
-
-            while(idx < num_particles && keys[idx] == key)
+            #pragma unroll
+            for(k=-H; k<H+1; k++)
             {
-                pid = pids_src[idx];
-                h_j = radius_scale2*s_h[pid]*s_h[pid];
-                dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
-                        q.z - s_z[pid]);
-                if(dist < h_i || dist < h_j)
+                #pragma unroll
+                for(m=-H; m<H+1; m++)
                 {
-                    nbrs[start_idx + curr_idx] = pid;
-                    curr_idx++;
+                    if(c.x+m < 0 || c.y+k < 0 || c.z+j < 0)
+                        continue;
+                    key = mask + interleave(c.x+m, c.y+k, c.z+j);
+                    idx = find_idx(keys + start_idx_levels[level],
+                        num_particles_levels[level], key);
+                    if(idx == -1)
+                        continue;
+                    idx += start_idx_levels[level];
+                    //key = keys[idx];
+
+                    while(idx < num_particles && keys[idx] == key)
+                    {
+                        pid = pids_src[idx];
+                        h_j = radius_scale2*s_h[pid]*s_h[pid];
+                        dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
+                                q.z - s_z[pid]);
+                        if(dist < h_i || dist < h_j)
+                        {
+                            nbrs[start_idx + curr_idx] = pid;
+                            curr_idx++;
+                        }
+                        idx++;
+                    }
                 }
-                idx++;
             }
         }
     }
-
 
 </%def>
 
