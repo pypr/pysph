@@ -24,7 +24,7 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
-DEF EPS = 1e-6
+DEF EPS = 1e-13
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:

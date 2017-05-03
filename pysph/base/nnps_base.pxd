@@ -390,7 +390,6 @@ cdef class GPUNeighborCache:
     cdef void copy_to_cpu(self)
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs)
     cdef void get_neighbors_raw_gpu(self)
-    #cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs)
     cpdef update(self)
 
     cdef void _find_neighbors(self)
