@@ -79,30 +79,4 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices)
 
-cdef class StratifiedSFCGPUNNPS(GPUNNPS):
-    cdef NNPSParticleArrayWrapper src, dst # Current source and destination.
-
-    cdef public list pids
-    cdef public list pid_keys
-    cdef public list start_idx_levels
-    cdef public list num_particles_levels
-    cdef public int max_num_bits
-    cdef int num_levels
-    cdef double interval_size
-    cdef double eps
-
-    cdef object helper
-
-    cdef public bint use_double
-    cdef bint _sorted
-
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
-
-    cpdef _bin(self, int pa_index)
-
-    cpdef _refresh(self)
-
-    cdef void find_neighbor_lengths(self, nbr_lengths)
-
-    cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
 
