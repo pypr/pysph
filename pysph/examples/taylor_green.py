@@ -191,7 +191,7 @@ class TaylorGreen(Application):
     def _get_post_process_props(self, array):
         """Return x, y, m, u, v, p.
         """
-        if 'pavg' not in array.properties and \
+        if 'pavg' not in array.properties or \
            'pavg' not in array.output_property_arrays:
             self._add_extra_props(array)
             sph_eval = self._get_sph_evaluator(array)
@@ -206,7 +206,7 @@ class TaylorGreen(Application):
     def _add_extra_props(self, array):
         extra = ['pavg', 'nnbr']
         for prop in extra:
-            if not prop in array.properties:
+            if prop not in array.properties:
                 array.add_property(prop)
         array.add_output_arrays(extra)
 

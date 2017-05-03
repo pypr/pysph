@@ -202,9 +202,9 @@ def add_bool_argument(group, arg, dest, help, default):
 
 class WCSPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, rho0, c0, h0, hdx, gamma=7.0,
-                  gx=0.0, gy=0.0, gz=0.0, alpha=0.1, beta=0.0, delta=0.1,
-                  nu=0.0, tensile_correction=False, hg_correction=False,
-                  update_h=False, delta_sph=False):
+                 gx=0.0, gy=0.0, gz=0.0, alpha=0.1, beta=0.0, delta=0.1,
+                 nu=0.0, tensile_correction=False, hg_correction=False,
+                 update_h=False, delta_sph=False, summation_density=False):
         """
         Parameters
         ----------
@@ -243,6 +243,8 @@ class WCSPHScheme(Scheme):
             Update the smoothing length as per Ferrari et al.
         delta_sph: bool
             Use the delta-SPH correction terms.
+        summation_density: bool
+            Use summation density instead of continuity.
 
         References
         ----------
@@ -280,6 +282,7 @@ class WCSPHScheme(Scheme):
         self.hg_correction = hg_correction
         self.update_h = update_h
         self.delta_sph = delta_sph
+        self.summation_density = summation_density
 
     def add_user_options(self, group):
         group.add_argument(
@@ -322,10 +325,16 @@ class WCSPHScheme(Scheme):
             help="Use the delta-SPH correction terms.",
             default=self.delta_sph
         )
+        add_bool_argument(
+            group, "summation-density", dest="summation_density",
+            help="Use summation density instead of continuity.",
+            default=self.summation_density
+        )
 
     def consume_user_options(self, options):
         vars = ['gamma', 'tensile_correction', 'hg_correction',
-                'update_h', 'delta_sph', 'alpha', 'beta']
+                'update_h', 'delta_sph', 'alpha', 'beta',
+                'summation_density']
         data = dict((var, getattr(options, var)) for var in vars)
         self.configure(**data)
 
@@ -366,13 +375,20 @@ class WCSPHScheme(Scheme):
              TaitEOSHGCorrection, UpdateSmoothingLengthFerrari)
         from pysph.sph.wc.basic import (ContinuityEquationDeltaSPH,
                                         MomentumEquationDeltaSPH)
-        from pysph.sph.basic_equations import (ContinuityEquation,
-             XSPHCorrection)
+        from pysph.sph.basic_equations import \
+            (ContinuityEquation, SummationDensity, XSPHCorrection)
         from pysph.sph.wc.viscosity import LaminarViscosity
 
         equations = []
         g1 = []
         all = self.fluids + self.solids
+
+        if self.summation_density:
+            g0 = []
+            for name in self.fluids:
+                g0.append(SummationDensity(dest=name, sources=all))
+            equations.append(Group(equations=g0, real=False))
+
         for name in self.fluids:
             g1.append(TaitEOS(
                 dest=name, sources=None, rho0=self.rho0, c0=self.c0,
@@ -423,15 +439,17 @@ class WCSPHScheme(Scheme):
 
                 g2.append(XSPHCorrection(dest=name, sources=[name]))
             else:
+                if not self.summation_density:
+                    g2.append(ContinuityEquation(dest=name, sources=all))
                 g2.extend([
-                    ContinuityEquation(dest=name, sources=all),
                     MomentumEquation(
-                        dest=name, sources=all, alpha=self.alpha, beta=self.beta,
-                        gx=self.gx, gy=self.gy, gz=self.gz, c0=self.c0,
-                        tensile_correction=self.tensile_correction
+                        dest=name, sources=all, alpha=self.alpha,
+                        beta=self.beta, gx=self.gx, gy=self.gy, gz=self.gz,
+                        c0=self.c0, tensile_correction=self.tensile_correction
                     ),
                     XSPHCorrection(dest=name, sources=[name])
                 ])
+
             if abs(self.nu) > 1e-14:
                 eq = LaminarViscosity(
                     dest=name, sources=self.fluids, nu=self.nu
@@ -450,7 +468,7 @@ class WCSPHScheme(Scheme):
         return equations
 
     def setup_properties(self, particles, clean=True):
-        from pysph.base.utils import get_particle_array_wcsph, DEFAULT_PROPS
+        from pysph.base.utils import get_particle_array_wcsph
         dummy = get_particle_array_wcsph(name='junk')
         props = list(dummy.properties.keys())
         output_props = ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
@@ -462,7 +480,7 @@ class WCSPHScheme(Scheme):
 
 class TVFScheme(Scheme):
     def __init__(self, fluids, solids, dim, rho0, c0, nu, p0, pb, h0,
-                  gx=0.0, gy=0.0, gz=0.0, alpha=0.0, tdamp=0.0):
+                 gx=0.0, gy=0.0, gz=0.0, alpha=0.0, tdamp=0.0):
         self.fluids = fluids
         self.solids = solids
         self.solver = None

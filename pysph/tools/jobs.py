@@ -156,8 +156,33 @@ def serve(channel):
 
 
 class Worker(object):
+    def __init__(self):
+        self.jobs = dict()
+        self.running_jobs = set()
+
+    def _check_running_jobs(self):
+        for i in self.running_jobs.copy():
+            self.status(i)
+
     def free_cores(self):
         return free_cores()
+
+    def can_run(self, n_core):
+        """Returns True if the worker can run a job with the required cores.
+        """
+        if n_core == 0:
+            return True
+        free = self.free_cores()
+        result = False
+        if free >= n_core:
+            self._check_running_jobs()
+            jobs = self.jobs
+            n_cores_used = sum(
+                [jobs[i].n_core for i in self.running_jobs]
+            )
+            if (free - n_cores_used) >= n_core:
+                result = True
+        return result
 
     def run(self, job):
         """Runs the job and returns a JobProxy for the job."""
@@ -210,8 +235,8 @@ class JobProxy(object):
 
 class LocalWorker(Worker):
     def __init__(self):
+        super(LocalWorker, self).__init__()
         self.host = 'localhost'
-        self.jobs = dict()
         self.job_count = 0
 
     def get_config(self):
@@ -221,12 +246,17 @@ class LocalWorker(Worker):
         count = self.job_count
         print("Running %s" % job.pretty_command())
         self.jobs[count] = job
+        self.running_jobs.add(count)
         job.run()
         self.job_count += 1
         return JobProxy(self, count, job)
 
     def status(self, job_id):
-        return self.jobs[job_id].status()
+        s = self.jobs[job_id].status()
+        rj = self.running_jobs
+        if s != 'running':
+            rj.discard(job_id)
+        return s
 
     def copy_output(self, job_id, dest):
         return
@@ -244,6 +274,7 @@ class LocalWorker(Worker):
 
 class RemoteWorker(Worker):
     def __init__(self, host, python, chdir=None, testing=False):
+        super(RemoteWorker, self).__init__()
         self.host = host
         self.python = python
         self.chdir = chdir
@@ -262,7 +293,6 @@ class RemoteWorker(Worker):
         self.channel = self.gw.remote_exec(
             "from pysph.tools import jobs; jobs.serve(channel)"
         )
-        self.jobs = dict()
 
     def get_config(self):
         return dict(host=self.host, python=self.python, chdir=self.chdir)
@@ -279,10 +309,15 @@ class RemoteWorker(Worker):
         print("Running %s" % job.pretty_command())
         job_id = self._call_remote('run', job.to_dict())
         self.jobs[job_id] = job
+        self.running_jobs.add(job_id)
         return JobProxy(self, job_id, job)
 
     def status(self, job_id):
-        return self._call_remote('status', job_id)
+        s = self._call_remote('status', job_id)
+        rj = self.running_jobs
+        if s != 'running':
+            rj.discard(job_id)
+        return s
 
     def copy_output(self, job_id, dest):
         job = self.jobs[job_id]
@@ -364,7 +399,7 @@ class Scheduler(object):
             if n_running > len(active_workers):
                 for w in self.workers:
                     if (w.host not in active_workers) and \
-                       (w.free_cores() >= n_core):
+                       w.can_run(n_core):
                         worker = w
                         break
                 else:
@@ -392,7 +427,7 @@ class Scheduler(object):
         while proxy is None:
             for i in range(len(self.worker_config)):
                 worker = self._get_worker(job.n_core)
-                if worker.free_cores() >= job.n_core:
+                if worker.can_run(job.n_core):
                     if slept:
                         print()
                         slept = False
@@ -404,4 +439,5 @@ class Scheduler(object):
                 time.sleep(wait)
                 slept = True
                 print("\rWaiting for free worker ...", end='')
+                sys.stdout.flush()
         return proxy

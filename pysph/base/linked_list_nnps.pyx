@@ -307,6 +307,10 @@ cdef class LinkedListNNPS(NNPS):
             raise RuntimeError(msg)
             return -1
 
+        ncx = 1 if ncx == 0 else ncx
+        ncy = 1 if ncy == 0 else ncy
+        ncz = 1 if ncz == 0 else ncz
+
         # number of cells along each coordinate direction
         self.ncells_per_dim.data[0] = ncx
         self.ncells_per_dim.data[1] = ncy
@@ -373,5 +377,3 @@ cdef class LinkedListNNPS(NNPS):
 
             for j in range(np):
                 next.data[j] = UINT_MAX
-
-

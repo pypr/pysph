@@ -16,12 +16,22 @@ except ImportError:
     raise unittest.SkipTest('test_jobs requires psutil')
 
 
+def safe_rmtree(*args, **kw):
+    if sys.platform.startswith('win'):
+        try:
+            shutil.rmtree(*args, **kw)
+        except WindowsError:
+            pass
+    else:
+        shutil.rmtree(*args, **kw)
+
+
 class TestJob(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
 
     def tearDown(self):
-        shutil.rmtree(self.root)
+        safe_rmtree(self.root)
 
     def test_job_can_handle_string_command(self):
         # Given
@@ -145,7 +155,7 @@ class TestLocalWorker(unittest.TestCase):
         self.root = tempfile.mkdtemp()
 
     def tearDown(self):
-        shutil.rmtree(self.root)
+        safe_rmtree(self.root)
 
     def test_scheduler_works_with_local_worker(self):
         # Given
@@ -159,7 +169,7 @@ class TestLocalWorker(unittest.TestCase):
         proxy = s.submit(j)
 
         # Then
-        wait_until(lambda: proxy.status() != 'done')
+        wait_until(lambda: proxy.status() != 'done', timeout=2)
         self.assertEqual(proxy.status(), 'done')
         self.assertEqual(proxy.get_stderr(), '')
         self.assertEqual(proxy.get_stdout().strip(), '1')
@@ -174,7 +184,7 @@ class TestRemoteWorker(unittest.TestCase):
             raise unittest.SkipTest('This test requires execnet')
 
     def tearDown(self):
-        shutil.rmtree(self.root)
+        safe_rmtree(self.root)
 
     def test_free_cores(self):
         # Given
@@ -216,13 +226,15 @@ class TestScheduler(unittest.TestCase):
             raise unittest.SkipTest('This test requires execnet')
 
     def tearDown(self):
-        shutil.rmtree(self.root)
+        safe_rmtree(self.root)
 
-    def _make_dummy_job(self):
+    def _make_dummy_job(self, n_core=1, sleep=0.05):
         output = os.path.join(self.root, 'job%d' % self.count)
         job = jobs.Job(
-            [sys.executable, '-c', 'import time; time.sleep(0.05); print(1)'],
-            output_dir=output
+            [sys.executable, '-c',
+             'import time; time.sleep(%f); print(1)' % sleep],
+            output_dir=output,
+            n_core=n_core
         )
         self.count += 1
         return job
@@ -277,10 +289,7 @@ class TestScheduler(unittest.TestCase):
 
         # Wait for this job to end and then see what happens
         # When a new job is submitted.
-        count = 0
-        while proxy.status() != 'done' and count < 10:
-            time.sleep(0.1)
-            count += 1
+        self._wait_while_not_done(proxy, 15)
 
         # When
         j = self._make_dummy_job()
@@ -309,11 +318,47 @@ class TestScheduler(unittest.TestCase):
 
         # Then
         self.assertEqual(len(s.workers), 2)
-        count = 0
-        while proxy1.status() != 'done' and count < 10:
-            time.sleep(0.1)
-            count += 1
+        self._wait_while_not_done(proxy1, 15)
 
         self.assertEqual(proxy.status(), 'done')
         self.assertEqual(proxy.worker.host, 'host1')
         self.assertEqual(proxy1.worker.host, 'host2')
+
+    def test_scheduler_should_not_overload_worker(self):
+        # Given
+        n_core = jobs.free_cores()
+        config = [dict(host='localhost')]
+        s = jobs.Scheduler(worker_config=config)
+
+        j1 = self._make_dummy_job(n_core, sleep=0.5)
+        j2 = self._make_dummy_job(n_core, sleep=0.5)
+        j3 = self._make_dummy_job(n_core, sleep=0.5)
+        j4 = self._make_dummy_job(0, sleep=0.5)
+
+        # When
+        proxy1 = s.submit(j1, wait=0.5)
+        proxy2 = s.submit(j2, wait=0.5)
+        proxy3 = s.submit(j3, wait=0.5)
+        proxy4 = s.submit(j4, wait=0.5)
+
+        # Then
+        self.assertEqual(len(s.workers), 1)
+        # Basically, submit will wait for the existing jobs to complete.
+        # Therefore when s.submit(j3) is called it should wait until a
+        # free worker is available.
+        self.assertEqual(proxy1.status(), 'done')
+        self.assertEqual(proxy2.status(), 'done')
+        self.assertEqual(proxy3.status(), 'running')
+
+        # Proxy4 will be running since it needs no cores.
+        self.assertEqual(proxy4.status(), 'running')
+        self._wait_while_not_done(proxy3, 20)
+        self.assertEqual(proxy3.status(), 'done')
+        self._wait_while_not_done(proxy4, 15)
+        self.assertEqual(proxy4.status(), 'done')
+
+    def _wait_while_not_done(self, proxy, n_count, sleep=0.1):
+        count = 0
+        while proxy.status() != 'done' and count < n_count:
+            time.sleep(sleep)
+            count += 1

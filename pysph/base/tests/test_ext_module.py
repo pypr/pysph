@@ -59,7 +59,6 @@ class TestExtModule(TestCase):
 
     def tearDown(self):
         if sys.platform.startswith('win'):
-            from exceptions import WindowsError
             try:
                 shutil.rmtree(self.root)
             except WindowsError:
