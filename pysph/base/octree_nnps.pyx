@@ -9,19 +9,6 @@ from libc.stdlib cimport malloc, free
 cimport cython
 from cython.operator cimport dereference as deref, preincrement as inc
 
-import pyopencl as cl
-import pyopencl.array
-import pyopencl.algorithm
-from pyopencl.scan import GenericScanKernel
-from pyopencl.scan import GenericDebugScanKernel
-from pyopencl.elementwise import ElementwiseKernel
-
-from mako.template import Template
-import os
-
-from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-
-
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
@@ -238,49 +225,5 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
-
-cdef class OctreeGPUNNPS(GPUNNPS):
-    def __init__(self, int dim, list particles, double radius_scale=2.0,
-            int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, bint use_double=True,
-            ctx=None):
-        GPUNNPS.__init__(
-            self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, ctx
-        )
-
-        self.radius_scale2 = radius_scale*radius_scale
-        self.use_double = use_double
-
-        self.helper = GPUNNPSHelper(self.ctx, "octree_nnps.mako", use_double)
-
-        self.src_index = -1
-        self.dst_index = -1
-        self.sort_gids = sort_gids
-        self.domain.update()
-        self.update()
-
-    cpdef _refresh(self):
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef int i, num_particles
-        self.pids = []
-        self.pid_keys = []
-        self.cid_to_idx = [None for i in range(self.narrays)]
-        self._sorted = False
-
-        for i from 0<=i<self.narrays:
-            pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
-
-            if self.use_double:
-                pa_wrapper.copy_to_gpu(self.queue, np.float64)
-            else:
-                pa_wrapper.copy_to_gpu(self.queue, np.float32)
-
-            num_particles = pa_wrapper.get_number_of_particles()
-
-            self.pids.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint32))
-            self.pid_keys.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint64))
 
 

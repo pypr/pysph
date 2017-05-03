@@ -282,6 +282,20 @@ def get_basic_extensions():
         ),
 
         Extension(
+            name="pysph.base.gpu_nnps",
+            sources=["pysph/base/gpu_nnps.pyx"],
+            depends=get_deps(
+                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/particle_array", "pysph/base/nnps_base"
+            ),
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args + openmp_compile_args,
+            extra_link_args=openmp_link_args,
+            cython_compile_time_env={'OPENMP': openmp_env},
+            language="c++"
+        ),
+
+        Extension(
             name="pysph.base.linked_list_nnps",
             sources=["pysph/base/linked_list_nnps.pyx"],
             depends=get_deps(

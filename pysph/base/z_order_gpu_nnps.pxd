@@ -2,7 +2,7 @@
 from libcpp.map cimport map
 from libcpp.pair cimport pair
 
-from nnps_base cimport *
+from pysph.base.gpu_nnps cimport *
 
 ctypedef unsigned int u_int
 ctypedef map[u_int, pair[u_int, u_int]] key_to_idx_t

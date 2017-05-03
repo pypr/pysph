@@ -8,7 +8,6 @@ from libcpp.pair cimport pair
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
-from nnps_base cimport *
 from gpu_nnps_helper import GPUNNPSHelper
 
 import pyopencl as cl
@@ -78,9 +77,9 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
 
             if self.use_double:
-                pa_wrapper.copy_to_gpu(self.queue, np.float64)
+                copy_to_gpu(pa_wrapper, self.queue, np.float64)
             else:
-                pa_wrapper.copy_to_gpu(self.queue, np.float32)
+                copy_to_gpu(pa_wrapper, self.queue, np.float32)
 
             num_particles = pa_wrapper.get_number_of_particles()
 
