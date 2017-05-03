@@ -371,8 +371,6 @@ cdef class GPUNeighborCache:
 
     cdef bint _cached
     cdef bint _copied_to_cpu
-    #cdef void **_neighbors
-    #cdef list _neighbor_arrays
     cdef GPUNNPS _nnps
 
     cdef object _neighbors_gpu
