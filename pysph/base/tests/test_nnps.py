@@ -17,7 +17,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
-import cPickle as pickle
+from nose.plugins.skip import SkipTest
 
 class SimpleNNPSTestCase(unittest.TestCase):
     """Simplified NNPS test case
@@ -159,9 +159,6 @@ class NNPSTestCase(unittest.TestCase):
 
         # the list of particles
         self.particles = [pa1, pa2]
-
-        with open("data", "wb") as f:
-            pickle.dump(self.particles, f)
 
     def _create_random(self, numPoints):
         # average particle spacing and volume in the unit cube
@@ -323,19 +320,34 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.ZOrderGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0,
-            use_double=False
-        )
+        try:
+            import pyopencl as cl
+            ctx = cl.create_some_context(interactive=False)
+
+            self.nps = nnps.ZOrderGPUNNPS(
+                dim=3, particles=self.particles, radius_scale=2.0,
+                use_double=False, ctx=ctx
+            )
+        except ImportError:
+            msg = "pyopencl is not present"
+            raise SkipTest(msg)
+
 
 class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC based OpenCL algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        self.nps = nnps.StratifiedSFCGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0,
-            use_double=False, num_levels=2
-        )
+        try:
+            import pyopencl as cl
+            ctx = cl.create_some_context(interactive=False)
+
+            self.nps = nnps.StratifiedSFCGPUNNPS(
+                dim=3, particles=self.particles, radius_scale=2.0,
+                use_double=False, num_levels=2, ctx=ctx
+            )
+        except ImportError:
+            msg = "pyopencl is not present"
+            raise SkipTest(msg)
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Compressed Octree based algorithm"""

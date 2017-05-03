@@ -63,10 +63,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef list pids
     cdef list pid_keys
     cdef list cids
-    cdef public list cid_to_idx
-    cdef public list max_cid
-    cdef public object dst_to_src
-    cdef public object overflow_cid_to_idx
+    cdef list cid_to_idx
+    cdef list max_cid
+    cdef object dst_to_src
+    cdef object overflow_cid_to_idx
 
     cdef object helper
 
