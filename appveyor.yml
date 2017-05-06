@@ -28,4 +28,4 @@ install:
 
 test_script:
   # Run the tests.
-  - python -m nose.core -v -A slow --with-xunit --xunit-file=nosetests.xml
+  - python -m pytest -v -m "not slow" --junit-xml=pytest.xml

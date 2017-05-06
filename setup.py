@@ -612,7 +612,8 @@ def setup_package():
           url='http://pysph.bitbucket.org',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          test_suite="nose.collector",
+          setup_requires=['pytest-runner'],
+          tests_require=['pytest'],
           packages=find_packages(),
           package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',
