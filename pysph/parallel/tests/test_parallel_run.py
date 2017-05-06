@@ -6,12 +6,13 @@ This is done till better strategy for parallel testing is implemented
 
 """
 
-from pytest import mark
+from pytest import mark, importorskip
 
 from pysph.tools import run_parallel_script
 from pysph.parallel.tests.example_test_case import ExampleTestCase, get_example_script
 
-run_parallel_script.skip_if_no_mpi4py()
+importorskip("mpi4py.MPI")
+importorskip("pyzoltan.core.zoltan")
 
 
 class ParallelTests(ExampleTestCase):

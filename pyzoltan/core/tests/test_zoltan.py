@@ -1,16 +1,12 @@
 """Running script for Zoltan"""
 
 import unittest
-from pytest import mark
-from nose.plugins.skip import SkipTest
+from pytest import mark, importorskip
 
 from pysph.tools import run_parallel_script
 
-run_parallel_script.skip_if_no_mpi4py()
-try:
-    from pyzoltan.core import zoltan
-except ImportError:
-    raise SkipTest('Build does not support Zoltan.')
+importorskip("mpi4py.MPI")
+importorskip("pyzoltan.core.zoltan")
 
 path = run_parallel_script.get_directory(__file__)
 

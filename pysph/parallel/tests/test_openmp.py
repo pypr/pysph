@@ -6,16 +6,14 @@ This is done till better strategy for parallel testing is implemented
 
 """
 
-from pytest import mark
+from pytest import mark, skip
 from .example_test_case import ExampleTestCase, get_example_script
 
 def skip_if_no_openmp():
     from pysph.base.nnps import get_number_of_threads
-    from nose.plugins.skip import SkipTest
     n_threads = get_number_of_threads()
     if n_threads == 1:
-        reason = "N_threads=1; OpenMP does not seem available."
-        raise SkipTest(reason)
+        skip("N_threads=1; OpenMP does not seem available.")
     else:
         print("Running OpenMP tests with %s threads"%n_threads)
 

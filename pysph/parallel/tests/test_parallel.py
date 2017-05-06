@@ -5,10 +5,11 @@ import os
 import shutil
 import tempfile
 import unittest
-from pytest import mark
+from pytest import mark, importorskip
 from pysph.tools import run_parallel_script
 
-run_parallel_script.skip_if_no_mpi4py()
+importorskip("mpi4py.MPI")
+importorskip("pyzoltan.core.zoltan")
 path = run_parallel_script.get_directory(__file__)
 
 
