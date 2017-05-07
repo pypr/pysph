@@ -1,33 +1,10 @@
-"""Demonstrate the inlet and outlet feature in 2D. (1 second)
-
-We first create three particle arrays, an "inlet", "fluid" and "outlet" in the
-`create_particle` method. Initially there are no fluid and outlet particles.
-A single row of inlet particles are created between (0.0, 0.0) to (0.0, 1.0),
-i.e. along the y-axis with a u velocity = 0.25.
-
-The inlet and outlet are created in the `create_inlet_outlet` method.  This
-method is passed a dictionary of `{array_name:particle_array}`. An inlet
-between (-0.5, 0.0) and (0.0, 1.0) is created by instantiating a
-`SimpleInlet`.  The inlet first makes 4 copies of the inlet particle array
-data and stacks them along the negative x-axis.  The `InletOutletStep` is used
-to step all particles and simply moves the particles.  As particles leave the
-inlet they are converted to fluid particles.  It is important to note that the
-inlet must be defined such that the spacing times the total number of stacks
-of particles is equal to the length of the domain in the stacked direction.
-For example, if particles are stacked along the 'x' axis and n=5 with spacing
-0.1, then xmax - xmin should be 0.5.
-
-An outlet is also created in the region (0.5, 0.0), (1.0, 1.0) and as fluid
-particles enter the outlet region, they are converted to outlet particles.  As
-outlet particles leave the outlet they are removed from the simulation.
-
-The following figure should make this clear.
+"""Demonstrate the windtunnel simulation using inlet and outlet feature in 2D
 
                inlet       fluid       outlet
               ---------    --------    --------
              | * * * x |  |        |  |        |
      u       | * * * x |  |        |  |        |
-    --->     | * * * x |  |        |  |        |
+    --->     | * * * x |  | airfoil|  |        |
              | * * * x |  |        |  |        |
               --------     --------    --------
 
@@ -46,20 +23,96 @@ This example can be run in parallel.
 import numpy as np
 
 from pysph.base.kernels import CubicSpline
-from pysph.sph.equation import Group
 from pysph.base.utils import get_particle_array_wcsph
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import PECIntegrator
 from pysph.sph.simple_inlet_outlet import SimpleInlet, SimpleOutlet
+from pysph.sph.integrator_step import InletOutletStep, TransportVelocityStep
 from pysph.sph.integrator_step import InletOutletStep, WCSPHStep
 
+from pysph.sph.scheme import TVFScheme
 from pysph.sph.scheme import WCSPHScheme
 
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation
-from pysph.sph.basic_equations import ContinuityEquation, XSPHCorrection
+from pysph.tools.geometry import get_2d_wall, get_2d_block
+from pysph.tools.geometry import get_5digit_naca_airfoil
+from pysph.tools.geometry import get_4digit_naca_airfoil
+from pysph.tools.geometry import remove_overlap_particles
 
-from geometry import windtunnel_airfoil_model
+
+def windtunnel_airfoil_model(dx_wall=0.01, dx_airfoil=0.01, dx_fluid=0.01,
+                             r_solid=100.0, r_fluid=100.0, airfoil='2412',
+                             hdx=1.1, chord=1.0, h_tunnel=1.0, l_tunnel=10.0):
+    """
+    Generates a geometry which can be used for wind tunnel like simulations.
+
+    Parameters
+    ----------
+    dx_wall : a number which is the dx of the wind tunnel wall
+    dx_airfoil : a number which is the dx of the airfoil used
+    dx_fluid : a number which is the dx of the fluid used
+    r_solid : a number which is the initial density of the solid particles
+    r_fluid : a number which is the initial density of the fluid particles
+    airfoil : 4 or 5 digit string which is the airfoil name
+    hdx : a number which is the hdx for the particle arrays
+    chord : a number which is the chord of the airfoil
+    h_tunnel : a number which is the height of the wind tunnel
+    l_tunnel : a number which is the length of the wind tunnel
+
+    Returns
+    -------
+    wall : pysph wcsph particle array for the wind tunnel walls
+    wing : pysph wcsph particle array for the airfoil
+    fluid : pysph wcsph particle array for the fluid
+    """
+
+    wall_center_1 = np.array([0.0, h_tunnel / 2.])
+    wall_center_2 = np.array([0.0, -h_tunnel / 2.])
+    x_wall_1, y_wall_1 = get_2d_wall(dx_wall, wall_center_1, l_tunnel)
+    x_wall_2, y_wall_2 = get_2d_wall(dx_wall, wall_center_2, l_tunnel)
+    x_wall = np.concatenate([x_wall_1, x_wall_2])
+    y_wall = np.concatenate([y_wall_1, y_wall_2])
+    y_wall_1 = y_wall_1 + dx_wall
+    y_wall_2 = y_wall_2 - dx_wall
+    y_wall = np.concatenate([y_wall, y_wall_1, y_wall_2])
+    y_wall_1 = y_wall_1 + dx_wall
+    y_wall_2 = y_wall_2 - dx_wall
+    y_wall = np.concatenate([y_wall, y_wall_1, y_wall_2])
+    y_wall_1 = y_wall_1 + dx_wall
+    y_wall_2 = y_wall_2 - dx_wall
+    x_wall = np.concatenate([x_wall, x_wall, x_wall, x_wall])
+    y_wall = np.concatenate([y_wall, y_wall_1, y_wall_2])
+    h_wall = np.ones_like(x_wall) * dx_wall * hdx
+    rho_wall = np.ones_like(x_wall) * r_solid
+    mass_wall = rho_wall * dx_wall * dx_wall
+    wall = get_particle_array_wcsph(name='wall', x=x_wall, y=y_wall, h=h_wall,
+                                    rho=rho_wall, m=mass_wall)
+    if len(airfoil) == 4:
+        x_airfoil, y_airfoil = get_4digit_naca_airfoil(
+            dx_airfoil, airfoil, chord)
+    else:
+        x_airfoil, y_airfoil = get_5digit_naca_airfoil(
+            dx_airfoil, airfoil, chord)
+    x_airfoil = x_airfoil - 0.5
+    h_airfoil = np.ones_like(x_airfoil) * dx_airfoil * hdx
+    rho_airfoil = np.ones_like(x_airfoil) * r_solid
+    mass_airfoil = rho_airfoil * dx_airfoil * dx_airfoil
+    wing = get_particle_array_wcsph(name='wing', x=x_airfoil, y=y_airfoil,
+                                    h=h_airfoil, rho=rho_airfoil,
+                                    m=mass_airfoil)
+    x_fluid, y_fluid = get_2d_block(dx_fluid, 1.6, h_tunnel)
+    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
+    temp_array = get_particle_array_wcsph(x=x_fluid, y=y_fluid, h=h_fluid)
+    temp_array_2 = remove_overlap_particles(temp_array, wall, dx_wall, 2)
+    temp_array_3 = remove_overlap_particles(temp_array_2, wing, dx_airfoil, 2)
+    x_fluid = temp_array_3.x
+    y_fluid = temp_array_3.y
+    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
+    rho_fluid = np.ones_like(x_fluid) * r_fluid
+    mass_fluid = rho_fluid * dx_fluid * dx_fluid
+    fluid = get_particle_array_wcsph(name='fluid', x=x_fluid, y=y_fluid,
+                                     h=h_fluid, rho=rho_fluid, m=mass_fluid)
+    return wall, wing, fluid
 
 
 class WindTunnel(Application):
@@ -72,26 +125,19 @@ class WindTunnel(Application):
                            help="Speed of inlet particles.")
 
     def create_particles(self):
-        # Note that you need to create the inlet and outlet arrays in this
-        # method.
-
-        # Initially fluid has no particles -- these are generated by the inlet.
-        fluid = get_particle_array_wcsph(name='fluid')
-        wall, wing, fluid_2 = windtunnel_airfoil_model(dx_wall=0.005, 
-        											   dx_airfoil=0.005)
+        dx_airfoil = 0.002
+        dx_wall = 0.002
+        wall, wing, fluid = windtunnel_airfoil_model(
+            dx_wall=dx_wall, dx_airfoil=dx_airfoil)
         outlet = get_particle_array_wcsph(name='outlet')
 
-        # Setup the inlet particle array with just the particles we need at the
-        # exit plane which is replicated by the inlet.
         dx = 0.01
         y = np.linspace(-0.49, 0.49, 99)
-        x = np.zeros_like(y) - 0.8
+        x = np.zeros_like(y) - 0.81
         rho = np.ones_like(x) * 100.0
         m = rho * dx * dx
         h = np.ones_like(x) * dx * 1.1
 
-        # Remember to set u otherwise the inlet particles won't move.  Here we
-        # use the options which may be set by the user from the command line.
         u = np.ones_like(x) * self.options.speed
 
         inlet = get_particle_array_wcsph(name='inlet', x=x, y=y, m=m, h=h,
@@ -100,58 +146,22 @@ class WindTunnel(Application):
         return [inlet, fluid, wing, outlet, wall]
 
     def create_inlet_outlet(self, particle_arrays):
-        # particle_arrays is a dict {name: particle_array}
         fluid_pa = particle_arrays['fluid']
         inlet_pa = particle_arrays['inlet']
         outlet_pa = particle_arrays['outlet']
 
-        # Create the inlet and outlets as described in the documentation.
         inlet = SimpleInlet(
-            inlet_pa, fluid_pa, spacing=0.01, n=20, axis='x', xmin=-1.00, xmax=-0.80,
-            ymin=-0.49, ymax=0.49
+            inlet_pa, fluid_pa, spacing=0.01, n=19, axis='x', xmin=-1.00,
+            xmax=-0.81, ymin=-0.49, ymax=0.49
         )
         outlet = SimpleOutlet(
-            outlet_pa, fluid_pa, xmin=3.0, xmax=4.0, ymin=-0.49, ymax=0.49
+            outlet_pa, fluid_pa, xmin=3.0, xmax=4.0, ymin=-0.5, ymax=0.5
         )
         return [inlet, outlet]
 
     def create_scheme(self):
-        # eqns = [
-        #     Group(
-        #         equations=[
-        #         TaitEOS(dest='fluid', sources=None, rho0=100.0, 
-        #                 c0=10.0, gamma=7.0),
-        #         TaitEOS(dest='inlet', sources=None, rho0=100.0,
-        #                 c0=10.0, gamma=7.0),
-        #         TaitEOS(dest='outlet', sources=None, rho0=100.0,
-        #                 c0=10.0, gamma=7.0),
-        #         TaitEOSHGCorrection(dest='wing', sources=None, rho0=100.0,
-        #                 c0=10.0, gamma=7.0)
-        #         ], real=False),
-        #     Group(
-        #         equations=[
-        #         ContinuityEquation(dest='wing', sources=['fluid', \
-        #                                                  'inlet', 'outlet']),
-        #         ContinuityEquation(dest='fluid', sources=['fluid', 'inlet', \
-        #                                                   'outlet', 'wing']),
-        #         MomentumEquation(dest='fluid', c0=10.0, sources=['fluid', \
-        #                          'inlet', 'outlet', 'wing'], alpha=0.1, beta=0.),
-        #         XSPHCorrection(dest='fluid', sources=['fluid']),
-        #         ContinuityEquation(dest='inlet', sources=['fluid', 'inlet', \
-        #                                                   'outlet', 'wing']),
-        #         # MomentumEquation(dest='inlet', c0=10.0, sources=['fluid', \
-        #         #                  'inlet', 'outlet', 'wing'], alpha=0.1, beta=0.),
-        #         # XSPHCorrection(dest='inlet', sources=['inlet']),
-        #         ContinuityEquation(dest='outlet', sources=['fluid', 'inlet', \
-        #                                                    'outlet', 'wing']),
-        #         # MomentumEquation(dest='outlet', c0=10.0, sources=['fluid', \
-        #         #                  'inlet', 'outlet', 'wing'], alpha=0.1, beta=0.),
-        #         # XSPHCorrection(dest='outlet', sources=['outlet'])
-        #         ])
-        # ]
-        # return eqns
         s = WCSPHScheme(['fluid', 'inlet', 'outlet'], ['wing', 'wall'],
-                        dim=2, rho0=100.0, c0=10.0, h0=0.0011, hdx=1.1,
+                        dim=2, rho0=100.0, c0=10.0, h0=0.011, hdx=1.1,
                         hg_correction=True)
         return s
 
@@ -162,7 +172,7 @@ class WindTunnel(Application):
             outlet=InletOutletStep()
         )
 
-        dt = 1.0e-4
+        dt = 0.00005
         tf = 20.0
 
         solver = Solver(
