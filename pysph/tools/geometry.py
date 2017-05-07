@@ -15,7 +15,7 @@ def distance_2d(point1, point2=np.array([0.0, 0.0])):
     return np.sqrt(sum((point1 - point2) * (point1 - point2)))
 
 
-def exp(matrix):
+def matrix_exp(matrix):
     """
     Exponential of a matrix.
 
@@ -33,15 +33,16 @@ def exp(matrix):
     Examples
     --------
     >>>A = np.matrix([[1, 2],[2, 3]])
-    >>>exp(A)
+    >>>matrix_exp(A)
     matrix([[19.68002699, 30.56514746],
             [30.56514746, 50.24517445]])
     >>>B = np.matrix([[0, 0],[0, 0]])
-    >>>exp(B)
+    >>>matrix_exp(B)
     matrix([[1., 0.],
             [0., 1.]])
     """
 
+    matrix = np.asmatrix(matrix)
     tol = 1.0e-16
     result = matrix**(0)
     n = 1
@@ -172,7 +173,7 @@ def rotate(x, y, z, axis=np.array([0.0, 0.0, 1.0]), angle=90.0):
     theta = angle * np.pi / 180.0
     unit_vector = np.asarray(axis) / norm(np.asarray(axis))
     matrix = np.cross(np.eye(3), unit_vector * theta)
-    rotation_matrix = exp(np.matrix(matrix))
+    rotation_matrix = matrix_exp(np.matrix(matrix))
     new_points = []
     for xi, yi, zi in zip(np.asarray(x), np.asarray(y), np.asarray(z)):
         point = np.array([xi, yi, zi])
@@ -657,7 +658,6 @@ def get_naca_wing(dx=0.01, airfoil='0012', span=1.0, chord=1.0):
     return extrude(x, y, dx, span)
 
 
-# removes overlapping particles
 def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     """
     This function will take 2 particle arrays as input and will remove all
@@ -696,10 +696,8 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     modified_points = []
     h_new = []
     ll_nnps = LinkedListNNPS(dim, [fluid_parray, solid_parray])
-    # ll_nnps.set_context(1, 0)
     for i in range(len(x)):
         nbrs = UIntArray()
-        # src_index, dst_index, d_idx, nbrs
         ll_nnps.get_nearest_particles(1, 0, i, nbrs)
         point_i = np.array([x[i], y[i], z[i]])
         near_points = nbrs.get_npy_array()
@@ -721,128 +719,10 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     return p_array
 
 
-def windtunnel_airfoil_model(dx_wall=0.01, dx_airfoil=0.01, dx_fluid=0.01,
-                             r_solid=100.0, r_fluid=100.0, airfoil='2412',
-                             hdx=1.1, chord=1.0, h_tunnel=1.0, l_tunnel=10.0):
-    """
-    Generates a geometry which can be used for wind tunnel like simulations.
-
-    Parameters
-    ----------
-    dx_wall : a number which is the dx of the wind tunnel wall
-    dx_airfoil : a number which is the dx of the airfoil used
-    dx_fluid : a number which is the dx of the fluid used
-    r_solid : a number which is the initial density of the solid particles
-    r_fluid : a number which is the initial density of the fluid particles
-    airfoil : 4 or 5 digit string which is the airfoil name
-    hdx : a number which is the hdx for the particle arrays
-    chord : a number which is the chord of the airfoil
-    h_tunnel : a number which is the height of the wind tunnel
-    l_tunnel : a number which is the length of the wind tunnel
-
-    Returns
-    -------
-    wall : pysph wcsph particle array for the wind tunnel walls
-    wing : pysph wcsph particle array for the airfoil
-    fluid : pysph wcsph particle array for the fluid
-    """
-
-    wall_center_1 = np.array([0.0, h_tunnel / 2.])
-    wall_center_2 = np.array([0.0, -h_tunnel / 2.])
-    x_wall_1, y_wall_1 = get_2d_wall(dx_wall, wall_center_1, l_tunnel)
-    x_wall_2, y_wall_2 = get_2d_wall(dx_wall, wall_center_2, l_tunnel)
-    x_wall = np.concatenate([x_wall_1, x_wall_2])
-    y_wall = np.concatenate([y_wall_1, y_wall_2])
-    x_wall_1 = x_wall_1 + dx_wall
-    x_wall_2 = x_wall_2 - dx_wall
-    x_wall = np.concatenate([x_wall, x_wall_1, x_wall_2])
-    y_wall = np.concatenate([y_wall, y_wall])
-    x_wall_1 = x_wall_1 + dx_wall
-    x_wall_2 = x_wall_2 - dx_wall
-    x_wall = np.concatenate([x_wall, x_wall_1, x_wall_2])
-    y_wall = np.concatenate([y_wall, y_wall_1, y_wall_2])
-    h_wall = np.ones_like(x_wall) * dx_wall * hdx
-    rho_wall = np.ones_like(x_wall) * r_solid
-    mass_wall = rho_wall * dx_wall * dx_wall
-    wall = get_particle_array_wcsph(name='wall', x=x_wall, y=y_wall, h=h_wall,
-                                    rho=rho_wall, m=mass_wall)
-    if len(airfoil) == 4:
-        x_airfoil, y_airfoil = get_4digit_naca_airfoil(
-            dx_airfoil, airfoil, chord)
-    else:
-        x_airfoil, y_airfoil = get_5digit_naca_airfoil(
-            dx_airfoil, airfoil, chord)
-    x_airfoil = x_airfoil - 0.5
-    h_airfoil = np.ones_like(x_airfoil) * dx_airfoil * hdx
-    rho_airfoil = np.ones_like(x_airfoil) * r_solid
-    mass_airfoil = rho_airfoil * dx_airfoil * dx_airfoil
-    wing = get_particle_array_wcsph(name='wing', x=x_airfoil, y=y_airfoil,
-                                    h=h_airfoil, rho=rho_airfoil,
-                                    m=mass_airfoil)
-    x_fluid, y_fluid = get_2d_block(dx_fluid, l_tunnel, h_tunnel)
-    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
-    temp_array = get_particle_array_wcsph(x=x_fluid, y=y_fluid, h=h_fluid)
-    temp_array_2 = remove_overlap_particles(temp_array, wall, dx_wall, 2)
-    temp_array_3 = remove_overlap_particles(temp_array_2, wing, dx_airfoil, 2)
-    x_fluid = temp_array_3.x
-    y_fluid = temp_array_3.y
-    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
-    rho_fluid = np.ones_like(x_fluid) * r_fluid
-    mass_fluid = rho_fluid * dx_fluid * dx_fluid
-    fluid = get_particle_array_wcsph(name='fluid', x=x_fluid, y=y_fluid,
-                                     h=h_fluid, rho=rho_fluid, m=mass_fluid)
-    return wall, wing, fluid
-
-
-def washing_machine_model(dx_solid=0.01, dx_fluid=0.01, r_solid=100.0,
-                          r_fluid=100.0, hdx=1.1, h_wm=1.0, r_wm=0.5):
-    """
-    Generates a 3d geometry which can be used to simulate washing machine
-    like simulations.
-
-    Parameters
-    ----------
-    dx_solid : a number which is the dx of the washing machine
-    dx_fluid : a number which is the dx of the fluid used
-    r_solid : a number which is the initial density of the solid particles
-    r_fluid : a number which is the initial density of the fluid particles
-    hdx : a number which is the hdx for the particle arrays
-    h_wm : a number which is the height of the washing machine
-    r_wm : a number which is the radius of the washing machine
-
-    Returns
-    -------
-    wm : pysph wcsph particle array for the washing machine
-    fluid : pysph wcsph particle array for the fluid
-    """
-
-    x_wm, y_wm, z_wm = get_3d_hollow_cylinder(dx_solid, r_wm, h_wm)
-    x_circle, y_circle = get_2d_circle(dx_fluid, r_wm)
-    x_fluid, y_fluid, z_fluid = extrude(x_circle, y_circle, dx_fluid,
-                                        h_wm / 2.0, -h_wm / 4.0)
-    h = np.ones_like(x_wm) * dx_solid * hdx
-    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
-    rho_wm = np.ones_like(x_wm) * r_solid
-    mass_wm = rho_wm * dx_solid * dx_solid * dx_solid
-    wm_array = get_particle_array_wcsph(name='wm', x=x_wm, y=y_wm, z=z_wm,
-                                        h=h, rho=rho_wm, m=mass_wm)
-    fluid_array = get_particle_array_wcsph(x=x_fluid, y=y_fluid, z=z_fluid,
-                                           h=h_fluid)
-    w_x, w_y = get_2d_wall(dx=dx_solid, length=2.0 * r_wm - 6.0 * dx_solid)
-    wall_x, wall_y, wall_z = extrude(w_x, w_y, dx_solid, h_wm / 5, -0.7 * h_wm)
-    rho_wall = np.ones_like(wall_x) * r_solid
-    m_wall = rho_wall * dx_solid * dx_solid * dx_solid
-    wall = get_particle_array_wcsph(name='wall', x=wall_x, y=wall_y, z=wall_z,
-                                    rho=rho_wall, m=m_wall)
-    temp_array = remove_overlap_particles(fluid_array, wm_array, dx_solid, 3)
-    temp_parray = remove_overlap_particles(temp_array, wall, dx_solid, 3)
-    x_fluid = temp_parray.x
-    y_fluid = temp_parray.y
-    z_fluid = temp_parray.z
-    h_fluid = temp_parray.h
-    rho_fluid = np.ones_like(x_fluid) * r_fluid
-    mass_fluid = rho_fluid * dx_fluid * dx_fluid * dx_fluid
-    fluid = get_particle_array_wcsph(name='fluid', x=x_fluid, y=y_fluid,
-                                     z=z_fluid, h=h_fluid, rho=rho_fluid,
-                                     m=mass_fluid)
-    return wm_array, wall, fluid
+def show_2d(x, y):
+	import matplotlib.pyplot as plt
+	plt.figure(figsize=(17.0, 10.0))
+	plt.plot(x, y, 'o')
+	plt.xlabel('X', fontsize=22, fontweight='bold')
+	plt.ylabel('Y', fontsize=22, fontweight='bold')
+	plt.show()
