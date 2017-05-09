@@ -77,7 +77,7 @@ The core dependencies are:
   - NumPy_
   - Cython_ (version 0.20 and above)
   - Mako_
-  - nose_ for running the unit tests.
+  - pytest_ for running the unit tests.
 
 These packages can be installed from your Python distribution's package
 manager, or using pip_ or ``easy_install``.  For more detailed instructions on
@@ -101,7 +101,7 @@ equivalent compiler.  More details are available below.
 
 .. _NumPy: http://numpy.scipy.org
 .. _Cython: http://www.cython.org
-.. _nose: https://pypi.python.org/pypi/nose
+.. _pytest: https://pypi.python.org/pypi/pytest
 .. _Mako: https://pypi.python.org/pypi/Mako
 .. _pip: http://www.pip-installer.org
 
@@ -182,7 +182,7 @@ GNU/Linux is probably the easiest platform to install PySPH. On Ubuntu one may
 install the dependencies using::
 
     $ sudo apt-get install build-essential python-dev python-numpy \
-        python-mako cython python-nose mayavi2 python-qt4 python-virtualenv
+        python-mako cython python-pytest mayavi2 python-qt4 python-virtualenv
 
 OpenMP_ is typically available but if it is not, it can be installed with::
 
@@ -272,7 +272,7 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  $ edm install mayavi pyside cython matplotlib jupyter nose mock pip psutil
+  $ edm install mayavi pyside cython matplotlib jupyter pytest mock pip psutil
   $ edm shell
   $ pip install mako execnet
 
@@ -320,7 +320,7 @@ dependencies are installed. You can create a separate environment as follows::
 
 Now you can install the necessary packages::
 
-    $ conda install -c conda-forge cython mako matplotlib jupyter pyside nose mock
+    $ conda install -c conda-forge cython mako matplotlib jupyter pyside pytest mock
     $ conda install -c menpo mayavi
 
 
@@ -391,7 +391,7 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  > edm install mayavi pyside cython matplotlib jupyter nose mock pip psutil
+  > edm install mayavi pyside cython matplotlib jupyter pytest mock pip psutil
   > edm shell
   > pip install mako execnet
 
@@ -559,7 +559,7 @@ example you can do the following::
 
     $ virtualenv myenv
     $ source myenv/bin/activate
-    (myenv) $ pip install Cython mako nose
+    (myenv) $ pip install Cython mako pytest
     (myenv) $ cd pysph
     (myenv) $ python setup.py install
 
@@ -580,7 +580,7 @@ directory::
 .. note::
 
     With a virtualenv, one should be careful while running things like
-    ``ipython`` or ``nosetests`` as these are sometimes also installed on the
+    ``ipython`` or ``pytest`` as these are sometimes also installed on the
     system in ``/usr/bin``.  If you suspect that you are not running the
     correct Python, you could simply run (on Linux/OS X)::
 
@@ -698,7 +698,7 @@ Once you run the tests, you should see the section on
 
 .. note::
 
-    Internally, we use the ``nosetests`` package to run the tests.
+    Internally, we use the ``pytest`` package to run the tests.
 
 For more information on what you can do with the ``pysph`` script try
 this::
