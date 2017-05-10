@@ -371,6 +371,19 @@ available in :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
 :py:class:`pysph.tools.mayavi_viewer.InterpolatorView` that is used by the
 viewer. The other objects can be used to script the user interface if desired.
 
+Here is an example of scripting the viewer. Let us say we have two particle
+arrays, `'boundary'` and `'fluid'` in that order. Let us say, we wish to make
+the boundary translucent, then we can write the following::
+
+   b = particle_arrays[0]
+   b.plot.actor.property.opacity = 0.2
+
+This does require some knowledge of Mayavi_ and scripting with it. The `plot`
+attribute of the :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper` is
+a `Glyph` instance from Mayavi_. It is useful to use the `record feature
+<http://docs.enthought.com/mayavi/mayavi/mlab_changing_object_looks.html#changing-object-properties-interactively>`_
+of Mayavi to learn more about how best to script the view.
+
 
 Loading output data files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
