@@ -339,6 +339,11 @@ If you have Mayavi_ installed this should show a UI that looks like:
     :width: 800px
     :alt: PySPH viewer
 
+For more help on the viewer, please run::
+
+  $ pysph view -h
+
+
 .. _Mayavi: http://code.enthought.com/projects/mayavi
 .. _mpi4py: http://mpi4py.scipy.org/
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
@@ -360,10 +365,12 @@ interpreter with a few useful objects available.  These are::
     >>> particle_arrays[0].name
     'fluid'
 
-The ``particle_arrays`` object is a list of **ParticleArrays**.  The
+The ``particle_arrays`` object is a list of **ParticleArrayHelpers** which is
+available in :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
 ``interpolator`` is an instance of
-:py:class:`pysph.tools.interpolator.Interpolator` that is used by the viewer.
-The other objects can be used to script the user interface if desired.
+:py:class:`pysph.tools.mayavi_viewer.InterpolatorView` that is used by the
+viewer. The other objects can be used to script the user interface if desired.
+
 
 Loading output data files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
