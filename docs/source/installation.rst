@@ -101,7 +101,7 @@ equivalent compiler.  More details are available below.
 
 .. _NumPy: http://numpy.scipy.org
 .. _Cython: http://www.cython.org
-.. _pytest: https://pypi.python.org/pypi/pytest
+.. _pytest: https://www.pytest.org
 .. _Mako: https://pypi.python.org/pypi/Mako
 .. _pip: http://www.pip-installer.org
 

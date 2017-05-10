@@ -51,4 +51,3 @@ def run(filename, args=None, nprocs=2, timeout=30.0, path=None):
         print('#'*80)
         raise RuntimeError(msg)
     return retcode, out, err
-    
