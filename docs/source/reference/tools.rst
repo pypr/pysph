@@ -41,3 +41,10 @@ GMsh input/output
 .. automodule:: pysph.tools.gmsh
     :members:
     :undoc-members:
+
+Mayavi Viewer
+-------------
+
+.. automodule:: pysph.tools.mayavi_viewer
+   :members:
+   :undoc-members:
