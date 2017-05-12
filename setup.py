@@ -565,7 +565,7 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
-        'nose>=1.0.0', 'execnet', 'psutil',
+        'pytest>=3.0', 'execnet', 'psutil',
     ]
     if sys.version_info[:2] == (2, 6):
         install_requires += [
