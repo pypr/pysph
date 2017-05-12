@@ -8,12 +8,16 @@ import unittest
 from pytest import mark, importorskip
 from pysph.tools import run_parallel_script
 
-importorskip("mpi4py.MPI")
-importorskip("pyzoltan.core.zoltan")
+
 path = run_parallel_script.get_directory(__file__)
 
 
 class ParticleArrayExchangeTestCase(unittest.TestCase):
+
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
 
     @mark.parallel
     def test_lb_exchange(self):
@@ -26,6 +30,11 @@ class ParticleArrayExchangeTestCase(unittest.TestCase):
 
 class SummationDensityTestCase(unittest.TestCase):
 
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
+
     @mark.slow
     @mark.parallel
     def test_summation_density(self):
@@ -34,6 +43,11 @@ class SummationDensityTestCase(unittest.TestCase):
 
 
 class MPIReduceArrayTestCase(unittest.TestCase):
+
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
 
     def setUp(self):
         self.root = tempfile.mkdtemp()
@@ -56,6 +70,11 @@ class MPIReduceArrayTestCase(unittest.TestCase):
 
 
 class DumpLoadTestCase(unittest.TestCase):
+
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
 
     @mark.parallel
     def test_dump_and_load_work_in_parallel(self):

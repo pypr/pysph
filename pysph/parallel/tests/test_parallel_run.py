@@ -11,11 +11,13 @@ from pytest import mark, importorskip
 from pysph.tools import run_parallel_script
 from pysph.parallel.tests.example_test_case import ExampleTestCase, get_example_script
 
-importorskip("mpi4py.MPI")
-importorskip("pyzoltan.core.zoltan")
-
 
 class ParallelTests(ExampleTestCase):
+
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
 
     @mark.slow
     @mark.parallel

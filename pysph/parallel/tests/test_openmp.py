@@ -11,7 +11,7 @@ from .example_test_case import ExampleTestCase, get_example_script
 from pysph.base.nnps import get_number_of_threads
 
 
-@mark.skipif(get_number_of_threads() == 1, reason = "N_threads=1; OpenMP does not seem available.")
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 class TestOpenMPExamples(ExampleTestCase):
 
     @mark.slow
