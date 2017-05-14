@@ -25,10 +25,9 @@ def _has_pysph_dir():
     return exists(init_py) or exists(init_pyc)
 
 def run_tests(args):
-    wd = ['-w', 'docs'] if _has_pysph_dir() else []
-    argv = ['nosetests', 'pysph', 'pyzoltan'] + wd + args
-    from nose.core import main
-    main(argv=argv)
+    argv = ['--pyargs','pysph', 'pyzoltan'] + args
+    from pytest import cmdline
+    cmdline.main(args=argv)
 
 def main():
     parser = ArgumentParser(description=__doc__, add_help=False)

@@ -565,7 +565,7 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
-        'nose>=1.0.0', 'execnet', 'psutil',
+        'pytest>=3.0', 'execnet', 'psutil',
     ]
     if sys.version_info[:2] == (2, 6):
         install_requires += [
@@ -612,7 +612,8 @@ def setup_package():
           url='http://pysph.bitbucket.org',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          test_suite="nose.collector",
+          setup_requires=['pytest-runner'],
+          tests_require=['pytest'],
           packages=find_packages(),
           package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',

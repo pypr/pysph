@@ -4,13 +4,12 @@ import os
 from os.path import join
 from tempfile import mkdtemp
 from pysph import has_h5py
-from nose.plugins.skip import SkipTest
 
 try:
     # This is for Python-2.6.x
-    from unittest2 import TestCase, main
+    from unittest2 import TestCase, main, skipUnless
 except ImportError:
-    from unittest import TestCase, main
+    from unittest import TestCase, main, skipUnless
 
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.solver.utils import dump, load, dump_v1
@@ -120,10 +119,8 @@ class TestOutputNumpy(TestCase):
 
 
 class TestOutputHdf5(TestOutputNumpy):
+    @skipUnless(has_h5py(), "h5py module is not present")
     def setUp(self):
-        if not has_h5py():
-            msg = "h5py module is not present"
-            raise SkipTest(msg)
         super(TestOutputHdf5, self).setUp()
 
     def _get_filename(self, fname):

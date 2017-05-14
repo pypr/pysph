@@ -53,10 +53,10 @@ cleanall : clean
 #	-rm $(patsubst %.pyx,%.c,$(wildcard $(PKG)/*/*.pyx))
 
 test :
-	python `which nosetests` --exe -a '!slow' pysph
+	python `which pytest` -m 'not slow' pysph
 
 testall :
-	python `which nosetests` --exe pysph
+	python `which pytest` pysph
 
 epydoc :
 	python cython-epydoc.py --config epydoc.cfg pysph

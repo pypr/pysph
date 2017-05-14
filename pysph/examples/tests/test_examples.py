@@ -4,7 +4,7 @@ import shutil
 import subprocess
 import sys
 
-from nose.plugins.attrib import attr
+from pytest import mark
 
 from pysph.examples import run
 
@@ -60,7 +60,7 @@ def _has_tvtk():
         return True
 
 
-@attr(slow=True)
+@mark.slow
 def test_example_should_run():
     for module, doc in run.get_all_examples():
         if module == 'pysph.examples.rigid_body.dam_break3D_sph' and \
