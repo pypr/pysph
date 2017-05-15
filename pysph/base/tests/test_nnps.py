@@ -2,7 +2,7 @@
 
 You can run the tests like so:
 
-    $ nosetests -v test_nnps.py
+    $ pytest -v test_nnps.py
 """
 import numpy
 from numpy import random
@@ -17,7 +17,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
-from nose.plugins.skip import SkipTest
+from pytest import importorskip
 
 class SimpleNNPSTestCase(unittest.TestCase):
     """Simplified NNPS test case
@@ -320,38 +320,28 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        try:
-            from pysph.base import gpu_nnps
-            import pyopencl as cl
-            ctx = cl.create_some_context(interactive=False)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
 
-            self.nps = gpu_nnps.ZOrderGPUNNPS(
-                dim=3, particles=self.particles, radius_scale=2.0,
-                use_double=False, ctx=ctx
-            )
-
-        except ImportError:
-            msg = "pyopencl is not present"
-            raise SkipTest(msg)
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_double=False, ctx=ctx
+        )
 
 
 class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC based OpenCL algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
-        try:
-            from pysph.base import gpu_nnps
-            import pyopencl as cl
-            ctx = cl.create_some_context(interactive=False)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
 
-            self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
-                dim=3, particles=self.particles, radius_scale=2.0,
-                use_double=False, num_levels=2, ctx=ctx
-            )
-
-        except ImportError:
-            msg = "pyopencl is not present"
-            raise SkipTest(msg)
+        self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_double=False, num_levels=2, ctx=ctx
+        )
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Compressed Octree based algorithm"""
