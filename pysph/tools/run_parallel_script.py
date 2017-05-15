@@ -5,22 +5,6 @@ import sys
 from threading import Timer
 
 
-def skip_if_no_mpi4py():
-    """To be used with nose.
-    """
-    try:
-        import mpi4py.MPI as mpi
-    except ImportError:
-        from nose.plugins.skip import SkipTest
-        reason = "mpi4py not installed"
-        raise SkipTest(reason)
-
-    try:
-        from pyzoltan.core import zoltan
-    except ImportError:
-        from nose.plugins.skip import SkipTest
-        raise SkipTest('Build does not support Zoltan.')
-
 def get_directory(file):
     return dirname(abspath(file))
 
@@ -67,4 +51,3 @@ def run(filename, args=None, nprocs=2, timeout=30.0, path=None):
         print('#'*80)
         raise RuntimeError(msg)
     return retcode, out, err
-

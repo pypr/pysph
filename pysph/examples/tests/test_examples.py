@@ -4,9 +4,10 @@ import shutil
 import subprocess
 import sys
 
-from nose.plugins.attrib import attr
+from pytest import mark
 
 from pysph.examples import run
+
 
 def check_output(*args, **kw):
     """Simple hack to support Python 2.6 which does not have
@@ -17,6 +18,7 @@ def check_output(*args, **kw):
     else:
         subprocess.check_output(*args, **kw)
 
+
 _orig_ets_toolkit = None
 def setup_module():
     # Set the ETS_TOOLKIT to null to avoid errors when importing TVTK.
@@ -25,12 +27,14 @@ def setup_module():
     _orig_ets_toolkit = os.environ.get(var)
     os.environ[var] = 'null'
 
+
 def teardown_module():
     var = 'ETS_TOOLKIT'
     if _orig_ets_toolkit is None:
         del os.environ[var]
     else:
         os.environ[var] = _orig_ets_toolkit
+
 
 def run_example(module):
     """This simply runs the example to make sure that the example executes
@@ -46,6 +50,7 @@ def run_example(module):
     finally:
         shutil.rmtree(out_dir)
 
+
 def _has_tvtk():
     try:
         from tvtk.api import tvtk
@@ -54,7 +59,8 @@ def _has_tvtk():
     else:
         return True
 
-@attr(slow=True)
+
+@mark.slow
 def test_example_should_run():
     for module, doc in run.get_all_examples():
         if module == 'pysph.examples.rigid_body.dam_break3D_sph' and \

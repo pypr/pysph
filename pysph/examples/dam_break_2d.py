@@ -55,7 +55,8 @@ class DamBreak2D(Application):
             kernel=kernel,
             integrator_cls=EPECIntegrator,
             tf=tf,
-            adaptive_timestep=True, n_damp=50, fixed_h=False
+            adaptive_timestep=True, n_damp=50, fixed_h=False,
+            output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
 
     def create_scheme(self):

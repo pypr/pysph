@@ -28,9 +28,12 @@ class TestLinalg3(unittest.TestCase):
     def _get_difficult_matrix(self):
         a = np.identity(3, dtype=float)
         for p in range(3):
-            a[p==0][2-(p==2)] = (p==0)*1e-2
-            a[2-(p==2)][p==0] = a[p==0][2-(p==2)]
+            p0 = int(p == 0)
+            p2 = int(p == 2)
+            a[p0][2-p2] = p0*1e-2
+            a[2-p2][p0] = a[p0][2-p2]
 
+        print(a)
         return a
 
     def _get_test_matrices(self):
@@ -111,7 +114,7 @@ class TestLinalg3(unittest.TestCase):
             self._check_transform_function()
 
     def _check_transform_function(self):
-        # Given 
+        # Given
         a = np.random.random((3,3))
         p = np.random.random((3,3))
 
@@ -127,7 +130,7 @@ class TestLinalg3(unittest.TestCase):
             self._check_transform_diag_function()
 
     def _check_transform_diag_function(self):
-        # Given 
+        # Given
         a = np.random.random(3)
         p = np.random.random((3,3))
 
@@ -143,7 +146,7 @@ class TestLinalg3(unittest.TestCase):
             self._check_transform_diag_inv_function()
 
     def _check_transform_diag_inv_function(self):
-        # Given 
+        # Given
         a = np.random.random(3)
         p = np.random.random((3,3))
 
@@ -156,4 +159,3 @@ class TestLinalg3(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

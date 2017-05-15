@@ -6,17 +6,21 @@ This is done till better strategy for parallel testing is implemented
 
 """
 
-from nose.plugins.attrib import attr
+from pytest import mark, importorskip
 
 from pysph.tools import run_parallel_script
 from pysph.parallel.tests.example_test_case import ExampleTestCase, get_example_script
 
-run_parallel_script.skip_if_no_mpi4py()
-
 
 class ParallelTests(ExampleTestCase):
 
-    @attr(slow=True, parallel=True)
+    @classmethod
+    def setup_class(cls):
+        importorskip("mpi4py.MPI")
+        importorskip("pyzoltan.core.zoltan")
+
+    @mark.slow
+    @mark.parallel
     def test_3Ddam_break_example(self):
         serial_kwargs = dict(
             max_steps=50, pfreq=200, sort_gids=None, test=None
@@ -29,7 +33,8 @@ class ParallelTests(ExampleTestCase):
             extra_parallel_kwargs=extra_parallel_kwargs
         )
 
-    @attr(slow=True, parallel=True)
+    @mark.slow
+    @mark.parallel
     def test_elliptical_drop_example(self):
         serial_kwargs = dict(sort_gids=None, kernel='CubicSpline', tf=0.0038)
         extra_parallel_kwargs = dict(ghost_layers=1, lb_freq=5)
@@ -39,7 +44,7 @@ class ParallelTests(ExampleTestCase):
             extra_parallel_kwargs=extra_parallel_kwargs
         )
 
-    @attr(parallel=True)
+    @mark.parallel
     def test_ldcavity_example(self):
         max_steps = 150
         serial_kwargs = dict(max_steps=max_steps, pfreq=500, sort_gids=None)

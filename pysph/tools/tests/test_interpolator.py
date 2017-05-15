@@ -130,7 +130,7 @@ class TestInterpolator(unittest.TestCase):
         pa = self._make_2d_grid()
         # Make half the particles ghosts.
         n = pa.get_number_of_particles()
-        pa.tag[n/2:] = 1
+        pa.tag[int(n//2):] = 1
         pa.align_particles()
 
         # When.

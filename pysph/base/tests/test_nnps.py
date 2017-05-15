@@ -379,11 +379,11 @@ class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
         # flattened indices, get the unflattened version and check
         # that each component remains positive
         for cell_index in range(ncells_tot):
-            cid = nnps.py_unflatten( cell_index, ncells_per_dim, dim )
+            cid = nnps.py_unflatten(cell_index, ncells_per_dim, dim)
 
-            self.assertTrue( cid.x > -1 )
-            self.assertTrue( cid.y > -1 )
-            self.assertTrue( cid.z > -1 )
+            self.assertTrue(cid.x > -1)
+            self.assertTrue(cid.y > -1)
+            self.assertTrue(cid.z > -1)
 
 
 class TestNNPSOnLargeDomain(unittest.TestCase):
@@ -570,6 +570,7 @@ class TestMultipleLevelsStratifiedSFCNNPSWithSorting(TestLinkedListNNPSWithSorti
                 sort_gids=True)
         return pa, nps
 
+
 def test_large_number_of_neighbors_linked_list():
     x = numpy.random.random(1 << 14)*0.1
     y = x.copy()
@@ -582,6 +583,29 @@ def test_large_number_of_neighbors_linked_list():
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
     assert nbrs.length == len(x)
+
+
+def test_use_2d_for_1d_data_with_llnps():
+    y = numpy.array([1.0, 1.5])
+    h = numpy.ones_like(y)
+    pa = get_particle_array(name='fluid', y=y, h=h)
+    nps = nnps.LinkedListNNPS(dim=2, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    print(nbrs.length)
+    assert nbrs.length == len(y)
+
+
+def test_use_3d_for_1d_data_with_llnps():
+    y = numpy.array([1.0, 1.5])
+    h = numpy.ones_like(y)
+    pa = get_particle_array(name='fluid', y=y, h=h)
+    nps = nnps.LinkedListNNPS(dim=3, particles=[pa], cache=False)
+    nbrs = UIntArray()
+    nps.get_nearest_particles(0, 0, 0, nbrs)
+    print(nbrs.length)
+    assert nbrs.length == len(y)
+
 
 def test_large_number_of_neighbors_spatial_hash():
     x = numpy.random.random(1 << 14)*0.1
@@ -596,6 +620,7 @@ def test_large_number_of_neighbors_spatial_hash():
     # print(nbrs.length)
     assert nbrs.length == len(x)
 
+
 def test_large_number_of_neighbors_octree():
     x = numpy.random.random(1 << 14)*0.1
     y = x.copy()
@@ -608,6 +633,7 @@ def test_large_number_of_neighbors_octree():
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
     assert nbrs.length == len(x)
+
 
 def test_flatten_unflatten():
     # first consider the 2D case where we assume a 4 X 5 grid of cells
