@@ -36,6 +36,12 @@ try:
 except ImportError:
     HAVE_MPI = False
 
+HAVE_OPENCL = True
+try:
+    import pyopencl
+except ImportError:
+    HAVE_OPENCL = False
+
 USE_ZOLTAN = True
 
 compiler = 'gcc'
@@ -281,19 +287,6 @@ def get_basic_extensions():
             language="c++"
         ),
 
-        Extension(
-            name="pysph.base.gpu_nnps",
-            sources=["pysph/base/gpu_nnps.pyx"],
-            depends=get_deps(
-                "pyzoltan/core/carray", "pysph/base/point",
-                "pysph/base/particle_array", "pysph/base/nnps_base"
-            ),
-            include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args + openmp_compile_args,
-            extra_link_args=openmp_link_args,
-            cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
-        ),
 
         Extension(
             name="pysph.base.linked_list_nnps",
@@ -362,19 +355,6 @@ def get_basic_extensions():
         ),
 
         Extension(
-            name="pysph.base.z_order_gpu_nnps",
-            sources=["pysph/base/z_order_gpu_nnps.pyx"],
-            depends=get_deps(
-                "pysph/base/nnps_base"
-            ),
-            include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args + openmp_compile_args,
-            extra_link_args=openmp_link_args,
-            cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
-        ),
-
-        Extension(
             name="pysph.base.stratified_hash_nnps",
             sources=["pysph/base/stratified_hash_nnps.pyx"],
             depends=get_deps(
@@ -392,19 +372,6 @@ def get_basic_extensions():
             sources=["pysph/base/stratified_sfc_nnps.pyx"],
             depends=get_deps(
                 "pysph/base/nnps_base", "pysph/base/z_order_nnps"
-            ),
-            include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args + openmp_compile_args,
-            extra_link_args=openmp_link_args,
-            cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
-        ),
-
-        Extension(
-            name="pysph.base.stratified_sfc_gpu_nnps",
-            sources=["pysph/base/stratified_sfc_gpu_nnps.pyx"],
-            depends=get_deps(
-                "pysph/base/nnps_base"
             ),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args + openmp_compile_args,
@@ -439,7 +406,6 @@ def get_basic_extensions():
             language="c++"
         ),
 
-
         # kernels used for tests
         Extension(
             name="pysph.base.c_kernels",
@@ -458,6 +424,50 @@ def get_basic_extensions():
             language="c++"
         ),
     ]
+
+    if HAVE_OPENCL:
+        ext_modules.extend((
+            Extension(
+                name="pysph.base.gpu_nnps_base",
+                sources=["pysph/base/gpu_nnps_base.pyx"],
+                depends=get_deps(
+                    "pyzoltan/core/carray", "pysph/base/point",
+                    "pysph/base/particle_array", "pysph/base/nnps_base"
+                ),
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                cython_compile_time_env={'OPENMP': openmp_env},
+                language="c++"
+            ),
+
+            Extension(
+                name="pysph.base.z_order_gpu_nnps",
+                sources=["pysph/base/z_order_gpu_nnps.pyx"],
+                depends=get_deps(
+                    "pysph/base/nnps_base"
+                ),
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                cython_compile_time_env={'OPENMP': openmp_env},
+                language="c++"
+            ),
+
+            Extension(
+                name="pysph.base.stratified_sfc_gpu_nnps",
+                sources=["pysph/base/stratified_sfc_gpu_nnps.pyx"],
+                depends=get_deps(
+                    "pysph/base/nnps_base"
+                ),
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                cython_compile_time_env={'OPENMP': openmp_env},
+                language="c++"
+            ))
+        )
+
     return ext_modules
 
 

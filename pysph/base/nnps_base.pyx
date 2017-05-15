@@ -979,7 +979,7 @@ cdef class NNPSBase:
         pass
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
-        raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")
+        raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):

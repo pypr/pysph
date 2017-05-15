@@ -24,15 +24,6 @@ cdef extern from 'limits.h':
     cdef unsigned int UINT_MAX
     cdef int INT_MAX
 
-cdef extern from "numpy/arrayobject.h":
-    ctypedef int intp
-    ctypedef extern class numpy.ndarray [object PyArrayObject]:
-        cdef char *data
-        cdef int nd
-        cdef intp *dimensions
-        cdef intp *strides
-        cdef int flags
-
 # ZOLTAN ID TYPE AND PTR
 ctypedef unsigned int ZOLTAN_ID_TYPE
 ctypedef unsigned int* ZOLTAN_ID_PTR
@@ -283,7 +274,6 @@ cdef class NNPSBase:
     cdef public double radius_scale   # Radius scale for kernel
     cdef IntArray cell_shifts         # cell shifts
     cdef public int n_cells           # number of cells
-    #cdef public bint sort_gids        # Sort neighbors by their gids.
 
     # Testing function for brute force neighbor search. The return
     # list is of the same type of the local and global ids (uint)

@@ -321,13 +321,15 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         try:
+            from pysph.base import gpu_nnps
             import pyopencl as cl
             ctx = cl.create_some_context(interactive=False)
 
-            self.nps = nnps.ZOrderGPUNNPS(
+            self.nps = gpu_nnps.ZOrderGPUNNPS(
                 dim=3, particles=self.particles, radius_scale=2.0,
                 use_double=False, ctx=ctx
             )
+
         except ImportError:
             msg = "pyopencl is not present"
             raise SkipTest(msg)
@@ -338,13 +340,15 @@ class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         try:
+            from pysph.base import gpu_nnps
             import pyopencl as cl
             ctx = cl.create_some_context(interactive=False)
 
-            self.nps = nnps.StratifiedSFCGPUNNPS(
+            self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
                 dim=3, particles=self.particles, radius_scale=2.0,
                 use_double=False, num_levels=2, ctx=ctx
             )
+
         except ImportError:
             msg = "pyopencl is not present"
             raise SkipTest(msg)

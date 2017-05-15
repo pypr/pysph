@@ -1,101 +1,6 @@
 //CL//
 
 <%def name="preamble(data_t)" cached="True">
-    #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-
-    #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
-    c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)
-
-    #define MIN(a,b) (((a)<(b))?(a):(b))
-    #define MAX(a,b) (((a)>(b))?(a):(b))
-
-    inline ulong interleave(ulong p, \
-            ulong q, ulong r);
-
-    inline int neighbor_boxes(int c_x, int c_y, int c_z, \
-            ulong* nbr_boxes, int H);
-
-    inline ulong interleave(ulong p, \
-            ulong q, ulong r)
-    {
-        p = (p | (p << 32)) & 0x1f00000000ffff;
-        p = (p | (p << 16)) & 0x1f0000ff0000ff;
-        p = (p | (p <<  8)) & 0x100f00f00f00f00f;
-        p = (p | (p <<  4)) & 0x10c30c30c30c30c3;
-        p = (p | (p <<  2)) & 0x1249249249249249;
-
-        q = (q | (q << 32)) & 0x1f00000000ffff;
-        q = (q | (q << 16)) & 0x1f0000ff0000ff;
-        q = (q | (q <<  8)) & 0x100f00f00f00f00f;
-        q = (q | (q <<  4)) & 0x10c30c30c30c30c3;
-        q = (q | (q <<  2)) & 0x1249249249249249;
-
-        r = (r | (r << 32)) & 0x1f00000000ffff;
-        r = (r | (r << 16)) & 0x1f0000ff0000ff;
-        r = (r | (r <<  8)) & 0x100f00f00f00f00f;
-        r = (r | (r <<  4)) & 0x10c30c30c30c30c3;
-        r = (r | (r <<  2)) & 0x1249249249249249;
-
-        return (p | (q << 1) | (r << 2));
-    }
-
-    inline int find_idx(__global ulong* keys, \
-            int num_particles, ulong key)
-    {
-        int first = 0;
-        int last = num_particles - 1;
-        int middle = (first + last) / 2;
-
-        while(first <= last)
-        {
-            if(keys[middle] < key)
-                first = middle + 1;
-            else if(keys[middle] > key)
-                last = middle - 1;
-            else if(keys[middle] == key)
-            {
-                if(middle == 0)
-                    return 0;
-                if(keys[middle - 1] != key)
-                    return middle;
-                else
-                    last = middle - 1;
-            }
-            middle = (first + last) / 2;
-        }
-
-        return -1;
-    }
-
-    inline int neighbor_boxes(int c_x, int c_y, int c_z, \
-            ulong* nbr_boxes, int H)
-    {
-        int nbr_boxes_length = 0;
-        int j, k, m;
-        ulong key;
-
-        #pragma unroll
-        for(j=-H; j<H+1; j++)
-        {
-            #pragma unroll
-            for(k=-H; k<H+1; k++)
-            {
-                #pragma unroll
-                for(m=-H; m<H+1; m++)
-                {
-                    if(c_x+m >= 0 && c_y+k >= 0 && c_z+j >= 0)
-                    {
-                        key = interleave(c_x+m, c_y+k, c_z+j);
-                        nbr_boxes[nbr_boxes_length] = key;
-                        nbr_boxes_length++;
-                    }
-                }
-            }
-        }
-
-        return nbr_boxes_length;
-    }
-
     inline int get_level(${data_t} radius_scale, ${data_t} hmin, \
             ${data_t} interval_size, ${data_t} h)
     {
@@ -157,18 +62,8 @@
 </%def>
 
 
-// IMPORTANT: Check if refactoring of the following kernels is needed for caching
-// the result
-
 <%def name="find_nbrs_prep(data_t, sorted)", cached="True">
     uint qid = i;
-
-    // IMPORTANT: Make sure the 'cid' approach works for sorted particle arrays
-    //% if sorted:
-    //    qid = i;
-    //% else:
-    //    qid = pids_dst[i];
-    //% endif
 
     ${data_t}4 q = (${data_t}4)(d_x[qid], d_y[qid], d_z[qid], d_h[qid]);
     ${data_t} radius_scale2 = radius_scale*radius_scale;
@@ -238,7 +133,6 @@
                     if(idx == -1)
                         continue;
                     idx += start_idx_levels[level];
-                    //key = keys[idx];
 
                     while(idx < num_particles && keys[idx] == key)
                     {
@@ -311,7 +205,6 @@
                     if(idx == -1)
                         continue;
                     idx += start_idx_levels[level];
-                    //key = keys[idx];
 
                     while(idx < num_particles && keys[idx] == key)
                     {

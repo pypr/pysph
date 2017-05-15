@@ -11,8 +11,15 @@ class GPUNNPSHelper(object):
                     tpl_filename), disable_unicode=True)
 
         self.data_t = "double" if use_double else "float"
-        self.preamble = self.src_tpl.get_def("preamble").render(
+
+        helper_tpl = Template(filename = \
+                os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                    "gpu_helper_functions.mako"), disable_unicode=True)
+
+        helper_preamble = helper_tpl.get_def("get_helpers").render(
                 data_t=self.data_t)
+        self.preamble = "\n".join([helper_preamble, self.src_tpl.get_def("preamble").render(
+                data_t=self.data_t)])
         self.ctx = ctx
 
     def _get_code(self, kernel_name, **kwargs):

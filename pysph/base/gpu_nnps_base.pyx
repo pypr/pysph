@@ -31,29 +31,6 @@ from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
 
-IF OPENMP:
-    cimport openmp
-    cpdef int get_number_of_threads():
-        cdef int i, n
-        with nogil, parallel():
-            for i in prange(1):
-                n = openmp.omp_get_num_threads()
-        return n
-    cpdef set_number_of_threads(int n):
-        openmp.omp_set_num_threads(n)
-ELSE:
-    cpdef int get_number_of_threads():
-        return 1
-    cpdef set_number_of_threads(int n):
-        print "OpenMP not available, cannot set number of threads."
-
-
-IF UNAME_SYSNAME == "Windows":
-    cdef inline double fmin(double x, double y) nogil:
-        return x if x < y else y
-    cdef inline double fmax(double x, double y) nogil:
-        return x if x > y else y
-
 # Particle Tag information
 from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
@@ -224,7 +201,7 @@ cdef class GPUNNPS(NNPSBase):
         for arr in pa.properties.values():
             arr.c_align_array(indices)
 
-        self.pa_wrappers[pa_index].copy_to_gpu(self.queue,
+        copy_to_gpu(self.pa_wrappers[pa_index], self.queue,
                 (np.float64 if self.use_double else np.float32))
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
