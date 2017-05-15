@@ -58,14 +58,15 @@ from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
 import logging
 logger = logging.getLogger()
 
+
 def set_arrays(dataset, particle_array):
     """ Code to add all the arrays to a dataset given a particle array."""
     props = set(particle_array.properties.keys())
     # Add the vector data.
     vec = numpy.empty((len(particle_array.x), 3), dtype=float)
-    vec[:,0] = particle_array.u
-    vec[:,1] = particle_array.v
-    vec[:,2] = particle_array.w
+    vec[:, 0] = particle_array.u
+    vec[:, 1] = particle_array.v
+    vec[:, 2] = particle_array.w
     va = tvtk.to_tvtk(array2vtk(vec))
     va.name = 'velocity'
     dataset.data.point_data.add_array(vec)
@@ -78,6 +79,7 @@ def set_arrays(dataset, particle_array):
         dataset.data.point_data.add_array(va)
     dataset._update_data()
 
+
 def glob_files(fname):
     """Glob for all similar files given one of them.
 
@@ -85,7 +87,8 @@ def glob_files(fname):
     """
     fbase = fname[:fname.rfind('_')+1]
     ext = fname[fname.rfind('.'):]
-    return glob.glob("%s*%s"%(fbase, ext))
+    return glob.glob("%s*%s" % (fbase, ext))
+
 
 def sort_file_list(files):
     """Given a list of input files, sort them in serial order, in-place.
@@ -102,7 +105,7 @@ class InterpolatorView(HasTraits):
 
     # The bounds on which to interpolate.
     bounds = Array(cols=3, dtype=float,
-                   desc='spatial bounds for the interpolation '\
+                   desc='spatial bounds for the interpolation '
                         '(xmin, xmax, ymin, ymax, zmin, zmax)')
 
     # The number of points to interpolate onto.
@@ -146,8 +149,7 @@ class InterpolatorView(HasTraits):
     #### View definition ######################################################
     view = View(Item(name='visible'),
                 Item(name='scalar',
-                     editor=EnumEditor(name='scalar_list')
-                    ),
+                     editor=EnumEditor(name='scalar_list')),
                 Item(name='num_points'),
                 Item(name='bounds'),
                 Item(name='set_bounds', show_label=False),
@@ -324,8 +326,7 @@ class ParticleArrayHelper(HasTraits):
                     Item(name='visible'),
                     Item(name='show_legend'),
                     Item(name='scalar',
-                         editor=EnumEditor(name='scalar_list')
-                    ),
+                         editor=EnumEditor(name='scalar_list')),
                     Item(name='list_all_scalars'),
                     Item(name='show_time'),
                     columns=2,
@@ -460,7 +461,9 @@ class ParticleArrayHelper(HasTraits):
             except AttributeError:
                 pass
             else:
-                self.plot.mlab_source.vectors = numpy.c_[vec[0], vec[1], vec[2]]
+                self.plot.mlab_source.set(
+                    vectors=numpy.c_[vec[0], vec[1], vec[2]]
+                )
 
     def _show_vectors_changed(self, value):
         pv = self.plot_vectors
@@ -488,7 +491,7 @@ class ParticleArrayHelper(HasTraits):
     def _time_changed(self, value):
         txt = self._text
         if txt is not None:
-            txt.text = 'Time = %.3e'%(value)
+            txt.text = 'Time = %.3e' % (value)
 
     def _extra_scalars_default(self):
         return ['vmag']
@@ -716,6 +719,14 @@ class MayaviViewer(HasTraits):
         if self.record:
             self._do_snap()
 
+    def run_script(self, path):
+        """Execute a script in the namespace of the viewer.
+        """
+        with open(path) as fp:
+            data = fp.read()
+            ns = self._get_shell_namespace()
+            exec(compile(data, path, 'exec'), ns)
+
     ######################################################################
     # Private interface.
     ######################################################################
@@ -739,8 +750,8 @@ class MayaviViewer(HasTraits):
 
         interval = self.frame_interval
         count = self._count
-        if count%interval == 0:
-            fname = 'frame%06d.png'%(self._frame_count)
+        if count % interval == 0:
+            fname = 'frame%06d.png' % (self._frame_count)
             p_arrays[0].scene.save_png(os.path.join(movie_dir, fname))
             self._frame_count += 1
             self._last_time = self.current_time
@@ -762,8 +773,8 @@ class MayaviViewer(HasTraits):
             try:
                 c = self.client.controller
             except Exception as e:
-                logger.info('Error: no connection or connection closed: '\
-                        'reconnecting: %s'%e)
+                logger.info('Error: no connection or connection closed: '
+                            'reconnecting: %s' % e)
                 reconnect = True
                 self.client = None
             else:
@@ -783,13 +794,13 @@ class MayaviViewer(HasTraits):
                     )
                 else:
                     logger.info(
-                        'Could not connect: Multiprocessing Interface'\
-                        ' not available on %s:%s'%(self.host,self.port)
+                        'Could not connect: Multiprocessing Interface'
+                        ' not available on %s:%s' % (self.host, self.port)
                     )
                     return None
             except Exception as e:
-                logger.info('Could not connect: check if solver is '\
-                            'running:%s'%e)
+                logger.info('Could not connect: check if solver is '
+                            'running:%s' % e)
                 return None
             c = self.client.controller
             self.iteration = c.get_count()
@@ -823,7 +834,7 @@ class MayaviViewer(HasTraits):
         try:
             self.update_plot()
         except Exception as e:
-            logger.info('Exception: %s caught in timer_event'%e)
+            logger.info('Exception: %s caught in timer_event' % e)
 
     def _interval_changed(self, value):
         t = self.timer
@@ -964,11 +975,14 @@ class MayaviViewer(HasTraits):
             self._play_changed(self.play)
 
     def _shell_fired(self):
-        ns = dict(viewer=self, particle_arrays=self.particle_arrays,
-                  interpolator=self.interpolator, scene=self.scene,
-                  mlab=self.scene.mlab)
+        ns = self._get_shell_namespace()
         obj = PythonShellView(ns=ns)
         obj.edit_traits()
+
+    def _get_shell_namespace(self):
+        return dict(viewer=self, particle_arrays=self.particle_arrays,
+                    interpolator=self.interpolator, scene=self.scene,
+                    mlab=self.scene.mlab)
 
     def _directory_changed(self, d):
         ext = os.path.splitext(self.files[-1])[1]
@@ -1013,7 +1027,7 @@ class MayaviViewer(HasTraits):
 ######################################################################
 def usage():
     print("""Usage:
-pysph view [-v] <trait1=value> <trait2=value> [directory or files.npz]
+pysph view [-v] <trait1=value> <trait2=value> [directory or files.npz or script.py]
 
 If a directory or *.npz files are not supplied it will connect to a running
 solver, if not it will display the given files.
@@ -1036,6 +1050,18 @@ etc.  The following traits are available:
   play          -- True/False: Play all stored data files.
   loop          -- True/False: Loop over data files.
 
+If a Python script is supplied, the code is executed in the same namespace as
+provided by the embedded Python shell, i.e. the following names are available
+in the namespace of the script:
+
+    viewer: The MayaviViewer instance.
+    particle_arrays: A list of ParticleArrayHelper instances corresponding
+                     to the data.
+    interpolator: An InterpolatorView instance.
+    scene: The active scene
+    mlab: The scene's mlab attribute.  See the Mayavi documentation.
+
+
 Options:
 --------
 
@@ -1053,9 +1079,11 @@ Examples::
 
 """)
 
+
 def error(msg):
     print(msg)
     sys.exit()
+
 
 def main(args=None):
     if args is None:
@@ -1072,9 +1100,13 @@ def main(args=None):
 
     kw = {}
     files = []
+    scripts = []
     for arg in args:
         if '=' not in arg:
-            if arg.endswith(output_formats):
+            if arg.endswith('.py'):
+                scripts.append(arg)
+                continue
+            elif arg.endswith(output_formats):
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
@@ -1101,7 +1133,10 @@ def main(args=None):
     # are not displayed on screen so we use do_later to set the  files.
     m = MayaviViewer(live_mode=live_mode)
     do_later(m.set, files=files, **kw)
+    for script in scripts:
+        do_later(m.run_script, script)
     m.configure_traits()
+
 
 if __name__ == '__main__':
     main()

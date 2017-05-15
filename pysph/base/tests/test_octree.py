@@ -2,7 +2,7 @@
 
 You can run the tests like so:
 
-    $ nosetests -v test_octree.py
+    $ pytest -v run_tests.py
 """
 import numpy as np
 
@@ -12,7 +12,7 @@ from pysph.base.octree import Octree, CompressedOctree
 
 # Python testing framework
 import unittest
-from nose.plugins.skip import SkipTest
+from pytest import importorskip
 
 def test_single_level_octree():
     N = 50
@@ -151,14 +151,10 @@ class SimpleOctreeTestCase(unittest.TestCase):
         pa = get_particle_array(x=self.x, y=self.y, z=self.z, h=self.h)
         self.tree.build_tree(pa)
         root = self.tree.get_root()
-        try:
-            import matplotlib as mpl
-            mpl.use('Agg')
-            import matplotlib.pyplot as plt
-            from mpl_toolkits.mplot3d import Axes3D
-        except:
-            msg = "matplotlib is not present"
-            raise SkipTest(msg)
+        mpl = importorskip("matplotlib")
+        mpl.use('Agg')
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
         fig = plt.figure()
         ax = Axes3D(fig)
 
@@ -283,4 +279,3 @@ class TestCompressedOctreeForFloatingPointError(SimpleOctreeTestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

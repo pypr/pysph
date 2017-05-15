@@ -2,7 +2,7 @@ numpy
 setuptools>=6.0
 Cython>=0.20
 mako
-nose>=1.0.0
+pytest>=3.0
 mock>=1.0
 ordereddict
 importlib

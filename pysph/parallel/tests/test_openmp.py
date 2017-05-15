@@ -6,26 +6,15 @@ This is done till better strategy for parallel testing is implemented
 
 """
 
-from nose.plugins.attrib import attr
-
+from pytest import mark
 from .example_test_case import ExampleTestCase, get_example_script
-
-def skip_if_no_openmp():
-    from pysph.base.nnps import get_number_of_threads
-    from nose.plugins.skip import SkipTest
-    n_threads = get_number_of_threads()
-    if n_threads == 1:
-        reason = "N_threads=1; OpenMP does not seem available."
-        raise SkipTest(reason)
-    else:
-        print("Running OpenMP tests with %s threads"%n_threads)
-
-skip_if_no_openmp()
+from pysph.base.nnps import get_number_of_threads
 
 
+@mark.skipif(get_number_of_threads() == 1, reason= "N_threads=1; OpenMP does not seem available.")
 class TestOpenMPExamples(ExampleTestCase):
 
-    @attr(slow=True)
+    @mark.slow
     def test_3Ddam_break_example(self):
         dt = 2e-5; tf = 13*dt
         serial_kwargs = dict(
@@ -41,7 +30,7 @@ class TestOpenMPExamples(ExampleTestCase):
             extra_parallel_kwargs=extra_parallel_kwargs
         )
 
-    @attr(slow=True)
+    @mark.slow
     def test_elliptical_drop_example(self):
         tf = 0.0076*0.25
         serial_kwargs = dict(kernel='CubicSpline', tf=tf)
