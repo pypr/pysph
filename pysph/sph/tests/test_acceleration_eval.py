@@ -21,7 +21,7 @@ from pysph.sph.sph_compiler import SPHCompiler
 from pysph.base.reduce_array import serial_reduce_array
 
 
-class TestEquation(Equation):
+class DummyEquation(Equation):
     def initialize(self, d_idx, d_rho, d_V):
         d_rho[d_idx] = d_V[d_idx]
 
@@ -84,7 +84,7 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         f = get_particle_array(name='f')
 
         # When
-        eq = TestEquation(dest='f', sources=['f'])
+        eq = DummyEquation(dest='f', sources=['f'])
 
         # Then
         self.assertRaises(RuntimeError,
@@ -97,7 +97,7 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         s = get_particle_array(name='s')
 
         # When
-        eq = TestEquation(dest='f', sources=['f', 's'])
+        eq = DummyEquation(dest='f', sources=['f', 's'])
 
         # Then
         self.assertRaises(RuntimeError,
@@ -111,7 +111,7 @@ class TestCheckEquationArrayProps(unittest.TestCase):
         s.add_property('V')
 
         # When
-        eq = TestEquation(dest='f', sources=['f', 's'])
+        eq = DummyEquation(dest='f', sources=['f', 's'])
 
         # Then
         check_equation_array_properties(eq, [f, s])
