@@ -139,14 +139,14 @@ class TestEquations(TestBase):
             Group.pre_comp = precomputed_symbols()
 
 
-class TestEq1(Equation):
+class Equation1(Equation):
     def loop(self, WIJ=0.0):
         x = WIJ
 
     def post_loop(self, d_idx, d_h):
         x = d_h[d_idx]
 
-class TestEq2(Equation):
+class Equation2(Equation):
     def loop(self, d_idx, s_idx):
         x = s_idx + d_idx
 
@@ -216,8 +216,8 @@ class TestGroup(TestBase):
     def test_loop_code(self):
         from pysph.base.kernels import CubicSpline
         k = CubicSpline(dim=3)
-        e1 = TestEq1('f', ['f'])
-        e2 = TestEq2('f', ['f'])
+        e1 = Equation1('f', ['f'])
+        e2 = Equation2('f', ['f'])
         g = Group([e1, e2])
         # First get the equation wrappers so the equation names are setup.
         w = g.get_equation_wrappers()
@@ -231,8 +231,8 @@ class TestGroup(TestBase):
             RIJ = sqrt(R2IJ)
             WIJ = self.kernel.kernel(XIJ, RIJ, HIJ)
 
-            self.test_eq10.loop(WIJ)
-            self.test_eq20.loop(d_idx, s_idx)
+            self.equation10.loop(WIJ)
+            self.equation20.loop(d_idx, s_idx)
             ''')
         msg = 'EXPECTED:\n%s\nGOT:\n%s'%(expect, result)
         self.assertEqual(result, expect, msg)
@@ -240,14 +240,14 @@ class TestGroup(TestBase):
     def test_post_loop_code(self):
         from pysph.base.kernels import CubicSpline
         k = CubicSpline(dim=3)
-        e1 = TestEq1('f', ['f'])
-        e2 = TestEq2('f', ['f'])
+        e1 = Equation1('f', ['f'])
+        e2 = Equation2('f', ['f'])
         g = Group([e1, e2])
         # First get the equation wrappers so the equation names are setup.
         w = g.get_equation_wrappers()
         result = g.get_post_loop_code(k)
         expect = dedent('''\
-            self.test_eq10.post_loop(d_idx, d_h)
+            self.equation10.post_loop(d_idx, d_h)
             ''')
         msg = 'EXPECTED:\n%s\nGOT:\n%s'%(expect, result)
         self.assertEqual(result, expect, msg)

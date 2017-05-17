@@ -60,10 +60,17 @@ def _has_tvtk():
         return True
 
 
-@mark.slow
-def test_example_should_run():
+def _find_examples():
+    examples = []
     for module, doc in run.get_all_examples():
         if module == 'pysph.examples.rigid_body.dam_break3D_sph' and \
            not _has_tvtk():
                 continue
-        yield run_example, module
+        examples.append(module)
+    return examples
+
+
+@mark.slow
+@mark.parametrize("module", _find_examples())
+def test_example_should_run(module):
+    run_example(module)
