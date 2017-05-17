@@ -548,19 +548,27 @@ def compare_runs(sims, method, labels, exact=None):
 
     sims: sequence
         Sequence of `Simulation` objects.
-    method: str
+    method: str or callable
         Name of a method on each simulation method to call for plotting.
+        Or a callable which is passed the simulation instance and any kwargs.
     labels: sequence
         Sequence of parameters to use as labels for the plot.
-    exact: str
-        Name of a method that produces an exact solution plot.
+    exact: str or callable
+        Name of a method that produces an exact solution plot
+        or a callable that will be called.
     """
     ls = linestyles()
     if exact is not None:
-        getattr(sims[0], exact)(**next(ls))
+        if isinstance(exact, str):
+            getattr(sims[0], exact)(**next(ls))
+        else:
+            exact(sims[0], **next(ls))
     for s in sims:
-        m = getattr(s, method)
-        m(label=s.get_labels(labels), **next(ls))
+        if isinstance(method, str):
+            m = getattr(s, method)
+            m(label=s.get_labels(labels), **next(ls))
+        else:
+            method(s, label=s.get_labels(labels), **next(ls))
 
 
 def filter_cases(runs, **params):

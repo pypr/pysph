@@ -6,9 +6,13 @@ import sys
 import tempfile
 import unittest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from pysph.tools.automation import (
-    Problem, Simulation, SolveProblem, TaskRunner
+    Problem, Simulation, SolveProblem, TaskRunner, compare_runs
 )
 try:
     from pysph.tools.jobs import Scheduler
@@ -189,3 +193,39 @@ class TestRemoteAutomation(TestLocalAutomation):
                 self.assertTrue(t.complete())
             if s == 'error':
                 self.assertFalse(t.complete())
+
+
+def test_compare_runs_calls_methods_when_given_names():
+    # Given
+    sims = [mock.MagicMock(), mock.MagicMock()]
+    s0, s1 = sims
+    s0.get_labels.return_value = s1.get_labels.return_value = 'label'
+
+    # When
+    compare_runs(sims, 'fig', labels=['x'], exact='exact')
+
+    # Then
+    s0.exact.assert_called_once_with(color='k', linestyle='-')
+    s0.fig.assert_called_once_with(color='k', label='label', linestyle='--')
+    s0.get_labels.assert_called_once_with(['x'])
+    assert s1.exact.called == False
+    s1.fig.assert_called_once_with(color='k', label='label', linestyle='-.')
+    s1.get_labels.assert_called_once_with(['x'])
+
+
+def test_compare_runs_works_when_given_callables():
+    # Given
+    sims = [mock.MagicMock()]
+    s0 = sims[0]
+    s0.get_labels.return_value = 'label'
+
+    func = mock.MagicMock()
+    exact = mock.MagicMock()
+
+    # When
+    compare_runs(sims, func, labels=['x'], exact=exact)
+
+    # Then
+    exact.assert_called_once_with(s0, color='k', linestyle='-')
+    func.assert_called_once_with(s0, color='k', label='label', linestyle='--')
+    s0.get_labels.assert_called_once_with(['x'])
