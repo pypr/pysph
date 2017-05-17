@@ -288,7 +288,7 @@ class Problem(object):
        results and simulations are collected inside a directory with
        this name.
      - `get_commands(self)`: returns a sequence of (directory_name,
-       command_string) pairs.  These are to be exeuted before the
+       command_string, job_info) tuples.  These are to be exeuted before the
        `run` method is called.
      - `run(self)`: Processes the completed simulations to make plots etc.
 
@@ -329,19 +329,6 @@ class Problem(object):
         """Called by init, so add any initialization here.
         """
         pass
-
-    def get_requires(self):
-        """Used by task runners like doit/luigi to run required
-        commands.
-        """
-        base = self.get_name()
-        result = []
-        for name, cmd, job_info in self.get_commands():
-            sim_output_dir = self.input_path(name)
-            task = PySPHTask(cmd, sim_output_dir, job_info)
-            task_name = '%s.%s' % (base, name)
-            result.append((task_name, task))
-        return result
 
     def make_output_dir(self):
         """Convenience to make the output directory if needed.
@@ -607,14 +594,24 @@ class SolveProblem(Task):
     of the requirements for the problem.
     """
 
-    def __init__(self, problem, match=''):
+    def __init__(self, problem, match='', task_cls=PySPHTask):
         self.problem = problem
         self.match = match
-        self._requires = [
-            task
-            for name, task in self.problem.get_requires()
-            if len(match) == 0 or fnmatch(name, match)
-        ]
+        self.task_cls = task_cls
+        self._requires = self._get_requires()
+
+    def _get_requires(self):
+        problem = self.problem
+        match = self.match
+        base = problem.get_name()
+        result = []
+        for name, cmd, job_info in problem.get_commands():
+            task_name = '%s.%s' % (base, name)
+            if len(match) == 0 or fnmatch(task_name, match):
+                sim_output_dir = problem.input_path(name)
+                task = self.task_cls(cmd, sim_output_dir, job_info)
+                result.append(task)
+        return result
 
     def output(self):
         return self.problem.get_outputs()
@@ -632,18 +629,24 @@ class RunAll(WrapperTask):
     """
 
     def __init__(self, simulation_dir, output_dir, problem_classes,
-                 force=False, match=''):
+                 force=False, match='', task_cls=PySPHTask):
         self.simulation_dir = simulation_dir
         self.output_dir = output_dir
         self.force = force
         self.match = match
+        self.task_cls = task_cls
         self.problems = self._make_problems(problem_classes)
-        self._requires = [
-            SolveProblem(problem=x, match=self.match) for x in self.problems
-        ]
+        self._requires = self._get_requires()
 
     # #### Private protocol  ###############################################
 
+    def _get_requires(self):
+        return [
+            SolveProblem(
+                problem=x, match=self.match, task_cls=self.task_cls
+            )
+            for x in self.problems
+        ]
     def _make_problems(self, problem_classes):
         problems = []
         for klass in problem_classes:
@@ -677,7 +680,7 @@ class Automator(object):
 
     """
     def __init__(self, simulation_dir, output_dir, all_problems,
-                 cluster_manager_factory=None):
+                 cluster_manager_factory=None, task_cls=PySPHTask):
         """Constructor.
 
         Parameters
@@ -695,6 +698,7 @@ class Automator(object):
         self.simulation_dir = simulation_dir
         self.output_dir = output_dir
         self.all_problems = all_problems
+        self.task_cls = task_cls
         if cluster_manager_factory is None:
             from pysph.tools.cluster_manager import ClusterManager
             self.cluster_manager_factory = ClusterManager
@@ -724,7 +728,8 @@ class Automator(object):
             simulation_dir=self.simulation_dir,
             output_dir=self.output_dir,
             problem_classes=problem_classes,
-            force=args.force, match=args.match
+            force=args.force, match=args.match,
+            task_cls=self.task_cls
         )
 
         self.scheduler = self.cluster_manager.create_scheduler()
