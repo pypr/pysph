@@ -209,7 +209,7 @@ class TestCommandTask(TestAutomationBase):
     def test_command_tasks_executes_simple_command(self):
         # Given
         s = self._make_scheduler()
-        cmd = 'python -c "print 1"'
+        cmd = 'python -c "print(1)"'
         t = CommandTask(cmd, output_dir=self.sim_dir)
 
         self.assertFalse(t.complete())
@@ -226,7 +226,7 @@ class TestCommandTask(TestAutomationBase):
     def test_command_tasks_converts_dollar_output_dir(self):
         # Given
         s = self._make_scheduler()
-        cmd = '''python -c "print '$output_dir'"'''
+        cmd = '''python -c "print('$output_dir')"'''
         t = CommandTask(cmd, output_dir=self.sim_dir)
 
         self.assertFalse(t.complete())
