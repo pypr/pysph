@@ -164,19 +164,31 @@ class TaskRunner(object):
         print("Finished!")
 
 
-class PySPHTask(Task):
-    """Convenience class to run a PySPH simulation via an automation
-    framework.  The class provides a method to run the simulation and
-    also check if the simulation is completed.
+class CommandTask(Task):
+    """Convenience class to run a command via the framework. The class provides a
+    method to run the simulation and also check if the simulation is completed.
+    The command should ideally produce all of its outputs inside an output
+    directory that is specified.
 
     """
 
     def __init__(self, command, output_dir, job_info=None):
+        """Constructor
+
+        Parameters
+        ----------
+
+        command: str or list: command to run $output_dir is substituted.
+        output_dir: str : path of output directory.
+        job_info: dict: dictionary of job information.
+
+        """
         if isinstance(command, str):
             self.command = shlex.split(command)
         else:
             self.command = command
-        self.command += ['-d', output_dir]
+        self.command = [x.replace('$output_dir', output_dir)
+                        for x in self.command]
         self.output_dir = output_dir
         self.job_info = job_info if job_info is not None else {}
         self.job_proxy = None
@@ -184,6 +196,10 @@ class PySPHTask(Task):
         # This is a sentinel set to true when the job is finished
         # the data is copied to a local machine and cleaned on the remote.
         self._finished = False
+        # This file will be created if the job exited with an error.
+        self._error_status_file = os.path.join(
+            self.output_dir, 'command_exited_with_error'
+        )
 
     # #### Public protocol ###########################################
 
@@ -218,20 +234,11 @@ class PySPHTask(Task):
     def _is_done(self):
         """Returns True if the simulation completed.
         """
-        if not os.path.exists(self.output_dir):
+        if (not os.path.exists(self.output_dir)) \
+           or os.path.exists(self._error_status_file):
             return False
-        info_fname = self._get_info_filename()
-        if not info_fname or not os.path.exists(info_fname):
-            return False
-        d = json.load(open(info_fname))
-        return d.get('completed')
-
-    def _get_info_filename(self):
-        files = glob.glob(os.path.join(self.output_dir, '*.info'))
-        if len(files) > 0:
-            return files[0]
         else:
-            return None
+            return True
 
     def _check_if_copy_complete(self):
         proc = self._copy_proc
@@ -265,9 +272,55 @@ class PySPHTask(Task):
                 proc.wait()
             jp.clean()
             print('***************** ERROR **********************')
+            with open(self._error_status_file, 'w') as fp:
+                fp.write('')
             self._finished = True
             raise RuntimeError(msg)
         return False
+
+
+class PySPHTask(CommandTask):
+    """Convenience class to run a PySPH simulation via an automation
+    framework.
+
+    This task automatically adds the output directory specification for pysph
+    so users to not need to add it.
+
+    """
+
+    def __init__(self, command, output_dir, job_info=None):
+        """Constructor
+
+        Parameters
+        ----------
+
+        command: str or list: command to run $output_dir is substituted.
+        output_dir: str : path of output directory.
+        job_info: dict: dictionary of job information.
+
+        """
+        super(PySPHTask, self).__init__(command, output_dir, job_info)
+        self.command += ['-d', output_dir]
+
+    # #### Private protocol ###########################################
+
+    def _is_done(self):
+        """Returns True if the simulation completed.
+        """
+        if not os.path.exists(self.output_dir):
+            return False
+        info_fname = self._get_info_filename()
+        if not info_fname or not os.path.exists(info_fname):
+            return False
+        d = json.load(open(info_fname))
+        return d.get('completed')
+
+    def _get_info_filename(self):
+        files = glob.glob(os.path.join(self.output_dir, '*.info'))
+        if len(files) > 0:
+            return files[0]
+        else:
+            return None
 
 
 class Problem(object):
