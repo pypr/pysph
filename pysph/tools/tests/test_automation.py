@@ -6,14 +6,21 @@ import sys
 import tempfile
 import unittest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 
 from pysph.tools.automation import (
-    Problem, Simulation, SolveProblem, TaskRunner
+    CommandTask, Problem, Simulation, SolveProblem, TaskRunner,
+    compare_runs
 )
 try:
     from pysph.tools.jobs import Scheduler
 except ImportError:
     raise unittest.SkipTest('test_jobs requires psutil')
+
+from pysph.tools.tests.test_jobs import wait_until
 
 
 class EllipticalDrop(Problem):
@@ -64,7 +71,7 @@ class EllipticalDrop(Problem):
         output.close()
 
 
-class TestLocalAutomation(unittest.TestCase):
+class TestAutomationBase(unittest.TestCase):
     def setUp(self):
         self.cwd = os.getcwd()
         self.root = tempfile.mkdtemp()
@@ -77,6 +84,8 @@ class TestLocalAutomation(unittest.TestCase):
         if os.path.exists(self.root):
             shutil.rmtree(self.root)
 
+
+class TestLocalAutomation(TestAutomationBase):
     def _make_scheduler(self):
         worker = dict(host='localhost')
         s = Scheduler(root='.', worker_config=[worker])
@@ -189,3 +198,106 @@ class TestRemoteAutomation(TestLocalAutomation):
                 self.assertTrue(t.complete())
             if s == 'error':
                 self.assertFalse(t.complete())
+
+
+class TestCommandTask(TestAutomationBase):
+    def _make_scheduler(self):
+        worker = dict(host='localhost')
+        s = Scheduler(root='.', worker_config=[worker])
+        return s
+
+    def test_command_tasks_executes_simple_command(self):
+        # Given
+        s = self._make_scheduler()
+        cmd = 'python -c "print 1"'
+        t = CommandTask(cmd, output_dir=self.sim_dir)
+
+        self.assertFalse(t.complete())
+
+        # When
+        t.run(s)
+        wait_until(lambda: not t.complete())
+
+        # Then
+        self.assertTrue(t.complete())
+        self.assertEqual(t.job_proxy.status(), 'done')
+        self.assertEqual(t.job_proxy.get_stdout().strip(), '1')
+
+    def test_command_tasks_converts_dollar_output_dir(self):
+        # Given
+        s = self._make_scheduler()
+        cmd = '''python -c "print '$output_dir'"'''
+        t = CommandTask(cmd, output_dir=self.sim_dir)
+
+        self.assertFalse(t.complete())
+
+        # When
+        t.run(s)
+        wait_until(lambda: not t.complete())
+
+        # Then
+        self.assertTrue(t.complete())
+        self.assertEqual(t.job_proxy.status(), 'done')
+        self.assertEqual(t.job_proxy.get_stdout().strip(), self.sim_dir)
+
+    def test_command_tasks_handles_errors_correctly(self):
+        # Given
+        s = self._make_scheduler()
+        cmd = 'python --junk'
+        t = CommandTask(cmd, output_dir=self.sim_dir)
+
+        self.assertFalse(t.complete())
+
+        # When
+        t.run(s)
+        try:
+            wait_until(lambda: not t.complete())
+        except RuntimeError:
+            pass
+
+        # Then
+        self.assertFalse(t.complete())
+        self.assertEqual(t.job_proxy.status(), 'error')
+
+        # A new command task should still detect that the run failed, even
+        # though the output directory exists.
+        # Given
+        t = CommandTask(cmd, output_dir=self.sim_dir)
+        # When/Then
+        self.assertFalse(t.complete())
+
+
+def test_compare_runs_calls_methods_when_given_names():
+    # Given
+    sims = [mock.MagicMock(), mock.MagicMock()]
+    s0, s1 = sims
+    s0.get_labels.return_value = s1.get_labels.return_value = 'label'
+
+    # When
+    compare_runs(sims, 'fig', labels=['x'], exact='exact')
+
+    # Then
+    s0.exact.assert_called_once_with(color='k', linestyle='-')
+    s0.fig.assert_called_once_with(color='k', label='label', linestyle='--')
+    s0.get_labels.assert_called_once_with(['x'])
+    assert s1.exact.called == False
+    s1.fig.assert_called_once_with(color='k', label='label', linestyle='-.')
+    s1.get_labels.assert_called_once_with(['x'])
+
+
+def test_compare_runs_works_when_given_callables():
+    # Given
+    sims = [mock.MagicMock()]
+    s0 = sims[0]
+    s0.get_labels.return_value = 'label'
+
+    func = mock.MagicMock()
+    exact = mock.MagicMock()
+
+    # When
+    compare_runs(sims, func, labels=['x'], exact=exact)
+
+    # Then
+    exact.assert_called_once_with(s0, color='k', linestyle='-')
+    func.assert_called_once_with(s0, color='k', label='label', linestyle='--')
+    s0.get_labels.assert_called_once_with(['x'])

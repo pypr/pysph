@@ -22,30 +22,16 @@ if not os.environ.get('ETS_TOOLKIT'):
         from enthought.etsconfig.api import ETSConfig
     ETSConfig.toolkit = 'qt4'
 
-try:
-    from traits.api import (Any, Array, Dict, HasTraits, Instance,
-        on_trait_change, List, Str, Int, Range, Float, Bool, Button,
-        Directory, Event, Password, Property, cached_property)
-    from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
-        EnumEditor, TitleEditor, HGroup, ShellEditor, VSplit)
-    from mayavi.core.api import PipelineBase
-    from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
-    from pyface.timer.api import Timer, do_later
-    from tvtk.api import tvtk
-    from tvtk.array_handler import array2vtk
-except ImportError:
-    from enthought.traits.api import (Any, Array, Dict, HasTraits,
-        Instance, on_trait_change, List, Str, Int, Range, Float, Bool, Button,
-        Directory, Event, Password, Property, cached_property)
-    from enthought.traits.ui.api import (View, Item, Group, Handler,
-        HSplit, ListEditor, EnumEditor, TitleEditor, HGroup, ShellEditor,
-        VSplit)
-    from enthought.mayavi.core.api import PipelineBase
-    from enthought.mayavi.core.ui.api import (MayaviScene, SceneEditor,
-                                              MlabSceneModel)
-    from enthought.pyface.timer.api import Timer, do_later
-    from enthought.tvtk.api import tvtk
-    from enthought.tvtk.array_handler import array2vtk
+from traits.api import (Any, Array, Dict, HasTraits, Instance,
+    on_trait_change, List, Str, Int, Range, Float, Bool, Button,
+    Directory, Event, Password, Property, cached_property)
+from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
+    EnumEditor, TitleEditor, HGroup, ShellEditor, VSplit)
+from mayavi.core.api import PipelineBase
+from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
+from pyface.timer.api import Timer, do_later
+from tvtk.api import tvtk
+from tvtk.array_handler import array2vtk
 
 from pysph.base.particle_array import ParticleArray
 from pysph.solver.solver_interfaces import MultiprocessingClient
