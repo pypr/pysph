@@ -16,6 +16,10 @@ cdef extern from 'math.h':
     double fmax(double, double) nogil
     double fmin(double, double) nogil
 
+cdef extern from 'math.h':
+    double log(double) nogil
+    double log2(double) nogil
+
 cdef extern from "z_order.h":
     ctypedef unsigned long long uint64_t
     inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil

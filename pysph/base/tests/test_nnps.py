@@ -2,7 +2,7 @@
 
 You can run the tests like so:
 
-    $ nosetests -v test_nnps.py
+    $ pytest -v test_nnps.py
 """
 import numpy
 from numpy import random
@@ -17,6 +17,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
+from pytest import importorskip
 
 class SimpleNNPSTestCase(unittest.TestCase):
     """Simplified NNPS test case
@@ -197,12 +198,15 @@ class NNPSTestCase(unittest.TestCase):
         nbrs1 = UIntArray()
         nbrs2 = UIntArray()
 
+        nps.set_context(src_index, dst_index)
+
         # get the neighbors and sort the result
         for i in range(dst_numPoints):
             nps.get_nearest_particles(src_index, dst_index, i, nbrs1)
             nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
 
             # ensure that the neighbor lists are the same
+
             self._assert_neighbors(nbrs1, nbrs2)
 
 class DictBoxSortNNPSTestCase(NNPSTestCase):
@@ -214,16 +218,20 @@ class DictBoxSortNNPSTestCase(NNPSTestCase):
         )
 
     def test_neighbors_aa(self):
-        self._test_neighbors_by_particle(src_index=0, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=0, dst_index=0,
+                dst_numPoints=self.numPoints1)
 
     def test_neighbors_ab(self):
-        self._test_neighbors_by_particle(src_index=0, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=0, dst_index=1,
+                dst_numPoints=self.numPoints2)
 
     def test_neighbors_ba(self):
-        self._test_neighbors_by_particle(src_index=1, dst_index=0, dst_numPoints=self.numPoints1)
+        self._test_neighbors_by_particle(src_index=1, dst_index=0,
+                dst_numPoints=self.numPoints1)
 
     def test_neighbors_bb(self):
-        self._test_neighbors_by_particle(src_index=1, dst_index=1, dst_numPoints=self.numPoints2)
+        self._test_neighbors_by_particle(src_index=1, dst_index=1,
+                dst_numPoints=self.numPoints2)
 
 
 class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
@@ -277,7 +285,7 @@ class MultipleLevelsStratifiedSFCNNPSTestCase(DictBoxSortNNPSTestCase):
         )
 
 class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Spatial Hash algorithm"""
+    """Test for Extended Spatial Hash algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ExtendedSpatialHashNNPS(
@@ -285,7 +293,7 @@ class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
         )
 
 class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Spatial Hash algorithm"""
+    """Test for Octree based algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.OctreeNNPS(
@@ -293,7 +301,7 @@ class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
         )
 
 class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Spatial Hash algorithm"""
+    """Test for Cell Indexing based algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.CellIndexingNNPS(
@@ -301,15 +309,42 @@ class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
         )
 
 class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Spatial Hash algorithm"""
+    """Test for Z-Order SFC based algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ZOrderNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_double=False, ctx=ctx
+        )
+
+
+class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Stratified SFC based OpenCL algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+
+        self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_double=False, num_levels=2, ctx=ctx
+        )
+
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
-    """Test for Spatial Hash algorithm"""
+    """Test for Compressed Octree based algorithm"""
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.CompressedOctreeNNPS(

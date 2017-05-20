@@ -224,6 +224,8 @@ cdef class NNPSParticleArrayWrapper:
 
         self.np = pa.get_number_of_particles()
 
+        self.copied_to_gpu = False
+
     cdef int get_number_of_particles(self):
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
@@ -231,7 +233,6 @@ cdef class NNPSParticleArrayWrapper:
     def remove_tagged_particles(self, int tag):
         cdef ParticleArray pa = self.pa
         pa.remove_tagged_particles(tag)
-
 
 ##############################################################################
 cdef class DomainManager:
@@ -719,6 +720,7 @@ cdef class Cell:
 
 
 ###############################################################################
+
 cdef class NeighborCache:
     def __init__(self, NNPS nnps, int dst_index, int src_index):
         self._dst_index = dst_index
@@ -726,6 +728,7 @@ cdef class NeighborCache:
         self._nnps = nnps
         self._particles = nnps.particles
         self._narrays = nnps.narrays
+
         cdef long n_p = self._particles[dst_index].get_number_of_particles()
         cdef int nnbr = 10
         cdef size_t i
@@ -761,9 +764,6 @@ cdef class NeighborCache:
 
     #### Public protocol ################################################
 
-    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
-        self.get_neighbors_raw(d_idx, nbrs)
-
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil:
         if self._cached.data[d_idx] == 0:
             self._find_neighbors(d_idx)
@@ -774,6 +774,9 @@ cdef class NeighborCache:
         nbrs.c_set_view(
             &(<UIntArray>self._neighbors[tid]).data[start], end - start
         )
+
+    cpdef get_neighbors(self, int src_index, size_t d_idx, UIntArray nbrs):
+        self.get_neighbors_raw(d_idx, nbrs)
 
     cpdef find_all_neighbors(self):
         cdef long d_idx
@@ -832,14 +835,7 @@ cdef class NeighborCache:
 
 
 ##############################################################################
-cdef class NNPS:
-    """Nearest neighbor query class using the box-sort algorithm.
-
-    NNPS bins all local particles using the box sort algorithm in
-    Cells. The cells are stored in a dictionary 'cells' which is keyed
-    on the spatial index (IntPoint) of the cell.
-
-    """
+cdef class NNPSBase:
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint cache=False,
                  bint sort_gids=False):
@@ -907,16 +903,6 @@ cdef class NNPS:
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
 
-        # The cache.
-        self.use_cache = cache
-        _cache = []
-        for d_idx in range(len(particles)):
-            for s_idx in range(len(particles)):
-                _cache.append(NeighborCache(self, d_idx, s_idx))
-        self.cache = _cache
-
-    #### Public protocol #################################################
-
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         cdef NNPSParticleArrayWrapper src = self.pa_wrappers[src_index]
@@ -960,17 +946,6 @@ cdef class NNPS:
             if ( (xij < hi) or (xij < hj) ):
                 nbrs.append( <ZOLTAN_ID_TYPE> j )
 
-    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
-        # Implement this in the subclass to actually do something useful.
-        pass
-
-    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
-        if self.use_cache:
-            self.current_cache.get_neighbors_raw(d_idx, nbrs)
-        else:
-            nbrs.c_reset()
-            self.find_nearest_neighbors(d_idx, nbrs)
-
     cpdef get_nearest_particles_no_cache(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs, bint prealloc):
         """Find nearest neighbors for particle id 'd_idx' without cache
@@ -999,6 +974,13 @@ cdef class NNPS:
 
         self.find_nearest_neighbors(d_idx, nbrs)
 
+    cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        # Implement this in the subclass to actually do something useful.
+        pass
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
+
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
         cdef int idx = dst_index*self.narrays + src_index
@@ -1011,9 +993,6 @@ cdef class NNPS:
             return self.get_nearest_particles_no_cache(
                 src_index, dst_index, d_idx, nbrs, False
             )
-
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
-        raise NotImplementedError("NNPS :: get_spatially_ordered_indices called")
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -1031,9 +1010,6 @@ cdef class NNPS:
         self.dst_index = dst_index
         self.current_cache = self.cache[idx]
 
-    def set_in_parallel(self, bint in_parallel):
-        self.domain.in_parallel = in_parallel
-
     cpdef spatially_order_particles(self, int pa_index):
         """Spatially order particles such that nearby particles have indices
         nearer each other.  This may improve pre-fetching on the CPU.
@@ -1048,87 +1024,6 @@ cdef class NNPS:
 
     def update_domain(self, *args, **kwargs):
         self.domain.update()
-
-    cpdef update(self):
-        """Update the local data after particles have moved.
-
-        For parallel runs, we want the NNPS to be independent of the
-        ParallelManager which is solely responsible for distributing
-        particles across available processors. We assume therefore
-        that after a parallel update, each processor has all the local
-        particle information it needs and this operation is carried
-        out locally.
-
-        For serial runs, this method should be called when the
-        particles have moved.
-
-        """
-        cdef int i, num_particles
-        cdef ParticleArray pa
-        cdef UIntArray indices
-
-        cdef DomainManager domain = self.domain
-
-        # use cell sizes computed by the domain.
-        self.cell_size = domain.cell_size
-        self.hmin = domain.hmin
-
-        # compute bounds and refresh the data structure
-        self._compute_bounds()
-        self._refresh()
-
-        # indices on which to bin. We bin all local particles
-        for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
-            # bin the particles
-            self._bin( pa_index=i, indices=indices )
-
-        if self.use_cache:
-            for cache in self.cache:
-                cache.update()
-
-    #### Private protocol ################################################
-
-    cpdef _bin(self, int pa_index, UIntArray indices):
-        raise NotImplementedError("NNPS :: _bin called")
-
-    cpdef _refresh(self):
-        raise NotImplementedError("NNPS :: _refresh called")
-
-    cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
-                              unsigned int *gids) nogil:
-        if length == 0:
-            return
-        cdef id_gid_pair_t _entry
-        cdef vector[id_gid_pair_t] _data
-        cdef vector[unsigned int] _ids
-        cdef int i
-        cdef unsigned int _id
-
-        if gids[0] == UINT_MAX:
-            # Serial runs will have invalid gids so just compare the ids.
-            _ids.resize(length)
-            for i in range(length):
-                _ids[i] = nbrs[i]
-            sort(_ids.begin(), _ids.end())
-            for i in range(length):
-                nbrs[i] = _ids[i]
-        else:
-            # Copy the neighbor id and gid data.
-            _data.resize(length)
-            for i in range(length):
-                _id = nbrs[i]
-                _entry.first = _id
-                _entry.second = gids[_id]
-                _data[i] = _entry
-            # Sort it.
-            sort(_data.begin(), _data.end(), _compare_gids)
-            # Set the sorted neighbors.
-            for i in range(length):
-                nbrs[i] = _data[i].first
 
     cdef _compute_bounds(self):
         """Compute coordinate bounds for the particles"""
@@ -1173,5 +1068,120 @@ cdef class NNPS:
         # store the minimum and maximum of physical coordinates
         self.xmin.set_data(np.asarray([xmin, ymin, zmin]))
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
+
+
+cdef class NNPS(NNPSBase):
+    """Nearest neighbor query class using the box-sort algorithm.
+
+    NNPS bins all local particles using the box sort algorithm in
+    Cells. The cells are stored in a dictionary 'cells' which is keyed
+    on the spatial index (IntPoint) of the cell.
+
+    """
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+                 int ghost_layers=1, domain=None, bint cache=False,
+                 bint sort_gids=False):
+        NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
+                domain, cache, sort_gids)
+        # The cache.
+        self.use_cache = cache
+        _cache = []
+        for d_idx in range(len(particles)):
+            for s_idx in range(len(particles)):
+                _cache.append(NeighborCache(self, d_idx, s_idx))
+        self.cache = _cache
+
+    #### Public protocol #################################################
+
+    def set_in_parallel(self, bint in_parallel):
+        self.domain.in_parallel = in_parallel
+
+    cpdef update(self):
+        """Update the local data after particles have moved.
+
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
+
+        """
+        cdef int i, num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        cdef DomainManager domain = self.domain
+
+        # use cell sizes computed by the domain.
+        self.cell_size = domain.cell_size
+        self.hmin = domain.hmin
+
+        # compute bounds and refresh the data structure
+        self._compute_bounds()
+        self._refresh()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa_index=i, indices=indices )
+
+        if self.use_cache:
+            for cache in self.cache:
+                cache.update()
+
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        if self.use_cache:
+            self.current_cache.get_neighbors_raw(d_idx, nbrs)
+        else:
+            nbrs.c_reset()
+            self.find_nearest_neighbors(d_idx, nbrs)
+
+    #### Private protocol ################################################
+
+    cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
+                              unsigned int *gids) nogil:
+        if length == 0:
+            return
+        cdef id_gid_pair_t _entry
+        cdef vector[id_gid_pair_t] _data
+        cdef vector[unsigned int] _ids
+        cdef int i
+        cdef unsigned int _id
+
+        if gids[0] == UINT_MAX:
+            # Serial runs will have invalid gids so just compare the ids.
+            _ids.resize(length)
+            for i in range(length):
+                _ids[i] = nbrs[i]
+            sort(_ids.begin(), _ids.end())
+            for i in range(length):
+                nbrs[i] = _ids[i]
+        else:
+            # Copy the neighbor id and gid data.
+            _data.resize(length)
+            for i in range(length):
+                _id = nbrs[i]
+                _entry.first = _id
+                _entry.second = gids[_id]
+                _data[i] = _entry
+            # Sort it.
+            sort(_data.begin(), _data.end(), _compare_gids)
+            # Set the sorted neighbors.
+            for i in range(length):
+                nbrs[i] = _data[i].first
+
+    cpdef _bin(self, int pa_index, UIntArray indices):
+        raise NotImplementedError("NNPS :: _bin called")
+
+    cpdef _refresh(self):
+        raise NotImplementedError("NNPS :: _refresh called")
 
 

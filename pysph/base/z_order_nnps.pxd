@@ -58,4 +58,3 @@ cdef class ZOrderNNPS(NNPS):
     cpdef _bin(self, int pa_index, UIntArray indices)
 
 
-

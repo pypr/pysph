@@ -226,3 +226,4 @@ cdef class CompressedOctreeNNPS(OctreeNNPS):
     cpdef _bin(self, int pa_index, UIntArray indices):
         pass
 
+

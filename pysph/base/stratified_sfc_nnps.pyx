@@ -9,9 +9,11 @@ from libcpp.pair cimport pair
 from cython.operator cimport dereference as deref, preincrement as inc
 
 from nnps_base cimport *
-
 # Cython for compiler directives
 cimport cython
+
+import numpy as np
+cimport numpy as np
 
 DEF EPS = 1e-13
 
@@ -20,6 +22,10 @@ IF UNAME_SYSNAME == "Windows":
         return x if x < y else y
     cdef inline double fmax(double x, double y) nogil:
         return x if x > y else y
+
+    @cython.cdivision(True)
+    cdef inline double log2(double n) nogil:
+        return log(n)/log(2)
 
 #############################################################################
 cdef class StratifiedSFCNNPS(NNPS):

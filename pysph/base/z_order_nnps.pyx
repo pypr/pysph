@@ -10,6 +10,9 @@ from cython.operator cimport dereference as deref, preincrement as inc
 # Cython for compiler directives
 cimport cython
 
+import numpy as np
+cimport numpy as np
+
 cdef extern from "<algorithm>" namespace "std" nogil:
     void sort[Iter, Compare](Iter first, Iter last, Compare comp)
     void sort[Iter](Iter first, Iter last)
@@ -316,4 +319,6 @@ cdef class ZOrderNNPS(NNPS):
         cdef key_to_idx_t* current_indices = self.pid_indices[pa_index]
 
         self.fill_array(pa_wrapper, pa_index, indices, current_pids, current_indices)
+
+
 
