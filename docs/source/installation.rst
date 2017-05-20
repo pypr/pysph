@@ -173,10 +173,13 @@ Installing the dependencies on GNU/Linux
 -----------------------------------------
 
 If you are using `Enthought Canopy`_ EDM_ or Anaconda_ the instructions in the
-section :ref:`installing-deps-osx` will be useful as the instructions are
-similar. The following are for the case where you wish to use the native
-Python packages distributed with the Linux distribution you are using.
+section :ref:`installing-deps-osx` will be useful as the instructions are the
+same. The following are for the case where you wish to use the native Python
+packages distributed with the Linux distribution you are using.
 
+If you are running into trouble, note that it is very easy to install using
+EDM_ (see :ref:`using_edm_osx`) or conda (see :ref:`using_conda_osx`) and you
+may make your lives easier going that route.
 
 GNU/Linux is probably the easiest platform to install PySPH. On Ubuntu one may
 install the dependencies using::
@@ -205,6 +208,11 @@ short do the following::
 
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
+
+On recent versions of Ubuntu (16.04 and 16.10) there may be problems with
+Mayavi viewer, and ``pysph view`` may not work correctly. To see how to
+resolve these, please look at :ref:`viewer-issues`.
+
 
 .. note::
 
@@ -749,13 +757,18 @@ If you have Mayavi_ installed this should show a UI that looks like:
     :width: 800px
     :alt: PySPH viewer
 
+If the viewer does not start, you may want to see :ref:`viewer-issues`.
+
 There are other examples that use the transport velocity formulation::
 
     $ pysph run cavity
 
 This runs the driven cavity problem using the transport velocity formulation
-of Adami et al.  The example also performs post-processing of the results and
-the ``cavity_output`` will contain a few PNG images with these.  For example for
+of Adami et al. The example also performs post-processing of the results and
+the ``cavity_output`` will contain a few PNG images with these. You may view
+these results using ``pysph view cavity_output``.
+
+For example for
 example the file ``streamlines.png`` may look like what is shown below:
 
 .. image:: ../Images/ldc-streamlines.png
@@ -766,12 +779,18 @@ examples from Gray et al., Comput. Methods Appl. Mech. Engrg. 190
 
     $ pysph run solid_mech.rings
 
-Which runs the problem of the collision of two elastic rings:
+Which runs the problem of the collision of two elastic rings. View the results
+like so::
+
+    $ pysph view rings_output
+
+This should produce something that may look like the image below.
 
 .. image:: ../Images/rings-collision.png
 
-The auto-generated code for the example resides in the directory
-``~/.pysph/source``. A note of caution however, it's not for the faint hearted.
+The auto-generated high-performance code for the example resides in the
+directory ``~/.pysph/source``. A note of caution however, it's not for the
+faint hearted.
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Running the examples with OpenMP
@@ -823,3 +842,66 @@ host information suitably to utilize the processors effectively.
 
     Note that again we are using ``pysph run`` here but for any other
     scripts, one could do ``mpirun -np python some_script.py``
+
+
+.. _viewer-issues:
+
+-------------------------------
+Possible issues with the viewer
+-------------------------------
+
+Often users are able to install PySPH and run the examples but are unable to
+run ``pysph view`` for a variety of reasons. This section discusses how these
+could be resolved.
+
+The PySPH viewer uses Mayavi_ and while Mayavi itself is a Python package and
+can be installed with pip_, it depends on VTK_ which is harder to install and
+cannot be installed using pip.
+
+If you are using Ubuntu 16.04 or 16.10 or a VTK version built with Qt5, it is
+possible that you will see a strange segmentation fault when starting the
+viewer. This is because Mayavi uses Qt4 and the VTK build has linked to Qt5. In
+this case your only option is to not use Qt at all and use the wxPython_
+backend for Mayavi.  This can be done on Linux/OS X as follows::
+
+   $ export ETS_TOOLKIT=wx
+   $ pysph view ...
+
+The environment variable ``ETS_TOOLKIT`` tells Mayavi to use wxPython. By
+default, the Mayavi viewer will use the Qt backend. You will obviously need
+wxPython installed to use the wx backend. On Ubuntu this is available via::
+
+   $ sudo apt install python-wxgtk3.0
+
+With EDM_ one can do::
+
+   $ edm install wxpython
+
+If you have VTK installed but you want a more recent version of Mayavi, you
+can always use pip_ to install Mayavi.
+
+For the very specific case of Mayavi on Ubuntu 16.04 and its derivatives, you
+can use Ubuntu's older VTK package like so::
+
+   $ sudo apt remove mayavi2 python-vtk6
+   $ sudo apt install python-vtk
+   $ pip install mayavi
+
+What this does is to remove the system Mayavi and the VTK-6.x package which is
+linked to Qt5 and instead install the older python-vtk package. Then using pip
+to install Mayavi against this version of VTK. If the problem persists
+remember that by default pip caches any previous installations of Mayavi and
+you may need to install Mayavi like this::
+
+   $ pip --no-cache-dir install mayavi
+
+
+If you are using EDM_ or Anaconda_, things should work most of the time.
+However, there may be problems and in this case please report the issues to
+the `pysph-users mailing list
+<https://groups.google.com/forum/#!forum/pysph-users>`_ or send us `email
+<mailto:pysph-users@googlegroups.com>`_.
+
+.. _VTK: http://www.vtk.org
+
+.. _wxPython: http://www.wxpython.org

@@ -719,19 +719,26 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     return p_array
 
 
-def show_2d(list_of_tuples, markers_list=None):
+def show_2d(points, **kw):
+    """Show two-dimensional geometry data.
+
+    The `points` are a tuple of x, y, z values, the extra keyword arguments are
+    passed along to the scatter function.
+
+    """
     import matplotlib.pyplot as plt
-    if markers_list == None:
-        markers_list = ['o'] * len(list_of_tuples)
-    for i, element in enumerate(list_of_tuples):
-        plt.plot(element[0], element[1], markers_list[i])
+    plt.scatter(points[0], points[1], **kw)
     plt.xlabel('X')
     plt.ylabel('Y')
-    plt.show()
 
 
-def show_3d(list_of_tuples):
+def show_3d(points, **kw):
+    """Show two-dimensional geometry data.
+
+    The `points` are a tuple of x, y, z values, the extra keyword arguments are
+    passed along to the `mlab.points3d` function.
+
+    """
     from mayavi import mlab
-    for element in list_of_tuples:
-        mlab.points3d(element[0], element[1], element[2])
+    mlab.points3d(element[0], element[1], element[2], **kw)
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')

@@ -16,10 +16,7 @@ import os.path
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
     # set the default manually via the env var.
-    try:
-        from traits.etsconfig.api import ETSConfig
-    except ImportError:
-        from enthought.etsconfig.api import ETSConfig
+    from traits.etsconfig.api import ETSConfig
     ETSConfig.toolkit = 'qt4'
 
 from traits.api import (Any, Array, Dict, HasTraits, Instance,
