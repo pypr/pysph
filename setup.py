@@ -659,7 +659,7 @@ def setup_package():
           description="A general purpose Smoothed Particle Hydrodynamics "
           "framework",
           long_description=open('README.rst').read(),
-          url='http://pysph.bitbucket.org',
+          url='http://github.com/pypr/pysph',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
           setup_requires=['pytest-runner'],
