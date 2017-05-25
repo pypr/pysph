@@ -5,7 +5,7 @@ environment:
     python: "C:\\Python27-x64"
 
   EPD_AUTH:
-    secure: 8xQi8VNnhx6CdGMEbDsSRCeRh94jQdq1LX9nab6LAWSFaT3cEm61dD3wVtUqn5QM
+    secure: 8xQi8VNnhx6CdGMEbDsSRK5BdT7J2dhwIJASlTBOjGWGkWCUC69nLVI6AtM5kkvQ
 
 init:
   - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path

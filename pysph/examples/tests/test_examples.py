@@ -54,7 +54,7 @@ def run_example(module):
 def _has_tvtk():
     try:
         from tvtk.api import tvtk
-    except ImportError:
+    except (ImportError, SystemExit):
         return False
     else:
         return True
