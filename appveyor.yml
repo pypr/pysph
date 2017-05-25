@@ -10,25 +10,23 @@ cache:
 
 init:
   - ps: $Env:sdkbin = "C:\Program Files\Microsoft SDKs\Windows\" + $Env:sdkver + "\Bin"
-  - ps: $Env:sdkverpath = "C:\Program Files\Microsoft SDKs/Windows/" + $Env:sdkver + "/Setup/WindowsSdkVer.exe"
+  - ps: $Env:sdkverpath = "C:/Program Files/Microsoft SDKs/Windows/" + $Env:sdkver + "/Setup/WindowsSdkVer.exe"
   - ps: $Env:path = "C:\Enthought\edm;" + $Env:sdkbin + ";" + $Env:path
 
 
 install:
-  # Just test to see if we have a reasonable Python.
-  - ps: python -c "import sys; print(sys.executable)"
-
-  # Install enstaller, needed so we can quickly install numpy.
+  # Install edm, needed so we can quickly install numpy.
   - ps: "(new-object net.webclient).DownloadFile('https://package-data.enthought.com/edm/win_x86_64/1.2/edm_1.2.0_x86_64.msi', 'edm.msi')"
   - ps: msiexec /qn /a edm.msi TARGETDIR=c:\
-  - edm install -y numpy cython pytest mock h5py psutil
+  - cmd: edm info
+  - cmd: edm install -y numpy cython pytest mock h5py psutil
 
   # Install pysph related dependencies.
-  - edm run -- pip install -r requirements.txt
+  - cmd: edm run -- pip install -r requirements.txt
 
   # Build pysph.
-  - edm run -- python setup.py develop
+  - cmd: edm run -- python setup.py develop
 
 test_script:
   # Run the tests.
-  - edm run -- python -m pytest -v -m "not slow" --junit-xml=pytest.xml
+  - cmd: edm run -- python -m pytest -v -m "not slow" --junit-xml=pytest.xml
