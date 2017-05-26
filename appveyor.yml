@@ -17,18 +17,18 @@ init:
 install:
   # Install edm, needed so we can quickly install numpy.
   - ps: "(new-object net.webclient).DownloadFile('https://package-data.enthought.com/edm/win_x86_64/1.6/edm_1.6.1_x86_64.msi', 'edm.msi')"
-  - ps: msiexec /a edm.msi /qn /log install.log TARGETDIR=c:\
-  - cmd: type install.log
-  - cmd: echo %PATH%
-  - cmd: edm info
-  - cmd: edm install -y numpy cython pytest mock h5py psutil
+  - start /wait msiexec /a edm.msi /qn /log install.log TARGETDIR=c:\
+  - type install.log
+  - echo %PATH%
+  - edm info
+  - edm install -y numpy cython pytest mock h5py psutil
 
   # Install pysph related dependencies.
-  - cmd: edm run -- pip install -r requirements.txt
+  - edm run -- pip install -r requirements.txt
 
   # Build pysph.
-  - cmd: edm run -- python setup.py develop
+  - edm run -- python setup.py develop
 
 test_script:
   # Run the tests.
-  - cmd: edm run -- python -m pytest -v -m "not slow" --junit-xml=pytest.xml
+  - edm run -- python -m pytest -v -m "not slow" --junit-xml=pytest.xml
