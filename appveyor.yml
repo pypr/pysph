@@ -16,9 +16,9 @@ init:
 
 install:
   # Install edm, needed so we can quickly install numpy.
-  - ps: (new-object net.webclient).DownloadFile('https://package-data.enthought.com/edm/win_x86_64/1.6/edm_1.6.1_x86_64.msi', 'edm.msi')
+  - ps: Start-FileDownload "https://package-data.enthought.com/edm/win_x86_64/1.6/edm_1.6.1_x86_64.msi"
   - dir
-  - start /wait msiexec /a edm.msi /qn /log install.log TARGETDIR=c:\
+  - start /wait msiexec /a edm_1.6.1_x86_64.msi /qn /log install.log TARGETDIR=c:\
   - dir
   - type install.log
   - echo %PATH%
