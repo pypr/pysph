@@ -1,31 +1,32 @@
 build: false
+platform: x64
+
 environment:
+  distutils_use_sdk: 1
+  sdkver: "v7.0"
 
-  global:
-    python: "C:\\Python27-x64"
-
-  EPD_AUTH:
-    secure: 8xQi8VNnhx6CdGMEbDsSRCeRh94jQdq1LX9nab6LAWSFaT3cEm61dD3wVtUqn5QM
+cache:
+  - C:\Users\appveyor\.cache
 
 init:
-  - ps: $Env:path = $Env:python + ";" + $Env:python + "\scripts;" + "C:\Program Files (x86)\Common Files\Microsoft\Visual C++ for Python\9.0\VC\Bin;" + $Env:path
+  - ps: $Env:sdkbin = "C:\Program Files\Microsoft SDKs\Windows\" + $Env:sdkver + "\Bin"
+  - ps: $Env:sdkverpath = "C:/Program Files/Microsoft SDKs/Windows/" + $Env:sdkver + "/Setup/WindowsSdkVer.exe"
+  - ps: $Env:path = "C:\Enthought\edm;" + $Env:sdkbin + ";" + $Env:path
+
 
 install:
-  # Just test to see if we have a reasonable Python.
-  - ps: python -c "import sys; print(sys.executable)"
-
-  # Install enstaller, needed so we can quickly install numpy.
-  - ps: Start-FileDownload 'https://s3.amazonaws.com/enstaller-assets/enstaller/bootstrap.py'
-  - python bootstrap.py
-  - ECHO EPD_auth = '%EPD_AUTH%' > %HOMEPATH%\.enstaller4rc
-  - enpkg numpy
+  # Install edm, needed so we can quickly install numpy.
+  - ps: Start-FileDownload "https://package-data.enthought.com/edm/win_x86_64/1.6/edm_1.6.1_x86_64.msi"
+  - start /wait msiexec /a edm_1.6.1_x86_64.msi /qn /log install.log TARGETDIR=c:\
+  - edm info
+  - edm install -y numpy cython pytest mock h5py psutil
 
   # Install pysph related dependencies.
-  - pip install -r requirements.txt
+  - edm run -- pip install -r requirements.txt
 
   # Build pysph.
-  - python setup.py develop
+  - edm run -- python setup.py develop
 
 test_script:
   # Run the tests.
-  - python -m pytest -v -m "not slow" --junit-xml=pytest.xml
+  - edm run -- python -m pytest -v -m "not slow" --junit-xml=pytest.xml

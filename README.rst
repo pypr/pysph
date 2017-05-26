@@ -1,7 +1,7 @@
 PySPH: a Python-based SPH framework
 ------------------------------------
 
-|Shippable Status| |Appveyor Status| |Codeship Status|
+|Travis Status|  |Shippable Status|  |Appveyor Status|  |Codeship Status|
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in
@@ -16,15 +16,14 @@ seamlessly with OpenMP and MPI.
 The latest documentation for PySPH is available at
 `pysph.readthedocs.org <http://pysph.readthedocs.org>`_.
 
-.. |Shippable Status| image:: https://api.shippable.com/projects/540e849c3479c5ea8f9f030e/badge?branchName=master
-   :target: https://app.shippable.com/projects/540e849c3479c5ea8f9f030e/builds/latest
-.. |Drone Status| image:: https://drone.io/bitbucket.org/pysph/pysph/status.png
-   :target: https://drone.io/bitbucket.org/pysph/pysph/latest
-.. |Codeship Status| image:: https://codeship.com/projects/473620b0-ec57-0132-044a-1a6982ed746d/status?branch=master
-   :target: https://codeship.com/projects/83729
-.. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/emqifa4xg2b837qj
-   :target: https://ci.appveyor.com/project/prabhuramachandran/pysph
-
+.. |Travis Status| image:: https://travis-ci.org/pypr/pysph.svg?branch=master
+    :target: https://travis-ci.org/pypr/pysph
+.. |Shippable Status| image:: https://api.shippable.com/projects/59272c73b2b3a60800b215d7/badge?branch=master
+   :target: https://app.shippable.com/github/pypr/pysph
+.. |Codeship Status| image:: https://app.codeship.com/projects/37370120-23ab-0135-b8f4-5ed227e7b019/status?branch=master
+   :target: https://codeship.com/projects/222098
+.. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/q7ujoef1xbguk4wx
+   :target: https://ci.appveyor.com/project/prabhuramachandran/pysph-00bq8
 Here are `videos
 <https://www.youtube.com/playlist?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr>`_
 of some example problems solved using PySPH.
@@ -69,10 +68,9 @@ available from
 `here <http://pysph.readthedocs.org/en/latest/installation.html>`_.
 
 If you wish to see a working build/test script please see our `shippable.yml
-<https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`_.  Or you could
-see the `build script <https://drone.io/bitbucket.org/pysph/pysph/admin>`_
-hosted at `drone.io <http://drone.io>`_ or for Windows platforms see the
-`appveyor.yml <https://bitbucket.org/pysph/pysph/src/master/appveyor.yml>`_.
+<https://github.com/pypr/pysph/blob/master/shippable.yml>`_. For
+Windows platforms see the `appveyor.yml
+<https://github.com/pypr/pysph/blob/master/appveyor.yml>`_.
 
 Running the examples
 --------------------
@@ -108,7 +106,7 @@ as::
 This runs the 3D dam-break problem which is also a SPHERIC benchmark
 `Test 2 <https://wiki.manchester.ac.uk/spheric/index.php/Test2>`_
 
-.. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/db3d.png
+.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/db3d.png
    :width: 550px
    :alt: Three-dimensional dam-break example
 
@@ -121,7 +119,7 @@ Adami et al. The output directory ``cavity_output`` will also contain
 streamlines and other post-processed results after the simulation completes.
 For example the streamlines look like the following image:
 
-.. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/ldc-streamlines.png
+.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/ldc-streamlines.png
    :width: 550px
    :alt: Lid-driven-cavity example
 
@@ -132,7 +130,7 @@ examples from the ``pysph.examples.solid_mech`` package::
 
 Which runs the problem of the collision of two elastic rings:
 
-.. figure:: https://bitbucket.org/pysph/pysph/raw/master/docs/Images/rings-collision.png
+.. figure:: https://github.com/pypr/pysph/raw/master/docs/Images/rings-collision.png
    :width: 550px
    :alt: Collision of two steel rings
 
@@ -173,5 +171,4 @@ please email or post your questions on the pysph-users mailing list here:
 https://groups.google.com/d/forum/pysph-users
 
 Please also take a look at the `PySPH issue tracker
-<https://bitbucket.org/pysph/pysph/issues>`_.
-
+<https://github.com/pypr/pysph/issues>`_.
