@@ -49,7 +49,7 @@ can download the sources either using the tarball/ZIP or from git, see
 The above will install the latest released version of PySPH, you can install
 the development version using::
 
-    $ pip install git+https://bitbucket.org/pysph/pysph.git#egg=PySPH
+    $ pip install git+https://github.com/pypr/pysph.git#egg=PySPH
 
 If you wish to track the development of the package, clone the repository (as
 described in :ref:`downloading-pysph` and do the following::
@@ -85,7 +85,7 @@ how to do this for different distributions, see below.
 
 On Python-2.6.x a few additional packages are needed and these are listed in
 the project's `requirements-2.6.txt
-<https://bitbucket.org/pysph/pysph/src/master/requirements-2.6.txt>`_
+<https://github.com/pypr/pysph/src/master/requirements-2.6.txt>`_
 
 Running PySPH requires a working C/C++ compiler on your machine.  On Linux/OS X
 the gcc toolchain will work well.  On Windows, you will need to have `Microsoft
@@ -145,7 +145,7 @@ Linux and OS X but not on Windows.  It can be used as::
 where the ``INSTALL_PREFIX`` is where the library and includes will be
 installed.  You may edit and tweak the build to suit your installation.
 However, this script is what we use to build Zoltan on our continuous
-integration servers on Drone_ and Shippable_.
+integration servers on Travis-CI_ and Shippable_.
 
 After Zoltan is build, set the environment variable ``ZOLTAN`` to point to the
 ``INSTALL_PREFIX`` that you used above::
@@ -218,14 +218,10 @@ resolve these, please look at :ref:`viewer-issues`.
 
     If you wish to see a working build/test script please see our
     `shippable.yml
-    <https://bitbucket.org/pysph/pysph/src/master/shippable.yml>`_. Or you
-    could see the `build script
-    <https://drone.io/bitbucket.org/pysph/pysph/admin>`_ hosted at `Drone.io
-    <http://drone.io>`_.
+    <https://github.com/pypr/pysph/src/master/shippable.yml>`_.
 
-.. _Drone: http://drone.io
 .. _Shippable: http://shippable.com
-
+.. _Travis-CI: http://travis-ci.org
 
 .. _installing-deps-osx:
 
@@ -629,10 +625,10 @@ below.
 
 To get PySPH using git_ type the following ::
 
-    $ git clone https://bitbucket.org/pysph/pysph.git
+    $ git clone https://github.com/pypr/pysph.git
 
 If you do not have git_ or do not wish to bother with it, you can get a ZIP or
-tarball from the `pysph site <https://bitbucket.org/pysph/pysph/downloads>`_.
+tarball from the `pysph site <https://github.com/pypr/pysph/downloads>`_.
 You can unzip/untar this and use the sources.
 
 .. _git: http://git-scm.com/
@@ -645,7 +641,7 @@ directory ``pysph`` and are inside the root of this directory. For example::
 
 or if you cloned the repository::
 
-    $ git clone https://bitbucket.org/pysph/pysph.git
+    $ git clone https://github.com/pypr/pysph.git
     $ cd pysph
 
 Once you have downloaded PySPH you should be ready to build and install it,

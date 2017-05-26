@@ -23,8 +23,8 @@ Here are some videos of simulations made with PySPH.
     </div>
 
 
-PySPH is hosted on `bitbucket <http://bitbucket.org/pysph/pysph>`_.  Please see
-the `bitbucket <http://bitbucket.org/pysph/pysph>`_ site for development
+PySPH is hosted on `github <http://github.com/pypr/pysph>`_.  Please see
+the `github <http://github.com/pypr/pysph>`_ site for development
 details.
 
 .. _Python: http://www.python.org

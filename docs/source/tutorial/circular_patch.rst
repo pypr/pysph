@@ -17,7 +17,7 @@ tutorial explains some of those details by solving the same problem using a
 lower-level approach where the actual SPH equations, the integrator and the
 solver are created manually.  This should help a user write their own schemes
 or modify an existing scheme.  The full code for this example can be seen in `elliptical_drop_no_scheme.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/elliptical_drop_no_scheme.py>`_.
+<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop_no_scheme.py>`_.
 
 
 Imports

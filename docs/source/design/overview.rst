@@ -349,7 +349,7 @@ Now that we have a hypothetical implementation outlined, we can proceed to
 describe the abstractions that PySPH introduces, enabling a highly user
 friendly and flexible way to define pairwise particle interactions.  To see a
 working example, see `dam_break_2d.py
-<https://bitbucket.org/pysph/pysph/src/master/pysph/examples/dam_break_2d.py>`_.
+<https://github.com/pypr/pysph/src/master/pysph/examples/dam_break_2d.py>`_.
 
 We assume that we have the same **ParticleArrays** (*fluid* and
 *solid*) and **NNPS** objects as before.
