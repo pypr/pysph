@@ -289,7 +289,7 @@ class TestScheduler(unittest.TestCase):
 
         # Wait for this job to end and then see what happens
         # When a new job is submitted.
-        self._wait_while_not_done(proxy, 15)
+        self._wait_while_not_done(proxy, 25)
 
         # When
         j = self._make_dummy_job()

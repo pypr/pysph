@@ -24,15 +24,16 @@ def _check_write_source(root):
     """
     m = mock.mock_open()
     with mock.patch('pysph.base.ext_module.open', m, create=True):
-        s = ExtModule("print 'hello'", root=root)
+        s = ExtModule("print('hello')", root=root)
     if m.called:
         with open(*m.call_args[0]) as fp:
             fp.write("junk")
     return m.call_count
 
+
 def _check_compile(root):
     with mock.patch('shutil.copy') as m:
-        s = ExtModule("print 'hello'", root=root)
+        s = ExtModule("print('hello')", root=root)
         s.build()
     if m.called:
         # If it was called, do the copy to mimic the action.
