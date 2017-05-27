@@ -12,7 +12,7 @@ from pysph.solver.application import Application
 
 from pysph.sph.equation import Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
-
+from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
 
 # domain and constants
 L = 1.0; U = 1.0
@@ -29,27 +29,6 @@ def exact_solution(U, b, t, x, y):
     p = -0.25*(cos(4*pi*x) + cos(4*pi*y))
 
     return factor * u, factor * v, factor*factor*p
-
-
-class ComputeAveragePressure(Equation):
-    """Simple function to compute the average pressure at each particle.
-
-    This is used for the Basa, Quinlan and Lastiwka correction from their 2009
-    paper.  This equation should be in a separate group and computed before the
-    Momentum equation.
-    """
-    def initialize(self, d_idx, d_pavg, d_nnbr):
-        d_pavg[d_idx] = 0.0
-        d_nnbr[d_idx] = 0.0
-
-    def loop(self, d_idx, d_pavg, s_idx, s_p, d_nnbr):
-        d_pavg[d_idx] += s_p[s_idx]
-        d_nnbr[d_idx] += 1.0
-
-    def post_loop(self, d_idx, d_pavg, d_nnbr):
-        if d_nnbr[d_idx] > 0:
-            d_pavg[d_idx] /= d_nnbr[d_idx]
-
 
 
 class TaylorGreen(Application):
@@ -106,6 +85,8 @@ class TaylorGreen(Application):
             scheme.configure(pb=self.options.pb_factor*p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
+        elif self.options.scheme == 'edac':
+            scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor*p0)
         kernel = QuinticSpline(dim=2)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
 
@@ -120,7 +101,11 @@ class TaylorGreen(Application):
             ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
             p0=p0, pb=None, h0=h0
         )
-        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf)
+        edac = EDACScheme(
+            ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
+            pb=p0, h=h0
+        )
+        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf, edac=edac)
         return s
 
     def create_domain(self):
