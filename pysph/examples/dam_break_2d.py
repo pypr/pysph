@@ -10,10 +10,11 @@ J.C Crespo, Journal of Hydraulic Research, Vol 48, Extra Issue (2010), pp
 import os
 import numpy as np
 
-from pysph.base.kernels import WendlandQuintic
+from pysph.base.kernels import WendlandQuintic, QuinticSpline
 from pysph.examples._db_geometry import DamBreak2DGeometry
 from pysph.solver.application import Application
-from pysph.sph.scheme import WCSPHScheme
+from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
+from pysph.sph.wc.edac import EDACScheme
 
 fluid_column_height = 2.0
 fluid_column_width = 1.0
@@ -21,7 +22,9 @@ container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
 #h = 0.0156
+nu = 0.0
 h = 0.039
+g = 9.81
 ro = 1000.0
 co = 10.0 * np.sqrt(2*9.81*fluid_column_height)
 gamma = 7.0
@@ -43,39 +46,91 @@ class DamBreak2D(Application):
     def consume_user_options(self):
         self.h = h/self.options.h_factor
         print("Using h = %f"%self.h)
-        self.hdx = self.hdx
+        if self.options.scheme == 'wcsph':
+            self.hdx = self.hdx
+        else:
+            self.hdx = 1.0
         self.dx = self.h/self.hdx
 
     def configure_scheme(self):
-        self.scheme.configure(h0=self.h, hdx=self.hdx)
-        kernel = WendlandQuintic(dim=2)
         tf = 2.5
-        from pysph.sph.integrator import EPECIntegrator
-        self.scheme.configure_solver(
-            kernel=kernel,
-            integrator_cls=EPECIntegrator,
-            tf=tf,
-            adaptive_timestep=True, n_damp=50, fixed_h=False,
-            output_at_times=[0.4, 0.6, 0.8, 1.0]
+        kw = dict(
+            tf=tf, output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
+        if self.options.scheme == 'wcsph':
+            self.scheme.configure(h0=self.h, hdx=self.hdx)
+            kernel = WendlandQuintic(dim=2)
+            from pysph.sph.integrator import EPECIntegrator
+            kw.update(
+                dict(
+                    integrator_cls=EPECIntegrator,
+                    kernel=kernel, adaptive_timestep=True, n_damp=50,
+                    fixed_h=False
+                )
+            )
+        elif self.options.scheme == 'aha':
+            self.scheme.configure(h0=self.h)
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125*self.h/co
+            kw.update(
+                dict(
+                    kernel=kernel, dt=dt
+                )
+            )
+            print("dt = %f"%dt)
+        elif self.options.scheme == 'edac':
+            self.scheme.configure(h=self.h)
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125*self.h/co
+            kw.update(
+                dict(
+                    kernel=kernel, dt=dt
+                )
+            )
+            print("dt = %f"%dt)
+
+        self.scheme.configure_solver(**kw)
 
     def create_scheme(self):
-        s = WCSPHScheme(
+        wcsph = WCSPHScheme(
             ['fluid'], ['boundary'], dim=2, rho0=ro, c0=co,
             h0=h, hdx=1.3, gy=-9.81, alpha=alpha, beta=beta,
             gamma=gamma, hg_correction=True, update_h=True
         )
+        aha = AdamiHuAdamsScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, c0=co, nu=nu,
+            rho0=ro, h0=h, p0=0.0, gy=-g, gamma=1.0, tdamp=0.0, alpha=alpha
+        )
+        edac = EDACScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, c0=co, nu=nu,
+            rho0=ro, h=h, pb=0.0, gy=-g, eps=0.0, clamp_p=True
+        )
+        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
         return s
 
     def create_particles(self):
+        if self.options.scheme == 'wcsph':
+            nboundary_layers = 2
+            nfluid_offset = 2
+            wall_hex_pack = True
+        else:
+            nboundary_layers = 4
+            nfluid_offset = 1
+            wall_hex_pack = False
         geom = DamBreak2DGeometry(
             container_width=container_width, container_height=container_height,
             fluid_column_height=fluid_column_height,
             fluid_column_width=fluid_column_width, dx=self.dx, dy=self.dx,
             nboundary_layers=1, ro=ro, co=co,
-            with_obstacle=False,
+            with_obstacle=False, wall_hex_pack=wall_hex_pack,
             beta=1.0, nfluid_offset=1, hdx=self.hdx)
-        return geom.create_particles()
+        fluid, boundary = geom.create_particles(
+            nboundary_layers=nboundary_layers, hdx=self.hdx,
+            nfluid_offset=nfluid_offset,
+        )
+        self.scheme.setup_properties([fluid, boundary])
+
+        return [fluid, boundary]
 
     def post_process(self, info_fname):
         info = self.read_info(info_fname)
