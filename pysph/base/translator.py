@@ -15,7 +15,6 @@ TODO
 - support user-guided type declarations.
 - support some automatic type detection using default args.
 - support simple classes -> mangled methods + structs.
-- 100% coverage
 
 '''
 
@@ -57,10 +56,10 @@ class CConverter(ast.NodeVisitor):
             return ''
 
     def visit_Name(self, node):
-        if isinstance(node.ctx, self._name_ctx):
-            if node.id not in self._declares and node.id not in self._known:
-                self._declares[node.id] = 'double %s;' % node.id
-            return node.id
+        assert isinstance(node.ctx, self._name_ctx)
+        if node.id not in self._declares and node.id not in self._known:
+            self._declares[node.id] = 'double %s;' % node.id
+        return node.id
 
     def visit_Add(self, node):
         return '+'
@@ -72,24 +71,22 @@ class CConverter(ast.NodeVisitor):
         return '%s = %s;' % (self.visit(node.targets[0]), self.visit(node.value))
 
     def visit_Attribute(self, node):
-        return '%s.%s' % (self.visit(node.value), node.attr)
+        return '%s->%s' % (self.visit(node.value), node.attr)
 
     def visit_AugAssign(self, node):
         return '%s %s= %s;' % (self.visit(node.target), self.visit(node.op),
                                self.visit(node.value))
 
     def visit_BinOp(self, node):
-        result = tuple(self.visit(x) for x in (node.left, node.op, node.right))
-        return '(%s %s %s)' % result
+        if isinstance(node.op, ast.Pow):
+            return 'pow(%s, %s)' %(self.visit(node.left), self.visit(node.right))
+        else:
+            result = tuple(self.visit(x) for x in (node.left, node.op, node.right))
+            return '(%s %s %s)' % result
 
     def visit_BoolOp(self, node):
-        if len(node.values) != 2:
-            raise NotImplementedError(
-                'Only 2 operands supported for boolean operations.'
-            )
-        return '(%s %s %s)' % (self.visit(node.values[0]),
-                               self.visit(node.op),
-                               self.visit(node.values[1]))
+        op = ' %s ' % self.visit(node.op)
+        return '(%s)' % (op.join(self.visit(x) for x in node.values))
 
     def visit_Break(self, node):
         return 'break;'
@@ -214,9 +211,8 @@ class CConverter(ast.NodeVisitor):
     def visit_Or(self, node):
         return '||'
 
-    def visit_Power(self, node):
-        # FIXME
-        return '**'
+    def visit_Pass(self, node):
+        return ';'
 
     def visit_Return(self, node):
         return 'return %s;' % (self.visit(node.value))
