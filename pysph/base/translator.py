@@ -11,7 +11,6 @@ tested and modified to be suitable for use with PySPH.
 TODO
 ----
 
-- support declaring variables using the declare function.
 - support user-guided type declarations.
 - support some automatic type detection using default args.
 - support simple classes -> mangled methods + structs.
@@ -47,6 +46,14 @@ class CConverter(ast.NodeVisitor):
         pad = ' '*4
         return '\n'.join(pad + x for x in lines)
 
+    def _get_variable_declaration(self, type_str, name):
+        if type_str.startswith('matrix'):
+            shape = ast.literal_eval(type_str[7:-1])
+            sz = ''.join('[%d]' % x for x in shape)
+            return 'double %s%s;' % (name, sz)
+        else:
+            return '%s %s;' %(type_str, name)
+
     def get_declarations(self):
         if len(self._declares) > 0:
             return '\n'.join(
@@ -68,7 +75,14 @@ class CConverter(ast.NodeVisitor):
         return '&&'
 
     def visit_Assign(self, node):
-        return '%s = %s;' % (self.visit(node.targets[0]), self.visit(node.value))
+        assert len(node.targets) == 1, "Assignments can have only one target."
+        left, right = node.targets[0], node.value
+        if isinstance(right, ast.Call) and right.func.id == 'declare':
+            assert isinstance(right.args[0], ast.Str), \
+                "Argument to declare should be a string."
+            type = right.args[0].s
+            return self._get_variable_declaration(type, self.visit(left))
+        return '%s = %s;' % (self.visit(left), self.visit(right))
 
     def visit_Attribute(self, node):
         return '%s->%s' % (self.visit(node.value), node.attr)

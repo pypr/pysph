@@ -461,3 +461,52 @@ def test_attribute():
     double self;
     self->x = 1
     ''')
+
+
+def test_declare_call_declares_variable():
+    # Given
+    src = dedent('''
+    x = declare('int')
+    x += 1
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int x;
+    x += 1;
+    ''')
+
+
+def test_declare_matrix():
+    # Given
+    src = dedent('''
+    x = declare('matrix((3,))')
+    do(x[0])
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x[3];
+    do(x[0]);
+    ''')
+
+    # Given
+    src = dedent('''
+    x = declare('matrix((2, 3))')
+    do(x[0][1])
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x[2][3];
+    do(x[0][1]);
+    ''')
