@@ -11,20 +11,51 @@ tested and modified to be suitable for use with PySPH.
 TODO
 ----
 
-- support user-guided type declarations.
-- support some automatic type detection using default args.
 - support simple classes -> mangled methods + structs.
 
 '''
 
 import ast
 import re
+from pysph.base.cython_generator import (
+    CodeGenerationError, KnownType, Undefined, all_numeric
+)
 
 
-def py2c(src):
+def detect_type(name, value):
+    if isinstance(value, KnownType):
+        return value.type
+    if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+        return 'double*'
+    if name in ['s_idx', 'd_idx']:
+        return 'long'
+    if value is Undefined or isinstance(value, Undefined):
+        raise CodeGenerationError('Unknown type, for %s' % name)
+
+    if isinstance(value, bool):
+        return 'int'
+    elif isinstance(value, int):
+        return 'long'
+    elif isinstance(value, float):
+        return 'double'
+    elif isinstance(value, (list, tuple)):
+        if all_numeric(value):
+            # We don't deal with integer lists for now.
+            return 'double*'
+        else:
+            raise CodeGenerationError(
+                'Unknown type, for %s with value %s' % (name, value)
+            )
+    else:
+        raise CodeGenerationError(
+            'Unknown type, for %s with value %s' % (name, value)
+        )
+
+
+def py2c(src, detect_type=detect_type, known_types=None):
     code = ast.parse(src)
     print(ast.dump(code))
-    converter = CConverter()
+    converter = CConverter(detect_type=detect_type, known_types=known_types)
     result = converter.visit(code)
     r = converter.get_declarations() + result
     print(r)
@@ -32,11 +63,13 @@ def py2c(src):
 
 
 class CConverter(ast.NodeVisitor):
-    def __init__(self):
+    def __init__(self, detect_type=detect_type, known_types=None):
         self._declares = {}
         self._known = set()
         self._name_ctx = (ast.Load, ast.Store)
         self._indent = ''
+        self._detect_type = detect_type
+        self._known_types = known_types if known_types is not None else {}
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
@@ -156,10 +189,35 @@ class CConverter(ast.NodeVisitor):
              )
         return r
 
+    def _get_function_args(self, node):
+        args = [x.id for x in node.args.args]
+        defaults = [ast.literal_eval(x) for x in node.args.defaults]
+
+        # Fill up the call_args dict with the defaults.
+        call_args = {}
+        for i in range(1, len(defaults) + 1):
+            call_args[args[-i]] = defaults[-i]
+
+        # Set the rest to Undefined.
+        for i in range(len(args) - len(defaults)):
+            call_args[args[i]] = Undefined
+
+        call_args.update(self._known_types)
+        call_sig = []
+        for arg in args:
+            value = call_args[arg]
+            type = self._detect_type(arg, value)
+            call_sig.append('{type} {arg}'.format(type=type, arg=arg))
+
+        return ', '.join(call_sig)
+
     def visit_FunctionDef(self, node):
+        assert node.args.vararg is None, "Functions with varargs nor supported."
+        assert node.args.kwarg is None, "Functions with kwargs not supported."
+
         orig_known = set(self._known)
         self._known.update(x.id for x in node.args.args)
-        args = ', '.join('double %s' % x.id for x in node.args.args)
+        args = self._get_function_args(node)
         body = '\n'.join('    %s' % self.visit(item) for item in node.body)
         if self._body_has_return(body):
             sig = 'double %s(%s) {\n' % (node.name, args)

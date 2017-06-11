@@ -1,7 +1,9 @@
 from textwrap import dedent
 import pytest
 
-from pysph.base.translator import py2c
+from pysph.base.translator import (
+    py2c, KnownType, CodeGenerationError
+)
 
 
 def test_simple_assignment_expression():
@@ -219,7 +221,7 @@ def test_subscript():
 def test_simple_function_with_return():
     # Given
     src = dedent('''
-    def f(x):
+    def f(x=0.0):
         return x+1
     ''')
 
@@ -238,7 +240,7 @@ def test_simple_function_with_return():
 def test_simple_function_without_return():
     # Given
     src = dedent('''
-    def f(y, x):
+    def f(y=0.0, x=0.0):
         y += x
     ''')
 
@@ -252,6 +254,100 @@ def test_simple_function_without_return():
     }
     ''')
     assert code == expect.strip()
+
+
+def test_function_argument_types():
+    # Given
+    src = dedent('''
+    def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    void f(long s_idx, double* s_p, long d_idx, double* d_p, long J, double t, double* l, double* xx) {
+        ;
+    }
+    ''')
+    assert code == expect.strip()
+
+
+def test_known_types_in_funcargs():
+    # Given
+    src = dedent('''
+    def f(x, xx, cond=True):
+        pass
+    ''')
+
+    # When
+    known_types = {'xx': KnownType('foo*'), 'x': KnownType('float32')}
+    code = py2c(src, known_types=known_types)
+
+    # Then
+    expect = dedent('''
+    void f(float32 x, foo* xx, int cond) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_raises_error_when_unknown_args_are_given():
+    # Given
+    src = dedent('''
+    def f(x):
+        pass
+    ''')
+
+    # When/Then
+    with pytest.raises(CodeGenerationError):
+        code = py2c(src)
+
+    # Given
+    # Unsupported default arg.
+    src = dedent('''
+    def f(x=''):
+        pass
+    ''')
+
+    # When/Then
+    with pytest.raises(CodeGenerationError):
+        code = py2c(src)
+
+    # Given
+    # Unsupported default arg list.
+    src = dedent('''
+    def f(x=(1, '')):
+        pass
+    ''')
+
+    # When/Then
+    with pytest.raises(CodeGenerationError):
+        code = py2c(src)
+
+
+def test_user_supplied_detect_type():
+    # Given
+    src = dedent('''
+    def f(x, xx=[1,2,3], cond=True):
+        pass
+    ''')
+
+    # When
+    def dt(name, value):
+        return 'double'
+    code = py2c(src, detect_type=dt)
+
+    # Then
+    expect = dedent('''
+    void f(double x, double xx, double cond) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
 
 
 def test_while():
@@ -447,7 +543,7 @@ def test_try_block_raises_error():
         code = py2c(src)
 
 
-def test_attribute():
+def test_attribute_access():
     # Given
     src = dedent('''
     self.x = 1
