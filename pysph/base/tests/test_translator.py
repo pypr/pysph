@@ -117,7 +117,6 @@ def test_conditionals():
     ''')
     assert code.strip() == expect.strip()
 
-
     # Given
     src = dedent('''
     if x != 10 and x is 100 or (x == 20 and x is not 1):
@@ -169,8 +168,9 @@ def test_power():
     # Then
     expect = dedent('''
     double x;
-    (1.5 * pow(x, 2))
+    (1.5 * pow(x, 2));
     ''')
+    assert code.strip() == expect.strip()
 
 
 def test_only_two_operands_supported_for_comparisons():
@@ -182,7 +182,7 @@ def test_only_two_operands_supported_for_comparisons():
 
     # When
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
 
 def test_calling_function():
@@ -304,7 +304,7 @@ def test_raises_error_when_unknown_args_are_given():
 
     # When/Then
     with pytest.raises(CodeGenerationError):
-        code = py2c(src)
+        py2c(src)
 
     # Given
     # Unsupported default arg.
@@ -315,7 +315,7 @@ def test_raises_error_when_unknown_args_are_given():
 
     # When/Then
     with pytest.raises(CodeGenerationError):
-        code = py2c(src)
+        py2c(src)
 
     # Given
     # Unsupported default arg list.
@@ -326,7 +326,7 @@ def test_raises_error_when_unknown_args_are_given():
 
     # When/Then
     with pytest.raises(CodeGenerationError):
-        code = py2c(src)
+        py2c(src)
 
 
 def test_user_supplied_detect_type():
@@ -450,8 +450,6 @@ def test_two_fors():
     assert code.strip() == expect.strip()
 
 
-
-
 def test_for_with_break_continue():
     # Given
     src = dedent('''
@@ -490,7 +488,7 @@ def test_for_not_range_and_else_fails():
 
     # When/Then
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
     # Given
     src = dedent('''
@@ -502,7 +500,7 @@ def test_for_not_range_and_else_fails():
 
     # When/Then
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
     # Given
     src = dedent('''
@@ -512,7 +510,7 @@ def test_for_not_range_and_else_fails():
 
     # When/Then
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
 
 def test_while_else_raises_error():
@@ -526,7 +524,7 @@ def test_while_else_raises_error():
 
     # When/Then
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
 
 def test_try_block_raises_error():
@@ -540,7 +538,7 @@ def test_try_block_raises_error():
 
     # When/Then
     with pytest.raises(NotImplementedError):
-        code = py2c(src)
+        py2c(src)
 
 
 def test_attribute_access():
@@ -555,8 +553,10 @@ def test_attribute_access():
     # Then
     expect = dedent('''
     double self;
-    self->x = 1
+    self->x = 1;
     ''')
+
+    assert code.strip() == expect.strip()
 
 
 def test_declare_call_declares_variable():
@@ -574,6 +574,7 @@ def test_declare_call_declares_variable():
     int x;
     x += 1;
     ''')
+    assert code.strip() == expect.strip()
 
 
 def test_declare_matrix():
@@ -591,6 +592,7 @@ def test_declare_matrix():
     double x[3];
     do(x[0]);
     ''')
+    assert code.strip() == expect.strip()
 
     # Given
     src = dedent('''
@@ -606,3 +608,4 @@ def test_declare_matrix():
     double x[2][3];
     do(x[0][1]);
     ''')
+    assert code.strip() == expect.strip()

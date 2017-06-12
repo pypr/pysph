@@ -114,6 +114,7 @@ class CConverter(ast.NodeVisitor):
             assert isinstance(right.args[0], ast.Str), \
                 "Argument to declare should be a string."
             type = right.args[0].s
+            self._known.add(left.id)
             return self._get_variable_declaration(type, self.visit(left))
         return '%s = %s;' % (self.visit(left), self.visit(right))
 
