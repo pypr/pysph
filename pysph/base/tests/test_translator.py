@@ -609,3 +609,41 @@ def test_declare_matrix():
     do(x[0][1]);
     ''')
     assert code.strip() == expect.strip()
+
+
+def test_class():
+    # Given
+    src = dedent('''
+    class Foo(object):
+        def g(self, x=0.0):
+            pass
+        def f(self, x=0.0):
+            do(self.a, x)
+            self.g(x)
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    void Foo_g(Foo* self, double x) {
+        ;
+    }
+    void Foo_f(Foo* self, double x) {
+        do(self->a, x);
+        Foo_g(self, x);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_unsupported_method():
+    # Given
+    src = dedent('''
+    np.identity(25)
+    ''')
+
+    # When
+    with pytest.raises(NotImplementedError):
+        py2c(src)
