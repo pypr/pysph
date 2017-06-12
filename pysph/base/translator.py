@@ -85,7 +85,7 @@ class CConverter(ast.NodeVisitor):
             sz = ''.join('[%d]' % x for x in shape)
             return 'double %s%s;' % (name, sz)
         else:
-            return '%s %s;' %(type_str, name)
+            return '%s %s;' % (type_str, name)
 
     def get_declarations(self):
         if len(self._declares) > 0:
@@ -127,9 +127,12 @@ class CConverter(ast.NodeVisitor):
 
     def visit_BinOp(self, node):
         if isinstance(node.op, ast.Pow):
-            return 'pow(%s, %s)' %(self.visit(node.left), self.visit(node.right))
+            return 'pow(%s, %s)' % (
+                self.visit(node.left), self.visit(node.right)
+            )
         else:
-            result = tuple(self.visit(x) for x in (node.left, node.op, node.right))
+            result = tuple(self.visit(x)
+                           for x in (node.left, node.op, node.right))
             return '(%s %s %s)' % result
 
     def visit_BoolOp(self, node):
@@ -166,7 +169,9 @@ class CConverter(ast.NodeVisitor):
 
     def visit_For(self, node):
         if node.iter.func.id != 'range':
-            raise NotImplementedError('Only for var in range syntax supported.')
+            raise NotImplementedError(
+                'Only for var in range syntax supported.'
+            )
         if node.orelse:
             raise NotImplementedError('For/else not supported.')
         args = node.iter.args
@@ -179,7 +184,7 @@ class CConverter(ast.NodeVisitor):
         else:
             raise NotImplementedError('range should have either [1,2,3] args')
         if isinstance(node.target, ast.Name) and \
-           not node.target.id in self._known:
+           node.target.id not in self._known:
             self._known.add(node.target.id)
         r = ('for (long {i}={start}; {i}<{stop}; {i}+={incr})'
              ' {{\n{block}\n}}\n').format(
@@ -213,7 +218,8 @@ class CConverter(ast.NodeVisitor):
         return ', '.join(call_sig)
 
     def visit_FunctionDef(self, node):
-        assert node.args.vararg is None, "Functions with varargs nor supported."
+        assert node.args.vararg is None, \
+            "Functions with varargs nor supported."
         assert node.args.kwarg is None, "Functions with kwargs not supported."
 
         orig_known = set(self._known)
@@ -294,7 +300,9 @@ class CConverter(ast.NodeVisitor):
         return '-'
 
     def visit_Subscript(self, node):
-        return '%s[%s]' % (self.visit(node.value), self.visit(node.slice.value))
+        return '%s[%s]' % (
+            self.visit(node.value), self.visit(node.slice.value)
+        )
 
     def visit_TryExcept(self, node):
         raise NotImplementedError('Try/except not implemented.')
