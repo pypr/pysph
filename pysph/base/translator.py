@@ -7,16 +7,15 @@ https://github.com/mdipierro/ocl
 This code does not use meta and uses the standard ast visitor, it is also
 tested and modified to be suitable for use with PySPH.
 
-
-TODO
-----
-
-- convert class instance to struct.
-
 '''
 
 import ast
+import inspect
 import re
+from textwrap import dedent
+
+from mako.template import Template
+
 from pysph.base.cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )
@@ -58,6 +57,23 @@ def py2c(src, detect_type=detect_type, known_types=None):
     r = converter.get_declarations() + result
     print(r)
     return r
+
+
+class CStructHelper(object):
+    def __init__(self, name, vars):
+        self.name = name
+        self.vars = vars
+
+    def generate(self):
+        template = dedent("""
+        typedef struct ${class_name} {
+        %for name, type in sorted(vars.items()):
+            ${type} ${name};
+        %endfor
+        } ${class_name};
+        """)
+        t = Template(text=template)
+        return t.render(class_name=self.name, vars=self.vars)
 
 
 class CConverter(ast.NodeVisitor):
@@ -108,6 +124,18 @@ class CConverter(ast.NodeVisitor):
         else:
             return '%s %s;' % (type_str, name)
 
+    def _get_public_vars(self, obj):
+        data = obj.__dict__
+        vars = {}
+        type_names = {int: 'int', float: 'double', bool: 'int'}
+        for name in data:
+            if name.startswith('_'):
+                continue
+            value = data[name]
+            if isinstance(value, (int, float, bool)):
+                vars[name] = type_names[type(value)]
+        return vars
+
     def _indent_block(self, code):
         lines = code.splitlines()
         pad = ' '*4
@@ -135,6 +163,15 @@ class CConverter(ast.NodeVisitor):
             ) + '\n'
         else:
             return ''
+
+    def parse_instance(self, obj):
+        name = obj.__class__.__name__
+        vars = self._get_public_vars(obj)
+        helper = CStructHelper(name, vars)
+        code = helper.generate() + '\n'
+        src = dedent(inspect.getsource(obj.__class__))
+        code += self.convert(src)
+        return code
 
     def visit_Add(self, node):
         return '+'
@@ -251,6 +288,9 @@ class CConverter(ast.NodeVisitor):
             "Functions with varargs nor supported in line %d." % node.lineno
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
+
+        if self._class_name and node.name.startswith('_'):
+            return ''
 
         orig_known = set(self._known)
         self._known.update(x.id for x in node.args.args)

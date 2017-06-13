@@ -2,7 +2,7 @@ from textwrap import dedent
 import pytest
 
 from pysph.base.translator import (
-    py2c, KnownType, CodeGenerationError
+    py2c, KnownType, CConverter, CodeGenerationError, CStructHelper
 )
 
 
@@ -647,3 +647,55 @@ def test_unsupported_method():
     # When
     with pytest.raises(NotImplementedError):
         py2c(src)
+
+
+def test_c_struct_helper():
+    # Given
+    h = CStructHelper(name='Fruit', vars={'apple': 'int', 'pear': 'double',
+                                          'banana': 'float'})
+
+    # When
+    result = h.generate()
+
+    # Then
+    expect = dedent('''
+    typedef struct Fruit {
+        int apple;
+        float banana;
+        double pear;
+    } Fruit;
+    ''')
+    assert result.strip() == expect.strip()
+
+
+def test_wrapping_class():
+    # Given
+    class Dummy(object):
+        def __init__(self, x=0, f=0.0, s=''):
+            self.x = x
+            self.f = f
+            self.s = s
+            self._private = 1
+
+        def method(self):
+            pass
+
+    obj = Dummy()
+
+    # When
+    c = CConverter()
+    result = c.parse_instance(obj)
+
+    # Then
+    expect = dedent('''
+    typedef struct Dummy {
+        double f;
+        int x;
+    } Dummy;
+
+
+    void Dummy_method(Dummy* self) {
+        ;
+    }
+    ''')
+    assert result.strip() == expect.strip()
