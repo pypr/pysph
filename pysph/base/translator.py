@@ -86,6 +86,7 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._replacements = {'True': '1', 'False': '0', 'None': 'NULL'}
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
@@ -354,9 +355,12 @@ class CConverter(ast.NodeVisitor):
 
     def visit_Name(self, node):
         assert isinstance(node.ctx, self._name_ctx)
-        if node.id not in self._declares and node.id not in self._known:
-            self._declares[node.id] = 'double %s;' % node.id
-        return node.id
+        id = node.id
+        if id in self._replacements:
+            return self._replacements[id]
+        if id not in self._declares and id not in self._known:
+            self._declares[id] = 'double %s;' % id
+        return id
 
     def visit_Not(self, node):
         return '!'

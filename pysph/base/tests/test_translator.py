@@ -372,6 +372,38 @@ def test_while():
     assert code.strip() == expect.strip()
 
 
+def test_bool_true_false_and_none():
+    # Given
+    src = dedent('''
+    while True:
+        pass
+    if False:
+        pass
+    if x is None or x is not None:
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x;
+    while (1) {
+        ;
+    }
+
+    if (0) {
+        ;
+    }
+
+    if (((x == NULL) || (x != NULL))) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_for():
     # Given
     src = dedent('''
