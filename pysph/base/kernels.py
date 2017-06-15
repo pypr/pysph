@@ -143,10 +143,106 @@ class CubicSpline(object):
         return -fac * h1 * (dw * q + w * self.dim)
 
 
-class WendlandQuintic(object):
-    r"""The WendlandQuintic kernel, also called the Wendland C2 kernel.
+class WendlandQuinticC2_1D(object):
+    r"""The following is the WendlandQuintic kernel (Wendland C2) kernel for 1D.
 
-    In PySPH this is only implemented for 2D and 3D.
+    .. math::
+             W(q) = \ & \alpha_d (1-q/2)^3 (1.5q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+                  = \ & 0, & \textrm{for} \ q>2,\\
+
+    where :math:`d` is the number of dimensions and
+
+    .. math::
+             \alpha_d  = \ & \frac{5}{8h}, \ & \textrm{for dim=1}
+
+    """
+    def __init__(self, dim=1):
+        self.radius_scale = 2.0
+        if dim == 1:
+            self.fac = 5.0 / 8.0
+
+        elif dim == 2:
+            raise ValueError(
+                "WendlandQuinticC2_1D: Dim %d not supported" % dim)
+            self.dim = dim
+
+        elif dim == 3:
+            raise ValueError(
+                "WendlandQuinticC2_1D: Dim %d not supported" % dim)
+            self.dim = dim
+
+    def get_deltap(self):
+        return 0.5
+
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1.0 / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        val = 0.0
+
+        tmp = 1. - 0.5 * q
+        if (q < 2.0):
+            val = tmp * tmp * tmp * (1.5 * q + 1.0)
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the gradient
+        val = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            if (rij > 1e-12):
+                val = -3.0 * q * tmp * tmp * h1 / rij
+
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the kernel and gradient at q
+        w = 0.0
+        dw = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            w = tmp * tmp * tmp * (1.5 * q + 1.0)
+            dw = -3.0 * q * tmp * tmp
+
+        return -fac * h1 * (dw * q + w * self.dim)
+
+
+class WendlandQuintic(object):
+    r"""The following is the WendlandQuintic kernel (Wendland C2) kernel for 2D and 3D.
 
     .. math::
              W(q) = \ & \alpha_d (1-q/2)^4(2q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
@@ -237,6 +333,205 @@ class WendlandQuintic(object):
         if (q < 2.0):
             w = tmp * tmp * tmp * tmp * (2.0 * q + 1.0)
             dw = -5.0 * q * tmp * tmp * tmp
+
+        return -fac * h1 * (dw * q + w * self.dim)
+
+
+class WendlandQuinticC4_1D(object):
+    r"""The following is the WendlandQuintic kernel (Wendland C4) kernel for 1D.
+
+    .. math::
+             W(q) = \ & \alpha_d (1-q/2)^5 (2q^2 + 2.5q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+                  = \ & 0, & \textrm{for} \ q>2,\\
+
+    where :math:`d` is the number of dimensions and
+
+    .. math::
+             \alpha_d  = \ & \frac{3}{4h}, \ & \textrm{for dim=1}
+
+    """
+
+    def __init__(self, dim=1):
+        self.radius_scale = 2.0
+        if dim == 1:
+            self.fac = 0.75
+
+        if dim == 2:
+            raise ValueError(
+                "WendlandQuinticC4_1D: Dim %d not supported" % dim)
+            self.dim = dim
+
+        elif dim == 3:
+            raise ValueError(
+                "WendlandQuinticC4_1D: Dim %d not supported" % dim)
+            self.dim = dim
+
+    def get_deltap(self):
+        return 0.5
+
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1.0 / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        val = 0.0
+
+        tmp = 1. - 0.5 * q
+        if (q < 2.0):
+            val = tmp * tmp * tmp * tmp * tmp * (2 * q * q + 2.5 * q + 1.0)
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the gradient
+        val = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            if (rij > 1e-12):
+                val = -3.5 * q * (2 * q + 1) * tmp * tmp * tmp * tmp * h1 / rij
+
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the kernel and gradient at q
+        w = 0.0
+        dw = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            w = tmp * tmp * tmp * tmp * tmp * (2 * q * q + 2.5 * q + 1.0)
+            dw = -3.5 * q * (2 * q + 1) * tmp * tmp * tmp * tmp
+
+        return -fac * h1 * (dw * q + w * self.dim)
+
+
+class WendlandQuinticC4(object):
+    r"""The following is the WendlandQuintic kernel (Wendland C4) kernel for 2D and 3D.
+
+    .. math::
+             W(q) = \ & \alpha_d (1-q/2)^6(\frac{35}{12} q^2 + 3q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+                  = \ & 0, & \textrm{for} \ q>2,\\
+
+    where :math:`d` is the number of dimensions and
+
+    .. math::
+             \alpha_d  = \ & \frac{9}{4\pi h^2}, \ & \textrm{for dim=2}, \\
+             \alpha_d  = \ & \frac{495}{256\pi h^3}, \ & \textrm{for dim=3}
+
+    """
+
+    def __init__(self, dim=2):
+        self.radius_scale = 2.0
+        if dim == 1:
+            raise ValueError("WendlandQuinticC4: Dim %d not supported" % dim)
+            self.dim = dim
+
+        if dim == 2:
+            self.fac = 9.0 * M_1_PI / 4.0
+        elif dim == 3:
+            self.fac = M_1_PI * 495.0 / 256.0
+
+    def get_deltap(self):
+        return 0.5
+
+    def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1.0 / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        val = 0.0
+
+        tmp = 1. - 0.5 * q
+        if (q < 2.0):
+            val = tmp * tmp * tmp * tmp * tmp * tmp * \
+                ((35.0 / 12.0) * q * q + 3.0 * q + 1.0)
+
+        return val * fac
+
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the gradient
+        val = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            if (rij > 1e-12):
+                val = (-14.0 / 3.0) * q * (1 + 2.5 * q) * \
+                    tmp * tmp * tmp * tmp * tmp * h1 / rij
+
+        tmp = val * fac
+        grad[0] = tmp * xij[0]
+        grad[1] = tmp * xij[1]
+        grad[2] = tmp * xij[2]
+
+    def gradient_h(self, xij=[0., 0, 0], rij=1.0, h=1.0):
+        h1 = 1. / h
+        q = rij * h1
+
+        # get the kernel normalizing factor
+        if self.dim == 1:
+            fac = self.fac * h1
+        elif self.dim == 2:
+            fac = self.fac * h1 * h1
+        elif self.dim == 3:
+            fac = self.fac * h1 * h1 * h1
+
+        # compute the kernel and gradient at q
+        w = 0.0
+        dw = 0.0
+        tmp = 1.0 - 0.5 * q
+        if (q < 2.0):
+            w = tmp * tmp * tmp * tmp * tmp * tmp * \
+                ((35.0 / 12.0) * q * q + 3.0 * q + 1.0)
+            dw = (-14.0 / 3.0) * q * (1 + 2.5 * q) * \
+                tmp * tmp * tmp * tmp * tmp
 
         return -fac * h1 * (dw * q + w * self.dim)
 
