@@ -172,7 +172,7 @@ class WendlandQuinticC2_1D(object):
             self.dim = dim
 
     def get_deltap(self):
-        return 0.5
+        return 2.0/3
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0 / h
@@ -367,7 +367,7 @@ class WendlandQuinticC4_1D(object):
             self.dim = dim
 
     def get_deltap(self):
-        return 0.5
+        return 0.55195628
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0 / h
@@ -463,7 +463,7 @@ class WendlandQuinticC4(object):
             self.fac = M_1_PI * 495.0 / 256.0
 
     def get_deltap(self):
-        return 0.5
+        return 0.47114274
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0 / h
@@ -566,7 +566,7 @@ class WendlandQuinticC6_1D(object):
             self.dim = dim
 
     def get_deltap(self):
-        return 0.5
+        return 0.47996698
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0 / h
@@ -606,7 +606,7 @@ class WendlandQuinticC6_1D(object):
         tmp = 1.0 - 0.5 * q
         if (q < 2.0):
             if (rij > 1e-12):
-                val = -0.5 * q * (105 * q * q + 54 * q + 9.0) * \
+                val = -0.5 * q * (26.25 * q * q + 27 * q + 9.0) * \
                     tmp * tmp * tmp * tmp * tmp * tmp * h1 / rij
 
         tmp = val * fac
@@ -633,7 +633,7 @@ class WendlandQuinticC6_1D(object):
         if (q < 2.0):
             w = tmp * tmp * tmp * tmp * tmp * tmp * tmp * \
                 (2.625 * q * q * q + 4.75 * q * q + 3.5 * q + 1.0)
-            dw = -0.5 * q * (105 * q * q + 54 * q + 9.0) * \
+            dw = -0.5 * q * (26.25 * q * q + 27 * q + 9.0) * \
                 tmp * tmp * tmp * tmp * tmp * tmp
 
         return -fac * h1 * (dw * q + w * self.dim)
@@ -666,7 +666,7 @@ class WendlandQuinticC6(object):
             self.fac = M_1_PI * 1365.0 / 512.0
 
     def get_deltap(self):
-        return 0.5
+        return 0.4305720757
 
     def kernel(self, xij=[0., 0, 0], rij=1.0, h=1.0):
         h1 = 1.0 / h
