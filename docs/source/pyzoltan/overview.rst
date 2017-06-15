@@ -244,7 +244,7 @@ A simple example demonstrating this is given below:
     zz.exportGlobalids.resize(numExport); zz.exportGlobalids.set_data(glbids)
     zz.exportProcs.resize(numExport); zz.exportProcs.set_data(proclist)
 
-    print 'Proc %d to send %s to %s'%(rank, glbids, proclist)
+    print('Proc %d to send %s to %s'%(rank, glbids, proclist))
 
     # Invert the lists
     zz.Zoltan_Invert_Lists()
@@ -255,7 +255,7 @@ A simple example demonstrating this is given below:
     importglbids = zz.importGlobalids.get_npy_array()
     importprocs = zz.importProcs.get_npy_array()
 
-    print 'Proc %d to recv %s from %s'%(rank, importglbids, importprocs)
+    print('Proc %d to recv %s from %s'%(rank, importglbids, importprocs))
 
 In this example (which is hard coded for up to 3 processors), each
 processor artificially creates a list of objects it knows it must send
@@ -355,9 +355,9 @@ the communication using the :py:meth:`ZComm.Comm_Do` method:
 .. code-block:: python
 
     # use zoltan to exchange doubles
-    print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+    print("Proc %d, Sending %s to %s"%(rank, senddata, proclist))
     zcomm.Comm_Do(senddata, recvdata)
-    print "Proc %d, Received %s"%(rank, recvdata)
+    print("Proc %d, Received %s"%(rank, recvdata))
 
 Note that the user does not need to explicitly write the `MPI` send
 and receive calls. All that is required from the user is to correctly
@@ -388,9 +388,9 @@ the global indices (`uint32`) like so:
     recvdata = np.ones(zcomm.nreturn, dtype=np.uint32)
     zcomm.set_nbytes(recvdata.itemsize)
 
-    print "Proc %d, Sending %s to %s"%(rank, senddata, proclist)
+    print("Proc %d, Sending %s to %s"%(rank, senddata, proclist))
     zcomm.Comm_Do(senddata, recvdata)
-    print "Proc %d, Received %s"%(rank, recvdata)
+    print("Proc %d, Received %s"%(rank, recvdata))
 
 .. note::
 
@@ -432,9 +432,9 @@ remote processor and communicated back using the
     recvdata[:] = rank
 
     updated_info = np.zeros(zcomm.nsend, dtype=senddata.dtype)
-    print 'Proc %d, sending updated data %s'%(rank, recvdata)
+    print('Proc %d, sending updated data %s'%(rank, recvdata))
     zcomm.Comm_Do_Reverse(recvdata, updated_info)
-    print 'Proc %d, received updated data %s'%(rank, updated_info)
+    print('Proc %d, received updated data %s'%(rank, updated_info))
 
 .. note::
 

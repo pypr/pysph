@@ -23,7 +23,7 @@ involved in adding an interface to the solver.
 .. figure:: images/controller.png
     :align: center
     :width: 900
-    
+
     Overview of the Solver Interfaces
 
 The basic design of the controller is as follows:
@@ -32,22 +32,22 @@ The basic design of the controller is as follows:
    :py:meth:`~pysph.solver.solver.Solver.set_command_handler` takes a callable
    and a command_interval, and calls the callable with self as an argument
    every `command_interval` iterations
- 
+
 #. The method :meth:`CommandManager.execute_commands` of `CommandManager` object is
    set as the command_handler for the solver. Now `CommandManager` can do any operation
    on the solver
- 
+
 #. Interfaces are added to the `CommandManager` by the :meth:`CommandManager.add_interface`
    method, which takes a callable (Interface) as an argument and calls the callable
    in a separate thread with a new :class:`Controller` instance as an argument
- 
+
 #. A `Controller` instance is a proxy for the `CommandManager` which redirects
    its methods to call :meth:`CommandManager.dispatch` on the `CommandManager`, which is
    synchronized in the `CommandManager` class so that only one thread (Interface)
    can call it at a time. The `CommandManager` queues the commands and sends them to
    all procs in a parallel run and executes them when the solver calls its
    :meth:`execute_commands` method
- 
+
 #. Writing a new Interface is simply writing a function/method which calls
    appropriate methods on the :class:`Controller` instance passed to it.
 
@@ -83,7 +83,7 @@ The :py:class:`Controller` object has a notion of Blocking and Non-Blocking mode
 
 **Switching between modes**
 
-The blocking/non-blocking modes can be get/set using the methods 
+The blocking/non-blocking modes can be get/set using the methods
 :py:meth:`Controller.get_blocking` and :py:meth:`Controller.set_blocking` methods
 
 **NOTE :**
@@ -110,10 +110,10 @@ count every second to monitor the solver
 ::
 
     import time
-    
+
     def simple_interface(controller):
         while True:
-            print controller.get_count()
+            print(controller.get_count())
             time.sleep(1)
 
 You can use ``dir(controller)`` to find out what methods are available on the
@@ -140,7 +140,7 @@ can be added to a solver::
     # add CommandManager to solver
     command_manager = CommandManager(solver)
     solver.set_command_handler(command_manager.execute_commands)
-    
+
     # add the interface
     command_manager.add_interface(simple_interface)
 
@@ -161,7 +161,7 @@ the commandline even as it is running. Here's a sample session of the command-li
 interface from the controller_elliptical_drop.py example::
 
     $ python controller_elliptical_drop.py
-    pysph[0]>>> 
+    pysph[0]>>>
     Invalid command
     Valid commands are:
         p | pause
@@ -197,17 +197,17 @@ control the solver from a web page.
 The following code snippet shows the use of XML-RPC interface, which is
 not much different from any other interface, as they all export the interface
 of the Controller object::
-    
+
     import xmlrpclib
-    
+
     # address is a tuple of hostname, port, ex. ('localhost',8900)
     client = xmlrpclib.ServerProxy(address, allow_none=True)
-    
+
     # client has all the methods of the controller
-    print client.system.listMethods()
-    
-    print client.get_t()
-    print client.get('count')
+    print(client.system.listMethods())
+
+    print(client.get_t())
+    print(client.get('count'))
 
 The XML-RPC interface also implements a
 simple http server which serves html, javascript and image files from the
@@ -221,7 +221,7 @@ in action
 .. _fig_html_client:
 .. figure:: images/html_client.png
     :align: center
-    
+
     PySPH html client using XML-RPC interface
 
 One limitation of XML-RPC interface is that arbitrary python objects cannot be
@@ -236,21 +236,21 @@ The :py:class:`MultiprocessingInterface` interface also exports the controller
 object similar to the XML-RPC interface, but it is more featured, can use
 authentication keys and can send arbitrary picklable objects. Usage of
 Multiprocessing client is also similar to the XML-RPC client::
-    
+
     from pysph.solver.solver_interfaces import MultiprocessingClient
-    
+
     # address is a tuple of hostname, port, ex. ('localhost',8900)
     # authkey is authentication key set on server, defaults to 'pysph'
     client = MultiprocessingClient(address, authkey)
-    
+
     # controller proxy
     controller = client.controller
-    
+
     pa_names = controller.get_particle_array_names()
-    
+
     # arbitrary python objects can be transferred (ParticleArray)
     pa = controller.get_named_particle_array(pa_names[0])
-    
+
 
 Example
 -------
@@ -262,18 +262,18 @@ as a scatter map with color-mapped velocities, and updates the plot every second
 while maintaining user interactivity::
 
     from pysph.solver.solver_interfaces import MultiprocessingClient
-    
+
     client = MultiprocessingClient(address, authkey)
     controller = client.controller
-    
+
     pa_name = controller.get_particle_array_names()[0]
     pa = controller.get_named_particle_array(pa_name)
-    
+
     #plt.ion()
     fig = plt.figure()
     ax = fig.add_subplot(111)
     line = ax.scatter(pa.x, pa.y, c=numpy.hypot(pa.u,pa.v))
-    
+
     global t
     t = time.time()
     def update():
@@ -281,18 +281,17 @@ while maintaining user interactivity::
         t2 = time.time()
         dt = t2 - t
         t = t2
-        print 'count:', controller.get_count(), '\ttimer time:', dt,
+        print('count:', controller.get_count(), '\ttimer time:', dt,)
         pa = controller.get_named_particle_array(pa_name)
-    
+
         line.set_offsets(zip(pa.x, pa.y))
         line.set_array(numpy.hypot(pa.u,pa.v))
         fig.canvas.draw()
-        
-        print '\tresult & draw time:', time.time()-t
-        
+
+        print('\tresult & draw time:', time.time()-t)
+
         return True
-    
+
     update()
     gobject.timeout_add_seconds(1, update)
     plt.show()
-

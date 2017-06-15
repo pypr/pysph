@@ -433,7 +433,7 @@ grid that is automatically computed from the known particle arrays::
     data = load('elliptical_drop_output/elliptical_drop_100.npz')
     from pysph.tools.interpolator import Interpolator
     parrays = data['arrays']
-    interp = Interpolator(parrays.values(), num_points=10000)
+    interp = Interpolator(list(parrays.values()), num_points=10000)
     p = interp.interpolate('p')
 
 ``p`` is now a numpy array of size 10000 elements shaped such that it
@@ -462,7 +462,7 @@ data as::
 Where ``x, y, z`` are numpy arrays of the coordinates of the points on which
 the interpolation is desired.  This can also be done with the constructor as::
 
-    interp = Interpolator(parrays.values(), x=x, y=y, z=z)
+    interp = Interpolator(list(parrays.values()), x=x, y=y, z=z)
 
 For more details on the class and the available methods, see
 :py:class:`pysph.tools.interpolator.Interpolator`.
