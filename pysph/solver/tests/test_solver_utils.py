@@ -28,8 +28,9 @@ class TestGetFiles(TestCase):
             )
             for i in range(11)
         ]
-        for names in self.files:
-            open(names, 'a').close()
+        for name in self.files:
+            with open(name, 'w') as fp:
+                fp.write('')
 
     def test_get_files(self):
         self.assertEqual(get_files(self.dirname), self.files)
