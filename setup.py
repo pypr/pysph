@@ -23,7 +23,7 @@ except ImportError:
 
 import sys
 
-if os.environ.get('COVERAGE','') == 'true':
+if len(os.environ.get('COVERAGE','')) > 0:
     MACROS = [("CYTHON_TRACE","1"),("CYTHON_TRACE_NOGIL","1")]
     COMPILER_DIRECTIVES = {"linetrace":True}
     print("-"*80)
