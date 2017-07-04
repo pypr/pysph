@@ -194,39 +194,8 @@ class Viewer(object):
 
 
 
-    def _display_widgets(self):
-        '''
-        Display the widgets created using _create_widgets() method.
-        '''
 
-        from ipywidgets import HBox, VBox, Label, Layout
-        from IPython.display import display
-        items = []
-        for particles_type in self._widgets['particles'].keys():
-            items.append(
-                VBox([
-                    Label(particles_type),
-                    self._widgets['particles'][particles_type]['scalar'],
-                    self._widgets['particles'][particles_type]['legend'],
-                    self._widgets['particles'][particles_type]['vector'],
-                    self._widgets[
-                        'particles'
-                    ][particles_type]['vector_scale'],
-                    self._widgets['particles'][particles_type]['vector_width'],
-                    self._widgets['particles'][particles_type]['scalar_size'],
-                ],
-                    layout=Layout(display='flex'))
-            )
 
-        display(
-            VBox(
-                [
-                    HBox(items, layout=Layout(display='flex')),
-                    self._widgets['frame'],
-                    self._widgets['save_figure']
-                ]
-            )
-        )
 
 class Viewer2D(Viewer):
 
@@ -291,6 +260,7 @@ class Viewer2D(Viewer):
                 self._legend_handler,
                 'value',
             )
+
             self._widgets[
                 'particles'
             ][particles_type]['vector'] = widgets.Text(
@@ -354,6 +324,39 @@ class Viewer2D(Viewer):
                 'value',
             )
 
+    def _display_widgets(self):
+        '''
+        Display the widgets created using _create_widgets() method.
+        '''
+
+        from ipywidgets import HBox, VBox, Label, Layout
+        from IPython.display import display
+        items = []
+        for particles_type in self._widgets['particles'].keys():
+            items.append(
+                VBox([
+                    Label(particles_type),
+                    self._widgets['particles'][particles_type]['scalar'],
+                    self._widgets['particles'][particles_type]['legend'],
+                    self._widgets['particles'][particles_type]['vector'],
+                    self._widgets[
+                        'particles'
+                    ][particles_type]['vector_scale'],
+                    self._widgets['particles'][particles_type]['vector_width'],
+                    self._widgets['particles'][particles_type]['scalar_size'],
+                ],
+                    layout=Layout(display='flex'))
+            )
+
+        display(
+            VBox(
+                [
+                    HBox(items, layout=Layout(display='flex')),
+                    self._widgets['frame'],
+                    self._widgets['save_figure']
+                ]
+            )
+        )
     def _configure_plot(self):
         '''
         Set attributes for plotting.
@@ -626,8 +629,6 @@ class Viewer2D(Viewer):
         self._widgets['save_figure'].value = ""
 
 
-
-
 class Viewer3D(Viewer):
 
     def _create_widgets(self):
@@ -674,19 +675,6 @@ class Viewer3D(Viewer):
             )
             self._widgets['particles'][particles_type]['scalar'].observe(
                 self._scalar_handler,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['legend'] = widgets.ToggleButton(
-                value=False,
-                description=particles_type + "_legend",
-                disabled=False,
-                tooltip='Description',
-                layout=widgets.Layout(width='240px', display='flex')
-            )
-            self._widgets['particles'][particles_type]['legend'].observe(
-                self._legend_handler,
                 'value',
             )
             self._widgets[
@@ -747,19 +735,67 @@ class Viewer3D(Viewer):
             )
             self._widgets[
                 'particles'
+            ][particles_type]['legend'] = widgets.ToggleButton(
+                value=False,
+                description=particles_type + "_legend",
+                disabled=False,
+                tooltip='Description',
+                layout=widgets.Layout(width='240px', display='flex')
+            )
+            self._widgets['particles'][particles_type]['legend'].observe(
+                self._show_legend,
+                'value',
+            )
+            self._widgets[
+                'particles'
             ][particles_type]['scalar_size'].observe(
                 self._scalar_size_handler,
                 'value',
             )
+    def _display_widgets(self):
+        '''
+        Display the widgets created using _create_widgets() method.
+        '''
 
+        from ipywidgets import HBox, VBox, Label, Layout
+        from IPython.display import display
+        items = []
+        for particles_type in self._widgets['particles'].keys():
+            items.append(
+                VBox([
+                    Label(particles_type),
+                    self._widgets['particles'][particles_type]['scalar'],
+                    self._widgets['particles'][particles_type]['vector'],
+                    self._widgets[
+                        'particles'
+                    ][particles_type]['vector_scale'],
+                    self._widgets['particles'][particles_type]['vector_width'],
+                    self._widgets['particles'][particles_type]['scalar_size'],
+                    self._widgets['particles'][particles_type]['legend'],
+                ],
+                    layout=Layout(display='flex'))
+            )
+
+        display(
+            VBox(
+                [
+                    HBox(items, layout=Layout(display='flex')),
+                    self._widgets['frame'],
+                    self._widgets['save_figure']
+                ]
+            )
+        )
     def interactive_plot(self):
         self._create_widgets()
         self.scatters={}
         self._display_widgets()
         self.vectors = {}
+
         import ipyvolume.pylab as p3
         import numpy as np
         import matplotlib.cm
+        from IPython.display import display
+        import ipywidgets as widgets
         colormap = matplotlib.cm.viridis
         p3.clear()
         data = self.get_buffer(self._widgets['frame'].value)['arrays']
@@ -770,8 +806,17 @@ class Viewer3D(Viewer):
                 data[particles_type].y,
                 data[particles_type].z,
                 color = c,
+                size=self._widgets['particles'][particles_type]['scalar_size'].value,
             )
-        p3.show()
+        out = widgets.Output()
+        with out:
+            if hasattr(self,'plfigure'):
+                display(self.pltfigure)
+            else:
+                pass
+
+        display(widgets.VBox((p3.gcc(),out)))
+        #HBox does not allow custom layout.
 
     def _frame_handler(self, change):
         import numpy as np
@@ -802,11 +847,53 @@ class Viewer3D(Viewer):
     def _scalar_handler(self, change):
         import numpy as np
         import matplotlib.cm
-        colormap = matplotlib.cm.viridis
+        colormap = matplotlib.cm.jet
         data = self.get_buffer(self._widgets['frame'].value)['arrays']
         particles_type = change['owner'].description.split("_")[0]
         c = colormap(getattr(data[particles_type], self._widgets['particles'][particles_type]['scalar'].value))
         self.scatters[particles_type].color = c
+
+
+    def _show_legend(self, change):
+        import matplotlib.pyplot as plt
+        import matplotlib as mpl
+        import numpy as np
+        import ipywidgets as widgets
+        from IPython.display import clear_output
+        temp_data = self.get_buffer(self._widgets['frame'].value)
+        cmap = mpl.cm.cool
+
+        self.pltfigure = plt.figure(figsize=(8,8))
+        self.cbars = {}
+        self.cbars_ax = {}
+
+        for particles_type in self._widgets['particles'].keys():
+            self.cbars_ax[particles_type] = self.pltfigure.add_axes(
+                [
+                    0.2*len(self.cbars_ax.keys()),
+                    0,
+                    0.05,
+                    0.5
+                ]
+            )
+            self.cbars[particles_type] = mpl.colorbar.ColorbarBase(
+                ax=self.cbars_ax[particles_type],
+                cmap=cmap,
+                boundaries=np.sort(
+                    getattr(
+                    temp_data['arrays'][particles_type],
+                    self._widgets['particles'][particles_type]['scalar'].value
+                    )
+                )
+            )
+        out = widgets.Output()
+        with out:
+            if hasattr(self,'plfigure'):
+                display(self.pltfigure)
+            else:
+                pass
+        clear_output()
+        display(widgets.VBox((p3.gcc(),out)))
 
     def _vector_handler(self, change):
         pass
@@ -843,9 +930,6 @@ class Viewer3D(Viewer):
         self.scatters[particles_type].size = self._widgets['particles'][particles_type]['scalar_size'].value
 
     def _vector_width_handler(self, change):
-        pass
-
-    def _legend_handler(self, change, manual=False):
         pass
 
     def _save_figure_handler(self, change):
