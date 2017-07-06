@@ -358,7 +358,6 @@ class RigidBodyCollision(Equation):
         m_eff = np.pi * 0.5**2 * 1e-6 * 2120
         self.gamma_n = -(2 * np.sqrt(kn * m_eff) * np.log(en)) / (
             np.sqrt(np.pi**2 + np.log(en)**2))
-        print(self.gamma_n)
         self.gamma_t = 0.5 * self.gamma_n
         self.mu = mu
         super(RigidBodyCollision, self).__init__(dest, sources)
