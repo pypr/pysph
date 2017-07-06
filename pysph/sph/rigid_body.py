@@ -300,6 +300,36 @@ class PressureRigidBody(Equation):
         s_fy[s_idx] += -d_m[d_idx]*ay
         s_fz[s_idx] += -d_m[d_idx]*az
 
+
+class LiuFluidForce(Equation):
+    """Force between a solid sphere and a SPH fluid particle.
+    This is implemented using Akinchi's
+
+    'Versatile Rigid-Fluid Coupling for Incompressible SPH'
+
+    URL: https://graphics.ethz.ch/~sobarbar/papers/Sol12/Sol12.pdf
+
+    Note: Here forces for both the phases are added at once.
+          Please make sure that this force is applied only once
+          for both the particle properties.
+
+    """
+    def __init__(self, dest, sources):
+        super(LiuFluidForce, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
+             s_idx, s_V, s_fx, s_fy, s_fz, DWIJ, s_m, s_p, s_rho):
+        _t1 = s_p[s_idx] / (s_rho[s_idx]**2) + d_p[d_idx] / (d_rho[d_idx]**2)
+
+        d_au[d_idx] += -s_m[s_idx] * _t1 * DWIJ[0]
+        d_av[d_idx] += -s_m[s_idx] * _t1 * DWIJ[1]
+        d_aw[d_idx] += -s_m[s_idx] * _t1 * DWIJ[2]
+
+        s_fx[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[0]
+        s_fy[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[1]
+        s_fz[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[2]
+
+
 class RigidBodyCollision(Equation):
     """Force between two spheres is implemented using DEM contact force law.
 
@@ -408,7 +438,6 @@ class RigidBodyCollision(Equation):
             d_fx[d_idx] += fn_x + ft_x
             d_fy[d_idx] += fn_y + ft_y
             d_fz[d_idx] += fn_z + ft_z
-            # print(d_fz[d_idx])
         else:
             d_tang_velocity_x[d_idx] = 0
             d_tang_velocity_y[d_idx] = 0
