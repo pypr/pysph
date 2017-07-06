@@ -448,6 +448,125 @@ class RigidBodyCollision(Equation):
             d_tang_disp_z[d_idx] = 0
 
 
+class RigidBodyWallCollision(Equation):
+    """Force between sphere and a wall is implemented using
+    DEM contact force law.
+
+    Refer https://doi.org/10.1016/j.powtec.2011.09.019 for more
+    information.
+
+    Open-source MFIX-DEM software for gas–solids flows:
+    Part I—Verification studies .
+
+    """
+    def __init__(self, dest, sources, kn=1e3, mu=0.5, en=0.8):
+        """Initialise the required coefficients for force calculation.
+
+
+        Keyword arguments:
+        kn -- Normal spring stiffness (default 1e3)
+        mu -- friction coefficient (default 0.5)
+        en -- coefficient of restitution (0.8)
+
+        Given these coefficients, tangential spring stiffness, normal and
+        tangential damping coefficient are calculated by default.
+
+        """
+        self.kn = kn
+        self.kt = 2. / 7. * kn
+        m_eff = np.pi * 0.5**2 * 1e-6 * 2120
+        self.gamma_n = -(2 * np.sqrt(kn * m_eff) * np.log(en)) / (
+            np.sqrt(np.pi**2 + np.log(en)**2))
+        print(self.gamma_n)
+        self.gamma_t = 0.5 * self.gamma_n
+        self.mu = mu
+        super(RigidBodyWallCollision, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_fx, d_fy, d_fz, d_h, d_total_mass, d_rad_s,
+             d_tang_disp_x, d_tang_disp_y, d_tang_disp_z, d_tang_velocity_x,
+             d_tang_velocity_y, d_tang_velocity_z, s_idx, XIJ, RIJ,
+             R2IJ, VIJ, s_nx, s_ny, s_nz):
+        # check overlap amount
+        overlap = d_rad_s[d_idx] - (XIJ[0] * s_nx[s_idx] + XIJ[1] *
+                                    s_ny[s_idx] + XIJ[2] * s_nz[s_idx])
+
+        if overlap > 0:
+            # basic variables: normal vector
+            nij_x = -s_nx[s_idx]
+            nij_y = -s_ny[s_idx]
+            nij_z = -s_nz[s_idx]
+
+            # overlap speed: a scalar
+            vijdotnij = VIJ[0] * nij_x + VIJ[1] * nij_y + VIJ[2] * nij_z
+
+            # normal velocity
+            vijn_x = vijdotnij * nij_x
+            vijn_y = vijdotnij * nij_y
+            vijn_z = vijdotnij * nij_z
+
+            # normal force with conservative and dissipation part
+            fn_x = -self.kn * overlap * nij_x - self.gamma_n * vijn_x
+            fn_y = -self.kn * overlap * nij_y - self.gamma_n * vijn_y
+            fn_z = -self.kn * overlap * nij_z - self.gamma_n * vijn_z
+
+            # ----------------------Tangential force---------------------- #
+
+            # tangential velocity
+            d_tang_velocity_x[d_idx] = VIJ[0] - vijn_x
+            d_tang_velocity_y[d_idx] = VIJ[1] - vijn_y
+            d_tang_velocity_z[d_idx] = VIJ[2] - vijn_z
+
+            _tang = (
+                (d_tang_velocity_x[d_idx]**2) + (d_tang_velocity_y[d_idx]**2) +
+                (d_tang_velocity_z[d_idx]**2))**(1. / 2.)
+
+            # tangential unit vector
+            tij_x = 0
+            tij_y = 0
+            tij_z = 0
+            if _tang > 0:
+                tij_x = d_tang_velocity_x[d_idx] / _tang
+                tij_y = d_tang_velocity_y[d_idx] / _tang
+                tij_z = d_tang_velocity_z[d_idx] / _tang
+
+            # damping force or dissipation
+            ft_x_d = -self.gamma_t * d_tang_velocity_x[d_idx]
+            ft_y_d = -self.gamma_t * d_tang_velocity_y[d_idx]
+            ft_z_d = -self.gamma_t * d_tang_velocity_z[d_idx]
+
+            # tangential spring force
+            ft_x_s = -self.kt * d_tang_disp_x[d_idx]
+            ft_y_s = -self.kt * d_tang_disp_y[d_idx]
+            ft_z_s = -self.kt * d_tang_disp_z[d_idx]
+
+            ft_x = ft_x_d + ft_x_s
+            ft_y = ft_y_d + ft_y_s
+            ft_z = ft_z_d + ft_z_s
+
+            # coulomb law
+            ftij = ((ft_x**2) + (ft_y**2) + (ft_z**2))**(1. / 2.)
+            fnij = ((fn_x**2) + (fn_y**2) + (fn_z**2))**(1. / 2.)
+
+            _fnij = self.mu * fnij
+
+            if _fnij < ftij:
+                ft_x = -_fnij * tij_x
+                ft_y = -_fnij * tij_y
+                ft_z = -_fnij * tij_z
+
+            d_fx[d_idx] += fn_x + ft_x
+            d_fy[d_idx] += fn_y + ft_y
+            d_fz[d_idx] += fn_z + ft_z
+            # print(d_fz[d_idx])
+        else:
+            d_tang_velocity_x[d_idx] = 0
+            d_tang_velocity_y[d_idx] = 0
+            d_tang_velocity_z[d_idx] = 0
+
+            d_tang_disp_x[d_idx] = 0
+            d_tang_disp_y[d_idx] = 0
+            d_tang_disp_z[d_idx] = 0
+
 class EulerStepRigidBody(IntegratorStep):
     """Fast but inaccurate integrator. Use this for testing"""
     def initialize(self):
