@@ -1,191 +1,250 @@
-"""A block of rigid solid falling on a tank of water. (6 minutes)
+"""A block of rigid solid falling on wood in a tank of water.
 
 This also demonstrates that rigid-rigid collisions work as well.
 
 """
-# NumPy
+from __future__ import print_function
 import numpy as np
+import matplotlib.pyplot as plt
 
-# PySPH imports
-from pysph.base.utils import get_particle_array_wcsph as gpa
-from pysph.base.utils import get_particle_array_rigid_body
-from pysph.base.kernels import WendlandQuintic
+# PySPH base and carray imports
+from pysph.base.utils import get_particle_array_wcsph, get_particle_array_rigid_body
+from pysph.base.kernels import CubicSpline
 
 from pysph.solver.solver import Solver
-from pysph.solver.application import Application
-
 from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
+from pysph.solver.utils import get_files, iter_output
 
-# the eqations
 from pysph.sph.equation import Group
+from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
+                                       SummationDensity)
+from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
+from pysph.solver.application import Application
+from pysph.sph.rigid_body import (
+    BodyForce, RigidBodyCollision, LiuFluidForce,
+    NumberDensity, RigidBodyMoments, RigidBodyMotion, RK2StepRigidBody,
+    PressureRigidBody)
 
-from pysph.sph.basic_equations import XSPHCorrection, ContinuityEquation
-from pysph.sph.wc.basic import TaitEOS, TaitEOSHGCorrection, MomentumEquation, \
-    ContinuityEquationDeltaSPH
+
+def create_boundary():
+    dx = 2
+
+    # bottom particles in tank
+    xb = np.arange(-2 * dx, 140 + 2 * dx, dx)
+    yb = np.arange(-2 * dx, 0, dx)
+    xb, yb = np.meshgrid(xb, yb)
+    xb = xb.ravel()
+    yb = yb.ravel()
+
+    xl = np.arange(-2 * dx, 0, dx)
+    yl = np.arange(0, 150, dx)
+    xl, yl = np.meshgrid(xl, yl)
+    xl = xl.ravel()
+    yl = yl.ravel()
+
+    xr = np.arange(140, 140 + 2 * dx, dx)
+    yr = np.arange(0, 150, dx)
+    xr, yr = np.meshgrid(xr, yr)
+    xr = xr.ravel()
+    yr = yr.ravel()
+
+    x = np.concatenate([xl, xb, xr])
+    y = np.concatenate([yl, yb, yr])
+
+    return x * 1e-3, y * 1e-3
 
 
-from pysph.sph.rigid_body import (BodyForce, NumberDensity, RigidBodyCollision,
-    RigidBodyMoments, RigidBodyMotion,
-    RK2StepRigidBody, ViscosityRigidBody, PressureRigidBody)
+def create_fluid():
+    dx = 2
+    # xf = np.arange(dx/2., 140-dx/2., dx)
+    # yf = np.arange(dx/2., 130+dx/2., dx)
+    xf = np.arange(0, 140, dx)
+    yf = np.arange(0, 130, dx)
+    xf, yf = np.meshgrid(xf, yf)
+    xf = xf.ravel()
+    yf = yf.ravel()
+    xf = np.arange(0, 140, dx)
+    yf = np.arange(0, 130, dx)
+    xf, yf = np.meshgrid(xf, yf)
+    xf = xf.ravel()
+    yf = yf.ravel()
 
-# domain and reference values
-Lx = 2.0; Ly = 1.0; H = 0.5
-gy = -1.0
-Vmax = np.sqrt(abs(gy) * H)
-c0 = 10 * Vmax; rho0 = 1000.0
-rho_block = rho0
-p0 = c0*c0*rho0
-gamma = 1.0
-alpha = 0.1
-beta = 0.0
-# Reynolds number and kinematic viscosity
-Re = 100; nu = Vmax * Ly/Re
+    p = (xf > 59) & (xf < 81) & (yf > 119)
+    # p = (xf > 59) & (xf < 81)
 
-# Numerical setup
-nx = 100; dx = Lx/nx
-ghost_extent = 5.5 * dx
-hdx = 1.2
+    xf = xf[~p]
+    yf = yf[~p]
 
-# adaptive time steps
-h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Vmax )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * np.sqrt(h0/abs(gy))
+    return xf * 1e-3, yf * 1e-3
 
-tf = 6.0
-dt = 0.5 * min(dt_cfl, dt_viscous, dt_force)
 
-class RigidBlockInTank(Application):
+def create_cube(dx=1):
+    x = np.arange(60, 80, dx)
+    y = np.arange(121, 141, dx)
+    x, y = np.meshgrid(x, y)
+    x = x.ravel()
+    y = y.ravel()
+
+    return x * 1e-3, y * 1e-3
+
+
+def get_density(y):
+    c_0 = 2 * np.sqrt(2 * 9.81 * 130 * 1e-3)
+    rho_0 = 1000
+    height_water_clmn = 130 * 1e-3
+    gamma = 7.
+    _tmp = gamma / (rho_0 * c_0**2)
+
+    rho = np.zeros_like(y)
+    for i in range(len(rho)):
+        p_i = rho_0 * 9.81 * (height_water_clmn - y[i])
+        rho[i] = rho_0 * (1 + p_i * _tmp)**(1. / gamma)
+    return rho
+
+
+def geometry():
+    # please run this function to know how
+    # geometry looks like
+    x_tank, y_tank = create_boundary()
+    x_fluid, y_fluid = create_fluid()
+    x_cube, y_cube = create_cube()
+    x_wood, y_wood = create_cube()
+    y_wood = y_wood + 0.04
+    plt.scatter(x_fluid, y_fluid)
+    plt.scatter(x_tank, y_tank)
+    plt.scatter(x_cube, y_cube)
+    plt.scatter(x_wood, y_wood)
+    plt.axes().set_aspect('equal', 'datalim')
+    print("done")
+    plt.show()
+
+
+class FluidStructureInteration(Application):
+    # here wood has 2120 density and falls from some height on low density cube
+    def initialize(self):
+        self.dx = 2 * 1e-3
+        self.hdx = 1.2
+        self.ro = 1000
+        self.solid_rho = 500
+        self.wood_rho = 2120
+        self.m = 1000 * self.dx * self.dx
+        self.co = 2 * np.sqrt(2 * 9.81 * 130 * 1e-3)
+        self.alpha = 0.1
+
     def create_particles(self):
-        side = 0.1
+        """Create the circular patch of fluid."""
+        # xf, yf = create_fluid_with_solid_cube()
+        xf, yf = create_fluid()
+        rho = get_density(yf)
+        m = rho[:] * self.dx * self.dx
+        rho = np.ones_like(xf) * self.ro
+        h = np.ones_like(xf) * self.hdx * self.dx
+        fluid = get_particle_array_wcsph(x=xf, y=yf, h=h, m=m, rho=rho,
+                                         name="fluid")
 
-        _x = np.arange(Lx*0.5-side , Lx*0.5 + side, dx )
-        _y = np.arange( 0.8, 0.8+side*2, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
-        x += 0.25
-        m = np.ones_like(x)*dx*dx*rho_block
-        h = np.ones_like(x)*hdx*dx
-        rho = np.ones_like(x)*rho_block
-        block = get_particle_array_rigid_body(
-            name='block', x=x, y=y, h=h, m=m, rho=rho
-        )
-        block.total_mass[0] = np.sum(m)
-        block.vc[0] = 1.0
+        xt, yt = create_boundary()
+        m = np.ones_like(xt) * 1000 * self.dx * self.dx
+        rho = np.ones_like(xt) * 1000
+        rad_s = np.ones_like(xt) * 2 / 2. * 1e-3
+        h = np.ones_like(xt) * self.hdx * self.dx
+        tank = get_particle_array_wcsph(x=xt, y=yt, h=h, m=m, rho=rho,
+                                        rad_s=rad_s, name="tank")
 
-        # create all the particles
-        _x = np.arange( -ghost_extent, Lx + ghost_extent, dx )
-        _y = np.arange( -ghost_extent, Ly, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
+        dx = 1
+        xc, yc = create_cube(1)
+        m = np.ones_like(xc) * self.solid_rho * dx * 1e-3 * dx * 1e-3
+        rho = np.ones_like(xc) * self.solid_rho
+        h = np.ones_like(xc) * self.hdx * self.dx
+        rad_s = np.ones_like(xc) * dx / 2. * 1e-3
+        # add cs property to run the simulation
+        cs = np.zeros_like(xc)
+        cube = get_particle_array_rigid_body(x=xc, y=yc, h=h, m=m, rho=rho,
+                                             rad_s=rad_s, cs=cs, name="cube")
 
-        # sort out the fluid and the solid
-        indices = []
-        for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < Lx) ):
-                if ( (y[i] > 0.0) and (y[i] < H) ):
-                    indices.append(i)
-
-        # create the arrays
-        solid = gpa(name='solid', x=x, y=y)
-
-        # remove the fluid particles from the solid
-        fluid = solid.extract_particles(indices); fluid.set_name('fluid')
-        solid.remove_particles(indices)
-
-        # remove the lid to generate an open tank
-        indices = []
-        for i in range(solid.get_number_of_particles()):
-            if solid.y[i] > H:
-                if (0 < solid.x[i] < Lx):
-                    indices.append(i)
-        solid.remove_particles(indices)
-
-        print("Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
-            fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt))
-
-        ###### ADD PARTICLE PROPS SPH ######
-
-        for prop in ('arho', 'cs', 'V', 'fx', 'fy', 'fz'):
-            solid.add_property(prop )
-            block.add_property(prop )
-
-        ##### INITIALIZE PARTICLE PROPS #####
-        fluid.rho[:] = rho0
-        solid.rho[:] = rho0
-
-        fluid.rho0[:] = rho0
-        solid.rho0[:] = rho0
-
-        # mass is set to get the reference density of rho0
-        volume = dx * dx
-
-        fluid.m[:] = volume * rho0
-        solid.m[:] = volume * rho0
-
-        # smoothing lengths
-        fluid.h[:] = hdx * dx
-        solid.h[:] = hdx * dx
-
-        # return the particle list
-        return [fluid, solid, block]
+        dx = 1
+        xc, yc = create_cube(1)
+        yc = yc + 0.04
+        xc = xc + 0.02
+        m = np.ones_like(xc) * self.wood_rho * dx * 1e-3 * dx * 1e-3
+        rho = np.ones_like(xc) * self.wood_rho
+        h = np.ones_like(xc) * self.hdx * self.dx
+        rad_s = np.ones_like(xc) * dx / 2. * 1e-3
+        # add cs property to run the simulation
+        cs = np.zeros_like(xc)
+        wood = get_particle_array_rigid_body(x=xc, y=yc, h=h, m=m, rho=rho,
+                                             rad_s=rad_s, cs=cs, name="wood")
+        return [fluid, tank, cube, wood]
 
     def create_solver(self):
-        kernel = WendlandQuintic(dim=2)
+        kernel = CubicSpline(dim=2)
 
-        integrator = EPECIntegrator(fluid=WCSPHStep(), block=RK2StepRigidBody())
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=tf, dt=dt, adaptive_timestep=False)
+        integrator = EPECIntegrator(fluid=WCSPHStep(), tank=WCSPHStep(),
+                                    cube=RK2StepRigidBody(),
+                                    wood=RK2StepRigidBody())
+
+        dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
+        print("DT: %s" % dt)
+        tf = 1.5
+        solver = Solver(kernel=kernel, dim=2, integrator=integrator, dt=dt,
+                        tf=tf, adaptive_timestep=False)
+
         return solver
 
     def create_equations(self):
         equations = [
             Group(equations=[
-                    BodyForce(dest='block', sources=None, gy=gy),
-                    NumberDensity(dest='block', sources=['block']),
-                    NumberDensity(dest='solid', sources=['solid']),
-                    ], ),
-
-            # Equation of state is typically the Tait EOS with a suitable
-            # exponent gamma
+                BodyForce(dest='cube', sources=None, gy=-9.81),
+                BodyForce(dest='wood', sources=None, gy=-9.81),
+                SummationDensity(dest='cube', sources=['fluid', 'cube']),
+                SummationDensity(dest='wood', sources=['fluid', 'wood'])
+            ], real=False),
             Group(equations=[
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    TaitEOSHGCorrection(dest='solid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    TaitEOSHGCorrection(dest='block', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    ], ),
-
-            # Main acceleration block
+                TaitEOSHGCorrection(dest='wood', sources=None,
+                                    rho0=self.wood_rho, c0=self.co, gamma=7.0),
+                TaitEOSHGCorrection(dest='cube', sources=None,
+                                    rho0=self.solid_rho, c0=self.co,
+                                    gamma=7.0),
+                TaitEOSHGCorrection(dest='fluid', sources=None, rho0=self.ro,
+                                    c0=self.co, gamma=7.0),
+                TaitEOSHGCorrection(dest='tank', sources=None, rho0=self.ro,
+                                    c0=self.co, gamma=7.0),
+            ], real=False),
             Group(equations=[
-
-                    # Continuity equation with dissipative corrections for fluid on fluid
-                    ContinuityEquationDeltaSPH(dest='fluid', sources=['fluid'], c0=c0, delta=0.1),
-                    ContinuityEquation(dest='fluid', sources=['solid', 'block']),
-                    ContinuityEquation(dest='solid', sources=['fluid']),
-                    ContinuityEquation(dest='block', sources=['fluid']),
-
-                    # Momentum equation
-                    MomentumEquation(dest='fluid', sources=['fluid', 'solid', 'block'],
-                                     alpha=alpha, beta=beta, gy=-9.81, c0=c0,
-                                     tensile_correction=True),
-
-                    PressureRigidBody(dest='fluid', sources=['block', 'solid'], rho0=rho0),
-                    ViscosityRigidBody(dest='fluid', sources=['block', 'solid'], rho0=rho0, nu=nu),
-
-                    # Position step with XSPH
-                    XSPHCorrection(dest='fluid', sources=['fluid']),
-
-                    RigidBodyCollision(
-                        dest='block', sources=['solid'], k=1.0, d=2.0, eta=0.1, kt=0.1
-                    ),
-
-                    ]),
-            Group(equations=[RigidBodyMoments(dest='block', sources=None)]),
-            Group(equations=[RigidBodyMotion(dest='block', sources=None)]),
-
+                ContinuityEquation(
+                    dest='fluid',
+                    sources=['fluid', 'tank', 'cube', 'wood'], ),
+                ContinuityEquation(
+                    dest='tank',
+                    sources=['fluid', 'tank', 'cube', 'wood'], ),
+                MomentumEquation(dest='fluid', sources=[
+                    'fluid',
+                    'tank',
+                ], alpha=self.alpha, beta=0.0, c0=self.co, gy=-9.81),
+                LiuFluidForce(
+                    dest='fluid',
+                    sources=['cube'], ),
+                LiuFluidForce(
+                    dest='fluid',
+                    sources=['wood'], ),
+                XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
+            ]),
+            Group(equations=[
+                RigidBodyCollision(dest='cube', sources=['tank', 'wood'],
+                                   kn=1e6)
+            ]),
+            Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
+            Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
+            Group(equations=[
+                RigidBodyCollision(dest='wood', sources=['tank', 'cube'],
+                                   kn=1e6)
+            ]),
+            Group(equations=[RigidBodyMoments(dest='wood', sources=None)]),
+            Group(equations=[RigidBodyMotion(dest='wood', sources=None)]),
         ]
         return equations
 
 
 if __name__ == '__main__':
-    app = RigidBlockInTank()
+    app = FluidStructureInteration()
     app.run()
