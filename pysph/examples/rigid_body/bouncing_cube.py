@@ -37,8 +37,10 @@ class BouncingCube(Application):
         z = (z - 1).flat
         m = np.ones_like(x)*dx*dx*rho0
         h = np.ones_like(x)*hdx*dx
+        # radius of each sphere constituting in cube
+        rad_s = np.ones_like(x) * dx
         body = get_particle_array_rigid_body(
-            name='body', x=x, y=y, z=z, h=h, m=m,
+            name='body', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s
         )
 
         body.vc[0] = -5.0
@@ -56,8 +58,11 @@ class BouncingCube(Application):
         z = z[tank].flat
         m = np.ones_like(x)*dx*dx*rho0
         h = np.ones_like(x)*hdx*dx
+
+        # radius of each sphere constituting in cube
+        rad_s = np.ones_like(x) * dx
         tank = get_particle_array_rigid_body(
-            name='tank', x=x, y=y, z=z, h=h, m=m,
+            name='tank', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s
         )
         tank.total_mass[0] = np.sum(m)
 
@@ -69,7 +74,7 @@ class BouncingCube(Application):
         integrator = EPECIntegrator(body=RK2StepRigidBody())
 
         solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                    dt=dt, tf=tf, adaptive_timestep=False)
+                        dt=dt, tf=tf, adaptive_timestep=False)
         solver.set_print_freq(10)
         return solver
 
@@ -78,7 +83,7 @@ class BouncingCube(Application):
             Group(equations=[
                 BodyForce(dest='body', sources=None, gz=gz),
                 RigidBodyCollision(
-                    dest='body', sources=['tank'], k=1.0, d=2.0, eta=0.1, kt=0.1
+                    dest='body', sources=['tank'], kn=1e4, en=1
                 )]
             ),
             Group(equations=[RigidBodyMoments(dest='body', sources=None)]),
