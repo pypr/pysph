@@ -301,18 +301,27 @@ class PressureRigidBody(Equation):
         s_fz[s_idx] += -d_m[d_idx]*az
 
 class RigidBodyCollision(Equation):
-    """This is inspired from
-    http://http.developer.nvidia.com/GPUGems3/gpugems3_ch29.html
-    and
+    """Force between two spheres is implemented using DEM contact force law.
 
-    BK Mishra's article on DEM
-    http://dx.doi.org/10.1016/S0301-7516(03)00032-2
+    Refer https://doi.org/10.1016/j.powtec.2011.09.019 for more
+    information.
 
-    A review of computer simulation of tumbling mills by the discrete element
-    method: Part I - contact mechanics
+    Open-source MFIX-DEM software for gas–solids flows:
+    Part I—Verification studies .
+
     """
-    def __init__(self, dest, sources, kn=1e3, gamma_n=0.5, mu=0.5, en=0.8):
-        """Note that d is a factor multiplied with the "h" of the particle.
+    def __init__(self, dest, sources, kn=1e3, mu=0.5, en=0.8):
+        """Initialise the required coefficients for force calculation.
+
+
+        Keyword arguments:
+        kn -- Normal spring stiffness (default 1e3)
+        mu -- friction coefficient (default 0.5)
+        en -- coefficient of restitution (0.8)
+
+        Given these coefficients, tangential spring stiffness, normal and
+        tangential damping coefficient are calculated by default.
+
         """
         self.kn = kn
         self.kt = 2. / 7. * kn
