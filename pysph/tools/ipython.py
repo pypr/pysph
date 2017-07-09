@@ -193,18 +193,9 @@ class Viewer(object):
         self.show_log()
 
 
-
-
-
-
 class Viewer2D(Viewer):
 
     def _create_widgets(self):
-        '''
-        For handlers to work,
-        make sure description of each widget starts like fluid_widname.
-
-        '''
 
         from pysph.solver.utils import load
         import ipywidgets as widgets
@@ -239,10 +230,13 @@ class Viewer2D(Viewer):
                     'None'
                 ]+temp_data[particles_type].output_property_arrays,
                 value='rho',
-                description=particles_type + "_scalar",
+                description="scalar",
                 disabled=False,
                 layout=widgets.Layout(width='240px', display='flex')
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['scalar'].owner = particles_type
             self._widgets['particles'][particles_type]['scalar'].observe(
                 self._scalar_handler,
                 'value',
@@ -251,11 +245,15 @@ class Viewer2D(Viewer):
                 'particles'
             ][particles_type]['legend'] = widgets.ToggleButton(
                 value=False,
-                description=particles_type + "_legend",
+                description="legend",
                 disabled=False,
                 tooltip='Description',
-                layout=widgets.Layout(width='240px', display='flex')
+                layout=widgets.Layout(width='80px', display='flex')
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['legend'].owner = particles_type
+
             self._widgets['particles'][particles_type]['legend'].observe(
                 self._legend_handler,
                 'value',
@@ -266,10 +264,13 @@ class Viewer2D(Viewer):
             ][particles_type]['vector'] = widgets.Text(
                 value='',
                 placeholder='variable1,variable2',
-                description=particles_type + '_vector',
+                description='vector',
                 disabled=False,
                 layout=widgets.Layout(width='240px', display='flex')
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['vector'].owner = particles_type
             self._widgets['particles'][particles_type]['vector'].observe(
                 self._vector_handler,
                 'value',
@@ -281,9 +282,12 @@ class Viewer2D(Viewer):
                 max=100,
                 step=1,
                 value=25,
-                description=particles_type + '_vector_width',
+                description='vector width',
                 layout=widgets.Layout(width='300px'),
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['vector_width'].owner = particles_type
 
             self._widgets[
                 'particles'
@@ -298,9 +302,12 @@ class Viewer2D(Viewer):
                 max=100,
                 step=1,
                 value=55,
-                description=particles_type + '_vector_scale',
+                description='vector scale',
                 layout=widgets.Layout(width='300px'),
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['vector_scale'].owner = particles_type
             self._widgets[
                 'particles'
             ][particles_type]['vector_scale'].observe(
@@ -314,9 +321,12 @@ class Viewer2D(Viewer):
                 max=50,
                 step=1,
                 value=10,
-                description=particles_type + '_scalar_size',
+                description='scalar size',
                 layout=widgets.Layout(width='300px'),
             )
+            self._widgets[
+                'particles'
+            ][particles_type]['scalar_size'].owner = particles_type
             self._widgets[
                 'particles'
             ][particles_type]['scalar_size'].observe(
@@ -337,13 +347,14 @@ class Viewer2D(Viewer):
                 VBox([
                     Label(particles_type),
                     self._widgets['particles'][particles_type]['scalar'],
-                    self._widgets['particles'][particles_type]['legend'],
                     self._widgets['particles'][particles_type]['vector'],
                     self._widgets[
                         'particles'
                     ][particles_type]['vector_scale'],
                     self._widgets['particles'][particles_type]['vector_width'],
                     self._widgets['particles'][particles_type]['scalar_size'],
+                    self._widgets['particles'][particles_type]['legend'],
+
                 ],
                     layout=Layout(display='flex'))
             )
@@ -357,6 +368,7 @@ class Viewer2D(Viewer):
                 ]
             )
         )
+
     def _configure_plot(self):
         '''
         Set attributes for plotting.
@@ -476,7 +488,7 @@ class Viewer2D(Viewer):
 
         temp_data = self.get_buffer(self._widgets['frame'].value)['arrays']
 
-        particles_type = change['owner'].description.split('_')[0]
+        particles_type = change['owner'].owner
 
         if particles_type in self._scatters.keys():
             if self._scatters[particles_type] in self._scatter_ax.collections:
@@ -509,7 +521,7 @@ class Viewer2D(Viewer):
             self._widgets['frame'].value
         )['arrays']
 
-        particles_type = change['owner'].description.split('_')[0]
+        particles_type = change['owner'].owner
 
         if particles_type in self._vectors.keys():
             if self._vectors[particles_type] in self._scatter_ax.collections:
@@ -550,7 +562,7 @@ class Viewer2D(Viewer):
     def _vector_scale_handler(self, change):
         from IPython.display import display, clear_output
         # the widget value must already have updated.
-        particles_type = change['owner'].description.split('_')[0]
+        particles_type = change['owner'].owner
         if particles_type in self._vectors.keys():
             self._vectors[particles_type].scale = change['new']
         clear_output(wait=True)
@@ -558,7 +570,7 @@ class Viewer2D(Viewer):
 
     def _scalar_size_handler(self, change):
         from IPython.display import display, clear_output
-        particles_type = change['owner'].description.split('_')[0]
+        particles_type = change['owner'].owner
         if particles_type in self._scatters.keys():
             self._scatters[particles_type].set_sizes([change['new']])
         clear_output(wait=True)
@@ -567,7 +579,7 @@ class Viewer2D(Viewer):
     def _vector_width_handler(self, change):
         from IPython.display import display, clear_output
         # the widget value must already have updated.
-        particles_type = change['owner'].description.split('_')[0]
+        particles_type = change['owner'].owner
         if particles_type in self._vectors.keys():
             self._vectors[particles_type].width = change['new']/10000
         clear_output(wait=True)
@@ -627,325 +639,3 @@ class Viewer2D(Viewer):
                 )
                 break
         self._widgets['save_figure'].value = ""
-
-
-class Viewer3D(Viewer):
-
-    def _create_widgets(self):
-        '''
-        For handlers to work,
-        make sure description of each widget starts like fluid_widname.
-
-        '''
-
-        from pysph.solver.utils import load
-        import ipywidgets as widgets
-
-        temp_data = load(self.paths_list[0])['arrays']
-        self._widgets = {}
-        file_count = len(self.paths_list) - 1
-        self._widgets['frame'] = widgets.IntSlider(
-            min=0,
-            max=file_count,
-            step=1,
-            value=0,
-            description='frame',
-            layout=widgets.Layout(width='600px'),
-        )
-        self._widgets['frame'].observe(self._frame_handler, 'value')
-        self._widgets['save_figure'] = widgets.Text(
-                value='',
-                placeholder='example.pdf',
-                description='Save figure',
-                disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
-        )
-        self._widgets['save_figure'].on_submit(self._save_figure_handler)
-        self._widgets['particles'] = {}
-        for particles_type in temp_data.keys():
-            self._widgets['particles'][particles_type] = {}
-            self._widgets[
-                'particles'
-            ][particles_type]['scalar'] = widgets.Dropdown(
-                options=temp_data[particles_type].output_property_arrays,
-                value='rho',
-                description=particles_type + "_scalar",
-                disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
-            )
-            self._widgets['particles'][particles_type]['scalar'].observe(
-                self._scalar_handler,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['vector'] = widgets.Text(
-                value='',
-                placeholder='variable1,variable2',
-                description=particles_type + '_vector',
-                disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
-            )
-            self._widgets['particles'][particles_type]['vector'].observe(
-                self._vector_handler,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['vector_width'] = widgets.FloatSlider(
-                min=1,
-                max=100,
-                step=1,
-                value=25,
-                description=particles_type + '_vector_width',
-                layout=widgets.Layout(width='300px'),
-            )
-
-            self._widgets[
-                'particles'
-            ][particles_type]['vector_width'].observe(
-                self._vector_width_handler,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['vector_scale'] = widgets.FloatSlider(
-                min=1,
-                max=100,
-                step=1,
-                value=55,
-                description=particles_type + '_vector_scale',
-                layout=widgets.Layout(width='300px'),
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['vector_scale'].observe(
-                self._vector_scale_handler,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['scalar_size'] = widgets.FloatSlider(
-                min=0,
-                max=10,
-                step=0.1,
-                value=10,
-                description=particles_type + '_scalar_size',
-                layout=widgets.Layout(width='300px'),
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['legend'] = widgets.ToggleButton(
-                value=False,
-                description=particles_type + "_legend",
-                disabled=False,
-                tooltip='Description',
-                layout=widgets.Layout(width='240px', display='flex')
-            )
-            self._widgets['particles'][particles_type]['legend'].observe(
-                self._show_legend,
-                'value',
-            )
-            self._widgets[
-                'particles'
-            ][particles_type]['scalar_size'].observe(
-                self._scalar_size_handler,
-                'value',
-            )
-    def _display_widgets(self):
-        '''
-        Display the widgets created using _create_widgets() method.
-        '''
-
-        from ipywidgets import HBox, VBox, Label, Layout
-        from IPython.display import display
-        items = []
-        for particles_type in self._widgets['particles'].keys():
-            items.append(
-                VBox([
-                    Label(particles_type),
-                    self._widgets['particles'][particles_type]['scalar'],
-                    self._widgets['particles'][particles_type]['vector'],
-                    self._widgets[
-                        'particles'
-                    ][particles_type]['vector_scale'],
-                    self._widgets['particles'][particles_type]['vector_width'],
-                    self._widgets['particles'][particles_type]['scalar_size'],
-                    self._widgets['particles'][particles_type]['legend'],
-                ],
-                    layout=Layout(display='flex'))
-            )
-
-        display(
-            VBox(
-                [
-                    HBox(items, layout=Layout(display='flex')),
-                    self._widgets['frame'],
-                    self._widgets['save_figure']
-                ]
-            )
-        )
-    def interactive_plot(self):
-        self._create_widgets()
-        self.scatters={}
-        self._display_widgets()
-        self.vectors = {}
-
-        import ipyvolume.pylab as p3
-        import numpy as np
-        import matplotlib.cm
-        from IPython.display import display
-        import ipywidgets as widgets
-        colormap = matplotlib.cm.viridis
-        p3.clear()
-        data = self.get_buffer(self._widgets['frame'].value)['arrays']
-        for particles_type in self._widgets['particles'].keys():
-            c = colormap(getattr(data[particles_type], self._widgets['particles'][particles_type]['scalar'].value))
-            self.scatters[particles_type] = p3.scatter(
-                data[particles_type].x,
-                data[particles_type].y,
-                data[particles_type].z,
-                color = c,
-                size=self._widgets['particles'][particles_type]['scalar_size'].value,
-            )
-        out = widgets.Output()
-        with out:
-            if hasattr(self,'plfigure'):
-                display(self.pltfigure)
-            else:
-                pass
-
-        display(widgets.VBox((p3.gcc(),out)))
-        #HBox does not allow custom layout.
-
-    def _frame_handler(self, change):
-        import numpy as np
-        import matplotlib.cm
-        colormap = matplotlib.cm.viridis
-        data = self.get_buffer(self._widgets['frame'].value)['arrays']
-        for particles_type in self._widgets['particles'].keys():
-
-            c = colormap(getattr(data[particles_type], self._widgets['particles'][particles_type]['scalar'].value))
-
-            self.scatters[particles_type].x = data[particles_type].x
-            self.scatters[particles_type].y = data[particles_type].y,
-            self.scatters[particles_type].z = data[particles_type].z,
-            self.scatters[particles_type].color = c
-
-#            if self._widgets['particles'][particles_type]['vector'].value != '':
-#                if particles_type in self.vectors.keys():
-#                    if self.vectors[particles_type].size != 0:
-#                        self.vectors[particles_type].x = data[particles_type].x
-#                        self.vectors[particles_type].y = data[particles_type].y
-#                        self.vectors[particles_type].z = data[particles_type].z
-#                        self.vectors[particles_type].vx = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[0])
-#                        self.vectors[particles_type].vy = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[1])
-#                        self.vectors[particles_type].vz = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[2])
-
-
-
-    def _scalar_handler(self, change):
-        import numpy as np
-        import matplotlib.cm
-        colormap = matplotlib.cm.jet
-        data = self.get_buffer(self._widgets['frame'].value)['arrays']
-        particles_type = change['owner'].description.split("_")[0]
-        c = colormap(getattr(data[particles_type], self._widgets['particles'][particles_type]['scalar'].value))
-        self.scatters[particles_type].color = c
-
-
-    def _show_legend(self, change):
-        import matplotlib.pyplot as plt
-        import matplotlib as mpl
-        import numpy as np
-        import ipywidgets as widgets
-        from IPython.display import clear_output
-        temp_data = self.get_buffer(self._widgets['frame'].value)
-        cmap = mpl.cm.cool
-
-        self.pltfigure = plt.figure(figsize=(8,8))
-        self.cbars = {}
-        self.cbars_ax = {}
-
-        for particles_type in self._widgets['particles'].keys():
-            self.cbars_ax[particles_type] = self.pltfigure.add_axes(
-                [
-                    0.2*len(self.cbars_ax.keys()),
-                    0,
-                    0.05,
-                    0.5
-                ]
-            )
-            self.cbars[particles_type] = mpl.colorbar.ColorbarBase(
-                ax=self.cbars_ax[particles_type],
-                cmap=cmap,
-                boundaries=np.sort(
-                    getattr(
-                    temp_data['arrays'][particles_type],
-                    self._widgets['particles'][particles_type]['scalar'].value
-                    )
-                )
-            )
-        out = widgets.Output()
-        with out:
-            if hasattr(self,'plfigure'):
-                display(self.pltfigure)
-            else:
-                pass
-        clear_output()
-        display(widgets.VBox((p3.gcc(),out)))
-
-    def _vector_handler(self, change):
-        pass
-#        import numpy as np
-#        import ipyvolume.pylab as p3
-#        import matplotlib.cm
-#        data = self.get_buffer(self._widgets['frame'].value)['arrays']
-#        particles_type = change['owner'].description.split("_")[0]
-#        if change['new'] != '':
-#            if particles_type in self.vectors.keys():
-#                self.vectors[particles_type].vx = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[0])
-#                self.vectors[particles_type].vy = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[1])
-#                self.vectors[particles_type].vz = getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[2])
-#                self.vectors[particles_type].size = self._widgets['particles'][particles_type]['vector_width'].value
-#            else:
-#                self.vectors[particles_type] = p3.quiver(
-#                    data[particles_type].x,
-#                    data[particles_type].y,
-#                    data[particles_type].z,
-#                    getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[0]),
-#                    getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[1]),
-#                    getattr(data[particles_type], self._widgets['particles'][particles_type]['vector'].value.split(",")[2]),
-#                    size=self._widgets['particles'][particles_type]['vector_width'].value,
-#                )
-#        else:
-#            if particles_type in self.vectors.keys():
-#                self.vectors[particles_type].size = 0
-
-    def _vector_scale_handler(self, change):
-        pass
-
-    def _scalar_size_handler(self, change):
-        particles_type = change['owner'].description.split("_")[0]
-        self.scatters[particles_type].size = self._widgets['particles'][particles_type]['scalar_size'].value
-
-    def _vector_width_handler(self, change):
-        pass
-
-    def _save_figure_handler(self, change):
-        pass
-#        import ipyvolume.pylab as p3
-#        for extension in [
-#            '.png',
-#            '.jpeg',
-#        ]:
-#            if self._widgets['save_figure'].value.endswith(extension):
-#                p3.savefig(self._widgets['save_figure'].value)
-#                print(
-#                    "Saved figure as {} in the present working directory"
-#                    .format(
-#                        self._widgets['save_figure'].value
-#                    )
-#                )
-#                break
-#        self._widgets['save_figure'].value = ""
