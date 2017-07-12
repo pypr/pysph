@@ -7,13 +7,13 @@ from __future__ import print_function
 import numpy as np
 
 # PySPH base and carray imports
-from pysph.base.utils import get_particle_array_wcsph, get_particle_array_rigid_body
+from pysph.base.utils import (get_particle_array_wcsph,
+                              get_particle_array_rigid_body)
 from pysph.base.kernels import CubicSpline
 
 from pysph.solver.solver import Solver
 from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
-from pysph.solver.utils import get_files, iter_output
 
 from pysph.sph.equation import Group
 from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
@@ -21,9 +21,12 @@ from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
 from pysph.sph.rigid_body import (
-    BodyForce, RigidBodyCollision, SolidFluidForce, LiuFluidForce,
-    NumberDensity, RigidBodyMoments, RigidBodyMotion, RK2StepRigidBody,
-    PressureRigidBody)
+    BodyForce,
+    RigidBodyCollision,
+    LiuFluidForce,
+    RigidBodyMoments,
+    RigidBodyMotion,
+    RK2StepRigidBody, )
 
 
 def create_boundary():
@@ -56,8 +59,6 @@ def create_boundary():
 
 def create_fluid():
     dx = 2
-    # xf = np.arange(dx/2., 140-dx/2., dx)
-    # yf = np.arange(dx/2., 130+dx/2., dx)
     xf = np.arange(0, 140, dx)
     yf = np.arange(0, 130, dx)
     xf, yf = np.meshgrid(xf, yf)
@@ -70,7 +71,6 @@ def create_fluid():
     yf = yf.ravel()
 
     p = (xf > 59) & (xf < 81) & (yf > 119)
-    # p = (xf > 59) & (xf < 81)
 
     xf = xf[~p]
     yf = yf[~p]
@@ -204,7 +204,6 @@ class RigidFluidCoupling(Application):
                     BodyForce(dest='wood', sources=None, gy=-9.81),
                     SummationDensity(dest='cube', sources=['fluid', 'cube']),
                     SummationDensity(dest='wood', sources=['fluid', 'wood'])
-                    # NumberDensity(dest='cube', sources=['cube']),
                 ],
                 real=False),
             Group(equations=[
@@ -235,8 +234,6 @@ class RigidFluidCoupling(Application):
                 LiuFluidForce(
                     dest='fluid',
                     sources=['wood'], ),
-                # PressureRigidBody(dest='fluid', sources=['cube'],
-                #                   rho0=1500),
                 XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
             ]),
             Group(equations=[
@@ -258,4 +255,3 @@ class RigidFluidCoupling(Application):
 if __name__ == '__main__':
     app = RigidFluidCoupling()
     app.run()
-    # geometry()
