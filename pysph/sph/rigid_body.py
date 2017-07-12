@@ -302,12 +302,19 @@ class PressureRigidBody(Equation):
 
 
 class LiuFluidForce(Equation):
-    """Force between a solid sphere and a SPH fluid particle.
-    This is implemented using Akinchi's
+    """Force between a solid sphere and a SPH fluid particle.  This is
+    implemented using Akinci's[1] force and additional force from solid
+    bodies pressure which is implemented by Liu[2]
 
-    'Versatile Rigid-Fluid Coupling for Incompressible SPH'
+    [1]'Versatile Rigid-Fluid Coupling for Incompressible SPH'
 
     URL: https://graphics.ethz.ch/~sobarbar/papers/Sol12/Sol12.pdf
+
+    [2]A 3D Simulation of a Moving Solid in Viscous Free-Surface Flows by
+    Coupling SPH and DEM
+
+    https://doi.org/10.1155/2017/3174904
+
 
     Note: Here forces for both the phases are added at once.
           Please make sure that this force is applied only once
@@ -328,6 +335,48 @@ class LiuFluidForce(Equation):
         s_fx[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[0]
         s_fy[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[1]
         s_fz[s_idx] += d_m[d_idx] * s_m[s_idx] * _t1 * DWIJ[2]
+
+
+class RigidBodyForceGPUGems(Equation):
+    """This is inspired from
+    http://http.developer.nvidia.com/GPUGems3/gpugems3_ch29.html
+    and
+    BK Mishra's article on DEM
+    http://dx.doi.org/10.1016/S0301-7516(03)00032-2
+    A review of computer simulation of tumbling mills by the discrete element
+    method: Part I - contact mechanics
+    """
+    def __init__(self, dest, sources, k=1.0, d=1.0, eta=1.0, kt=1.0):
+        """Note that d is a factor multiplied with the "h" of the particle.
+        """
+        self.k = k
+        self.d = d
+        self.eta = eta
+        self.kt = kt
+        super(RigidBodyCollision, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_fx, d_fy, d_fz, d_h, d_total_mass, XIJ, RIJ, R2IJ, VIJ):
+        vijdotrij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        if RIJ > 1e-9:
+            vijdotrij_r2ij = vijdotrij/R2IJ
+            nij_x = XIJ[0]/RIJ
+            nij_y = XIJ[1]/RIJ
+            nij_z = XIJ[2]/RIJ
+        else:
+            vijdotrij_r2ij = 0.0
+            nij_x = 0.0
+            nij_y = 0.0
+            nij_z = 0.0
+        vijt_x = VIJ[0] - vijdotrij_r2ij*XIJ[0]
+        vijt_y = VIJ[1] - vijdotrij_r2ij*XIJ[1]
+        vijt_z = VIJ[2] - vijdotrij_r2ij*XIJ[2]
+
+        d = self.d*d_h[d_idx]
+        fac = self.k*d_total_mass[0]/d*max(d - RIJ, 0.0)
+
+        d_fx[d_idx] += fac*nij_x - self.eta*VIJ[0] - self.kt*vijt_x
+        d_fy[d_idx] += fac*nij_y - self.eta*VIJ[1] - self.kt*vijt_y
+        d_fz[d_idx] += fac*nij_z - self.eta*VIJ[2] - self.kt*vijt_z
 
 
 class RigidBodyCollision(Equation):
