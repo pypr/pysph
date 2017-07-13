@@ -78,6 +78,11 @@ class TestAutomationBase(unittest.TestCase):
         os.chdir(self.root)
         self.sim_dir = 'sim'
         self.output_dir = 'output'
+        patch = mock.patch(
+            'pysph.tools.jobs.free_cores', return_value=2
+        )
+        patch.start()
+        self.addCleanup(patch.stop)
 
     def tearDown(self):
         os.chdir(self.cwd)
