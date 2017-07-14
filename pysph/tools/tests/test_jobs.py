@@ -271,7 +271,7 @@ class TestScheduler(unittest.TestCase):
         self.assertEqual(mock_lw.call_count, 1)
         self.assertEqual(len(s.workers), 1)
 
-    @mock.patch('pysph.tools.jobs.free_cores', return_value=2)
+    @mock.patch.object(jobs.RemoteWorker, 'free_cores', return_value=2.0)
     def test_scheduler_only_creates_required_workers(self, mock_free_cores):
         # Given
         config = [
