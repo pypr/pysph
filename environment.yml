@@ -1,4 +1,4 @@
-name: pysph
+name: pysph_env
 dependencies:
   - python >=2.7.12
   - mako
