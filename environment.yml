@@ -1,4 +1,4 @@
-name: pysph_check
+name: pysph
 dependencies:
   - python >=2.7.12
   - mako
