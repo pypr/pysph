@@ -1,0 +1,14 @@
+name: pysph_env
+dependencies:
+  - python >=2.7.12
+  - mako
+  - execnet
+  - mayavi
+  - pyside
+  - cython
+  - matplotlib
+  - jupyter
+  - pytest
+  - mock
+  - pip
+  - psutil
