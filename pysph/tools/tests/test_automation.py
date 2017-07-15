@@ -16,7 +16,7 @@ from pysph.tools.automation import (
     compare_runs
 )
 try:
-    from pysph.tools.jobs import Scheduler
+    from pysph.tools.jobs import Scheduler, RemoteWorker
 except ImportError:
     raise unittest.SkipTest('test_jobs requires psutil')
 
@@ -78,6 +78,11 @@ class TestAutomationBase(unittest.TestCase):
         os.chdir(self.root)
         self.sim_dir = 'sim'
         self.output_dir = 'output'
+        patch = mock.patch(
+            'pysph.tools.jobs.free_cores', return_value=2
+        )
+        patch.start()
+        self.addCleanup(patch.stop)
 
     def tearDown(self):
         os.chdir(self.cwd)
@@ -140,6 +145,11 @@ class TestRemoteAutomation(TestLocalAutomation):
     def setUp(self):
         super(TestRemoteAutomation, self).setUp()
         self.other_dir = tempfile.mkdtemp()
+        p = mock.patch.object(
+            RemoteWorker, 'free_cores', return_value=2.0
+        )
+        p.start()
+        self.addCleanup(p.stop)
 
     def tearDown(self):
         super(TestRemoteAutomation, self).tearDown()
