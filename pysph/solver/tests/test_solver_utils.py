@@ -12,7 +12,40 @@ except ImportError:
     from unittest import TestCase, main, skipUnless
 
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pysph.solver.utils import dump, load, dump_v1
+from pysph.solver.utils import dump, load, dump_v1, get_files
+
+
+class TestGetFiles(TestCase):
+    def setUp(self):
+        self.root = mkdtemp()
+        self.fname = 'dam_break_2d'
+        self.dirname = join(self.root, self.fname + '_output')
+        os.mkdir(self.dirname)
+        self.files = [
+            join(
+                self.dirname,
+                self.fname+'_'+str(i)+'.npz'
+            )
+            for i in range(11)
+        ]
+        for name in self.files:
+            with open(name, 'w') as fp:
+                fp.write('')
+
+    def test_get_files(self):
+        self.assertEqual(get_files(self.dirname), self.files)
+        self.assertEqual(get_files(self.dirname, fname=self.fname), self.files)
+        self.assertEqual(
+            get_files(
+                self.dirname,
+                fname=self.fname,
+                endswith=('npz', 'hdf5')
+            ),
+            self.files
+        )
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
 
 
 class TestOutputNumpy(TestCase):

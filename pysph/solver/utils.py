@@ -375,11 +375,11 @@ def get_files(dirname=None, fname=None, endswith=output_formats):
     if dirname is None:
         return []
 
-    if fname is None:
-        fname = dirname.split("_output")[0]
-
     path = os.path.abspath( dirname )
     files = os.listdir( path )
+
+    if fname is None:
+        fname = os.path.split(path)[1].split('_output')[0]
 
     # get all the output files in the directory
     files = [f for f in files if f.startswith(fname) and f.endswith(endswith)]

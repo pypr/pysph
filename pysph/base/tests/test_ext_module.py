@@ -23,11 +23,16 @@ def _check_write_source(root):
     It returns the number of times "open" was called.
     """
     m = mock.mock_open()
-    with mock.patch('pysph.base.ext_module.open', m, create=True):
-        s = ExtModule("print('hello')", root=root)
-    if m.called:
-        with open(*m.call_args[0]) as fp:
+    orig_side_effect = m.side_effect
+
+    def _side_effect(*args, **kw):
+        with open(*args, **kw) as fp:
             fp.write("junk")
+        return orig_side_effect(*args, **kw)
+    m.side_effect = _side_effect
+
+    with mock.patch('pysph.base.ext_module.open', m, create=True):
+        ExtModule("print('hello')", root=root)
     return m.call_count
 
 

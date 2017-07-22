@@ -144,7 +144,7 @@ calculated, a fixed size constant can be added.  This can be done by adding a
 
     >>> pa.add_constant('total_mass', 0.0)
     >>> pa.add_constant('total_force', [0.0, 0.0, 0.0])
-    >>> print pa.total_mass, pa.total_force
+    >>> print(pa.total_mass, pa.total_force)
 
 In the above, the ``total_mass`` is a fixed ``DoubleArray`` of length 1 and
 the ``total_force`` is a fixed ``DoubleArray`` of length 3.  These constants
@@ -329,21 +329,21 @@ of PySPH:
 
    >>> pa = utils.get_particle_array(x=x, tag=tag)
 
-   >>> print pa.get_number_of_particles()                     # total number of particles
+   >>> print(pa.get_number_of_particles())                     # total number of particles
    >>> 4
-   >>> print pa.num_real_particles                            # no. of particles with tag 0
+   >>> print(pa.num_real_particles)                            # no. of particles with tag 0
    >>> 2
 
    >>> x, tag = pa.get('x', 'tag', only_real_particles=True)  # get only real particles (tag == 0)
-   >>> print x
+   >>> print(x)
    >>> [0. 2.]
-   >>> print tag
+   >>> print(tag)
    >>> [0 0]
 
    >>> x, tag = pa.get('x', 'tag', only_real_particles=False) # get all particles
-   >>> print x
+   >>> print(x)
    >>> [0. 2. 1. 3.]
-   >>> print tag
+   >>> print(tag)
    >>> [0 0 2 1]
 
 We are now in a position to put all these ideas together and write our

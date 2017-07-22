@@ -248,7 +248,11 @@ def get_particle_array_rigid_body(constants=None, **props):
     get_particle_array
 
     """
-    extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'x0', 'y0', 'z0']
+    extra_props = ['au', 'av', 'aw', 'V', 'fx', 'fy', 'fz', 'x0', 'y0', 'z0',
+                   'tang_disp_x', 'tang_disp_y', 'tang_disp_z', 'tang_disp_x0',
+                   'tang_disp_y0', 'tang_disp_z0', 'tang_velocity_x',
+                   'tang_velocity_y', 'rad_s',
+                   'tang_velocity_z',  'nx', 'ny', 'nz']
 
     body_id = props.pop('body_id', None)
     nb = 1 if body_id is None else numpy.max(body_id) + 1

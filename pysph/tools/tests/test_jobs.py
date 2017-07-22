@@ -157,7 +157,8 @@ class TestLocalWorker(unittest.TestCase):
     def tearDown(self):
         safe_rmtree(self.root)
 
-    def test_scheduler_works_with_local_worker(self):
+    @mock.patch('pysph.tools.jobs.free_cores', return_value=2.0)
+    def test_scheduler_works_with_local_worker(self, mock_free_cores):
         # Given
         s = jobs.Scheduler(worker_config=[dict(host='localhost')])
 
@@ -271,7 +272,8 @@ class TestScheduler(unittest.TestCase):
         self.assertEqual(mock_lw.call_count, 1)
         self.assertEqual(len(s.workers), 1)
 
-    def test_scheduler_only_creates_required_workers(self):
+    @mock.patch.object(jobs.RemoteWorker, 'free_cores', return_value=2.0)
+    def test_scheduler_only_creates_required_workers(self, mock_remote_worker):
         # Given
         config = [
             dict(host='host1', python=sys.executable, testing=True),
@@ -324,7 +326,8 @@ class TestScheduler(unittest.TestCase):
         self.assertEqual(proxy.worker.host, 'host1')
         self.assertEqual(proxy1.worker.host, 'host2')
 
-    def test_scheduler_should_not_overload_worker(self):
+    @mock.patch('pysph.tools.jobs.free_cores', return_value=2.0)
+    def test_scheduler_should_not_overload_worker(self, mock_free_cores):
         # Given
         n_core = jobs.free_cores()
         config = [dict(host='localhost')]
