@@ -23,9 +23,9 @@ except ImportError:
 
 import sys
 
-if len(os.environ.get('COVERAGE','')) > 0:
-    MACROS = [("CYTHON_TRACE","1"),("CYTHON_TRACE_NOGIL","1")]
-    COMPILER_DIRECTIVES = {"linetrace":True}
+if len(os.environ.get('COVERAGE', '')) > 0:
+    MACROS = [("CYTHON_TRACE", "1"), ("CYTHON_TRACE_NOGIL", "1")]
+    COMPILER_DIRECTIVES = {"linetrace": True}
     print("-"*80)
     print("Enabling linetracing for cython and setting CYTHON_TRACE = 1")
     print("-"*80)
