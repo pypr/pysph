@@ -146,10 +146,11 @@ class Viewer(object):
         self.show_results()
         self.show_log()
 
+
 class ParticleArrayWidgets(object):
 
     def __init__(self, particlearray, particles_type):
-
+        self.particles_type = particles_type
         self.scalar = widgets.Dropdown(
             options=[
                 'None'
@@ -204,6 +205,23 @@ class ParticleArrayWidgets(object):
         )
         self.scalar_size.owner = particles_type
 
+    def _create_vbox(self):
+
+        from ipywidgets import VBox, Label, Layout
+        return VBox([
+            Label(self.particles_type),
+            self.scalar,
+            self.vector,
+            self.vector_scale,
+            self.vector_width,
+            self.scalar_size,
+            self.legend,
+
+        ],
+            layout=Layout(display='flex')
+        )
+
+
 class Viewer2DWidgets(object):
 
     def __init__(self, file, file_count):
@@ -236,20 +254,7 @@ class Viewer2DWidgets(object):
         from ipywidgets import HBox, VBox, Label, Layout
         items = []
         for particles_type in self.particles.keys():
-            pa_widgets = self.particles[particles_type]
-            items.append(
-                VBox([
-                    Label(particles_type),
-                    pa_widgets.scalar,
-                    pa_widgets.vector,
-                    pa_widgets.vector_scale,
-                    pa_widgets.vector_width,
-                    pa_widgets.scalar_size,
-                    pa_widgets.legend,
-
-                ],
-                    layout=Layout(display='flex'))
-            )
+            items.append(self.particles[particles_type]._create_vbox())
 
         return VBox(
                 [
@@ -258,6 +263,7 @@ class Viewer2DWidgets(object):
                     self.save_figure
                 ]
             )
+
 
 class Viewer2D(Viewer):
 
@@ -279,7 +285,7 @@ class Viewer2D(Viewer):
             file_count=len(self.paths_list) - 1,
         )
         widgets = self._widgets
-        widgets.frame.observe(self._frame_handler, 'value' )
+        widgets.frame.observe(self._frame_handler, 'value')
         widgets.save_figure.on_submit(self._save_figure_handler)
 
         for particles_type in self._widgets.particles.keys():
@@ -380,13 +386,11 @@ class Viewer2D(Viewer):
                     width=(pa_widgets.vector_width.value)/10000,
                 )
 
-
         # show the changes #
         clear_output(wait=True)
         display(self.figure)
 
     def _scalar_handler(self, change):
-
 
         particles_type = change['owner'].owner
         temp_data = self.get_frame(
