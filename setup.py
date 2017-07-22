@@ -23,6 +23,16 @@ except ImportError:
 
 import sys
 
+if len(os.environ.get('COVERAGE', '')) > 0:
+    MACROS = [("CYTHON_TRACE", "1"), ("CYTHON_TRACE_NOGIL", "1")]
+    COMPILER_DIRECTIVES = {"linetrace": True}
+    print("-"*80)
+    print("Enabling linetracing for cython and setting CYTHON_TRACE = 1")
+    print("-"*80)
+else:
+    MACROS = []
+    COMPILER_DIRECTIVES = {}
+
 MODE = 'normal'
 if len(sys.argv) >= 2 and \
    ('--help' in sys.argv[1:] or
@@ -262,7 +272,8 @@ def get_basic_extensions():
             depends=get_deps("pyzoltan/core/carray"),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -270,7 +281,8 @@ def get_basic_extensions():
             sources=["pysph/base/point.pyx"],
             extra_compile_args=extra_compile_args,
             include_dirs=include_dirs,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -284,7 +296,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
 
@@ -298,7 +311,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -311,7 +325,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -324,7 +339,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -337,7 +353,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
 
@@ -351,7 +368,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -364,7 +382,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -377,7 +396,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -390,7 +410,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -403,7 +424,8 @@ def get_basic_extensions():
             extra_compile_args=extra_compile_args + openmp_compile_args,
             extra_link_args=openmp_link_args,
             cython_compile_time_env={'OPENMP': openmp_env},
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         # kernels used for tests
@@ -412,7 +434,8 @@ def get_basic_extensions():
             sources=["pysph/base/c_kernels.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         # Eigen decomposition code
@@ -421,7 +444,8 @@ def get_basic_extensions():
             sources=["pysph/base/linalg3.pyx"],
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
     ]
 
@@ -438,7 +462,8 @@ def get_basic_extensions():
                 extra_compile_args=extra_compile_args + openmp_compile_args,
                 extra_link_args=openmp_link_args,
                 cython_compile_time_env={'OPENMP': openmp_env},
-                language="c++"
+                language="c++",
+                define_macros=MACROS,
             ),
 
             Extension(
@@ -451,7 +476,8 @@ def get_basic_extensions():
                 extra_compile_args=extra_compile_args + openmp_compile_args,
                 extra_link_args=openmp_link_args,
                 cython_compile_time_env={'OPENMP': openmp_env},
-                language="c++"
+                language="c++",
+                define_macros=MACROS,
             ),
 
             Extension(
@@ -464,7 +490,8 @@ def get_basic_extensions():
                 extra_compile_args=extra_compile_args + openmp_compile_args,
                 extra_link_args=openmp_link_args,
                 cython_compile_time_env={'OPENMP': openmp_env},
-                language="c++"
+                language="c++",
+                define_macros=MACROS,
             ))
         )
 
@@ -514,7 +541,8 @@ def get_parallel_extensions():
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -531,7 +559,8 @@ def get_parallel_extensions():
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
 
         Extension(
@@ -547,7 +576,8 @@ def get_parallel_extensions():
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
     ]
 
@@ -568,7 +598,8 @@ def get_parallel_extensions():
             extra_link_args=mpi_link_args,
             extra_compile_args=mpi_compile_args+extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
-            language="c++"
+            language="c++",
+            define_macros=MACROS,
         ),
     ]
     return zoltan_modules + parallel_modules
@@ -649,7 +680,8 @@ def setup_package():
         ext_modules = cythonize(
             ext_modules, compile_time_env=compile_env,
             include_path=list(include_path),
-            language="c++"
+            language="c++",
+            compiler_directives=COMPILER_DIRECTIVES,
         )
 
     setup(name='PySPH',
