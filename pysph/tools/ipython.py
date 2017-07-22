@@ -146,13 +146,69 @@ class Viewer(object):
         self.show_results()
         self.show_log()
 
+class ParticleArrayWidgets(object):
+
+    def __init__(self, particlearray, particles_type):
+
+        self.scalar = widgets.Dropdown(
+            options=[
+                'None'
+            ]+particlearray.output_property_arrays,
+            value='rho',
+            description="scalar",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.scalar.owner = particles_type
+        self.legend = widgets.ToggleButton(
+            value=False,
+            description="legend",
+            disabled=False,
+            tooltip='Description',
+            layout=widgets.Layout(width='80px', display='flex')
+        )
+        self.legend.owner = particles_type
+        self.vector = widgets.Text(
+            value='',
+            placeholder='variable1,variable2',
+            description='vector',
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.vector.owner = particles_type
+        self.vector_width = widgets.FloatSlider(
+            min=1,
+            max=100,
+            step=1,
+            value=25,
+            description='vector width',
+            layout=widgets.Layout(width='300px'),
+        )
+        self.vector_width.owner = particles_type
+        self.vector_scale = widgets.FloatSlider(
+            min=1,
+            max=100,
+            step=1,
+            value=55,
+            description='vector scale',
+            layout=widgets.Layout(width='300px'),
+        )
+        self.vector_scale.owner = particles_type
+        self.scalar_size = widgets.FloatSlider(
+            min=0,
+            max=50,
+            step=1,
+            value=10,
+            description='scalar size',
+            layout=widgets.Layout(width='300px'),
+        )
+        self.scalar_size.owner = particles_type
 
 class Viewer2DWidgets(object):
 
-    def __init__(self, file, file_count, handlers):
+    def __init__(self, file, file_count):
 
-        temp_data = load(file)['arrays']
-
+        self.temp_data = load(file)['arrays']
         self.frame = widgets.IntSlider(
             min=0,
             max=file_count,
@@ -161,8 +217,6 @@ class Viewer2DWidgets(object):
             description='frame',
             layout=widgets.Layout(width='600px'),
         )
-        self.frame.observe(handlers['frame'], 'value')
-
         self.save_figure = widgets.Text(
                 value='',
                 placeholder='example.pdf',
@@ -170,103 +224,40 @@ class Viewer2DWidgets(object):
                 disabled=False,
                 layout=widgets.Layout(width='240px', display='flex')
         )
-        self.save_figure.on_submit(handlers['save_figure'])
-
         self.particles = {}
-
-        class extend(object):
-            pass
-
-        for particles_type in temp_data.keys():
-
-            self.particles[particles_type] = extend()
-
-            self.particles[particles_type].scalar = widgets.Dropdown(
-                options=[
-                    'None'
-                ]+temp_data[particles_type].output_property_arrays,
-                value='rho',
-                description="scalar",
-                disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
-            )
-            self.particles[particles_type].scalar.owner = particles_type
-            self.particles[particles_type].scalar.observe(
-                handlers['scalar_handler'],
-                'value',
+        for particles_type in self.temp_data.keys():
+            self.particles[particles_type] = ParticleArrayWidgets(
+                self.temp_data[particles_type],
+                particles_type,
             )
 
-            self.particles[particles_type].legend = widgets.ToggleButton(
-                value=False,
-                description="legend",
-                disabled=False,
-                tooltip='Description',
-                layout=widgets.Layout(width='80px', display='flex')
-            )
-            self.particles[particles_type].legend.owner = particles_type
+    def _create_vbox(self):
 
-            self.particles[particles_type].legend.observe(
-                handlers['legend_handler'],
-                'value',
-            )
+        from ipywidgets import HBox, VBox, Label, Layout
+        items = []
+        for particles_type in self.particles.keys():
+            pa_widgets = self.particles[particles_type]
+            items.append(
+                VBox([
+                    Label(particles_type),
+                    pa_widgets.scalar,
+                    pa_widgets.vector,
+                    pa_widgets.vector_scale,
+                    pa_widgets.vector_width,
+                    pa_widgets.scalar_size,
+                    pa_widgets.legend,
 
-            self.particles[particles_type].vector = widgets.Text(
-                value='',
-                placeholder='variable1,variable2',
-                description='vector',
-                disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
+                ],
+                    layout=Layout(display='flex'))
             )
 
-            self.particles[particles_type].vector.owner = particles_type
-            self.particles[particles_type].vector.observe(
-                handlers['vector_handler'],
-                'value',
+        return VBox(
+                [
+                    HBox(items, layout=Layout(display='flex')),
+                    self.frame,
+                    self.save_figure
+                ]
             )
-
-            self.particles[particles_type].vector_width = widgets.FloatSlider(
-                min=1,
-                max=100,
-                step=1,
-                value=25,
-                description='vector width',
-                layout=widgets.Layout(width='300px'),
-            )
-            self.particles[particles_type].vector_width.owner = particles_type
-
-            self.particles[particles_type].vector_width.observe(
-                handlers['vector_width_handler'],
-                'value',
-            )
-
-            self.particles[particles_type].vector_scale = widgets.FloatSlider(
-                min=1,
-                max=100,
-                step=1,
-                value=55,
-                description='vector scale',
-                layout=widgets.Layout(width='300px'),
-            )
-            self.particles[particles_type].vector_scale.owner = particles_type
-            self.particles[particles_type].vector_scale.observe(
-                handlers['vector_scale_handler'],
-                'value',
-            )
-
-            self.particles[particles_type].scalar_size = widgets.FloatSlider(
-                min=0,
-                max=50,
-                step=1,
-                value=10,
-                description='scalar size',
-                layout=widgets.Layout(width='300px'),
-            )
-            self.particles[particles_type].scalar_size.owner = particles_type
-            self.particles[particles_type].scalar_size.observe(
-                handlers['scalar_size_handler'],
-                'value',
-            )
-
 
 class Viewer2D(Viewer):
 
@@ -283,54 +274,28 @@ class Viewer2D(Viewer):
 
     def _create_widgets(self):
 
-        handlers = {}
-        handlers['frame'] = self._frame_handler
-        handlers['scalar_handler'] = self._scalar_handler
-        handlers['vector_handler'] = self._vector_handler
-        handlers['vector_scale_handler'] = self._vector_scale_handler
-        handlers['vector_width_handler'] = self._vector_width_handler
-        handlers['scalar_size_handler'] = self._scalar_size_handler
-        handlers['save_figure'] = self._save_figure_handler
-        handlers['legend_handler'] = self._legend_handler
-
         self._widgets = Viewer2DWidgets(
             file=self.paths_list[0],
             file_count=len(self.paths_list) - 1,
-            handlers=handlers
         )
+        widgets = self._widgets
+        widgets.frame.observe(self._frame_handler, 'value' )
+        widgets.save_figure.on_submit(self._save_figure_handler)
 
-    def _display_widgets(self):
-        '''
-        Display the widgets created using _create_widgets() method.
-        '''
-
-        from ipywidgets import HBox, VBox, Label, Layout
-
-        items = []
         for particles_type in self._widgets.particles.keys():
-            items.append(
-                VBox([
-                    Label(particles_type),
-                    self._widgets.particles[particles_type].scalar,
-                    self._widgets.particles[particles_type].vector,
-                    self._widgets.particles[particles_type].vector_scale,
-                    self._widgets.particles[particles_type].vector_width,
-                    self._widgets.particles[particles_type].scalar_size,
-                    self._widgets.particles[particles_type].legend,
-
-                ],
-                    layout=Layout(display='flex'))
+            pa_widgets = widgets.particles[particles_type]
+            pa_widgets.scalar.observe(self._scalar_handler, 'value')
+            pa_widgets.vector.observe(self._vector_handler, 'value')
+            pa_widgets.vector_width.observe(
+                self._vector_width_handler,
+                'value'
             )
-
-        display(
-            VBox(
-                [
-                    HBox(items, layout=Layout(display='flex')),
-                    self._widgets.frame,
-                    self._widgets.save_figure
-                ]
+            pa_widgets.vector_scale.observe(
+                self._vector_scale_handler,
+                'value'
             )
-        )
+            pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
+            pa_widgets.legend.observe(self._legend_handler, 'value')
 
     def _configure_plot(self):
         '''
@@ -357,7 +322,7 @@ class Viewer2D(Viewer):
         self._configure_plot()
         self._create_widgets()
         self._frame_handler(None)
-        self._display_widgets()
+        display(self._widgets._create_vbox())
 
     def _frame_handler(self, change):
 
@@ -376,19 +341,16 @@ class Viewer2D(Viewer):
 
         self._scatters = {}
         for particles_type in self._widgets.particles.keys():
-            if self._widgets.particles[particles_type].scalar.value != 'None':
+            pa_widgets = self._widgets.particles[particles_type]
+            if pa_widgets.scalar.value != 'None':
                 self._scatters[particles_type] = self._scatter_ax.scatter(
                     temp_data[particles_type].x,
                     temp_data[particles_type].y,
                     c=getattr(
                             temp_data[particles_type],
-                            self._widgets.particles[
-                                particles_type
-                            ].scalar.value
+                            pa_widgets.scalar.value
                     ),
-                    s=self._widgets.particles[
-                        particles_type
-                    ].scalar_size.value,
+                    s=pa_widgets.scalar_size.value,
                 )
         self._legend_handler(None, manual=True)
 
@@ -401,40 +363,23 @@ class Viewer2D(Viewer):
         self._vectors = {}
         for particles_type in self._widgets.particles.keys():
             if self._widgets.particles[particles_type].vector.value != '':
+                pa_widgets = self._widgets.particles[particles_type]
+                temp_data = temp_data[particles_type]
+                x = temp_data.x
+                y = temp_data.y
+                v1 = getattr(temp_data, pa_widgets.vector.value.split(",")[0])
+                v2 = getattr(temp_data, pa_widgets.vector.value.split(",")[1])
+                vmag = (v1**2 + v2**2)**0.5
                 self._vectors[particles_type] = self._scatter_ax.quiver(
-                    temp_data[particles_type].x,
-                    temp_data[particles_type].y,
-                    getattr(
-                        temp_data[particles_type],
-                        self.self._widgets.particles[
-                            particles_type
-                        ].vector.value.split(",")[0]
-                    ),
-                    getattr(
-                        temp_data[particles_type],
-                        self._widgets.particles[
-                            particles_type
-                        ].vector.value.split(",")[1]
-                    ),
-                    ((getattr(
-                        temp_data[particles_type],
-                        self._widgets.particles[
-                            particles_type
-                        ].vector.value.split(",")[0]
-                    ))**2 + (getattr(
-                        temp_data[particles_type],
-                        self._widgets.particles[
-                            particles_type
-                        ].vector.value.split(",")[1]
-                        ))**2
-                    )**0.5,
-                    scale=self._widgets.particles[
-                        particles_type
-                    ].vector_scale.value,
-                    width=(self._widgets.particles[
-                        particles_type
-                    ].vector_width.value)/10000,
+                    x,
+                    y,
+                    v1,
+                    v2,
+                    vmag,
+                    scale=pa_widgets.vector_scale.value,
+                    width=(pa_widgets.vector_width.value)/10000,
                 )
+
 
         # show the changes #
         clear_output(wait=True)
@@ -442,22 +387,25 @@ class Viewer2D(Viewer):
 
     def _scalar_handler(self, change):
 
-        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
 
         particles_type = change['owner'].owner
-
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays'][particles_type]
+        scatter = self._scatters[particles_type]
+        pa_widgets = self._widgets.particles[particles_type]
         if particles_type in self._scatters.keys():
-            if self._scatters[particles_type] in self._scatter_ax.collections:
+            if scatter in self._scatter_ax.collections:
                 self._scatter_ax.collections.remove(
-                    self._scatters[particles_type]
+                    scatter
                 )
 
         if change['new'] != 'None':
-            self._scatters[particles_type] = self._scatter_ax.scatter(
-                temp_data[particles_type].x,
-                temp_data[particles_type].y,
-                c=getattr(temp_data[particles_type], change['new']),
-                s=self._widgets.particles[particles_type].scalar_size.value
+            scatter = self._scatter_ax.scatter(
+                temp_data.x,
+                temp_data.y,
+                c=getattr(temp_data, change['new']),
+                s=pa_widgets.scalar_size.value
             )
 
         self._legend_handler(None, manual=True)
@@ -469,12 +417,11 @@ class Viewer2D(Viewer):
         Bug : Arrows go out of the figure
         '''
 
+        particles_type = change['owner'].owner
         temp_data = self.get_frame(
             self._widgets.frame.value
-        )['arrays']
-
-        particles_type = change['owner'].owner
-
+        )['arrays'][particles_type]
+        pa_widgets = self._widgets.particles[particles_type]
         if particles_type in self._vectors.keys():
             if self._vectors[particles_type] in self._scatter_ax.collections:
                 self._scatter_ax.collections.remove(
@@ -482,30 +429,19 @@ class Viewer2D(Viewer):
                 )
 
         if change['new'] != '':
+            x = temp_data.x
+            y = temp_data.y
+            v1 = getattr(temp_data, change['new'].split(",")[0])
+            v2 = getattr(temp_data, change['new'].split(",")[0])
+            vmag = (v1**2 + v2**2)**0.5
             self._vectors[particles_type] = self._scatter_ax.quiver(
-                temp_data[particles_type].x,
-                temp_data[particles_type].y,
-                getattr(
-                    temp_data[particles_type],
-                    change['new'].split(",")[0]
-                ),
-                getattr(
-                    temp_data[particles_type],
-                    change['new'].split(",")[1]
-                ),
-                ((getattr(
-                    temp_data[particles_type],
-                    change['new'].split(",")[0]
-                ))**2 + (getattr(
-                    temp_data[particles_type], change['new'].split(",")[1]
-                ))**2
-                )**0.5,
-                scale=self._widgets.particles[
-                    particles_type
-                ].vector_scale.value,
-                width=(self._widgets.particles[
-                    particles_type
-                ].vector_width.value)/10000,
+                x,
+                y,
+                v1,
+                v2,
+                vmag,
+                scale=pa_widgets.vector_scale.value,
+                width=(pa_widgets.vector_width.value)/10000,
             )
 
         clear_output(wait=True)
@@ -542,10 +478,9 @@ class Viewer2D(Viewer):
         self._cbars = {}
         self._scatter_ax.set_position([0, 0, 1, 1])
         for particles_type in self._widgets.particles.keys():
-            if self._widgets.particles[particles_type].legend.value:
-                if self._widgets.particles[
-                    particles_type
-                ].scalar.value != 'None':
+            pa_widgets = self._widgets.particles[particles_type]
+            if pa_widgets.legend.value:
+                if pa_widgets.scalar.value != 'None':
                     self._scatter_ax.set_position(
                         [0, 0, 0.84 - 0.15*len(self._cbars.keys()), 1]
                     )
@@ -563,9 +498,7 @@ class Viewer2D(Viewer):
                     )
                     self._cbars[particles_type].set_label(
                             particles_type + " : " +
-                            self._widgets.particles[
-                                particles_type
-                            ].scalar.value
+                            pa_widgets.scalar.value
                     )
         if not manual:
             clear_output(wait=True)
