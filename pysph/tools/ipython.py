@@ -12,7 +12,9 @@ class Viewer(object):
     -------
 
     >>> from pysph.solver.utils import ipython
-    >>> sample = ipython.Viewer2D('/home/uname/pysph_files/dam_Break_2d_output')
+    >>> sample = ipython.Viewer2D(
+        '/home/uname/pysph_files/dam_Break_2d_output'
+    )
     >>> sample.interactive_plot()
     >>> sample.show_log()
     >>> sample.show_info()
@@ -51,10 +53,14 @@ class Viewer(object):
 
         >>> sample = Viewer2D('/home/deep/pysph/trivial_inlet_outlet_output/')
         >>> sample.get_frame(12)
-        {'arrays': {'fluid': <pysph.base.particle_array.ParticleArray at 0x7f3f7d144d60>,
+        {
+        'arrays': {
+        'fluid': <pysph.base.particle_array.ParticleArray at 0x7f3f7d144d60>,
         'inlet': <pysph.base.particle_array.ParticleArray at 0x7f3f7d144b98>,
-        'outlet': <pysph.base.particle_array.ParticleArray at 0x7f3f7d144c30>},
-        'solver_data': {'count': 240, 'dt': 0.01, 't': 2.399999999999993}}
+        'outlet': <pysph.base.particle_array.ParticleArray at 0x7f3f7d144c30>
+                },
+        'solver_data': {'count': 240, 'dt': 0.01, 't': 2.399999999999993}
+        }
 
 
         '''
@@ -272,7 +278,9 @@ class Viewer2D(Viewer):
     -------
 
     >>> from pysph.solver.utils import ipython
-    >>> sample = ipython.Viewer2D('/home/uname/pysph_files/dam_Break_2d_output')
+    >>> sample = ipython.Viewer2D(
+        '/home/uname/pysph_files/dam_Break_2d_output'
+        )
     >>> sample.interactive_plot()
     >>> sample.show_log()
     >>> sample.show_info()
