@@ -470,6 +470,39 @@ For more details on the class and the available methods, see
 In addition to this there are other useful pre and post-processing utilities
 described in :doc:`../reference/tools`.
 
+Viewing the data in an IPython notebook
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+PySPH makes it relatively easy to view the data inside an IPython notebook
+with minimal additional dependencies. A simple UI is provided to view the
+saved data using this interface. It requires jupyter_ and ipywidgets_.
+Currently, a 2D viewer is provided for the data. Here is a simple example of
+how one may use this in a notebook.  Inside a notebook, one needs the following::
+
+    from pysph.tools.ipy_viewer import Viewer2D
+    viewer = Viewer2D('dam_break_2d_output')
+
+The ``viewer`` has many useful methods::
+
+    viewer.show_info() # prints useful information about the run.
+    viewer.show_results() # plots any images in the output directory
+    viewer.show_log() # Prints the log file.
+
+The most handy one is the one to perform interactive plots::
+
+    viewer.interactive_plot()
+
+This shows a simple ipywidgets_ based UI that uses matplotlib to plot the data
+on the browser. The different saved snapshots can be viewed using a convenient
+slider. The viewer shows both the particles as well as simple vector plots.
+This is convenient when one wishes to share and show the data without
+requiring Mayavi. It does require pysph to be installed in order to be able to
+load the files.
+
+
+.. _jupyter: https://jupyter.org
+.. _ipywidgets: https://github.com/jupyter-widgets/ipywidgets
+
 A slightly more complex example
 -------------------------------
 

@@ -8,21 +8,10 @@ import ipywidgets as widgets
 class Viewer(object):
 
     '''
-    Example
-    -------
-
-    >>> from pysph.solver.utils import ipython
-    >>> sample = ipython.Viewer2D(
-        '/home/uname/pysph_files/dam_Break_2d_output'
-    )
-    >>> sample.interactive_plot()
-    >>> sample.show_log()
-    >>> sample.show_info()
+    Base class for viewers.
     '''
 
     def __init__(self, path, cache=True):
-
-        # Configuring the path #
 
         self.path = path
         self.paths_list = get_files(path)
@@ -277,8 +266,8 @@ class Viewer2D(Viewer):
     Example
     -------
 
-    >>> from pysph.solver.utils import ipython
-    >>> sample = ipython.Viewer2D(
+    >>> from pysph.tools.ipy_viewer import Viewer2D
+    >>> sample = Viewer2D(
         '/home/uname/pysph_files/dam_Break_2d_output'
         )
     >>> sample.interactive_plot()
