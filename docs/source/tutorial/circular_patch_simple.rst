@@ -475,7 +475,7 @@ Viewing the data in an IPython notebook
 
 PySPH makes it relatively easy to view the data inside an IPython notebook
 with minimal additional dependencies. A simple UI is provided to view the
-saved data using this interface. It requires Jupyter_ and ipywidgets_.
+saved data using this interface. It requires jupyter_ and ipywidgets_.
 Currently, a 2D viewer is provided for the data. Here is a simple example of
 how one may use this in a notebook.  Inside a notebook, one needs the following::
 
