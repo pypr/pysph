@@ -27,7 +27,7 @@ to a breaking dam problem:
 A column of water is initially at rest (presumably held in place by
 some membrane). The problem simulates a breaking dam in that the
 membrane is instantly removed and the column is free to fall under
-it's own weight and the effect of gravity. This and other variants of
+its own weight and the effect of gravity. This and other variants of
 the dam break problem can be found in the `examples` directory of
 PySPH.
 
