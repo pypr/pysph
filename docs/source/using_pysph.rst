@@ -4,12 +4,11 @@
 Using the PySPH library
 ==========================
 
-In this document, we describe the fundamental data structures for
-working with particles in PySPH. Take a look at :ref:`tutorials` for a
-tutorial introduction to some of the examples. For the experienced
-user, take a look at :ref:`design_overview` for some of the internal
-code-generation details and if you want to extend PySPH for your
-application.
+In this document, we describe the fundamental data structures for working with
+particles in PySPH. Take a look at :ref:`tutorial` for a tutorial introduction
+to some of the examples. For the experienced user, take a look at
+:ref:`design_overview` for some of the internal code-generation details and if
+you want to extend PySPH for your application.
 
 -----------------------
 Working With Particles
@@ -257,7 +256,6 @@ construct a :py:class:`DomainManager` object like so
 .. code-block:: python
 
    >>> from pysph.base.nnps import DomainManager
-   >>> from pysph.base.point import Point
    >>> domain = DomainManager(xmin, xmax, ymin, ymax, zmin, zmax,
                               periodic_in_x=True, periodic_in_y=True,
                               periodic_in_z=False)
@@ -549,7 +547,7 @@ in PySPH for working with particles. With these data structures, PySPH
 can be used as a library for managing particles for your application.
 
 If you are interested in the PySPH framework and want to try out some
-eaxmples, check out the tutorials: :ref:`tutorials`.
+examples, check out :ref:`tutorial`.
 
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
 
