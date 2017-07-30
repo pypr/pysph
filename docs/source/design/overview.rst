@@ -750,4 +750,7 @@ place any particles at :math:`x=1.0` they will be copied to :math:`x=0`. This
 will mean that there will be one real particle at 0 and a copy from 1.0 as
 well at the same location. It is therefore important to initialize the
 particles starting at ``dx/2`` and all the way up-to ``1.0-dx/2`` so as to get
-a uniform distribution of particles without any repetitions.
+a uniform distribution of particles without any repetitions. It is important
+to remember that the periodic particles will be "ghost" particles and so any
+equations that set properties like pressure should be in a group with
+``real=False``.
