@@ -412,11 +412,14 @@ method in our hypothetical implementation:
     is quite easy to make subtle errors.
 
 Note that in the first group, we have an additional parameter called
-``real=False``.  This is only relevant for parallel simulations and what it
-says is that the equations in that group should be applied to all particles
-(remote and local), non-local particles are not "real".  By default a
-``Group`` has ``real=True``, thus only local particles are operated on.
-However, we wish to apply the Equation of state on all particles.
+``real=False``. This is only relevant for parallel simulations and for
+simulations with periodic boundaries. What it says is that the equations in
+that group should be applied to all particles (remote and local), non-local
+particles are not "real". By default a ``Group`` has ``real=True``, thus only
+local particles are operated on. However, we wish to apply the Equation of
+state on all particles. Similar is the case for periodic problems where it is
+sometimes necessary to set ``real=True`` in order to set the properties of the
+additional particles used for periodicity.
 
 Writing the equations
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -558,7 +561,7 @@ precomputed quantites are available and may be passed into any equation:
     - ``RHOIJ1 = 1.0/RHOIJ``
 
     - ``DWIJ``: ``GRADIENT(XIJ, RIJ, HIJ, DWIJ)``
-    - ``DWI``: ``GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)``
+    - ``DWJ``: ``GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)``
     - ``DWI``: ``GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)``
 
     - ``VIJ[0] = d_u[d_idx] - s_u[s_idx]``
@@ -581,6 +584,16 @@ the following may be passed into any of the methods of an equation:
 
     - ``dt``: the current time step.
 
+
+.. note::
+
+   Note that all standard functions and constants in ``math.h`` are available
+   for use in the equations. ``pi`` is defined. Please avoid using functions
+   from ``numpy`` as these are Python functions and are slow. They also will
+   not allow PySPH to be run with OpenMP. Similarly, do not use functions or
+   constants from ``sympy`` and other libraries inside the equation methods as
+   these will significantly slow down your code.
+
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
 one may declare a temporary variable to be a ``matrix`` or a ``cPoint`` by
@@ -597,6 +610,9 @@ When the Cython code is generated, this gets translated to:
 
     cdef double[3][3] mat
     cdef cPoint point
+
+One can also declare any valid c-type using the same approach, for example if
+one desires a ``long`` data type, one may use ``ii = declare("long")``.
 
 One may also perform any reductions on properties.  Consider a trivial example
 of calculating the total mass and the maximum ``u`` velocity in the following
@@ -697,3 +713,44 @@ It is important to note that if there are additional variables to be stepped
 in addition to these standard ones, you must write your own stepper.
 Currently, only certain steppers are supported by the framework. Take a look
 at the :doc:`../reference/integrator` for more examples.
+
+
+Simulating periodicity
+^^^^^^^^^^^^^^^^^^^^^^
+
+PySPH provides a simplistic implementation for problems with periodicity. The
+:py:class:`pysph.base.nnps_base.DomainManager` is used to specify this. To use
+this in an application simply define a method as follows:
+
+.. code-block:: python
+
+   # ...
+   from pysph.base.nnps import DomainManager
+
+   class TaylorGreen(Application):
+       def create_domain(self):
+           return DomainManager(
+               xmin=0.0, xmax=1.0, ymin=0.0, ymax=1.0,
+               periodic_in_x=True, periodic_in_y=True
+           )
+       # ...
+
+This is a 2D example but something similar can be done in 3D. How this works
+is that PySPH will automatically copy the appropriate layer of the particles
+from each side of the domain and create "Ghost" particles (these are not
+"real" particles). The properties of the particles will also be copied but
+this is done before any accelerations are computed. Note that this implies
+that the real particles should be created carefully so as to avoid two
+particles being placed at the same location.
+
+For example in the above example, the domain is defined in the unit square
+with one corner at the origin and the other at (1,1). If we place any
+particles exactly at :math:`x=0.0` they will be copied over to 1.0 and if we
+place any particles at :math:`x=1.0` they will be copied to :math:`x=0`. This
+will mean that there will be one real particle at 0 and a copy from 1.0 as
+well at the same location. It is therefore important to initialize the
+particles starting at ``dx/2`` and all the way up-to ``1.0-dx/2`` so as to get
+a uniform distribution of particles without any repetitions. It is important
+to remember that the periodic particles will be "ghost" particles and so any
+equations that set properties like pressure should be in a group with
+``real=False``.

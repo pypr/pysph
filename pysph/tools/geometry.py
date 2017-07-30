@@ -658,15 +658,15 @@ def get_naca_wing(dx=0.01, airfoil='0012', span=1.0, chord=1.0):
     return extrude(x, y, dx, span)
 
 
-def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
-    """
-    This function will take 2 particle arrays as input and will remove all
-    the particles of the first particle array which are in the vicinity of
-    the particles from second particle array. The function will remove all
-    the particles within the dx_solid vicinity so some particles are removed
+def find_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
+    """This function will take 2 particle arrays as input and will find all the
+    particles of the first particle array which are in the vicinity of the
+    particles from second particle array. The function will find all the
+    particles within the dx_solid vicinity so some particles may be identified
     at the outer surface of the particles from the second particle array.
-    This uses a pysph nearest neighbour particles search which will output
-    the particles within some range for every given particle.
+
+    The particle arrays should atleast contain x, y and h values for a 2d case
+    and atleast x, y, z and h values for a 3d case.
 
     Parameters
     ----------
@@ -675,12 +675,10 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     dx_solid : a number which is the dx of the second particle array
     dim : dimensionality of the problem
 
-    The particle arrays should atleast contain x, y and h values for a 2d case
-    and atleast x, y, z and h values for a 3d case
-
     Returns
     -------
-    particle_array : pysph wcsph_particle_array with x, y, z and h values
+    list of particle indices to remove from the first array.
+
     """
 
     x = fluid_parray.x
@@ -689,12 +687,10 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
     y1 = solid_parray.y
     z = fluid_parray.z
     z1 = solid_parray.z
-    h = fluid_parray.h
     if dim == 2:
         z = np.zeros_like(x)
         z1 = np.zeros_like(x1)
-    modified_points = []
-    h_new = []
+    to_remove = []
     ll_nnps = LinkedListNNPS(dim, [fluid_parray, solid_parray])
     for i in range(len(x)):
         nbrs = UIntArray()
@@ -706,17 +702,37 @@ def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
             dest = [x1[ind], y1[ind], z1[ind]]
             distances.append(distance(point_i, dest))
         if len(distances) == 0:
-            modified_points.append(point_i)
-            h_new.append(h[i])
-        elif min(distances) >= (dx_solid * (1.0 - 1.0e-07)):
-            modified_points.append(point_i)
-            h_new.append(h[i])
-    modified_points = np.array(modified_points)
-    x_new = modified_points[:, 0]
-    y_new = modified_points[:, 1]
-    z_new = modified_points[:, 2]
-    p_array = get_particle_array_wcsph(x=x_new, y=y_new, z=z_new, h=h_new)
-    return p_array
+            continue
+        elif min(distances) < (dx_solid * (1.0 - 1.0e-07)):
+            to_remove.append(i)
+    return to_remove
+
+
+def remove_overlap_particles(fluid_parray, solid_parray, dx_solid, dim=3):
+    """
+    This function will take 2 particle arrays as input and will remove all
+    the particles of the first particle array which are in the vicinity of
+    the particles from second particle array. The function will remove all
+    the particles within the dx_solid vicinity so some particles are removed
+    at the outer surface of the particles from the second particle array.
+
+    The particle arrays should atleast contain x, y and h values for a 2d case
+    and atleast x, y, z and h values for a 3d case
+
+    Parameters
+    ----------
+    fluid_parray : a pysph particle array object
+    solid_parray : a pysph particle array object
+    dx_solid : a number which is the dx of the second particle array
+    dim : dimensionality of the problem
+
+    Returns
+    -------
+    None
+    """
+
+    idx = find_overlap_particles(fluid_parray, solid_parray, dx_solid, dim)
+    fluid_parray.remove_particles(idx)
 
 
 def show_2d(points, **kw):

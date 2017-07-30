@@ -102,16 +102,12 @@ def windtunnel_airfoil_model(dx_wall=0.01, dx_airfoil=0.01, dx_fluid=0.01,
                                     m=mass_airfoil)
     x_fluid, y_fluid = get_2d_block(dx_fluid, 1.6, h_tunnel)
     h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
-    temp_array = get_particle_array_wcsph(x=x_fluid, y=y_fluid, h=h_fluid)
-    temp_array_2 = remove_overlap_particles(temp_array, wall, dx_wall, 2)
-    temp_array_3 = remove_overlap_particles(temp_array_2, wing, dx_airfoil, 2)
-    x_fluid = temp_array_3.x
-    y_fluid = temp_array_3.y
-    h_fluid = np.ones_like(x_fluid) * dx_fluid * hdx
     rho_fluid = np.ones_like(x_fluid) * r_fluid
     mass_fluid = rho_fluid * dx_fluid * dx_fluid
     fluid = get_particle_array_wcsph(name='fluid', x=x_fluid, y=y_fluid,
                                      h=h_fluid, rho=rho_fluid, m=mass_fluid)
+    remove_overlap_particles(fluid, wall, dx_wall, 2)
+    remove_overlap_particles(fluid, wing, dx_airfoil, 2)
     return wall, wing, fluid
 
 

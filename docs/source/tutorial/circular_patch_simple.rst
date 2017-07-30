@@ -479,6 +479,7 @@ saved data using this interface. It requires jupyter_ and ipywidgets_.
 Currently, a 2D viewer is provided for the data. Here is a simple example of
 how one may use this in a notebook.  Inside a notebook, one needs the following::
 
+    %matplotlib notebook
     from pysph.tools.ipy_viewer import Viewer2D
     viewer = Viewer2D('dam_break_2d_output')
 
@@ -497,7 +498,9 @@ on the browser. The different saved snapshots can be viewed using a convenient
 slider. The viewer shows both the particles as well as simple vector plots.
 This is convenient when one wishes to share and show the data without
 requiring Mayavi. It does require pysph to be installed in order to be able to
-load the files.
+load the files. It is useful although not mandatory to have the first line
+that sets the matplotlib backend to the ``notebook``. What this does is to
+allow you to zoom and interact with the interactive plots.
 
 
 .. _jupyter: https://jupyter.org
