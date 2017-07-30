@@ -719,8 +719,8 @@ Simulating periodicity
 ^^^^^^^^^^^^^^^^^^^^^^
 
 PySPH provides a simplistic implementation for problems with periodicity. The
-:py:class:`pysph.base.nnps.DomainManager` is used to specify this. To use this
-in an application simply define a method as follows::
+:py:class:`pysph.base.nnps_base.DomainManager` is used to specify this. To use
+this in an application simply define a method as follows:
 
 .. code-block:: python
 
