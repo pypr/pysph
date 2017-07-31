@@ -186,7 +186,8 @@ def rotate(x, y, z, axis=np.array([0.0, 0.0, 1.0]), angle=90.0):
     return x_new, y_new, z_new
 
 
-def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
+def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0,
+                num_layers=1, up=True):
     """
     Generates a 2d wall which is parallel to x-axis. The wall can be
     rotated parallel to any axis using the rotate function. 3d wall
@@ -207,6 +208,8 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
     dx : a number which is the spacing required
     center : 1d array like object which is the center of wall
     length : a number which is the length of the wall
+    num_layers : Number of layers for the wall
+    up : True if the layers have to created on top of base wall
 
     Returns
     -------
@@ -214,13 +217,17 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0):
     y : 1d numpy array with y coordinates of the wall
     """
 
-    x = np.arange(-length / 2., length / 2. + dx, dx)
+    x = np.arange(-length / 2., length / 2. + dx, dx) + center[0]
     y = np.ones_like(x) * center[1]
-    return x + center[0], y
+    value = 1 if up else -1
+    for i in range(1, num_layers):
+    	y1 = np.ones_like(x) * center[1] + value * i * dx
+    	y = np.concatenate([y, y1])
+    return np.tile(x, num_layers), y
 
 
 def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
-                height=1.0):
+                height=1.0, num_layers=1, outside=True):
     """
     Generates an open 2d tank with the base parallel to x-axis and the side
     walls parallel to y-axis. The tank can be rotated to any direction using
@@ -242,6 +249,8 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     base_center : 1d array like object which is the center of base wall
     length : a number which is the length of the base
     height : a number which is the length of the side wall
+    num_layers : Number of layers for the tank
+    outside : A boolean value which decides if the layers are inside or outside
 
     Returns
     -------
@@ -253,9 +262,16 @@ def get_2d_tank(dx=0.001, base_center=np.array([0.0, 0.0]), length=1.0,
     left_wall = np.arange(0.0, height + dx, dx) * (1.0j) - length / 2.
     right_wall = np.arange(0.0, height + dx, dx) * (1.0j) + length / 2.
     particles = np.concatenate([left_wall, base, right_wall])
-    x = particles.real + base_center[0]
-    y = particles.imag + base_center[1]
-    return x, y
+    x = particles.real
+    y = particles.imag
+    value = 1 if outside else -1
+    for i in range(1, num_layers):
+        x1, y1 = get_2d_tank(dx, np.array(
+            [0.0, -value * i * dx]), length + 2 * i * value * dx,
+            height + i * value * dx)
+        x = np.concatenate([x, x1])
+        y = np.concatenate([y, y1])
+    return x + base_center[0], y + base_center[1]
 
 
 def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
