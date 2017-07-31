@@ -221,8 +221,8 @@ def get_2d_wall(dx=0.01, center=np.array([0.0, 0.0]), length=1.0,
     y = np.ones_like(x) * center[1]
     value = 1 if up else -1
     for i in range(1, num_layers):
-    	y1 = np.ones_like(x) * center[1] + value * i * dx
-    	y = np.concatenate([y, y1])
+        y1 = np.ones_like(x) * center[1] + value * i * dx
+        y = np.concatenate([y, y1])
     return np.tile(x, num_layers), y
 
 

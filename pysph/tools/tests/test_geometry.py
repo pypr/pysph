@@ -26,8 +26,8 @@ class TestGeometry(unittest.TestCase):
             n = np.random.randint(15)
             mat = np.random.rand(n, n)
             assert np.allclose(e(mat), matrix_exp(mat))
-        except:
-            raise unittest.SkipTest('test_matrix_exp requires scipy')
+        except ImportError:
+            raise unittest.SkipTest()
 
     def test_extrude(self):
         n = np.random.randint(20)
@@ -89,7 +89,7 @@ class TestGeometry(unittest.TestCase):
         x_test = np.arange(-length / 2.0, length / 2.0, dx) + center[0]
         y_test = np.ones_like(x_test) * center[1]
         layer_length = len(x) / num_layers
-        value = 1 if up == True else -1
+        value = 1 if up else -1
         assert np.allclose(x_test, x[:len(x_test)])
         assert np.allclose(y_test, y[:len(y_test)])
         assert np.allclose(x[:layer_length], x[-layer_length:])
@@ -101,6 +101,9 @@ class TestGeometry(unittest.TestCase):
         center = np.random.random_sample(2)
         length = np.random.uniform(0.0, 10.0)
         height = np.random.uniform(0.0, 10.0)
+        num_layers = np.random.randint(10)
+        outside = np.random.choice([True, False])
+        value = 1 if outside else -1
         x, y = get_2d_tank(dx, center, length, height)
 
 
