@@ -390,6 +390,7 @@ class ParticleArrayHelper(HasTraits):
                 p.mlab_source.set(x=x, y=y, z=z, scalars=s)
             else:
                 p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
+                p.mlab_source.update()
 
         if self.plot_vectors:
             self._vectors_changed(self.vectors)
