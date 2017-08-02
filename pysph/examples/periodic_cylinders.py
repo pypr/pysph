@@ -25,8 +25,10 @@ from pysph.sph.scheme import TVFScheme
 
 
 # domain and reference values
-L = 0.12; Umax = 1.2e-4
-a = 0.02; H = 4*a
+L = 0.12
+Umax = 1.2e-4
+a = 0.02
+H = 4*a
 fx = 2.5e-4
 
 # c0 is set from Ellero and Adams.
@@ -38,16 +40,18 @@ p0 = c0*c0*rho0
 pb = p0
 
 # Reynolds number and kinematic viscosity
-nu = 0.1/rho0; Re = a*Umax/nu
+nu = 0.1/rho0
+Re = a*Umax/nu
 
 # Numerical setup
-nx = 144; dx = L/nx
+nx = 144
+dx = L/nx
 ghost_extent = 5 * 1.5 * dx
 hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Umax )
+dt_cfl = 0.25 * h0/(c0 + Umax)
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 0.25 * np.sqrt(h0/abs(fx))
 
@@ -66,30 +70,35 @@ class PeriodicCylinders(Application):
 
     def create_particles(self):
         # create all the particles
-        _x = np.arange( dx/2, L, dx )
-        _y = np.arange( -ghost_extent, H+ghost_extent, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
+        _x = np.arange(dx/2, L, dx)
+        _y = np.arange(-ghost_extent, H+ghost_extent, dx)
+        x, y = np.meshgrid(_x, _y)
+        x = x.ravel()
+        y = y.ravel()
 
         # sort out the fluid and the solid
         indices = []
-        cx = 0.5 * L; cy = 0.5 * H
+        cx = 0.5 * L
+        cy = 0.5 * H
         for i in range(x.size):
-            xi = x[i]; yi = y[i]
-            if ( np.sqrt( (xi-cx)**2 + (yi-cy)**2 ) > a ):
-                if ( (yi > 0) and (yi < H) ):
+            xi = x[i]
+            yi = y[i]
+            if (np.sqrt((xi-cx)**2 + (yi-cy)**2) > a):
+                if ((yi > 0) and (yi < H)):
                     indices.append(i)
 
         # create the arrays
         solid = get_particle_array(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+        fluid = solid.extract_particles(indices)
+        fluid.set_name('fluid')
         solid.remove_particles(indices)
 
-        print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"%(
-            Re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), dt))
-        print("tf = %f"%tf)
+        print("Periodic cylinders :: Re = %g, nfluid = %d, nsolid=%d, dt = %g"
+              % (Re, fluid.get_number_of_particles(),
+                 solid.get_number_of_particles(), dt))
+        print("tf = %f" % tf)
 
         # add requisite properties to the arrays:
         self.scheme.setup_properties([fluid, solid])
@@ -127,7 +136,7 @@ class PeriodicCylinders(Application):
         return s
 
     def post_process(self, info_fname):
-        info = self.read_info(info_fname)
+        self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
 
@@ -139,15 +148,18 @@ class PeriodicCylinders(Application):
         from pysph.solver.utils import iter_output, load
         from pysph.tools.sph_evaluator import SPHEvaluator
         from pysph.sph.equation import Group
-        from pysph.sph.wc.transport_velocity import (SetWallVelocity,
-            MomentumEquationPressureGradient, SolidWallNoSlipBC,
-            SolidWallPressureBC, VolumeSummation)
+        from pysph.base.kernels import QuinticSpline
+        from pysph.sph.wc.transport_velocity import (
+            SetWallVelocity, MomentumEquationPressureGradient,
+            SolidWallNoSlipBC, SolidWallPressureBC, VolumeSummation
+        )
 
         data = load(self.output_files[0])
         solid = data['arrays']['solid']
         fluid = data['arrays']['fluid']
         x, y = solid.x.copy(), solid.y.copy()
-        cx = 0.5 * L; cy = 0.5 * H
+        cx = 0.5 * L
+        cy = 0.5 * H
         inside = np.sqrt((x-cx)**2 + (y-cy)**2) <= a
         dest = solid.extract_particles(inside.nonzero()[0])
         # We use the same equations for this as the simulation, except that we
@@ -207,14 +219,16 @@ class PeriodicCylinders(Application):
         matplotlib.use('Agg')
 
         from matplotlib import pyplot as plt
-        f = plt.figure()
+        plt.figure()
         plt.plot(t, cd)
-        plt.xlabel('$t$'); plt.ylabel(r'$C_D$')
+        plt.xlabel('$t$')
+        plt.ylabel(r'$C_D$')
         fig = os.path.join(self.output_dir, "cd_vs_t.png")
         plt.savefig(fig, dpi=300)
         plt.close()
 
         return t, cd
+
 
 if __name__ == '__main__':
     app = PeriodicCylinders()
