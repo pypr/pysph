@@ -28,8 +28,8 @@ class TestSimpleInlet1D(unittest.TestCase):
 
     def test_inlet_block_has_correct_copies(self):
         # Given
-        inlet = SimpleInlet(self.inlet_pa, self.dest_pa, spacing=self.dx, n=5,
-                            xmin=-0.5, xmax=0.0)
+        SimpleInlet(self.inlet_pa, self.dest_pa, spacing=self.dx, n=5,
+                    xmin=-0.5, xmax=0.0)
         # When
         x = self.inlet_pa.x
         p = self.inlet_pa.p
@@ -40,7 +40,9 @@ class TestSimpleInlet1D(unittest.TestCase):
         x_expect = -np.arange(0, 5)*self.dx
         self.assertListEqual(list(x), list(x_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
         self.assertEqual(self.dest_pa.get_number_of_particles(), 0)
 
@@ -75,7 +77,9 @@ class TestSimpleInlet1D(unittest.TestCase):
         x_expect[x_expect > 0.0] -= 0.5
         self.assertListEqual(list(x), list(x_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
         # The destination particle array should now have two particles.
         x = self.dest_pa.x
@@ -85,7 +89,9 @@ class TestSimpleInlet1D(unittest.TestCase):
         x_expect = (-np.arange(0, 2)*self.dx + 0.15)
         self.assertListEqual(list(x), list(x_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
 
 class TestSimpleInletGenericMotion2D(unittest.TestCase):
@@ -134,7 +140,9 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         self.assertListEqual(list(y), list(y_expect))
 
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
         # The destination particle array should now have 9 particles.
         x = dest_pa.x
@@ -154,7 +162,9 @@ class TestSimpleInletGenericMotion2D(unittest.TestCase):
         self.assertListEqual(list(x), list(x_expect))
         self.assertListEqual(list(y), list(y_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
 
 class TestSimpleOutlet1D(unittest.TestCase):
@@ -186,7 +196,9 @@ class TestSimpleOutlet1D(unittest.TestCase):
         x_expect = np.arange(0, 6, dtype=float)*self.dx + 0.45
         self.assertListEqual(list(x), list(x_expect))
         self.assertTrue(np.allclose(p, np.ones_like(x)*5, atol=1e-14))
-        self.assertTrue(np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14))
+        self.assertTrue(
+            np.allclose(h, np.ones_like(x)*self.dx*1.5, atol=1e-14)
+        )
 
         x = self.outlet_pa.x
         p = self.outlet_pa.p
@@ -214,6 +226,29 @@ class TestSimpleOutlet1D(unittest.TestCase):
         # Then
         self.assertEqual(len(outlet_pa.x), 0)
         self.assertEqual(len(source_pa.x), 0)
+
+    def test_outlet_calls_callback(self):
+        # Given
+        calls = []
+
+        def _callback(o, p):
+            calls.append((o, p))
+
+        outlet = SimpleOutlet(self.outlet_pa, self.source_pa, xmin=1.0,
+                              xmax=1.5, callback=_callback)
+
+        # When
+        self.source_pa.x += 0.45
+        outlet.update()
+
+        # Then
+        self.assertEqual(len(calls), 1)
+        o_pa, props = calls[0]
+        self.assertEqual(o_pa, self.outlet_pa)
+        # 4 particles have left the source, the props should number the same.
+        self.assertEqual(len(props['x']), 4)
+        self.assertEqual(sorted(props.keys()), sorted(o_pa.properties.keys()))
+
 
 if __name__ == '__main__':
     unittest.main()
