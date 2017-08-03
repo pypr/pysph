@@ -273,6 +273,10 @@ cdef class ParticleArray:
             if isinstance(prop, dict):
                 prop_info = prop
                 prop_info['name'] = name
+                data = prop.get('data', None)
+                if data is not None:
+                    if nv > 1 and len(prop['data']) == 1:
+                        prop_info['data'] = numpy.ones(nv)*data
             else:
                 if nv > 1 and len(prop) == 1:
                     prop = numpy.ones(nv)*prop

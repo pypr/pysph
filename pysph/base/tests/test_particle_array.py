@@ -739,6 +739,16 @@ class ParticleArrayUtils(unittest.TestCase):
         self.assertEqual(dummy.name, 'f')
         self.assertTrue('x' in dummy.properties)
 
+    def test_get_particle_array_takes_scalars(self):
+        # Given/when
+        x = [1, 2, 3]
+        pa = utils.get_particle_array(x=x, y=0, rho=1)
+
+        # Then
+        self.assertTrue(numpy.allclose(x, pa.x))
+        self.assertTrue(numpy.allclose(numpy.zeros(3), pa.y))
+        self.assertTrue(numpy.allclose(numpy.ones(3), pa.rho))
+
 
 if __name__ == '__main__':
     import logging
