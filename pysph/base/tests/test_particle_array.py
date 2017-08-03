@@ -479,7 +479,6 @@ class ParticleArrayTest(unittest.TestCase):
                          p.get_number_of_particles())
         self.assertEqual(check_array(p.f5, [10.0, 10.0, 10.0, 10.0]), True)
 
-
     def test_extend(self):
         """
         Tests the extend function.
