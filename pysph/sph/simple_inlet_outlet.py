@@ -81,10 +81,10 @@ class SimpleInlet(object):
         self._check_domain_and_spacing()
 
     def _check_domain_and_spacing(self):
-        l = dict(x=self.xmax - self.xmin,
-                 y=self.ymax - self.ymin,
-                 z=self.zmax - self.zmin)
-        l_axis = l[self.axis]
+        domain = dict(x=self.xmax - self.xmin,
+                      y=self.ymax - self.ymin,
+                      z=self.zmax - self.zmin)
+        l_axis = domain[self.axis]
         expected = self.spacing*self.n
         message = "Make sure that the spacing*n is equal\n"\
                   "to the length of the domain in the stacked axis.\n"\
