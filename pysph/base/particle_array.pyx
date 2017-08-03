@@ -106,7 +106,7 @@ cdef class ParticleArray:
     # `object` interface
     ######################################################################
     def __init__(self, str name='', default_particle_tag=Local,
-                  constants=None, **props):
+                 constants=None, **props):
         """Constructor
 
         Parameters
@@ -248,12 +248,34 @@ cdef class ParticleArray:
         if nprop == 0:
             return
 
+        # Iterate over all props to find the maximum number of values passed.
+        nv = 0
+        _props = {}
+        for name, prop in props.items():
+            if isinstance(prop, dict):
+                if 'data' in prop:
+                    d = prop['data']
+                    if d is not None:
+                        d = numpy.atleast_1d(prop['data'])
+                        prop['data'] = d
+                        nv = max(nv, len(d))
+                _props[name] = prop
+            elif prop is not None:
+                d = numpy.atleast_1d(prop)
+                _props[name] = d
+                nv = max(nv, len(d))
+            else:
+                _props[name] = prop
+        props.update(_props)
+
         # add the properties
         for name, prop in props.items():
             if isinstance(prop, dict):
                 prop_info = prop
                 prop_info['name'] = name
             else:
+                if nv > 1 and len(prop) == 1:
+                    prop = numpy.ones(nv)*prop
                 prop_info = dict(name=name, data=prop)
             self.add_property(**prop_info)
 
@@ -821,6 +843,12 @@ cdef class ParticleArray:
         """
         cdef str prop_name=name, data_type=type
         cdef bint array_size_proper = False
+
+        if data is not None:
+            try:
+                len(data)
+            except TypeError:
+                data = numpy.ones(self.get_number_of_particles())*data
 
         # make sure the size of the supplied array is consistent.
         if (data is None or self.get_number_of_particles() == 0 or
