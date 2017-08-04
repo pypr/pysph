@@ -121,15 +121,20 @@ class ParticleArrayTest(unittest.TestCase):
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         rho = 10.0
+        data = numpy.diag((2, 2))
 
         # When
-        p = particle_array.ParticleArray(x=x, y=y, rho=rho, name='fluid')
+        p = particle_array.ParticleArray(
+            x=x, y=y, rho=rho, data=data, name='fluid'
+        )
 
         # Then
         self.assertEqual(p.name, 'fluid')
 
         self.assertEqual('x' in p.properties, True)
         self.assertEqual('y' in p.properties, True)
+        self.assertEqual('rho' in p.properties, True)
+        self.assertEqual('data' in p.properties, True)
         self.assertEqual('tag' in p.properties, True)
         self.assertEqual('pid' in p.properties, True)
         self.assertEqual('gid' in p.properties, True)
@@ -137,6 +142,8 @@ class ParticleArrayTest(unittest.TestCase):
         # get the properties are check if they are the same
         self.assertEqual(check_array(p.x, x), True)
         self.assertEqual(check_array(p.y, y), True)
+        self.assertEqual(check_array(p.rho, numpy.ones(4)*rho), True)
+        self.assertEqual(check_array(p.data, numpy.ravel(data)), True)
 
     def test_get_number_of_particles(self):
         """
@@ -740,13 +747,15 @@ class ParticleArrayUtils(unittest.TestCase):
 
     def test_get_particle_array_takes_scalars(self):
         # Given/when
-        x = [1, 2, 3]
-        pa = utils.get_particle_array(x=x, y=0, rho=1)
+        x = [1, 2, 3, 4]
+        data = numpy.diag((2, 2))
+        pa = utils.get_particle_array(x=x, y=0, rho=1, data=data)
 
         # Then
         self.assertTrue(numpy.allclose(x, pa.x))
-        self.assertTrue(numpy.allclose(numpy.zeros(3), pa.y))
-        self.assertTrue(numpy.allclose(numpy.ones(3), pa.rho))
+        self.assertTrue(numpy.allclose(numpy.zeros(4), pa.y))
+        self.assertTrue(numpy.allclose(numpy.ones(4), pa.rho))
+        self.assertTrue(numpy.allclose(numpy.ravel(data), pa.data))
 
 
 if __name__ == '__main__':

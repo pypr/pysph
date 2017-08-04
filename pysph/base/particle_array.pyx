@@ -256,12 +256,12 @@ cdef class ParticleArray:
                 if 'data' in prop:
                     d = prop['data']
                     if d is not None:
-                        d = numpy.atleast_1d(prop['data'])
+                        d = numpy.ravel(prop['data'])
                         prop['data'] = d
                         nv = max(nv, len(d))
                 _props[name] = prop
             elif prop is not None:
-                d = numpy.atleast_1d(prop)
+                d = numpy.ravel(prop)
                 _props[name] = d
                 nv = max(nv, len(d))
             else:
@@ -793,7 +793,7 @@ cdef class ParticleArray:
         if name in self.properties:
             raise RuntimeError('Property called "%s" already exists.'%name)
 
-        array_data = numpy.atleast_1d(data)
+        array_data = numpy.ravel(data)
         self.constants[name] = self._create_c_array_from_npy_array(array_data)
 
     cpdef add_property(self, str name, str type='double', default=None, data=None):
@@ -853,6 +853,8 @@ cdef class ParticleArray:
                 len(data)
             except TypeError:
                 data = numpy.ones(self.get_number_of_particles())*data
+            else:
+                data = numpy.ravel(data)
 
         # make sure the size of the supplied array is consistent.
         if (data is None or self.get_number_of_particles() == 0 or
