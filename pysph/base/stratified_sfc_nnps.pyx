@@ -137,7 +137,8 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
         indices.reset()
-        cdef int num_particles
+        cdef int num_particles = (<NNPSParticleArrayWrapper> \
+                self.pa_wrappers[pa_index]).get_number_of_particles()
         cdef uint32_t* current_pids = self.pids[pa_index]
 
         cdef int j
