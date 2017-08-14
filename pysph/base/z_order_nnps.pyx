@@ -235,7 +235,6 @@ cdef class ZOrderNNPS(NNPS):
                 CompareSortWrapper(current_pids, current_keys, indices.length)
 
         sort_wrapper.compare_sort()
-        sort(current_keys, current_keys + indices.length)
 
         cdef pair[u_int, pair[u_int, u_int]] temp
         cdef pair[u_int, u_int] cell

@@ -86,6 +86,8 @@ public:
     {
         sort(this->current_pids, this->current_pids + this->length,
                 CompareFunctionWrapper(this));
+
+        sort(this->current_keys, this->current_keys + this->length);
     }
 };
 
