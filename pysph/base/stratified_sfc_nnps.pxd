@@ -46,8 +46,8 @@ cdef class StratifiedSFCNNPS(NNPS):
     cdef uint64_t** keys
     cdef uint64_t* current_keys
 
-    cdef key_to_idx_t*** pid_indices
-    cdef key_to_idx_t** current_indices
+    cdef key_to_idx_t** pid_indices
+    cdef key_to_idx_t* current_indices
 
     cdef double** cell_sizes
     cdef double* current_cells
@@ -73,7 +73,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper,
             int pa_index, UIntArray indices, uint32_t* current_pids,
-            uint64_t* current_keys, key_to_idx_t** current_indices,
+            uint64_t* current_keys, key_to_idx_t* current_indices,
             double* current_cells)
 
     cdef inline int _get_level(self, double h) nogil

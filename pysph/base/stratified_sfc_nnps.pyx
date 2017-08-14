@@ -66,21 +66,15 @@ cdef class StratifiedSFCNNPS(NNPS):
 
         self.pids = <uint32_t**> malloc(narrays*sizeof(uint32_t*))
         self.keys = <uint64_t**> malloc(narrays*sizeof(uint64_t*))
-        self.pid_indices = <key_to_idx_t***> malloc(narrays*sizeof(key_to_idx_t**))
+        self.pid_indices = <key_to_idx_t**> malloc(narrays*sizeof(key_to_idx_t*))
         self.cell_sizes = <double**> malloc(narrays*sizeof(double*))
 
-        cdef key_to_idx_t** current_indices
         cdef int i, j, num_particles
         for i from 0<=i<narrays:
             self.pids[i] = NULL
             self.keys[i] = NULL
-            self.pid_indices[i] = <key_to_idx_t**> \
-                    malloc(self.num_levels*sizeof(key_to_idx_t*))
+            self.pid_indices[i] = NULL
             self.cell_sizes[i] = <double*> malloc(self.num_levels*sizeof(double))
-
-            current_indices = self.pid_indices[i]
-            for j from 0<=j<self.num_levels:
-                current_indices[j] = NULL
 
         self.current_pids = NULL
         self.current_keys = NULL
@@ -90,18 +84,15 @@ cdef class StratifiedSFCNNPS(NNPS):
     def __dealloc__(self):
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
-        cdef key_to_idx_t** current_indices
+        cdef key_to_idx_t* current_indices
         cdef int i, j
         for i from 0<=i<self.narrays:
             current_pids = self.pids[i]
             current_keys = self.keys[i]
             current_indices = self.pid_indices[i]
-            for j from 0<=j<self.num_levels:
-                if current_indices[j] != NULL:
-                    del current_indices[j]
             free(current_pids)
             free(current_keys)
-            free(current_indices)
+            del current_indices
             free(self.cell_sizes[i])
         free(self.pids)
         free(self.keys)
@@ -190,14 +181,13 @@ cdef class StratifiedSFCNNPS(NNPS):
         cdef int* z_boxes
 
         cdef map[uint64_t, pair[uint32_t, uint32_t]].iterator it
-        cdef key_to_idx_t* indices_level
         cdef uint64_t level_padded
 
         for i from 0<=i<self.num_levels:
-            indices_level = self.current_indices[i]
             level_padded = i << self.max_num_bits
 
-            h_max = fmax(self.radius_scale*h, self.radius_scale*self.current_cells[i])
+            h_max = fmax(self.radius_scale*h,
+                    self.radius_scale*self.current_cells[i])
             H = <int> ceil(h_max/(self.radius_scale*self.current_cells[i]))
 
             mask_len = (2*H+1)*(2*H+1)*(2*H+1)
@@ -218,9 +208,9 @@ cdef class StratifiedSFCNNPS(NNPS):
                     x_boxes, y_boxes, z_boxes, H)
 
             for j from 0<=j<num_boxes:
-                it = indices_level.find(level_padded + \
+                it = self.current_indices.find(level_padded + \
                         get_key(x_boxes[j], y_boxes[j], z_boxes[j]))
-                if it == indices_level.end():
+                if it == self.current_indices.end():
                     continue
                 candidate = deref(it).second
                 n = candidate.first
@@ -292,7 +282,6 @@ cdef class StratifiedSFCNNPS(NNPS):
     cpdef _refresh(self):
         self.interval_size = ((self.cell_size - self.hmin)/self.num_levels) + EPS
 
-        cdef key_to_idx_t** current_indices
         cdef double* current_cells
 
         cdef int i, j, num_particles
@@ -303,14 +292,13 @@ cdef class StratifiedSFCNNPS(NNPS):
                 free(self.pids[i])
             if self.keys[i] != NULL:
                 free(self.keys[i])
+            if self.pid_indices[i] != NULL:
+                del self.pid_indices[i]
             self.pids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
             self.keys[i] = <uint64_t*> malloc(num_particles*sizeof(uint64_t))
-            current_indices = self.pid_indices[i]
+            self.pid_indices[i] = new key_to_idx_t()
             current_cells = self.cell_sizes[i]
             for j from 0<=j<self.num_levels:
-                if current_indices[j] != NULL:
-                    del current_indices[j]
-                current_indices[j] = new key_to_idx_t()
                 current_cells[j] = 0
         self.current_pids = self.pids[self.src_index]
         self.current_indices = self.pid_indices[self.src_index]
@@ -325,7 +313,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
     cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper,
             int pa_index, UIntArray indices, uint32_t* current_pids,
-            uint64_t* current_keys, key_to_idx_t** current_indices,
+            uint64_t* current_keys, key_to_idx_t* current_indices,
             double* current_cells):
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
@@ -381,8 +369,7 @@ cdef class StratifiedSFCNNPS(NNPS):
             if(current_keys[i] != current_keys[i-1]):
                 cell.second = length
                 temp.second = cell
-                level = temp.first >> self.max_num_bits
-                current_indices[level].insert(temp)
+                current_indices.insert(temp)
 
                 temp.first = current_keys[i]
                 cell.first = i
@@ -391,8 +378,7 @@ cdef class StratifiedSFCNNPS(NNPS):
 
         cell.second = length + 1
         temp.second = cell
-        level = temp.first >> self.max_num_bits
-        current_indices[level].insert(temp)
+        current_indices.insert(temp)
 
     @cython.cdivision(True)
     cpdef _bin(self, int pa_index, UIntArray indices):
@@ -401,7 +387,7 @@ cdef class StratifiedSFCNNPS(NNPS):
         cdef double* current_cells = self.cell_sizes[pa_index]
         cdef uint32_t* current_pids = self.pids[pa_index]
         cdef uint64_t* current_keys = self.keys[pa_index]
-        cdef key_to_idx_t** current_indices = self.pid_indices[pa_index]
+        cdef key_to_idx_t* current_indices = self.pid_indices[pa_index]
 
         self.fill_array(pa_wrapper, pa_index, indices, current_pids,
                 current_keys, current_indices, current_cells)
