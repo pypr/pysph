@@ -3,6 +3,7 @@ one can define a scheme and thereafter one simply instantiates a suitable
 scheme, gives it a bunch of particles and runs the application.
 """
 
+
 class Scheme(object):
 
     """An API for an SPH scheme.
@@ -26,7 +27,7 @@ class Scheme(object):
         self.solver = None
         self.attributes_changed()
 
-    #### Public protocol ###################################################
+    # Public protocol ###################################################
     def add_user_options(self, group):
         pass
 
@@ -55,7 +56,7 @@ class Scheme(object):
         pass
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         Parameters
@@ -94,7 +95,7 @@ class Scheme(object):
         """
         raise NotImplementedError()
 
-    #### Private protocol ###################################################
+    # Private protocol ###################################################
 
     def _ensure_properties(self, pa, desired_props, clean=True):
         """Given a particle array and a set of properties desired,
@@ -144,7 +145,7 @@ class SchemeChooser(Scheme):
         group.add_argument(
             "--scheme", action="store", dest="scheme",
             default=self.default, choices=choices,
-            help="Specify scheme to use (one of %s)."%choices
+            help="Specify scheme to use (one of %s)." % choices
         )
 
     def attributes_changed(self):
@@ -158,7 +159,7 @@ class SchemeChooser(Scheme):
         self.scheme.consume_user_options(options)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         for scheme in self.schemes.values():
             self.scheme.configure_solver(
                 kernel=kernel, integrator_cls=integrator_cls,
@@ -191,11 +192,11 @@ class SchemeChooser(Scheme):
 
 def add_bool_argument(group, arg, dest, help, default):
     group.add_argument(
-        '--%s'%arg, action="store_true", dest=dest, help=help
+        '--%s' % arg, action="store_true", dest=dest, help=help
     )
     neg_help = 'Do not ' + help[0].lower() + help[1:]
     group.add_argument(
-        '--no-%s'%arg, action="store_false", dest=dest, help=neg_help
+        '--no-%s' % arg, action="store_false", dest=dest, help=neg_help
     )
     group.set_defaults(**{dest: default})
 
@@ -205,8 +206,7 @@ class WCSPHScheme(Scheme):
                  gx=0.0, gy=0.0, gz=0.0, alpha=0.1, beta=0.0, delta=0.1,
                  nu=0.0, tensile_correction=False, hg_correction=False,
                  update_h=False, delta_sph=False, summation_density=False):
-        """
-        Parameters
+        """Parameters
         ----------
 
         fluids: list
@@ -249,17 +249,17 @@ class WCSPHScheme(Scheme):
         References
         ----------
 
-        .. [Hughes2010] J. P. Hughes and D. I. Graham, "Comparison of incompressible
-           and weakly-compressible SPH models for free-surface water flows",
-           Journal of Hydraulic Research, 48 (2010), pp. 105-117.
+        .. [Hughes2010] J. P. Hughes and D. I. Graham, "Comparison of
+           incompressible and weakly-compressible SPH models for free-surface
+           water flows", Journal of Hydraulic Research, 48 (2010), pp. 105-117.
 
         .. [Marrone2011] S. Marrone et al., "delta-SPH model for simulating
            violent impact flows", Computer Methods in Applied Mechanics and
            Engineering, 200 (2011), pp 1526--1542.
 
-        .. [Cherfils2012] J. M. Cherfils et al., "JOSEPHINE: A parallel SPH code for
-           free-surface flows", Computer Physics Communications, 183 (2012),
-           pp 1468--1480.
+        .. [Cherfils2012] J. M. Cherfils et al., "JOSEPHINE: A parallel SPH
+           code for free-surface flows", Computer Physics Communications, 183
+           (2012), pp 1468--1480.
 
         """
         self.fluids = fluids
@@ -342,7 +342,7 @@ class WCSPHScheme(Scheme):
         return cfl*self.h0/self.c0
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         from pysph.base.kernels import CubicSpline
         if kernel is None:
             kernel = CubicSpline(dim=self.dim)
@@ -371,8 +371,10 @@ class WCSPHScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.wc.basic import (MomentumEquation, TaitEOS,
-             TaitEOSHGCorrection, UpdateSmoothingLengthFerrari)
+        from pysph.sph.wc.basic import (
+            MomentumEquation, TaitEOS, TaitEOSHGCorrection,
+            UpdateSmoothingLengthFerrari
+        )
         from pysph.sph.wc.basic import (ContinuityEquationDeltaSPH,
                                         MomentumEquationDeltaSPH)
         from pysph.sph.basic_equations import \
@@ -525,7 +527,7 @@ class TVFScheme(Scheme):
         return min(dt_cfl, dt_viscous, dt_force)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         Parameters
@@ -565,11 +567,12 @@ class TVFScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.wc.transport_velocity import (SummationDensity,
-            StateEquation, MomentumEquationPressureGradient,
+        from pysph.sph.wc.transport_velocity import (
+            SummationDensity, StateEquation, MomentumEquationPressureGradient,
             MomentumEquationArtificialViscosity,
             MomentumEquationViscosity, MomentumEquationArtificialStress,
-            SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity)
+            SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity
+        )
         equations = []
         all = self.fluids + self.solids
         g1 = []
@@ -590,11 +593,10 @@ class TVFScheme(Scheme):
 
         g3 = []
         for solid in self.solids:
-            for fluid in self.fluids:
-                g3.append(SolidWallPressureBC(
-                    dest=solid, sources=[fluid], b=1.0, rho0=self.rho0,
-                    p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
-                ))
+            g3.append(SolidWallPressureBC(
+                dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
+                p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
+            ))
 
         equations.append(Group(equations=g3, real=False))
 
@@ -635,8 +637,8 @@ class TVFScheme(Scheme):
         return equations
 
     def setup_properties(self, particles, clean=True):
-        from pysph.base.utils import (get_particle_array_tvf_fluid,
-            get_particle_array_tvf_solid)
+        from pysph.base.utils import get_particle_array_tvf_fluid, \
+            get_particle_array_tvf_solid
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_tvf_fluid(name='junk')
         props = list(dummy.properties.keys())
@@ -667,8 +669,8 @@ class AdamiHuAdamsScheme(TVFScheme):
     in PySPH readily so we simply use the WCSPHStep which works well.
     """
     def __init__(self, fluids, solids, dim, rho0, c0, nu, h0,
-                  gx=0.0, gy=0.0, gz=0.0, p0=0.0, gamma=7.0,
-                  tdamp=0.0, alpha=0.0):
+                 gx=0.0, gy=0.0, gz=0.0, p0=0.0, gamma=7.0,
+                 tdamp=0.0, alpha=0.0):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -703,7 +705,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         Parameters
@@ -745,7 +747,8 @@ class AdamiHuAdamsScheme(TVFScheme):
         from pysph.sph.equation import Group
         from pysph.sph.wc.basic import TaitEOS
         from pysph.sph.basic_equations import XSPHCorrection
-        from pysph.sph.wc.transport_velocity import (ContinuityEquation,
+        from pysph.sph.wc.transport_velocity import (
+            ContinuityEquation,
             MomentumEquationPressureGradient,
             MomentumEquationViscosity, MomentumEquationArtificialViscosity,
             SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity,
@@ -770,11 +773,10 @@ class AdamiHuAdamsScheme(TVFScheme):
 
         g3 = []
         for solid in self.solids:
-            for fluid in self.fluids:
-                g3.append(SolidWallPressureBC(
-                    dest=solid, sources=[fluid], b=1.0, rho0=self.rho0,
-                    p0=self.B, gx=self.gx, gy=self.gy, gz=self.gz
-                ))
+            g3.append(SolidWallPressureBC(
+                dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
+                p0=self.B, gx=self.gx, gy=self.gy, gz=self.gz
+            ))
 
         equations.append(Group(equations=g3, real=False))
 
@@ -826,8 +828,8 @@ class AdamiHuAdamsScheme(TVFScheme):
 
 class GasDScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
-                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
-                  update_alpha1=False, update_alpha2=False):
+                 alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
+                 update_alpha1=False, update_alpha2=False):
         """
         Parameters
         ----------
@@ -875,7 +877,7 @@ class GasDScheme(Scheme):
         group.add_argument(
             "--adaptive-h", action="store", dest="adaptive_h_scheme",
             default=default, choices=choices,
-            help="Specify scheme for adaptive smoothing lengths %s"%choices
+            help="Specify scheme for adaptive smoothing lengths %s" % choices
         )
         group.add_argument(
             "--alpha1", action="store", type=float, dest="alpha1",
@@ -916,7 +918,7 @@ class GasDScheme(Scheme):
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         Parameters
@@ -958,9 +960,10 @@ class GasDScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.gas_dynamics.basic import (ScaleSmoothingLength,
-            UpdateSmoothingLengthFromVolume, SummationDensity, IdealGasEOS,
-            MPMAccelerations)
+        from pysph.sph.gas_dynamics.basic import (
+            ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
+            SummationDensity, IdealGasEOS, MPMAccelerations
+        )
 
         equations = []
         # Find the optimal 'h'
@@ -971,7 +974,8 @@ class GasDScheme(Scheme):
                     SummationDensity(
                         dest=fluid, sources=self.fluids, k=self.kernel_factor,
                         density_iterations=True, dim=self.dim, htol=1e-3
-                ))
+                    )
+                )
 
             equations.append(Group(
                 equations=g1, update_nnps=True, iterate=True,
@@ -1021,8 +1025,6 @@ class GasDScheme(Scheme):
 
         equations.append(Group(equations=g2))
 
-        alpha1 = self.alpha1
-        alpha2 = self.alpha2
         g3 = []
         for fluid in self.fluids:
             g3.append(MPMAccelerations(
@@ -1048,7 +1050,7 @@ class GasDScheme(Scheme):
 
 class ADKEScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma=1.4, alpha=1.0, beta=2.0,
-            k=1.0, eps=0.0, g1=0, g2=0):
+                 k=1.0, eps=0.0, g1=0, g2=0):
         self.fluids = fluids
         self.solids = solids
         self.dim = dim
@@ -1064,10 +1066,10 @@ class ADKEScheme(Scheme):
     def get_equations(self):
         from pysph.sph.equation import Group
         from pysph.sph.basic_equations import SummationDensity
-        from pysph.sph.gas_dynamics.basic import ( IdealGasEOS,
-                ADKEAccelerations, SummationDensityADKE)
-        from pysph.sph.gas_dynamics.boundary_equations import (
-                WallBoundary)
+        from pysph.sph.gas_dynamics.basic import (
+            IdealGasEOS, ADKEAccelerations, SummationDensityADKE
+        )
+        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
         g1 = []
@@ -1077,10 +1079,12 @@ class ADKEScheme(Scheme):
 
         g2 = []
         for fluid in self.fluids:
-            g2.append(SummationDensityADKE(
-                fluid,  sources=self.fluids + self.solids, k = self.k,
-                eps= self.eps
-                ))
+            g2.append(
+                SummationDensityADKE(
+                    fluid, sources=self.fluids + self.solids, k=self.k,
+                    eps=self.eps
+                )
+            )
         equations.append(Group(g2, update_nnps=True, iterate=False))
 
         g3 = []
@@ -1088,20 +1092,15 @@ class ADKEScheme(Scheme):
             g3.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g3))
 
-
-
         g4 = []
         for fluid in self.fluids:
             g4.append(SummationDensity(fluid, self.fluids+self.solids))
         equations.append(Group(g4))
 
-
-
         g5 = []
         for solid in self.solids:
             g5.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=g5))
-
 
         g6 = []
         for elem in self.fluids+self.solids:
@@ -1110,17 +1109,19 @@ class ADKEScheme(Scheme):
 
         g7 = []
         for fluid in self.fluids:
-            g7.append(ADKEAccelerations(
-                dest=fluid, sources = self.fluids + self.solids,
-                alpha=self.alpha, beta=self.beta, g1=self.g1, g2=self.g2,
-                k= self.k, eps=self.eps
-                ))
+            g7.append(
+                ADKEAccelerations(
+                    dest=fluid, sources=self.fluids + self.solids,
+                    alpha=self.alpha, beta=self.beta, g1=self.g1, g2=self.g2,
+                    k=self.k, eps=self.eps
+                )
+            )
 
         equations.append(Group(equations=g7))
         return equations
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         Parameters
@@ -1163,18 +1164,18 @@ class ADKEScheme(Scheme):
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array
         particle_arrays = dict([(p.name, p) for p in particles])
-        import numpy
         required_props = [
                 'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p',
                 'e', 'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0',
                 'z0', 'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div',  'h0',
                 'wij', 'htmp', 'logrho']
 
-
-        dummy = get_particle_array( additional_props=required_props,
-                name='junk')
-        dummy.set_output_arrays(['x', 'y', 'u', 'v', 'rho', 'm', 'h',
-            'cs', 'p', 'e','au', 'av', 'ae', 'pid', 'gid', 'tag'] )
+        dummy = get_particle_array(additional_props=required_props,
+                                   name='junk')
+        dummy.set_output_arrays(
+            ['x', 'y', 'u', 'v', 'rho', 'm', 'h',
+             'cs', 'p', 'e', 'au', 'av', 'ae', 'pid', 'gid', 'tag']
+        )
 
         props = list(dummy.properties.keys())
         output_props = dummy.output_property_arrays

@@ -19,26 +19,26 @@ if not os.environ.get('ETS_TOOLKIT'):
     from traits.etsconfig.api import ETSConfig
     ETSConfig.toolkit = 'qt4'
 
-from traits.api import (Any, Array, Dict, HasTraits, Instance,
+
+from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
     on_trait_change, List, Str, Int, Range, Float, Bool, Button,
     Directory, Event, Password, Property, cached_property)
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
-    EnumEditor, TitleEditor, HGroup, ShellEditor, VSplit)
-from mayavi.core.api import PipelineBase
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)
-from pyface.timer.api import Timer, do_later
-from tvtk.api import tvtk
-from tvtk.array_handler import array2vtk
+    EnumEditor, TitleEditor, HGroup, ShellEditor)  # noqa: E402
+from mayavi.core.api import PipelineBase  # noqa: E402
+from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
+from pyface.timer.api import Timer, do_later  # noqa: E402
+from tvtk.api import tvtk  # noqa: E402
+from tvtk.array_handler import array2vtk  # noqa: E402
 
-from pysph.base.particle_array import ParticleArray
-from pysph.solver.solver_interfaces import MultiprocessingClient
-from pysph.solver.utils import load, dump, output_formats
-from pysph.solver.utils import remove_irrelevant_files, _sort_key
-from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,
+from pysph.base.particle_array import ParticleArray  # noqa: E402
+from pysph.solver.solver_interfaces import MultiprocessingClient  # noqa: E402
+from pysph.solver.utils import load, dump, output_formats  # noqa: E402
+from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
+from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,  # noqa: E402
     Interpolator)
 
-
-import logging
+import logging  # noqa: E402
 logger = logging.getLogger()
 
 
@@ -113,7 +113,7 @@ class InterpolatorView(HasTraits):
     # A button to recompute the bounds.
     recompute_bounds = Button('Recompute Bounds')
 
-    #### Private traits. ######################################################
+    # Private traits. ######################################################
 
     # The interpolator we are a view for.
     interpolator = Instance(Interpolator)
@@ -129,7 +129,7 @@ class InterpolatorView(HasTraits):
 
     _arrays_changed = Bool(False)
 
-    #### View definition ######################################################
+    # View definition ######################################################
     view = View(Item(name='visible'),
                 Item(name='scalar',
                      editor=EnumEditor(name='scalar_list')),
@@ -140,7 +140,7 @@ class InterpolatorView(HasTraits):
                 Item(name='show_legend'),
                 )
 
-    #### Private protocol  ###################################################
+    # Private protocol  ###################################################
     def _change_bounds(self):
         interp = self.interpolator
         if interp is not None:
@@ -159,7 +159,7 @@ class InterpolatorView(HasTraits):
                 self.interpolator.update_particle_arrays(self.particle_arrays)
                 self._arrays_changed = False
 
-    #### Trait handlers  #####################################################
+    # Trait handlers  #####################################################
     def _particle_arrays_changed(self, pas):
         if len(pas) > 0:
             all_props = reduce(set.union,
@@ -329,7 +329,7 @@ class ParticleArrayHelper(HasTraits):
         )
     )
 
-    #######  Private protocol ############################################
+    # Private protocol ############################################
     def _add_vmag(self, pa):
         if 'vmag' not in pa.properties:
             if 'vmag2' in pa.output_property_arrays:
@@ -356,7 +356,7 @@ class ParticleArrayHelper(HasTraits):
             method(pa)
         return getattr(pa, scalar)
 
-    #######  Traits handlers #############################################
+    #  Traits handlers #############################################
     def _edit_scalars_fired(self):
         self.plot.edit_traits()
 
@@ -383,16 +383,22 @@ class ParticleArrayHelper(HasTraits):
                     data_name=self.scalar)
             self.sync_trait('visible', p, mutual=True)
             self.sync_trait('show_legend', scm, mutual=True)
-            #set_arrays(p.mlab_source.m_data, pa)
+            # set_arrays(p.mlab_source.m_data, pa)
             self.plot = p
         else:
             if len(x) == len(p.mlab_source.x):
                 p.mlab_source.set(x=x, y=y, z=z, scalars=s)
+                if self.plot_vectors:
+                    self._vectors_changed(self.vectors)
             else:
-                p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
-
-        if self.plot_vectors:
-            self._vectors_changed(self.vectors)
+                if self.plot_vectors:
+                    u, v, w = self._get_vectors_for_plot(self.vectors)
+                    p.mlab_source.reset(
+                        x=x, y=y, z=z, scalars=s, u=u, v=v, w=w
+                    )
+                else:
+                    p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
+                p.mlab_source.update()
 
         # Setup the time.
         self._show_time_changed(self.show_time)
@@ -435,18 +441,23 @@ class ParticleArrayHelper(HasTraits):
             if txt is not None:
                 txt.visible = False
 
-    def _vectors_changed(self, value):
+    def _get_vectors_for_plot(self, vectors):
         pa = self.particle_array
-        comps = [x.strip() for x in value.split(',')]
+        comps = [x.strip() for x in vectors.split(',')]
         if len(comps) == 3:
             try:
-                vec = [getattr(pa, x) for x in comps]
+                vec = tuple(getattr(pa, x) for x in comps)
             except AttributeError:
-                pass
+                return None
             else:
-                self.plot.mlab_source.set(
-                    vectors=numpy.c_[vec[0], vec[1], vec[2]]
-                )
+                return vec
+
+    def _vectors_changed(self, value):
+        vec = self._get_vectors_for_plot(value)
+        if vec is not None:
+            self.plot.mlab_source.set(
+                vectors=numpy.c_[vec[0], vec[1], vec[2]]
+            )
 
     def _show_vectors_changed(self, value):
         pv = self.plot_vectors
@@ -514,7 +525,7 @@ class MayaviViewer(HasTraits):
 
     ########################################
     # Traits to pull data from a live solver.
-    live_mode = Bool(False, desc='if data is obtained from a running solver '\
+    live_mode = Bool(False, desc='if data is obtained from a running solver '
                                  'or from saved files')
 
     shell = Button('Launch Python Shell')
@@ -582,8 +593,7 @@ class MayaviViewer(HasTraits):
                                    Item(name='loop'),
                                    Item(name='update_files',
                                         show_label=False),
-                                   padding=0,
-                               ),
+                                   padding=0),
                             padding=0,
                             label='Saved Data',
                             selected=True,
@@ -641,7 +651,7 @@ class MayaviViewer(HasTraits):
                   ),
                   Group(
                     Item('scene', editor=SceneEditor(scene_class=MayaviScene),
-                            height=400, width=600, show_label=False),
+                         height=400, width=600, show_label=False),
                   )
                 ),
                 resizable=True,
@@ -1010,7 +1020,7 @@ class MayaviViewer(HasTraits):
 ######################################################################
 def usage():
     print("""Usage:
-pysph view [-v] <trait1=value> <trait2=value> [directory or files.npz or script.py]
+pysph view [-v] <trait1=value> <trait2=value> [directory or fl.npz or sc.py]
 
 If a directory or *.npz files are not supplied it will connect to a running
 solver, if not it will display the given files.
