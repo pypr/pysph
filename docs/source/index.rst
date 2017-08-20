@@ -61,6 +61,7 @@ The framework and library
    design/overview.rst
    using_pysph.rst
    pyzoltan/overview
+   starcluster/overview
 
 ************************
 Reference documentation
