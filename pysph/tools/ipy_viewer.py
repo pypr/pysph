@@ -3,6 +3,7 @@ import glob
 from pysph.solver.utils import load, get_files
 from IPython.display import display, clear_output, Image
 import ipywidgets as widgets
+import matplotlib.pyplot as plt
 
 
 class Viewer(object):
@@ -156,12 +157,19 @@ class ParticleArrayWidgets(object):
             layout=widgets.Layout(width='240px', display='flex')
         )
         self.scalar.owner = particles_type
-        self.legend = widgets.ToggleButton(
+        self.scalar_cmap = widgets.Dropdown(
+            options=map(str, plt.colormaps()),
+            value='viridis',
+            description="Colormap",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.scalar_cmap.owner = particles_type
+        self.legend = widgets.Checkbox(
             value=False,
             description="legend",
             disabled=False,
-            tooltip='Description',
-            layout=widgets.Layout(width='80px', display='flex')
+            layout=widgets.Layout(width='100px', display='flex')
         )
         self.legend.owner = particles_type
         self.vector = widgets.Text(
@@ -204,16 +212,17 @@ class ParticleArrayWidgets(object):
 
         from ipywidgets import VBox, Label, Layout
         return VBox([
-            Label(self.particles_type),
+            HTML('<b>' + self.particles_type.upper() + '</b>'),
             self.scalar,
             self.vector,
             self.vector_scale,
             self.vector_width,
             self.scalar_size,
+            self.scalar_cmap,
             self.legend,
 
         ],
-            layout=Layout(display='flex')
+            layout=Layout(display='flex', border='1px solid', margin='3px')
         )
 
 
@@ -253,7 +262,10 @@ class Viewer2DWidgets(object):
 
         return VBox(
                 [
-                    HBox(items, layout=Layout(display='flex')),
+                    HBox(
+                        items,
+                        layout=Layout(display='flex', overflow_x='scroll')
+                    ),
                     self.frame,
                     self.save_figure
                 ]
@@ -299,13 +311,12 @@ class Viewer2D(Viewer):
             )
             pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
             pa_widgets.legend.observe(self._legend_handler, 'value')
+            pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
 
     def _configure_plot(self):
         '''
         Set attributes for plotting.
         '''
-
-        from matplotlib import pyplot as plt
 
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
@@ -388,7 +399,6 @@ class Viewer2D(Viewer):
         display(self.figure)
 
     def _scalar_handler(self, change):
-
         particles_type = change['owner'].owner
         temp_data = self.get_frame(
             self._widgets.frame.value
@@ -402,14 +412,16 @@ class Viewer2D(Viewer):
                 )
 
         if change['new'] != 'None':
-            scatter = self._scatter_ax.scatter(
+            self._scatters[particles_type] = self._scatter_ax.scatter(
                 temp_data.x,
                 temp_data.y,
                 c=getattr(temp_data, change['new']),
-                s=pa_widgets.scalar_size.value
+                s=pa_widgets.scalar_size.value,
+                cmap=pa_widgets.scalar_cmap.value,
             )
 
         self._legend_handler(None, manual=True)
+
         clear_output(wait=True)
         display(self.figure)
 
@@ -470,6 +482,12 @@ class Viewer2D(Viewer):
             self._vectors[particles_type].width = change['new']/10000
         clear_output(wait=True)
         display(self.figure)
+
+    def _scalar_cmap_handler(self, change):
+        particles_type = change['owner'].owner
+        pa_widgets = self._widgets.particles[particles_type]
+        change['new'] = pa_widgets.scalar.value
+        self._scalar_handler(change)
 
     def _legend_handler(self, change, manual=False):
 
