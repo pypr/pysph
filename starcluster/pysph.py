@@ -21,8 +21,8 @@ class PySPHInstallerBase(DefaultClusterSetup):
           export ZOLTAN_LIBRARY=/usr/lib/x86_64-linux-gnu
           cd /home/pysph &&
           git clone https://github.com/pypr/pysph &&
-          cd pysph && 
-          pip install -r requirements.txt && 
+          cd pysph &&
+          pip install -r requirements.txt &&
           pip install mpi4py &&
           python setup.py install
           fi"""
@@ -30,7 +30,8 @@ class PySPHInstallerBase(DefaultClusterSetup):
 
     def _configure_python(self, node):
         node.ssh.execute(
-            "sudo update-alternatives --install /usr/bin/python python /home/pysph/pysph_env/bin/python2.7 1")
+            r"""sudo update-alternatives --install
+            /usr/bin/python python /home/pysph/pysph_env/bin/python2.7 1""")
 
 
 class PySPHInstaller(PySPHInstallerBase):
@@ -62,6 +63,7 @@ class PySPHInstaller(PySPHInstallerBase):
         pysph_hosts.write(new_node.alias + '\n')
         pysph_hosts.close()
 
-    def on_remove_node(self, remove_node, nodes, master, user, user_shell, volumes):
+    def on_remove_node(self, remove_node, nodes, master,
+                       user, user_shell, volumes):
         log.info("Removing %s from PYSPH hosts file" % remove_node.alias)
         master.ssh.remove_lines_from_file(self.PYSPH_HOSTS, remove_node.alias)
