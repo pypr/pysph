@@ -4,8 +4,6 @@ from libcpp.pair cimport pair
 
 from nnps_base cimport *
 
-ctypedef map[uint64_t, pair[uint32_t, uint32_t]] key_to_idx_t
-
 cdef extern from "math.h":
     double log2(double) nogil
 
@@ -19,6 +17,8 @@ cdef extern from "z_order.h":
         CompareSortWrapper(uint32_t* current_pids, uint64_t* current_keys,
                 int length) nogil except +
         inline void compare_sort() nogil
+
+ctypedef map[uint64_t, pair[uint32_t, uint32_t]] key_to_idx_t
 
 cdef class ZOrderNNPS(NNPS):
     ############################################################################
