@@ -222,7 +222,7 @@ class ParticleArrayWidgets(object):
             self.legend,
 
         ],
-            layout=Layout(display='flex', border='1px solid', margin='3px')
+            layout=Layout(border='1px solid', margin='3px', min_width='320px')
         )
 
 
@@ -264,7 +264,6 @@ class Viewer2DWidgets(object):
                 [
                     HBox(
                         items,
-                        layout=Layout(display='flex', overflow_x='scroll')
                     ),
                     self.frame,
                     self.save_figure
