@@ -16,7 +16,7 @@ cdef extern from 'math.h':
     double log(double) nogil
     double log2(double) nogil
 
-cdef extern from "z_order_new.h":
+cdef extern from "z_order.h":
     ctypedef unsigned int uint32_t
     ctypedef unsigned long long uint64_t
     inline uint64_t get_key(uint64_t i, uint64_t j, uint64_t k) nogil

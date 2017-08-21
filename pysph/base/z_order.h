@@ -64,7 +64,7 @@ public:
     {
         this->current_pids = current_pids;
         this->current_keys = current_keys;
-        this->length = 0;
+        this->length = length;
     }
 
     struct CompareFunctionWrapper
@@ -78,7 +78,7 @@ public:
 
         inline bool operator()(const int &a, const int &b)
         {
-            return this->current_keys[a] < this->current_keys[b];
+            return this->data->current_keys[a] < this->data->current_keys[b];
         }
     };
 
@@ -86,6 +86,8 @@ public:
     {
         sort(this->current_pids, this->current_pids + this->length,
                 CompareFunctionWrapper(this));
+
+        sort(this->current_keys, this->current_keys + this->length);
     }
 };
 
