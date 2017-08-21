@@ -364,6 +364,7 @@ class Viewer2D(Viewer):
                             pa_widgets.scalar.value
                     ),
                     s=pa_widgets.scalar_size.value,
+                    cmap=pa_widgets.scalar_cmap.value,
                 )
         self._legend_handler(None, manual=True)
 
