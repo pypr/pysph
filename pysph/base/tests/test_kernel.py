@@ -8,7 +8,7 @@ from unittest import TestCase, main
 from pysph.base.kernels import (CubicSpline, Gaussian, QuinticSpline,
                                 SuperGaussian, WendlandQuintic,
                                 WendlandQuinticC4, WendlandQuinticC6,
-                                WendlandQuinticC2_1D,WendlandQuinticC4_1D,
+                                WendlandQuinticC2_1D, WendlandQuinticC4_1D,
                                 WendlandQuinticC6_1D, get_compiled_kernel)
 
 
