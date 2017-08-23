@@ -242,7 +242,7 @@ class WendlandQuinticC2_1D(object):
 
 
 class WendlandQuintic(object):
-    r"""The following is the WendlandQuintic kernel (Wendland C2) kernel for 2D and 3D.
+    r"""The following is the WendlandQuintic kernel(C2) kernel for 2D and 3D.
 
     .. math::
              W(q) = \ & \alpha_d (1-q/2)^4(2q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
@@ -640,7 +640,7 @@ class WendlandQuinticC6_1D(object):
 
 
 class WendlandQuinticC6(object):
-    r"""The following is the WendlandQuintic kernel (Wendland C6) kernel for 2D and 3D.
+    r"""The following is the WendlandQuintic kernel(C6) kernel for 2D and 3D.
 
     .. math::
              W(q) = \ & \alpha_d (1-q/2)^8 (4 q^3 + 6.25 q^2 + 4q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
