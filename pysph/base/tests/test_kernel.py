@@ -404,7 +404,7 @@ class TestSuperGaussian3D(TestGaussian3D):
         self.assertAlmostEqual(r[2], -1.0, 1)
 
 ###############################################################################
-# WendlandQuintic kernel
+# WendlandQuintic C2 kernel
 class TestWendlandQuintic2D(TestCubicSpline2D):
     kernel_factory = staticmethod(lambda: WendlandQuintic(dim=2))
 
@@ -420,6 +420,62 @@ class TestWendlandQuintic3D(TestGaussian3D):
 
     def test_simple(self):
         self.check_kernel_at_origin(21.0/(16.0*np.pi))
+
+
+class TestWendlandQuintic1D(TestCubicSpline1D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC2_1D(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(5.0/8.0)
+
+
+
+
+###############################################################################
+# WendlandQuintic C4 kernel
+class TestWendlandQuinticC4_2D(TestCubicSpline2D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC4(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(9.0/(4.0*np.pi))
+
+
+class TestWendlandQuinticC4_3D(TestGaussian3D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC4(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(495.0/(256.0*np.pi))
+
+
+class TestWendlandQuinticC4_1D(TestCubicSpline1D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC4_1D(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(3.0/4.0)
+
+
+
+###############################################################################
+# WendlandQuintic C6 kernel
+class TestWendlandQuinticC6_2D(TestCubicSpline2D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC6(dim=2))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(78.0/(28.0*np.pi))
+
+
+class TestWendlandQuinticC6_3D(TestGaussian3D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC6(dim=3))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(1365.0/(512.0*np.pi))
+
+
+class TestWendlandQuinticC6_1D(TestCubicSpline1D):
+    kernel_factory = staticmethod(lambda: WendlandQuinticC6_1D(dim=1))
+
+    def test_simple(self):
+        self.check_kernel_at_origin(55.0/64.0)
 
 
 
