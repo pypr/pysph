@@ -165,12 +165,12 @@ class TestCubicSpline1D(TestKernelBase):
         r = self.check_grad_moment_1d(0.0, 2*kh, 1.0, 1, xj=kh)
         self.assertAlmostEqual(r, -1.0, 8)
 
+        
 ###############################################################################
 # `TestCubicSpline2D` class.
 ###############################################################################
 class TestCubicSpline2D(TestKernelBase):
     kernel_factory = staticmethod(lambda: CubicSpline(dim=2))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(10./(7*np.pi))
@@ -245,11 +245,11 @@ class TestCubicSpline3D(TestKernelBase):
         self.assertAlmostEqual(r[1], 0.0, 8)
         self.assertAlmostEqual(r[2], -1.0, 4)
 
+        
 ###############################################################################
 # Gaussian kernel
 class TestGaussian1D(TestCubicSpline1D):
     kernel_factory = staticmethod(lambda: Gaussian(dim=1))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(1.0/np.sqrt(np.pi))
@@ -323,17 +323,17 @@ class TestGaussian3D(TestCubicSpline3D):
 class TestQuinticSpline1D(TestCubicSpline1D):
     kernel_factory = staticmethod(lambda: QuinticSpline(dim=1))
 
-
     def test_simple(self):
         self.check_kernel_at_origin(0.55)
 
+    
 class TestQuinticSpline2D(TestCubicSpline2D):
     kernel_factory = staticmethod(lambda: QuinticSpline(dim=2))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(66.0*7.0/(478.0*np.pi))
 
+        
 class TestQuinticSpline3D(TestGaussian3D):
     kernel_factory = staticmethod(lambda: QuinticSpline(dim=3))
 
@@ -345,7 +345,6 @@ class TestQuinticSpline3D(TestGaussian3D):
 # SuperGaussian kernel
 class TestSuperGaussian1D(TestGaussian1D):
     kernel_factory = staticmethod(lambda: SuperGaussian(dim=1))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(1.5/np.sqrt(np.pi))
@@ -366,9 +365,9 @@ class TestSuperGaussian1D(TestGaussian1D):
         r = self.check_kernel_moment_1d(0.0, 2*kh, 1.0, 0, xj=kh)
         self.assertAlmostEqual(r, 1.0, 3)
 
+        
 class TestSuperGaussian2D(TestGaussian2D):
     kernel_factory = staticmethod(lambda: SuperGaussian(dim=2))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(2.0/np.pi)
@@ -388,10 +387,9 @@ class TestSuperGaussian2D(TestGaussian2D):
         self.assertAlmostEqual(r[0], 0.0, 8)
         self.assertAlmostEqual(r[1], 0.0, 8)
 
-
+        
 class TestSuperGaussian3D(TestGaussian3D):
     kernel_factory = staticmethod(lambda: SuperGaussian(dim=3))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(5.0/(2.0*pow(np.pi, 1.5)))
@@ -410,11 +408,11 @@ class TestSuperGaussian3D(TestGaussian3D):
         self.assertAlmostEqual(r[1], 0.0, 8)
         self.assertAlmostEqual(r[2], -1.0, 1)
 
+        
 ###############################################################################
 # WendlandQuintic C2 kernel
 class TestWendlandQuintic2D(TestCubicSpline2D):
     kernel_factory = staticmethod(lambda: WendlandQuintic(dim=2))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(7.0/(4.0*np.pi))
@@ -423,9 +421,9 @@ class TestWendlandQuintic2D(TestCubicSpline2D):
         r = self.check_kernel_moment_2d(0, 0)
         self.assertAlmostEqual(r, 1.0, 6)
 
+        
 class TestWendlandQuintic3D(TestGaussian3D):
     kernel_factory = staticmethod(lambda: WendlandQuintic(dim=3))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(21.0/(16.0*np.pi))
@@ -434,18 +432,14 @@ class TestWendlandQuintic3D(TestGaussian3D):
 class TestWendlandQuintic1D(TestCubicSpline1D):
     kernel_factory = staticmethod(lambda: WendlandQuinticC2_1D(dim=1))
 
-
     def test_simple(self):
         self.check_kernel_at_origin(5.0/8.0)
-
-
-
-
+        
+        
 ###############################################################################
 # WendlandQuintic C4 kernel
 class TestWendlandQuinticC4_2D(TestCubicSpline2D):
     kernel_factory = staticmethod(lambda: WendlandQuinticC4(dim=2))
-
 
     def test_simple(self):
         self.check_kernel_at_origin(9.0/(4.0*np.pi))
@@ -454,7 +448,6 @@ class TestWendlandQuinticC4_2D(TestCubicSpline2D):
 class TestWendlandQuinticC4_3D(TestGaussian3D):
     kernel_factory = staticmethod(lambda: WendlandQuinticC4(dim=3))
 
-
     def test_simple(self):
         self.check_kernel_at_origin(495.0/(256.0*np.pi))
 
@@ -462,10 +455,10 @@ class TestWendlandQuinticC4_3D(TestGaussian3D):
 class TestWendlandQuinticC4_1D(TestCubicSpline1D):
     kernel_factory = staticmethod(lambda: WendlandQuinticC4_1D(dim=1))
 
-
     def test_simple(self):
         self.check_kernel_at_origin(3.0/4.0)
 
+        
 ###############################################################################
 # WendlandQuintic C6 kernel
 class TestWendlandQuinticC6_2D(TestCubicSpline2D):
