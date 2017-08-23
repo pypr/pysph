@@ -6,7 +6,10 @@ except ImportError:
 from unittest import TestCase, main
 
 from pysph.base.kernels import (CubicSpline, Gaussian, QuinticSpline,
-                                SuperGaussian, WendlandQuintic, get_compiled_kernel)
+                                SuperGaussian, WendlandQuintic,
+                                WendlandQuinticC4, WendlandQuinticC6,
+                                WendlandQuinticC2_1D,WendlandQuinticC4_1D,
+                                WendlandQuinticC6_1D, get_compiled_kernel)
 
 
 ###############################################################################
@@ -75,7 +78,7 @@ class TestKernelBase(TestCase):
 
         def func(x, y):
             fac = pow(x - x0, m) * pow(y - y0, n)
-            return fac * np.asarray(self.gradient(x, y, 0.0, x0, y0, 0.0, 0.15))
+            return fac*np.asarray(self.gradient(x, y, 0.0, x0, y0, 0.0, 0.15))
         vfunc = np.vectorize(func, otypes=[np.ndarray])
         nx, ny = 101, 101
         vol = 1.0 / (nx - 1) * 1.0 / (ny - 1)
@@ -113,22 +116,26 @@ class TestKernelBase(TestCase):
         k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = w_0
         self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)' % (k, expect))
+                               msg='Kernel value %s != %s (expected)' \
+                               % (k, expect))
         k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)' % (k, expect))
+                               msg='Kernel value %s != %s (expected)' \
+                               % (k, expect))
 
         g = self.gradient(xi=0.0, yi=0.0, zi=0.0,
                           xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)' % (g[0], expect))
+                               msg='Kernel value %s != %s (expected)' \
+                               % (g[0], expect))
         g = self.gradient(xi=3.0, yi=0.0, zi=0.0,
                           xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)' % (g[0], expect))
+                               msg='Kernel value %s != %s (expected)' \
+                               % (g[0], expect))
 
 
 ###############################################################################
