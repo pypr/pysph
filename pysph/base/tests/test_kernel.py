@@ -116,25 +116,25 @@ class TestKernelBase(TestCase):
         k = self.kernel(xi=0.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = w_0
         self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)' \
+                               msg='Kernel value %s != %s (expected)'
                                % (k, expect))
         k = self.kernel(xi=3.0, yi=0.0, zi=0.0, xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(k, expect,
-                               msg='Kernel value %s != %s (expected)' \
+                               msg='Kernel value %s != %s (expected)'
                                % (k, expect))
 
         g = self.gradient(xi=0.0, yi=0.0, zi=0.0,
                           xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)' \
+                               msg='Kernel value %s != %s (expected)'
                                % (g[0], expect))
         g = self.gradient(xi=3.0, yi=0.0, zi=0.0,
                           xj=0.0, yj=0.0, zj=0.0, h=1.0)
         expect = 0.0
         self.assertAlmostEqual(g[0], expect,
-                               msg='Kernel value %s != %s (expected)' \
+                               msg='Kernel value %s != %s (expected)'
                                % (g[0], expect))
 
 
