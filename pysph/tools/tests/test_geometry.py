@@ -28,7 +28,8 @@ class TestGeometry(unittest.TestCase):
 
     def test_matrix_exp(self):
         try:
-            import scipy.linalg.expm as e
+            from scipy import linalg
+            e = linalg.expm
             n = np.random.randint(1, 10)
             mat = np.random.rand(n, n)
             assert np.allclose(e(mat), matrix_exp(mat))
@@ -86,7 +87,7 @@ class TestGeometry(unittest.TestCase):
         assert np.allclose(z_new, z_test)
 
     def test_get_2d_wall(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = (10.0)**(np.random.uniform(-2, -1))
         center = np.random.random_sample(2)
         length = np.random.randint(50, 200) * dx
         num_layers = np.random.randint(1, 4)
@@ -103,7 +104,7 @@ class TestGeometry(unittest.TestCase):
                            y[-layer_length:] - value * (num_layers - 1) * dx)
 
     def test_get_2d_tank(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = (10.0)**(np.random.uniform(-2, -1))
         center = np.random.random_sample(2)
         length = np.random.randint(50, 200) * dx
         height = np.random.randint(50, 200) * dx
@@ -115,9 +116,9 @@ class TestGeometry(unittest.TestCase):
         assert abs(y_len - height - num_layers * dx) <= 1.001 * dx
 
     def test_get_2d_circle(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = (10.0)**(np.random.uniform(-2, -1))
         center = np.random.random_sample(2)
-        radius = np.random.randint(50, 200) * dx
+        radius = np.random.randint(50, 100) * dx
         x, y = get_2d_circle(dx, radius, center)
         count = 0
         for i in range(len(x)):
@@ -128,7 +129,7 @@ class TestGeometry(unittest.TestCase):
         assert count == 0
 
     def test_get_2d_block(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = (10.0)**(np.random.uniform(-2, -1))
         center = np.random.random_sample(2)
         length = np.random.randint(50, 200) * dx
         height = np.random.randint(50, 200) * dx
@@ -142,9 +143,9 @@ class TestGeometry(unittest.TestCase):
         assert np.allclose(new_center, center)
 
     def test_get_3d_sphere(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = 0.23
         center = np.random.random_sample(3)
-        radius = np.random.randint(20, 50) * dx
+        radius = 2.0
         x, y, z = get_3d_sphere(dx, radius, center)
         count = 0
         for i in range(len(x)):
@@ -155,11 +156,11 @@ class TestGeometry(unittest.TestCase):
         assert count == 0
 
     def test_get_3d_block(self):
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = 0.23
         center = np.random.random_sample(3)
-        length = np.random.randint(50, 200) * dx
-        height = np.random.randint(50, 200) * dx
-        depth = np.random.randint(50, 200) * dx
+        length = np.random.randint(50, 100) * dx
+        height = np.random.randint(50, 100) * dx
+        depth = np.random.randint(50, 100) * dx
         x, y, z = get_3d_block(dx, length, height, depth, center)
         len_x = max(x) - min(x)
         len_y = max(y) - min(y)
@@ -173,9 +174,9 @@ class TestGeometry(unittest.TestCase):
         assert np.allclose(center, new_center)
 
     def test_get_3d_hollow_cylinder(self):
-        dx = (10)**(np.random.uniform(-3, -1))
-        radius = np.random.randint(50, 100) * dx
-        length = np.random.randint(50, 100) * dx
+        dx = 0.17
+        radius = np.random.randint(20, 40) * dx
+        length = np.random.randint(20, 40) * dx
         center = np.random.random_sample(3)
         num_layers = np.random.randint(1, 5)
         x, y, z = get_3d_hollow_cylinder(dx, radius, length, center,
@@ -194,7 +195,7 @@ class TestGeometry(unittest.TestCase):
         assert count == 0
 
     def test_get_naca_wing(self):
-        dx = (10)**(np.random.uniform(-3, -1))
+        dx = (10)**(np.random.uniform(-2, -1))
         c = np.random.uniform(0.5, 2.0)
         span = np.random.uniform(1.0, 4.0)
         series = np.random.choice(['210', '220', '230', '240', '250', '221',
@@ -212,11 +213,11 @@ class TestGeometry(unittest.TestCase):
         assert count == 0
 
     def test_remove_overlap_particles(self):
-        dx_1 = (10)**(np.random.randint(-3, -1))
-        dx_2 = (10)**(np.random.randint(-3, -1))
-        length = np.random.randint(50, 100) * dx_1
-        height = np.random.randint(50, 100) * dx_1
-        radius = np.random.randint(50, 100) * dx_2
+        dx_1 = (10)**(np.random.randint(-2, -1))
+        dx_2 = (10)**(np.random.randint(-2, -1))
+        length = np.random.randint(20, 40) * dx_1
+        height = np.random.randint(20, 40) * dx_1
+        radius = np.random.randint(20, 40) * dx_2
         x1, y1 = get_2d_block(dx_1, length, height)
         x2, y2 = get_2d_circle(dx_2, radius)
         r1 = np.ones_like(x1) * 100.0
