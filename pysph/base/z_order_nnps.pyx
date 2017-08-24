@@ -4,6 +4,7 @@
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libcpp.map cimport map
+from libc.stdlib cimport bsearch
 
 from cython.operator cimport dereference as deref, preincrement as inc
 
@@ -40,7 +41,8 @@ cdef class ZOrderNNPS(NNPS):
             num_particles = pa_wrapper.get_number_of_particles()
 
             self.pids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
-            self.key_maps[i] = new key_to_idx_t()
+            self.keys[i] = <uint64_t*> malloc(num_particles*sizeof(uint64_t))
+            self.cids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
 
         self.src_index = 0
         self.dst_index = 0
@@ -55,10 +57,11 @@ cdef class ZOrderNNPS(NNPS):
 
         self.pids = <uint32_t**> malloc(narrays*sizeof(uint32_t*))
         self.keys = <uint64_t**> malloc(narrays*sizeof(uint64_t*))
-        self.key_maps = <key_to_idx_t**> malloc(narrays*sizeof(key_to_idx_t*))
+        self.cids = <uint32_t**> malloc(narrays*sizeof(uint32_t*))
 
         self.current_pids = NULL
-        self.current_map = NULL
+        self.current_cids = NULL
+        self.current_keys = NULL
 
     def __dealloc__(self):
         cdef int i
@@ -111,6 +114,9 @@ cdef class ZOrderNNPS(NNPS):
         cdef double z = dst_z_ptr[d_idx]
         cdef double h = dst_h_ptr[d_idx]
 
+        cdef uint32_t cid = self.current_cids[d_idx]
+        cdef int* nbr_indices = &self.current_nbr_boxes[27*cid]
+
         cdef unsigned int* s_gid = self.src.gid.data
         cdef int orig_length = nbrs.length
 
@@ -130,28 +136,17 @@ cdef class ZOrderNNPS(NNPS):
         cdef double hi2 = self.radius_scale2*h*h
         cdef double hj2 = 0
 
-        cdef map[uint32_t, pair[uint32_t, uint32_t]].iterator it
-
-        cdef int x_boxes[27]
-        cdef int y_boxes[27]
-        cdef int z_boxes[27]
-        cdef int num_boxes = self._neighbor_boxes(c_x, c_y, c_z,
-                x_boxes, y_boxes, z_boxes)
-
-        cdef pair[uint32_t, uint32_t] candidate
-
+        cdef int start_idx, curr_idx
         cdef uint32_t n, idx
-        for i from 0<=i<num_boxes:
-            it = self.current_map.find(get_key(x_boxes[i], y_boxes[i],
-                z_boxes[i]))
-            if it == self.current_map.end():
+        for i from 0<=i<27:
+            if nbr_indices[i] == -1:
                 continue
-            candidate = deref(it).second
-            n = candidate.first
-            candidate_length = candidate.second
+            start_idx = nbr_indices[i]
+            curr_idx = 0
 
-            for j from 0<=j<candidate_length:
-                idx = self.current_pids[n+j]
+            while self.current_cids[start_idx + curr_idx] \
+                    == self.current_cids[start_idx]:
+                idx = self.current_pids[start_idx + curr_idx]
 
                 hj2 = self.radius_scale2*src_h_ptr[idx]*src_h_ptr[idx]
 
@@ -163,6 +158,8 @@ cdef class ZOrderNNPS(NNPS):
 
                 if (xij2 < hi2) or (xij2 < hj2):
                     nbrs.c_append(idx)
+
+                curr_idx += 1
 
         if self.sort_gids:
             self._sort_neighbors(
@@ -208,9 +205,10 @@ cdef class ZOrderNNPS(NNPS):
         for j from 0<=j<num_particles:
             indices.c_append(<long>current_pids[j])
 
-    cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
+    cdef int fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
             UIntArray indices, uint32_t* current_pids, uint64_t* current_keys,
-            key_to_idx_t* current_map):
+            uint32_t curr_cid):
+
         cdef double* x_ptr = pa_wrapper.x.data
         cdef double* y_ptr = pa_wrapper.y.data
         cdef double* z_ptr = pa_wrapper.z.data
@@ -236,61 +234,150 @@ cdef class ZOrderNNPS(NNPS):
 
         sort_wrapper.compare_sort()
 
-        cdef pair[uint32_t, pair[uint32_t, uint32_t]] temp
-        cdef pair[uint32_t, uint32_t] cell, found_cell
-        cdef map[uint64_t, pair[uint32_t, uint32_t]].iterator it
+        cdef uint32_t prev_max_cid = 0
+        if pa_index != 0:
+            prev_max_cid = self.max_cid[pa_index - 1]
 
-        temp.first = current_keys[0]
-        cell.first = 0
-
-        cdef uint32_t length = 0
-        cdef uint32_t curr_cid = 0
         cdef uint32_t found_cid = UINT_MAX
+        cdef int num_particles
+        cdef uint64_t* found_ptr = NULL
+
+        cdef uint32_t* iter_cids
+        cdef uint64_t* iter_keys
+
+        for j from 0<=j<self.narrays:
+            iter_cids = self.cids[j]
+            num_particles = (NNPSParticleArrayWrapper> \
+                    self.pa_wrappers[j]).get_number_of_particles()
+            found_ptr = <uint64_t*> bsearch(&current_keys[0],
+                    self.keys[j], num_particles, sizeof(uint64_t))
+
+            if found_ptr != NULL:
+                found_cid = iter_cids[idx]
+                break
+
+        if found_cid == UINT_MAX:
+            found_cid = curr_cid
+            curr_cid += 1
+
+        current_cids[0] = found_cid
 
         for i from 0<i<indices.length:
-            length += 1
-
             if(current_keys[i] != current_keys[i-1]):
 
-                for j from 0<=j<self.narrays:
-                    iter_map = self.key_maps[j]
+                for j from 0<=j<pa_index:
                     iter_cids = self.cids[j]
-                    it = iter_map.find(temp.first)
+                    iter_keys = self.keys[j]
+                    num_particles = (NNPSParticleArrayWrapper> \
+                            self.pa_wrappers[j]).get_number_of_particles()
+                    found_ptr = <uint64_t*> bsearch(&current_keys[0],
+                            iter_keys, num_particles, sizeof(uint64_t))
 
-                    if it != iter_map.end():
-                        found_cell = deref(it).second
-                        found_cid = iter_cids[found_cell.first]
+                    if found_ptr != NULL:
+                        found_cid = iter_cids[found_ptr - iter_keys]
                         break
 
                 if found_cid == UINT_MAX:
+                    found_cid = curr_cid
                     curr_cid += 1
 
-                current_cids[i] = curr_cid
+            current_cids[i] = found_cid
 
-                cell.second = length
-                temp.second = cell
-                current_map.insert(temp)
+        return curr_cid
 
-                temp.first = current_keys[i]
-                cell.first = i
 
-                length = 0
+    cdef void _fill_nbr_boxes(self):
+        cdef int i, j, k
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int num_particles
 
-        cell.second = length + 1
-        temp.second = cell
-        current_map.insert(temp)
+        cdef int* current_nbr_boxes
+        cdef uint32_t max_cid = self.max_cids[pa_index]
+
+        cdef double* x_ptr
+        cdef double* y_ptr
+        cdef double* z_ptr
+
+        cdef int c_x, c_y, c_z
+        cdef uint64_t nbr_keys[27]
+        cdef int num_boxes
+
+        cdef int n = 0
+        cdef uint32_t cid
+
+        cdef int* found_ptr
+        
+        for i from 0<=i<self.narrays:
+            pa_wrapper = self.pa_wrappers[pa_index]
+            num_particles = pa_wrapper.get_number_of_particles()
+            x_ptr = pa_wrapper.x.data
+            y_ptr = pa_wrapper.y.data
+            z_ptr = pa_wrapper.z.data
+
+            current_keys = self.keys[i]
+            current_cids = self.cids[i]
+            current_nbr_boxes = self.nbr_boxes[i]
+
+            # init self.nbr_boxes to -1
+            for j from 0<=j<27*self.max_cid:
+                current_nbr_boxes[j] = -1
+
+            cid = current_cids[0]
+
+            find_cell_id_raw(
+                x_ptr[0] - xmin[0],
+                y_ptr[0] - xmin[1],
+                z_ptr[0] - xmin[2],
+                self.cell_size,
+                &c_x, &c_y, &c_z
+                )
+
+            num_boxes = self._neighbor_boxes(c_x, c_y, c_z, nbr_keys)
+
+            for k from 0<=k<num_boxes:
+                found_ptr = bsearch(&nbr_keys[k], current_keys,
+                        num_particles, sizeof(uint64_t))
+                if found_ptr == NULL:
+                    continue
+                    
+                found_idx = found_ptr - current_keys
+                current_nbr_boxes[27*cid + n] = found_idx
+                n += 1
+
+            # nbrs of all cids in particle array i
+            for j from 0<=j<num_particles:
+                cid = current_cids[j]
+
+                if cid == current_cids[j-1]:
+                    find_cell_id_raw(
+                        x_ptr[j] - xmin[0],
+                        y_ptr[j] - xmin[1],
+                        z_ptr[j] - xmin[2],
+                        self.cell_size,
+                        &c_x, &c_y, &c_z
+                        )
+
+                    num_boxes = self._neighbor_boxes(c_x, c_y, c_z, nbr_keys)
+
+                    for k from 0<=k<num_boxes:
+                        found_ptr = bsearch(&nbr_keys[k], current_keys,
+                                num_particles, sizeof(uint64_t))
+                        if found_ptr == NULL:
+                            continue
+                            
+                        found_idx = found_ptr - current_keys
+                        current_nbr_boxes[27*cid + n] = found_idx
+                        n += 1
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil:
+            uint64_t* nbr_keys) nogil:
         cdef int length = 0
         cdef int p, q, r
         for p from -1<=p<2:
             for q from -1<=q<2:
                 for r from -1<=r<2:
                     if i+r>=0 and j+q>=0 and k+p>=0:
-                        x[length] = i+r
-                        y[length] = j+q
-                        z[length] = k+p
+                        nbr_keys[length] = get_key(i+r, j+q, k+p)
                         length += 1
         return length
 
@@ -302,29 +389,46 @@ cdef class ZOrderNNPS(NNPS):
         cdef double* xmax = self.xmax.data
         cdef double* xmin = self.xmin.data
 
+        cdef uint32_t max_cid = 0
+
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int num_particles
+
+        cdef uint32_t* current_pids
+        cdef uint64_t* current_keys
+
         for i from 0<=i<self.narrays:
             free(self.pids[i])
-            del self.key_maps[i]
+            free(self.keys[i])
+            free(self.cids[i])
 
             pa_wrapper = <NNPSParticleArrayWrapper> self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
             self.pids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
             self.keys[i] = <uint64_t*> malloc(num_particles*sizeof(uint64_t))
-            self.key_maps[i] = new key_to_idx_t()
+            self.cids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
 
+            pa_wrapper = self.pa_wrappers[i]
+            num_particles = pa_wrapper.get_number_of_particles()
+
+            current_pids = self.pids[i]
+            current_keys = self.keys[i]
+
+            max_cid = self.fill_array(pa_wrapper, i, indices, current_pids,
+                    current_keys, max_cid)
+
+        self.nbr_boxes = <int**> malloc(self.narrays*sizeof(int*))
+        
+        for i from 0<=i<self.narrays:
+            self.nbr_boxes[i] = <int*> malloc(max_cid*sizeof(int))
+
+            self._fill_nbr_boxes()
+
+        self.max_cid = max_cid # this is max_cid + 1
         self.current_pids = self.pids[self.src_index]
-        self.current_map = self.key_maps[self.src_index]
 
     @cython.cdivision(True)
     cpdef _bin(self, int pa_index, UIntArray indices):
-        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
-        cdef int num_particles = pa_wrapper.get_number_of_particles()
-
-        cdef uint32_t* current_pids = self.pids[pa_index]
-        cdef uint64_t* current_keys = self.keys[pa_index]
-        cdef key_to_idx_t* current_map = self.key_maps[pa_index]
-
-        self.fill_array(pa_wrapper, pa_index, indices, current_pids, current_keys,
-                current_map)
+        pass
 

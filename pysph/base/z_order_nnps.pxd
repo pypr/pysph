@@ -4,8 +4,6 @@ from libcpp.pair cimport pair
 
 from nnps_base cimport *
 
-ctypedef map[uint64_t, pair[uint32_t, uint32_t]] key_to_idx_t
-
 cdef extern from "math.h":
     double log2(double) nogil
 
@@ -28,9 +26,13 @@ cdef class ZOrderNNPS(NNPS):
     cdef uint32_t* current_pids
 
     cdef uint64_t** keys
+    cdef uint64_t* current_keys
 
-    cdef key_to_idx_t** pid_indices
-    cdef key_to_idx_t* current_indices
+    cdef uint32_t** cids
+    cdef uint32_t* current_cids
+
+    cdef int** nbr_boxes
+    cdef int* current_nbr_boxes
 
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
