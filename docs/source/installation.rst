@@ -276,9 +276,9 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  $ edm install mayavi pyside cython matplotlib jupyter pytest mock pip psutil
+  $ edm install mayavi pyside cython matplotlib jupyter pytest mock pip
   $ edm shell
-  $ pip install mako execnet
+  $ pip install mako
 
 - With this done, you should be able to install PySPH relatively easily, see
   :ref:`building-pysph`.
@@ -395,9 +395,9 @@ Manager (EDM_).
 
 - Once you have installed EDM, run the following::
 
-  > edm install mayavi pyside cython matplotlib jupyter pytest mock pip psutil
+  > edm install mayavi pyside cython matplotlib jupyter pytest mock pip
   > edm shell
-  > pip install mako execnet
+  > pip install mako
 
 Once you are done with this, please skip ahead to
 :ref:`installing-visual-c++`.

@@ -4,5 +4,3 @@ Cython>=0.20
 mako
 pytest>=3.0
 mock>=1.0
-execnet
-psutil

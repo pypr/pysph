@@ -19,7 +19,7 @@ install:
   - ps: Start-FileDownload "https://package-data.enthought.com/edm/win_x86_64/1.6/edm_1.6.1_x86_64.msi"
   - start /wait msiexec /a edm_1.6.1_x86_64.msi /qn /log install.log TARGETDIR=c:\
   - edm info
-  - edm install -y numpy cython pytest mock h5py psutil
+  - edm install -y numpy cython pytest mock h5py
 
   # Install pysph related dependencies.
   - edm run -- pip install -r requirements.txt
