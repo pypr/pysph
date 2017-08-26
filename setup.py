@@ -48,7 +48,7 @@ except ImportError:
 
 HAVE_OPENCL = True
 try:
-    import pyopencl
+    import pyopencl  # noqa: F401
 except ImportError:
     HAVE_OPENCL = False
 
@@ -185,7 +185,7 @@ def get_mpi_flags():
             compile_args = check_output(
                 [mpic, '--showme:compile'], universal_newlines=True
             ).strip()
-    except:
+    except:  # noqa: E722
         print('-'*80)
         print("Unable to run mpic++ correctly, skipping parallel build")
         print('-'*80)
@@ -734,6 +734,7 @@ def setup_package():
             Topic :: Software Development :: Libraries
             """.splitlines() if len(c.split()) > 0],
           )
+
 
 if __name__ == '__main__':
     setup_package()
