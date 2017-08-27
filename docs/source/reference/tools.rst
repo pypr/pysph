@@ -34,6 +34,19 @@ points.  SPH interpolation is performed with a simple Shepard filtering.
     :members:
     :undoc-members:
 
+
+SPH Evaluator
+-------------
+
+This module provides a class that allows one to evaluate a set of equations on
+a collection of particle arrays. This is very handy for non-trivial
+post-processing that needs to be quick.
+
+.. automodule:: pysph.tools.sph_evaluator
+    :members:
+    :undoc-members:
+
+
 GMsh input/output
 ------------------
 

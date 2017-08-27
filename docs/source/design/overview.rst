@@ -349,7 +349,7 @@ Now that we have a hypothetical implementation outlined, we can proceed to
 describe the abstractions that PySPH introduces, enabling a highly user
 friendly and flexible way to define pairwise particle interactions.  To see a
 working example, see `dam_break_2d.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/dam_break_2d.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/dam_break_2d.py>`_.
 
 We assume that we have the same **ParticleArrays** (*fluid* and
 *solid*) and **NNPS** objects as before.
@@ -714,6 +714,8 @@ in addition to these standard ones, you must write your own stepper.
 Currently, only certain steppers are supported by the framework. Take a look
 at the :doc:`../reference/integrator` for more examples.
 
+
+.. _simulating_periodicity:
 
 Simulating periodicity
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -54,7 +54,6 @@
 .. _h5py: http://www.h5py.org
 .. _PyVisfile: http://github.com/inducer/pyvisfile
 .. _Mayavi: http://code.enthought.com/projects/mayavi/
-.. _mpi4py: https://pypi.python.org/pypi/mpi4py
 
 1.0a3
 ------
