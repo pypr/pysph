@@ -47,7 +47,7 @@ Features
     implemented in FORTRAN.
   - Seamless multi-core support with OpenMP.
   - Seamless parallel integration using Zoltan_.
-  - `BSD license <https://github.com/pypr/pysph/src/master/LICENSE.txt>`_.
+  - `BSD license <https://github.com/pypr/pysph/tree/master/LICENSE.txt>`_.
 
 -----------------
 SPH formulations

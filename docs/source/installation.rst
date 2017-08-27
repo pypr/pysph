@@ -85,7 +85,7 @@ how to do this for different distributions, see below.
 
 On Python-2.6.x a few additional packages are needed and these are listed in
 the project's `requirements-2.6.txt
-<https://github.com/pypr/pysph/src/master/requirements-2.6.txt>`_
+<https://github.com/pypr/pysph/tree/master/requirements-2.6.txt>`_
 
 Running PySPH requires a working C/C++ compiler on your machine.  On Linux/OS X
 the gcc toolchain will work well.  On Windows, you will need to have `Microsoft
@@ -218,7 +218,7 @@ resolve these, please look at :ref:`viewer-issues`.
 
     If you wish to see a working build/test script please see our
     `shippable.yml
-    <https://github.com/pypr/pysph/src/master/shippable.yml>`_.
+    <https://github.com/pypr/pysph/tree/master/shippable.yml>`_.
 
 .. _Shippable: http://shippable.com
 .. _Travis-CI: http://travis-ci.org
