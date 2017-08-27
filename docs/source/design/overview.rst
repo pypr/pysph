@@ -715,6 +715,8 @@ Currently, only certain steppers are supported by the framework. Take a look
 at the :doc:`../reference/integrator` for more examples.
 
 
+.. _simulating_periodicity:
+
 Simulating periodicity
 ^^^^^^^^^^^^^^^^^^^^^^
 
