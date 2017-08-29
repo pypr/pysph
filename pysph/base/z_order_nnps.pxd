@@ -34,6 +34,8 @@ cdef class ZOrderNNPS(NNPS):
     cdef int** nbr_boxes
     cdef int* current_nbr_boxes
 
+    cdef public uint32_t max_cid
+
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
 
@@ -41,10 +43,21 @@ cdef class ZOrderNNPS(NNPS):
     # Member functions
     ##########################################################################
 
+    cdef inline uint64_t* find(self, uint64_t query, uint64_t* array,
+            int num_particles) nogil
+
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            int* x, int* y, int* z) nogil
+            uint64_t* nbr_keys) nogil
 
     cpdef set_context(self, int src_index, int dst_index)
+
+    cpdef IntArray get_nbr_boxes(self, pa_index, cid)
+
+    cpdef UIntArray get_pids(self, pa_index)
+
+    cpdef UIntArray get_cids(self, pa_index)
+
+    cpdef get_key(self, pa_index, idx)
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
@@ -53,9 +66,11 @@ cdef class ZOrderNNPS(NNPS):
 
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
-    cdef void fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
-            UIntArray indices, uint32_t* current_pids, uint64_t* current_keys,
-            key_to_idx_t* current_indices)
+    cdef int fill_array(self, NNPSParticleArrayWrapper pa_wrapper, int pa_index,
+            uint32_t* current_pids, uint64_t* current_keys,
+            uint32_t* current_cids, uint32_t curr_cid)
+
+    cdef void _fill_nbr_boxes(self)
 
     cpdef _refresh(self)
 
