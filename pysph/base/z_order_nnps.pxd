@@ -51,13 +51,13 @@ cdef class ZOrderNNPS(NNPS):
 
     cpdef set_context(self, int src_index, int dst_index)
 
-    cpdef IntArray get_nbr_boxes(self, pa_index, cid)
+    cpdef np.ndarray get_nbr_boxes(self, pa_index, cid)
 
-    cpdef UIntArray get_pids(self, pa_index)
+    cpdef np.ndarray get_pids(self, pa_index)
 
-    cpdef UIntArray get_cids(self, pa_index)
+    cpdef np.ndarray get_cids(self, pa_index)
 
-    cpdef get_key(self, pa_index, idx)
+    cpdef np.ndarray get_keys(self, pa_index)
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
