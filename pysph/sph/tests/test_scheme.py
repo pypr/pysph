@@ -26,3 +26,11 @@ def test_scheme_chooser_does_not_clobber_default():
     # Then
     assert s.scheme.alpha == 0.2
     assert s.scheme.beta == 0.1
+
+    # When
+    opts = p.parse_args(['--alpha', '0.3', '--beta', '0.4'])
+    s.consume_user_options(opts)
+
+    # Then
+    assert s.scheme.alpha == 0.3
+    assert s.scheme.beta == 0.4
