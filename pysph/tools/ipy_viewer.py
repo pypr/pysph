@@ -158,7 +158,7 @@ class ParticleArrayWidgets(object):
         )
         self.scalar.owner = particles_type
         self.scalar_cmap = widgets.Dropdown(
-            options=map(str, plt.colormaps()),
+            options=list(map(str, plt.colormaps())),
             value='viridis',
             description="Colormap",
             disabled=False,
