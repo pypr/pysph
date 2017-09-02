@@ -33,9 +33,9 @@ class TestKernelBase(TestCase):
     def check_kernel_moment_1d(self, a, b, h, m, xj=0.0):
         func = self.kernel
         if m == 0:
-            def f(x) : return func(x, 0, 0, xj, 0, 0, h)
+            def f(x): return func(x, 0, 0, xj, 0, 0, h)
         else:
-            def f(x) : return (pow(x, m) * func(x, 0, 0, xj, 0, 0, h))
+            def f(x): return (pow(x, m) * func(x, 0, 0, xj, 0, 0, h))
         if quad is None:
             kern_f = np.vectorize(f)
             nx = 201
@@ -49,9 +49,9 @@ class TestKernelBase(TestCase):
     def check_grad_moment_1d(self, a, b, h, m, xj=0.0):
         func = self.gradient
         if m == 0:
-            def f(x) : return func(x, 0, 0, xj, 0, 0, h)[0]
+            def f(x): return func(x, 0, 0, xj, 0, 0, h)[0]
         else:
-            def f(x) : return (pow(x - xj, m) * func(x, 0, 0, xj, 0, 0, h)[0])
+            def f(x): return (pow(x - xj, m) * func(x, 0, 0, xj, 0, 0, h)[0])
         if quad is None:
             kern_f = np.vectorize(f)
             nx = 201
