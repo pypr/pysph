@@ -1,15 +1,12 @@
 """
-SPHysics case7 - wavemaker in beach with stationary obstacle (20 minutes)
+SPHysics case7 - wavemaker in beach with stationary obstacle (25 minutes)
 """
 
 from pysph.base.kernels import CubicSpline
-from pysph.solver.solver import Solver
 from pysph.solver.application import Application
 
 from pysph.sph.integrator_step import WCSPHStep
-from pysph.sph.integrator_step import OneStageRigidBodyStep
 from pysph.sph.integrator_step import TwoStageRigidBodyStep
-from pysph.sph.integrator import Integrator
 from pysph.base.utils import get_particle_array
 
 import numpy as np
@@ -74,6 +71,20 @@ def get_wavespaddle_geometry(hdx=1., dx_f=0.02, dx_s=0.02, r_f=100., r_s=100.,
 
 class WavesPaddle2D(Application):
 
+    def add_user_options(self, group):
+        group.add_argument(
+            "--hdx", action="store", type=float, dest="hdx", default=1.3,
+            help="h/dx value used in SPH to change the smoothness")
+        group.add_argument(
+            "--dx", action="store", type=float, dest="dx", default=0.02,
+            help="spacing between the particles")
+
+    def consume_user_options(self):
+        self.hdx = self.options.hdx
+        self.dx = self.options.dx
+        self.h0 = self.hdx * self.dx
+        self.dt = 0.25 * self.h0 / co
+
     def pre_step(self, solver):
         t = solver.t
         theta = 2.0 * np.pi * t / period
@@ -81,42 +92,41 @@ class WavesPaddle2D(Application):
         paddle.u[:] = -amplitude * np.sin(theta)
 
     def create_particles(self):
-        fluid, wall, paddle = get_wavespaddle_geometry(hdx, dx_f, dx_s,
-                                                       h_fluid=h_fluid)
+        fluid, wall, paddle = get_wavespaddle_geometry(
+            self.hdx, self.dx, self.dx, h_fluid=h_fluid)
         self.scheme.setup_properties([fluid, wall, paddle])
-        if self.options.scheme == 'aha':
-            for p in ['x0', 'y0', 'z0']:
+        scheme = self.options.scheme
+        if scheme == 'aha' or scheme == 'edac':
+            for p in ['u0', 'v0', 'w0', 'x0', 'y0', 'z0']:
                 paddle.add_property(p)
-        if self.options.scheme == 'edac':
-            for p in ['rho0', 'arho']:
-                fluid.add_property(p)
-            fluid.rho0[:] = ro
-            fluid.add_output_arrays(['rho0', 'arho'])
         particles = [fluid, wall, paddle]
         return particles
-
-    def create_solver(self):
-        kernel = CubicSpline(dim=2)
-        integrator = Integrator(
-            paddle=TwoStageRigidBodyStep(), fluid=WCSPHStep())
-
-        solver = Solver(kernel=kernel, dim=2, integrator=integrator,
-                        tf=10.0, dt=dt, adaptive_timestep=False,
-                        output_at_times=[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0,
-                                         8.0, 9.0, 10.0])
-        return solver
 
     def create_scheme(self):
         aha = AdamiHuAdamsScheme(['fluid'], ['wall', 'paddle'], dim=2,
                                  rho0=ro, c0=co, alpha=alp, gy=-9.81, nu=0.0,
-                                 h0=h0, gamma=1.0)
+                                 h0=0.02, gamma=1.0)
         wcsph = WCSPHScheme(['fluid'], ['wall', 'paddle'], dim=2, rho0=ro,
-                            c0=co, h0=h0, hdx=hdx, hg_correction=True,
+                            c0=co, h0=0.02, hdx=1.3, hg_correction=True,
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['wall', 'paddle'], dim=2, rho0=ro,
-                          c0=co, gy=-9.81, alpha=alp, nu=0.0, h=h0,
+                          c0=co, gy=-9.81, alpha=alp, nu=0.0, h=0.02,
                           clamp_p=True)
         return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
+
+    def configure_scheme(self):
+        s = self.scheme
+        scheme = self.options.scheme
+        if scheme == 'wcsph':
+            s.configure(h0=self.h0, hdx=self.hdx)
+        elif scheme == 'aha':
+            s.configure(h0=self.h0)
+        elif scheme == 'edac':
+            s.configure(h=self.h0)
+        step = dict(paddle=TwoStageRigidBodyStep())
+        s.configure_solver(
+            kernel=CubicSpline(dim=2), tf=10.0, dt=self.dt,
+            adaptive_timestep=False, extra_steppers=step)
 
 
 if __name__ == '__main__':
@@ -126,13 +136,7 @@ if __name__ == '__main__':
     alp = 0.1
     gamma = 7.0
     flat_l = 1.0
-    dx_s = 0.02
-    dx_f = 0.02
-    hdx = 1.3
-    h0 = max(dx_s, dx_f) * hdx
-    dt = 0.25 * h0 / co
     amplitude = 1.0
     period = 0.6
-    print 'dt=%s, h0=%s, hdx=%s, co=%s' % (dt, h0, hdx, co)
     app = WavesPaddle2D()
     app.run()
