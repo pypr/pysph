@@ -77,6 +77,10 @@ class WavesPaddle2D(Application):
         fluid, wall, paddle = get_wavespaddle_geometry(
             self.hdx, self.dx, self.dx, h_fluid=h_fluid)
         self.scheme.setup_properties([fluid, wall, paddle])
+        scheme = self.options.scheme
+        if scheme == 'aha' or scheme == 'edac':
+            for p in ['u0', 'v0', 'w0', 'x0', 'y0', 'z0']:
+                paddle.add_property(p)
         particles = [fluid, wall, paddle]
         return particles
 
