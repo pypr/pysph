@@ -4,6 +4,7 @@ from pysph.solver.utils import load, get_files
 from IPython.display import display, clear_output, Image
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 
 class Viewer(object):
@@ -210,7 +211,7 @@ class ParticleArrayWidgets(object):
 
     def _create_vbox(self):
 
-        from ipywidgets import VBox, Label, Layout
+        from ipywidgets import VBox, HTML, Layout
         return VBox([
             HTML('<b>' + self.particles_type.upper() + '</b>'),
             self.scalar,
@@ -540,3 +541,294 @@ class Viewer2D(Viewer):
                 )
                 break
         self._widgets.save_figure.value = ""
+
+
+class ParticleArrayWidgets3D(object):
+
+    def __init__(self, particlearray, particles_type):
+        self.particles_type = particles_type
+        self.scalar = widgets.Dropdown(
+            options=[
+                'None'
+            ]+particlearray.output_property_arrays,
+            value='rho',
+            description="scalar",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.scalar.owner = particles_type
+        self.scalar_cmap = widgets.Dropdown(
+            options=map(str, plt.colormaps()),
+            value='viridis',
+            description="Colormap",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.scalar_cmap.owner = particles_type
+        self.velocity_vectors = widgets.Checkbox(
+            value=False,
+            description="Vectors",
+            disabled=False,
+            layout=widgets.Layout(width='100px', display='flex')
+        )
+        self.velocity_vectors.owner = particles_type
+        self.vector_size = widgets.FloatSlider(
+            min=1,
+            max=10,
+            step=0.01,
+            value=5.5,
+            description='vector size',
+            layout=widgets.Layout(width='300px'),
+        )
+        self.vector_size.owner = particles_type
+
+        self.scalar_size = widgets.FloatSlider(
+            min=0,
+            max=3,
+            step=0.02,
+            value=1,
+            description='scalar size',
+            layout=widgets.Layout(width='300px'),
+        )
+        self.scalar_size.owner = particles_type
+
+    def _create_vbox(self):
+
+        from ipywidgets import VBox, Layout, HTML
+        return VBox([
+            HTML('<b>' + self.particles_type.upper() + '</b>'),
+            self.scalar,
+            self.velocity_vectors,
+            self.vector_size,
+            self.scalar_size,
+            self.scalar_cmap,
+
+        ],
+            layout=Layout(border='1px solid', margin='3px', min_width='320px')
+        )
+
+
+class Viewer3DWidgets(object):
+
+    def __init__(self, file, file_count):
+
+        self.temp_data = load(file)['arrays']
+        self.frame = widgets.IntSlider(
+            min=0,
+            max=file_count,
+            step=1,
+            value=0,
+            description='frame',
+            layout=widgets.Layout(width='600px'),
+        )
+
+        self.particles = {}
+        for particles_type in self.temp_data.keys():
+            self.particles[particles_type] = ParticleArrayWidgets3D(
+                self.temp_data[particles_type],
+                particles_type,
+            )
+
+    def _create_vbox(self):
+
+        from ipywidgets import HBox, VBox, Label, Layout
+        items = []
+        for particles_type in self.particles.keys():
+            items.append(self.particles[particles_type]._create_vbox())
+
+        return VBox(
+                [
+                    HBox(
+                        items,
+                    ),
+                    self.frame,
+                ]
+            )
+
+
+class Viewer3D(Viewer):
+
+    '''
+    Example
+    -------
+
+    >>> from pysph.tools.ipy_viewer import Viewer3D
+    >>> sample = Viewer3D(
+        '/home/uname/pysph_files/dam_Break_3d_output'
+        )
+    >>> sample.interactive_plot()
+    >>> sample.show_log()
+    >>> sample.show_info()
+    '''
+
+    def _create_widgets(self):
+
+        self._widgets = Viewer3DWidgets(
+            file=self.paths_list[0],
+            file_count=len(self.paths_list) - 1,
+        )
+        widgets = self._widgets
+        widgets.frame.observe(self._frame_handler, 'value')
+
+        for particles_type in self._widgets.particles.keys():
+            pa_widgets = widgets.particles[particles_type]
+            pa_widgets.scalar.observe(self._scalar_handler, 'value')
+            pa_widgets.velocity_vectors.observe(
+                self._velocity_vectors_handler,
+                'value'
+            )
+            pa_widgets.vector_size.observe(
+                self._vector_size_handler,
+                'value'
+            )
+            pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
+            pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
+
+    def interactive_plot(self):
+        self._create_widgets()
+        self.scatters = {}
+        display(self._widgets._create_vbox())
+        self.vectors = {}
+        self.legend = widgets.Output()
+
+        import ipyvolume.pylab as p3
+
+        p3.clear()
+        data = self.get_frame(self._widgets.frame.value)['arrays']
+        for particles_type in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[particles_type]
+            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+            c = colormap(
+                getattr(data[particles_type], pa_widgets.scalar.value)
+            )
+            self.scatters[particles_type] = p3.scatter(
+                data[particles_type].x,
+                data[particles_type].y,
+                data[particles_type].z,
+                color=c,
+                size=pa_widgets.scalar_size.value,
+            )
+        self._legend_handler(None)
+        display(widgets.VBox((p3.gcc(), self.legend)))
+        # HBox does not allow custom layout.
+
+    def _frame_handler(self, change):
+
+        data = self.get_frame(self._widgets.frame.value)['arrays']
+        for particles_type in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[particles_type]
+            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+
+            scatters = self.scatters[particles_type]
+            c = colormap(
+                getattr(data[particles_type], pa_widgets.scalar.value)
+            )
+            scatters.x = data[particles_type].x
+            scatters.y = data[particles_type].y,
+            scatters.z = data[particles_type].z,
+            scatters.color = c
+            pa_widgets = self._widgets.particles[particles_type]
+            if hasattr(self.vectors, particles_type):
+                vectors = self.vectors[particles_type]
+                if pa_widgets.velocity_vectors.value is True:
+                    vectors.x = data[particles_type].x
+                    vectors.y = data[particles_type].y
+                    vectors.z = data[particles_type].z
+                    vectors.vx = getattr(data[particles_type], 'u')
+                    vectors.vy = getattr(data[particles_type], 'v')
+                    vectors.vz = getattr(data[particles_type], 'w')
+        self._legend_handler(None)
+
+    def _scalar_handler(self, change):
+        particles_type = change['owner'].owner
+        pa_widgets = self._widgets.particles[particles_type]
+        colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+        data = self.get_frame(self._widgets.frame.value)['arrays']
+        particles_type = change['owner'].owner
+        c = colormap(getattr(data[particles_type], pa_widgets.scalar.value))
+        self.scatters[particles_type].color = c
+        self._legend_handler(None)
+
+    def _velocity_vectors_handler(self, change):
+        import ipyvolume.pylab as p3
+        data = self.get_frame(self._widgets.frame.value)['arrays']
+        particles_type = change['owner'].owner
+        pa_widgets = self._widgets.particles[particles_type]
+        if change['new'] is False:
+            self.vectors[particles_type].size = 0
+        else:
+            if particles_type in self.vectors.keys():
+                self.vectors[
+                    particles_type
+                ].size = pa_widgets.vector_size.value
+            else:
+                self.vectors[particles_type] = p3.quiver(
+                    data[particles_type].x,
+                    data[particles_type].y,
+                    data[particles_type].z,
+                    getattr(data[particles_type], 'u'),
+                    getattr(data[particles_type], 'v'),
+                    getattr(data[particles_type], 'w'),
+                    size=pa_widgets.vector_size.value,
+                )
+
+    def _scalar_size_handler(self, change):
+        particles_type = change['owner'].owner
+        if particles_type in self.scatters.keys():
+            self.scatters[particles_type].size = change['new']
+
+    def _vector_size_handler(self, change):
+        particles_type = change['owner'].owner
+        if particles_type in self.vectors.keys():
+            self.vectors[particles_type].size = change['new']
+
+    def _scalar_cmap_handler(self, change):
+        particles_type = change['owner'].owner
+        pa_widgets = self._widgets.particles[particles_type]
+        change['new'] = pa_widgets.scalar.value
+        self._scalar_handler(change)
+        self._legend_handler(None)
+
+    def _legend_handler(self, change):
+
+        import ipyvolume.pylab as p3
+        import numpy as np
+        temp_data = self.get_frame(self._widgets.frame.value)
+        self.pltfigure = plt.figure(figsize=(8, 8))
+        self.cbars = {}
+        self.cbars_ax = {}
+        for particles_type in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[particles_type]
+            cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+            ticks = set(list(np.sort(
+                getattr(
+                    temp_data['arrays'][particles_type],
+                    pa_widgets.scalar.value
+                )
+            )))
+            ticks = list(ticks)
+            ticks.sort()
+            if len(ticks) == 1:
+                ticks.append(ticks[0] + 0.00000001)
+                # To avoid passing a singleton set
+
+            self.cbars_ax[particles_type] = self.pltfigure.add_axes(
+                [
+                    0.2*len(self.cbars_ax.keys()),
+                    0,
+                    0.05,
+                    0.5
+                ]
+            )
+            self.cbars[particles_type] = mpl.colorbar.ColorbarBase(
+                ax=self.cbars_ax[particles_type],
+                cmap=cmap,
+                boundaries=ticks,
+            )
+            self.cbars[particles_type].set_label(
+                            particles_type + " : " + pa_widgets.scalar.value
+                    )
+        clear_output()
+        with self.legend:
+            self.legend.clear_output()
+            display(self.pltfigure)
