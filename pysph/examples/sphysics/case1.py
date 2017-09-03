@@ -69,21 +69,19 @@ class Dambreak2D(Application):
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['dam'], dim=2, rho0=ro, c0=co, gy=-9.81,
                           alpha=alp, nu=0.0, h=0.03, clamp_p=True)
-        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
-        step = dict(fluid=WCSPHStep())
-        s.configure_solver(kernel=CubicSpline(dim=2), dt=0.0001,
-                           adaptive_timestep=False, extra_steppers=step)
-        return s
+        return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
 
     def configure_scheme(self):
-        if self.options.scheme == 'wcsph':
-            self.scheme.configure(h0=self.h0, hdx=self.hdx)
-        elif self.options.scheme == 'aha':
-            self.scheme.configure(h0=self.h0)
-        elif self.options.scheme == 'edac':
-            self.scheme.configure(h=self.h0)
-        kw = dict(dt=self.dt, tf=10.0)
-        self.scheme.configure_solver(**kw)
+        s = self.scheme
+        scheme = self.options.scheme
+        if scheme == 'wcsph':
+            s.configure(h0=self.h0, hdx=self.hdx)
+        elif scheme == 'aha':
+            s.configure(h0=self.h0)
+        elif scheme == 'edac':
+            s.configure(h=self.h0)
+        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=10.0,
+                           adaptive_timestep=False)
 
 
 if __name__ == '__main__':
