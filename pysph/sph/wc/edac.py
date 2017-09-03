@@ -34,8 +34,8 @@ def get_particle_array_edac(constants=None, **props):
     pa = get_particle_array(
         constants=constants, additional_props=EDAC_PROPS, **props
     )
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
-                           'au', 'av', 'aw', 'ap', 'm', 'h'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
+                          'au', 'av', 'aw', 'ap', 'm', 'h'])
 
     return pa
 
@@ -50,8 +50,8 @@ def get_particle_array_edac_solid(constants=None, **props):
     pa = get_particle_array(
         constants=constants, additional_props=EDAC_SOLID_PROPS, **props
     )
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
-                           'h'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
+                          'h'])
 
     return pa
 
@@ -102,8 +102,8 @@ class EDACStep(IntegratorStep):
         d_p0[d_idx] = d_p[d_idx]
 
     def stage1(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_p0, d_p, d_au, d_av,
-                   d_aw, d_ax, d_ay, d_az, d_ap, dt=0.0):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_p0, d_p, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_ap, dt=0.0):
         dtb2 = 0.5*dt
         d_u[d_idx] = d_u0[d_idx] + dtb2*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dtb2*d_av[d_idx]
@@ -116,8 +116,8 @@ class EDACStep(IntegratorStep):
         d_p[d_idx] = d_p0[d_idx] + dtb2 * d_ap[d_idx]
 
     def stage2(self, d_idx, d_x0, d_y0, d_z0, d_x, d_y, d_z,
-                   d_u0, d_v0, d_w0, d_u, d_v, d_w, d_p0, d_p, d_au, d_av,
-                   d_aw, d_ax, d_ay, d_az, d_ap, dt=0.0):
+               d_u0, d_v0, d_w0, d_u, d_v, d_w, d_p0, d_p, d_au, d_av,
+               d_aw, d_ax, d_ay, d_az, d_ap, dt=0.0):
 
         d_u[d_idx] = d_u0[d_idx] + dt*d_au[d_idx]
         d_v[d_idx] = d_v0[d_idx] + dt*d_av[d_idx]
@@ -206,7 +206,7 @@ class SetWallVelocity(Equation):
         d_wf[d_idx] += s_w[s_idx] * WIJ
 
     def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx,
-            d_ug, d_vg, d_wg, d_u, d_v, d_w):
+                  d_ug, d_vg, d_wg, d_u, d_v, d_w):
 
         # calculation is done only for the relevant boundary particles.
         # d_wij (and d_uf) is 0 for particles sufficiently away from the
@@ -276,12 +276,12 @@ class MomentumEquation(Equation):
         d_av[d_idx] +=  damping_factor*self.gy
         d_aw[d_idx] +=  damping_factor*self.gz
 
-        acc2 = ( d_au[d_idx]*d_au[d_idx] + \
-                    d_av[d_idx]*d_av[d_idx] + \
-                    d_aw[d_idx]*d_aw[d_idx] )
+        acc2 = (d_au[d_idx]*d_au[d_idx] +
+                d_av[d_idx]*d_av[d_idx] +
+                d_aw[d_idx]*d_aw[d_idx])
 
         # store the square of the max acceleration
-        DT_ADAPT[1] = max( acc2, DT_ADAPT[1] )
+        DT_ADAPT[1] = max(acc2, DT_ADAPT[1])
 
 
 class EDACEquation(Equation):
@@ -351,8 +351,8 @@ class MomentumEquationPressureGradient(Equation):
         This function also computes the contribution to the background
         pressure and accelerations due to a body force or gravity.
 
-        The body forces are damped according to Eq. (13) in [Adami2012] to avoid
-        instantaneous accelerations. By default, damping is neglected.
+        The body forces are damped according to Eq. (13) in [Adami2012] to
+        avoid instantaneous accelerations. By default, damping is neglected.
         """
 
         self.pb = pb
@@ -467,7 +467,6 @@ class EDACTVFStep(IntegratorStep):
         d_p[d_idx] = d_p0[d_idx] + dt * d_ap[d_idx]
 
 
-
 class EDACScheme(Scheme):
     def __init__(self, fluids, solids, dim, c0, nu, rho0, pb=0.0,
                  gx=0.0, gy=0.0, gz=0.0, tdamp=0.0, eps=0.0, h=0.0,
@@ -530,37 +529,38 @@ class EDACScheme(Scheme):
         self.h = h
         self.attributes_changed()
 
-    #### Public protocol ###################################################
+    # Public protocol ###################################################
     def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=self.alpha,
+            default=None,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--edac-alpha", action="store", type=float, dest="edac_alpha",
-            default=self.edac_alpha,
+            default=None,
             help="Alpha for the EDAC scheme viscosity."
         )
         add_bool_argument(
             group, 'clamp-pressure', dest='clamp_p',
             help="Clamp pressure on boundaries to be non-negative.",
-            default=self.clamp_p
+            default=None
         )
         add_bool_argument(
             group, 'use-bql', dest='bql',
             help="Use the Basa-Quinlan-Lastiwka correction.",
-            default=self.bql
+            default=None
         )
         group.add_argument(
             "--tdamp", action="store", type=float, dest="tdamp",
-            default=self.tdamp,
+            default=None,
             help="Time for which the accelerations are damped."
         )
 
     def consume_user_options(self, options):
         vars = ['alpha', 'edac_alpha', 'clamp_p', 'bql', 'tdamp']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self.smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def attributes_changed(self):
@@ -570,7 +570,7 @@ class EDACScheme(Scheme):
             self.art_nu = self.edac_alpha*self.h*self.c0/8
 
     def configure_solver(self, kernel=None, integrator_cls=None,
-                           extra_steppers=None, **kw):
+                         extra_steppers=None, **kw):
         """Configure the solver to be generated.
 
         This is to be called before `get_solver` is called.
@@ -635,19 +635,20 @@ class EDACScheme(Scheme):
             If True, removes any unnecessary properties.
         """
         particle_arrays = dict([(p.name, p) for p in particles])
-        TVF_FLUID_PROPS = set(['uhat', 'vhat', 'what', 'ap',
-                               'auhat', 'avhat', 'awhat', 'V',
-                               'p0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
-                               'pavg', 'nnbr'
-                           ])
+        TVF_FLUID_PROPS = set([
+            'uhat', 'vhat', 'what', 'ap',
+            'auhat', 'avhat', 'awhat', 'V',
+            'p0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
+            'pavg', 'nnbr'
+        ])
         extra_props = TVF_FLUID_PROPS if self.use_tvf else EDAC_PROPS
 
         all_fluid_props = DEFAULT_PROPS.union(extra_props)
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, all_fluid_props, clean)
-            pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
-                                   'm', 'h', 'V'] )
+            pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
+                                  'm', 'h', 'V'])
             if 'pavg' in pa.properties:
                 pa.add_output_arrays(['pavg'])
 
@@ -658,17 +659,17 @@ class EDACScheme(Scheme):
         for solid in self.solids:
             pa = particle_arrays[solid]
             self._ensure_properties(pa, all_solid_props, clean)
-            pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
-                                   'm', 'h', 'V'] )
+            pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
+                                  'm', 'h', 'V'])
 
-    #### Private protocol ###################################################
+    # Private protocol ###################################################
     def _get_edac_nu(self):
         if self.art_nu > 0:
             nu = self.art_nu
-            print("Using artificial viscosity for EDAC with nu = %s"%nu)
+            print("Using artificial viscosity for EDAC with nu = %s" % nu)
         else:
             nu = self.nu
-            print("Using real viscosity for EDAC with nu = %s"%self.nu)
+            print("Using real viscosity for EDAC with nu = %s" % self.nu)
         return nu
 
     def _get_internal_flow_equations(self):

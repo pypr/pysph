@@ -122,6 +122,13 @@ class Scheme(object):
         for prop in to_add:
             pa.add_property(prop)
 
+    def _smart_getattr(self, obj, var):
+        res = getattr(obj, var)
+        if res is None:
+            return getattr(self, var)
+        else:
+            return res
+
 
 class SchemeChooser(Scheme):
     def __init__(self, default, **schemes):
@@ -287,55 +294,57 @@ class WCSPHScheme(Scheme):
     def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=self.alpha,
+            default=None,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=self.beta,
+            default=None,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--delta", action="store", type=float, dest="delta",
-            default=self.delta,
+            default=None,
             help="Delta for the delta-SPH."
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, 'tensile-correction', dest='tensile_correction',
             help="Use tensile instability correction.",
-            default=self.tensile_correction
+            default=None
         )
         add_bool_argument(
             group, "hg-correction", dest="hg_correction",
             help="Use the Hughes Graham correction.",
-            default=self.hg_correction
+            default=None
         )
         add_bool_argument(
             group, "update-h", dest="update_h",
             help="Update the smoothing length as per Ferrari et al.",
-            default=self.update_h
+            default=None
         )
         add_bool_argument(
             group, "delta-sph", dest="delta_sph",
             help="Use the delta-SPH correction terms.",
-            default=self.delta_sph
+            default=None
         )
         add_bool_argument(
             group, "summation-density", dest="summation_density",
             help="Use summation density instead of continuity.",
-            default=self.summation_density
+            default=None
         )
 
     def consume_user_options(self, options):
         vars = ['gamma', 'tensile_correction', 'hg_correction',
                 'update_h', 'delta_sph', 'alpha', 'beta',
                 'summation_density']
-        data = dict((var, getattr(options, var)) for var in vars)
+
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def get_timestep(self, cfl=0.5):
@@ -502,18 +511,19 @@ class TVFScheme(Scheme):
     def add_user_options(self, group):
         group.add_argument(
             "--alpha", action="store", type=float, dest="alpha",
-            default=self.alpha,
+            default=None,
             help="Alpha for the artificial viscosity."
         )
         group.add_argument(
             "--tdamp", action="store", type=float, dest="tdamp",
-            default=self.tdamp,
+            default=None,
             help="Time for which the accelerations are damped."
         )
 
     def consume_user_options(self, options):
         vars = ['alpha', 'tdamp']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def get_timestep(self, cfl=0.25):
@@ -692,7 +702,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         super(AdamiHuAdamsScheme, self).add_user_options(group)
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
 
@@ -701,7 +711,8 @@ class AdamiHuAdamsScheme(TVFScheme):
 
     def consume_user_options(self, options):
         vars = ['alpha', 'tdamp', 'gamma']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
@@ -873,48 +884,48 @@ class GasDScheme(Scheme):
 
     def add_user_options(self, group):
         choices = ['gsph', 'mpm']
-        default = self.adaptive_h_scheme
         group.add_argument(
             "--adaptive-h", action="store", dest="adaptive_h_scheme",
-            default=default, choices=choices,
+            default=None, choices=choices,
             help="Specify scheme for adaptive smoothing lengths %s" % choices
         )
         group.add_argument(
             "--alpha1", action="store", type=float, dest="alpha1",
-            default=self.alpha1,
+            default=None,
             help="Alpha1 for the artificial viscosity."
         )
         group.add_argument(
             "--beta", action="store", type=float, dest="beta",
-            default=self.beta,
+            default=None,
             help="Beta for the artificial viscosity."
         )
         group.add_argument(
             "--alpha2", action="store", type=float, dest="alpha2",
-            default=self.alpha2,
+            default=None,
             help="Alpha2 for artificial viscosity"
         )
         group.add_argument(
             "--gamma", action="store", type=float, dest="gamma",
-            default=self.gamma,
+            default=None,
             help="Gamma for the state equation."
         )
         add_bool_argument(
             group, "update-alpha1", dest="update_alpha1",
             help="Update the alpha1 parameter.",
-            default=self.update_alpha1
+            default=None
         )
         add_bool_argument(
             group, "update-alpha2", dest="update_alpha2",
             help="Update the alpha2 parameter.",
-            default=self.update_alpha2
+            default=None
         )
 
     def consume_user_options(self, options):
         self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
                 'update_alpha2']
-        data = dict((var, getattr(options, var)) for var in vars)
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
         self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
