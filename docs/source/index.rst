@@ -59,8 +59,18 @@ The framework and library
    :maxdepth: 2
 
    design/overview.rst
+   starcluster/overview
    using_pysph.rst
    pyzoltan/overview
+
+**************************
+Gallery of PySPH examples
+**************************
+
+.. toctree::
+   :maxdepth: 2
+
+   examples/index.rst
 
 ************************
 Reference documentation

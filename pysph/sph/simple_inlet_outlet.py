@@ -12,7 +12,7 @@ array.  When outlet particles leave the outlet region (specified with a
 bounding box) they are removed from the simulation.
 
 """
-# Copyright (c) 2015, Prabhu Ramachandran
+# Copyright (c) 2015-2017, Prabhu Ramachandran
 # License: BSD
 
 import numpy as np
@@ -36,7 +36,8 @@ class SimpleInlet(object):
 
     """
     def __init__(self, inlet_pa, dest_pa, spacing, n=5, axis='x',
-                 xmin=-1.0, xmax=1.0, ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0):
+                 xmin=-1.0, xmax=1.0, ymin=-1.0, ymax=1.0, zmin=-1.0,
+                 zmax=1.0):
         """Constructor.
 
         Note that the inlet must be defined such that the spacing times the
@@ -80,20 +81,20 @@ class SimpleInlet(object):
         self._check_domain_and_spacing()
 
     def _check_domain_and_spacing(self):
-        l = dict(x=self.xmax - self.xmin,
-                 y=self.ymax - self.ymin,
-                 z=self.zmax - self.zmin)
-        l_axis = l[self.axis]
+        domain = dict(x=self.xmax - self.xmin,
+                      y=self.ymax - self.ymin,
+                      z=self.zmax - self.zmin)
+        l_axis = domain[self.axis]
         expected = self.spacing*self.n
         message = "Make sure that the spacing*n is equal\n"\
                   "to the length of the domain in the stacked axis.\n"\
-                  "expected %s, you have %s."%(expected, l_axis)
+                  "expected %s, you have %s." % (expected, l_axis)
 
         if abs(expected - l_axis) > 1e-12:
             raise RuntimeError(message)
 
     def _create_inlet_particles(self):
-        props =  self.inlet_pa.get_property_arrays()
+        props = self.inlet_pa.get_property_arrays()
         inlet_props = {}
         for prop, array in props.items():
             new_array = np.array([], dtype=array.dtype)
@@ -133,9 +134,9 @@ class SimpleInlet(object):
         self.dest_pa.add_particles(**pa_add)
 
         # moving the moved particles back to the array beginning.
-        inlet_pa.x[x_idx] -=  np.sign(inlet_pa.x[x_idx] - xmax)*lx
-        inlet_pa.y[y_idx] -=  np.sign(inlet_pa.y[y_idx] - ymax)*ly
-        inlet_pa.z[z_idx] -=  np.sign(inlet_pa.z[z_idx] - zmax)*lz
+        inlet_pa.x[x_idx] -= np.sign(inlet_pa.x[x_idx] - xmax)*lx
+        inlet_pa.y[y_idx] -= np.sign(inlet_pa.y[y_idx] - ymax)*ly
+        inlet_pa.z[z_idx] -= np.sign(inlet_pa.z[z_idx] - zmax)*lz
 
 
 class SimpleOutlet(object):
@@ -145,8 +146,11 @@ class SimpleOutlet(object):
 
     """
     def __init__(self, outlet_pa, source_pa, xmin=-1.0, xmax=1.0,
-                 ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0):
+                 ymin=-1.0, ymax=1.0, zmin=-1.0, zmax=1.0, callback=None):
         """Constructor.
+
+        Note that the callback argument can be used to set the properties of
+        any particles that exit into the outlet.
 
         Parameters
         ----------
@@ -160,9 +164,17 @@ class SimpleOutlet(object):
         xmin, xmax, ymin, ymax, zmin, zmax: float
             Domain of the outlet.
 
+        callback : callable
+            Called on update, passed (outlet_pa, new_props) where new_props is
+            a dictionary with the new particle properties. This is called
+            before the particles are removed and added to the outlet. This can
+            be used to change the properties of the particles going into the
+            outlet.
+
         """
         self.outlet_pa = outlet_pa
         self.source_pa = source_pa
+        self.callback = callback
         self.xmin, self.xmax = xmin, xmax
         self.ymin, self.ymax = ymin, ymax
         self.zmin, self.zmax = zmin, zmax
@@ -184,6 +196,10 @@ class SimpleOutlet(object):
         props = source_pa.get_property_arrays()
         for prop, array in props.items():
             pa_add[prop] = np.array(array[idx])
+
+        if self.callback is not None:
+            self.callback(outlet_pa, pa_add)
+
         outlet_pa.add_particles(**pa_add)
 
         # removing the particles that moved into the outlet

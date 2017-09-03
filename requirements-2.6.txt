@@ -9,5 +9,3 @@ importlib
 unittest2
 argparse
 progressbar
-execnet
-psutil

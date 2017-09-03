@@ -66,7 +66,7 @@ def _convert_to_points(dataset, vertices=True, cell_centers=True):
         cell_centers.update()
         p = cell_centers.output.points.to_array()
         pts = np.append(pts, p)
-    pts.shape = len(pts)/3, 3
+    pts.shape = len(pts)//3, 3
     x, y, z = pts.T
     return x, y, z
 

@@ -7,19 +7,19 @@ import unittest
 import numpy
 
 # local imports
-import pysph
 from pysph.base import particle_array
 from pysph.base import utils
 
-from pyzoltan.core import carray
 from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
 
 import pickle
+
 
 def check_array(x, y):
     """Check if two arrays are equal with an absolute tolerance of
     1e-16."""
     return numpy.allclose(x, y, atol=1e-16, rtol=0)
+
 
 ###############################################################################
 # `ParticleArrayTest` class.
@@ -46,11 +46,11 @@ class ParticleArrayTest(unittest.TestCase):
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
-        p = particle_array.ParticleArray(x={'data':x},
-                                         y={'data':y},
-                                         z={'data':z},
-                                         m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x},
+                                         y={'data': y},
+                                         z={'data': z},
+                                         m={'data': m},
+                                         h={'data': h})
 
         self.assertEqual(p.name, '')
 
@@ -82,17 +82,17 @@ class ParticleArrayTest(unittest.TestCase):
 
         # Constructor with tags
         tags = [0, 1, 0, 1]
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z},
-                                         tag={'data':tags,'type':'int'})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z},
+                                         tag={'data': tags, 'type': 'int'})
         self.assertEqual(check_array(p.get('tag', only_real_particles=False),
-                                     [0,0,1,1]), True)
+                                     [0, 0, 1, 1]), True)
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
-                                     [1,3,2,4]), True)
+                                     [1, 3, 2, 4]), True)
         self.assertEqual(check_array(p.get('y', only_real_particles=False),
-                                     [0,2,1,3]), True)
+                                     [0, 2, 1, 3]), True)
         self.assertEqual(check_array(p.get('z', only_real_particles=False),
-                                     [0,0,0,0]), True)
+                                     [0, 0, 0, 0]), True)
 
         # trying to create particle array without any values but some
         # properties.
@@ -105,8 +105,10 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual('tag' in p.properties, True)
 
         # now trying to supply some properties with values and others without
-        p = particle_array.ParticleArray(x={'default':10.0}, y={'data':[1.0, 2.0]},
-                                         z={}, h={'data':[0.1, 0.1]})
+        p = particle_array.ParticleArray(
+            x={'default': 10.0}, y={'data': [1.0, 2.0]},
+            z={}, h={'data': [0.1, 0.1]}
+        )
 
         self.assertEqual(p.get_number_of_particles(), 2)
         self.assertEqual(check_array(p.x, [10., 10.]), True)
@@ -115,13 +117,24 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(p.h, [0.1, 0.1]), True)
 
     def test_constructor_works_with_simple_props(self):
+        # Given
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
-        p = particle_array.ParticleArray(x=x, y=y, name='fluid')
+        rho = 10.0
+        data = numpy.diag((2, 2))
+
+        # When
+        p = particle_array.ParticleArray(
+            x=x, y=y, rho=rho, data=data, name='fluid'
+        )
+
+        # Then
         self.assertEqual(p.name, 'fluid')
 
         self.assertEqual('x' in p.properties, True)
         self.assertEqual('y' in p.properties, True)
+        self.assertEqual('rho' in p.properties, True)
+        self.assertEqual('data' in p.properties, True)
         self.assertEqual('tag' in p.properties, True)
         self.assertEqual('pid' in p.properties, True)
         self.assertEqual('gid' in p.properties, True)
@@ -129,6 +142,8 @@ class ParticleArrayTest(unittest.TestCase):
         # get the properties are check if they are the same
         self.assertEqual(check_array(p.x, x), True)
         self.assertEqual(check_array(p.y, y), True)
+        self.assertEqual(check_array(p.rho, numpy.ones(4)*rho), True)
+        self.assertEqual(check_array(p.data, numpy.ravel(data)), True)
 
     def test_get_number_of_particles(self):
         """
@@ -139,8 +154,9 @@ class ParticleArrayTest(unittest.TestCase):
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m}, h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         self.assertEqual(p.get_number_of_particles(), 4)
 
@@ -154,8 +170,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m}, h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         self.assertEqual(check_array(x, p.get('x')), True)
         self.assertEqual(check_array(y, p.get('y')), True)
@@ -173,27 +190,29 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         # set the x array with new values
-        p.set(**{'x':[4., 3, 2, 1], 'h':[0.2, 0.2, 0.2, 0.2]})
+        p.set(**{'x': [4., 3, 2, 1], 'h': [0.2, 0.2, 0.2, 0.2]})
         self.assertEqual(check_array(p.get('x'), [4., 3, 2, 1]), True)
         self.assertEqual(check_array(p.get('h'), [0.2, 0.2, 0.2, 0.2]), True)
 
         # trying to set the tags
-        p.set(**{'tag':[0, 1, 1, 1]})
-        self.assertEqual(check_array(p.get('tag', only_real_particles=False)
-                                     , [0, 1, 1, 1]), True)
+        p.set(**{'tag': [0, 1, 1, 1]})
+        self.assertEqual(
+            check_array(p.get('tag', only_real_particles=False), [0, 1, 1, 1]),
+            True
+        )
         self.assertEqual(check_array(p.get('tag'), [0]), True)
 
         # try setting array with smaller length array.
-        p.set(**{'x':[5, 6, 7]})
+        p.set(**{'x': [5, 6, 7]})
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
                                      [5, 6, 7, 1]), True)
         # try setting array with longer array.
-        self.assertRaises(ValueError, p.set, **{'x':[1., 2, 3, 5, 6]})
+        self.assertRaises(ValueError, p.set, **{'x': [1., 2, 3, 5, 6]})
 
     def test_clear(self):
         """
@@ -205,9 +224,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         p.clear()
 
@@ -233,9 +252,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         self.assertEqual(check_array(x, p.x), True)
         self.assertEqual(check_array(y, p.y), True)
@@ -256,9 +275,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
 
         p.x = p.x*2.0
 
@@ -276,9 +295,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
         remove_arr = LongArray(0)
         remove_arr.append(0)
         remove_arr.append(1)
@@ -319,9 +338,9 @@ class ParticleArrayTest(unittest.TestCase):
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
         p.set_dirty(False)
 
         new_particles = {}
@@ -356,9 +375,9 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(len(p.m), 7)
 
         # adding particles with tags
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
         p.add_particles(x=[5, 6, 7, 8], tag=[1, 1, 0, 0])
 
         self.assertEqual(p.get_number_of_particles(), 8)
@@ -377,23 +396,36 @@ class ParticleArrayTest(unittest.TestCase):
         h = [.1, .1, .1, .1]
         tag = [1, 1, 1, 0]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h}, tag={'data':tag})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h}, tag={'data': tag})
 
         p.remove_tagged_particles(0)
 
         self.assertEqual(p.get_number_of_particles(), 3)
-        self.assertEqual(check_array(p.get('x', only_real_particles=False)
-                                     , [1, 2, 3.]), True)
-        self.assertEqual(check_array(p.get('y', only_real_particles=False)
-                                     , [0., 1, 2]), True)
-        self.assertEqual(check_array(p.get('z', only_real_particles=False)
-                                     , [0., 0, 0]), True)
-        self.assertEqual(check_array(p.get('h', only_real_particles=False)
-                                     , [.1, .1, .1]), True)
-        self.assertEqual(check_array(p.get('m', only_real_particles=False)
-                                     , [1., 1., 1.]), True)
+        self.assertEqual(
+            check_array(p.get('x', only_real_particles=False), [1, 2, 3.]),
+            True
+        )
+        self.assertEqual(
+            check_array(
+                p.get('y', only_real_particles=False), [0., 1, 2]
+            ), True
+        )
+        self.assertEqual(
+            check_array(
+                p.get('z', only_real_particles=False),
+                [0., 0, 0]
+            ), True
+        )
+        self.assertEqual(
+            check_array(p.get('h', only_real_particles=False),
+                        [.1, .1, .1]), True
+        )
+        self.assertEqual(
+            check_array(p.get('m', only_real_particles=False), [1., 1., 1.]),
+            True
+        )
 
         self.assertEqual(check_array(p.x, []), True)
         self.assertEqual(check_array(p.y, []), True)
@@ -412,46 +444,54 @@ class ParticleArrayTest(unittest.TestCase):
         h = [.1, .1, .1, .1]
         tag = [0, 0, 0, 0]
 
-        p = particle_array.ParticleArray(x={'data':x}, y={'data':y},
-                                         z={'data':z}, m={'data':m},
-                                         h={'data':h}, tag={'data':tag})
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h}, tag={'data': tag})
 
-        p.add_property(**{'name':'x'})
+        p.add_property(**{'name': 'x'})
         # make sure the current 'x' property is intact.
         self.assertEqual(check_array(p.x, x), True)
 
         # add a property with complete specification
-        p.add_property(**{'name':'f1',
-                        'data':[1, 1, 2, 3],
-                        'type':'int',
-                        'default':4})
+        p.add_property(**{'name': 'f1',
+                          'data': [1, 1, 2, 3],
+                          'type': 'int',
+                          'default': 4})
         self.assertEqual(check_array(p.f1, [1, 1, 2, 3]), True)
         self.assertEqual(type(p.properties['f1']), IntArray)
         self.assertEqual(p.default_values['f1'], 4)
 
         # add a property without specifying the type
-        p.add_property(**{'name':'f2',
-                        'data':[1, 1, 2, 3],
-                        'default':4.0})
+        p.add_property(**{'name': 'f2',
+                          'data': [1, 1, 2, 3],
+                          'default': 4.0})
         self.assertEqual(type(p.properties['f2']), DoubleArray)
         self.assertEqual(check_array(p.f2, [1, 1, 2, 3]), True)
 
-        p.add_property(**{'name':'f3'})
+        p.add_property(**{'name': 'f3'})
         self.assertEqual(type(p.properties['f3']), DoubleArray)
-        self.assertEqual(p.properties['f3'].length, p.get_number_of_particles())
+        self.assertEqual(p.properties['f3'].length,
+                         p.get_number_of_particles())
         self.assertEqual(check_array(p.f3, [0, 0, 0, 0]), True)
 
-        p.add_property(**{'name':'f4', 'default':3.0})
+        p.add_property(**{'name': 'f4', 'default': 3.0})
         self.assertEqual(type(p.properties['f4']), DoubleArray)
-        self.assertEqual(p.properties['f4'].length, p.get_number_of_particles())
+        self.assertEqual(p.properties['f4'].length,
+                         p.get_number_of_particles())
         self.assertEqual(check_array(p.f4, [3, 3, 3, 3]), True)
+
+        p.add_property('f5', data=10.0)
+        self.assertEqual(type(p.properties['f5']), DoubleArray)
+        self.assertEqual(p.properties['f5'].length,
+                         p.get_number_of_particles())
+        self.assertEqual(check_array(p.f5, [10.0, 10.0, 10.0, 10.0]), True)
 
     def test_extend(self):
         """
         Tests the extend function.
         """
         p = particle_array.ParticleArray(default_particle_tag=10, x={},
-                                         y={'default':-1.})
+                                         y={'default': -1.})
         p.extend(5)
 
         self.assertEqual(p.get_number_of_particles(), 5)
@@ -467,10 +507,12 @@ class ParticleArrayTest(unittest.TestCase):
         Tests the align particles function.
         """
         p = particle_array.ParticleArray()
-        p.add_property(**{'name':'x', 'data':[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
-        p.add_property(**{'name':'y', 'data':[10, 9, 8, 7, 6, 5, 4, 3, 2, 1]})
+        p.add_property(**{'name': 'x',
+                          'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
+        p.add_property(**{'name': 'y',
+                          'data': [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]})
         p.set_dirty(False)
-        p.set(**{'tag':[0, 0, 1, 1, 1, 0, 4, 0, 1, 5]})
+        p.set(**{'tag': [0, 0, 1, 1, 1, 0, 4, 0, 1, 5]})
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
                                      [1, 2, 6, 8, 5, 3, 7, 4, 9, 10]),
                          True)
@@ -480,7 +522,7 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(p.is_dirty, True)
 
         p.set_dirty(False)
-        p.set(**{'tag':[0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
+        p.set(**{'tag': [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
                                      [1, 2, 6, 8, 5, 3, 7, 4, 9, 10]),
                          True)
@@ -493,13 +535,12 @@ class ParticleArrayTest(unittest.TestCase):
         Tests the append_parray function.
         """
         p1 = particle_array.ParticleArray()
-        p1.add_property(**{'name':'x', 'data':[1, 2, 3]})
+        p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
         p1.align_particles()
 
-        p2 = particle_array.ParticleArray(x={'data':[4, 5, 6]},
-                                          y={'data':[1, 2, 3 ]},
-                                          tag={'data':[1, 0, 1]})
-
+        p2 = particle_array.ParticleArray(x={'data': [4, 5, 6]},
+                                          y={'data': [1, 2, 3]},
+                                          tag={'data': [1, 0, 1]})
 
         p1.append_parray(p2)
 
@@ -517,25 +558,28 @@ class ParticleArrayTest(unittest.TestCase):
         Tests the copy properties function.
         """
         p1 = particle_array.ParticleArray()
-        p1.add_property(**{'name':'x', 'data':[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
-        p1.add_property(**{'name':'y'})
-        p1.add_property(**{'name':'t'})
+        p1.add_property(**{'name': 'x',
+                           'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
+        p1.add_property(**{'name': 'y'})
+        p1.add_property(**{'name': 't'})
         p1.align_particles()
 
         p2 = particle_array.ParticleArray()
-        p2.add_property(**{'name':'t', 'data':[-1, -1, -1, -1]})
-        p2.add_property(**{'name':'s', 'data':[2, 3, 4, 5]})
+        p2.add_property(**{'name': 't', 'data': [-1, -1, -1, -1]})
+        p2.add_property(**{'name': 's', 'data': [2, 3, 4, 5]})
         p2.align_particles()
 
         p1.copy_properties(p2, start_index=5, end_index=9)
         self.assertEqual(check_array(p1.t, [0, 0, 0, 0, 0, -1, -1, -1, -1, 0]),
                          True)
 
-        p1.add_property(**{'name':'s'})
+        p1.add_property(**{'name': 's'})
         p1.copy_properties(p2, start_index=5, end_index=9)
         self.assertEqual(check_array(p1.t, [0, 0, 0, 0, 0, -1, -1, -1, -1, 0]),
                          True)
-        self.assertEqual(check_array(p1.s, [0, 0, 0, 0, 0, 2, 3, 4, 5, 0]), True)
+        self.assertEqual(
+            check_array(p1.s, [0, 0, 0, 0, 0, 2, 3, 4, 5, 0]), True
+        )
 
     def test_pickle(self):
         """
@@ -592,7 +636,7 @@ class ParticleArrayTest(unittest.TestCase):
 
     def test_that_get_works_on_constants(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1,2,3])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
 
         # When
         p.add_constant('s', 0.0)
@@ -643,7 +687,7 @@ class ParticleArrayTest(unittest.TestCase):
 
     def test_extract_particles_extracts_particles_and_output_arrays(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1,2,3])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
         p.set_output_arrays(['x'])
 
         # When.
@@ -657,8 +701,8 @@ class ParticleArrayTest(unittest.TestCase):
 
     def test_extract_particles_works_with_specific_props(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1,2,3], y=[0,0,0])
-        p.set_output_arrays(['x', 'y'])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
+        p.set_output_arrays(['x',  'y'])
 
         # When.
         n = p.extract_particles(indices=[1], props=['x'])
@@ -673,7 +717,7 @@ class ParticleArrayTest(unittest.TestCase):
 
     def test_that_remove_property_also_removes_output_arrays(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1,2,3], y=[0,0,0])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
         p.add_property('test')
         p.set_output_arrays(['x', 'y', 'test'])
 
@@ -687,7 +731,7 @@ class ParticleArrayTest(unittest.TestCase):
 class ParticleArrayUtils(unittest.TestCase):
     def test_that_get_particles_info_works(self):
         # Given.
-        p = particle_array.ParticleArray(name='f', x=[1,2,3])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
         c = [1.0, 2.0]
         p.add_constant('c', c)
 
@@ -700,6 +744,18 @@ class ParticleArrayUtils(unittest.TestCase):
         self.assertTrue(check_array(dummy.c, c))
         self.assertEqual(dummy.name, 'f')
         self.assertTrue('x' in dummy.properties)
+
+    def test_get_particle_array_takes_scalars(self):
+        # Given/when
+        x = [1, 2, 3, 4]
+        data = numpy.diag((2, 2))
+        pa = utils.get_particle_array(x=x, y=0, rho=1, data=data)
+
+        # Then
+        self.assertTrue(numpy.allclose(x, pa.x))
+        self.assertTrue(numpy.allclose(numpy.zeros(4), pa.y))
+        self.assertTrue(numpy.allclose(numpy.ones(4), pa.rho))
+        self.assertTrue(numpy.allclose(numpy.ravel(data), pa.data))
 
 
 if __name__ == '__main__':

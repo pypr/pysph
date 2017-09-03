@@ -24,7 +24,7 @@ with increasing complexity.
 
 The first example we consider is a "patch" test for SPH formulations for
 incompressible fluids in `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_.
 This problem simulates the evolution of a 2D circular patch of fluid under the
 influence of an initial velocity field given by:
 
@@ -42,7 +42,7 @@ Imports
 ~~~~~~~~~~~~~
 
 Taking a look at the example (see `elliptical_drop_simple.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop_simple.py>`_),
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_simple.py>`_),
 the first several lines are imports of various modules:
 
 .. code-block:: python
@@ -433,7 +433,7 @@ grid that is automatically computed from the known particle arrays::
     data = load('elliptical_drop_output/elliptical_drop_100.npz')
     from pysph.tools.interpolator import Interpolator
     parrays = data['arrays']
-    interp = Interpolator(parrays.values(), num_points=10000)
+    interp = Interpolator(list(parrays.values()), num_points=10000)
     p = interp.interpolate('p')
 
 ``p`` is now a numpy array of size 10000 elements shaped such that it
@@ -462,13 +462,49 @@ data as::
 Where ``x, y, z`` are numpy arrays of the coordinates of the points on which
 the interpolation is desired.  This can also be done with the constructor as::
 
-    interp = Interpolator(parrays.values(), x=x, y=y, z=z)
+    interp = Interpolator(list(parrays.values()), x=x, y=y, z=z)
 
 For more details on the class and the available methods, see
 :py:class:`pysph.tools.interpolator.Interpolator`.
 
 In addition to this there are other useful pre and post-processing utilities
 described in :doc:`../reference/tools`.
+
+Viewing the data in an IPython notebook
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+PySPH makes it relatively easy to view the data inside an IPython notebook
+with minimal additional dependencies. A simple UI is provided to view the
+saved data using this interface. It requires jupyter_ and ipywidgets_.
+Currently, a 2D viewer is provided for the data. Here is a simple example of
+how one may use this in a notebook.  Inside a notebook, one needs the following::
+
+    %matplotlib notebook
+    from pysph.tools.ipy_viewer import Viewer2D
+    viewer = Viewer2D('dam_break_2d_output')
+
+The ``viewer`` has many useful methods::
+
+    viewer.show_info() # prints useful information about the run.
+    viewer.show_results() # plots any images in the output directory
+    viewer.show_log() # Prints the log file.
+
+The most handy one is the one to perform interactive plots::
+
+    viewer.interactive_plot()
+
+This shows a simple ipywidgets_ based UI that uses matplotlib to plot the data
+on the browser. The different saved snapshots can be viewed using a convenient
+slider. The viewer shows both the particles as well as simple vector plots.
+This is convenient when one wishes to share and show the data without
+requiring Mayavi. It does require pysph to be installed in order to be able to
+load the files. It is useful although not mandatory to have the first line
+that sets the matplotlib backend to the ``notebook``. What this does is to
+allow you to zoom and interact with the interactive plots.
+
+
+.. _jupyter: https://jupyter.org
+.. _ipywidgets: https://github.com/jupyter-widgets/ipywidgets
 
 A slightly more complex example
 -------------------------------
@@ -478,7 +514,7 @@ of the results. Many pysph examples also include post processing code in the
 example. This makes it easy to reproduce results and also easily compare
 different schemes. A complete version of the elliptical drop example is
 available at `elliptical_drop.py
-<https://github.com/pypr/pysph/src/master/pysph/examples/elliptical_drop.py>`_.
+<https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop.py>`_.
 
 There are a few things that this example does a bit differently:
 
@@ -527,7 +563,7 @@ documentation to see these. The order of invocation of the various methods is
 also documented there.
 
 There are several `examples
-<https://github.com/pypr/pysph/src/master/pysph/examples/>`_ that
+<https://github.com/pypr/pysph/tree/master/pysph/examples/>`_ that
 ship with PySPH, explore these to get a better idea of what is possible.
 
 

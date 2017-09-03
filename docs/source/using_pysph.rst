@@ -4,12 +4,11 @@
 Using the PySPH library
 ==========================
 
-In this document, we describe the fundamental data structures for
-working with particles in PySPH. Take a look at :ref:`tutorials` for a
-tutorial introduction to some of the examples. For the experienced
-user, take a look at :ref:`design_overview` for some of the internal
-code-generation details and if you want to extend PySPH for your
-application.
+In this document, we describe the fundamental data structures for working with
+particles in PySPH. Take a look at :ref:`tutorial` for a tutorial introduction
+to some of the examples. For the experienced user, take a look at
+:ref:`design_overview` for some of the internal code-generation details and if
+you want to extend PySPH for your application.
 
 -----------------------
 Working With Particles
@@ -144,7 +143,7 @@ calculated, a fixed size constant can be added.  This can be done by adding a
 
     >>> pa.add_constant('total_mass', 0.0)
     >>> pa.add_constant('total_force', [0.0, 0.0, 0.0])
-    >>> print pa.total_mass, pa.total_force
+    >>> print(pa.total_mass, pa.total_force)
 
 In the above, the ``total_mass`` is a fixed ``DoubleArray`` of length 1 and
 the ``total_force`` is a fixed ``DoubleArray`` of length 3.  These constants
@@ -257,7 +256,6 @@ construct a :py:class:`DomainManager` object like so
 .. code-block:: python
 
    >>> from pysph.base.nnps import DomainManager
-   >>> from pysph.base.point import Point
    >>> domain = DomainManager(xmin, xmax, ymin, ymax, zmin, zmax,
                               periodic_in_x=True, periodic_in_y=True,
                               periodic_in_z=False)
@@ -329,21 +327,21 @@ of PySPH:
 
    >>> pa = utils.get_particle_array(x=x, tag=tag)
 
-   >>> print pa.get_number_of_particles()                     # total number of particles
+   >>> print(pa.get_number_of_particles())                     # total number of particles
    >>> 4
-   >>> print pa.num_real_particles                            # no. of particles with tag 0
+   >>> print(pa.num_real_particles)                            # no. of particles with tag 0
    >>> 2
 
    >>> x, tag = pa.get('x', 'tag', only_real_particles=True)  # get only real particles (tag == 0)
-   >>> print x
+   >>> print(x)
    >>> [0. 2.]
-   >>> print tag
+   >>> print(tag)
    >>> [0 0]
 
    >>> x, tag = pa.get('x', 'tag', only_real_particles=False) # get all particles
-   >>> print x
+   >>> print(x)
    >>> [0. 2. 1. 3.]
-   >>> print tag
+   >>> print(tag)
    >>> [0 0 2 1]
 
 We are now in a position to put all these ideas together and write our
@@ -549,7 +547,7 @@ in PySPH for working with particles. With these data structures, PySPH
 can be used as a library for managing particles for your application.
 
 If you are interested in the PySPH framework and want to try out some
-eaxmples, check out the tutorials: :ref:`tutorials`.
+examples, check out :ref:`tutorial`.
 
 .. _Zoltan: http://www.cs.sandia.gov/Zoltan/
 
