@@ -125,7 +125,7 @@ class WavesPaddle2D(Application):
             s.configure(h=self.h0)
         step = dict(paddle=TwoStageRigidBodyStep())
         s.configure_solver(
-            kernel=CubicSpline(dim=2), tf=10.0, dt=self.dt,
+            kernel=CubicSpline(dim=2), tf=12.0, dt=self.dt,
             adaptive_timestep=False, extra_steppers=step)
 
 

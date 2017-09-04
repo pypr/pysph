@@ -1,5 +1,5 @@
 """
-SPHysics case2 - dambreak on wet surface (50 minutes)
+SPHysics case2 - dambreak on wet surface (5 minutes)
 """
 
 from pysph.base.kernels import CubicSpline
@@ -86,7 +86,7 @@ class Dambreak_2D(Application):
             s.configure(h0=self.h0)
         elif scheme == 'edac':
             s.configure(h=self.h0)
-        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=10.0,
+        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=1.2,
                            adaptive_timestep=False)
 
 

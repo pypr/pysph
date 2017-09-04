@@ -1,5 +1,5 @@
 """
-SPHysics case4 - tsunami (25 minutes)
+SPHysics case4 - tsunami (6 minutes)
 """
 
 from pysph.base.kernels import CubicSpline
@@ -134,7 +134,7 @@ class Tsunami2D(Application):
         elif scheme == 'edac':
             s.configure(h=self.h0)
         step = dict(obstacle=TwoStageRigidBodyStep())
-        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=10.0,
+        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=3.0,
                            adaptive_timestep=False, extra_steppers=step)
 
 

@@ -1,5 +1,5 @@
 """
-SPHysics case2 - wavemaker in beach (25 minutes)
+SPHysics case3 - wavemaker in beach (17 minutes)
 """
 
 from pysph.base.kernels import CubicSpline
@@ -107,7 +107,7 @@ class WavesPaddle2D(Application):
             s.configure(h=self.h0)
         step = dict(paddle=TwoStageRigidBodyStep())
         s.configure_solver(
-            kernel=CubicSpline(dim=2), tf=10.0, dt=self.dt,
+            kernel=CubicSpline(dim=2), tf=5.0, dt=self.dt,
             adaptive_timestep=False, extra_steppers=step)
 
 

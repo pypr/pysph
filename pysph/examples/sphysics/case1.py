@@ -1,5 +1,5 @@
 """
-SPHysics case1 - dambreak (30 minutes)
+SPHysics case1 - dambreak (6 minutes)
 """
 
 from pysph.base.kernels import CubicSpline
@@ -80,7 +80,7 @@ class Dambreak2D(Application):
             s.configure(h0=self.h0)
         elif scheme == 'edac':
             s.configure(h=self.h0)
-        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=10.0,
+        s.configure_solver(kernel=CubicSpline(dim=2), dt=self.dt, tf=3.0,
                            adaptive_timestep=False)
 
 
