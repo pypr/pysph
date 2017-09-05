@@ -1,14 +1,8 @@
 import numpy as np
 import unittest
+import pytest
 
-from pysph.tools.geometry import distance, distance_2d
-from pysph.tools.geometry import matrix_exp, extrude, translate, rotate
-from pysph.tools.geometry import get_2d_wall, get_2d_tank, get_2d_block
-from pysph.tools.geometry import get_2d_circle, get_3d_hollow_cylinder
-from pysph.tools.geometry import get_3d_sphere, get_3d_block
-from pysph.tools.geometry import get_4digit_naca_airfoil, get_naca_wing
-from pysph.tools.geometry import get_5digit_naca_airfoil, _get_m_k
-from pysph.tools.geometry import remove_overlap_particles
+import pysph.tools.geometry as G
 from pysph.base.utils import get_particle_array
 
 
@@ -17,14 +11,16 @@ class TestGeometry(unittest.TestCase):
     def test_distance(self):
         point_1 = np.random.random_sample(3)
         point_2 = np.random.random_sample(3)
-        self.assertAlmostEqual(distance(point_1, point_2),
-                               np.linalg.norm(point_1 - point_2))
+        d1 = G.distance(point_1, point_2)
+        d2 = np.linalg.norm(point_1 - point_2)
+        assert d1 == pytest.approx(d2)
 
     def test_distance_2d(self):
         point_1 = np.random.random_sample(2)
         point_2 = np.random.random_sample(2)
-        self.assertAlmostEqual(distance_2d(point_1, point_2),
-                               np.linalg.norm(point_1 - point_2))
+        d1 = G.distance_2d(point_1, point_2)
+        d2 = np.linalg.norm(point_1 - point_2)
+        assert d1 == pytest.approx(d2)
 
     def test_matrix_exp(self):
         try:
@@ -32,17 +28,17 @@ class TestGeometry(unittest.TestCase):
             e = linalg.expm
             n = np.random.randint(1, 10)
             mat = np.random.rand(n, n)
-            assert np.allclose(e(mat), matrix_exp(mat))
+            assert np.allclose(e(mat), G.matrix_exp(mat))
         except ImportError:
-            raise unittest.SkipTest()
+            raise unittest.SkipTest('Scipy is not installed')
 
     def test_extrude(self):
         n = np.random.randint(1, 20)
         x = np.random.random_sample(n)
         y = np.random.random_sample(n)
-        dx = (10.0)**(np.random.uniform(-3, -1))
+        dx = 0.05
         extrude_dist = np.random.random()
-        x_new, y_new, z_new = extrude(x, y, dx, extrude_dist)
+        x_new, y_new, z_new = G.extrude(x, y, dx, extrude_dist)
         assert np.allclose(x_new[:len(x)], x)
         assert np.allclose(x_new[-len(x):], x)
         assert np.allclose(y_new[:len(y)], y)
@@ -56,7 +52,7 @@ class TestGeometry(unittest.TestCase):
         x_shift = np.random.uniform(0.0, n)
         y_shift = np.random.uniform(0.0, n)
         z_shift = np.random.uniform(0.0, n)
-        x_new, y_new, z_new = translate(x, y, z, x_shift, y_shift, z_shift)
+        x_new, y_new, z_new = G.translate(x, y, z, x_shift, y_shift, z_shift)
         assert np.allclose(x_new - x_shift, x)
         assert np.allclose(y_new - y_shift, y)
         assert np.allclose(z_new - z_shift, z)
@@ -69,10 +65,10 @@ class TestGeometry(unittest.TestCase):
         angle = np.random.uniform(0.0, 360.0)
         theta = np.pi * angle / 180.0
         axis = np.random.random_sample(3)
-        x_new, y_new, z_new = rotate(x, y, z, axis, angle)
+        x_new, y_new, z_new = G.rotate(x, y, z, axis, angle)
         unit_vector = axis / np.linalg.norm(axis)
         mat = np.cross(np.eye(3), unit_vector * theta)
-        rotation_matrix = matrix_exp(np.matrix(mat))
+        rotation_matrix = G.matrix_exp(np.matrix(mat))
         test_points = []
         for xi, yi, zi in zip(x, y, z):
             point = np.array([xi, yi, zi])
@@ -87,12 +83,12 @@ class TestGeometry(unittest.TestCase):
         assert np.allclose(z_new, z_test)
 
     def test_get_2d_wall(self):
-        dx = (10.0)**(np.random.uniform(-2, -1))
+        dx = 0.05
+        length = 3.0
         center = np.random.random_sample(2)
-        length = np.random.randint(50, 200) * dx
         num_layers = np.random.randint(1, 4)
         up = np.random.choice([True, False])
-        x, y = get_2d_wall(dx, center, length, num_layers, up)
+        x, y = G.get_2d_wall(dx, center, length, num_layers, up)
         x_test = np.arange(-length / 2.0, length / 2.0, dx) + center[0]
         y_test = np.ones_like(x_test) * center[1]
         layer_length = int(len(x) / num_layers)
@@ -104,98 +100,151 @@ class TestGeometry(unittest.TestCase):
                            y[-layer_length:] - value * (num_layers - 1) * dx)
 
     def test_get_2d_tank(self):
-        dx = (10.0)**(np.random.uniform(-2, -1))
+        dx = 0.05
+        length = 5.0
+        height = 4.0
         center = np.random.random_sample(2)
-        length = np.random.randint(50, 200) * dx
-        height = np.random.randint(50, 200) * dx
         num_layers = np.random.randint(1, 4)
-        x, y = get_2d_tank(dx, center, length, height, num_layers)
+        x, y = G.get_2d_tank(dx, center, length, height, num_layers)
         x_len = max(x) - min(x)
         y_len = max(y) - min(y)
         assert abs(x_len - length - (2.0 * num_layers - 1) * dx) <= 1.001 * dx
         assert abs(y_len - height - num_layers * dx) <= 1.001 * dx
 
     def test_get_2d_circle(self):
-        dx = (10.0)**(np.random.uniform(-2, -1))
+        dx = 0.05
+        radius = 3.0
         center = np.random.random_sample(2)
-        radius = np.random.randint(50, 100) * dx
-        x, y = get_2d_circle(dx, radius, center)
-        count = 0
-        for i in range(len(x)):
-            point = np.array([x[i], y[i]])
-            dist = distance_2d(point, center)
-            if dist >= radius * (1.0 + dx * 1.0e-03):
-                count += 1
-        assert count == 0
+        x, y = G.get_2d_circle(dx, radius, center)
+        xc, yc = x - center[0], y - center[1]
+        assert not np.any(xc * xc + yc * yc) > radius * radius
 
     def test_get_2d_block(self):
-        dx = (10.0)**(np.random.uniform(-2, -1))
+        dx = 0.05
+        length = 5.0
+        height = 4.0
         center = np.random.random_sample(2)
-        length = np.random.randint(50, 200) * dx
-        height = np.random.randint(50, 200) * dx
-        x, y = get_2d_block(dx, length, height, center)
+        x, y = G.get_2d_block(dx, length, height, center)
         len_x = max(x) - min(x)
         len_y = max(y) - min(y)
         new_center = np.array(
             [(max(x) + min(x)) / 2.0, (max(y) + min(y)) / 2.0])
-        self.assertAlmostEqual(len_x, length)
-        self.assertAlmostEqual(len_y, height)
+        assert len_x == pytest.approx(length)
+        assert len_y == pytest.approx(height)
         assert np.allclose(new_center, center)
 
     def test_get_3d_sphere(self):
         dx = 0.23
-        center = np.random.random_sample(3)
         radius = 2.0
-        x, y, z = get_3d_sphere(dx, radius, center)
-        count = 0
-        for i in range(len(x)):
-            point = np.array([x[i], y[i], z[i]])
-            dist = distance(point, center)
-            if dist >= radius * (1.0 + dx * 1.0e-04):
-                count += 1
-        assert count == 0
+        center = np.random.random_sample(3)
+        x, y, z = G.get_3d_sphere(dx, radius, center)
+        xs, ys, zs = x - center[0], y - center[1], z - center[2]
+        assert not np.any(xs * xs + ys * ys + zs * zs) > radius * radius
 
     def test_get_3d_block(self):
         dx = 0.23
+        length = 3.0
+        height = 2.0
+        depth = 1.5
         center = np.random.random_sample(3)
-        length = np.random.randint(50, 100) * dx
-        height = np.random.randint(50, 100) * dx
-        depth = np.random.randint(50, 100) * dx
-        x, y, z = get_3d_block(dx, length, height, depth, center)
+        x, y, z = G.get_3d_block(dx, length, height, depth, center)
         len_x = max(x) - min(x)
         len_y = max(y) - min(y)
         len_z = max(z) - min(z)
         new_center = np.array([(max(x) + min(x)) / 2.0,
                                (max(y) + min(y)) / 2.0,
                                (max(z) + min(z)) / 2.0])
-        self.assertAlmostEqual(len_x, length)
-        self.assertAlmostEqual(len_y, height)
-        self.assertAlmostEqual(len_z, depth)
+        assert len_x == pytest.approx(length)
+        assert len_y == pytest.approx(height)
+        assert len_z == pytest.approx(depth)
         assert np.allclose(center, new_center)
 
     def test_get_3d_hollow_cylinder(self):
-        dx = 0.17
-        radius = np.random.randint(20, 40) * dx
-        length = np.random.randint(20, 40) * dx
+        dx = 0.15
+        radius = 2.0
+        length = 3.0
         center = np.random.random_sample(3)
         num_layers = np.random.randint(1, 5)
-        x, y, z = get_3d_hollow_cylinder(dx, radius, length, center,
-                                         num_layers)
-        x = x - center[0]
-        y = y - center[1]
-        z = z - center[2]
+        x, y, z = G.get_3d_hollow_cylinder(dx, radius, length, center,
+                                           num_layers)
+        xc, yc, zc = x - center[0], y - center[1], z - center[2]
+        assert not np.any(xc * xc + yc * yc) > radius * radius
+        assert not np.any(zc) > (length / 2.0)
+
+    def test_get_4digit_naca_airfoil(self):
+        dx = 0.05
+        c = 1.5
+        camber = '44'
+        t = 10
+        airfoil = np.random.choice(['00', camber]) + str(t)
+        x, y = G.get_4digit_naca_airfoil(dx, airfoil, c)
         count = 0
-        for i in range(len(x)):
-            point = np.array([x[i], y[i]])
-            dist = distance_2d(point)
-            condition_1 = dist >= radius * (1.0 + dx * 1.0e-03)
-            condition_2 = abs(z[i]) >= (length / 2.0) * (1.0 + dx * 1.0e-03)
-            if condition_1 or condition_2:
-                count += 1
+        t = 0.01 * t
+        for xi, yi in zip(x, y):
+            yt = 5.0 * t * (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
+                            0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
+                            0.1015 * ((xi / c)**4.))
+            if airfoil[:2] == '00':
+                if abs(yi) > yt + dx:
+                    count += 1
+            else:
+                m = 0.01 * float(airfoil[0])
+                p = 0.1 * float(airfoil[1])
+                if xi <= p * c:
+                    yc = (m / (p * p)) * (2. * p * (xi / c) - (xi / c)**2.)
+                    dydx = (2. * m / (p * p)) * (p - xi / c) / c
+                else:
+                    yc = (m / ((1. - p) * (1. - p))) * \
+                        (1. - 2. * p + 2. * p * (xi / c) - (xi / c)**2.)
+                    dydx = (2. * m / ((1. - p) * (1. - p))) * (p - xi / c) / c
+                theta = np.arctan(dydx)
+                if yi >= 0.0:
+                    yu = yc + yt * np.cos(theta)
+                    if yi > yu + dx:
+                        count += 1
+                else:
+                    yl = yc - yt * np.cos(theta)
+                    if yi < yl + dx:
+                        count += 1
+        assert count == 0
+
+    def test_get_5digit_naca_airfoil(self):
+        dx = 0.05
+        c = 1.5
+        series = np.random.choice(['210', '220', '230', '240', '250', '221',
+                                   '231', '241', '251'])
+        t = 12
+        airfoil = series + str(t)
+        x, y = G.get_5digit_naca_airfoil(dx, airfoil, c)
+        count = 0
+        t = 0.01 * t
+        m, k = G._get_m_k(series)
+        for xi, yi in zip(x, y):
+            yt = 5.0 * t * (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
+                            0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
+                            0.1015 * ((xi / c)**4.))
+            xn = xi / c
+            if xn <= m:
+                yc = c * (k / 6.) * (xn**3. - 3. * m *
+                                     xn * xn + m * m * (3. - m) * xn)
+                dydx = (k / 6.) * (3. * xn * xn -
+                                   6. * m * xn + m * m * (3. - m))
+            else:
+                yc = c * (k * (m**3.) / 6.) * (1. - xn)
+                dydx = -(k * (m**3.) / 6.)
+            theta = np.arctan(dydx)
+            if yi >= 0.0:
+                yu = yc + yt * np.cos(theta)
+                if yi > yu + dx:
+                    count += 1
+            else:
+                yl = yc - yt * np.cos(theta)
+                if yi < yl + dx:
+                    count += 1
         assert count == 0
 
     def test_get_naca_wing(self):
-        dx = (10)**(np.random.uniform(-2, -1))
+        dx = 0.15
         c = np.random.uniform(0.5, 2.0)
         span = np.random.uniform(1.0, 4.0)
         series = np.random.choice(['210', '220', '230', '240', '250', '221',
@@ -205,7 +254,7 @@ class TestGeometry(unittest.TestCase):
         camber = str(2 + np.random.randint(5)) + str(2 + np.random.randint(6))
         airfoil_2 = np.random.choice(['00', camber]) + str(t)
         airfoil = np.random.choice([airfoil_1, airfoil_2])
-        x, y, z = get_naca_wing(dx, airfoil, span, c)
+        x, y, z = G.get_naca_wing(dx, airfoil, span, c)
         count = 0
         for zi in z:
             if abs(zi) > (span + dx) / 2.0:
@@ -218,8 +267,8 @@ class TestGeometry(unittest.TestCase):
         length = np.random.randint(20, 40) * dx_1
         height = np.random.randint(20, 40) * dx_1
         radius = np.random.randint(20, 40) * dx_2
-        x1, y1 = get_2d_block(dx_1, length, height)
-        x2, y2 = get_2d_circle(dx_2, radius)
+        x1, y1 = G.get_2d_block(dx_1, length, height)
+        x2, y2 = G.get_2d_circle(dx_2, radius)
         r1 = np.ones_like(x1) * 100.0
         m1 = r1 * dx_1 * dx_1
         h1 = np.ones_like(x1) * dx_1 * 1.5
@@ -230,13 +279,13 @@ class TestGeometry(unittest.TestCase):
         h2 = np.ones_like(x2) * dx_2 * 1.5
         solid = get_particle_array(name='solid', x=x2, y=y2, h=h2, rho=r2,
                                    m=m2)
-        remove_overlap_particles(fluid, solid, dx_2, 2)
+        G.remove_overlap_particles(fluid, solid, dx_2, 2)
         x1 = fluid.x
         y1 = fluid.y
         count = 0
         for i in range(len(x1)):
             point = np.array([x1[i], y1[i]])
-            dist = distance_2d(point)
+            dist = G.distance_2d(point)
             if dist <= radius:
                 count += 1
         assert count == 0
