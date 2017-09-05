@@ -292,18 +292,10 @@ def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
 
     N = int(2.0 * r / dx) + 1
     x, y = np.mgrid[-r:r:N * 1j, -r:r:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    circle = []
-    points = np.array([x, y])
-    for i in range(len(points[0])):
-        dist = distance_2d(points[:, i])
-        if dist <= r * (1.0 + dx * 1.0e-04):
-            circle.append(points[:, i] + np.asarray(center))
-    circle = np.array(circle)
-    x_pa = circle[:, 0]
-    y_pa = circle[:, 1]
-    return x_pa, y_pa
+    x, y = np.ravel(x), np.ravel(y)
+    condition = (x * x + y * y <= r * r)
+    x, y = x[condition], y[condition]
+    return x + center[0], y + center[0]
 
 
 def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),
@@ -330,24 +322,16 @@ def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),
     r_grid = r + dx * num_layers
     N = int(2.0 * r_grid / dx) + 1
     x, y = np.mgrid[-r_grid:r_grid:N * 1j, -r_grid:r_grid:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    circle = []
-    for i in range(len(x)):
-        point = np.array([x[i], y[i]])
-        distance = distance_2d(point)
-        if inside:
-            if (r - num_layers * dx - dx * 1.0e-07 <= distance <=
-                    r + dx * 1.0e-07):
-                circle.append(point)
-        else:
-            if (r - dx * 1.0e-07 <= distance <= r + num_layers * dx
-                    + dx * 1.0e-07):
-                circle.append(point)
-    circle = np.array(circle)
-    x_circle = circle[:, 0] + center[0]
-    y_circle = circle[:, 1] + center[1]
-    return x_circle, y_circle
+    x, y = np.ravel(x), np.ravel(y)
+    if inside:
+        cond1 = (x * x + y * y <= r * r)
+        cond2 = (x * x + y * y >= (r - num_layers * dx)**2)
+    else:
+        cond1 = (x * x + y * y >= r * r)
+        cond2 = (x * x + y * y <= (r + num_layers * dx)**2)
+    cond = cond1 & cond2
+    x, y = x[cond], y[cond]
+    return x + center[0], y + center[0]
 
 
 def get_3d_hollow_cylinder(dx=0.01, r=0.5, length=1.0,
@@ -419,9 +403,8 @@ def get_2d_block(dx=0.01, length=1.0, height=1.0, center=np.array([0., 0.])):
     n2 = int(height / dx) + 1
     x, y = np.mgrid[-length / 2.:length / 2.:n1 *
                     1j, -height / 2.:height / 2.:n2 * 1j]
-    x = np.ravel(x) + center[0]
-    y = np.ravel(y) + center[1]
-    return x, y
+    x, y = np.ravel(x), np.ravel(y)
+    return x + center[0], y + center[1]
 
 
 def get_3d_sphere(dx=0.01, r=0.5, center=np.array([0.0, 0.0, 0.0])):
@@ -443,20 +426,10 @@ def get_3d_sphere(dx=0.01, r=0.5, center=np.array([0.0, 0.0, 0.0])):
 
     N = int(2.0 * r / dx) + 1
     x, y, z = np.mgrid[-r:r:N * 1j, -r:r:N * 1j, -r:r:N * 1j]
-    x = np.ravel(x)
-    y = np.ravel(y)
-    z = np.ravel(z)
-    points = np.array([x, y, z])
-    sphere = []
-    for i in range(len(points[0])):
-        dist = distance(points[:, i])
-        if dist <= r * (1.0 + dx * 1.0e-05):
-            sphere.append(points[:, i] + np.asarray(center))
-    sphere = np.array(sphere)
-    x_pa = sphere[:, 0]
-    y_pa = sphere[:, 1]
-    z_pa = sphere[:, 2]
-    return x_pa, y_pa, z_pa
+    x, y, z = np.ravel(x), np.ravel(y), np.ravel(z)
+    cond = (x * x + y * y + z * z <= r * r)
+    x, y, z = x[cond], y[cond], z[cond]
+    return x + center[0], y + center[1], z + center[2]
 
 
 def get_3d_block(dx=0.01, length=1.0, height=1.0, depth=1.0,
@@ -485,10 +458,8 @@ def get_3d_block(dx=0.01, length=1.0, height=1.0, depth=1.0,
     n3 = int(depth / dx) + 1
     x, y, z = np.mgrid[-length / 2.:length / 2.:n1 * 1j, -height /
                        2.:height / 2.:n2 * 1j, -depth / 2.:depth / 2.:n3 * 1j]
-    x = np.ravel(x) + center[0]
-    y = np.ravel(y) + center[1]
-    z = np.ravel(z) + center[2]
-    return x, y, z
+    x, y, z = np.ravel(x), np.ravel(y), np.ravel(z)
+    return x + center[0], y + center[1], z + center[2]
 
 
 def get_4digit_naca_airfoil(dx=0.01, airfoil='0012', c=1.0):
