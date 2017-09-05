@@ -30,8 +30,11 @@ class CubicSpline(object):
     r"""Cubic Spline Kernel: [Monaghan1992]_
 
     .. math::
-             W(q) = \ &\sigma_3\left[ 1 - \frac{3}{2}q^2\left( 1 - \frac{q}{2} \right) \right], \ & \textrm{for} \ 0 \leq q \leq 1,\\
-                  = \ &\frac{\sigma_3}{4}(2-q)^3, & \textrm{for}\ 1 < q \leq 2,\\
+             W(q) = \ &\sigma_3\left[ 1 - \frac{3}{2}q^2\left( 1 -
+                    \frac{q}{2} \right) \right],
+                    \ & \textrm{for} \ 0 \leq q \leq 1,\\
+                  = \ &\frac{\sigma_3}{4}(2-q)^3, & \textrm{for}
+                    \ 1 < q \leq 2,\\
                   = \ &0, & \textrm{for}\ q>2, \\
 
     where :math:`\sigma_3` is a dimensional normalizing factor for the
@@ -147,29 +150,28 @@ class WendlandQuinticC2_1D(object):
     r"""The following is the WendlandQuintic kernel (Wendland C2) kernel for 1D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^3 (1.5q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^3 (1.5q +1))),
+                    \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
 
     .. math::
-             \alpha_d  = \ & \frac{5}{8h}, \ & \textrm{for dim=1}
+             \alpha_d  =  \frac{5}{8h}, \textrm{for dim=1}
+
 
     """
     def __init__(self, dim=1):
         self.radius_scale = 2.0
+        self.dim = dim
         if dim == 1:
             self.fac = 5.0 / 8.0
-
         elif dim == 2:
             raise ValueError(
                 "WendlandQuinticC2_1D: Dim %d not supported" % dim)
-            self.dim = dim
-
         elif dim == 3:
             raise ValueError(
                 "WendlandQuinticC2_1D: Dim %d not supported" % dim)
-            self.dim = dim
 
     def get_deltap(self):
         return 2.0/3
@@ -245,7 +247,8 @@ class WendlandQuintic(object):
     r"""The following is the WendlandQuintic kernel(C2) kernel for 2D and 3D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^4(2q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^4(2q +1))),
+                    \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
@@ -341,30 +344,30 @@ class WendlandQuinticC4_1D(object):
     r"""The following is the WendlandQuintic kernel (Wendland C4) kernel for 1D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^5 (2q^2 + 2.5q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^5 (2q^2 + 2.5q +1))),
+                     \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
 
     .. math::
-             \alpha_d  = \ & \frac{3}{4h}, \ & \textrm{for dim=1}
+            \alpha_d =  \frac{3}{4h}, \ \textrm{for dim=1}
 
     """
 
     def __init__(self, dim=1):
         self.radius_scale = 2.0
+        self.dim = dim
         if dim == 1:
             self.fac = 0.75
 
         if dim == 2:
             raise ValueError(
                 "WendlandQuinticC4_1D: Dim %d not supported" % dim)
-            self.dim = dim
 
         elif dim == 3:
             raise ValueError(
                 "WendlandQuinticC4_1D: Dim %d not supported" % dim)
-            self.dim = dim
 
     def get_deltap(self):
         return 0.55195628
@@ -437,10 +440,12 @@ class WendlandQuinticC4_1D(object):
 
 
 class WendlandQuinticC4(object):
-    r"""The following is the WendlandQuintic kernel (Wendland C4) kernel for 2D and 3D.
+    r"""The following is the WendlandQuintic kernel (Wendland C4) kernel for
+        2D and 3D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^6(\frac{35}{12} q^2 + 3q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^6(\frac{35}{12} q^2 + 3q +1))),
+                     \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
@@ -453,9 +458,9 @@ class WendlandQuinticC4(object):
 
     def __init__(self, dim=2):
         self.radius_scale = 2.0
+        self.dim = dim
         if dim == 1:
             raise ValueError("WendlandQuinticC4: Dim %d not supported" % dim)
-            self.dim = dim
 
         if dim == 2:
             self.fac = 9.0 * M_1_PI / 4.0
@@ -540,30 +545,30 @@ class WendlandQuinticC6_1D(object):
     r"""The following is the WendlandQuintic kernel (Wendland C6) kernel for 1D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^7 (\frac{21}{8} q^3 + \frac{19}{4} q^2 + 3.5q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^7 (\frac{21}{8} q^3
+                    + \frac{19}{4} q^2 + 3.5q +1))),
+                    \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
 
     .. math::
-             \alpha_d  = \ & \frac{55}{64h}, \ & \textrm{for dim=1}
+             \alpha_d  = \ \frac{55}{64h},  \textrm{for dim=1}
 
     """
 
     def __init__(self, dim=1):
         self.radius_scale = 2.0
+        self.dim = dim
         if dim == 1:
             self.fac = 55.0 / 64.0
 
         if dim == 2:
             raise ValueError(
                 "WendlandQuinticC6_1D: Dim %d not supported" % dim)
-            self.dim = dim
-
         elif dim == 3:
             raise ValueError(
                 "WendlandQuinticC6_1D: Dim %d not supported" % dim)
-            self.dim = dim
 
     def get_deltap(self):
         return 0.47996698
@@ -643,7 +648,8 @@ class WendlandQuinticC6(object):
     r"""The following is the WendlandQuintic kernel(C6) kernel for 2D and 3D.
 
     .. math::
-             W(q) = \ & \alpha_d (1-q/2)^8 (4 q^3 + 6.25 q^2 + 4q +1))), \ & \textrm{for} \ 0\leq q \leq 2,\\
+             W(q) = \ & \alpha_d (1-q/2)^8 (4 q^3 + 6.25 q^2 + 4q +1))),
+                     \ & \textrm{for} \ 0\leq q \leq 2,\\
                   = \ & 0, & \textrm{for} \ q>2,\\
 
     where :math:`d` is the number of dimensions and
@@ -656,9 +662,9 @@ class WendlandQuinticC6(object):
 
     def __init__(self, dim=2):
         self.radius_scale = 2.0
+        self.dim = dim
         if dim == 1:
             raise ValueError("WendlandQuinticC6: Dim %d not supported" % dim)
-        self.dim = dim
 
         if dim == 2:
             self.fac = 78.0 * M_1_PI / 28.0
@@ -846,7 +852,8 @@ class SuperGaussian(object):
     r"""Super Gaussian Kernel: [Monaghan1992]_
 
     .. math::
-             W(q) = \ &\frac{1}{h^{d}\pi^{d/2}} e^{-q^2} (d/2 + 1 - q^2), \ & \textrm{for} \ 0\leq q \leq 3,\\
+             W(q) = \ &\frac{1}{h^{d}\pi^{d/2}} e^{-q^2} (d/2 + 1 - q^2),
+                    \ & \textrm{for} \ 0\leq q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
     where :math:`d` is the number of dimensions.
@@ -941,8 +948,10 @@ class QuinticSpline(object):
     r"""Quintic Spline SPH kernel: [Liu2010]_
 
     .. math::
-             W(q) = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 + 15(1-q)^5 \right], \ & \textrm{for} \ 0\leq q \leq 1,\\
-                  = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 \right], & \textrm{for} \ 1 <  q \leq 2,\\
+             W(q) = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 + 15(1-q)^5 \right],
+                    \ & \textrm{for} \ 0\leq q \leq 1,\\
+                  = \ &\sigma_5\left[ (3-q)^5 - 6(2-q)^5 \right], &
+                    \textrm{for} \ 1 <  q \leq 2,\\
                   = \ &\sigma_5 \ (3-q)^5 , & \textrm{for} \ 2 < q \leq 3,\\
                   = \ & 0, & \textrm{for} \ q>3,\\
 
