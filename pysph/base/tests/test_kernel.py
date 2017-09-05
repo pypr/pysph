@@ -452,6 +452,22 @@ class TestWendlandQuintic1D(TestCubicSpline1D):
     def test_simple(self):
         self.check_kernel_at_origin(5.0 / 8.0)
 
+    def test_zeroth_kernel_moments(self):
+        kh = self.wrapper.radius_scale
+        # zero'th moment
+        r = self.check_kernel_moment_1d(-kh, kh, 1.0, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 8)
+        # Use a non-unit h.
+        r = self.check_kernel_moment_1d(-kh, kh, 0.5, 0, xj=0)
+        self.assertAlmostEqual(r, 1.0, 7)
+        r = self.check_kernel_moment_1d(0.0, 2 * kh, 1.0, 0, xj=kh)
+        self.assertAlmostEqual(r, 1.0, 7)
+
+    def test_first_grad_moment(self):
+        kh = self.wrapper.radius_scale
+        r = self.check_grad_moment_1d(0.0, 2 * kh, 1.0, 1, xj=kh)
+        self.assertAlmostEqual(r, -1.0, 7)
+
 
 ###############################################################################
 # WendlandQuintic C4 kernel
