@@ -297,6 +297,10 @@ class ParticleArrayHelper(HasTraits):
     # Set to True when the particle array is updated with a new property say.
     updated = Event
 
+    # Private attribute to store old value of visibility in case of empty
+    # arrays.
+    _old_visible = Bool(True)
+
     ########################################
     # View related code.
     view = View(
@@ -363,7 +367,7 @@ class ParticleArrayHelper(HasTraits):
     def _edit_vectors_fired(self):
         self.plot_vectors.edit_traits()
 
-    def _particle_array_changed(self, pa):
+    def _particle_array_changed(self, old, pa):
         self.name = pa.name
 
         self._list_all_scalars_changed(self.list_all_scalars)
@@ -373,7 +377,9 @@ class ParticleArrayHelper(HasTraits):
         s = self._get_scalar(pa, self.scalar)
         p = self.plot
         mlab = self.scene.mlab
-        if p is None:
+        empty = len(x) == 0
+        old_empty = len(old.x) == 0 if old is not None else True
+        if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
             p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
             p.actor.property.point_size = 3
@@ -385,7 +391,7 @@ class ParticleArrayHelper(HasTraits):
             self.sync_trait('show_legend', scm, mutual=True)
             # set_arrays(p.mlab_source.m_data, pa)
             self.plot = p
-        else:
+        elif not empty:
             if len(x) == len(p.mlab_source.x):
                 p.mlab_source.set(x=x, y=y, z=z, scalars=s)
                 if self.plot_vectors:
@@ -399,6 +405,16 @@ class ParticleArrayHelper(HasTraits):
                 else:
                     p.mlab_source.reset(x=x, y=y, z=z, scalars=s)
                 p.mlab_source.update()
+
+        if empty and not old_empty:
+            if p is not None:
+                src = p.parent.parent
+                self._old_visible = src.visible
+                src.visible = False
+        if old_empty and not empty:
+            if p is not None:
+                p.parent.parent.visible = self._old_visible
+                self._show_vectors_changed(self.show_vectors)
 
         # Setup the time.
         self._show_time_changed(self.show_time)
@@ -463,7 +479,7 @@ class ParticleArrayHelper(HasTraits):
         pv = self.plot_vectors
         if pv is not None:
             pv.visible = value
-        else:
+        elif self.plot is not None and value:
             self._vectors_changed(self.vectors)
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
