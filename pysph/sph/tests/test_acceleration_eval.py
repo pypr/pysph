@@ -12,7 +12,7 @@ import numpy as np
 from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (AccelerationEval,
-    check_equation_array_properties)
+                                         check_equation_array_properties)
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
@@ -67,7 +67,6 @@ class TestCheckEquationArrayProps(unittest.TestCase):
             check_equation_array_properties,
             eq, [f]
         )
-
 
     def test_should_pass_when_properties_exist(self):
         # Given
@@ -144,7 +143,6 @@ class SimpleEquation(Equation):
         d_au[d_idx] = 0.0
 
     def loop(self, d_idx, d_au, s_idx, s_m):
-        #print d_idx, s_idx
         d_au[d_idx] += s_m[s_idx]
 
     def post_loop(self, d_idx, d_u, d_au):
@@ -158,13 +156,13 @@ class SimpleEquation(Equation):
             self.count = 0
         return result
 
+
 class MixedTypeEquation(Equation):
     def initialize(self, d_idx, d_u, d_au, d_pid, d_tag):
         d_u[d_idx] = 0.0 + d_pid[d_idx]
         d_au[d_idx] = 0.0 + d_tag[d_idx]
 
     def loop(self, d_idx, d_au, s_idx, s_m, s_pid, s_tag):
-        #print d_idx, s_idx
         d_au[d_idx] += s_m[s_idx] + s_pid[s_idx] + s_tag[s_idx]
 
     def post_loop(self, d_idx, d_u, d_au, d_pid):
@@ -204,7 +202,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Given
         pa = self.pa
         pa.add_constant('total_mass', 0.0)
-        equations = [FindTotalMass (dest='fluid', sources=['fluid'])]
+        equations = [FindTotalMass(dest='fluid', sources=['fluid'])]
         a_eval = self._make_accel_eval(equations)
 
         # When
@@ -243,9 +241,10 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Given
         pa = self.pa
         equations = [Group(
-            equations=[SimpleEquation(dest='fluid', sources=['fluid']),
-                       SimpleEquation(dest='fluid', sources=['fluid']),
-                      ],
+            equations=[
+                SimpleEquation(dest='fluid', sources=['fluid']),
+                SimpleEquation(dest='fluid', sources=['fluid']),
+            ],
             iterate=True
         )]
         a_eval = self._make_accel_eval(equations)
@@ -265,7 +264,7 @@ class TestAccelerationEval1D(unittest.TestCase):
                     equations=[SimpleEquation(dest='fluid', sources=['fluid'])]
                 ),
                 Group(
-                    equations=[SimpleEquation(dest='fluid', sources=['fluid'])],
+                    equations=[SimpleEquation(dest='fluid', sources=['fluid'])]
                 ),
             ],
             iterate=True,
