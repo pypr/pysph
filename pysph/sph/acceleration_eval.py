@@ -62,9 +62,10 @@ def check_equation_array_properties(equation, particle_arrays):
             _check_array(p_arrays[src], eq_src, errors)
 
     if len(errors) > 0:
-        msg = "ERROR: Missing array properties for equation: %s\n"%equation.name
+        msg = ("ERROR: Missing array properties for equation: %s\n"
+               % equation.name)
         for name, missing in errors.items():
-            msg += "Array '%s' missing properties %s.\n"%(name, missing)
+            msg += "Array '%s' missing properties %s.\n" % (name, missing)
         print(msg)
         raise RuntimeError(msg)
 
@@ -78,7 +79,7 @@ class MegaGroup(object):
 
     MegaGroups are organized as:
         {destination: (eqs_with_no_source, sources, all_eqs)}
-        eqs_with_no_source: Group([equations]) all SPH Equations with no source.
+        eqs_with_no_source: Group([equations]) all SPH Equations with no src.
         sources are {source: Group([equations...])}
         all_eqs is a Group of all equations having this destination.
 
@@ -112,7 +113,7 @@ class MegaGroup(object):
         dests = OrderedDict()
         for dest in dest_list:
             sources = defaultdict(list)
-            eqs_with_no_source = [] # For equations that have no source.
+            eqs_with_no_source = []
             all_eqs = set()
             for equation in equations:
                 if equation.dest != dest:
@@ -131,7 +132,7 @@ class MegaGroup(object):
             # Sort the all_eqs set; so the order is deterministic.  Without
             # this a  user may get a recompilation for no obvious reason.
             all_equations = list(all_eqs)
-            all_equations.sort(key=lambda x:x.__class__.__name__)
+            all_equations.sort(key=lambda x: x.__class__.__name__)
             dests[dest] = (Group(eqs_with_no_source), sources,
                            Group(all_equations))
 
@@ -149,7 +150,7 @@ class AccelerationEval(object):
         particle_arrays: list(ParticleArray): list of particle arrays to use.
         equations: list: A list of equations/groups.
         kernel: The kernel to use.
-        parallel: str: One of 'serial', 'mpi'.
+        mode: str: One of 'serial', 'mpi'.
         """
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
