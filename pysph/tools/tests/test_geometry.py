@@ -172,57 +172,62 @@ class TestGeometry(unittest.TestCase):
         assert not np.any(zc) > (length / 2.0)
 
     def test_get_4digit_naca_airfoil(self):
-        dx = 0.05
+        dx = 0.1
         c = 1.5
         camber = '44'
-        t = 10
-        airfoil = np.random.choice(['00', camber]) + str(t)
-        x, y = G.get_4digit_naca_airfoil(dx, airfoil, c)
-        count = 0
-        t = 0.01 * t
-        for xi, yi in zip(x, y):
-            yt = 5.0 * t * (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
-                            0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
-                            0.1015 * ((xi / c)**4.))
-            if airfoil[:2] == '00':
-                if abs(yi) > yt + dx:
-                    count += 1
-            else:
-                m = 0.01 * float(airfoil[0])
-                p = 0.1 * float(airfoil[1])
-                if xi <= p * c:
-                    yc = (m / (p * p)) * (2. * p * (xi / c) - (xi / c)**2.)
-                    dydx = (2. * m / (p * p)) * (p - xi / c) / c
-                else:
-                    yc = (m / ((1. - p) * (1. - p))) * \
-                        (1. - 2. * p + 2. * p * (xi / c) - (xi / c)**2.)
-                    dydx = (2. * m / ((1. - p) * (1. - p))) * (p - xi / c) / c
-                theta = np.arctan(dydx)
-                if yi >= 0.0:
-                    yu = yc + yt * np.cos(theta)
-                    if yi > yu + dx:
+        airfoils = ['0010', '2414', '4420', '3218', '2424']
+        for airfoil in airfoils:
+            x, y = G.get_4digit_naca_airfoil(dx, airfoil, c)
+            count = 0
+            t = 0.01 * float(airfoil[2:])
+            for xi, yi in zip(x, y):
+                yt = (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
+                      0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
+                      0.1015 * ((xi / c)**4.))
+                yt = yt * 5.0 * t
+                if airfoil[:2] == '00':
+                    if abs(yi) > yt + dx:
                         count += 1
                 else:
-                    yl = yc - yt * np.cos(theta)
-                    if yi < yl + dx:
-                        count += 1
-        assert count == 0
+                    m = 0.01 * float(airfoil[0])
+                    p = 0.1 * float(airfoil[1])
+                    if xi <= p * c:
+                        yc = (m / (p**2.0)) * \
+                            (2. * p * (xi / c) - (xi / c)**2.)
+                        dydx = (2. * m / (p * p)) * (p - xi / c) / c
+                    else:
+                        yc = (m / ((1. - p) * (1. - p))) * \
+                            (1. - 2. * p + 2. * p * (xi / c) - (xi / c)**2.)
+                        dydx = (2. * m / ((1. - p) * (1. - p))) * \
+                            (p - xi / c) / c
+                    theta = np.arctan(dydx)
+                    if yi >= 0.0:
+                        yu = yc + yt * np.cos(theta)
+                        if yi > yu + dx:
+                            count += 1
+                    else:
+                        yl = yc - yt * np.cos(theta)
+                        if yi < yl - dx:
+                            count += 1
+            assert count == 0
 
     def test_get_5digit_naca_airfoil(self):
         dx = 0.05
         c = 1.5
-        series = np.random.choice(['210', '220', '230', '240', '250', '221',
-                                   '231', '241', '251'])
+        series = ['210', '220', '230', '240', '250',
+                  '221', '231', '241', '251']
         t = 12
-        airfoil = series + str(t)
-        x, y = G.get_5digit_naca_airfoil(dx, airfoil, c)
-        count = 0
-        t = 0.01 * t
-        m, k = G._get_m_k(series)
-        for xi, yi in zip(x, y):
-            yt = 5.0 * t * (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
-                            0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
-                            0.1015 * ((xi / c)**4.))
+        for s in series:
+            airfoil = s + str(t)
+            t = 0.01 * t
+            x, y = G.get_5digit_naca_airfoil(dx, airfoil, c)
+            count = 0
+            m, k = G._get_m_k(s)
+            for xi, yi in zip(x, y):
+                yt = (0.2969 * np.sqrt(xi / c) - 0.1260 * (xi / c) -
+                      0.3516 * ((xi / c)**2.) + 0.2843 * (xi / c)**3. -
+                      0.1015 * ((xi / c)**4.))
+                yt = 5.0 * t * yt
             xn = xi / c
             if xn <= m:
                 yc = c * (k / 6.) * (xn**3. - 3. * m *
@@ -239,34 +244,25 @@ class TestGeometry(unittest.TestCase):
                     count += 1
             else:
                 yl = yc - yt * np.cos(theta)
-                if yi < yl + dx:
+                if yi < yl - dx:
                     count += 1
-        assert count == 0
+            assert count == 0
 
     def test_get_naca_wing(self):
         dx = 0.15
-        c = np.random.uniform(0.5, 2.0)
-        span = np.random.uniform(1.0, 4.0)
-        series = np.random.choice(['210', '220', '230', '240', '250', '221',
-                                   '231', '241', '251'])
-        t = np.random.randint(10, 24)
-        airfoil_1 = series + str(t)
-        camber = str(2 + np.random.randint(5)) + str(2 + np.random.randint(6))
-        airfoil_2 = np.random.choice(['00', camber]) + str(t)
-        airfoil = np.random.choice([airfoil_1, airfoil_2])
-        x, y, z = G.get_naca_wing(dx, airfoil, span, c)
-        count = 0
-        for zi in z:
-            if abs(zi) > (span + dx) / 2.0:
-                count += 1
-        assert count == 0
+        c = 1.5
+        span = 3.0
+        airfoils = ['23014', '22112', '0012', '2410']
+        for airfoil in airfoils:
+            x, y, z = G.get_naca_wing(dx, airfoil, span, c)
+            assert not np.any(z) > (span / dx + dx)
 
     def test_remove_overlap_particles(self):
-        dx_1 = (10)**(np.random.randint(-2, -1))
-        dx_2 = (10)**(np.random.randint(-2, -1))
-        length = np.random.randint(20, 40) * dx_1
-        height = np.random.randint(20, 40) * dx_1
-        radius = np.random.randint(20, 40) * dx_2
+        dx_1 = 0.1
+        dx_2 = 0.15
+        length = 4.5
+        height = 3.0
+        radius = 2.0
         x1, y1 = G.get_2d_block(dx_1, length, height)
         x2, y2 = G.get_2d_circle(dx_2, radius)
         r1 = np.ones_like(x1) * 100.0
@@ -292,5 +288,5 @@ class TestGeometry(unittest.TestCase):
 
 
 if __name__ == "__main__":
-	np.random.seed(0)
+    np.random.seed(0)
     unittest.main()
