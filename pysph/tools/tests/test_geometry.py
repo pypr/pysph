@@ -9,35 +9,40 @@ from pysph.base.utils import get_particle_array
 class TestGeometry(unittest.TestCase):
 
     def test_distance(self):
-        point_1 = np.random.random_sample(3)
-        point_2 = np.random.random_sample(3)
+        point_1 = np.array([1.5, np.pi, np.exp(2.0)])
+        point_2 = np.array([np.pi, np.exp(1), -1.9])
         d1 = G.distance(point_1, point_2)
         d2 = np.linalg.norm(point_1 - point_2)
         assert d1 == pytest.approx(d2)
+        assert G.distance(point_1) == pytest.approx(np.linalg.norm(point_1))
 
     def test_distance_2d(self):
-        point_1 = np.random.random_sample(2)
-        point_2 = np.random.random_sample(2)
+        point_1 = np.array([np.pi, np.exp(2.5)])
+        point_2 = np.array([np.sqrt(2.4), np.pi])
         d1 = G.distance_2d(point_1, point_2)
         d2 = np.linalg.norm(point_1 - point_2)
+        d3 = np.linalg.norm(point_1)
         assert d1 == pytest.approx(d2)
+        assert G.distance_2d(point_1) == pytest.approx(d3)
 
     def test_matrix_exp(self):
         try:
             from scipy import linalg
             e = linalg.expm
-            n = np.random.randint(1, 10)
-            mat = np.random.rand(n, n)
+            n = 3
+            mat = np.array([[5.59, -6.5, 0.73],
+                            [4.12, 6.4, -5.3],
+                            [0.95, 3.54, -9.3]])
             assert np.allclose(e(mat), G.matrix_exp(mat))
         except ImportError:
             raise unittest.SkipTest('Scipy is not installed')
 
     def test_extrude(self):
-        n = np.random.randint(1, 20)
-        x = np.random.random_sample(n)
-        y = np.random.random_sample(n)
+        n = 15
+        x = np.linspace(0.0, 2.5, n)
+        y = np.linspace(-1.0, 4.0, n)
         dx = 0.05
-        extrude_dist = np.random.random()
+        extrude_dist = 3.0
         x_new, y_new, z_new = G.extrude(x, y, dx, extrude_dist)
         assert np.allclose(x_new[:len(x)], x)
         assert np.allclose(x_new[-len(x):], x)
@@ -45,26 +50,26 @@ class TestGeometry(unittest.TestCase):
         assert np.allclose(y_new[-len(y):], y)
 
     def test_translate(self):
-        n = np.random.randint(1, 100)
-        x = np.random.random_sample(n)
-        y = np.random.random_sample(n)
-        z = np.random.random_sample(n)
-        x_shift = np.random.uniform(0.0, n)
-        y_shift = np.random.uniform(0.0, n)
-        z_shift = np.random.uniform(0.0, n)
+        n = 50
+        x = np.linspace(1.0, 5.0, n)
+        y = np.linspace(-5.0, 2.0, n)
+        z = (x + y)**2 / 10.0
+        x_shift = np.pi
+        y_shift = np.exp(1)
+        z_shift = np.sqrt(2.9)
         x_new, y_new, z_new = G.translate(x, y, z, x_shift, y_shift, z_shift)
         assert np.allclose(x_new - x_shift, x)
         assert np.allclose(y_new - y_shift, y)
         assert np.allclose(z_new - z_shift, z)
 
     def test_rotate(self):
-        n = np.random.randint(1, 25)
-        x = np.random.random_sample(n)
-        y = np.random.random_sample(n)
-        z = np.random.random_sample(n)
-        angle = np.random.uniform(0.0, 360.0)
+        n = 15
+        x = np.linspace(1.5, 10.0, n)
+        y = np.linspace(5.0, 15.0, n)
+        z = x * y / 10.0
+        angle = 154.0
         theta = np.pi * angle / 180.0
-        axis = np.random.random_sample(3)
+        axis = np.array([1.0, np.sqrt(2.0), np.sqrt(3.0)])
         x_new, y_new, z_new = G.rotate(x, y, z, axis, angle)
         unit_vector = axis / np.linalg.norm(axis)
         mat = np.cross(np.eye(3), unit_vector * theta)
@@ -85,9 +90,9 @@ class TestGeometry(unittest.TestCase):
     def test_get_2d_wall(self):
         dx = 0.05
         length = 3.0
-        center = np.random.random_sample(2)
-        num_layers = np.random.randint(1, 4)
-        up = np.random.choice([True, False])
+        center = np.array([np.pi, 1.5])
+        num_layers = 3
+        up = True
         x, y = G.get_2d_wall(dx, center, length, num_layers, up)
         x_test = np.arange(-length / 2.0, length / 2.0, dx) + center[0]
         y_test = np.ones_like(x_test) * center[1]
@@ -103,8 +108,8 @@ class TestGeometry(unittest.TestCase):
         dx = 0.05
         length = 5.0
         height = 4.0
-        center = np.random.random_sample(2)
-        num_layers = np.random.randint(1, 4)
+        center = np.array([1.4, -0.5])
+        num_layers = 4
         x, y = G.get_2d_tank(dx, center, length, height, num_layers)
         x_len = max(x) - min(x)
         y_len = max(y) - min(y)
@@ -114,7 +119,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_2d_circle(self):
         dx = 0.05
         radius = 3.0
-        center = np.random.random_sample(2)
+        center = np.array([1.45, -0.43])
         x, y = G.get_2d_circle(dx, radius, center)
         xc, yc = x - center[0], y - center[1]
         assert not np.any(xc * xc + yc * yc) > radius * radius
@@ -123,7 +128,7 @@ class TestGeometry(unittest.TestCase):
         dx = 0.05
         length = 5.0
         height = 4.0
-        center = np.random.random_sample(2)
+        center = np.array([0.4, 10.3])
         x, y = G.get_2d_block(dx, length, height, center)
         len_x = max(x) - min(x)
         len_y = max(y) - min(y)
@@ -136,7 +141,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_3d_sphere(self):
         dx = 0.23
         radius = 2.0
-        center = np.random.random_sample(3)
+        center = np.array([np.pi, 1.5, np.exp(1.5)])
         x, y, z = G.get_3d_sphere(dx, radius, center)
         xs, ys, zs = x - center[0], y - center[1], z - center[2]
         assert not np.any(xs * xs + ys * ys + zs * zs) > radius * radius
@@ -146,7 +151,7 @@ class TestGeometry(unittest.TestCase):
         length = 3.0
         height = 2.0
         depth = 1.5
-        center = np.random.random_sample(3)
+        center = np.array([0.4, np.pi, -1.6])
         x, y, z = G.get_3d_block(dx, length, height, depth, center)
         len_x = max(x) - min(x)
         len_y = max(y) - min(y)
@@ -163,8 +168,8 @@ class TestGeometry(unittest.TestCase):
         dx = 0.15
         radius = 2.0
         length = 3.0
-        center = np.random.random_sample(3)
-        num_layers = np.random.randint(1, 5)
+        center = np.array([0.56, np.pi, np.sqrt(3.0)])
+        num_layers = 5
         x, y, z = G.get_3d_hollow_cylinder(dx, radius, length, center,
                                            num_layers)
         xc, yc, zc = x - center[0], y - center[1], z - center[2]
@@ -288,5 +293,4 @@ class TestGeometry(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    np.random.seed(0)
     unittest.main()
