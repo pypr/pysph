@@ -304,3 +304,43 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
+
+
+class TestAccelerationEval1DGPU(unittest.TestCase):
+    # Fix this to be a subclass of TestAccelerationEval1D
+
+    def setUp(self):
+        self.dim = 1
+        n = 10
+        dx = 1.0/(n-1)
+        x = np.linspace(0, 1, n)
+        m = np.ones_like(x)
+        h = np.ones_like(x)*dx*1.05
+        pa = get_particle_array(name='fluid', x=x, h=h, m=m)
+        self.pa = pa
+
+    def _make_accel_eval(self, equations, cache_nnps=False):
+        arrays = [self.pa]
+        kernel = CubicSpline(dim=self.dim)
+        a_eval = AccelerationEval(
+            particle_arrays=arrays, equations=equations, kernel=kernel
+        )
+        comp = SPHCompiler(a_eval, integrator=None, backend='opencl')
+        comp.compile()
+        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        return a_eval
+
+    def test_accel_eval_should_work_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [SimpleEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        self.assertListEqual(list(pa.u), list(expect))
