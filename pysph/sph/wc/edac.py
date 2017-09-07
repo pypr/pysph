@@ -16,6 +16,9 @@ References
 
 """
 
+from math import sin
+from math import pi as M_PI
+
 from pysph.base.utils import get_particle_array
 from pysph.base.utils import DEFAULT_PROPS
 from pysph.sph.equation import Equation, Group
@@ -247,22 +250,23 @@ class MomentumEquation(Equation):
     def loop(self, d_idx, s_idx, d_m, d_rho, d_p, d_V, d_au, d_av, d_aw,
              s_m, s_rho, s_p, s_V, DWIJ):
 
-        rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
-        pi = d_p[d_idx]; pj = s_p[s_idx]
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        pi = d_p[d_idx]
+        pj = s_p[s_idx]
 
         pij = rhoj * pi + rhoi * pj
         pij /= (rhoj + rhoi)
 
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # inverse mass of destination particle
         mi1 = 1.0/d_m[d_idx]
 
         tmp = -pij * mi1 * (Vi2 + Vj2)
-
-        # Morris 1996 scheme.
-        #tmp = -s_m[s_idx]*(pj - pi)/(rhoi*rhoj)
 
         d_au[d_idx] += tmp * DWIJ[0]
         d_av[d_idx] += tmp * DWIJ[1]
@@ -271,10 +275,10 @@ class MomentumEquation(Equation):
     def post_loop(self, d_idx, d_au, d_av, d_aw, t, DT_ADAPT):
         damping_factor = 1.0
         if t < self.tdamp:
-            damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
-        d_au[d_idx] +=  damping_factor*self.gx
-        d_av[d_idx] +=  damping_factor*self.gy
-        d_aw[d_idx] +=  damping_factor*self.gz
+            damping_factor = 0.5 * (sin((-0.5 + t/self.tdamp)*M_PI) + 1.0)
+        d_au[d_idx] += damping_factor*self.gx
+        d_av[d_idx] += damping_factor*self.gy
+        d_aw[d_idx] += damping_factor*self.gz
 
         acc2 = (d_au[d_idx]*d_au[d_idx] +
                 d_av[d_idx]*d_av[d_idx] +
@@ -298,8 +302,10 @@ class EDACEquation(Equation):
     def loop(self, d_idx, d_m, d_rho, d_ap, d_p, d_V, s_idx, s_m, s_rho, s_p,
              s_V, DWIJ, VIJ, XIJ, R2IJ, EPS):
 
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         etai = d_rho[d_idx]
         etaj = s_rho[s_idx]
@@ -376,16 +382,20 @@ class MomentumEquationPressureGradient(Equation):
              d_auhat, d_avhat, d_awhat, d_V, s_V, DWIJ):
 
         # averaged pressure Eq. (7)
-        rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
         pavg = d_pavg[d_idx]
-        pi = d_p[d_idx]; pj = s_p[s_idx]
+        pi = d_p[d_idx]
+        pj = s_p[s_idx]
 
         pij = rhoj * (pi - pavg) + rhoi * (pj - pavg)
         pij /= (rhoj + rhoi)
 
         # particle volumes
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # inverse mass of destination particle
         mi1 = 1.0/d_m[d_idx]
@@ -408,7 +418,7 @@ class MomentumEquationPressureGradient(Equation):
         # damped accelerations due to body or external force
         damping_factor = 1.0
         if t < self.tdamp:
-            damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
+            damping_factor = 0.5 * (sin((-0.5 + t/self.tdamp)*M_PI) + 1.0)
 
         d_au[d_idx] += self.gx * damping_factor
         d_av[d_idx] += self.gy * damping_factor
@@ -559,7 +569,7 @@ class EDACScheme(Scheme):
 
     def consume_user_options(self, options):
         vars = ['alpha', 'edac_alpha', 'clamp_p', 'bql', 'tdamp']
-        data = dict((var, self.smart_getattr(options, var))
+        data = dict((var, self._smart_getattr(options, var))
                     for var in vars)
         self.configure(**data)
 
@@ -675,7 +685,8 @@ class EDACScheme(Scheme):
     def _get_internal_flow_equations(self):
         from pysph.sph.wc.transport_velocity import (
             VolumeSummation, SolidWallNoSlipBC, SummationDensity,
-            MomentumEquationArtificialStress, MomentumEquationArtificialViscosity,
+            MomentumEquationArtificialStress,
+            MomentumEquationArtificialViscosity,
             MomentumEquationViscosity
         )
         edac_nu = self._get_edac_nu()
