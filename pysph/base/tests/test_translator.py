@@ -222,6 +222,7 @@ def test_simple_function_with_return():
     # Given
     src = dedent('''
     def f(x=0.0):
+        'docstring'
         return x+1
     ''')
 
@@ -573,6 +574,17 @@ def test_try_block_raises_error():
         py2c(src)
 
 
+def test_strings_raise_error():
+    # Given
+    src = dedent('''
+    x = 'hello'
+    ''')
+
+    # When/Then
+    with pytest.raises(NotImplementedError):
+        py2c(src)
+
+
 def test_attribute_access():
     # Given
     src = dedent('''
@@ -703,13 +715,17 @@ def test_c_struct_helper():
 def test_wrapping_class():
     # Given
     class Dummy(object):
+        '''Class Docstring'''
         def __init__(self, x=0, f=0.0, s=''):
+            "Constructor docstring"
             self.x = x
             self.f = f
             self.s = s
             self._private = 1
 
         def method(self):
+            '''Method docstring.
+            '''
             pass
 
     obj = Dummy()

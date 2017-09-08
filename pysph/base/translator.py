@@ -142,6 +142,13 @@ class CConverter(ast.NodeVisitor):
         pad = ' '*4
         return '\n'.join(pad + x for x in lines)
 
+    def _remove_docstring(self, body):
+        if body and isinstance(body[0], ast.Expr) and \
+           isinstance(body[0].value, ast.Str):
+            return body[1:]
+        else:
+            return body
+
     def convert(self, src):
         self._src = src.splitlines()
         code = ast.parse(src)
@@ -233,7 +240,7 @@ class CConverter(ast.NodeVisitor):
     def visit_ClassDef(self, node):
         self._class_name = node.name
         # FIXME: Does not handle base class methods.
-        code = [self.visit(x) for x in node.body]
+        code = [self.visit(x) for x in self._remove_docstring(node.body)]
         self._class_name = ''
         return '\n'.join(code)
 
@@ -296,7 +303,8 @@ class CConverter(ast.NodeVisitor):
         orig_known = set(self._known)
         self._known.update(x.id for x in node.args.args)
         args = self._get_function_args(node)
-        body = '\n'.join('    %s' % self.visit(item) for item in node.body)
+        body = '\n'.join('    %s' % self.visit(item)
+                         for item in self._remove_docstring(node.body))
         if len(self._class_name) > 0:
             func_name = self._class_name + '_' + node.name
         else:
@@ -382,6 +390,9 @@ class CConverter(ast.NodeVisitor):
 
     def visit_Sub(self, node):
         return '-'
+
+    def visit_Str(self, node):
+        self.error("Strings are not yet supported.", node)
 
     def visit_Subscript(self, node):
         return '%s[%s]' % (
