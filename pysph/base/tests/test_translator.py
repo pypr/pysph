@@ -2,7 +2,8 @@ from textwrap import dedent
 import pytest
 
 from pysph.base.translator import (
-    py2c, KnownType, CConverter, CodeGenerationError, CStructHelper
+    CConverter, CodeGenerationError, CStructHelper, KnownType,
+    OpenCLConverter, py2c
 )
 
 
@@ -223,7 +224,8 @@ def test_simple_function_with_return():
     src = dedent('''
     def f(x=0.0):
         'docstring'
-        return x+1
+        y = x + 1
+        return y
     ''')
 
     # When
@@ -232,17 +234,20 @@ def test_simple_function_with_return():
     # Then
     expect = dedent('''
     double f(double x) {
-        return (x + 1);
+        double y;
+        y = (x + 1);
+        return y;
     }
     ''')
-    assert code == expect.strip()
+    assert code.strip() == expect.strip()
 
 
 def test_simple_function_without_return():
     # Given
     src = dedent('''
     def f(y=0.0, x=0.0):
-        y += x
+        z = y + x
+        y = z
     ''')
 
     # When
@@ -251,10 +256,12 @@ def test_simple_function_without_return():
     # Then
     expect = dedent('''
     void f(double y, double x) {
-        y += x;
+        double z;
+        z = (y + x);
+        y = z;
     }
     ''')
-    assert code == expect.strip()
+    assert code.strip() == expect.strip()
 
 
 def test_function_argument_types():
@@ -273,7 +280,7 @@ def test_function_argument_types():
         ;
     }
     ''')
-    assert code == expect.strip()
+    assert code.strip() == expect.strip()
 
 
 def test_known_types_in_funcargs():
@@ -662,8 +669,9 @@ def test_class():
         def g(self, x=0.0):
             pass
         def f(self, x=0.0):
+            y = x + 1
             do(self.a, x)
-            self.g(x)
+            self.g(y)
     ''')
 
     # When
@@ -674,9 +682,12 @@ def test_class():
     void Foo_g(Foo* self, double x) {
         ;
     }
+
     void Foo_f(Foo* self, double x) {
+        double y;
+        y = (x + 1);
         do(self->a, x);
-        Foo_g(self, x);
+        Foo_g(self, y);
     }
     ''')
     assert code.strip() == expect.strip()
@@ -747,3 +758,42 @@ def test_wrapping_class():
     }
     ''')
     assert result.strip() == expect.strip()
+
+
+def test_opencl_conversion():
+    src = dedent('''
+    def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
+        pass
+    ''')
+
+    # When
+    converter = OpenCLConverter()
+    code = converter.convert(src)
+
+    # Then
+    expect = dedent('''
+    void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p, long J, double t, double* l, double* xx) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_opencl_class():
+    src = dedent('''
+    class Foo(object):
+        def g(self, x=0.0):
+            pass
+    ''')
+
+    # When
+    converter = OpenCLConverter()
+    code = converter.convert(src)
+
+    # Then
+    expect = dedent('''
+    void Foo_g(__global Foo* self, double x) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()

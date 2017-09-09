@@ -91,6 +91,9 @@ class CConverter(ast.NodeVisitor):
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
 
+    def _get_self_type(self):
+        return KnownType('%s*' % self._class_name)
+
     def _get_function_args(self, node):
         node_args = node.args.args
         args = [x.id for x in node_args]
@@ -106,7 +109,7 @@ class CConverter(ast.NodeVisitor):
             call_args[args[i]] = Undefined
 
         if len(self._class_name) > 0:
-            call_args['self'] = KnownType('%s*' % self._class_name)
+            call_args['self'] = self._get_self_type()
 
         call_args.update(self._known_types)
         call_sig = []
@@ -172,11 +175,14 @@ class CConverter(ast.NodeVisitor):
         else:
             return ''
 
-    def parse_instance(self, obj):
+    def get_struct_from_instance(self, obj):
         name = obj.__class__.__name__
         vars = self._get_public_vars(obj)
         helper = CStructHelper(name, vars)
-        code = helper.generate() + '\n'
+        return helper.generate() + '\n'
+
+    def parse_instance(self, obj):
+        code = self.get_struct_from_instance(obj)
         src = dedent(inspect.getsource(obj.__class__))
         code += self.convert(src)
         return code
@@ -300,10 +306,13 @@ class CConverter(ast.NodeVisitor):
         if self._class_name and node.name.startswith('_'):
             return ''
 
+        orig_declares = self._declares
+        self._declares = {}
         orig_known = set(self._known)
         self._known.update(x.id for x in node.args.args)
+
         args = self._get_function_args(node)
-        body = '\n'.join('    %s' % self.visit(item)
+        body = '\n'.join(self._indent_block(self.visit(item))
                          for item in self._remove_docstring(node.body))
         if len(self._class_name) > 0:
             func_name = self._class_name + '_' + node.name
@@ -314,8 +323,13 @@ class CConverter(ast.NodeVisitor):
         else:
             sig = 'void %s(%s) {\n' % (func_name, args)
 
+        declares = self._indent_block(self.get_declarations())
+        if len(declares) > 0:
+            declares += '\n'
+
         self._known = orig_known
-        return sig + body + '\n}'
+        self._declares = orig_declares
+        return sig + declares + body + '\n}\n'
 
     def visit_Gt(self, node):
         return '>'
@@ -417,3 +431,18 @@ class CConverter(ast.NodeVisitor):
                 self._indent_block(self.visit(x)) for x in node.body
             )
         )
+
+
+def ocl_detect_type(name, value):
+    if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+        return '__global double*'
+    else:
+        return detect_type(name, value)
+
+
+class OpenCLConverter(CConverter):
+    def __init__(self, detect_type=ocl_detect_type, known_types=None):
+        super(OpenCLConverter, self).__init__(detect_type, known_types)
+
+    def _get_self_type(self):
+        return KnownType('__global %s*' % self._class_name)
