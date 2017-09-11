@@ -48,9 +48,9 @@ cdef class GPUNeighborCache:
     cdef bint _copied_to_cpu
     cdef GPUNNPS _nnps
 
-    cdef object _neighbors_gpu
-    cdef object _nbr_lengths_gpu
-    cdef object _start_idx_gpu
+    cdef public object _neighbors_gpu
+    cdef public object _nbr_lengths_gpu
+    cdef public object _start_idx_gpu
 
     cdef np.ndarray _neighbors_cpu
     cdef np.ndarray _nbr_lengths
@@ -109,4 +109,3 @@ cdef class BruteForceNNPS(GPUNNPS):
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
 
     cpdef _refresh(self)
-

@@ -1,5 +1,6 @@
 from textwrap import dedent
 import pytest
+import numpy as np
 
 from pysph.base.translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
@@ -706,21 +707,59 @@ def test_unsupported_method():
 
 def test_c_struct_helper():
     # Given
-    h = CStructHelper(name='Fruit', vars={'apple': 'int', 'pear': 'double',
-                                          'banana': 'float'})
+    class Fruit(object):
+        pass
+
+    f = Fruit()
+    f.apple = 1
+    f.banana = 2.0
+    f.pear = 1.5
+    h = CStructHelper(f)
 
     # When
-    result = h.generate()
+    result = h.get_code()
 
     # Then
     expect = dedent('''
     typedef struct Fruit {
         int apple;
-        float banana;
+        double banana;
         double pear;
     } Fruit;
     ''')
     assert result.strip() == expect.strip()
+
+    # When/Then
+    array = h.get_array()
+    expect = np.dtype([('apple', np.int),
+                       ('banana', np.float), ('pear', np.float)])
+
+    assert array.dtype == expect
+    assert array['apple'] == 1
+    assert array['banana'] == 2.0
+    assert array['pear'] == 1.5
+
+
+def test_c_struct_helper_empty_object():
+    # Given
+    class Fruit(object):
+        pass
+
+    f = Fruit()
+    h = CStructHelper(f)
+
+    # When
+    result = h.get_code()
+
+    # Then
+    expect = dedent('''
+    typedef struct Fruit {
+    } Fruit;
+    ''')
+    assert result.strip() == expect.strip()
+
+    # When/Then
+    assert h.get_array() is None
 
 
 def test_wrapping_class():
@@ -758,6 +797,12 @@ def test_wrapping_class():
     }
     ''')
     assert result.strip() == expect.strip()
+
+    # When
+    h = CStructHelper(obj)
+    dtype = np.dtype([('f', np.float), ('x', np.int)])
+    expect = np.zeros(1, dtype)
+    assert h.get_array() == expect
 
 
 def test_opencl_conversion():

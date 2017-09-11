@@ -1,4 +1,4 @@
-"""Unittests for the serial NNPS
+"""unittests for the serial NNPS
 
 You can run the tests like so:
 

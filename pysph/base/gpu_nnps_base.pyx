@@ -30,6 +30,7 @@ from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
+from pysph.base.opencl import get_context, get_queue, set_context, set_queue
 
 # Particle Tag information
 from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
@@ -162,10 +163,13 @@ cdef class GPUNNPS(NNPSBase):
                 domain, cache, sort_gids)
 
         if ctx is None:
-            self.ctx = cl.create_some_context()
+            self.ctx = get_context()
+            self.queue = get_queue()
         else:
             self.ctx = ctx
-        self.queue = cl.CommandQueue(self.ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
+            set_context(ctx)
+            self.queue = cl.CommandQueue(self.ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
+            set_queue(self.queue)
 
         # The cache.
         self.use_cache = cache
@@ -362,4 +366,3 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cpdef _refresh(self):
         pass
-

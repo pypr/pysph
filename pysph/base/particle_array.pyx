@@ -717,6 +717,11 @@ cdef class ParticleArray:
         else:
             return tuple(result)
 
+    def set_device_helper(self, gpu):
+        """Set the device helper to push/pull from a hardware accelerator.
+        """
+        self.gpu = gpu
+
     def set(self, **props):
         """ Set properties from numpy arrays like objects
 

@@ -16,6 +16,7 @@ from pysph.sph.acceleration_eval import (AccelerationEval,
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
+from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
 from pysph.sph.sph_compiler import SPHCompiler
 
 from pysph.base.reduce_array import serial_reduce_array
@@ -319,7 +320,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
-    def _make_accel_eval(self, equations, cache_nnps=False):
+    def _make_accel_eval(self, equations, cache_nnps=True):
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
@@ -328,7 +329,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
-        nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval
@@ -344,4 +345,5 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        pa.gpu.pull('u')
         self.assertListEqual(list(pa.u), list(expect))

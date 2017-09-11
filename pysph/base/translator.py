@@ -14,6 +14,7 @@ import inspect
 import re
 from textwrap import dedent
 
+import numpy as np
 from mako.template import Template
 
 from pysph.base.cython_generator import (
@@ -60,11 +61,42 @@ def py2c(src, detect_type=detect_type, known_types=None):
 
 
 class CStructHelper(object):
-    def __init__(self, name, vars):
-        self.name = name
-        self.vars = vars
+    def __init__(self, obj):
+        self.parse(obj)
 
-    def generate(self):
+    def _get_public_vars(self):
+        data = self.obj.__dict__
+        vars = {}
+        type_names = {int: 'int', float: 'double', bool: 'int'}
+        for name in data:
+            if name.startswith('_'):
+                continue
+            value = data[name]
+            if isinstance(value, (int, float, bool)):
+                vars[name] = type_names[type(value)]
+
+        return vars
+
+    def parse(self, obj):
+        self.name = obj.__class__.__name__
+        self.obj = obj
+        self.vars = self._get_public_vars()
+
+    def get_array(self):
+        if len(self.vars) > 0:
+            obj = self.obj
+            fields = []
+            for var in sorted(self.vars):
+                fields.append((var, getattr(np, self.vars[var])))
+            dtype = np.dtype(fields)
+            ary = np.empty(1, dtype)
+            for var in self.vars:
+                ary[var][0] = getattr(obj, var)
+            return ary
+        else:
+            return None
+
+    def get_code(self):
         template = dedent("""
         typedef struct ${class_name} {
         %for name, type in sorted(vars.items()):
@@ -128,18 +160,6 @@ class CConverter(ast.NodeVisitor):
         else:
             return '%s %s;' % (type_str, name)
 
-    def _get_public_vars(self, obj):
-        data = obj.__dict__
-        vars = {}
-        type_names = {int: 'int', float: 'double', bool: 'int'}
-        for name in data:
-            if name.startswith('_'):
-                continue
-            value = data[name]
-            if isinstance(value, (int, float, bool)):
-                vars[name] = type_names[type(value)]
-        return vars
-
     def _indent_block(self, code):
         lines = code.splitlines()
         pad = ' '*4
@@ -176,10 +196,8 @@ class CConverter(ast.NodeVisitor):
             return ''
 
     def get_struct_from_instance(self, obj):
-        name = obj.__class__.__name__
-        vars = self._get_public_vars(obj)
-        helper = CStructHelper(name, vars)
-        return helper.generate() + '\n'
+        helper = CStructHelper(obj)
+        return helper.get_code() + '\n'
 
     def parse_instance(self, obj):
         code = self.get_struct_from_instance(obj)
