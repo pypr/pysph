@@ -31,6 +31,9 @@ cdef class OctreeNNPS(NNPS):
     ##########################################################################
     # Member functions
     ##########################################################################
+
+    cpdef get_depth(self, int pa_index)
+
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
     cpdef set_context(self, int src_index, int dst_index)

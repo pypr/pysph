@@ -29,10 +29,14 @@ cdef class ZOrderNNPS(NNPS):
     cdef uint64_t* current_keys
 
     cdef uint32_t** cids
-    cdef uint32_t* current_cids
+    cdef uint32_t* current_cids_dst
+    cdef uint32_t* current_cids_src
 
     cdef int** nbr_boxes
     cdef int* current_nbr_boxes
+
+    cdef int** lengths
+    cdef int* current_lengths
 
     cdef public uint32_t max_cid
 
@@ -47,7 +51,8 @@ cdef class ZOrderNNPS(NNPS):
             int num_particles) nogil
 
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            uint64_t* nbr_keys) nogil
+            uint64_t* current_keys, int num_particles,
+            uint64_t** found_ptrs) nogil
 
     cpdef set_context(self, int src_index, int dst_index)
 

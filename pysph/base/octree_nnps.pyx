@@ -46,6 +46,9 @@ cdef class OctreeNNPS(NNPS):
 
     #### Public protocol ################################################
 
+    cpdef get_depth(self, int pa_index):
+        return (<Octree>self.tree[pa_index]).depth
+
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
 

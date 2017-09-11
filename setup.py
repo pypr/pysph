@@ -1,3 +1,6 @@
+import Cython.Compiler.Options
+Cython.Compiler.Options.annotate = True
+
 import os
 from os import path
 try:
