@@ -323,9 +323,10 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
-            particle_arrays=arrays, equations=equations, kernel=kernel
+            particle_arrays=arrays, equations=equations, kernel=kernel,
+            backend='opencl'
         )
-        comp = SPHCompiler(a_eval, integrator=None, backend='opencl')
+        comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
         nnps = NNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()

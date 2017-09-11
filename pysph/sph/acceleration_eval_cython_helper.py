@@ -1,10 +1,12 @@
 from collections import defaultdict
-from mako.template import Template
 from os.path import dirname, join
 
+from mako.template import Template
 from pyzoltan.core import carray
+
 from pysph.base.config import get_config
 from pysph.base.cython_generator import CythonGenerator, KnownType
+from pysph.base.ext_module import ExtModule
 
 
 ###############################################################################
@@ -110,6 +112,8 @@ class AccelerationEvalCythonHelper(object):
         self.known_types = get_known_types_for_arrays(
             self.all_array_names
         )
+        self._ext_mod = None
+        self._module = None
 
     ##########################################################################
     # Public interface.
@@ -128,6 +132,14 @@ class AccelerationEvalCythonHelper(object):
             object.particle_arrays
         )
         object.set_compiled_object(acceleration_eval)
+
+    def compile(self, code):
+        # Note, we do not add carray or particle_array as nnps_base would
+        # have been rebuilt anyway if they changed.
+        depends = ["pysph.base.nnps_base"]
+        self._ext_mod = ExtModule(code, verbose=True, depends=depends)
+        self._module = self._ext_mod.load()
+        return self._module
 
     ##########################################################################
     # Mako interface.

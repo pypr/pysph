@@ -20,6 +20,7 @@ from textwrap import dedent
 # Local imports.
 from pysph.base.ast_utils import get_symbols
 from pysph.base.cython_generator import CythonGenerator, KnownType
+from pysph.base.translator import OpenCLConverter
 
 
 def camel_to_underscore(name):
@@ -262,7 +263,7 @@ def precomputed_symbols():
     return c
 
 
-def sort_precomputed(precomputed):
+def sort_precomputed(precomputed, all_pre_comp):
     """Sorts the precomputed equations in the given dictionary as per the
     dependencies of the symbols and returns an ordered dict.
 
@@ -271,7 +272,7 @@ def sort_precomputed(precomputed):
     right order.
     """
     weights = dict((x, None) for x in precomputed)
-    pre_comp = Group.pre_comp
+    pre_comp = all_pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
     depends = dict((x, None) for x in precomputed)
     for pre, cb in precomputed.items():
@@ -476,6 +477,134 @@ class Group(object):
             cls, ',\n'.join(eqs), kws
         )
 
+    def _has_code(self, kind='loop'):
+        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
+        for equation in self.equations:
+            if hasattr(equation, kind):
+                return True
+
+    def _setup_precomputed(self):
+        """Get the precomputed symbols for this group of equations.
+        """
+        # Calculate the precomputed symbols for this equation.
+        all_args = set()
+        for equation in self.equations:
+            if hasattr(equation, 'loop'):
+                args = inspect.getargspec(equation.loop).args
+                all_args.update(args)
+        all_args.discard('self')
+
+        pre = self.pre_comp
+        precomputed = dict((s, pre[s]) for s in all_args if s in pre)
+
+        # Now find the precomputed symbols in the pre-computed symbols.
+        done = False
+        found_precomp = set(precomputed.keys())
+        while not done:
+            done = True
+            all_new = set()
+            for sym in found_precomp:
+                code_block = pre[sym]
+                new = set([s for s in code_block.symbols
+                           if s in pre and s not in precomputed])
+                all_new.update(new)
+            if len(all_new) > 0:
+                done = False
+                for s in all_new:
+                    precomputed[s] = pre[s]
+            found_precomp = all_new
+
+        self.precomputed = sort_precomputed(precomputed, pre)
+
+        # Update the context.
+        context = self.context
+        for p, cb in self.precomputed.items():
+            context[p] = cb.context[p]
+
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def update(self):
+        self.context = Context()
+        if not self.has_subgroups:
+            self._setup_precomputed()
+
+    def get_array_names(self, recompute=False):
+        """Returns two sets of array names, the first being source_arrays
+        and the second being destination array names.
+        """
+        if not recompute and self.src_arrays is not None:
+            return set(self.src_arrays), set(self.dest_arrays)
+        src_arrays = set()
+        dest_arrays = set()
+        for equation in self.equations:
+            s, d = get_arrays_used_in_equation(equation)
+            src_arrays.update(s)
+            dest_arrays.update(d)
+
+        for cb in self.precomputed.values():
+            src_arrays.update(cb.src_arrays)
+            dest_arrays.update(cb.dest_arrays)
+
+        self.src_arrays = src_arrays
+        self.dest_arrays = dest_arrays
+        return src_arrays, dest_arrays
+
+    def get_converged_condition(self):
+        if self.has_subgroups:
+            code = [g.get_converged_condition() for g in self.equations]
+            return ' & '.join(code)
+        else:
+            code = []
+            for equation in self.equations:
+                code.append('(self.%s.converged() > 0)' % equation.var_name)
+            # Note, we use '&' because we want to call converged on all
+            # equations and not be short-circuited by the first one that
+            # returns False.
+            return ' & '.join(code)
+
+    def get_variable_names(self):
+        # First get all the contexts and find the names.
+        all_vars = set()
+        for cb in self.precomputed.values():
+            all_vars.update(cb.symbols)
+
+        # Filter out all arrays.
+        filtered_vars = [x for x in all_vars
+                         if not x.startswith(('s_', 'd_'))]
+        # Filter other things.
+        ignore = ['KERNEL', 'GRADIENT', 's_idx', 'd_idx']
+        # Math functions.
+        import math
+        ignore += [x for x in dir(math) if not x.startswith('_')
+                   and callable(getattr(math, x))]
+        try:
+            ignore.remove('gamma')
+            ignore.remove('lgamma')
+        except ValueError:
+            # Older Python's don't have gamma/lgamma.
+            pass
+        filtered_vars = [x for x in filtered_vars if x not in ignore]
+
+        return filtered_vars
+
+    def has_initialize(self):
+        return self._has_code('initialize')
+
+    def has_loop(self):
+        return self._has_code('loop')
+
+    def has_post_loop(self):
+        return self._has_code('post_loop')
+
+    def has_reduce(self):
+        return self._has_code('reduce')
+
+
+class CythonGroup(Group):
+    ##########################################################################
+    # Non-public interface.
+    ##########################################################################
     def _get_variable_decl(self, context, mode='declare'):
         decl = []
         names = list(context.keys())
@@ -506,12 +635,6 @@ class Group(object):
                 else:
                     pass
         return '\n'.join(decl)
-
-    def _has_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
-        for equation in self.equations:
-            if hasattr(equation, kind):
-                return True
 
     def _get_code(self, kind='loop'):
         assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
@@ -551,98 +674,9 @@ class Group(object):
         else:
             return code
 
-    def _setup_precomputed(self):
-        """Get the precomputed symbols for this group of equations.
-        """
-        # Calculate the precomputed symbols for this equation.
-        all_args = set()
-        for equation in self.equations:
-            if hasattr(equation, 'loop'):
-                args = inspect.getargspec(equation.loop).args
-                all_args.update(args)
-        all_args.discard('self')
-
-        pre = self.pre_comp
-        precomputed = dict((s, pre[s]) for s in all_args if s in pre)
-
-        # Now find the precomputed symbols in the pre-computed symbols.
-        done = False
-        found_precomp = set(precomputed.keys())
-        while not done:
-            done = True
-            all_new = set()
-            for sym in found_precomp:
-                code_block = pre[sym]
-                new = set([s for s in code_block.symbols
-                           if s in pre and s not in precomputed])
-                all_new.update(new)
-            if len(all_new) > 0:
-                done = False
-                for s in all_new:
-                    precomputed[s] = pre[s]
-            found_precomp = all_new
-
-        self.precomputed = sort_precomputed(precomputed)
-
-        # Update the context.
-        context = self.context
-        for p, cb in self.precomputed.items():
-            context[p] = cb.context[p]
-
     ##########################################################################
     # Public interface.
     ##########################################################################
-    def update(self):
-        self.context = Context()
-        if not self.has_subgroups:
-            self._setup_precomputed()
-
-    def get_array_names(self, recompute=False):
-        """Returns two sets of array names, the first being source_arrays
-        and the second being destination array names.
-        """
-        if not recompute and self.src_arrays is not None:
-            return set(self.src_arrays), set(self.dest_arrays)
-        src_arrays = set()
-        dest_arrays = set()
-        for equation in self.equations:
-            s, d = get_arrays_used_in_equation(equation)
-            src_arrays.update(s)
-            dest_arrays.update(d)
-
-        for cb in self.precomputed.values():
-            src_arrays.update(cb.src_arrays)
-            dest_arrays.update(cb.dest_arrays)
-
-        self.src_arrays = src_arrays
-        self.dest_arrays = dest_arrays
-        return src_arrays, dest_arrays
-
-    def get_variable_names(self):
-        # First get all the contexts and find the names.
-        all_vars = set()
-        for cb in self.precomputed.values():
-            all_vars.update(cb.symbols)
-
-        # Filter out all arrays.
-        filtered_vars = [x for x in all_vars
-                         if not x.startswith(('s_', 'd_'))]
-        # Filter other things.
-        ignore = ['KERNEL', 'GRADIENT', 's_idx', 'd_idx']
-        # Math functions.
-        import math
-        ignore += [x for x in dir(math) if not x.startswith('_')
-                   and callable(getattr(math, x))]
-        try:
-            ignore.remove('gamma')
-            ignore.remove('lgamma')
-        except ValueError:
-            # Older Python's don't have gamma/lgamma.
-            pass
-        filtered_vars = [x for x in filtered_vars if x not in ignore]
-
-        return filtered_vars
-
     def get_array_declarations(self, names, known_types={}):
         decl = []
         for arr in sorted(names):
@@ -670,45 +704,20 @@ class Group(object):
                 )
         return '\n'.join(code)
 
-    def has_initialize(self):
-        return self._has_code('initialize')
-
     def get_initialize_code(self, kernel=None):
         code = self._get_code(kind='initialize')
         return self._set_kernel(code, kernel)
-
-    def has_loop(self):
-        return self._has_code('loop')
 
     def get_loop_code(self, kernel=None):
         code = self._get_code(kind='loop')
         return self._set_kernel(code, kernel)
 
-    def has_post_loop(self):
-        return self._has_code('post_loop')
-
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
 
-    def has_reduce(self):
-        return self._has_code('reduce')
-
     def get_reduce_code(self):
         return self._get_code(kind='reduce')
-
-    def get_converged_condition(self):
-        if self.has_subgroups:
-            code = [g.get_converged_condition() for g in self.equations]
-            return ' & '.join(code)
-        else:
-            code = []
-            for equation in self.equations:
-                code.append('(self.%s.converged() > 0)' % equation.var_name)
-            # Note, we use '&' because we want to call converged on all
-            # equations and not be short-circuited by the first one that
-            # returns False.
-            return ' & '.join(code)
 
     def get_equation_wrappers(self, known_types={}):
         classes = defaultdict(lambda: 0)
@@ -746,3 +755,28 @@ class Group(object):
                                 idx=i)
             lines.append(code)
         return '\n'.join(lines)
+
+
+class OpenCLGroup(Group):
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def get_equation_wrappers(self, known_types={}):
+        classes = defaultdict(lambda: 0)
+        eqs = {}
+        for equation in self.equations:
+            cls = equation.__class__.__name__
+            n = classes[cls]
+            equation.var_name = '%s%d' % (
+                camel_to_underscore(equation.name), n
+            )
+            classes[cls] += 1
+            eqs[cls] = equation
+        wrappers = []
+        predefined = dict(get_predefined_types(self.pre_comp))
+        predefined.update(known_types)
+        code_gen = OpenCLConverter(known_types=predefined)
+        for cls in sorted(classes.keys()):
+            src = code_gen.parse_instance(eqs[cls])
+            wrappers.append(src)
+        return '\n'.join(wrappers)
