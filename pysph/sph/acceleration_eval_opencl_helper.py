@@ -3,19 +3,20 @@ TODO:
 
 Basic support:
 - integrator support.
+- support for doubles/floats.
 
 Advanced:
-- support for doubles/floats.
 - sub groups.
 - Iterated groups.
 - DT_ADAPT.
 - Reduction.
-- support get_code for helper functions etc.
+- support get_code for helper functions.
 
 """
 import inspect
 from os.path import dirname, join
 
+import numpy as np
 from mako.template import Template
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
@@ -24,6 +25,7 @@ from pysph.base.opencl import get_context, get_queue, DeviceHelper
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
+from .equation import get_predefined_types
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
@@ -39,6 +41,7 @@ class OpenCLAccelerationEval(object):
     def compute(self, t, dt):
         helper = self.helper
         nnps = self.nnps
+        extra_args = [np.asarray(t), np.asarray(dt)]
         for call, args, loop_info in helper.calls:
             if loop_info[0]:
                 nnps.set_context(loop_info[1], loop_info[2])
@@ -48,9 +51,10 @@ class OpenCLAccelerationEval(object):
                     cache._nbr_lengths_gpu.data,
                     cache._start_idx_gpu.data,
                     cache._neighbors_gpu.data
-                ]
+                ] + extra_args
                 call(*args)
             else:
+                args.extend(extra_args)
                 call(*args)
 
     def set_nnps(self, nnps):
@@ -76,6 +80,10 @@ class AccelerationEvalOpenCLHelper(object):
             self.all_array_names
         )
         add_address_space(self.known_types)
+        predefined = dict(get_predefined_types(
+            self.object.all_group.pre_comp
+        ))
+        self.known_types.update(predefined)
         self.data = []
         self._ctx = get_context()
         self._queue = get_queue()
@@ -123,7 +131,7 @@ class AccelerationEvalOpenCLHelper(object):
         for info in self.data:
             method = getattr(prg, info.get('kernel'))
             dest = info['dest']
-            src = info.get('source', None)
+            src = info.get('source', dest)
             np = self._array_map[dest].get_number_of_particles()
             args = [self._queue, (np,), None]
             for arg in info['args']:
@@ -144,6 +152,7 @@ class AccelerationEvalOpenCLHelper(object):
         path = join(dirname(__file__), 'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
+        print(main)
         return main
 
     def setup_compiled_module(self, module):
@@ -188,11 +197,7 @@ class AccelerationEvalOpenCLHelper(object):
     def _get_typed_args(self, args):
         code = []
         for arg in args:
-            if arg in self.known_types:
-                type = self.known_types[arg].type
-            else:
-                type = ocl_detect_type(arg, None)
-
+            type = ocl_detect_type(arg, self.known_types.get(arg))
             code.append('{type} {arg}'.format(
                 type=type, arg=arg
             ))
@@ -220,24 +225,21 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                args = inspect.getargspec(method).args
-                if 'self' in args:
-                    args.remove('self')
-                call_args = list(args)
-                self._clean_kernel_args(args)
-                for x in self._get_typed_args(args):
-                    if x not in all_args:
-                        all_args.append(x)
-                for x in args:
-                    if x not in py_args:
-                        py_args.append(x)
 
+                call_args = list(inspect.getargspec(method).args)
+                if 'self' in call_args:
+                    call_args.remove('self')
                 call_args.insert(0, eq.var_name)
                 code.append(
                     '{cls}_{kind}({args});'.format(
                         cls=cls, kind=kind, args=', '.join(call_args)
                     )
                 )
+        s_ary, d_ary = all_eqs.get_array_names()
+        s_ary.update(d_ary)
+        _args = list(s_ary)
+        py_args.extend(_args)
+        all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
 
         body = '\n'.join([' '*4 + x for x in code])
         self.data.append(
@@ -269,7 +271,7 @@ class AccelerationEvalOpenCLHelper(object):
                 ))
             elif isinstance(value, (list, tuple)):
                 decl.append(
-                    'double[{size}] {var};'.format(
+                    'double {var}[{size}];'.format(
                         var=var, size=len(value)
                     )
                 )
@@ -329,33 +331,32 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                args = inspect.getargspec(method).args
-                if 'self' in args:
-                    args.remove('self')
-                call_args = list(args)
-                self._clean_kernel_args(args)
-                for x in self._get_typed_args(args):
-                    if x not in all_args and x not in context:
-                        all_args.append(x)
-                for x in args:
-                    if x not in py_args and x not in context:
-                        py_args.append(x)
-
+                call_args = list(inspect.getargspec(method).args)
+                if 'self' in call_args:
+                    call_args.remove('self')
                 call_args.insert(0, eq.var_name)
+
                 code.append(
                     '    {cls}_{kind}({args});'.format(
                         cls=cls, kind=kind, args=', '.join(call_args)
                     )
                 )
 
+        s_ary, d_ary = eq_group.get_array_names()
+        s_ary.update(d_ary)
+        _args = list(s_ary)
+        py_args.extend(_args)
+        all_args.extend(self._get_typed_args(_args))
+
         body = '\n'.join([' '*4 + x for x in code])
-        self._set_kernel(body, self.object.kernel)
+        body = self._set_kernel(body, self.object.kernel)
         k_name = self.object.kernel.__class__.__name__
         all_args.extend(
             ['__global {kernel}* kern'.format(kernel=k_name),
              '__global unsigned int *nbr_length',
              '__global unsigned int *start_idx',
-             '__global unsigned int *neighbors']
+             '__global unsigned int *neighbors',
+             'double t', 'double dt']
         )
         self.data.append(
             dict(kernel=kernel, args=py_args, dest=dest,

@@ -307,6 +307,14 @@ class TestAccelerationEval1D(unittest.TestCase):
         self.assertListEqual(list(pa.u), list(expect))
 
 
+class EqWithTime(Equation):
+    def initialize(self, d_idx, d_au, t, dt):
+        d_au[d_idx] = t + dt
+
+    def loop(self, d_idx, d_au, s_idx, s_m, t, dt):
+        d_au[d_idx] += t + dt
+
+
 class TestAccelerationEval1DGPU(unittest.TestCase):
     # Fix this to be a subclass of TestAccelerationEval1D
 
@@ -347,3 +355,33 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         pa.gpu.pull('u')
         self.assertListEqual(list(pa.u), list(expect))
+
+    def test_precomputed_should_work_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9.,  9.,  7.357])
+        pa.gpu.pull('rho')
+        print(pa.rho)
+        self.assertTrue(np.allclose(expect, pa.rho, atol=1e-2))
+
+    def test_equation_with_time_should_work_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [EqWithTime(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.2, 0.1)
+
+        # Then
+        expect = np.asarray([4., 5., 6., 6., 6., 6., 6., 6.,  5.,  4.])*0.3
+        pa.gpu.pull('au')
+        print(pa.au, expect)
+        self.assertTrue(np.allclose(expect, pa.au))
