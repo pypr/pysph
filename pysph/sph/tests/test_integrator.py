@@ -3,6 +3,7 @@ import unittest
 
 # Library imports.
 import numpy as np
+import pytest
 
 # Local imports.
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
@@ -15,6 +16,7 @@ from pysph.sph.integrator import (LeapFrogIntegrator, PECIntegrator,
                                   PEFRLIntegrator)
 from pysph.sph.integrator_step import (LeapFrogStep, PEFRLStep,
                                        TwoStageRigidBodyStep)
+
 
 class SHM(Equation):
     """Simple harmonic oscillator equation.
@@ -112,6 +114,7 @@ class TestLeapFrogIntegrator(TestIntegratorBase):
 
         # When
         energy = []
+
         def callback(t):
             x, u = self.pa.x[0], self.pa.u[0]
             energy.append(0.5*(x*x + u*u))
@@ -136,6 +139,7 @@ class TestLeapFrogIntegrator(TestIntegratorBase):
         tf = np.pi
         dt = 0.02*tf
         energy = []
+
         def callback(t):
             x, u = self.pa.x[0], self.pa.u[0]
             energy.append(0.5*(x*x + u*u))
@@ -171,6 +175,7 @@ class TestPEFRLIntegrator(TestIntegratorBase):
 
         # When
         energy = []
+
         def callback(t):
             x, u = self.pa.x[0], self.pa.u[0]
             energy.append(0.5*(x*x + u*u))
@@ -195,6 +200,7 @@ class TestPEFRLIntegrator(TestIntegratorBase):
         tf = np.pi
         dt = 0.1*tf
         energy = []
+
         def callback(t):
             x, u = self.pa.x[0], self.pa.u[0]
             energy.append(0.5*(x*x + u*u))
@@ -217,6 +223,47 @@ class TestPEFRLIntegrator(TestIntegratorBase):
         # Then
         self.assertTrue(err2 < err1)
         self.assertTrue(err1/err2 > 16.0)
+
+
+class TestLeapFrogIntegratorGPU(TestIntegratorBase):
+    def _setup_integrator(self, equations, integrator):
+        pytest.importorskip('pysph.base.gpu_nnps')
+        kernel = CubicSpline(dim=1)
+        arrays = [self.pa]
+        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
+        a_eval = AccelerationEval(
+             particle_arrays=arrays, equations=equations, kernel=kernel,
+             backend='opencl'
+        )
+        comp = SPHCompiler(a_eval, integrator=integrator)
+        comp.compile()
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=True)
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        integrator.set_nnps(nnps)
+
+    def test_leapfrog(self):
+        # Given.
+        integrator = LeapFrogIntegrator(fluid=LeapFrogStep())
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+        tf = np.pi/10
+        dt = 0.1*tf
+
+        # When
+        energy = []
+
+        def callback(t):
+            self.pa.gpu.pull('x', 'u')
+            x, u = self.pa.x[0], self.pa.u[0]
+            energy.append(0.5*(x*x + u*u))
+
+        callback(0.0)
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        energy = np.asarray(energy)
+        self.assertAlmostEqual(np.max(np.abs(energy - 0.5)), 0.0, places=3)
 
 
 if __name__ == '__main__':

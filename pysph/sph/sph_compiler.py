@@ -35,7 +35,11 @@ class SPHCompiler(object):
                     mod, cython_a_eval
                 )
         elif self.backend == 'opencl':
-            pass
+            if self.integrator is not None:
+                c_a_eval = self.acceleration_eval.c_acceleration_eval
+                self.integrator_helper.setup_compiled_module(
+                    mod, c_a_eval
+                )
 
     # Private interface. ####################################################
     def _get_code(self):
@@ -62,11 +66,11 @@ class SPHCompiler(object):
         elif self.backend == 'opencl':
             from .acceleration_eval_opencl_helper import \
                 AccelerationEvalOpenCLHelper
-            # FIXME
-            # from .integrator_opencl_helper import IntegratorOpenCLHelper
+            from .integrator_opencl_helper import IntegratorOpenCLHelper
 
             self.acceleration_eval_helper = AccelerationEvalOpenCLHelper(
                 self.acceleration_eval
             )
-            # FIXME
-            self.integrator_helper = None
+            self.integrator_helper = IntegratorOpenCLHelper(
+                self.integrator, self.acceleration_eval_helper
+            )

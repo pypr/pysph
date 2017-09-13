@@ -6,11 +6,16 @@ Basic support:
 - support for doubles/floats.
 
 Advanced:
+- Handle: Real=True/False, update_nnps, iterate
 - sub groups.
 - Iterated groups.
 - DT_ADAPT.
 - Reduction.
 - support get_code for helper functions.
+
+General OpenCL issues:
+- Handle changes to number of particles correctly.
+- Periodicity.
 
 """
 import inspect
@@ -54,14 +59,13 @@ class OpenCLAccelerationEval(object):
                 ] + extra_args
                 call(*args)
             else:
-                args.extend(extra_args)
-                call(*args)
+                call(*(args + extra_args))
 
     def set_nnps(self, nnps):
         self.nnps = nnps
 
     def update_particle_arrays(self, arrays):
-        pass
+        raise NotImplementedError('OpenCL backend is incomplete')
 
 
 def add_address_space(known_types):
@@ -152,7 +156,6 @@ class AccelerationEvalOpenCLHelper(object):
         path = join(dirname(__file__), 'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
-        print(main)
         return main
 
     def setup_compiled_module(self, module):
