@@ -317,6 +317,9 @@ cdef class BruteForceNNPS(GPUNNPS):
                 }
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
+        norm2 = """
+                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+                """
         brute_force_nbr_lengths = ElementwiseKernel(self.ctx,
                 arguments, src, "brute_force_nbr_lengths", preamble=norm2)
 
