@@ -6,6 +6,7 @@ except ImportError:
     import unittest
 
 # Library imports.
+import pytest
 import numpy as np
 
 # Local imports.
@@ -16,7 +17,6 @@ from pysph.sph.acceleration_eval import (AccelerationEval,
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
-from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
 from pysph.sph.sph_compiler import SPHCompiler
 
 from pysph.base.reduce_array import serial_reduce_array
@@ -329,6 +329,8 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         self.pa = pa
 
     def _make_accel_eval(self, equations, cache_nnps=True):
+        pytest.importorskip('pysph.base.gpu_nnps')
+        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(

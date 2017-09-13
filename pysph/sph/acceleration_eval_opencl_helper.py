@@ -236,8 +236,9 @@ class AccelerationEvalOpenCLHelper(object):
                     )
                 )
         s_ary, d_ary = all_eqs.get_array_names()
-        s_ary.update(d_ary)
-        _args = list(s_ary)
+        # We only need the dest arrays here as these are simple kernels
+        # without a loop so there is no "source".
+        _args = list(d_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
 
