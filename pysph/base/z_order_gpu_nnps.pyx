@@ -45,6 +45,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
         self.use_double = use_double
+        self.radix_sort = None
 
         self.helper = GPUNNPSHelper(self.ctx, "z_order_gpu_nnps.mako", use_double)
 
@@ -63,13 +64,18 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
                 self.pid_keys[pa_index], self.pids[pa_index])
 
-        radix_sort = cl.algorithm.RadixSort(self.ctx,
+        if self.radix_sort is None:
+            self.radix_sort = cl.algorithm.RadixSort(
+                self.ctx,
                 "unsigned int* pids, unsigned long* keys",
                 scan_kernel=GenericScanKernel, key_expr="keys[i]",
-                sort_arg_names=["pids", "keys"])
+                sort_arg_names=["pids", "keys"]
+            )
 
-        (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index],
-                self.pid_keys[pa_index], key_bits=64)
+
+        (sorted_indices, sorted_keys), evnt = self.radix_sort(
+            self.pids[pa_index], self.pid_keys[pa_index], key_bits=64
+        )
         self.pids[pa_index] = sorted_indices
         self.pid_keys[pa_index] = sorted_keys
 
@@ -223,4 +229,3 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.max_cid[self.src_index], self.cids[self.dst_index],
                 self.cid_to_idx[self.src_index], self.overflow_cid_to_idx,
                 self.dst_to_src, start_indices, nbrs, self.radius_scale2, self.cell_size)
-
