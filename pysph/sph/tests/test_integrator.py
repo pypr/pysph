@@ -230,7 +230,7 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         pytest.importorskip('pysph.base.gpu_nnps')
         kernel = CubicSpline(dim=1)
         arrays = [self.pa]
-        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
+        from pysph.base.gpu_nnps import BruteForceNNPS as GPUNNPS
         a_eval = AccelerationEval(
              particle_arrays=arrays, equations=equations, kernel=kernel,
              backend='opencl'
@@ -247,8 +247,8 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         integrator = LeapFrogIntegrator(fluid=LeapFrogStep())
         equations = [SHM(dest="fluid", sources=None)]
         self._setup_integrator(equations=equations, integrator=integrator)
-        tf = np.pi/10
-        dt = 0.1*tf
+        tf = np.pi/5
+        dt = 0.05*tf
 
         # When
         energy = []

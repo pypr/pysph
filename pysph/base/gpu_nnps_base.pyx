@@ -272,9 +272,9 @@ cdef class BruteForceNNPS(GPUNNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         for pa_wrapper in self.pa_wrappers:
             if use_double:
-                pa_wrapper.copy_to_gpu(self.queue, np.float64)
+                copy_to_gpu(pa_wrapper, self.queue, np.float64)
             else:
-                pa_wrapper.copy_to_gpu(self.queue, np.float32)
+                copy_to_gpu(pa_wrapper, self.queue, np.float32)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`

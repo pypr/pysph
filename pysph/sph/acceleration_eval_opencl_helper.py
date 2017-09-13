@@ -2,7 +2,6 @@
 TODO:
 
 Basic support:
-- integrator support.
 - support for doubles/floats.
 
 Advanced:
