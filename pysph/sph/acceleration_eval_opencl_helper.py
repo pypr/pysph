@@ -217,7 +217,10 @@ class AccelerationEvalOpenCLHelper(object):
         kernel = 'g{g_idx}_{kind}'.format(g_idx=g_idx, kind=kind)
         all_args = []
         py_args = []
-        code = ['int d_idx = get_global_id(0);']
+        code = [
+            'double DT_ADAPT[3];',
+            'int d_idx = get_global_id(0);'
+        ]
         for eq in all_eqs.equations:
             method = getattr(eq, kind, None)
             if method is not None:
@@ -286,7 +289,7 @@ class AccelerationEvalOpenCLHelper(object):
             kern = '%s_kernel(kern, ' % name
             grad = '%s_gradient(kern, ' % name
             grad_h = '%s_gradient_h(kern, ' % name
-            deltap = '%s_deltap(kern)' % name
+            deltap = '%s_get_deltap(kern)' % name
 
             code = code.replace('DELTAP', deltap).replace('GRADIENT(', grad)
             return code.replace('KERNEL(', kern).replace('GRADH(', grad_h)
@@ -309,6 +312,7 @@ class AccelerationEvalOpenCLHelper(object):
         )
         context = eq_group.context
         code = self._declare_precomp_vars(context)
+        code.append('double DT_ADAPT[3];')
         code.append('int d_idx = get_global_id(0);')
         code.append('int s_idx, i;')
         code.append('int start = start_idx[d_idx];')

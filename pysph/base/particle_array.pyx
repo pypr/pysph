@@ -364,6 +364,8 @@ cdef class ParticleArray:
 
         # number of particles
         num_particles = self.get_number_of_particles(only_real)
+        if self.gpu is not None:
+            self.gpu.pull(*props)
 
         # add the property arrays
         for prop in props:

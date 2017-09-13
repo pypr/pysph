@@ -29,6 +29,7 @@ ${helper.get_post_loop_kernel(g_idx, dest, all_eqs)}
 % endfor
 </%def>
 
+#define abs fabs
 ${helper.get_header()}
 
 % for g_idx, group in enumerate(helper.object.mega_groups):

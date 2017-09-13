@@ -382,9 +382,10 @@ def get_particle_array_gasd(constants=None, **props):
 
     pa.set_output_arrays(['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
                           'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh',
-                          'alpha1', 'alpha2'] )
+                          'alpha1', 'alpha2'])
 
     return pa
+
 
 def get_particles_info(particles):
     """Return the array information for a list of particles.
@@ -402,18 +403,21 @@ def get_particles_info(particles):
         prop_info = {}
         for prop_name, prop in parray.properties.items():
             prop_info[prop_name] = {
-                'name':prop_name, 'type':prop.get_c_type(),
-                'default':parray.default_values[prop_name],
-                'data':None}
+                'name': prop_name, 'type': prop.get_c_type(),
+                'default': parray.default_values[prop_name],
+                'data': None}
         const_info = {}
+        if parray.gpu is not None:
+            parray.gpu.pull(*list(parray.constants.keys()))
         for c_name, value in parray.constants.items():
             const_info[c_name] = value.get_npy_array()
-        info[ parray.name ] = dict(
+        info[parray.name] = dict(
             properties=prop_info, constants=const_info,
             output_property_arrays=parray.output_property_arrays
         )
 
     return info
+
 
 def create_dummy_particles(info):
     """Returns a replica (empty) of a list of particles"""

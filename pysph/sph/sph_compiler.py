@@ -44,11 +44,7 @@ class SPHCompiler(object):
     # Private interface. ####################################################
     def _get_code(self):
         main = self.acceleration_eval_helper.get_code()
-        # FIXME
-        if self.integrator_helper is None:
-            integrator_code = ''
-        else:
-            integrator_code = self.integrator_helper.get_code()
+        integrator_code = self.integrator_helper.get_code()
         return main + integrator_code
 
     def _setup_helpers(self):

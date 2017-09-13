@@ -329,12 +329,19 @@ class Application(object):
                           help="Dump output in the specified directory.")
 
         # --openmp
-        parser.add_argument("--openmp", action="store_true", dest="with_openmp",
-                          default=None, help="Use OpenMP to run the "\
+        parser.add_argument("--openmp", action="store_true",
+                            dest="with_openmp",
+                            default=None, help="Use OpenMP to run the "
                             "simulation using multiple cores.")
-        parser.add_argument("--no-openmp", action="store_false", dest="with_openmp",
-                          default=None, help="Do not use OpenMP to run the "\
+        parser.add_argument("--no-openmp", action="store_false",
+                            dest="with_openmp",
+                            default=None, help="Do not use OpenMP to run the "
                             "simulation using multiple cores.")
+        # --opencl
+        parser.add_argument("--opencl", action="store_true",
+                            dest="with_opencl",
+                            default=False,
+                            help="Use OpenCL to run the simulation.")
 
         # --kernel
         all_kernels = list_all_kernels()
@@ -707,6 +714,8 @@ class Application(object):
         # Setup configuration options.
         if options.with_openmp is not None:
             get_config().use_openmp = options.with_openmp
+        if options.with_opencl:
+            get_config().use_opencl = True
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 
@@ -726,9 +735,16 @@ class Application(object):
 
         if self.nnps is None:
             cache = options.cache_nnps
-
             # create the NNPS object
-            if options.nnps == 'box':
+            if options.with_opencl:
+                from pysph.base.gpu_nnps import ZOrderGPUNNPS
+                nnps = ZOrderGPUNNPS(
+                    dim=solver.dim, particles=self.particles,
+                    radius_scale=kernel.radius_scale, domain=self.domain,
+                    cache=True, sort_gids=options.sort_gids
+                )
+
+            elif options.nnps == 'box':
                 nnps = BoxSortNNPS(
                     dim=solver.dim, particles=self.particles,
                     radius_scale=kernel.radius_scale, domain=self.domain,
@@ -1107,7 +1123,7 @@ class Application(object):
         if self.solver is None:
             start_time = time.time()
 
-            self._parse_command_line()
+            self._parse_command_line(force=argv is not None)
             self._setup_logging()
 
             self.solver = self.create_solver()

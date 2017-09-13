@@ -55,6 +55,7 @@ cdef class GPUNeighborCache:
         cdef long n_p = self._particles[dst_index].get_number_of_particles()
         cdef size_t i
 
+        self._get_start_indices = None
         self._cached = False
         self._copied_to_cpu = False
 
@@ -89,10 +90,12 @@ cdef class GPUNeighborCache:
         self._start_idx_gpu = self._nbr_lengths_gpu.copy()
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
-        get_start_indices = ExclusiveScanKernel(self._nnps.ctx,
-                np.uint32, scan_expr="a+b", neutral="0")
+        if self._get_start_indices is None:
+            self._get_start_indices = ExclusiveScanKernel(
+                self._nnps.ctx, np.uint32, scan_expr="a+b", neutral="0"
+            )
 
-        get_start_indices(self._start_idx_gpu)
+        self._get_start_indices(self._start_idx_gpu)
         self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu,
                 self._start_idx_gpu)
         self._cached = True
