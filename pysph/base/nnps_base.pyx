@@ -224,8 +224,6 @@ cdef class NNPSParticleArrayWrapper:
 
         self.np = pa.get_number_of_particles()
 
-        self.copied_to_gpu = False
-
     cdef int get_number_of_particles(self):
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
@@ -1183,5 +1181,3 @@ cdef class NNPS(NNPSBase):
 
     cpdef _refresh(self):
         raise NotImplementedError("NNPS :: _refresh called")
-
-

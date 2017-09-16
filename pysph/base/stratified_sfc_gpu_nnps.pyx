@@ -37,7 +37,7 @@ IF UNAME_SYSNAME == "Windows":
 cdef class StratifiedSFCGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, bint use_double=True,
+            bint cache=True, bint sort_gids=False,
             int num_levels=2, ctx=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
@@ -45,9 +45,9 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-        self.use_double = use_double
 
-        self.helper = GPUNNPSHelper(self.ctx, "stratified_sfc_gpu_nnps.mako", use_double)
+        self.helper = GPUNNPSHelper(self.ctx, "stratified_sfc_gpu_nnps.mako",
+                                    self.use_double)
         self.eps = 16*np.finfo(np.float32).eps
 
         self.num_levels = num_levels
@@ -75,12 +75,6 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
-
-            if self.use_double:
-                copy_to_gpu(pa_wrapper, self.queue, np.float64)
-            else:
-                copy_to_gpu(pa_wrapper, self.queue, np.float32)
-
             num_particles = pa_wrapper.get_number_of_particles()
 
             self.pids.append(cl.array.empty(self.queue,
@@ -113,7 +107,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         levels = cl.array.empty(self.queue, pa_wrapper.get_number_of_particles(),
                 dtype=np.int32)
 
-        fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z, pa_wrapper.gpu_h,
+        pa_gpu = pa_wrapper.pa.gpu
+        fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z, pa_gpu.h,
                 self.interval_size, self.xmin[0], self.xmin[1], self.xmin[2], self.hmin,
                 self.pid_keys[pa_index], self.pids[pa_index],
                 self.radius_scale, self.max_num_bits)
@@ -164,9 +159,10 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         mask_lengths = cl.array.zeros(self.queue, self.dst.get_number_of_particles(),
                 dtype=np.int32)
 
-        find_nbr_lengths(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h,
+        dst_gpu = self.dst.pa.gpu
+        src_gpu = self.src.pa.gpu
+        find_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index], nbr_lengths,
@@ -181,14 +177,13 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
 
-        find_nbrs(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h,
+        dst_gpu = self.dst.pa.gpu
+        src_gpu = self.src.pa.gpu
+        find_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index],
                 start_indices, nbrs, self.radius_scale, self.hmin, self.interval_size,
                 self.start_idx_levels[self.src_index],
                 self.max_num_bits, self.num_levels, self.num_particles_levels[self.src_index])
-
-

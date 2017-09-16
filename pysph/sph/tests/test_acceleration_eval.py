@@ -10,6 +10,7 @@ import pytest
 import numpy as np
 
 # Local imports.
+from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (AccelerationEval,
@@ -370,7 +371,30 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         # Then
         expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9.,  9.,  7.357])
         pa.gpu.pull('rho')
-        print(pa.rho)
+
+        print(pa.rho, pa.gpu.rho)
+        self.assertTrue(np.allclose(expect, pa.rho, atol=1e-2))
+
+    def test_precomputed_should_work_on_gpu_with_double(self):
+        orig = get_config().use_double
+
+        def _cleanup():
+            get_config().use_double = orig
+        get_config().use_double = True
+        self.addCleanup(_cleanup)
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9.,  9.,  7.357])
+        pa.gpu.pull('rho')
+
+        print(pa.rho, pa.gpu.rho)
         self.assertTrue(np.allclose(expect, pa.rho, atol=1e-2))
 
     def test_equation_with_time_should_work_on_gpu(self):

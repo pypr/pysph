@@ -2,6 +2,7 @@ from textwrap import dedent
 import pytest
 import numpy as np
 
+from pysph.base.config import get_config
 from pysph.base.translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
     OpenCLConverter, py2c
@@ -731,8 +732,10 @@ def test_c_struct_helper():
 
     # When/Then
     array = h.get_array()
-    expect = np.dtype([('apple', np.int),
-                       ('banana', np.float), ('pear', np.float)])
+    use_double = get_config().use_double
+    fdtype = np.float64 if use_double else np.float32
+    expect = np.dtype([('apple', np.int32),
+                       ('banana', fdtype), ('pear', fdtype)])
 
     assert array.dtype == expect
     assert array['apple'] == 1
@@ -800,7 +803,9 @@ def test_wrapping_class():
 
     # When
     h = CStructHelper(obj)
-    dtype = np.dtype([('f', np.float), ('x', np.int)])
+    use_double = get_config().use_double
+    fdtype = np.float64 if use_double else np.float32
+    dtype = np.dtype([('f', fdtype), ('x', np.int32)])
     expect = np.zeros(1, dtype)
     assert h.get_array() == expect
 

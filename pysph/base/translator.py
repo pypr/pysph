@@ -17,6 +17,7 @@ from textwrap import dedent
 import numpy as np
 from mako.template import Template
 
+from pysph.base.config import get_config
 from pysph.base.cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )
@@ -62,6 +63,7 @@ def py2c(src, detect_type=detect_type, known_types=None):
 
 class CStructHelper(object):
     def __init__(self, obj):
+        self._use_double = get_config().use_double
         self.parse(obj)
 
     def _get_public_vars(self):
@@ -83,11 +85,13 @@ class CStructHelper(object):
         self.vars = self._get_public_vars()
 
     def get_array(self):
+        f_dtype = np.float64 if self._use_double else np.float32
+        types = {'int': np.int32, 'double': f_dtype, 'long': np.int64}
         if len(self.vars) > 0:
             obj = self.obj
             fields = []
             for var in sorted(self.vars):
-                fields.append((var, getattr(np, self.vars[var])))
+                fields.append((var, types[self.vars[var]]))
             dtype = np.dtype(fields)
             ary = np.empty(1, dtype)
             for var in self.vars:

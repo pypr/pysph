@@ -1,8 +1,11 @@
 """Common OpenCL related functionality.
 """
 
+import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
+
+from .config import get_config
 
 _ctx = None
 _queue = None
@@ -37,15 +40,24 @@ class DeviceHelper(object):
         self._particle_array = pa = particle_array
         self._queue = q = get_queue()
         self._props = []
+        use_double = get_config().use_double
+        self._dtype = np.float64 if use_double else np.float32
 
         for prop, ary in pa.properties.items():
-            a_gpu = cl.array.to_device(q, ary.get_npy_array())
+            a_gpu = cl.array.to_device(q, self._get_array(ary))
             setattr(self, prop, a_gpu)
             self._props.append(prop)
         for prop, ary in pa.constants.items():
-            a_gpu = cl.array.to_device(q, ary.get_npy_array())
+            a_gpu = cl.array.to_device(q, self._get_array(ary))
             setattr(self, prop, a_gpu)
             self._props.append(prop)
+
+    def _get_array(self, ary):
+        ctype = ary.get_c_type()
+        if ctype in ['float', 'double']:
+            return ary.get_npy_array().astype(self._dtype)
+        else:
+            return ary.get_npy_array()
 
     def _get_prop_or_const(self, prop):
         pa = self._particle_array
@@ -56,7 +68,7 @@ class DeviceHelper(object):
             args = self._props
         for arg in args:
             getattr(self, arg).set(
-                self._get_prop_or_const(arg).get_npy_array()
+                self._get_array(self._get_prop_or_const(arg))
             )
 
     def pull(self, *args):

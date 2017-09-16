@@ -1,9 +1,6 @@
 """
 TODO:
 
-Basic support:
-- support for doubles/floats.
-
 Advanced:
 - Handle: Real=True/False, update_nnps, iterate
 - sub groups.
@@ -15,16 +12,21 @@ Advanced:
 General OpenCL issues:
 - Handle changes to number of particles correctly.
 - Periodicity.
+- Cleanup the code generation
 
 """
 import inspect
-from os.path import dirname, join
+import os
+import re
 
 import numpy as np
 from mako.template import Template
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
+import pyopencl.tools  # noqa: 401
 
+from pysph.base.config import get_config
+from pysph.base.ext_module import get_platform_dir
 from pysph.base.opencl import get_context, get_queue, DeviceHelper
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
@@ -41,11 +43,13 @@ class OpenCLAccelerationEval(object):
     def __init__(self, helper):
         self.helper = helper
         self.nnps = None
+        self._use_double = get_config().use_double
 
     def compute(self, t, dt):
         helper = self.helper
         nnps = self.nnps
-        extra_args = [np.asarray(t), np.asarray(dt)]
+        dtype = np.float64 if self._use_double else np.float32
+        extra_args = [np.asarray(t, dtype=dtype), np.asarray(dt, dtype=dtype)]
         for call, args, loop_info in helper.calls:
             if loop_info[0]:
                 nnps.set_context(loop_info[1], loop_info[2])
@@ -71,6 +75,13 @@ def add_address_space(known_types):
     for v in known_types.values():
         if '__global' not in v.type:
             v.type = '__global ' + v.type
+
+
+def convert_to_float_if_needed(code):
+    use_double = get_config().use_double
+    if not use_double:
+        code = re.sub(r'\bdouble\b', 'float', code)
+    return code
 
 
 class AccelerationEvalOpenCLHelper(object):
@@ -102,7 +113,8 @@ class AccelerationEvalOpenCLHelper(object):
         array_map = {}
         array_index = {}
         for idx, pa in enumerate(pas):
-            pa.set_device_helper(DeviceHelper(pa))
+            if pa.gpu is None:
+                pa.set_device_helper(DeviceHelper(pa))
             array_map[pa.name] = pa
             array_index[pa.name] = idx
 
@@ -115,7 +127,11 @@ class AccelerationEvalOpenCLHelper(object):
             if v is None:
                 gpu[k] = v
             else:
-                gpu[k] = cl.array.to_device(self._queue, v)
+                g_struct, code = cl.tools.match_dtype_to_c_struct(
+                    self._ctx.devices[0], "dummy", v.dtype
+                )
+                g_v = v.astype(g_struct)
+                gpu[k] = cl.array.to_device(self._queue, g_v)
 
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
@@ -152,7 +168,8 @@ class AccelerationEvalOpenCLHelper(object):
     # Public interface.
     ##########################################################################
     def get_code(self):
-        path = join(dirname(__file__), 'acceleration_eval_opencl.mako')
+        path = os.path.join(os.path.dirname(__file__),
+                            'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
         return main
@@ -165,6 +182,16 @@ class AccelerationEvalOpenCLHelper(object):
         object.set_compiled_object(acceleration_eval)
 
     def compile(self, code):
+        code = convert_to_float_if_needed(code)
+        path = os.path.expanduser(os.path.join(
+            '~', '.pysph', 'source', get_platform_dir()
+        ))
+        if not os.path.exists(path):
+            os.makedirs(path)
+        fname = os.path.join(path, 'generated.cl')
+        with open(fname, 'w') as fp:
+            fp.write(code)
+            print("OpenCL code written to %s" % fname)
         self.program = cl.Program(self._ctx, code.encode('ascii')).build()
         return self.program
 

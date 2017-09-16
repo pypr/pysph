@@ -343,12 +343,18 @@ class Application(object):
                             default=False,
                             help="Use OpenCL to run the simulation.")
 
+        # --use-double
+        parser.add_argument("--use-double", action="store_true",
+                            dest="use_double",
+                            default=False,
+                            help="Use double precision for OpenCL code.")
+
         # --kernel
         all_kernels = list_all_kernels()
         parser.add_argument(
             "--kernel", action="store", dest="kernel", default=None,
-             choices=all_kernels,
-            help="Use specified kernel from %s"%all_kernels
+            choices=all_kernels,
+            help="Use specified kernel from %s" % all_kernels
         )
 
         # Restart options
@@ -716,6 +722,8 @@ class Application(object):
             get_config().use_openmp = options.with_openmp
         if options.with_opencl:
             get_config().use_opencl = True
+        if options.use_double:
+            get_config().use_double = options.use_double
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 

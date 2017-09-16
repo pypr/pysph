@@ -7,6 +7,7 @@ import types
 from mako.template import Template
 import numpy as np
 
+from pysph.base.config import get_config
 from pysph.base.translator import OpenCLConverter
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
@@ -21,6 +22,7 @@ class OpenCLIntegrator(object):
         self.nnps = None
         self.parallel_manager = None
         self._post_stage_callback = None
+        self._use_double = get_config().use_double
         self._setup_methods()
 
     def _setup_methods(self):
@@ -48,7 +50,9 @@ class OpenCLIntegrator(object):
     def _do_stage(self, method):
         # Call the appropriate kernels for either initialize/stage computation.
         call_info = self.helper.calls[method]
-        extra_args = [np.asarray(self.t), np.asarray(self.dt)]
+        dtype = np.float64 if self._use_double else np.float32
+        extra_args = [np.asarray(self.t, dtype=dtype),
+                      np.asarray(self.dt, dtype=dtype)]
         for dest, (call, args) in call_info.items():
             call(*(args + extra_args))
 

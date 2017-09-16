@@ -9,6 +9,7 @@ class Config(object):
     def __init__(self):
         self._use_openmp = None
         self._use_opencl = None
+        self._use_double = None
 
     @property
     def use_openmp(self):
@@ -34,6 +35,23 @@ class Config(object):
         self._use_opencl = value
 
     def _use_opencl_default(self):
+        return False
+
+    @property
+    def use_double(self):
+        """This is only used by OpenCL code.
+        """
+        if self._use_double is None:
+            self._use_double = self._use_double_default()
+        return self._use_double
+
+    @use_double.setter
+    def use_double(self, value):
+        """This is only used by OpenCL code.
+        """
+        self._use_double = value
+
+    def _use_double_default(self):
         return False
 
 

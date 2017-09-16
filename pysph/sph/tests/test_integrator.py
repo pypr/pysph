@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 # Local imports.
+from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
@@ -264,6 +265,15 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         # Then
         energy = np.asarray(energy)
         self.assertAlmostEqual(np.max(np.abs(energy - 0.5)), 0.0, places=3)
+
+    def test_leapfrog_with_double(self):
+        orig = get_config().use_double
+
+        def _cleanup():
+            get_config().use_double = orig
+        get_config().use_double = True
+        self.addCleanup(_cleanup)
+        self.test_leapfrog()
 
 
 if __name__ == '__main__':

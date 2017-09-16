@@ -24,7 +24,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object helper
     cdef object radix_sort
 
-    cdef public bint use_double
     cdef bint _sorted
     cdef bint dst_src
 

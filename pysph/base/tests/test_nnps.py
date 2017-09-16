@@ -11,6 +11,7 @@ from numpy import random
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
+from pysph.base.config import get_config
 
 # Carrays from PyZoltan
 from pyzoltan.core.carray import UIntArray, IntArray
@@ -323,11 +324,38 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
         ctx = cl.create_some_context(interactive=False)
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
 
         self.nps = gpu_nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            use_double=False, ctx=ctx
+            ctx=ctx
         )
+
+    def tearDown(self):
+        super(ZOrderGPUNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = True
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            ctx=ctx
+        )
+
+    def tearDown(self):
+        super(ZOrderGPUDoubleNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
 
 
 class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
@@ -340,7 +368,7 @@ class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
 
         self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            use_double=False, num_levels=2, ctx=ctx
+            num_levels=2, ctx=ctx
         )
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):

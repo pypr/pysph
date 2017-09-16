@@ -30,7 +30,9 @@ from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
-from pysph.base.opencl import get_context, get_queue, set_context, set_queue
+from pysph.base.config import get_config
+from pysph.base.opencl import (DeviceHelper, get_context, get_queue,
+                               set_context, set_queue)
 
 # Particle Tag information
 from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
@@ -80,6 +82,10 @@ cdef class GPUNeighborCache:
 
     cdef void _find_neighbors(self):
         self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu)
+        # FIXME:
+        # - Store sum kernel
+        # - don't allocate neighbors_gpu each time.
+        # - Don't allocate _nbr_lengths and start_idx.
         total_size_gpu = cl.array.sum(self._nbr_lengths_gpu)
         cdef unsigned long total_size = <unsigned long>(total_size_gpu.get())
 
@@ -110,6 +116,7 @@ cdef class GPUNeighborCache:
         self._start_idx_ptr = <unsigned int*> self._start_idx.data
 
     cpdef update(self):
+        # FIXME: Don't allocate here unless needed.
         self._cached = False
         self._copied_to_cpu = False
         cdef long n_p = self._particles[self._dst_index].get_number_of_particles()
@@ -121,6 +128,7 @@ cdef class GPUNeighborCache:
 
     cpdef get_neighbors_gpu(self):
         self.get_neighbors_raw_gpu()
+
 
 cdef class GPUNNPS(NNPSBase):
     """Nearest neighbor query class using the box-sort algorithm.
@@ -171,8 +179,18 @@ cdef class GPUNNPS(NNPSBase):
         else:
             self.ctx = ctx
             set_context(ctx)
-            self.queue = cl.CommandQueue(self.ctx, properties=cl.command_queue_properties.PROFILING_ENABLE)
+            self.queue = cl.CommandQueue(
+                self.ctx,
+                properties=cl.command_queue_properties.PROFILING_ENABLE
+            )
             set_queue(self.queue)
+
+        self.use_double = get_config().use_double
+
+        # Set the device helper if needed.
+        for pa in particles:
+            if pa.gpu is None:
+                pa.set_device_helper(DeviceHelper(pa))
 
         # The cache.
         self.use_cache = cache
@@ -208,9 +226,6 @@ cdef class GPUNNPS(NNPSBase):
         for arr in pa.properties.values():
             arr.c_align_array(indices)
 
-        copy_to_gpu(self.pa_wrappers[pa_index], self.queue,
-                (np.float64 if self.use_double else np.float32))
-
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
 
@@ -233,10 +248,6 @@ cdef class GPUNNPS(NNPSBase):
 
         # indices on which to bin. We bin all local particles
         for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
             # bin the particles
             self._bin(pa_index=i)
 
@@ -271,13 +282,6 @@ cdef class BruteForceNNPS(GPUNNPS):
                 """
 
         self.preamble = norm2
-
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        for pa_wrapper in self.pa_wrappers:
-            if use_double:
-                copy_to_gpu(pa_wrapper, self.queue, np.float64)
-            else:
-                copy_to_gpu(pa_wrapper, self.queue, np.float32)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -317,15 +321,16 @@ cdef class BruteForceNNPS(GPUNNPS):
                 }
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
-        norm2 = """
-                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-                """
-        brute_force_nbr_lengths = ElementwiseKernel(self.ctx,
-                arguments, src, "brute_force_nbr_lengths", preamble=norm2)
+        brute_force_nbr_lengths = ElementwiseKernel(
+            self.ctx, arguments, src, "brute_force_nbr_lengths",
+            preamble=self.preamble
+        )
 
-        brute_force_nbr_lengths(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.get_number_of_particles(),
+        src_gpu = self.src.pa.gpu
+        dst_gpu = self.dst.pa.gpu
+        brute_force_nbr_lengths(src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h, dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, self.src.get_number_of_particles(),
                 nbr_lengths, self.radius_scale2)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
@@ -355,16 +360,16 @@ cdef class BruteForceNNPS(GPUNNPS):
                 }
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
-        norm2 = """
-                #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
-                """
+        brute_force_nbrs = ElementwiseKernel(
+            self.ctx, arguments, src, "brute_force_nbrs",
+            preamble=self.preamble
+        )
 
-        brute_force_nbrs = ElementwiseKernel(self.ctx,
-                arguments, src, "brute_force_nbrs", preamble=norm2)
-
-        brute_force_nbrs(self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h, self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.get_number_of_particles(),
+        src_gpu = self.src.pa.gpu
+        dst_gpu = self.dst.pa.gpu
+        brute_force_nbrs(src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h, dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, self.src.get_number_of_particles(),
                 start_indices, nbrs, self.radius_scale2)
 
     cpdef _bin(self, int pa_index):
