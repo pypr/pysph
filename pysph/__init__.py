@@ -1,5 +1,5 @@
 # See PEP 440 for more on suitable version numbers.
-__version__ = '1.0a5.dev0'
+__version__ = '1.0b1.dev0'
 
 # Utility functions to determine if Zoltan/MPI are available.
 _has_mpi = None
@@ -19,6 +19,7 @@ def has_mpi():
             _has_mpi = False
     return _has_mpi
 
+
 def has_zoltan():
     """Return True if zoltan is available.
     """
@@ -30,6 +31,7 @@ def has_zoltan():
         except ImportError:
             _has_zoltan = False
     return _has_zoltan
+
 
 def in_parallel():
     """Return true if we're running with MPI and Zoltan support
