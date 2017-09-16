@@ -48,14 +48,7 @@ cdef class GPUNeighborCache:
         self._nnps = nnps
         self._particles = nnps.particles
         self._narrays = nnps.narrays
-
-        self._dst_index = dst_index
-        self._src_index = src_index
-        self._nnps = nnps
-        self._particles = nnps.particles
-        self._narrays = nnps.narrays
         cdef long n_p = self._particles[dst_index].get_number_of_particles()
-        cdef size_t i
 
         self._get_start_indices = None
         self._cached = False

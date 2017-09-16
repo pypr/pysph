@@ -43,6 +43,7 @@ class OpenCLAccelerationEval(object):
     def __init__(self, helper):
         self.helper = helper
         self.nnps = None
+        self._queue = helper._queue
         self._use_double = get_config().use_double
 
     def compute(self, t, dt):
@@ -55,6 +56,7 @@ class OpenCLAccelerationEval(object):
                 nnps.set_context(loop_info[1], loop_info[2])
                 cache = nnps.current_cache
                 cache.get_neighbors_gpu()
+                self._queue.finish()
                 args = list(args) + [
                     cache._nbr_lengths_gpu.data,
                     cache._start_idx_gpu.data,
@@ -63,6 +65,7 @@ class OpenCLAccelerationEval(object):
                 call(*args)
             else:
                 call(*(args + extra_args))
+            self._queue.finish()
 
     def set_nnps(self, nnps):
         self.nnps = nnps

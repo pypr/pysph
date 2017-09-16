@@ -1033,6 +1033,9 @@ cdef class NNPSBase:
         cdef double lx, ly, lz
 
         for pa_wrapper in pa_wrappers:
+            if pa_wrapper.pa.gpu is not None:
+                # FIXME: find the max/min on the GPU instead.
+                pa_wrapper.pa.gpu.pull('x', 'y', 'z')
             x = pa_wrapper.x
             y = pa_wrapper.y
             z = pa_wrapper.z
