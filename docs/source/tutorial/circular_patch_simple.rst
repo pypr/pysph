@@ -476,8 +476,9 @@ Viewing the data in an IPython notebook
 PySPH makes it relatively easy to view the data inside an IPython notebook
 with minimal additional dependencies. A simple UI is provided to view the
 saved data using this interface. It requires jupyter_ and ipywidgets_.
-Currently, a 2D viewer is provided for the data. Here is a simple example of
-how one may use this in a notebook.  Inside a notebook, one needs the following::
+Currently, a 2D and 3D viewer are provided for the data. Here is a simple
+example of how one may use this in a notebook. Inside a notebook, one needs
+the following::
 
     %matplotlib notebook
     from pysph.tools.ipy_viewer import Viewer2D
@@ -502,9 +503,14 @@ load the files. It is useful although not mandatory to have the first line
 that sets the matplotlib backend to the ``notebook``. What this does is to
 allow you to zoom and interact with the interactive plots.
 
+There is also a 3D viewer which may be used using ``Viewer3D`` instead of the
+``Viewer2D`` above.  This viewer requires ipyvolume_ to be installed.
+
 
 .. _jupyter: https://jupyter.org
 .. _ipywidgets: https://github.com/jupyter-widgets/ipywidgets
+.. _ipyvolume: https://pypi.python.org/pypi/ipyvolume
+
 
 A slightly more complex example
 -------------------------------

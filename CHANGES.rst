@@ -1,8 +1,26 @@
 1.0a5
 -----
 
-* Release date:  Still under development.
-* Improve the reference documentation a little.
+* Release date:  17th September, 2017
+* Mayavi viewer now supports empty particle arrays.
+* Fix error in scheme chooser which caused problems with default scheme
+  property values.
+* Add starcluster support/documentation so PySPH can be easily used on EC2.
+* Improve the particle array so it automatically ravel's the passed arrays and
+  also accepts constant values without needing an array each time.
+* Add a few new examples.
+* Added 2D and 3D viewers for Jupyter notebooks.
+* Add several new Wendland Quintic kernels.
+* Add option to measure coverage of Cython code.
+* Add EDAC scheme.
+* Move project to github.
+* Improve documentation and reference section.
+* Fix various bugs.
+* Switch to using pytest instead of nosetests.
+* Add a convenient geometry creation module in ``pysph.tools.geometry``
+* Add support to script the viewer with a Python file, see ``pysph view -h``.
+* Add several new NNPS schemes like extended spatial hashing, SFC, oct-trees
+  etc.
 * Improve Mayavi viewer so one can view the velocity vectors and any other
   vectors.
 * Viewer now has a button to edit the visualization properties easily.
