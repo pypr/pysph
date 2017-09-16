@@ -69,13 +69,14 @@ class CStructHelper(object):
     def _get_public_vars(self):
         data = self.obj.__dict__
         vars = {}
-        type_names = {int: 'int', float: 'double', bool: 'int'}
         for name in data:
             if name.startswith('_'):
                 continue
             value = data[name]
-            if isinstance(value, (int, float, bool)):
-                vars[name] = type_names[type(value)]
+            if isinstance(value, (int, bool)):
+                vars[name] = 'int'
+            elif isinstance(value, float):
+                vars[name] = 'double'
 
         return vars
 
@@ -115,7 +116,7 @@ class CStructHelper(object):
 class CConverter(ast.NodeVisitor):
     def __init__(self, detect_type=detect_type, known_types=None):
         self._declares = {}
-        self._known = set()
+        self._known = set(('M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI'))
         self._name_ctx = (ast.Load, ast.Store)
         self._indent = ''
         self._detect_type = detect_type

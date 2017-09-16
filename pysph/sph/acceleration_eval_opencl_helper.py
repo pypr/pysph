@@ -241,7 +241,9 @@ class AccelerationEvalOpenCLHelper(object):
 
     def _get_simple_kernel(self, g_idx, dest, all_eqs, kind):
         assert kind in ('initialize', 'post_loop', 'loop')
-        kernel = 'g{g_idx}_{kind}'.format(g_idx=g_idx, kind=kind)
+        kernel = 'g{g_idx}_{dest}_{kind}'.format(
+            g_idx=g_idx, dest=dest, kind=kind
+        )
         all_args = []
         py_args = []
         code = [
