@@ -26,6 +26,7 @@ The latest documentation for PySPH is available at
    :target: https://codeship.com/projects/222098
 .. |Appveyor Status| image:: https://ci.appveyor.com/api/projects/status/q7ujoef1xbguk4wx
    :target: https://ci.appveyor.com/project/prabhuramachandran/pysph-00bq8
+
 Here are `videos
 <https://www.youtube.com/playlist?list=PLH8Y2KepC2_VPLrcTiWGaYYh88gGVAuVr>`_
 of some example problems solved using PySPH.
