@@ -12,6 +12,7 @@ tested and modified to be suitable for use with PySPH.
 import ast
 import inspect
 import re
+import sys
 from textwrap import dedent
 
 import numpy as np
@@ -21,6 +22,8 @@ from pysph.base.config import get_config
 from pysph.base.cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )
+
+PY_VER = sys.version_info.major
 
 
 def detect_type(name, value):
@@ -123,7 +126,10 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
-        self._replacements = {'True': '1', 'False': '0', 'None': 'NULL'}
+        self._replacements = {
+            'True': '1', 'False': '0', 'None': 'NULL',
+            True: '1', False: '0', None: 'NULL',
+        }
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
@@ -133,7 +139,10 @@ class CConverter(ast.NodeVisitor):
 
     def _get_function_args(self, node):
         node_args = node.args.args
-        args = [x.id for x in node_args]
+        if PY_VER == 2:
+            args = [x.id for x in node_args]
+        else:
+            args = [x.arg for x in node_args]
         defaults = [ast.literal_eval(x) for x in node.args.defaults]
 
         # Fill up the call_args dict with the defaults.
@@ -332,7 +341,10 @@ class CConverter(ast.NodeVisitor):
         orig_declares = self._declares
         self._declares = {}
         orig_known = set(self._known)
-        self._known.update(x.id for x in node.args.args)
+        if PY_VER == 2:
+            self._known.update(x.id for x in node.args.args)
+        else:
+            self._known.update(x.arg for x in node.args.args)
 
         args = self._get_function_args(node)
         body = '\n'.join(self._indent_block(self.visit(item))
@@ -407,6 +419,13 @@ class CConverter(ast.NodeVisitor):
             self._declares[id] = 'double %s;' % id
         return id
 
+    def visit_NameConstant(self, node):
+        value = node.value
+        if value in self._replacements:
+            return self._replacements[value]
+        else:
+            return value
+
     def visit_Not(self, node):
         return '!'
 
@@ -438,6 +457,8 @@ class CConverter(ast.NodeVisitor):
 
     def visit_TryExcept(self, node):
         self.error('Try/except not implemented.', node)
+
+    visit_Try = visit_TryExcept
 
     def visit_UnaryOp(self, node):
         return '(%s %s)' % (self.visit(node.op), self.visit(node.operand))
