@@ -56,8 +56,8 @@ def in_parallel():
 
     return _in_parallel
 
-# Utility function to determine the possible output files
 
+# Utility function to determine the possible output files
 _has_h5py = None
 _has_pyvisfile = None
 _has_tvtk = None

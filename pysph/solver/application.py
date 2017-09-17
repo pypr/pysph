@@ -6,7 +6,7 @@ import logging
 import os
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
-    splitext)
+                     splitext)
 import socket
 import sys
 import time
@@ -44,6 +44,7 @@ def is_overloaded_method(method):
                 return True
     return False
 
+
 def is_using_ipython():
     """Return True if the code is being run from an IPython session or
     notebook.
@@ -56,6 +57,7 @@ def is_using_ipython():
         return False
     else:
         return True
+
 
 def list_all_kernels():
     """Return list of available kernels.
@@ -179,12 +181,14 @@ class Application(object):
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()
 
-        self._log_levels = {'debug': logging.DEBUG,
-                           'info': logging.INFO,
-                           'warning': logging.WARNING,
-                           'error': logging.ERROR,
-                           'critical': logging.CRITICAL,
-                           'none': None}
+        self._log_levels = {
+            'debug': logging.DEBUG,
+            'info': logging.INFO,
+            'warning': logging.WARNING,
+            'error': logging.ERROR,
+            'critical': logging.CRITICAL,
+            'none': None
+        }
 
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
@@ -222,156 +226,223 @@ class Application(object):
 
         """
         parser = ArgumentParser(
-            usage=usage, description=description,
-            formatter_class=ArgumentDefaultsHelpFormatter
-        )
+            usage=usage,
+            description=description,
+            formatter_class=ArgumentDefaultsHelpFormatter)
         self.arg_parse = parser
 
-         # Add some default options.
-         # -v
-        valid_vals = "Valid values: %s"%self._log_levels.keys()
-        parser.add_argument("-v", "--loglevel", action="store",
-                          dest="loglevel",
-                          default='info',
-                          help="Log-level to use for log messages. " +
-                               valid_vals)
+        # Add some default options.
+        # -v
+        valid_vals = "Valid values: %s" % self._log_levels.keys()
+        parser.add_argument(
+            "-v",
+            "--loglevel",
+            action="store",
+            dest="loglevel",
+            default='info',
+            help="Log-level to use for log messages. " + valid_vals)
         # --logfile
 
-        parser.add_argument("--logfile", action="store",
-                          dest="logfile",
-                          default=None,
-                          help="Log file to use for logging, set to "+
-                               "empty ('') for no file logging.")
+        parser.add_argument(
+            "--logfile",
+            action="store",
+            dest="logfile",
+            default=None,
+            help="Log file to use for logging, set to " +
+            "empty ('') for no file logging.")
         # -l
-        parser.add_argument("-l", "--print-log", action="store_true",
-                          dest="print_log", default=False,
-                          help="Print log messages to stderr.")
+        parser.add_argument(
+            "-l",
+            "--print-log",
+            action="store_true",
+            dest="print_log",
+            default=False,
+            help="Print log messages to stderr.")
         # --final-time
-        parser.add_argument("--tf", action="store",
-                          type=float,
-                          dest="final_time",
-                          default=None,
-                          help="Total time for the simulation.")
+        parser.add_argument(
+            "--tf",
+            action="store",
+            type=float,
+            dest="final_time",
+            default=None,
+            help="Total time for the simulation.")
         # --timestep
-        parser.add_argument("--timestep", action="store",
-                          type=float,
-                          dest="time_step",
-                          default=None,
-                          help="Timestep to use for the simulation.")
+        parser.add_argument(
+            "--timestep",
+            action="store",
+            type=float,
+            dest="time_step",
+            default=None,
+            help="Timestep to use for the simulation.")
         # --max-steps
         parser.add_argument(
-            "--max-steps", action="store", type=int, dest="max_steps",
-            default=1<<31,
+            "--max-steps",
+            action="store",
+            type=int,
+            dest="max_steps",
+            default=1 << 31,
             help="Maximum number of iteration steps to take (defaults to a "
-            "very large value)."
-        )
+            "very large value).")
 
         # --n-damp
         parser.add_argument(
-            "--n-damp", action="store", type=int, dest="n_damp",
+            "--n-damp",
+            action="store",
+            type=int,
+            dest="n_damp",
             default=None,
-            help="Number of iterations to damp timesteps initially."
-        )
+            help="Number of iterations to damp timesteps initially.")
 
         # --adaptive-timestep
-        parser.add_argument("--adaptive-timestep", action="store_true",
-                          dest="adaptive_timestep", default=None,
-                          help="Use adaptive time stepping.")
-        parser.add_argument("--no-adaptive-timestep", action="store_false",
-                          dest="adaptive_timestep", default=None,
-                          help="Do not use adaptive time stepping.")
+        parser.add_argument(
+            "--adaptive-timestep",
+            action="store_true",
+            dest="adaptive_timestep",
+            default=None,
+            help="Use adaptive time stepping.")
+        parser.add_argument(
+            "--no-adaptive-timestep",
+            action="store_false",
+            dest="adaptive_timestep",
+            default=None,
+            help="Do not use adaptive time stepping.")
 
         # --cfl
-        parser.add_argument("--cfl", action="store", dest="cfl", type=float,
-                          default=0.3,
-                          help="CFL number for adaptive time steps")
+        parser.add_argument(
+            "--cfl",
+            action="store",
+            dest="cfl",
+            type=float,
+            default=0.3,
+            help="CFL number for adaptive time steps")
 
         # -q/--quiet.
-        parser.add_argument("-q", "--quiet", action="store_true",
-                         dest="quiet", default=False,
-                         help="Do not print any progress information.")
+        parser.add_argument(
+            "-q",
+            "--quiet",
+            action="store_true",
+            dest="quiet",
+            default=False,
+            help="Do not print any progress information.")
 
         # --disable-output
-        parser.add_argument("--disable-output", action="store_true",
-                         dest="disable_output", default=False,
-                         help="Do not dump any output files.")
+        parser.add_argument(
+            "--disable-output",
+            action="store_true",
+            dest="disable_output",
+            default=False,
+            help="Do not dump any output files.")
 
         # -o/ --fname
-        parser.add_argument("-o", "--fname", action="store",
-                          dest="fname", default=self.fname,
-                          help="File name to use for output")
+        parser.add_argument(
+            "-o",
+            "--fname",
+            action="store",
+            dest="fname",
+            default=self.fname,
+            help="File name to use for output")
 
         # --pfreq.
-        parser.add_argument("--pfreq", action="store",
-                          dest="freq", default=None, type=int,
-                          help="Printing frequency for the output")
+        parser.add_argument(
+            "--pfreq",
+            action="store",
+            dest="freq",
+            default=None,
+            type=int,
+            help="Printing frequency for the output")
 
         # --detailed-output.
-        parser.add_argument("--detailed-output", action="store_true",
-                         dest="detailed_output", default=None,
-                         help="Dump detailed output.")
+        parser.add_argument(
+            "--detailed-output",
+            action="store_true",
+            dest="detailed_output",
+            default=None,
+            help="Dump detailed output.")
 
         # -z/--compress-output
         parser.add_argument(
-            "-z", "--compress-output", action="store_true",
-            dest="compress_output", default=False,
-            help="Compress generated output files."
-        )
+            "-z",
+            "--compress-output",
+            action="store_true",
+            dest="compress_output",
+            default=False,
+            help="Compress generated output files.")
 
         # --output-remote
-        parser.add_argument("--output-dump-remote", action="store_true",
-                          dest="output_dump_remote", default=False,
-                          help="Save Remote particles in parallel")
+        parser.add_argument(
+            "--output-dump-remote",
+            action="store_true",
+            dest="output_dump_remote",
+            default=False,
+            help="Save Remote particles in parallel")
         # -d/--directory
-        parser.add_argument("-d", "--directory", action="store",
-                          dest="output_dir",
-                          default=self._get_output_dir_from_fname(),
-                          help="Dump output in the specified directory.")
+        parser.add_argument(
+            "-d",
+            "--directory",
+            action="store",
+            dest="output_dir",
+            default=self._get_output_dir_from_fname(),
+            help="Dump output in the specified directory.")
 
         # --openmp
-        parser.add_argument("--openmp", action="store_true",
-                            dest="with_openmp",
-                            default=None, help="Use OpenMP to run the "
-                            "simulation using multiple cores.")
-        parser.add_argument("--no-openmp", action="store_false",
-                            dest="with_openmp",
-                            default=None, help="Do not use OpenMP to run the "
-                            "simulation using multiple cores.")
+        parser.add_argument(
+            "--openmp",
+            action="store_true",
+            dest="with_openmp",
+            default=None,
+            help="Use OpenMP to run the "
+            "simulation using multiple cores.")
+        parser.add_argument(
+            "--no-openmp",
+            action="store_false",
+            dest="with_openmp",
+            default=None,
+            help="Do not use OpenMP to run the "
+            "simulation using multiple cores.")
         # --opencl
-        parser.add_argument("--opencl", action="store_true",
-                            dest="with_opencl",
-                            default=False,
-                            help="Use OpenCL to run the simulation.")
+        parser.add_argument(
+            "--opencl",
+            action="store_true",
+            dest="with_opencl",
+            default=False,
+            help="Use OpenCL to run the simulation.")
 
         # --use-double
-        parser.add_argument("--use-double", action="store_true",
-                            dest="use_double",
-                            default=False,
-                            help="Use double precision for OpenCL code.")
+        parser.add_argument(
+            "--use-double",
+            action="store_true",
+            dest="use_double",
+            default=False,
+            help="Use double precision for OpenCL code.")
 
         # --kernel
         all_kernels = list_all_kernels()
         parser.add_argument(
-            "--kernel", action="store", dest="kernel", default=None,
+            "--kernel",
+            action="store",
+            dest="kernel",
+            default=None,
             choices=all_kernels,
-            help="Use specified kernel from %s" % all_kernels
-        )
+            help="Use specified kernel from %s" % all_kernels)
 
         # Restart options
         restart = parser.add_argument_group("Restart options",
                                             "Restart options for PySPH")
 
         restart.add_argument(
-            "--restart-file", action="store", dest="restart_file",
+            "--restart-file",
+            action="store",
+            dest="restart_file",
             default=None,
-            help=("""Restart a PySPH simulation using a specified file """)
-        )
+            help=("""Restart a PySPH simulation using a specified file """))
 
         restart.add_argument(
-            "--rescale-dt", action="store", dest="rescale_dt",
-            default=1.0, type=float,
-            help=("Scale dt upon restarting by a numerical constant")
-        )
+            "--rescale-dt",
+            action="store",
+            dest="rescale_dt",
+            default=1.0,
+            type=float,
+            help=("Scale dt upon restarting by a numerical constant"))
 
         # NNPS options
         nnps_options = parser.add_argument_group("NNPS",
@@ -379,9 +450,12 @@ class Application(object):
 
         # --nnps
         nnps_options.add_argument(
-            "--nnps", dest="nnps",
-            choices=['box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree',
-                     'strat_hash', 'strat_sfc', 'tree'],
+            "--nnps",
+            dest="nnps",
+            choices=[
+                'box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree',
+                'strat_hash', 'strat_sfc', 'tree'
+            ],
             default='ll',
             help="Use one of box-sort ('box') or "
             "the linked list algorithm ('ll') or "
@@ -392,200 +466,224 @@ class Application(object):
             "the stratified hash algorithm ('strat_hash') or "
             "the stratified sfc algorithm ('strat_sfc') or "
             "the octree algorithm ('tree') or "
-            "the compressed octree algorithm ('comp_tree')"
-        )
+            "the compressed octree algorithm ('comp_tree')")
 
         nnps_options.add_argument(
-            "--spatial-hash-sub-factor", dest="H",
-            type=int, default=3,
-            help="Sub division factor for ExtendedSpatialHashNNPS"
-        )
+            "--spatial-hash-sub-factor",
+            dest="H",
+            type=int,
+            default=3,
+            help="Sub division factor for ExtendedSpatialHashNNPS")
 
         nnps_options.add_argument(
-            "--approximate-nnps", dest="approximate_nnps",
-            action="store_true", default=False,
-            help="Use for approximate NNPS"
-        )
+            "--approximate-nnps",
+            dest="approximate_nnps",
+            action="store_true",
+            default=False,
+            help="Use for approximate NNPS")
 
         nnps_options.add_argument(
-            "--spatial-hash-table-size", dest="table_size",
-            type=int, default=131072,
-            help="Table size for SpatialHashNNPS and ExtendedSpatialHashNNPS"
-        )
+            "--spatial-hash-table-size",
+            dest="table_size",
+            type=int,
+            default=131072,
+            help="Table size for SpatialHashNNPS and ExtendedSpatialHashNNPS")
 
         nnps_options.add_argument(
-            "--stratified-grid-num-levels", dest="num_levels",
-            type=int, default=1,
+            "--stratified-grid-num-levels",
+            dest="num_levels",
+            type=int,
+            default=1,
             help="Number of levels for StratifiedHashNNPS and \
-            StratifiedSFCNNPS"
-        )
+            StratifiedSFCNNPS")
 
         nnps_options.add_argument(
-            "--tree-leaf-max-particles", dest="leaf_max_particles",
-            type=int, default=10,
-            help="Maximum number of particles in leaf of octree"
-        )
+            "--tree-leaf-max-particles",
+            dest="leaf_max_particles",
+            type=int,
+            default=10,
+            help="Maximum number of particles in leaf of octree")
 
         # --fixed-h
         nnps_options.add_argument(
-            "--fixed-h", dest="fixed_h",
-            action="store_true", default=False,
-            help="Option for fixed smoothing lengths"
-        )
+            "--fixed-h",
+            dest="fixed_h",
+            action="store_true",
+            default=False,
+            help="Option for fixed smoothing lengths")
 
         nnps_options.add_argument(
-            "--cache-nnps", dest="cache_nnps",
-            action="store_true", default=False,
-            help="Option to enable the use of neighbor caching."
-        )
+            "--cache-nnps",
+            dest="cache_nnps",
+            action="store_true",
+            default=False,
+            help="Option to enable the use of neighbor caching.")
 
         nnps_options.add_argument(
-            "--sort-gids", dest="sort_gids", action="store_true",
-            default=False, help="Sort neighbors by the GIDs to get " +
-            "consistent results in serial and parallel (slows down a bit)."
-        )
+            "--sort-gids",
+            dest="sort_gids",
+            action="store_true",
+            default=False,
+            help="Sort neighbors by the GIDs to get " +
+            "consistent results in serial and parallel (slows down a bit).")
 
         # Zoltan Options
         zoltan = parser.add_argument_group("PyZoltan",
                                            "Zoltan load balancing options")
 
         zoltan.add_argument(
-            "--with-zoltan", action="store_true",
-            dest="with_zoltan", default=True,
-            help="Use PyZoltan for dynamic load balancing"
-        )
+            "--with-zoltan",
+            action="store_true",
+            dest="with_zoltan",
+            default=True,
+            help="Use PyZoltan for dynamic load balancing")
 
         zoltan.add_argument(
-            "--zoltan-lb-method", action="store",
-            dest="zoltan_lb_method", default="RCB",
-            help="Choose the Zoltan load balancnig method"
-        )
+            "--zoltan-lb-method",
+            action="store",
+            dest="zoltan_lb_method",
+            default="RCB",
+            help="Choose the Zoltan load balancnig method")
 
         zoltan.add_argument(
-            "--rcb-lock", action="store_true",
+            "--rcb-lock",
+            action="store_true",
             dest="zoltan_rcb_lock_directions",
             default=False,
-            help="Lock the directions of the RCB cuts"
-        )
+            help="Lock the directions of the RCB cuts")
 
         zoltan.add_argument(
-            "--rcb-reuse", action='store_true', dest="zoltan_rcb_reuse",
+            "--rcb-reuse",
+            action='store_true',
+            dest="zoltan_rcb_reuse",
             default=False,
-            help="Reuse previous RCB cuts"
-        )
+            help="Reuse previous RCB cuts")
 
         zoltan.add_argument(
-            "--rcb-rectilinear", action="store_true",
+            "--rcb-rectilinear",
+            action="store_true",
             dest='zoltan_rcb_rectilinear',
             default=False,
-            help="Produce nice rectilinear blocks without projections"
-        )
+            help="Produce nice rectilinear blocks without projections")
 
         zoltan.add_argument(
-            "--rcb-set-direction", action='store',
+            "--rcb-set-direction",
+            action='store',
             dest="zoltan_rcb_set_direction",
-            default=0, type=int,
-            help="Set the order of the RCB cuts"
-        )
+            default=0,
+            type=int,
+            help="Set the order of the RCB cuts")
 
         zoltan.add_argument(
-            "--zoltan-weights", action="store_false",
-            dest="zoltan_weights", default=True,
+            "--zoltan-weights",
+            action="store_false",
+            dest="zoltan_weights",
+            default=True,
             help=("""Switch between using weights for input to Zoltan.
-            defaults to True""")
-        )
+            defaults to True"""))
 
         zoltan.add_argument(
-            "--ghost-layers", action='store', dest='ghost_layers',
-            default=3.0, type=float,
-            help=('Number of ghost cells to share for remote neighbors')
-        )
+            "--ghost-layers",
+            action='store',
+            dest='ghost_layers',
+            default=3.0,
+            type=float,
+            help=('Number of ghost cells to share for remote neighbors'))
 
         zoltan.add_argument(
-            "--lb-freq", action='store', dest='lb_freq',
-            default=10, type=int,
-            help=('The frequency for load balancing')
-        )
+            "--lb-freq",
+            action='store',
+            dest='lb_freq',
+            default=10,
+            type=int,
+            help=('The frequency for load balancing'))
 
         zoltan.add_argument(
-            "--zoltan-debug-level", action="store",
-            dest="zoltan_debug_level", default="0",
-            help=("""Zoltan debugging level""")
-        )
+            "--zoltan-debug-level",
+            action="store",
+            dest="zoltan_debug_level",
+            default="0",
+            help=("""Zoltan debugging level"""))
 
         # Options to control parallel execution
         parallel_options = parser.add_argument_group("Parallel Options")
 
         # --update-cell-sizes
         parallel_options.add_argument(
-            "--update-cell-sizes", action='store_true',
-            dest='update_cell_sizes', default=False,
-            help=("Recompute cell sizes for binning in parallel")
-        )
+            "--update-cell-sizes",
+            action='store_true',
+            dest='update_cell_sizes',
+            default=False,
+            help=("Recompute cell sizes for binning in parallel"))
 
         # --parallel-scale-factor
         parallel_options.add_argument(
-            "--parallel-scale-factor", action="store",
-            dest="parallel_scale_factor", default=2.0, type=float,
-            help=("""Kernel scale factor for the parallel update""")
-        )
+            "--parallel-scale-factor",
+            action="store",
+            dest="parallel_scale_factor",
+            default=2.0,
+            type=float,
+            help=("""Kernel scale factor for the parallel update"""))
 
         # --parallel-output-mode
         parallel_options.add_argument(
-            "--parallel-output-mode", action="store",
-            dest="parallel_output_mode", default='collected',
+            "--parallel-output-mode",
+            action="store",
+            dest="parallel_output_mode",
+            default='collected',
             choices=['collected', 'distributed'],
             help="""Use 'collected' to dump one output at
-            root or 'distributed' for every processor. """
-        )
+            root or 'distributed' for every processor. """)
 
         # solver interfaces
         interfaces = parser.add_argument_group("Interfaces",
                                                "Add interfaces to the solver")
 
         interfaces.add_argument(
-            "--interactive", action="store_true",
-            dest="cmd_line", default=False,
-            help=("Add an interactive commandline interface to the solver")
-        )
+            "--interactive",
+            action="store_true",
+            dest="cmd_line",
+            default=False,
+            help=("Add an interactive commandline interface to the solver"))
 
         interfaces.add_argument(
-            "--xml-rpc", action="store",
-            dest="xml_rpc", metavar="[HOST:] PORT",
+            "--xml-rpc",
+            action="store",
+            dest="xml_rpc",
+            metavar="[HOST:] PORT",
             help=("Add an XML-RPC interface to the solver;"
-                  "HOST=0.0.0.0 by default")
-        )
+                  "HOST=0.0.0.0 by default"))
 
         interfaces.add_argument(
-            "--multiproc", action="store",
-            dest="multiproc", metavar='[[AUTHKEY@] HOST:] PORT[+] ',
+            "--multiproc",
+            action="store",
+            dest="multiproc",
+            metavar='[[AUTHKEY@] HOST:] PORT[+] ',
             default="pysph@0.0.0.0:8800+",
             help=("Add a python multiprocessing interface "
                   "to the solver; "
                   "AUTHKEY=pysph, HOST=0.0.0.0, PORT=8800+ by"
                   " default (8800+ means first available port "
-                  "number 8800 onwards)")
-        )
+                  "number 8800 onwards)"))
 
         interfaces.add_argument(
-            "--no-multiproc", action="store_const",
-            dest="multiproc", const=None,
+            "--no-multiproc",
+            action="store_const",
+            dest="multiproc",
+            const=None,
             help=("Disable multiprocessing interface "
-                  "to the solver")
-        )
+                  "to the solver"))
 
         # Scheme options.
         if self.scheme is not None:
             scheme_options = parser.add_argument_group(
                 "SPH Scheme options",
                 "Scheme related command line arguments",
-                conflict_handler="resolve"
-            )
+                conflict_handler="resolve")
             self.scheme.add_user_options(scheme_options)
         # User options.
         user_options = parser.add_argument_group(
-            "User", "User defined command line arguments"
-        )
+            "User", "User defined command line arguments")
         self.add_user_options(user_options)
 
     def _parse_command_line(self, force=False):
@@ -595,9 +693,9 @@ class Application(object):
         """
         if is_using_ipython() and not force:
             # Don't parse the command line args.
-            options  = self.arg_parse.parse_args([])
+            options = self.arg_parse.parse_args([])
         else:
-            options  = self.arg_parse.parse_args(self.args)
+            options = self.arg_parse.parse_args(self.args)
 
         self.options = options
 
@@ -630,8 +728,8 @@ class Application(object):
         if len(filename) > 0:
             lfn = os.path.join(self.output_dir, filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
-            logging.basicConfig(level=level, format=format,
-                                filename=lfn, filemode='a')
+            logging.basicConfig(
+                level=level, format=format, filename=lfn, filemode='a')
         if options.print_log:
             logger.addHandler(logging.StreamHandler())
 
@@ -640,9 +738,8 @@ class Application(object):
             ip = socket.gethostbyname(host)
         except socket.gaierror:
             ip = host
-        logger.info('Running on {host} with address {ip}'.format(
-            host=host, ip=ip
-        ))
+        logger.info(
+            'Running on {host} with address {ip}'.format(host=host, ip=ip))
 
     def _create_inlet_outlet(self, inlet_outlet_factory):
         """Create the inlets and outlets if needed.
@@ -686,17 +783,18 @@ class Application(object):
                 # arrays and particles
                 particles = []
                 for array_name in arrays:
-                    particles.append( arrays[array_name] )
+                    particles.append(arrays[array_name])
 
                 # save the particles list
                 self.particles = particles
 
                 # time, timestep and solver iteration count at restart
-                t, dt, count = solver_data['t'], solver_data['dt'], solver_data['count']
+                t, dt, count = solver_data['t'], solver_data[
+                    'dt'], solver_data['count']
 
                 # rescale dt at restart
                 dt *= options.rescale_dt
-                solver.t, solver.dt, solver.count  = t, dt, count
+                solver.t, solver.dt, solver.count = t, dt, count
 
             else:
                 self.particles = particle_factory(*args, **kw)
@@ -747,90 +845,120 @@ class Application(object):
             if options.with_opencl:
                 from pysph.base.gpu_nnps import ZOrderGPUNNPS
                 nnps = ZOrderGPUNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    cache=True, sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    cache=True,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'box':
                 nnps = BoxSortNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    cache=cache, sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    cache=cache,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'll':
                 nnps = LinkedListNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'sh':
                 nnps = SpatialHashNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    table_size=options.table_size,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'esh':
                 nnps = ExtendedSpatialHashNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, H=options.H,
-                    table_size=options.table_size, sort_gids=options.sort_gids,
-                    approximate=options.approximate_nnps
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    H=options.H,
+                    table_size=options.table_size,
+                    sort_gids=options.sort_gids,
+                    approximate=options.approximate_nnps)
 
             elif options.nnps == 'strat_hash':
                 nnps = StratifiedHashNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, table_size=options.table_size,
-                    sort_gids=options.sort_gids, num_levels=options.num_levels
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    table_size=options.table_size,
+                    sort_gids=options.sort_gids,
+                    num_levels=options.num_levels)
 
             elif options.nnps == 'strat_sfc':
                 nnps = StratifiedSFCNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, sort_gids=options.sort_gids,
-                    num_levels=options.num_levels
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    sort_gids=options.sort_gids,
+                    num_levels=options.num_levels)
 
             elif options.nnps == 'tree':
                 nnps = OctreeNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    leaf_max_particles=options.leaf_max_particles,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'ci':
                 nnps = CellIndexingNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'sfc':
                 nnps = ZOrderNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    sort_gids=options.sort_gids)
 
             elif options.nnps == 'comp_tree':
                 nnps = CompressedOctreeNNPS(
-                    dim=solver.dim, particles=self.particles,
-                    radius_scale=kernel.radius_scale, domain=self.domain,
-                    fixed_h=fixed_h, cache=cache, leaf_max_particles=options.leaf_max_particles,
-                    sort_gids=options.sort_gids
-                )
+                    dim=solver.dim,
+                    particles=self.particles,
+                    radius_scale=kernel.radius_scale,
+                    domain=self.domain,
+                    fixed_h=fixed_h,
+                    cache=cache,
+                    leaf_max_particles=options.leaf_max_particles,
+                    sort_gids=options.sort_gids)
 
             self.nnps = nnps
 
@@ -839,7 +967,7 @@ class Application(object):
         # post-stage callback to the DomainManager.setup_domain
         # method. This method is responsible to computing the new cell
         # size and doing any periodicity checks if needed.
-        solver.add_post_stage_callback( nnps.update_domain )
+        solver.add_post_stage_callback(nnps.update_domain)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
@@ -910,9 +1038,11 @@ class Application(object):
 
         # setup the solver. This is where the code is compiled
         solver.setup(
-            particles=self.particles, equations=self.equations, nnps=nnps,
-            kernel=kernel, fixed_h=fixed_h
-        )
+            particles=self.particles,
+            equations=self.equations,
+            nnps=nnps,
+            kernel=kernel,
+            fixed_h=fixed_h)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
@@ -922,7 +1052,8 @@ class Application(object):
             # commandline interface
             if options.cmd_line:
                 from pysph.solver.solver_interfaces import CommandlineInterface
-                self.command_manager.add_interface(CommandlineInterface().start)
+                self.command_manager.add_interface(
+                    CommandlineInterface().start)
 
             # XML-RPC interface
             if options.xml_rpc:
@@ -930,19 +1061,22 @@ class Application(object):
                 addr = options.xml_rpc
                 idx = addr.find(':')
                 host = "0.0.0.0" if idx == -1 else addr[:idx]
-                port = int(addr[idx+1:])
-                self.command_manager.add_interface(XMLRPCInterface((host,port)).start)
+                port = int(addr[idx + 1:])
+                self.command_manager.add_interface(
+                    XMLRPCInterface((host, port)).start)
 
             # python MultiProcessing interface
             if options.multiproc:
-                from pysph.solver.solver_interfaces import MultiprocessingInterface
+                from pysph.solver.solver_interfaces import (
+                    MultiprocessingInterface
+                )
                 addr = options.multiproc
                 idx = addr.find('@')
                 authkey = "pysph" if idx == -1 else addr[:idx]
-                addr = addr[idx+1:]
+                addr = addr[idx + 1:]
                 idx = addr.find(':')
                 host = "0.0.0.0" if idx == -1 else addr[:idx]
-                port = addr[idx+1:]
+                port = addr[idx + 1:]
                 if port[-1] == '+':
                     try_next_port = True
                     port = port[:-1]
@@ -950,13 +1084,14 @@ class Application(object):
                     try_next_port = False
                 port = int(port)
 
-                interface = MultiprocessingInterface(
-                    (host,port), authkey.encode(), try_next_port)
+                interface = MultiprocessingInterface((host, port),
+                                                     authkey.encode(),
+                                                     try_next_port)
 
                 self.command_manager.add_interface(interface.start)
 
-                logger.info('started multiprocessing interface on %s'%(
-                             interface.address,))
+                logger.info('started multiprocessing interface on %s' %
+                            (interface.address, ))
 
     def _setup_parallel_manager_and_initial_load_balance(self):
         """This will automatically distribute the particles among processors
@@ -987,24 +1122,26 @@ class Application(object):
                 obj_weight_dim = "1"
 
             zoltan_lb_method = options.zoltan_lb_method
-            zoltan_obj_wgt_dim = obj_weight_dim
 
             # ghost layers
             ghost_layers = options.ghost_layers
 
             # radius scale for the parallel update
-            radius_scale = options.parallel_scale_factor*solver.kernel.radius_scale
+            radius_scale = (options.parallel_scale_factor *
+                            solver.kernel.radius_scale)
 
             self.parallel_manager = pm = ZoltanParallelManagerGeometric(
-                dim=solver.dim, particles=self.particles, comm=comm,
+                dim=solver.dim,
+                particles=self.particles,
+                comm=comm,
                 lb_method=zoltan_lb_method,
                 obj_weight_dim=obj_weight_dim,
                 ghost_layers=ghost_layers,
                 update_cell_sizes=options.update_cell_sizes,
-                radius_scale=radius_scale,
-                )
+                radius_scale=radius_scale
+            )
 
-            ### ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
+            # ## ADDITIONAL LOAD BALANCING FUNCTIONS FOR ZOLTAN ###
 
             # RCB lock directions
             if options.zoltan_rcb_lock_directions:
@@ -1017,7 +1154,8 @@ class Application(object):
                 pm.set_zoltan_rcb_rectilinear_blocks()
 
             if options.zoltan_rcb_set_direction > 0:
-                pm.set_zoltan_rcb_directions( str(options.zoltan_rcb_set_direction) )
+                pm.set_zoltan_rcb_directions(
+                    str(options.zoltan_rcb_set_direction))
 
             # set zoltan options
             pm.pz.Zoltan_Set_Param("DEBUG_LEVEL", options.zoltan_debug_level)
@@ -1029,8 +1167,9 @@ class Application(object):
 
             # set subsequent load balancing frequency
             lb_freq = options.lb_freq
-            if lb_freq < 1 : raise ValueError("Invalid lb_freq %d"%lb_freq)
-            pm.set_lb_freq( lb_freq )
+            if lb_freq < 1:
+                raise ValueError("Invalid lb_freq %d" % lb_freq)
+            pm.set_lb_freq(lb_freq)
 
             # wait till the initial partition is done
             comm.barrier()
@@ -1057,8 +1196,8 @@ class Application(object):
         if self.num_procs == 1:
             logger.info(msg)
             print(msg)
-        elif (self.num_procs > 1 and self.rank in (0,1)):
-            s = "Rank %d: %s"%(self.rank, msg)
+        elif (self.num_procs > 1 and self.rank in (0, 1)):
+            s = "Rank %d: %s" % (self.rank, msg)
             logger.info(s)
             print(s)
 
@@ -1067,8 +1206,7 @@ class Application(object):
         keyword arguments are written to the file.
         """
         info = dict(
-            fname=self.fname, output_dir=self.output_dir, args=self.args
-        )
+            fname=self.fname, output_dir=self.output_dir, args=self.args)
         info.update(kw)
         json.dump(info, open(filename, 'w'))
 
@@ -1159,19 +1297,16 @@ class Application(object):
 
             end_time = time.time()
             setup_duration = end_time - start_time
-            self._message("Setup took: %.5f secs"%(setup_duration))
-            self._write_info(
-                self.info_filename, completed=False, cpu_time=0
-            )
+            self._message("Setup took: %.5f secs" % (setup_duration))
+            self._write_info(self.info_filename, completed=False, cpu_time=0)
 
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
         end_time = time.time()
         run_duration = end_time - start_time
-        self._message("Run took: %.5f secs"%(run_duration))
+        self._message("Run took: %.5f secs" % (run_duration))
         self._write_info(
-            self.info_filename, completed=True, cpu_time=run_duration
-        )
+            self.info_filename, completed=True, cpu_time=run_duration)
 
     def set_args(self, args):
         self.args = args
@@ -1227,7 +1362,7 @@ class Application(object):
         start_time = time.time()
         self.solver = solver
         self.equations = equations
-        solver_opts = solver.get_options(self.arg_parse)
+        solver.get_options(self.arg_parse)
         self._parse_command_line()
         self._setup_logging()
 
@@ -1244,7 +1379,7 @@ class Application(object):
 
         end_time = time.time()
         setup_duration = end_time - start_time
-        self._message("Setup took: %.5f secs"%(setup_duration))
+        self._message("Setup took: %.5f secs" % (setup_duration))
         self._write_info(self.info_filename, completed=False, cpu_time=0)
 
     ######################################################################

@@ -262,5 +262,6 @@ class TestGroup(TestBase):
         msg = 'EXPECTED:\n%s\nGOT:\n%s' % (expect, result)
         self.assertEqual(result, expect, msg)
 
+
 if __name__ == '__main__':
     unittest.main()
