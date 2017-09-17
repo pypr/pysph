@@ -22,8 +22,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object overflow_cid_to_idx
 
     cdef object helper
+    cdef object radix_sort
 
-    cdef public bint use_double
     cdef bint _sorted
     cdef bint dst_src
 
@@ -36,4 +36,3 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef void find_neighbor_lengths(self, nbr_lengths)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
-

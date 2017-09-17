@@ -224,8 +224,6 @@ cdef class NNPSParticleArrayWrapper:
 
         self.np = pa.get_number_of_particles()
 
-        self.copied_to_gpu = False
-
     cdef int get_number_of_particles(self):
         cdef ParticleArray pa = self.pa
         return pa.get_number_of_particles()
@@ -1035,6 +1033,9 @@ cdef class NNPSBase:
         cdef double lx, ly, lz
 
         for pa_wrapper in pa_wrappers:
+            if pa_wrapper.pa.gpu is not None:
+                # FIXME: find the max/min on the GPU instead.
+                pa_wrapper.pa.gpu.pull('x', 'y', 'z')
             x = pa_wrapper.x
             y = pa_wrapper.y
             z = pa_wrapper.z
@@ -1183,5 +1184,3 @@ cdef class NNPS(NNPSBase):
 
     cpdef _refresh(self):
         raise NotImplementedError("NNPS :: _refresh called")
-
-

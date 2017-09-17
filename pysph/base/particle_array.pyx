@@ -364,6 +364,8 @@ cdef class ParticleArray:
 
         # number of particles
         num_particles = self.get_number_of_particles(only_real)
+        if self.gpu is not None:
+            self.gpu.pull(*props)
 
         # add the property arrays
         for prop in props:
@@ -716,6 +718,11 @@ cdef class ParticleArray:
             return result[0]
         else:
             return tuple(result)
+
+    def set_device_helper(self, gpu):
+        """Set the device helper to push/pull from a hardware accelerator.
+        """
+        self.gpu = gpu
 
     def set(self, **props):
         """ Set properties from numpy arrays like objects

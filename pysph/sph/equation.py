@@ -20,6 +20,8 @@ from textwrap import dedent
 # Local imports.
 from pysph.base.ast_utils import get_symbols
 from pysph.base.cython_generator import CythonGenerator, KnownType
+from pysph.base.translator import OpenCLConverter
+
 
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
@@ -57,20 +59,22 @@ class Context(dict):
         try:
             return self.__getitem__(key)
         except KeyError:
-            raise AttributeError('Context has no attribute %s'%key)
+            raise AttributeError('Context has no attribute %s' % key)
 
     def __setattr__(self, key, value):
         self[key] = value
+
 
 def get_array_names(symbols):
     """Given a set of symbols, return a set of source array names and
     a set of destination array names.
     """
     src_arrays = set(x for x in symbols
-                            if x.startswith('s_') and x != 's_idx')
+                     if x.startswith('s_') and x != 's_idx')
     dest_arrays = set(x for x in symbols
-                            if x.startswith('d_') and x != 'd_idx')
+                      if x.startswith('d_') and x != 'd_idx')
     return src_arrays, dest_arrays
+
 
 ##############################################################################
 # `BasicCodeBlock` class.
@@ -175,75 +179,91 @@ def precomputed_symbols():
 
     c.RHOIJ1 = BasicCodeBlock(code="RHOIJ1 = 1.0/RHOIJ", RHOIJ1=0.0)
 
-    c.XIJ = BasicCodeBlock(code=dedent("""
-                XIJ[0] = d_x[d_idx] - s_x[s_idx]
-                XIJ[1] = d_y[d_idx] - s_y[s_idx]
-                XIJ[2] = d_z[d_idx] - s_z[s_idx]
-                """),
-                XIJ=[0.0, 0.0, 0.0])
+    c.XIJ = BasicCodeBlock(
+        code=dedent(
+            """
+            XIJ[0] = d_x[d_idx] - s_x[s_idx]
+            XIJ[1] = d_y[d_idx] - s_y[s_idx]
+            XIJ[2] = d_z[d_idx] - s_z[s_idx]
+            """
+        ),
+        XIJ=[0.0, 0.0, 0.0]
+    )
 
-    c.VIJ = BasicCodeBlock(code=dedent("""
-                VIJ[0] = d_u[d_idx] - s_u[s_idx]
-                VIJ[1] = d_v[d_idx] - s_v[s_idx]
-                VIJ[2] = d_w[d_idx] - s_w[s_idx]
-                """),
-                VIJ=[0.0, 0.0, 0.0])
+    c.VIJ = BasicCodeBlock(
+        code=dedent(
+            """
+            VIJ[0] = d_u[d_idx] - s_u[s_idx]
+            VIJ[1] = d_v[d_idx] - s_v[s_idx]
+            VIJ[2] = d_w[d_idx] - s_w[s_idx]
+            """
+        ),
+        VIJ=[0.0, 0.0, 0.0]
+    )
 
-    c.R2IJ = BasicCodeBlock(code=dedent("""
-                R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]
-                """),
-                R2IJ=0.0)
+    c.R2IJ = BasicCodeBlock(
+        code=dedent(
+            """
+            R2IJ = XIJ[0]*XIJ[0] + XIJ[1]*XIJ[1] + XIJ[2]*XIJ[2]
+            """
+        ),
+        R2IJ=0.0
+    )
 
-    c.RIJ = BasicCodeBlock(code=dedent("""
-                RIJ = sqrt(R2IJ)
-                """),
-                RIJ=0.0)
+    c.RIJ = BasicCodeBlock(code="RIJ = sqrt(R2IJ)", RIJ=0.0)
 
     c.WIJ = BasicCodeBlock(
-                code="WIJ = KERNEL(XIJ, RIJ, HIJ)",
-                WIJ=0.0)
+        code="WIJ = KERNEL(XIJ, RIJ, HIJ)",
+        WIJ=0.0
+    )
 
     # wdeltap for tensile instability correction
     c.WDP = BasicCodeBlock(
-                code="WDP = KERNEL(XIJ, DELTAP*HIJ, HIJ)",
-                WDP=0.0)
+        code="WDP = KERNEL(XIJ, DELTAP*HIJ, HIJ)",
+        WDP=0.0
+    )
 
     c.WI = BasicCodeBlock(
-                code="WI = KERNEL(XIJ, RIJ, d_h[d_idx])",
-                WI=0.0)
+        code="WI = KERNEL(XIJ, RIJ, d_h[d_idx])",
+        WI=0.0
+    )
 
     c.WJ = BasicCodeBlock(
-                code="WJ = KERNEL(XIJ, RIJ, s_h[s_idx])",
-                WJ=0.0)
+        code="WJ = KERNEL(XIJ, RIJ, s_h[s_idx])",
+        WJ=0.0
+    )
 
     c.DWIJ = BasicCodeBlock(
-                code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
-                DWIJ=[0.0, 0.0, 0.0])
+        code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
+        DWIJ=[0.0, 0.0, 0.0]
+    )
 
     c.DWI = BasicCodeBlock(
-                code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
-                DWI=[0.0, 0.0, 0.0])
+        code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
+        DWI=[0.0, 0.0, 0.0]
+    )
 
     c.DWJ = BasicCodeBlock(
-                code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
-                DWJ=[0.0, 0.0, 0.0])
+        code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
+        DWJ=[0.0, 0.0, 0.0]
+    )
 
     c.GHI = BasicCodeBlock(
-                code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])",
-                GHI=0.0)
+        code="GHI = GRADH(XIJ, RIJ, d_h[d_idx])",
+        GHI=0.0
+    )
 
     c.GHJ = BasicCodeBlock(
-                code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])",
-                GHJ=0.0)
+        code="GHJ = GRADH(XIJ, RIJ, s_h[s_idx])",
+        GHJ=0.0
+    )
 
-    c.GHIJ= BasicCodeBlock(
-                code="GHIJ = GRADH(XIJ, RIJ, HIJ)",
-                GHIJ=0.0)
+    c.GHIJ = BasicCodeBlock(code="GHIJ = GRADH(XIJ, RIJ, HIJ)", GHIJ=0.0)
 
     return c
 
 
-def sort_precomputed(precomputed):
+def sort_precomputed(precomputed, all_pre_comp):
     """Sorts the precomputed equations in the given dictionary as per the
     dependencies of the symbols and returns an ordered dict.
 
@@ -252,7 +272,7 @@ def sort_precomputed(precomputed):
     right order.
     """
     weights = dict((x, None) for x in precomputed)
-    pre_comp = Group.pre_comp
+    pre_comp = all_pre_comp
     # Find the dependent pre-computed symbols for each in the precomputed.
     depends = dict((x, None) for x in precomputed)
     for pre, cb in precomputed.items():
@@ -293,7 +313,7 @@ def get_predefined_types(precomp):
     """Return a dictionary that can be used by a CythonGenerator for
     the precomputed symbols.
     """
-    result = {'DT_ADAPT':[0.0, 0.0, 0.0],
+    result = {'DT_ADAPT': [0.0, 0.0, 0.0],
               'dt': 0.0,
               't': 0.0,
               'dst': KnownType('ParticleArrayWrapper'),
@@ -317,13 +337,14 @@ def get_arrays_used_in_equation(equation):
             dest_arrays.update(d)
     return src_arrays, dest_arrays
 
+
 def get_init_args(obj, method, ignore=None):
     """Return the arguments for the method given, typically an __init__.
     """
     ignore = ignore if ignore is not None else []
     spec = inspect.getargspec(method)
     keys = [k for k in spec.args[1:] if k not in ignore and k in obj.__dict__]
-    args = ['%s=%r'%(k, getattr(obj, k)) for k in keys]
+    args = ['%s=%r' % (k, getattr(obj, k)) for k in keys]
     return args
 
 
@@ -345,8 +366,11 @@ class Equation(object):
             names of the source particle arrays
         """
         self.dest = dest
-        self.sources = sources if sources is not None and len(sources) > 0 \
-                                                                else None
+        if sources is not None and len(sources) > 0:
+            self.sources = sources
+        else:
+            self.sources = None
+
         # Does the equation require neighbors or not.
         self.no_source = self.sources is None
         self.name = self.__class__.__name__
@@ -357,12 +381,13 @@ class Equation(object):
     def __repr__(self):
         name = self.__class__.__name__
         args = get_init_args(self, self.__init__, [])
-        return '%s(%s)'%(name, ', '.join(args))
+        return '%s(%s)' % (name, ', '.join(args))
 
     def converged(self):
         """Return > 0 to indicate converged iterations and < 0 otherwise.
         """
         return 1.0
+
 
 ###############################################################################
 # `Group` class.
@@ -428,7 +453,9 @@ class Group(object):
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
-            raise ValueError('All elements must be Groups if you use sub groups.')
+            raise ValueError(
+                'All elements must be Groups if you use sub groups.'
+            )
 
         # This group has only sub-groups.
         self.has_subgroups = len(only_groups) > 0
@@ -446,80 +473,15 @@ class Group(object):
         eqs = [repr(eq) for eq in self.equations]
         ignore = ['equations']
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
-        return '%s(equations=[\n%s\n    ],\n    %s)'%(
+        return '%s(equations=[\n%s\n    ],\n    %s)' % (
             cls, ',\n'.join(eqs), kws
         )
-
-    def _get_variable_decl(self, context, mode='declare'):
-        decl = []
-        names = list(context.keys())
-        names.sort()
-        for var in names:
-            value = context[var]
-            if isinstance(value, int):
-                declare = 'cdef long ' if mode == 'declare' else ''
-                decl.append('{declare}{var} = {value}'.format(declare=declare,
-                                                              var=var,
-                                                              value=value))
-            elif isinstance(value, float):
-                declare = 'cdef double ' if mode == 'declare' else ''
-                decl.append('{declare}{var} = {value}'.format(declare=declare,
-                                                              var=var,
-                                                              value=value))
-            elif isinstance(value, (list, tuple)):
-                if mode == 'declare':
-                    decl.append('cdef DoubleArray _{var} = '\
-                        'DoubleArray(aligned({size}, 8)*self.n_threads)'.format(
-                            var=var, size=len(value)
-                        )
-                    )
-                    decl.append('cdef double* {var} = _{var}.data'\
-                            .format(size=len(value), var=var))
-                else:
-                    pass
-        return '\n'.join(decl)
 
     def _has_code(self, kind='loop'):
         assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
         for equation in self.equations:
             if hasattr(equation, kind):
                 return True
-
-    def _get_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
-        # We assume here that precomputed quantities are only relevant
-        # for loops and not post_loops and initialization.
-        pre = []
-        if kind == 'loop':
-            for p, cb in self.precomputed.items():
-                pre.append(cb.code.strip())
-            if len(pre) > 0:
-                pre.append('')
-        code = []
-        for eq in self.equations:
-            meth = getattr(eq, kind, None)
-            if meth is not None:
-                args = inspect.getargspec(meth).args
-                if 'self' in args:
-                    args.remove('self')
-                call_args = ', '.join(args)
-                c = 'self.{eq_name}.{method}({args})'\
-                      .format(eq_name=eq.var_name, method=kind, args=call_args)
-                code.append(c)
-        if len(code) > 0:
-            code.append('')
-        return '\n'.join(pre + code)
-
-    def _set_kernel(self, code, kernel):
-        if kernel is not None:
-            k_func = 'self.kernel.kernel'
-            g_func = 'self.kernel.gradient'
-            h_func = 'self.kernel.gradient_h'
-            deltap = 'self.kernel.get_deltap()'
-            code = code.replace('DELTAP', deltap)
-            return code.replace('GRADIENT', g_func).replace('KERNEL', k_func).replace('GRADH', h_func)
-        else:
-            return code
 
     def _setup_precomputed(self):
         """Get the precomputed symbols for this group of equations.
@@ -544,7 +506,7 @@ class Group(object):
             for sym in found_precomp:
                 code_block = pre[sym]
                 new = set([s for s in code_block.symbols
-                            if s in pre and s not in precomputed])
+                           if s in pre and s not in precomputed])
                 all_new.update(new)
             if len(all_new) > 0:
                 done = False
@@ -552,7 +514,7 @@ class Group(object):
                     precomputed[s] = pre[s]
             found_precomp = all_new
 
-        self.precomputed = sort_precomputed(precomputed)
+        self.precomputed = sort_precomputed(precomputed, pre)
 
         # Update the context.
         context = self.context
@@ -588,6 +550,19 @@ class Group(object):
         self.dest_arrays = dest_arrays
         return src_arrays, dest_arrays
 
+    def get_converged_condition(self):
+        if self.has_subgroups:
+            code = [g.get_converged_condition() for g in self.equations]
+            return ' & '.join(code)
+        else:
+            code = []
+            for equation in self.equations:
+                code.append('(self.%s.converged() > 0)' % equation.var_name)
+            # Note, we use '&' because we want to call converged on all
+            # equations and not be short-circuited by the first one that
+            # returns False.
+            return ' & '.join(code)
+
     def get_variable_names(self):
         # First get all the contexts and find the names.
         all_vars = set()
@@ -595,14 +570,14 @@ class Group(object):
             all_vars.update(cb.symbols)
 
         # Filter out all arrays.
-        filtered_vars = [x for x in all_vars \
+        filtered_vars = [x for x in all_vars
                          if not x.startswith(('s_', 'd_'))]
         # Filter other things.
         ignore = ['KERNEL', 'GRADIENT', 's_idx', 'd_idx']
         # Math functions.
         import math
         ignore += [x for x in dir(math) if not x.startswith('_')
-                                            and callable(getattr(math, x))]
+                   and callable(getattr(math, x))]
         try:
             ignore.remove('gamma')
             ignore.remove('lgamma')
@@ -613,6 +588,95 @@ class Group(object):
 
         return filtered_vars
 
+    def has_initialize(self):
+        return self._has_code('initialize')
+
+    def has_loop(self):
+        return self._has_code('loop')
+
+    def has_post_loop(self):
+        return self._has_code('post_loop')
+
+    def has_reduce(self):
+        return self._has_code('reduce')
+
+
+class CythonGroup(Group):
+    ##########################################################################
+    # Non-public interface.
+    ##########################################################################
+    def _get_variable_decl(self, context, mode='declare'):
+        decl = []
+        names = list(context.keys())
+        names.sort()
+        for var in names:
+            value = context[var]
+            if isinstance(value, int):
+                declare = 'cdef long ' if mode == 'declare' else ''
+                decl.append('{declare}{var} = {value}'.format(declare=declare,
+                                                              var=var,
+                                                              value=value))
+            elif isinstance(value, float):
+                declare = 'cdef double ' if mode == 'declare' else ''
+                decl.append('{declare}{var} = {value}'.format(declare=declare,
+                                                              var=var,
+                                                              value=value))
+            elif isinstance(value, (list, tuple)):
+                if mode == 'declare':
+                    decl.append(
+                        'cdef DoubleArray _{var} = '
+                        'DoubleArray(aligned({size}, 8)*self.n_threads)'
+                        .format(
+                            var=var, size=len(value)
+                        )
+                    )
+                    decl.append('cdef double* {var} = _{var}.data'
+                                .format(size=len(value), var=var))
+                else:
+                    pass
+        return '\n'.join(decl)
+
+    def _get_code(self, kind='loop'):
+        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
+        # We assume here that precomputed quantities are only relevant
+        # for loops and not post_loops and initialization.
+        pre = []
+        if kind == 'loop':
+            for p, cb in self.precomputed.items():
+                pre.append(cb.code.strip())
+            if len(pre) > 0:
+                pre.append('')
+        code = []
+        for eq in self.equations:
+            meth = getattr(eq, kind, None)
+            if meth is not None:
+                args = inspect.getargspec(meth).args
+                if 'self' in args:
+                    args.remove('self')
+                call_args = ', '.join(args)
+                c = 'self.{eq_name}.{method}({args})'\
+                    .format(eq_name=eq.var_name, method=kind, args=call_args)
+                code.append(c)
+        if len(code) > 0:
+            code.append('')
+        return '\n'.join(pre + code)
+
+    def _set_kernel(self, code, kernel):
+        if kernel is not None:
+            k_func = 'self.kernel.kernel'
+            g_func = 'self.kernel.gradient'
+            h_func = 'self.kernel.gradient_h'
+            deltap = 'self.kernel.get_deltap()'
+            code = code.replace('DELTAP', deltap)
+            return code.replace('GRADIENT', g_func).replace(
+                'KERNEL', k_func
+            ).replace('GRADH', h_func)
+        else:
+            return code
+
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
     def get_array_declarations(self, names, known_types={}):
         decl = []
         for arr in sorted(names):
@@ -621,7 +685,7 @@ class Group(object):
                     type=known_types[arr].type, arr=arr
                 ))
             else:
-                decl.append('cdef double* %s'%arr)
+                decl.append('cdef double* %s' % arr)
         return '\n'.join(decl)
 
     def get_variable_declarations(self, context):
@@ -635,49 +699,25 @@ class Group(object):
             value = self.context[var]
             if isinstance(value, (list, tuple)):
                 code.append(
-                    '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'\
-                        .format(size=len(value), var=var)
+                    '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'
+                    .format(size=len(value), var=var)
                 )
         return '\n'.join(code)
-
-    def has_initialize(self):
-        return self._has_code('initialize')
 
     def get_initialize_code(self, kernel=None):
         code = self._get_code(kind='initialize')
         return self._set_kernel(code, kernel)
 
-    def has_loop(self):
-        return self._has_code('loop')
-
     def get_loop_code(self, kernel=None):
         code = self._get_code(kind='loop')
         return self._set_kernel(code, kernel)
-
-    def has_post_loop(self):
-        return self._has_code('post_loop')
 
     def get_post_loop_code(self, kernel=None):
         code = self._get_code(kind='post_loop')
         return self._set_kernel(code, kernel)
 
-    def has_reduce(self):
-        return self._has_code('reduce')
-
     def get_reduce_code(self):
         return self._get_code(kind='reduce')
-
-    def get_converged_condition(self):
-        if self.has_subgroups:
-            code = [g.get_converged_condition() for g in self.equations]
-            return ' & '.join(code)
-        else:
-            code = []
-            for equation in self.equations:
-                code.append('(self.%s.converged() > 0)'%equation.var_name)
-            # Note, we use '&' because we want to call converged on all equations.
-            # and not be short-circuited by the first one that returns False.
-            return ' & '.join(code)
 
     def get_equation_wrappers(self, known_types={}):
         classes = defaultdict(lambda: 0)
@@ -685,7 +725,9 @@ class Group(object):
         for equation in self.equations:
             cls = equation.__class__.__name__
             n = classes[cls]
-            equation.var_name = '%s%d'%(camel_to_underscore(equation.name), n)
+            equation.var_name = '%s%d' % (
+                camel_to_underscore(equation.name), n
+            )
             classes[cls] += 1
             eqs[cls] = equation
         wrappers = []
@@ -713,3 +755,28 @@ class Group(object):
                                 idx=i)
             lines.append(code)
         return '\n'.join(lines)
+
+
+class OpenCLGroup(Group):
+    ##########################################################################
+    # Public interface.
+    ##########################################################################
+    def get_equation_wrappers(self, known_types={}):
+        classes = defaultdict(lambda: 0)
+        eqs = {}
+        for equation in self.equations:
+            cls = equation.__class__.__name__
+            n = classes[cls]
+            equation.var_name = '%s%d' % (
+                camel_to_underscore(equation.name), n
+            )
+            classes[cls] += 1
+            eqs[cls] = equation
+        wrappers = []
+        predefined = dict(get_predefined_types(self.pre_comp))
+        predefined.update(known_types)
+        code_gen = OpenCLConverter(known_types=predefined)
+        for cls in sorted(classes.keys()):
+            src = code_gen.parse_instance(eqs[cls])
+            wrappers.append(src)
+        return '\n'.join(wrappers)

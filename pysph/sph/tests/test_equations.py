@@ -6,8 +6,9 @@ import unittest
 
 # Local imports.
 from pysph.base.cython_generator import KnownType
-from pysph.sph.equation import (BasicCodeBlock, Context, Equation,
-    Group, sort_precomputed)
+from pysph.sph.equation import (
+    BasicCodeBlock, Context, CythonGroup, Equation, Group, sort_precomputed
+)
 
 
 class TestContext(unittest.TestCase):
@@ -41,7 +42,8 @@ class TestBase(unittest.TestCase):
         g.sort()
         e = list(expect)
         e.sort()
-        self.assertEqual(g, e, 'got %s, expected %s'%(g, e))
+        self.assertEqual(g, e, 'got %s, expected %s' % (g, e))
+
 
 class TestBasicCodeBlock(TestBase):
 
@@ -108,21 +110,22 @@ class TestEquations(TestBase):
 
         d_arho = [0.0, 0.0, 0.0]
         s_m = [0.0, 0.0]
-        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
-                   DWIJ=[0,0,0], VIJ=[0,0,0])
+        e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
+               DWIJ=[0, 0, 0], VIJ=[0, 0, 0])
         self.assertEqual(d_arho[0], 0.0)
         self.assertEqual(d_arho[1], 0.0)
         # Now call with specific arguments.
         s_m = [1, 1]
-        r = e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
-                   DWIJ=[1,1,1], VIJ=[1,1,1])
+        e.loop(d_idx=0, d_arho=d_arho, s_idx=0, s_m=s_m,
+               DWIJ=[1, 1, 1], VIJ=[1, 1, 1])
         self.assertEqual(d_arho[0], 3.0)
         self.assertEqual(d_arho[1], 0.0)
 
     def test_order_of_precomputed(self):
         try:
             pre_comp = Group.pre_comp
-            pre_comp.AIJ = BasicCodeBlock(code=dedent("""
+            pre_comp.AIJ = BasicCodeBlock(
+                code=dedent("""
                 AIJ[0] = XIJ[0]/RIJ
                 AIJ[1] = XIJ[1]/RIJ
                 AIJ[2] = XIJ[2]/RIJ
@@ -130,7 +133,7 @@ class TestEquations(TestBase):
                 AIJ=[1.0, 0.0, 0.0])
             input = dict((x, pre_comp[x]) for x in ['RIJ', 'R2IJ',
                                                     'XIJ', 'HIJ', 'AIJ'])
-            pre = sort_precomputed(input)
+            pre = sort_precomputed(input, pre_comp)
             self.assertEqual(
                 list(pre.keys()), ['HIJ', 'XIJ', 'R2IJ', 'RIJ', 'AIJ']
             )
@@ -142,19 +145,24 @@ class TestEquations(TestBase):
 class Equation1(Equation):
     def loop(self, WIJ=0.0):
         x = WIJ
+        x += 1
 
     def post_loop(self, d_idx, d_h):
         x = d_h[d_idx]
+        x += 1
+
 
 class Equation2(Equation):
     def loop(self, d_idx, s_idx):
         x = s_idx + d_idx
+        x += 1
+
 
 class TestGroup(TestBase):
     def setUp(self):
         from pysph.sph.basic_equations import SummationDensity
         from pysph.sph.wc.basic import TaitEOS
-        self.group = Group(
+        self.group = CythonGroup(
             [SummationDensity('f', ['f']),
              TaitEOS('f', None, rho0=1.0, c0=1.0, gamma=1.4, p0=1.0)]
         )
@@ -204,12 +212,14 @@ class TestGroup(TestBase):
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=[1., 2.])
-        expect = ('cdef DoubleArray _x = DoubleArray(aligned(2, 8)*self.n_threads)\n'
+        expect = ('cdef DoubleArray _x = DoubleArray(aligned(2, 8)*'
+                  'self.n_threads)\n'
                   'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
         context = Context(x=(0, 1., 2.))
-        expect = ('cdef DoubleArray _x = DoubleArray(aligned(3, 8)*self.n_threads)\n'
+        expect = ('cdef DoubleArray _x = DoubleArray(aligned(3, 8)*'
+                  'self.n_threads)\n'
                   'cdef double* x = _x.data')
         self.assertEqual(g.get_variable_declarations(context), expect)
 
@@ -218,9 +228,9 @@ class TestGroup(TestBase):
         k = CubicSpline(dim=3)
         e1 = Equation1('f', ['f'])
         e2 = Equation2('f', ['f'])
-        g = Group([e1, e2])
+        g = CythonGroup([e1, e2])
         # First get the equation wrappers so the equation names are setup.
-        w = g.get_equation_wrappers()
+        g.get_equation_wrappers()
         result = g.get_loop_code(k)
         expect = dedent('''\
             HIJ = 0.5*(d_h[d_idx] + s_h[s_idx])
@@ -234,7 +244,7 @@ class TestGroup(TestBase):
             self.equation10.loop(WIJ)
             self.equation20.loop(d_idx, s_idx)
             ''')
-        msg = 'EXPECTED:\n%s\nGOT:\n%s'%(expect, result)
+        msg = 'EXPECTED:\n%s\nGOT:\n%s' % (expect, result)
         self.assertEqual(result, expect, msg)
 
     def test_post_loop_code(self):
@@ -242,15 +252,16 @@ class TestGroup(TestBase):
         k = CubicSpline(dim=3)
         e1 = Equation1('f', ['f'])
         e2 = Equation2('f', ['f'])
-        g = Group([e1, e2])
+        g = CythonGroup([e1, e2])
         # First get the equation wrappers so the equation names are setup.
-        w = g.get_equation_wrappers()
+        g.get_equation_wrappers()
         result = g.get_post_loop_code(k)
         expect = dedent('''\
             self.equation10.post_loop(d_idx, d_h)
             ''')
-        msg = 'EXPECTED:\n%s\nGOT:\n%s'%(expect, result)
+        msg = 'EXPECTED:\n%s\nGOT:\n%s' % (expect, result)
         self.assertEqual(result, expect, msg)
+
 
 if __name__ == '__main__':
     unittest.main()

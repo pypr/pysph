@@ -1,9 +1,9 @@
 """Tests for the configuration.
 """
-import sys
 from unittest import TestCase, main
 
 from pysph.base.config import Config, get_config, set_config
+
 
 class ConfigTestCase(TestCase):
 
@@ -30,6 +30,36 @@ class ConfigTestCase(TestCase):
         config.use_openmp = 10
         # Then
         self.assertEqual(config.use_openmp, 10)
+
+    def test_use_opencl_config_default(self):
+        # Given
+        config = self.config
+        # When
+        # Then
+        self.assertFalse(config.use_opencl)
+
+    def test_set_get_use_opencl_config(self):
+        # Given
+        config = self.config
+        # When
+        config.use_opencl = 10
+        # Then
+        self.assertEqual(config.use_opencl, 10)
+
+    def test_use_double_config_default(self):
+        # Given
+        config = self.config
+        # When
+        # Then
+        self.assertFalse(config.use_double)
+
+    def test_set_get_use_double_config(self):
+        # Given
+        config = self.config
+        # When
+        config.use_double = 10
+        # Then
+        self.assertEqual(config.use_double, 10)
 
     def test_default_global_config_is_really_global(self):
         # Given.
