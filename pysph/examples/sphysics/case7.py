@@ -110,7 +110,7 @@ class WavesPaddle2D(Application):
                             c0=co, h0=0.02, hdx=1.3, hg_correction=True,
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['wall', 'paddle'], dim=2, rho0=ro,
-                          c0=co, gy=-9.81, alpha=0.0, nu=0.0, h=0.02,
+                          c0=co, gy=-9.81, alpha=alp, nu=0.0, h=0.02,
                           clamp_p=True)
         return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
 
