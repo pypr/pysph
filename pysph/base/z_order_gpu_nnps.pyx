@@ -36,17 +36,17 @@ IF UNAME_SYSNAME == "Windows":
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, bint use_double=True,
-            ctx=None):
+            bint cache=True, bint sort_gids=False, ctx=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids, ctx
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-        self.use_double = use_double
+        self.radix_sort = None
 
-        self.helper = GPUNNPSHelper(self.ctx, "z_order_gpu_nnps.mako", use_double)
+        self.helper = GPUNNPSHelper(self.ctx, "z_order_gpu_nnps.mako",
+                                    self.use_double)
 
         self.src_index = -1
         self.dst_index = -1
@@ -59,17 +59,23 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         fill_pids = self.helper.get_kernel("fill_pids")
 
-        fill_pids(pa_wrapper.gpu_x, pa_wrapper.gpu_y, pa_wrapper.gpu_z,
+        pa_gpu = pa_wrapper.pa.gpu
+        fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z,
                 self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
                 self.pid_keys[pa_index], self.pids[pa_index])
 
-        radix_sort = cl.algorithm.RadixSort(self.ctx,
+        if self.radix_sort is None:
+            self.radix_sort = cl.algorithm.RadixSort(
+                self.ctx,
                 "unsigned int* pids, unsigned long* keys",
                 scan_kernel=GenericScanKernel, key_expr="keys[i]",
-                sort_arg_names=["pids", "keys"])
+                sort_arg_names=["pids", "keys"]
+            )
 
-        (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index],
-                self.pid_keys[pa_index], key_bits=64)
+
+        (sorted_indices, sorted_keys), evnt = self.radix_sort(
+            self.pids[pa_index], self.pid_keys[pa_index], key_bits=64
+        )
         self.pids[pa_index] = sorted_indices
         self.pid_keys[pa_index] = sorted_keys
 
@@ -91,11 +97,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
 
-        map_cid_to_idx(pa_wrapper.gpu_x, pa_wrapper.gpu_y,
-                pa_wrapper.gpu_z, pa_wrapper.get_number_of_particles(), self.cell_size,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
-                self.cid_to_idx[pa_index])
+        map_cid_to_idx(
+            pa_gpu.x, pa_gpu.y, pa_gpu.z,
+            pa_wrapper.get_number_of_particles(), self.cell_size,
+            make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+            self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
+            self.cid_to_idx[pa_index]
+        )
 
         fill_cids = self.helper.get_kernel("fill_cids")
 
@@ -115,12 +123,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
-
-            if self.use_double:
-                copy_to_gpu(pa_wrapper, self.queue, np.float64)
-            else:
-                copy_to_gpu(pa_wrapper, self.queue, np.float32)
-
             num_particles = pa_wrapper.get_number_of_particles()
 
             self.pids.append(cl.array.empty(self.queue,
@@ -177,8 +179,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             make_vec = cl.array.vec.make_double3 if self.use_double \
                     else cl.array.vec.make_float3
 
+            dst_gpu = self.dst.pa.gpu
             fill_overflow_map(self.dst_to_src, self.cid_to_idx[dst_index],
-                    self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
+                    dst_gpu.x, dst_gpu.y, dst_gpu.z,
                     self.src.get_number_of_particles(), self.cell_size,
                     make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                     self.pid_keys[src_index], self.pids[dst_index],
@@ -197,9 +200,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
 
-        z_order_nbr_lengths(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h,
+        dst_gpu = self.dst.pa.gpu
+        src_gpu = self.src.pa.gpu
+        z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index],
@@ -214,13 +218,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
 
-        z_order_nbrs(self.dst.gpu_x, self.dst.gpu_y, self.dst.gpu_z,
-                self.dst.gpu_h, self.src.gpu_x, self.src.gpu_y, self.src.gpu_z,
-                self.src.gpu_h,
+        dst_gpu = self.dst.pa.gpu
+        src_gpu = self.src.pa.gpu
+        z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index],
                 self.max_cid[self.src_index], self.cids[self.dst_index],
                 self.cid_to_idx[self.src_index], self.overflow_cid_to_idx,
                 self.dst_to_src, start_indices, nbrs, self.radius_scale2, self.cell_size)
-

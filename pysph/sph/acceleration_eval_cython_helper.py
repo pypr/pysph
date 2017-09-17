@@ -1,10 +1,12 @@
 from collections import defaultdict
-from mako.template import Template
 from os.path import dirname, join
 
+from mako.template import Template
 from pyzoltan.core import carray
+
 from pysph.base.config import get_config
 from pysph.base.cython_generator import CythonGenerator, KnownType
+from pysph.base.ext_module import ExtModule
 
 
 ###############################################################################
@@ -15,16 +17,17 @@ def get_code(obj):
     result = []
     if hasattr(obj, '_cython_code_'):
         code = obj._cython_code_()
-        doc = '# From %s'%obj.__class__.__name__
+        doc = '# From %s' % obj.__class__.__name__
         result.extend([doc, code] if len(code) > 0 else [])
     if hasattr(obj, '_get_helpers_'):
         cg = CythonGenerator()
-        doc = '# From %s'%obj.__class__.__name__
+        doc = '# From %s' % obj.__class__.__name__
         result.append(doc)
         for helper in obj._get_helpers_():
             cg.parse(helper)
             result.append(cg.get_code())
     return result
+
 
 ###############################################################################
 def get_all_array_names(particle_arrays):
@@ -44,10 +47,10 @@ def get_all_array_names(particle_arrays):
 
     A simple example would be::
 
-        >>> x = np.linspace(0, 1, 10)
-        >>> pa = ParticleArray(name='f', x=x)
-        >>> get_all_array_names([pa])
-        {'DoubleArray': {'x'}, 'IntArray': {'pid', 'tag'}, 'UIntArray': {'gid'}}
+       >>> x = np.linspace(0, 1, 10)
+       >>> pa = ParticleArray(name='f', x=x)
+       >>> get_all_array_names([pa])
+       {'DoubleArray': {'x'}, 'IntArray': {'pid', 'tag'}, 'UIntArray': {'gid'}}
     """
     props = defaultdict(set)
     for array in particle_arrays:
@@ -56,6 +59,7 @@ def get_all_array_names(particle_arrays):
                 a_type = arr.__class__.__name__
                 props[a_type].add(name)
     return dict(props)
+
 
 def get_known_types_for_arrays(array_names):
     """Given all the array names from `get_all_array_names` this creates known
@@ -108,6 +112,8 @@ class AccelerationEvalCythonHelper(object):
         self.known_types = get_known_types_for_arrays(
             self.all_array_names
         )
+        self._ext_mod = None
+        self._module = None
 
     ##########################################################################
     # Public interface.
@@ -126,6 +132,14 @@ class AccelerationEvalCythonHelper(object):
             object.particle_arrays
         )
         object.set_compiled_object(acceleration_eval)
+
+    def compile(self, code):
+        # Note, we do not add carray or particle_array as nnps_base would
+        # have been rebuilt anyway if they changed.
+        depends = ["pysph.base.nnps_base"]
+        self._ext_mod = ExtModule(code, verbose=True, depends=depends)
+        self._module = self._ext_mod.load()
+        return self._module
 
     ##########################################################################
     # Mako interface.
@@ -170,11 +184,15 @@ class AccelerationEvalCythonHelper(object):
         return self.object.all_group.get_equation_init()
 
     def get_kernel_defs(self):
-        return 'cdef public %s kernel'%(self.object.kernel.__class__.__name__)
+        return 'cdef public %s kernel' % (
+            self.object.kernel.__class__.__name__
+        )
 
     def get_kernel_init(self):
         object = self.object
-        return 'self.kernel = %s(**kernel.__dict__)'%(object.kernel.__class__.__name__)
+        return 'self.kernel = %s(**kernel.__dict__)' % (
+            object.kernel.__class__.__name__
+        )
 
     def get_variable_declarations(self):
         group = self.object.all_group
@@ -187,21 +205,22 @@ class AccelerationEvalCythonHelper(object):
         src.update(dest)
         return group.get_array_declarations(src, self.known_types)
 
-    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources, real):
+    def get_dest_array_setup(self, dest_name, eqs_with_no_source, sources,
+                             real):
         src, dest_arrays = eqs_with_no_source.get_array_names()
         for g in sources.values():
             s, d = g.get_array_names()
             dest_arrays.update(d)
-        lines = ['NP_DEST = self.%s.size(real=%s)'%(dest_name, real)]
-        lines += ['%s = dst.%s.data'%(n, n[2:])
+        lines = ['NP_DEST = self.%s.size(real=%s)' % (dest_name, real)]
+        lines += ['%s = dst.%s.data' % (n, n[2:])
                   for n in sorted(dest_arrays)]
         return '\n'.join(lines)
 
     def get_src_array_setup(self, src_name, eq_group):
         src_arrays, dest = eq_group.get_array_names()
-        lines = ['NP_SRC = self.%s.size()'%src_name]
-        lines += ['%s = src.%s.data'%(n, n[2:])
-                 for n in sorted(src_arrays)]
+        lines = ['NP_SRC = self.%s.size()' % src_name]
+        lines += ['%s = src.%s.data' % (n, n[2:])
+                  for n in sorted(src_arrays)]
         return '\n'.join(lines)
 
     def get_parallel_block(self):

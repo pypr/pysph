@@ -78,9 +78,10 @@ class IntegratorCythonHelper(object):
         lines = []
         for dest, stepper in self.object.steppers.items():
             cls_name = stepper.__class__.__name__
-            code = 'self.{name} = {cls}(**steppers["{dest}"].__dict__)'\
-                        .format(name=dest+'_stepper', cls=cls_name,
-                                dest=dest)
+            code = (
+                'self.{name} = {cls}(**steppers["{dest}"].__dict__)'
+                .format(name=dest+'_stepper', cls=cls_name, dest=dest)
+            )
             lines.append(code)
         return '\n'.join(lines)
 
@@ -93,7 +94,7 @@ class IntegratorCythonHelper(object):
         arrays = set()
         for dest in self.object.steppers:
             s, d = get_array_names(self.get_args(dest, method))
-            self._check_arrays_for_properties(dest, s|d)
+            self._check_arrays_for_properties(dest, s | d)
             arrays.update(s | d)
 
         known_types = self.acceleration_eval_helper.known_types
@@ -107,7 +108,7 @@ class IntegratorCythonHelper(object):
 
     def get_array_setup(self, dest, method):
         s, d = get_array_names(self.get_args(dest, method))
-        lines = ['%s = dst.%s.data'%(n, n[2:]) for n in sorted(s|d)]
+        lines = ['%s = dst.%s.data' % (n, n[2:]) for n in sorted(s | d)]
         return '\n'.join(lines)
 
     def get_stepper_loop(self, dest, method):
@@ -115,8 +116,9 @@ class IntegratorCythonHelper(object):
         if 'self' in args:
             args.remove('self')
         call_args = ', '.join(args)
-        c = 'self.{obj}.{method}({args})'\
-                .format(obj=dest+'_stepper', method=method, args=call_args)
+        c = 'self.{obj}.{method}({args})'.format(
+            obj=dest+'_stepper', method=method, args=call_args
+        )
         return c
 
     def get_stepper_method_wrapper_names(self):
@@ -154,8 +156,8 @@ class IntegratorCythonHelper(object):
             diff = props.difference(available_props)
             integrator_name = self.object.steppers[dest].__class__.__name__
             names = ', '.join([x for x in sorted(diff)])
-            msg = "ERROR: {integrator_name} requires the following properties:"\
-                  "\n\t{names}\n"\
+            msg = "ERROR: {integrator_name} requires the following "\
+                  "properties:\n\t{names}\n"\
                   "Please add them to the particle array '{dest}'.".format(
                       integrator_name=integrator_name, names=names, dest=dest
                   )

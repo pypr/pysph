@@ -9,13 +9,15 @@ from .particle_array import ParticleArray, \
 
 from pyzoltan.core.carray import LongArray
 
-UINT_MAX = (1<<32) - 1
+UINT_MAX = (1 << 32) - 1
+
 
 # Internal tags used in PySPH (defined in particle_array.pxd)
 class ParticleTAGS:
     Local = get_local_tag()
     Remote = get_remote_tag()
     Ghost = get_ghost_tag()
+
 
 def arange_long(start, stop=-1):
     """ Creates a LongArray working same as builtin range with upto 2 arguments
@@ -102,47 +104,48 @@ def get_particle_array(additional_props=None, constants=None, **props):
         np = data.size
 
         if prop in ['tag', 'pid']:
-            prop_dict[prop] = {'data':data,
-                               'type':'int',
-                               'name':prop}
+            prop_dict[prop] = {'data': data,
+                               'type': 'int',
+                               'name': prop}
         elif prop in ['gid']:
-            prop_dict[prop] = {'data':data.astype(numpy.uint32),
-                               'type':'unsigned int',
-                               'name':prop}
+            prop_dict[prop] = {'data': data.astype(numpy.uint32),
+                               'type': 'unsigned int',
+                               'name': prop}
         else:
-            prop_dict[prop] = {'data':data,
-                               'type':'double',
-                               'name':prop}
+            prop_dict[prop] = {'data': data,
+                               'type': 'double',
+                               'name': prop}
 
     # Add the default props
     for prop in default_props:
-        if not prop in prop_dict:
+        if prop not in prop_dict:
             if prop in ["pid"]:
-                prop_dict[prop] = {'name':prop, 'type':'int',
-                                   'default':0}
+                prop_dict[prop] = {'name': prop, 'type': 'int',
+                                   'default': 0}
             elif prop in ['tag']:
-                prop_dict[prop] = {'name':prop, 'type':'int',
-                                    'default':ParticleTAGS.Local}
+                prop_dict[prop] = {'name': prop, 'type': 'int',
+                                   'default': ParticleTAGS.Local}
             elif prop in ['gid']:
                 data = numpy.ones(shape=np, dtype=numpy.uint32)
                 data[:] = UINT_MAX
 
-                prop_dict[prop] = {'name':prop, 'type':'unsigned int',
-                                   'data':data, 'default':UINT_MAX}
+                prop_dict[prop] = {'name': prop, 'type': 'unsigned int',
+                                   'data': data, 'default': UINT_MAX}
 
             else:
-                prop_dict[prop] = {'name':prop, 'type':'double',
-                                   'default':0}
+                prop_dict[prop] = {'name': prop, 'type': 'double',
+                                   'default': 0}
 
     # create the particle array
     pa = ParticleArray(name=name, constants=constants, **prop_dict)
 
     # default property arrays to save out. Any reasonable SPH particle
     # should define these
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
-                           'pid', 'gid', 'tag'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
+                          'pid', 'gid', 'tag'])
 
     return pa
+
 
 def get_particle_array_wcsph(constants=None, **props):
     """Return a particle array for the WCSPH formulation.
@@ -169,18 +172,21 @@ def get_particle_array_wcsph(constants=None, **props):
 
     """
 
-    wcsph_props = ['cs', 'ax', 'ay', 'az', 'arho', 'x0','y0', 'z0',
-                   'u0', 'v0','w0', 'rho0', 'div']
+    wcsph_props = ['cs', 'ax', 'ay', 'az', 'arho', 'x0', 'y0', 'z0',
+                   'u0', 'v0', 'w0', 'rho0', 'div']
 
     pa = get_particle_array(
         constants=constants, additional_props=wcsph_props, **props
     )
 
     # default property arrays to save out.
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
-                           'pid', 'gid', 'tag', 'p'] )
+    pa.set_output_arrays([
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
+        'pid', 'gid', 'tag', 'p'
+    ])
 
     return pa
+
 
 def get_particle_array_iisph(constants=None, **props):
     """Get a particle array for the IISPH formulation.
@@ -209,11 +215,10 @@ def get_particle_array_iisph(constants=None, **props):
 
     """
     iisph_props = ['uadv', 'vadv', 'wadv', 'rho_adv',
-                 'au', 'av', 'aw','ax', 'ay', 'az',
-                 'dii0', 'dii1', 'dii2', 'V',
-                 'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
-                 'compression'
-                 ]
+                   'au', 'av', 'aw', 'ax', 'ay', 'az',
+                   'dii0', 'dii1', 'dii2', 'V',
+                   'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
+                   'compression']
     # Used to calculate the total compression first index is count and second
     # the compression.
     consts = {'tmp_comp': [0.0, 0.0]}
@@ -223,9 +228,10 @@ def get_particle_array_iisph(constants=None, **props):
     pa = get_particle_array(
         constants=consts, additional_props=iisph_props, **props
     )
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
-                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+                          'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V'])
     return pa
+
 
 def get_particle_array_rigid_body(constants=None, **props):
     """Return a particle array for a rigid body motion.
@@ -257,7 +263,7 @@ def get_particle_array_rigid_body(constants=None, **props):
     body_id = props.pop('body_id', None)
     nb = 1 if body_id is None else numpy.max(body_id) + 1
 
-    consts = {'total_mass':numpy.zeros(nb, dtype=float),
+    consts = {'total_mass': numpy.zeros(nb, dtype=float),
               'num_body': numpy.asarray(nb, dtype=int),
               'cm': numpy.zeros(3*nb, dtype=float),
 
@@ -281,10 +287,11 @@ def get_particle_array_rigid_body(constants=None, **props):
     pa = get_particle_array(constants=consts, additional_props=extra_props,
                             **props)
     pa.add_property('body_id', type='int', data=body_id)
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
-                           'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V',
-                           'fx', 'fy', 'fz', 'body_id'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm',
+                          'p', 'pid', 'au', 'av', 'aw', 'tag', 'gid', 'V',
+                          'fx', 'fy', 'fz', 'body_id'])
     return pa
+
 
 def get_particle_array_tvf_fluid(constants=None, **props):
     """Return a particle array for the TVF formulation for a fluid.
@@ -310,11 +317,12 @@ def get_particle_array_tvf_fluid(constants=None, **props):
     pa = get_particle_array(
         constants=constants, additional_props=tv_props, **props
     )
-    pa.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
-                           'm', 'au', 'av', 'aw', 'V', 'vmag2', 'pid', 'gid',
-                           'tag'] )
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
+                          'm', 'au', 'av', 'aw', 'V', 'vmag2', 'pid', 'gid',
+                          'tag'])
 
     return pa
+
 
 def get_particle_array_tvf_solid(constants=None, **props):
     """Return a particle array for the TVF formulation for a solid.
@@ -346,6 +354,7 @@ def get_particle_array_tvf_solid(constants=None, **props):
     )
     return pa
 
+
 def get_particle_array_gasd(constants=None, **props):
     """Return a particle array for a Gas Dynamics problem.
 
@@ -366,10 +375,12 @@ def get_particle_array_gasd(constants=None, **props):
     """
     required_props = [
         'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
-        'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0',
-        'rho0', 'e0', 'h0', 'div', 'grhox', 'grhoy', 'grhoz', 'dwdh', 'omega',
-        'converged', 'alpha1', 'alpha10', 'aalpha1', 'alpha2', 'alpha20', 'aalpha2',
-        'del2e']
+        'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0',
+        'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div',
+        'grhox', 'grhoy', 'grhoz', 'dwdh', 'omega', 'converged',
+        'alpha1', 'alpha10', 'aalpha1', 'alpha2', 'alpha20', 'aalpha2',
+        'del2e'
+    ]
 
     pa = get_particle_array(
         constants=constants, additional_props=required_props, **props
@@ -382,9 +393,10 @@ def get_particle_array_gasd(constants=None, **props):
 
     pa.set_output_arrays(['x', 'y', 'u', 'v', 'rho', 'm', 'h', 'cs', 'p', 'e',
                           'au', 'av', 'ae', 'pid', 'gid', 'tag', 'dwdh',
-                          'alpha1', 'alpha2'] )
+                          'alpha1', 'alpha2'])
 
     return pa
+
 
 def get_particles_info(particles):
     """Return the array information for a list of particles.
@@ -402,18 +414,21 @@ def get_particles_info(particles):
         prop_info = {}
         for prop_name, prop in parray.properties.items():
             prop_info[prop_name] = {
-                'name':prop_name, 'type':prop.get_c_type(),
-                'default':parray.default_values[prop_name],
-                'data':None}
+                'name': prop_name, 'type': prop.get_c_type(),
+                'default': parray.default_values[prop_name],
+                'data': None}
         const_info = {}
+        if parray.gpu is not None:
+            parray.gpu.pull(*list(parray.constants.keys()))
         for c_name, value in parray.constants.items():
             const_info[c_name] = value.get_npy_array()
-        info[ parray.name ] = dict(
+        info[parray.name] = dict(
             properties=prop_info, constants=const_info,
             output_property_arrays=parray.output_property_arrays
         )
 
     return info
+
 
 def create_dummy_particles(info):
     """Returns a replica (empty) of a list of particles"""

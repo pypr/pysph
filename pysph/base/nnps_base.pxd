@@ -146,14 +146,8 @@ cdef class NNPSParticleArrayWrapper:
     cdef public IntArray tag
     cdef public ParticleArray pa
 
-    cdef public object gpu_x
-    cdef public object gpu_y
-    cdef public object gpu_z
-    cdef public object gpu_h
-
     cdef str name
     cdef int np
-    cdef public bint copied_to_gpu
 
     # get the number of particles
     cdef int get_number_of_particles(self)
@@ -348,5 +342,3 @@ cdef class NNPS(NNPSBase):
 
     # refresh any data structures needed for binning
     cpdef _refresh(self)
-
-

@@ -63,15 +63,10 @@ cdef class ParticleArray:
     cdef list lb_props
 
     ########################################
-    # OpenCL related attributes.
+    # OpenCL/accelerator related attributes.
 
-
-
-    # dictionary to hold the OpenCL properties for a particle
-    cdef public dict cl_properties
-
-    # bool indicating CL is setup
-    cdef public bint cl_setup_done
+    # Object that manages the device properties.
+    cdef public object gpu
 
     # time for the particle array
     cdef public double time
