@@ -796,5 +796,6 @@ def test_get_bbox():
     assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
     assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
 
+
 if __name__ == '__main__':
     unittest.main()
