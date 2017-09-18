@@ -119,7 +119,12 @@ class CStructHelper(object):
 class CConverter(ast.NodeVisitor):
     def __init__(self, detect_type=detect_type, known_types=None):
         self._declares = {}
-        self._known = set(('M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI'))
+        self._known = set((
+            'M_E', 'M_LOG2E', 'M_LOG10E', 'M_LN2', 'M_LN10',
+            'M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI',
+            'M_2_SQRTPI', 'M_SQRT2', 'M_SQRT1_2',
+            'INFINITY', 'NAN', 'HUGE_VALF', 'pi'
+        ))
         self._name_ctx = (ast.Load, ast.Store)
         self._indent = ''
         self._detect_type = detect_type

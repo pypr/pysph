@@ -30,6 +30,7 @@ ${helper.get_post_loop_kernel(g_idx, dest, all_eqs)}
 </%def>
 
 #define abs fabs
+#define pi M_PI
 ${helper.get_header()}
 
 % for g_idx, group in enumerate(helper.object.mega_groups):
