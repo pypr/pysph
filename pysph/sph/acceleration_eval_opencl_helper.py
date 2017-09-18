@@ -372,7 +372,7 @@ class AccelerationEvalOpenCLHelper(object):
         pre = []
         for p, cb in eq_group.precomputed.items():
             src = cb.code.strip().splitlines()
-            pre.append('\n'.join([' '*4 + x + ';' for x in src]))
+            pre.extend([' '*4 + x + ';' for x in src])
         if len(pre) > 0:
             pre.append('')
         code.extend(pre)
