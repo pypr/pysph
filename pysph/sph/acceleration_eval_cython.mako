@@ -112,6 +112,7 @@ nnps.update()
 % endfor
 </%def>
 
+from libc.stdio cimport printf
 from libc.math cimport *
 from libc.math cimport fabs as abs
 from libc.math cimport M_PI as pi
