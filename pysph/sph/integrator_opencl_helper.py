@@ -11,6 +11,8 @@ from pysph.base.config import get_config
 from pysph.base.translator import OpenCLConverter
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
+from .acceleration_eval_opencl_helper import (get_kernel_definition,
+                                              wrap_code)
 
 
 class OpenCLIntegrator(object):
@@ -127,13 +129,18 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
     def get_code(self):
         if self.object is not None:
             tpl = dedent("""
+            // ------------------------------------------------------------
+            // Integrator steppers.
             ${helper.get_stepper_code()}
 
+            // ------------------------------------------------------------
             % for dest in sorted(helper.object.steppers.keys()):
+            // Steppers for ${dest}
             % for method in helper.get_stepper_method_wrapper_names():
             ${helper.get_stepper_kernel(dest, method)}
             % endfor
             % endfor
+            // ------------------------------------------------------------
             """)
             template = Template(text=tpl)
             return template.render(helper=self)
@@ -184,18 +191,20 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         # as we do not need to generate structs and pass them around.
         code = [
             'int d_idx = get_global_id(0);',
+        ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,
                 args='0, ' + ', '.join(args)
-            )
-        ]
+            ), indent=''
+        )
+
         body = '\n'.join(' '*4 + x for x in code)
 
         self.data[method][dest] = (kernel, list(d))
 
+        sig = get_kernel_definition(kernel, all_args)
         return (
-            '__kernel void\n{kernel}\n({args})\n{{\n{body}\n}}\n'.format(
-                kernel=kernel, args=', '.join(all_args),
-                body=body
+            '{sig}\n{{\n{body}\n}}\n'.format(
+                sig=sig, body=body
             )
         )

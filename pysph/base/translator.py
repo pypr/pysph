@@ -13,7 +13,7 @@ import ast
 import inspect
 import re
 import sys
-from textwrap import dedent
+from textwrap import dedent, wrap
 
 import numpy as np
 from mako.template import Template
@@ -359,17 +359,18 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         if self._body_has_return(body):
-            sig = 'double %s(%s) {\n' % (func_name, args)
+            sig = 'double %s(%s)' % (func_name, args)
         else:
-            sig = 'void %s(%s) {\n' % (func_name, args)
+            sig = 'void %s(%s)' % (func_name, args)
 
         declares = self._indent_block(self.get_declarations())
         if len(declares) > 0:
             declares += '\n'
 
+        sig = '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
         self._known = orig_known
         self._declares = orig_declares
-        return sig + declares + body + '\n}\n'
+        return sig + '\n{\n' + declares + body + '\n}\n'
 
     def visit_Gt(self, node):
         return '>'

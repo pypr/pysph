@@ -1,14 +1,16 @@
 <%def name="do_group(helper, g_idx, group)" buffered="True">
-% for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
-% if all_eqs.has_initialize():
 // ------------------------------------------------------------------
+// Group${g_idx}
+% for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
+// Destination ${dest}
+% if all_eqs.has_initialize():
 // Initialization for destination ${dest}
 ${helper.get_initialize_kernel(g_idx, dest, all_eqs)}
 % endif
 
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
-// SPH Equations with no sources.
+// Equations with no sources.
 ${helper.get_simple_loop_kernel(g_idx, dest, all_eqs)}
 % endif
 % endif
@@ -25,8 +27,9 @@ ${helper.get_loop_kernel(g_idx, dest, source, eq_group)}
 ${helper.get_post_loop_kernel(g_idx, dest, all_eqs)}
 % endif
 // Finished destination ${dest}.
-// ------------------------------------------------------------------
 % endfor
+// Finished Group${g_idx}
+// ------------------------------------------------------------------
 </%def>
 
 #define abs fabs

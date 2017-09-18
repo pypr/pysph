@@ -18,6 +18,7 @@ General OpenCL issues:
 import inspect
 import os
 import re
+from textwrap import wrap
 
 import numpy as np
 from mako.template import Template
@@ -35,6 +36,20 @@ from .equation import get_predefined_types
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
+
+
+def get_kernel_definition(kernel, arg_list):
+    sig = '__kernel void\n{kernel}\n({args})'.format(
+        kernel=kernel, args=', '.join(arg_list),
+    )
+    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
+
+
+def wrap_code(code, indent=' '*4):
+    return wrap(
+        code, width=74, initial_indent=indent,
+        subsequent_indent=indent + ' '*4
+    )
 
 
 class OpenCLAccelerationEval(object):
@@ -267,9 +282,12 @@ class AccelerationEvalOpenCLHelper(object):
                 if 'self' in call_args:
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
-                code.append(
-                    '{cls}_{kind}({args});'.format(
-                        cls=cls, kind=kind, args=', '.join(call_args)
+                code.extend(
+                    wrap_code(
+                        '{cls}_{kind}({args});'.format(
+                            cls=cls, kind=kind, args=', '.join(call_args)
+                        ),
+                        indent=''
                     )
                 )
         s_ary, d_ary = all_eqs.get_array_names()
@@ -284,10 +302,10 @@ class AccelerationEvalOpenCLHelper(object):
             dict(kernel=kernel, args=py_args, dest=dest, loop=False)
         )
 
+        sig = get_kernel_definition(kernel, all_args)
         return (
-            '__kernel void\n{kernel}\n({args})\n{{\n{body}\n}}'.format(
-                kernel=kernel, args=', '.join(all_args),
-                body=body
+            '{sig}\n{{\n{body}\n}}'.format(
+                sig=sig, body=body
             )
         )
 
@@ -375,9 +393,12 @@ class AccelerationEvalOpenCLHelper(object):
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
 
-                code.append(
-                    '    {cls}_{kind}({args});'.format(
-                        cls=cls, kind=kind, args=', '.join(call_args)
+                code.extend(
+                    wrap_code(
+                        '{cls}_{kind}({args});'.format(
+                            cls=cls, kind=kind, args=', '.join(call_args)
+                        ),
+                        indent='    '
                     )
                 )
 
@@ -402,10 +423,9 @@ class AccelerationEvalOpenCLHelper(object):
                  source=source, loop=True)
         )
 
+        sig = get_kernel_definition(kernel, all_args)
         return (
-            '__kernel void\n{kernel}\n({args})\n'
-            '{{\n{body}\n    }}\n}}\n'.format(
-                kernel=kernel, args=', '.join(all_args),
-                body=body
+            '{sig}\n{{\n{body}\n    }}\n}}\n'.format(
+                sig=sig, body=body
             )
         )
