@@ -2,7 +2,6 @@
 TODO:
 
 Advanced:
-- Handle: Real=True/False, update_nnps, iterate
 - sub groups.
 - Iterated groups.
 - DT_ADAPT.
@@ -10,7 +9,6 @@ Advanced:
 - support get_code for helper functions.
 
 General OpenCL issues:
-- Handle changes to number of particles correctly.
 - Periodicity.
 - Cleanup the code generation
 
@@ -61,32 +59,49 @@ class OpenCLAccelerationEval(object):
         self._queue = helper._queue
         self._use_double = get_config().use_double
 
+    def _call_kernel(self, info, extra_args):
+        nnps = self.nnps
+        call = info.get('method')
+        args = info.get('args')
+        dest = info['dest']
+        n = dest.get_number_of_particles(info.get('real', True))
+        args[1] = (n,)
+        if info.get('loop'):
+            nnps.set_context(info['src_idx'], info['dst_idx'])
+            cache = nnps.current_cache
+            cache.get_neighbors_gpu()
+            self._queue.finish()
+            args = list(args) + [
+                cache._nbr_lengths_gpu.data,
+                cache._start_idx_gpu.data,
+                cache._neighbors_gpu.data
+            ] + extra_args
+            call(*args)
+        else:
+            call(*(args + extra_args))
+        self._queue.finish()
+
     def compute(self, t, dt):
         helper = self.helper
-        nnps = self.nnps
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(t, dtype=dtype), np.asarray(dt, dtype=dtype)]
-        for call, args, loop_info in helper.calls:
-            if loop_info[0]:
-                nnps.set_context(loop_info[1], loop_info[2])
-                cache = nnps.current_cache
-                cache.get_neighbors_gpu()
-                self._queue.finish()
-                args = list(args) + [
-                    cache._nbr_lengths_gpu.data,
-                    cache._start_idx_gpu.data,
-                    cache._neighbors_gpu.data
-                ] + extra_args
-                call(*args)
-            else:
-                call(*(args + extra_args))
-            self._queue.finish()
+        for info in helper.calls:
+            type = info['type']
+            if type == 'method':
+                method = getattr(self, info.get('method'))
+                method()
+            elif type == 'kernel':
+                self._call_kernel(info, extra_args)
 
     def set_nnps(self, nnps):
         self.nnps = nnps
 
     def update_particle_arrays(self, arrays):
         raise NotImplementedError('OpenCL backend is incomplete')
+
+    def update_nnps(self):
+        self.nnps.update_domain()
+        self.nnps.update()
 
 
 def add_address_space(known_types):
@@ -165,21 +180,27 @@ class AccelerationEvalOpenCLHelper(object):
         calls = []
         prg = self.program
         array_index = self._array_index
-        for info in self.data:
-            method = getattr(prg, info.get('kernel'))
-            dest = info['dest']
-            src = info.get('source', dest)
-            np = self._array_map[dest].get_number_of_particles()
-            args = [self._queue, (np,), None]
-            for arg in info['args']:
-                args.append(self._get_argument(arg, dest, src))
-            loop = info['loop']
-            if loop:
-                loop_info = (loop, array_index[src], array_index[dest])
-                args.append(self._get_argument('kern', dest, src))
+        for item in self.data:
+            kernel = item.get('kernel')
+            if kernel is not None:
+                method = getattr(prg, kernel)
+                dest = item['dest']
+                src = item.get('source', dest)
+                args = [self._queue, None, None]
+                for arg in item['args']:
+                    args.append(self._get_argument(arg, dest, src))
+                loop = item['loop']
+                if loop:
+                    args.append(self._get_argument('kern', dest, src))
+                info = dict(
+                    method=method, dest=self._array_map[dest],
+                    src=self._array_map[src], args=args,
+                    loop=loop, src_idx=array_index[src],
+                    dst_idx=array_index[dest], type='kernel'
+                )
             else:
-                loop_info = (loop, None, None)
-            calls.append((method, args, loop_info))
+                info = dict(method=item.get('method'), type='method')
+            calls.append(info)
         return calls
 
     ##########################################################################
@@ -257,7 +278,7 @@ class AccelerationEvalOpenCLHelper(object):
             if a in args:
                 args.remove(a)
 
-    def _get_simple_kernel(self, g_idx, dest, all_eqs, kind):
+    def _get_simple_kernel(self, g_idx, group, dest, all_eqs, kind):
         assert kind in ('initialize', 'post_loop', 'loop')
         kernel = 'g{g_idx}_{dest}_{kind}'.format(
             g_idx=g_idx, dest=dest, kind=kind
@@ -298,9 +319,10 @@ class AccelerationEvalOpenCLHelper(object):
         all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
 
         body = '\n'.join([' '*4 + x for x in code])
-        self.data.append(
-            dict(kernel=kernel, args=py_args, dest=dest, loop=False)
-        )
+        self.data.append(dict(
+            kernel=kernel, args=py_args, dest=dest, loop=False,
+            real=group.real
+        ))
 
         sig = get_kernel_definition(kernel, all_args)
         return (
@@ -346,16 +368,25 @@ class AccelerationEvalOpenCLHelper(object):
         else:
             return code
 
-    def get_initialize_kernel(self, g_idx, dest, all_eqs):
-        return self._get_simple_kernel(g_idx, dest, all_eqs, kind='initialize')
+    def call_update_nnps(self, group):
+        self.data.append(dict(method='update_nnps'))
 
-    def get_simple_loop_kernel(self, g_idx, dest, all_eqs):
-        return self._get_simple_kernel(g_idx, dest, all_eqs, kind='loop')
+    def get_initialize_kernel(self, g_idx, group, dest, all_eqs):
+        return self._get_simple_kernel(
+            g_idx, group, dest, all_eqs, kind='initialize'
+        )
 
-    def get_post_loop_kernel(self, g_idx, dest, all_eqs):
-        return self._get_simple_kernel(g_idx, dest, all_eqs, kind='post_loop')
+    def get_simple_loop_kernel(self, g_idx, group, dest, all_eqs):
+        return self._get_simple_kernel(
+            g_idx, group, dest, all_eqs, kind='loop'
+        )
 
-    def get_loop_kernel(self, g_idx, dest, source, eq_group):
+    def get_post_loop_kernel(self, g_idx, group, dest, all_eqs):
+        return self._get_simple_kernel(
+            g_idx, group, dest, all_eqs, kind='post_loop'
+        )
+
+    def get_loop_kernel(self, g_idx, group, dest, source, eq_group):
         kind = 'loop'
         kernel = 'g{g_idx}_{source}_on_{dest}_loop'.format(
             g_idx=g_idx, source=source, dest=dest
@@ -418,10 +449,10 @@ class AccelerationEvalOpenCLHelper(object):
              '__global unsigned int *neighbors',
              'double t', 'double dt']
         )
-        self.data.append(
-            dict(kernel=kernel, args=py_args, dest=dest,
-                 source=source, loop=True)
-        )
+        self.data.append(dict(
+            kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
+            real=group.real
+        ))
 
         sig = get_kernel_definition(kernel, all_args)
         return (

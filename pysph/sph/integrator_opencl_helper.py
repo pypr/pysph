@@ -55,7 +55,9 @@ class OpenCLIntegrator(object):
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(self.t, dtype=dtype),
                       np.asarray(self.dt, dtype=dtype)]
-        for dest, (call, args) in call_info.items():
+        for name, (call, args, dest) in call_info.items():
+            n = dest.get_number_of_particles(real=True)
+            args[1] = (n,)
             call(*(args + extra_args))
 
     def set_nnps(self, nnps):
@@ -116,14 +118,14 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         q = self.acceleration_eval_helper._queue
         calls = self.calls
         for method, info in self.data.items():
-            for dest, (kernel, args) in info.items():
+            for dest_name, (kernel, args) in info.items():
+                dest = array_map[dest_name]
                 _args = [
-                    getattr(array_map[dest].gpu, x[2:]).data for x in args
+                    getattr(dest.gpu, x[2:]).data for x in args
                 ]
-                np = array_map[dest].get_number_of_particles(real=True)
-                all_args = [q, (np,), None] + _args
+                all_args = [q, None, None] + _args
                 calls[method][dest] = (
-                    getattr(self.program, kernel), all_args
+                    getattr(self.program, kernel), all_args, dest
                 )
 
     def get_code(self):
