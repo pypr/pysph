@@ -221,6 +221,33 @@ def test_subscript():
     assert code == expect.strip()
 
 
+def test_known_math_constants():
+    # Given
+    src = dedent('''
+    x = M_E + M_LOG2E + M_LOG10E + M_LN2 + M_LN10
+    x += M_PI + M_PI_2 + M_PI_4 + M_1_PI * M_2_PI
+    x += M_2_SQRTPI * M_SQRT2 * M_SQRT1_2 * pi
+    x = INFINITY
+    x = NAN
+    x = HUGE_VALF
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x;
+    x = ((((M_E + M_LOG2E) + M_LOG10E) + M_LN2) + M_LN10);
+    x += (((M_PI + M_PI_2) + M_PI_4) + (M_1_PI * M_2_PI));
+    x += (((M_2_SQRTPI * M_SQRT2) * M_SQRT1_2) * pi);
+    x = INFINITY;
+    x = NAN;
+    x = HUGE_VALF;
+    ''')
+    assert code == expect.strip()
+
+
 def test_simple_function_with_return():
     # Given
     src = dedent('''
@@ -235,7 +262,8 @@ def test_simple_function_with_return():
 
     # Then
     expect = dedent('''
-    double f(double x) {
+    double f(double x)
+    {
         double y;
         y = (x + 1);
         return y;
@@ -257,7 +285,8 @@ def test_simple_function_without_return():
 
     # Then
     expect = dedent('''
-    void f(double y, double x) {
+    void f(double y, double x)
+    {
         double z;
         z = (y + x);
         y = z;
@@ -278,9 +307,11 @@ def test_function_argument_types():
 
     # Then
     expect = dedent('''
-    void f(long s_idx, double* s_p, long d_idx, double* d_p, long J, double t, double* l, double* xx) {
-        ;
-    }
+void f(long s_idx, double* s_p, long d_idx, double* d_p, long J, double t,
+    double* l, double* xx)
+{
+    ;
+}
     ''')
     assert code.strip() == expect.strip()
 
@@ -298,7 +329,8 @@ def test_known_types_in_funcargs():
 
     # Then
     expect = dedent('''
-    void f(float32 x, foo* xx, int cond) {
+    void f(float32 x, foo* xx, int cond)
+    {
         ;
     }
     ''')
@@ -353,7 +385,8 @@ def test_user_supplied_detect_type():
 
     # Then
     expect = dedent('''
-    void f(double x, double xx, double cond) {
+    void f(double x, double xx, double cond)
+    {
         ;
     }
     ''')
@@ -681,11 +714,13 @@ def test_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(Foo* self, double x) {
+    void Foo_g(Foo* self, double x)
+    {
         ;
     }
 
-    void Foo_f(Foo* self, double x) {
+    void Foo_f(Foo* self, double x)
+    {
         double y;
         y = (x + 1);
         do(self->a, x);
@@ -795,7 +830,8 @@ def test_wrapping_class():
     } Dummy;
 
 
-    void Dummy_method(Dummy* self) {
+    void Dummy_method(Dummy* self)
+    {
         ;
     }
     ''')
@@ -822,9 +858,11 @@ def test_opencl_conversion():
 
     # Then
     expect = dedent('''
-    void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p, long J, double t, double* l, double* xx) {
-        ;
-    }
+void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p,
+    long J, double t, double* l, double* xx)
+{
+    ;
+}
     ''')
     assert code.strip() == expect.strip()
 
@@ -842,7 +880,8 @@ def test_opencl_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(__global Foo* self, double x) {
+    void Foo_g(__global Foo* self, double x)
+    {
         ;
     }
     ''')

@@ -340,6 +340,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
+        self.sph_compiler = comp
         nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()
         a_eval.set_nnps(nnps)
@@ -411,3 +412,47 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa.gpu.pull('au')
         print(pa.au, expect)
         self.assertTrue(np.allclose(expect, pa.au))
+
+    def test_update_nnps_is_called_for_opencl(self):
+        # Given
+        equations = [
+            Group(
+                equations=[
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                ],
+                update_nnps=True
+            ),
+            Group(
+                equations=[EqWithTime(dest='fluid', sources=['fluid'])]
+            ),
+        ]
+
+        # When
+        a_eval = self._make_accel_eval(equations)
+
+        # Then
+        h = a_eval.c_acceleration_eval.helper
+        assert len(h.calls) == 5
+        call = h.calls[0]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g0_fluid_initialize'
+        assert call['loop'] is False
+
+        call = h.calls[1]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g0_fluid_on_fluid_loop'
+        assert call['loop'] is True
+
+        call = h.calls[2]
+        assert call['type'] == 'method'
+        assert call['method'] == 'update_nnps'
+
+        call = h.calls[3]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g1_fluid_initialize'
+        assert call['loop'] is False
+
+        call = h.calls[4]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g1_fluid_on_fluid_loop'
+        assert call['loop'] is True
