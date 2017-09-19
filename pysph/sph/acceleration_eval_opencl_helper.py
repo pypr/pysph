@@ -278,10 +278,11 @@ class AccelerationEvalOpenCLHelper(object):
             if a in args:
                 args.remove(a)
 
-    def _get_simple_kernel(self, g_idx, group, dest, all_eqs, kind):
+    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind):
         assert kind in ('initialize', 'post_loop', 'loop')
-        kernel = 'g{g_idx}_{dest}_{kind}'.format(
-            g_idx=g_idx, dest=dest, kind=kind
+        sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
+        kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
+            g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
         )
         all_args = []
         py_args = []
@@ -371,25 +372,26 @@ class AccelerationEvalOpenCLHelper(object):
     def call_update_nnps(self, group):
         self.data.append(dict(method='update_nnps'))
 
-    def get_initialize_kernel(self, g_idx, group, dest, all_eqs):
+    def get_initialize_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='initialize'
+            g_idx, sg_idx, group, dest, all_eqs, kind='initialize'
         )
 
-    def get_simple_loop_kernel(self, g_idx, group, dest, all_eqs):
+    def get_simple_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='loop'
+            g_idx, sg_idx, group, dest, all_eqs, kind='loop'
         )
 
-    def get_post_loop_kernel(self, g_idx, group, dest, all_eqs):
+    def get_post_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='post_loop'
+            g_idx, sg_idx, group, dest, all_eqs, kind='post_loop'
         )
 
-    def get_loop_kernel(self, g_idx, group, dest, source, eq_group):
+    def get_loop_kernel(self, g_idx, sg_idx, group, dest, source, eq_group):
         kind = 'loop'
-        kernel = 'g{g_idx}_{source}_on_{dest}_loop'.format(
-            g_idx=g_idx, source=source, dest=dest
+        sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
+        kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
+            g_idx=g_idx, sg=sub_grp, source=source, dest=dest
         )
         context = eq_group.context
         code = self._declare_precomp_vars(context)

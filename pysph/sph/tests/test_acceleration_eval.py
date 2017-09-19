@@ -456,3 +456,31 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         assert call['type'] == 'kernel'
         assert call['method'].function_name == 'g1_fluid_on_fluid_loop'
         assert call['loop'] is True
+
+    def test_should_iterate_nested_groups_on_gpu(self):
+        pa = self.pa
+
+        class SillyEquation(Equation):
+            def loop(self, d_idx, d_au, s_idx, s_m):
+                d_au[d_idx] += s_m[s_idx]
+
+        equations = [Group(
+            equations=[
+                Group(
+                    equations=[SillyEquation(dest='fluid', sources=['fluid'])]
+                ),
+                Group(
+                    equations=[SillyEquation(dest='fluid', sources=['fluid'])]
+                ),
+            ],
+            iterate=False,
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*2.0
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
