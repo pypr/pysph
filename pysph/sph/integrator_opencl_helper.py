@@ -11,6 +11,8 @@ from pysph.base.config import get_config
 from pysph.base.translator import OpenCLConverter
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
+from .acceleration_eval_opencl_helper import (get_kernel_definition,
+                                              wrap_code)
 
 
 class OpenCLIntegrator(object):
@@ -53,7 +55,9 @@ class OpenCLIntegrator(object):
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(self.t, dtype=dtype),
                       np.asarray(self.dt, dtype=dtype)]
-        for dest, (call, args) in call_info.items():
+        for name, (call, args, dest) in call_info.items():
+            n = dest.get_number_of_particles(real=True)
+            args[1] = (n,)
             call(*(args + extra_args))
 
     def set_nnps(self, nnps):
@@ -114,26 +118,31 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         q = self.acceleration_eval_helper._queue
         calls = self.calls
         for method, info in self.data.items():
-            for dest, (kernel, args) in info.items():
+            for dest_name, (kernel, args) in info.items():
+                dest = array_map[dest_name]
                 _args = [
-                    getattr(array_map[dest].gpu, x[2:]).data for x in args
+                    getattr(dest.gpu, x[2:]).data for x in args
                 ]
-                np = array_map[dest].get_number_of_particles(real=True)
-                all_args = [q, (np,), None] + _args
+                all_args = [q, None, None] + _args
                 calls[method][dest] = (
-                    getattr(self.program, kernel), all_args
+                    getattr(self.program, kernel), all_args, dest
                 )
 
     def get_code(self):
         if self.object is not None:
             tpl = dedent("""
+            // ------------------------------------------------------------
+            // Integrator steppers.
             ${helper.get_stepper_code()}
 
+            // ------------------------------------------------------------
             % for dest in sorted(helper.object.steppers.keys()):
+            // Steppers for ${dest}
             % for method in helper.get_stepper_method_wrapper_names():
             ${helper.get_stepper_kernel(dest, method)}
             % endfor
             % endfor
+            // ------------------------------------------------------------
             """)
             template = Template(text=tpl)
             return template.render(helper=self)
@@ -184,18 +193,20 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         # as we do not need to generate structs and pass them around.
         code = [
             'int d_idx = get_global_id(0);',
+        ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,
                 args='0, ' + ', '.join(args)
-            )
-        ]
+            ), indent=''
+        )
+
         body = '\n'.join(' '*4 + x for x in code)
 
         self.data[method][dest] = (kernel, list(d))
 
+        sig = get_kernel_definition(kernel, all_args)
         return (
-            '__kernel void\n{kernel}\n({args})\n{{\n{body}\n}}\n'.format(
-                kernel=kernel, args=', '.join(all_args),
-                body=body
+            '{sig}\n{{\n{body}\n}}\n'.format(
+                sig=sig, body=body
             )
         )

@@ -13,7 +13,7 @@ import ast
 import inspect
 import re
 import sys
-from textwrap import dedent
+from textwrap import dedent, wrap
 
 import numpy as np
 from mako.template import Template
@@ -119,7 +119,12 @@ class CStructHelper(object):
 class CConverter(ast.NodeVisitor):
     def __init__(self, detect_type=detect_type, known_types=None):
         self._declares = {}
-        self._known = set(('M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI'))
+        self._known = set((
+            'M_E', 'M_LOG2E', 'M_LOG10E', 'M_LN2', 'M_LN10',
+            'M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI',
+            'M_2_SQRTPI', 'M_SQRT2', 'M_SQRT1_2',
+            'INFINITY', 'NAN', 'HUGE_VALF', 'pi'
+        ))
         self._name_ctx = (ast.Load, ast.Store)
         self._indent = ''
         self._detect_type = detect_type
@@ -354,17 +359,18 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         if self._body_has_return(body):
-            sig = 'double %s(%s) {\n' % (func_name, args)
+            sig = 'double %s(%s)' % (func_name, args)
         else:
-            sig = 'void %s(%s) {\n' % (func_name, args)
+            sig = 'void %s(%s)' % (func_name, args)
 
         declares = self._indent_block(self.get_declarations())
         if len(declares) > 0:
             declares += '\n'
 
+        sig = '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
         self._known = orig_known
         self._declares = orig_declares
-        return sig + declares + body + '\n}\n'
+        return sig + '\n{\n' + declares + body + '\n}\n'
 
     def visit_Gt(self, node):
         return '>'
