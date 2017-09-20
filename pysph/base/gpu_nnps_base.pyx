@@ -257,9 +257,9 @@ cdef class GPUNNPS(NNPSBase):
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
-            bint sort_gids=False, bint use_double=False):
+            bint sort_gids=False, bint use_double=False, ctx=None):
         GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
-                domain, cache, sort_gids)
+                domain, cache, sort_gids, ctx)
 
         self.use_double = use_double
         self.radius_scale2 = radius_scale*radius_scale
@@ -294,9 +294,9 @@ cdef class BruteForceNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z,
-                %(data_t)s* s_h, %(data_t)s* d_x, %(data_t)s* d_y,
-                %(data_t)s* d_z, %(data_t)s* d_h, unsigned int num_particles,
+                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z,
+                %(data_t)s* d_h, %(data_t)s* s_x, %(data_t)s* s_y,
+                %(data_t)s* s_z, %(data_t)s* s_h, unsigned int num_particles,
                 unsigned int* nbr_lengths, %(data_t)s radius_scale2
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
@@ -321,16 +321,17 @@ cdef class BruteForceNNPS(GPUNNPS):
 
         src_gpu = self.src.pa.gpu
         dst_gpu = self.dst.pa.gpu
-        brute_force_nbr_lengths(src_gpu.x, src_gpu.y, src_gpu.z,
-                src_gpu.h, dst_gpu.x, dst_gpu.y, dst_gpu.z,
-                dst_gpu.h, self.src.get_number_of_particles(),
+        brute_force_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h, self.src.get_number_of_particles(),
                 nbr_lengths, self.radius_scale2)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
+
         arguments = \
-                """%(data_t)s* s_x, %(data_t)s* s_y, %(data_t)s* s_z,
-                %(data_t)s* s_h, %(data_t)s* d_x, %(data_t)s* d_y,
-                %(data_t)s* d_z, %(data_t)s* d_h, unsigned int num_particles,
+                """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z,
+                %(data_t)s* d_h, %(data_t)s* s_x, %(data_t)s* s_y,
+                %(data_t)s* s_z, %(data_t)s* s_h, unsigned int num_particles,
                 unsigned int* start_indices, unsigned int* nbrs,
                 %(data_t)s radius_scale2
                 """ % {"data_t" : ("double" if self.use_double else "float")}
@@ -360,9 +361,9 @@ cdef class BruteForceNNPS(GPUNNPS):
 
         src_gpu = self.src.pa.gpu
         dst_gpu = self.dst.pa.gpu
-        brute_force_nbrs(src_gpu.x, src_gpu.y, src_gpu.z,
-                src_gpu.h, dst_gpu.x, dst_gpu.y, dst_gpu.z,
-                dst_gpu.h, self.src.get_number_of_particles(),
+        brute_force_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h, self.src.get_number_of_particles(),
                 start_indices, nbrs, self.radius_scale2)
 
     cpdef _bin(self, int pa_index):

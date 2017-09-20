@@ -237,6 +237,12 @@ class DictBoxSortNNPSTestCase(NNPSTestCase):
         self._test_neighbors_by_particle(src_index=1, dst_index=1,
                                          dst_numPoints=self.numPoints2)
 
+    def test_repeated(self):
+        self.test_neighbors_aa()
+        self.test_neighbors_ab()
+        self.test_neighbors_ba()
+        self.test_neighbors_bb()
+
 
 class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
@@ -348,6 +354,27 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
 
     def tearDown(self):
         super(ZOrderGPUNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class BruteForceNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for OpenCL brute force algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+
+        self.nps = gpu_nnps.BruteForceNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            ctx=ctx
+        )
+
+    def tearDown(self):
+        super(BruteForceNNPSTestCase, self).tearDown()
         get_config().use_double = self._orig_use_double
 
 
