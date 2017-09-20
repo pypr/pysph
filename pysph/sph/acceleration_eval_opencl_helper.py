@@ -2,8 +2,6 @@
 TODO:
 
 Advanced:
-- sub groups.
-- Iterated groups.
 - DT_ADAPT.
 - Reduction.
 - support get_code for helper functions.
@@ -25,6 +23,7 @@ import pyopencl.array  # noqa: 401
 import pyopencl.tools  # noqa: 401
 
 from pysph.base.config import get_config
+from pysph.base.utils import is_overloaded_method
 from pysph.base.ext_module import get_platform_dir
 from pysph.base.opencl import get_context, get_queue, DeviceHelper
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
@@ -81,17 +80,47 @@ class OpenCLAccelerationEval(object):
             call(*(args + extra_args))
         self._queue.finish()
 
+    def _sync_from_gpu(self, eq):
+        ary = eq._gpu.get()
+        for i, name in enumerate(ary.dtype.names):
+            setattr(eq, name, ary[0][i])
+
+    def _converged(self, equations):
+        for eq in equations:
+            self._sync_from_gpu(eq)
+            if not (eq.converged() > 0):
+                return False
+        return True
+
     def compute(self, t, dt):
         helper = self.helper
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(t, dtype=dtype), np.asarray(dt, dtype=dtype)]
-        for info in helper.calls:
+        i = 0
+        iter_count = 0
+        iter_start = 0
+        while i < len(helper.calls):
+            info = helper.calls[i]
             type = info['type']
             if type == 'method':
                 method = getattr(self, info.get('method'))
                 method()
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
+            elif type == 'start_iteration':
+                iter_count = 0
+                iter_start = i
+            elif type == 'stop_iteration':
+                eqs = info['equations']
+                group = info['group']
+                iter_count += 1
+                if ((iter_count >= group.min_iterations) and
+                    (iter_count == group.max_iterations or
+                     self._converged(eqs))):
+                    pass
+                else:
+                    i = iter_start
+            i += 1
 
     def set_nnps(self, nnps):
         self.nnps = nnps
@@ -108,6 +137,20 @@ def add_address_space(known_types):
     for v in known_types.values():
         if '__global' not in v.type:
             v.type = '__global ' + v.type
+
+
+def get_equations_with_converged(group):
+    def _get_eqs(g):
+        if g.has_subgroups:
+            res = []
+            for x in g.equations:
+                res.extend(_get_eqs(x))
+            return res
+        else:
+            return g.equations
+    eqs = [x for x in _get_eqs(group)
+           if is_overloaded_method(getattr(x, 'converged'))]
+    return eqs
 
 
 def convert_to_float_if_needed(code):
@@ -136,6 +179,7 @@ class AccelerationEvalOpenCLHelper(object):
         self._queue = get_queue()
         self._array_map = None
         self._array_index = None
+        self._equations = {}
         self._cpu_structs = {}
         self._gpu_structs = {}
         self.calls = []
@@ -165,6 +209,8 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 g_v = v.astype(g_struct)
                 gpu[k] = cl.array.to_device(self._queue, g_v)
+                if k in self._equations:
+                    self._equations[k]._gpu = gpu[k]
 
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
@@ -181,8 +227,9 @@ class AccelerationEvalOpenCLHelper(object):
         prg = self.program
         array_index = self._array_index
         for item in self.data:
-            kernel = item.get('kernel')
-            if kernel is not None:
+            type = item.get('type')
+            if type == 'kernel':
+                kernel = item.get('kernel')
                 method = getattr(prg, kernel)
                 dest = item['dest']
                 src = item.get('source', dest)
@@ -198,8 +245,14 @@ class AccelerationEvalOpenCLHelper(object):
                     loop=loop, src_idx=array_index[src],
                     dst_idx=array_index[dest], type='kernel'
                 )
-            else:
+            elif type == 'method':
                 info = dict(method=item.get('method'), type='method')
+            elif 'iteration' in type:
+                group = item['group']
+                equations = get_equations_with_converged(group._orig_group)
+                info = dict(type=type, equations=equations, group=group)
+            else:
+                raise RuntimeError('Unknown type %s' % type)
             calls.append(info)
         return calls
 
@@ -257,6 +310,7 @@ class AccelerationEvalOpenCLHelper(object):
         h = CStructHelper(object.kernel)
         cpu_structs['kern'] = h.get_array()
         for eq in object.all_group.equations:
+            self._equations[eq.var_name] = eq
             h.parse(eq)
             cpu_structs[eq.var_name] = h.get_array()
 
@@ -278,10 +332,11 @@ class AccelerationEvalOpenCLHelper(object):
             if a in args:
                 args.remove(a)
 
-    def _get_simple_kernel(self, g_idx, group, dest, all_eqs, kind):
+    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind):
         assert kind in ('initialize', 'post_loop', 'loop')
-        kernel = 'g{g_idx}_{dest}_{kind}'.format(
-            g_idx=g_idx, dest=dest, kind=kind
+        sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
+        kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
+            g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
         )
         all_args = []
         py_args = []
@@ -321,7 +376,7 @@ class AccelerationEvalOpenCLHelper(object):
         body = '\n'.join([' '*4 + x for x in code])
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, loop=False,
-            real=group.real
+            real=group.real, type='kernel'
         ))
 
         sig = get_kernel_definition(kernel, all_args)
@@ -369,27 +424,28 @@ class AccelerationEvalOpenCLHelper(object):
             return code
 
     def call_update_nnps(self, group):
-        self.data.append(dict(method='update_nnps'))
+        self.data.append(dict(method='update_nnps', type='method'))
 
-    def get_initialize_kernel(self, g_idx, group, dest, all_eqs):
+    def get_initialize_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='initialize'
+            g_idx, sg_idx, group, dest, all_eqs, kind='initialize'
         )
 
-    def get_simple_loop_kernel(self, g_idx, group, dest, all_eqs):
+    def get_simple_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='loop'
+            g_idx, sg_idx, group, dest, all_eqs, kind='loop'
         )
 
-    def get_post_loop_kernel(self, g_idx, group, dest, all_eqs):
+    def get_post_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
-            g_idx, group, dest, all_eqs, kind='post_loop'
+            g_idx, sg_idx, group, dest, all_eqs, kind='post_loop'
         )
 
-    def get_loop_kernel(self, g_idx, group, dest, source, eq_group):
+    def get_loop_kernel(self, g_idx, sg_idx, group, dest, source, eq_group):
         kind = 'loop'
-        kernel = 'g{g_idx}_{source}_on_{dest}_loop'.format(
-            g_idx=g_idx, source=source, dest=dest
+        sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
+        kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
+            g_idx=g_idx, sg=sub_grp, source=source, dest=dest
         )
         context = eq_group.context
         code = self._declare_precomp_vars(context)
@@ -451,7 +507,7 @@ class AccelerationEvalOpenCLHelper(object):
         )
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
-            real=group.real
+            real=group.real, type='kernel'
         ))
 
         sig = get_kernel_definition(kernel, all_args)
@@ -460,3 +516,13 @@ class AccelerationEvalOpenCLHelper(object):
                 sig=sig, body=body
             )
         )
+
+    def start_iteration(self, group):
+        self.data.append(dict(
+            type='start_iteration', group=group
+        ))
+
+    def stop_iteration(self, group):
+        self.data.append(dict(
+            type='stop_iteration', group=group,
+        ))

@@ -439,7 +439,7 @@ class CConverter(ast.NodeVisitor):
         return '!='
 
     def visit_Num(self, node):
-        return node.n
+        return str(node.n)
 
     def visit_Or(self, node):
         return '||'
@@ -454,7 +454,7 @@ class CConverter(ast.NodeVisitor):
         return '-'
 
     def visit_Str(self, node):
-        self.error("Strings are not yet supported.", node)
+        return r'"%s"' % node.s
 
     def visit_Subscript(self, node):
         return '%s[%s]' % (
