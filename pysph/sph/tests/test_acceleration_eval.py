@@ -457,12 +457,15 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         assert call['method'].function_name == 'g1_fluid_on_fluid_loop'
         assert call['loop'] is True
 
-    def test_should_iterate_nested_groups_on_gpu(self):
+    def test_should_stop_iteration_with_max_iteration_on_gpu(self):
         pa = self.pa
 
         class SillyEquation(Equation):
             def loop(self, d_idx, d_au, s_idx, s_m):
                 d_au[d_idx] += s_m[s_idx]
+
+            def converged(self):
+                return 0
 
         equations = [Group(
             equations=[
@@ -473,7 +476,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
                     equations=[SillyEquation(dest='fluid', sources=['fluid'])]
                 ),
             ],
-            iterate=False,
+            iterate=True, max_iterations=2,
         )]
         a_eval = self._make_accel_eval(equations)
 
@@ -481,6 +484,69 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*2.0
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*4.0
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_stop_iteration_with_converged_on_gpu(self):
+        pa = self.pa
+
+        class SillyEquation1(Equation):
+            def __init__(self, dest, sources):
+                super(SillyEquation1, self).__init__(dest, sources)
+                self.conv = 0
+
+            def loop(self, d_idx, d_au, s_idx, s_m):
+                d_au[d_idx] += s_m[s_idx]
+
+            def post_loop(self, d_idx, d_au):
+                if d_au[d_idx] > 19.0:
+                    self.conv = 1
+
+            def converged(self):
+                return self.conv
+
+        equations = [Group(
+            equations=[
+                Group(
+                    equations=[SillyEquation1(dest='fluid', sources=['fluid'])]
+                ),
+                Group(
+                    equations=[SillyEquation1(dest='fluid', sources=['fluid'])]
+                ),
+            ],
+            iterate=True, max_iterations=10,
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*6.0
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_get_equations_with_converged(self):
+        pytest.importorskip('pysph.base.gpu_nnps')
+        from pysph.sph.acceleration_eval_opencl_helper import \
+            get_equations_with_converged
+        # Given
+        se = SimpleEquation(dest='fluid', sources=['fluid'])
+        se1 = SimpleEquation(dest='fluid', sources=['fluid'])
+        sd = SummationDensity(dest='fluid', sources=['fluid'])
+        me = MixedTypeEquation(dest='fluid', sources=['fluid'])
+        eq_t = EqWithTime(dest='fluid', sources=['fluid'])
+        g = Group(
+            equations=[
+                Group(equations=[Group(equations=[se, sd])],
+                      iterate=True, max_iterations=10),
+                Group(equations=[me, eq_t, se1]),
+            ],
+        )
+
+        # When
+        eqs = get_equations_with_converged(g)
+
+        # Then
+        assert eqs == [se, se1]
