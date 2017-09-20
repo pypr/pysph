@@ -220,7 +220,6 @@ def test_calling_printf_with_string():
     assert code == expect.strip()
 
 
-
 def test_subscript():
     # Given
     src = dedent('''
