@@ -204,6 +204,23 @@ def test_calling_function():
     assert code == expect.strip()
 
 
+def test_calling_printf_with_string():
+    # Given
+    src = dedent(r'''
+    printf('%s %d %f\n', 'hello', 1, 2.0)
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    printf("%s %d %f\n", "hello", 1, 2.0);
+    ''')
+    assert code == expect.strip()
+
+
+
 def test_subscript():
     # Given
     src = dedent('''
@@ -609,17 +626,6 @@ def test_try_block_raises_error():
         do()
     except ImportError:
         pass
-    ''')
-
-    # When/Then
-    with pytest.raises(NotImplementedError):
-        py2c(src)
-
-
-def test_strings_raise_error():
-    # Given
-    src = dedent('''
-    x = 'hello'
     ''')
 
     # When/Then
