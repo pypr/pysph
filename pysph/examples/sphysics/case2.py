@@ -97,7 +97,7 @@ if __name__ == '__main__':
     l_fluid = 0.376
     h_fluid2 = 0.018
     gamma = 7.0
-    alp = 0.1
+    alp = 0.2
     ro = 100.0
     co = 10.0 * np.sqrt(2.0 * 9.81 * h_fluid)
     app = Dambreak_2D()
