@@ -1,3 +1,7 @@
+//CL//
+
+// IMPORTANT NOTE: pyopencl uses the length of the first argument
+// to determine the global work size
 
 <%def name="preamble()" cached="True">
 </%def>

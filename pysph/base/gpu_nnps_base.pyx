@@ -293,6 +293,8 @@ cdef class BruteForceNNPS(GPUNNPS):
         self.dst = self.pa_wrappers[ dst_index ]
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
+        # IMPORTANT NOTE: pyopencl uses the length of the first argument
+        # to determine the global work size
         arguments = \
                 """%(data_t)s* d_x, %(data_t)s* d_y, %(data_t)s* d_z,
                 %(data_t)s* d_h, %(data_t)s* s_x, %(data_t)s* s_y,
