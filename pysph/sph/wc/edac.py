@@ -252,10 +252,10 @@ class MomentumEquation(Equation):
 
         rhoi = d_rho[d_idx]
         rhoj = s_rho[s_idx]
-        pi = d_p[d_idx]
-        pj = s_p[s_idx]
+        p_i = d_p[d_idx]
+        p_j = s_p[s_idx]
 
-        pij = rhoj * pi + rhoi * pj
+        pij = rhoj * p_i + rhoi * p_j
         pij /= (rhoj + rhoi)
 
         Vi = 1./d_V[d_idx]

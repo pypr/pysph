@@ -284,7 +284,9 @@ class AccelerationEvalOpenCLHelper(object):
         with open(fname, 'w') as fp:
             fp.write(code)
             print("OpenCL code written to %s" % fname)
-        self.program = cl.Program(self._ctx, code.encode('ascii')).build()
+        self.program = cl.Program(self._ctx, code.encode('ascii')).build(
+            options=['-w']
+        )
         return self.program
 
     ##########################################################################
