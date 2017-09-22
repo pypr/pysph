@@ -4,36 +4,22 @@ import numpy as np
 
 class GroupParticles(Equation):
 
-    def __init__(self, dest, sources=None, xmin=None, xmax=None, ymin=None,
-                 ymax=None, zmin=None, zmax=None, periodic_in_x=False,
+    def __init__(self, dest, sources=None, xmin=0.0, xmax=0.0, ymin=0.0,
+                 ymax=0.0, zmin=0.0, zmax=0.0, periodic_in_x=False,
                  periodic_in_y=False, periodic_in_z=False):
         self.periodic_in_x = periodic_in_x
         self.periodic_in_y = periodic_in_y
         self.periodic_in_z = periodic_in_z
-        if self.periodic_in_x:
-            self.xlen = abs(xmax - xmin)
-            self.xmin = xmin
-            self.xmax = xmax
-        else:
-            self.xlen = 0.0
-            self.xmin = 0.0
-            self.xmax = 0.0
-        if self.periodic_in_y:
-            self.ylen = abs(ymax - ymin)
-            self.ymin = ymin
-            self.ymax = ymax
-        else:
-            self.ylen = 0.0
-            self.ymin = 0.0
-            self.ymax = 0.0
-        if self.periodic_in_z:
-            self.zlen = abs(zmax - zmin)
-            self.zmin = zmin
-            self.zmax = zmax
-        else:
-            self.zlen = 0.0
-            self.zmin = 0.0
-            self.zmax = 0.0
+        self.xlen = abs(xmax - xmin)
+        self.xmin = xmin
+        self.xmax = xmax
+        self.ylen = abs(ymax - ymin)
+        self.ymin = ymin
+        self.ymax = ymax
+        self.zlen = abs(zmax - zmin)
+        self.zmin = zmin
+        self.zmax = zmax
+
         super(GroupParticles, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_cm, d_body_id, d_x, d_y, d_z):
