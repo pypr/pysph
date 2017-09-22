@@ -111,9 +111,6 @@ class Dambreak2D(Application):
         return particles
 
     def create_scheme(self):
-        aha = AdamiHuAdamsScheme(['fluid'], ['wall', 'cube'], dim=2, rho0=ro,
-                                 alpha=alp, gy=-9.81, nu=0.0, h0=0.03, c0=co,
-                                 gamma=1.0)
         wcsph = WCSPHScheme(['fluid'], ['wall', 'cube'], dim=2, rho0=ro,
                             h0=0.03, hdx=1.3, hg_correction=True, c0=co,
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
@@ -126,8 +123,6 @@ class Dambreak2D(Application):
         scheme = self.options.scheme
         if scheme == 'wcsph':
             s.configure(h0=self.h0, hdx=self.hdx)
-        elif scheme == 'aha':
-            s.configure(h0=self.h0)
         elif scheme == 'edac':
             s.configure(h=self.h0)
         step = dict(cube=RK2StepRigidBody())
