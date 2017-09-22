@@ -527,6 +527,31 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
 
+    def test_should_handle_helper_functions_on_gpu(self):
+        pa = self.pa
+
+        def helper(x=1.0):
+            return x*1.5
+
+        class SillyEquation2(Equation):
+            def initialize(self, d_idx, d_au, d_m):
+                d_au[d_idx] += helper(d_m[d_idx])
+
+            def _get_helpers_(self):
+                return [helper]
+
+        equations = [SillyEquation2(dest='fluid', sources=['fluid'])]
+
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.ones(10)*1.5
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
+
     def test_get_equations_with_converged(self):
         pytest.importorskip('pysph.base.gpu_nnps')
         from pysph.sph.acceleration_eval_opencl_helper import \

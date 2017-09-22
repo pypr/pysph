@@ -891,3 +891,40 @@ def test_opencl_class():
     }
     ''')
     assert code.strip() == expect.strip()
+
+
+def test_handles_parsing_functions():
+    # Given
+    def f(x=1.0):
+        return x + 1
+
+    # When
+    t = CConverter()
+    code = t.parse_function(f)
+
+    # Then
+    expect = dedent('''
+    double f(double x)
+    {
+        return (x + 1);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+    # Given
+    class A(object):
+        def f(self, x=1.0):
+            return x + 1.0
+
+    # When
+    t = CConverter()
+    code = t.parse_function(A)
+
+    # Then
+    expect = dedent('''
+    double A_f(A* self, double x)
+    {
+        return (x + 1.0);
+    }
+    ''')
+    assert code.strip() == expect.strip()

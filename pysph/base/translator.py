@@ -224,6 +224,10 @@ class CConverter(ast.NodeVisitor):
         code += self.convert(src)
         return code
 
+    def parse_function(self, obj):
+        src = dedent(inspect.getsource(obj))
+        return self.convert(src)
+
     def visit_Add(self, node):
         return '+'
 

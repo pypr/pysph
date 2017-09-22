@@ -4,7 +4,6 @@ TODO:
 Advanced:
 - DT_ADAPT.
 - Reduction.
-- support get_code for helper functions.
 
 General OpenCL issues:
 - Periodicity.
@@ -47,6 +46,21 @@ def wrap_code(code, indent=' '*4):
         code, width=74, initial_indent=indent,
         subsequent_indent=indent + ' '*4
     )
+
+
+def get_code(obj, transpiler=None):
+    """This function looks at the object and gets any additional code to
+    wrap from the `_get_helpers_` method.
+    """
+    result = []
+    if hasattr(obj, '_get_helpers_'):
+        if transpiler is None:
+            transpiler = OpenCLConverter()
+        doc = '\n// Helpers from %s' % obj.__class__.__name__
+        result.append(doc)
+        for helper in obj._get_helpers_():
+            result.append(transpiler.parse_function(helper))
+    return result
 
 
 class OpenCLAccelerationEval(object):
@@ -293,13 +307,15 @@ class AccelerationEvalOpenCLHelper(object):
     # Mako interface.
     ##########################################################################
     def get_header(self):
-        # FIXME
-        # Write the equivalent for get_code in cython where any extra code,
-        # helpers are suitably wrapped as well.
         object = self.object
 
-        headers = []
         transpiler = OpenCLConverter(known_types=self.known_types)
+
+        headers = []
+        headers.extend(get_code(object.kernel, transpiler))
+        for equation in object.all_group.equations:
+            headers.extend(get_code(equation, transpiler))
+
         headers.append(transpiler.parse_instance(object.kernel))
 
         headers.append(object.all_group.get_equation_wrappers(
