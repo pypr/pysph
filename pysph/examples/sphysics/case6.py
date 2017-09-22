@@ -116,9 +116,6 @@ class WavesPaddle2D(Application):
         return particles
 
     def create_scheme(self):
-        aha = AdamiHuAdamsScheme(['fluid'], ['wall', 'paddle', 'obstacle'],
-                                 dim=2, rho0=ro, c0=co, alpha=alp, gy=-9.81,
-                                 nu=0.0, h0=0.01, gamma=1.0)
         wcsph = WCSPHScheme(['fluid'], ['wall', 'paddle', 'obstacle'], dim=2,
                             rho0=ro, c0=co, h0=0.01, hdx=1.3, gy=-9.81,
                             hg_correction=True, alpha=alp, gamma=gamma,
@@ -126,7 +123,7 @@ class WavesPaddle2D(Application):
         edac = EDACScheme(['fluid'], ['wall', 'paddle', 'obstacle'], dim=2,
                           rho0=ro, c0=co, gy=-9.81, alpha=alp, nu=0.0, h=0.01,
                           clamp_p=True)
-        return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
+        return SchemeChooser(default='wcsph', wcsph=wcsph, edac=edac)
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
@@ -151,8 +148,6 @@ class WavesPaddle2D(Application):
         scheme = self.options.scheme
         if scheme == 'wcsph':
             s.configure(h0=self.h0, hdx=self.hdx)
-        elif scheme == 'aha':
-            s.configure(h0=self.h0)
         elif scheme == 'edac':
             s.configure(h=self.h0)
         step = dict(paddle=TwoStageRigidBodyStep(),
