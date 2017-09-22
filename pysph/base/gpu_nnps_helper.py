@@ -6,7 +6,7 @@ import os
 
 
 class GPUNNPSHelper(object):
-    def __init__(self, ctx, tpl_filename, use_double=True):
+    def __init__(self, ctx, tpl_filename, use_double=False):
         self.src_tpl = Template(
             filename=os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),

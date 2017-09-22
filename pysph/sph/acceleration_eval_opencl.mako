@@ -54,7 +54,7 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 </%def>
 
 #define abs fabs
-#define pi M_PI
+__constant double pi=M_PI;
 ${helper.get_header()}
 
 #######################################################################
