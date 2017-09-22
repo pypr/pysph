@@ -36,13 +36,11 @@ IF UNAME_SYSNAME == "Windows":
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, ctx=None,
-            bint use_double=False):
+            bint cache=True, bint sort_gids=False, ctx=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids, ctx
         )
-        self.use_double = use_double
 
         self.radius_scale2 = radius_scale*radius_scale
         self.radix_sort = None

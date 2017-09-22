@@ -390,7 +390,7 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         cfg.use_double = True
         self.nps = gpu_nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx, use_double=True
+            ctx=ctx
         )
 
     def tearDown(self):
