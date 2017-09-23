@@ -42,7 +42,9 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 ###################################################################
 ## Do any reductions for the destination.
 ###################################################################
-## FIXME
+% if all_eqs.has_reduce():
+<% helper.call_reduce(all_eqs, dest) %>
+% endif
 // Finished destination ${dest}.
 #######################################################################
 ## Update NNPS locally if needed

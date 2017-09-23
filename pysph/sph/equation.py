@@ -776,7 +776,8 @@ class OpenCLGroup(Group):
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
         code_gen = OpenCLConverter(known_types=predefined)
+        ignore = ['reduce']
         for cls in sorted(classes.keys()):
-            src = code_gen.parse_instance(eqs[cls])
+            src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
             wrappers.append(src)
         return '\n'.join(wrappers)

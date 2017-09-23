@@ -172,8 +172,13 @@ class MixedTypeEquation(Equation):
 
 
 class SimpleReduction(Equation):
+    def initialize(self, d_idx, d_au):
+        d_au[d_idx] = 0.0
+
     def reduce(self, dst):
-        dst.total_mass[0] = serial_reduce_array(dst.array.m, op='sum')
+        dst.total_mass[0] = serial_reduce_array(dst.m, op='sum')
+        if dst.gpu is not None:
+            dst.gpu.push('total_mass')
 
 
 class TestAccelerationEval1D(unittest.TestCase):
@@ -551,6 +556,21 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         expect = np.ones(10)*1.5
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_run_reduce_when_using_gpu(self):
+        # Given.
+        pa = self.pa
+        pa.add_constant('total_mass', 0.0)
+        equations = [SimpleReduction(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.sum(pa.m)
+        pa.gpu.pull('total_mass')
+        self.assertAlmostEqual(pa.total_mass[0], expect, 14)
 
     def test_get_equations_with_converged(self):
         pytest.importorskip('pysph.base.gpu_nnps')

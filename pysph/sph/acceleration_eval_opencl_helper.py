@@ -118,7 +118,7 @@ class OpenCLAccelerationEval(object):
             type = info['type']
             if type == 'method':
                 method = getattr(self, info.get('method'))
-                method()
+                method(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -145,6 +145,10 @@ class OpenCLAccelerationEval(object):
     def update_nnps(self):
         self.nnps.update_domain()
         self.nnps.update()
+
+    def reduce(self, eqs, dest):
+        for eq in eqs:
+            eq.reduce(dest)
 
 
 def add_address_space(known_types):
@@ -260,7 +264,14 @@ class AccelerationEvalOpenCLHelper(object):
                     dst_idx=array_index[dest], type='kernel'
                 )
             elif type == 'method':
-                info = dict(method=item.get('method'), type='method')
+                info = dict(item)
+                if info.get('method') == 'reduce':
+                    args = info.get('args')
+                    grp = args[0]
+                    args[0] = [x for x in grp.equations
+                               if hasattr(x, 'reduce')]
+                    args[1] = self._array_map[args[1]]
+
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -441,8 +452,13 @@ class AccelerationEvalOpenCLHelper(object):
         else:
             return code
 
+    def call_reduce(self, all_eq_group, dest):
+        self.data.append(dict(method='reduce', type='method',
+                              args=[all_eq_group, dest]))
+
     def call_update_nnps(self, group):
-        self.data.append(dict(method='update_nnps', type='method'))
+        self.data.append(dict(method='update_nnps',
+                              type='method', args=[]))
 
     def get_initialize_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
