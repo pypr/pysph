@@ -146,7 +146,7 @@ class OpenCLAccelerationEval(object):
         self.nnps.update_domain()
         self.nnps.update()
 
-    def reduce(self, eqs, dest):
+    def do_reduce(self, eqs, dest):
         for eq in eqs:
             eq.reduce(dest)
 
@@ -265,7 +265,7 @@ class AccelerationEvalOpenCLHelper(object):
                 )
             elif type == 'method':
                 info = dict(item)
-                if info.get('method') == 'reduce':
+                if info.get('method') == 'do_reduce':
                     args = info.get('args')
                     grp = args[0]
                     args[0] = [x for x in grp.equations
@@ -453,7 +453,7 @@ class AccelerationEvalOpenCLHelper(object):
             return code
 
     def call_reduce(self, all_eq_group, dest):
-        self.data.append(dict(method='reduce', type='method',
+        self.data.append(dict(method='do_reduce', type='method',
                               args=[all_eq_group, dest]))
 
     def call_update_nnps(self, group):

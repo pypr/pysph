@@ -887,13 +887,14 @@ def test_opencl_conversion():
     ''')
 
     # When
-    converter = OpenCLConverter()
+    known_types = {'d_p': KnownType('__global int*')}
+    converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
     # Then
     expect = dedent('''
-void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p,
-    long J, double t, double* l, double* xx)
+void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
+    J, double t, double* l, double* xx)
 {
     ;
 }

@@ -33,6 +33,10 @@ def camel_to_underscore(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
+def declare(*args):
+    pass
+
+
 ##############################################################################
 # `Context` class.
 ##############################################################################
@@ -316,7 +320,7 @@ def get_predefined_types(precomp):
     result = {'DT_ADAPT': [0.0, 0.0, 0.0],
               'dt': 0.0,
               't': 0.0,
-              'dst': KnownType('ParticleArrayWrapper'),
+              'dst': KnownType('object'),
               'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.items():
         result[sym] = value.context[sym]
@@ -653,6 +657,8 @@ class CythonGroup(Group):
                 args = inspect.getargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
+                if kind == 'reduce':
+                    args = ['dst.array']
                 call_args = ', '.join(args)
                 c = 'self.{eq_name}.{method}({args})'\
                     .format(eq_name=eq.var_name, method=kind, args=call_args)

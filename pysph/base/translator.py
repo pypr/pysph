@@ -494,7 +494,9 @@ class CConverter(ast.NodeVisitor):
 
 
 def ocl_detect_type(name, value):
-    if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+    if isinstance(value, KnownType):
+        return value.type
+    elif name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
         return '__global double*'
     else:
         return detect_type(name, value)
