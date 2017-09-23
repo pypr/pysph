@@ -115,7 +115,7 @@ class RigidFluidCoupling(Application):
         self.dx = 2 * 1e-3
         self.hdx = 1.2
         self.ro = 1000
-        self.solid_rho = 100
+        self.solid_rho = 500
         self.m = 1000 * self.dx * self.dx
         self.co = 2 * np.sqrt(2 * 9.81 * 150 * 1e-3)
         self.alpha = 0.1
@@ -162,8 +162,9 @@ class RigidFluidCoupling(Application):
                                     cube=RK2StepRigidBody())
 
         dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
+        # dt = 1e-4
         print("DT: %s" % dt)
-        tf = 2
+        tf = 0.5
         solver = Solver(
             kernel=kernel,
             dim=2,
