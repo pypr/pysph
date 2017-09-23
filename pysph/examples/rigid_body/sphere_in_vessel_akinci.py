@@ -4,7 +4,6 @@ Check basic equations of SPH to throw a ball inside the vessel
 """
 from __future__ import print_function
 import numpy as np
-import matplotlib.pyplot as plt
 
 # PySPH base and carray imports
 from pysph.base.utils import (get_particle_array_wcsph,
@@ -97,6 +96,7 @@ def get_density(y):
 
 
 def geometry():
+    import matplotlib.pyplot as plt
     # please run this function to know how
     # geometry looks like
     x_tank, y_tank = create_boundary()
@@ -123,20 +123,19 @@ class RigidFluidCoupling(Application):
     def create_particles(self):
         """Create the circular patch of fluid."""
         xf, yf = create_fluid()
-        rho = get_density(yf)
-        m = rho[:] * self.dx * self.dx
-        rho = np.ones_like(xf) * self.ro
-        h = np.ones_like(xf) * self.hdx * self.dx
+        m = self.ro * self.dx * self.dx
+        rho = self.ro
+        h = self.hdx * self.dx
         fluid = get_particle_array_wcsph(x=xf, y=yf, h=h, m=m, rho=rho,
                                          name="fluid")
 
         dx = 2
         xt, yt = create_boundary()
-        m = np.ones_like(xt) * 1000 * self.dx * self.dx
-        rho = np.ones_like(xt) * 1000
-        rad_s = np.ones_like(xt) * 2 / 2. * 1e-3
-        h = np.ones_like(xt) * self.hdx * self.dx
-        V = np.ones_like(xt) * dx * dx * 1e-6
+        m = 1000 * self.dx * self.dx
+        rho = 1000
+        rad_s = 2 / 2. * 1e-3
+        h = self.hdx * self.dx
+        V = dx * dx * 1e-6
         tank = get_particle_array_wcsph(x=xt, y=yt, h=h, m=m, rho=rho,
                                         rad_s=rad_s, V=V, name="tank")
         for name in ['fx', 'fy', 'fz']:
@@ -144,13 +143,12 @@ class RigidFluidCoupling(Application):
 
         dx = 1
         xc, yc = create_sphere(1)
-        m = np.ones_like(xc) * self.solid_rho * dx * 1e-3 * dx * 1e-3
-        rho = np.ones_like(xc) * self.solid_rho
-        h = np.ones_like(xc) * self.hdx * self.dx
-        rad_s = np.ones_like(xc) * dx / 2. * 1e-3
-        V = np.ones_like(xc) * dx * dx * 1e-6
-        # add cs property to run the simulation
-        cs = np.zeros_like(xc)
+        m = self.solid_rho * dx * 1e-3 * dx * 1e-3
+        rho = self.solid_rho
+        h = self.hdx * self.dx
+        rad_s = dx / 2. * 1e-3
+        V = dx * dx * 1e-6
+        cs = 0.0
         cube = get_particle_array_rigid_body(x=xc, y=yc, h=h, m=m, rho=rho,
                                              rad_s=rad_s, V=V, cs=cs,
                                              name="cube")
@@ -163,8 +161,7 @@ class RigidFluidCoupling(Application):
         integrator = EPECIntegrator(fluid=WCSPHStep(), tank=WCSPHStep(),
                                     cube=RK2StepRigidBody())
 
-        # dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
-        dt = 1e-4
+        dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
         print("DT: %s" % dt)
         tf = 2
         solver = Solver(
@@ -192,9 +189,6 @@ class RigidFluidCoupling(Application):
 
             # Tait equation of state
             Group(equations=[
-                # cut off the density of fluid, so that
-                # density is no less than 1000
-                CutoffDensity(dest='fluid', sources=None),
                 TaitEOSHGCorrection(dest='fluid', sources=None, rho0=self.ro,
                                     c0=self.co, gamma=7.0),
             ], real=False),

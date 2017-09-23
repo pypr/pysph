@@ -412,7 +412,6 @@ class LiuFluidForce(Equation):
 
     def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
              s_idx, s_V, s_fx, s_fy, s_fz, DWIJ, s_m, s_p, s_rho):
-
         _t1 = s_p[s_idx] / (s_rho[s_idx]**2) + d_p[d_idx] / (d_rho[d_idx]**2)
 
         d_au[d_idx] += -s_m[s_idx] * _t1 * DWIJ[0]
