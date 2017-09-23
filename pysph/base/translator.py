@@ -131,6 +131,7 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._ignore_methods = []
         self._replacements = {
             'True': '1', 'False': '0', 'None': 'NULL',
             True: '1', False: '0', None: 'NULL',
@@ -191,10 +192,14 @@ class CConverter(ast.NodeVisitor):
         else:
             return body
 
-    def convert(self, src):
+    def convert(self, src, ignore_methods=None):
+        if ignore_methods is not None:
+            self._ignore_methods = ignore_methods
         self._src = src.splitlines()
         code = ast.parse(src)
-        return self.visit(code)
+        result = self.visit(code)
+        self._ignore_methods = []
+        return result
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -218,10 +223,10 @@ class CConverter(ast.NodeVisitor):
         helper = CStructHelper(obj)
         return helper.get_code() + '\n'
 
-    def parse_instance(self, obj):
+    def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
         src = dedent(inspect.getsource(obj.__class__))
-        code += self.convert(src)
+        code += self.convert(src, ignore_methods)
         return code
 
     def parse_function(self, obj):
@@ -344,7 +349,8 @@ class CConverter(ast.NodeVisitor):
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
 
-        if self._class_name and node.name.startswith('_'):
+        if self._class_name and (node.name.startswith('_') or
+                                 node.name in self._ignore_methods):
             return ''
 
         orig_declares = self._declares

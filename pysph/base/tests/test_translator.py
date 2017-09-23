@@ -851,6 +851,35 @@ def test_wrapping_class():
     assert h.get_array() == expect
 
 
+def test_wrapping_class_with_ignore_methods():
+    # Given
+    class Dummy1(object):
+        '''Class Docstring'''
+        def f(self):
+            pass
+
+        def not_me(self):
+            pass
+
+    obj = Dummy1()
+
+    # When
+    c = CConverter()
+    result = c.parse_instance(obj, ignore_methods=['not_me'])
+
+    # Then
+    expect = dedent('''
+    typedef struct Dummy1 {
+    } Dummy1;
+
+    void Dummy1_f(Dummy1* self)
+    {
+        ;
+    }
+    ''')
+    assert result.strip() == expect.strip()
+
+
 def test_opencl_conversion():
     src = dedent('''
     def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
