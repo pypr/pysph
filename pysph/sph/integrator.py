@@ -11,6 +11,7 @@ from numpy import sqrt
 # Local imports.
 from .integrator_step import IntegratorStep
 
+
 ###############################################################################
 # `Integrator` class
 ###############################################################################
@@ -30,7 +31,8 @@ class Integrator(object):
         """
         for array_name, integrator_step in kw.items():
             if not isinstance(integrator_step, IntegratorStep):
-                msg='Stepper %s must be an instance of IntegratorStep'%(integrator_step)
+                msg = ('Stepper %s must be an instance of '
+                       'IntegratorStep' % (integrator_step))
                 raise ValueError(msg)
 
         self.steppers = kw
@@ -42,8 +44,8 @@ class Integrator(object):
     def __repr__(self):
         name = self.__class__.__name__
         s = self.steppers
-        args = ', '.join(['%s=%s'%(k, s[k]) for k in s])
-        return '%s(%s)'%(name, args)
+        args = ', '.join(['%s=%s' % (k, s[k]) for k in s])
+        return '%s(%s)' % (name, args)
 
     ##########################################################################
     # Public interface.
@@ -53,7 +55,7 @@ class Integrator(object):
         if fixed_h:
             self.compute_h_minimum()
 
-        self.fixed_h=fixed_h
+        self.fixed_h = fixed_h
 
     def set_nnps(self, nnps):
         self.c_integrator.set_nnps(nnps)
@@ -99,14 +101,14 @@ class Integrator(object):
 
         # stable time step based on force criterion
         if dt_force_factor > 0:
-            dt_force = sqrt( hmin/sqrt(dt_force_factor) )
+            dt_force = sqrt(hmin/sqrt(dt_force_factor))
 
         # stable time step based on viscous condition
         if dt_visc_factor > 0:
             dt_viscous = hmin/dt_visc_factor
 
         # minimum of all three
-        dt_min = min( dt_cfl, dt_force, dt_viscous )
+        dt_min = min(dt_cfl, dt_force, dt_viscous)
 
         # return the computed time steps. If dt factors aren't
         # defined, the default dt is returned
@@ -203,7 +205,8 @@ class PECIntegrator(Integrator):
 
     .. math::
 
-        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}}) --> Predict
+        y^{n+\frac{1}{2}} = y^n + \frac{\Delta t}{2}F(y^{n-\frac{1}{2}})
+        --> Predict
 
         F(y^{n+\frac{1}{2}}) --> Evaluate
 
@@ -226,6 +229,7 @@ class PECIntegrator(Integrator):
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
+
 
 ###############################################################################
 # `EPECIntegrator` class
@@ -256,7 +260,8 @@ class EPECIntegrator(Integrator):
 
     In the EPEC mode, the final corrector can be modified to:
 
-    :math:`y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) + F(y^{n+\frac{1}{2}}) \right)`
+    :math:`y^{n+1} = y^n + \frac{\Delta t}{2}\left( F(y^n) +
+                                F(y^{n+\frac{1}{2}}) \right)`
 
     This would require additional storage for the accelerations.
 
@@ -280,6 +285,7 @@ class EPECIntegrator(Integrator):
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
 
+
 ###############################################################################
 # `TVDRK3Integrator` class
 ###############################################################################
@@ -291,9 +297,11 @@ class TVDRK3Integrator(Integrator):
 
         y^{n + \frac{1}{3}} = y^n + \Delta t F( y^n )
 
-        y^{n + \frac{2}{3}} = \frac{3}{4}y^n + \frac{1}{4}(y^{n + \frac{1}{3}} + \Delta t F(y^{n + \frac{1}{3}}))
+        y^{n + \frac{2}{3}} = \frac{3}{4}y^n +
+        \frac{1}{4}(y^{n + \frac{1}{3}} + \Delta t F(y^{n + \frac{1}{3}}))
 
-        y^{n + 1} = \frac{1}{3}y^n + \frac{2}{3}(y^{n + \frac{2}{3}} + \Delta t F(y^{n + \frac{2}{3}}))
+        y^{n + 1} = \frac{1}{3}y^n + \frac{2}{3}(y^{n + \frac{2}{3}}
+        + \Delta t F(y^{n + \frac{2}{3}}))
 
     """
     def one_timestep(self, t, dt):
