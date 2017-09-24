@@ -1,15 +1,3 @@
-"""
-TODO:
-
-Advanced:
-- DT_ADAPT.
-- Reduction.
-
-General OpenCL issues:
-- Periodicity.
-- Cleanup the code generation
-
-"""
 import inspect
 import os
 import re
@@ -68,6 +56,7 @@ class OpenCLAccelerationEval(object):
     """
     def __init__(self, helper):
         self.helper = helper
+        self.particle_arrays = helper.object.particle_arrays
         self.nnps = None
         self._queue = helper._queue
         self._use_double = get_config().use_double
@@ -370,7 +359,6 @@ class AccelerationEvalOpenCLHelper(object):
         all_args = []
         py_args = []
         code = [
-            'double DT_ADAPT[3];',
             'int d_idx = get_global_id(0);'
         ]
         for eq in all_eqs.equations:
@@ -483,7 +471,6 @@ class AccelerationEvalOpenCLHelper(object):
         )
         context = eq_group.context
         code = self._declare_precomp_vars(context)
-        code.append('double DT_ADAPT[3];')
         code.append('int d_idx = get_global_id(0);')
         code.append('int s_idx, i;')
         code.append('int start = start_idx[d_idx];')

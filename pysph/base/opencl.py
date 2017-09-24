@@ -78,3 +78,6 @@ class DeviceHelper(object):
             self._get_prop_or_const(arg).set_data(
                 getattr(self, arg).get()
             )
+
+    def max(self, arg):
+        return float(cl.array.max(getattr(self, arg)).get())

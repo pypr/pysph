@@ -173,7 +173,7 @@ def get_particle_array_wcsph(constants=None, **props):
     """
 
     wcsph_props = ['cs', 'ax', 'ay', 'az', 'arho', 'x0', 'y0', 'z0',
-                   'u0', 'v0', 'w0', 'rho0', 'div']
+                   'u0', 'v0', 'w0', 'rho0', 'div', 'dt_cfl', 'dt_force']
 
     pa = get_particle_array(
         constants=constants, additional_props=wcsph_props, **props
@@ -216,7 +216,7 @@ def get_particle_array_iisph(constants=None, **props):
     """
     iisph_props = ['uadv', 'vadv', 'wadv', 'rho_adv',
                    'au', 'av', 'aw', 'ax', 'ay', 'az',
-                   'dii0', 'dii1', 'dii2', 'V',
+                   'dii0', 'dii1', 'dii2', 'V', 'dt_cfl', 'dt_force',
                    'aii', 'dijpj0', 'dijpj1', 'dijpj2', 'p', 'p0', 'piter',
                    'compression']
     # Used to calculate the total compression first index is count and second
@@ -376,7 +376,7 @@ def get_particle_array_gasd(constants=None, **props):
     required_props = [
         'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'cs', 'p', 'e',
         'au', 'av', 'aw', 'arho', 'ae', 'am', 'ah', 'x0', 'y0', 'z0',
-        'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div',
+        'u0', 'v0', 'w0', 'rho0', 'e0', 'h0', 'div', 'dt_cfl',
         'grhox', 'grhoy', 'grhoz', 'dwdh', 'omega', 'converged',
         'alpha1', 'alpha10', 'aalpha1', 'alpha2', 'alpha20', 'aalpha2',
         'del2e'

@@ -359,7 +359,7 @@ class MPMAccelerations(Equation):
         super(MPMAccelerations, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_au, d_av, d_aw, d_ae, d_am,
-                   d_aalpha1, d_aalpha2, d_del2e):
+                   d_aalpha1, d_aalpha2, d_del2e, d_dt_cfl):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
@@ -369,12 +369,13 @@ class MPMAccelerations(Equation):
         d_aalpha2[d_idx] = 0.0
 
         d_del2e[d_idx] = 0.0
+        d_dt_cfl[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_m, s_m, d_p, s_p, d_cs, s_cs,
              d_e, s_e, d_rho, s_rho, d_au, d_av, d_aw, d_ae,
              d_omega, s_omega, XIJ, VIJ, DWI, DWJ, DWIJ, HIJ,
              d_del2e, d_alpha1, s_alpha1, d_alpha2, s_alpha2,
-             EPS, RIJ, R2IJ, RHOIJ, DT_ADAPT):
+             EPS, RIJ, R2IJ, RHOIJ, d_dt_cfl):
 
         # particle pressure
         pi = d_p[d_idx]
@@ -415,12 +416,12 @@ class MPMAccelerations(Equation):
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
         # signal velocities
-        pdiff = abs(pi-pj)
+        pdiff = abs(pi - pj)
         vsig1 = 0.5 * max(cij - self.beta*dot, 0.0)
         vsig2 = sqrt(pdiff/RHOIJ)
 
         # compute the Courant-limited time step factor.
-        DT_ADAPT[0] = max(DT_ADAPT[0], cij + self.beta * dot)
+        d_dt_cfl[d_idx] = max(d_dt_cfl[d_idx], cij + self.beta * dot)
 
         # Artificial viscosity
         if dot <= 0.0:

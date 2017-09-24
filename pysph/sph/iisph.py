@@ -343,13 +343,13 @@ class PressureForce(Equation):
         d_aw[d_idx] += fac*DWIJ[2]
 
     def post_loop(self, d_idx, d_au, d_av, d_aw,
-                  d_uadv, d_vadv, d_wadv, DT_ADAPT):
+                  d_uadv, d_vadv, d_wadv, d_dt_cfl, d_dt_force):
         fac = d_au[d_idx]*d_au[d_idx] + d_av[d_idx]*d_av[d_idx] +\
                    d_aw[d_idx]*d_aw[d_idx]
         vmag = sqrt(d_uadv[d_idx]*d_uadv[d_idx] + d_vadv[d_idx]*d_vadv[d_idx] +
                     d_wadv[d_idx]*d_wadv[d_idx])
-        DT_ADAPT[0] = max(2.0*vmag, DT_ADAPT[0])
-        DT_ADAPT[1] = max(2.0*fac, DT_ADAPT[1])
+        d_dt_cfl[d_idx] = 2.0*vmag
+        d_dt_force[d_idx] = 2.0*fac
 
 
 class PressureForceBoundary(Equation):

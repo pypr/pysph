@@ -195,16 +195,17 @@ class MomentumEquation(Equation):
 
         super(MomentumEquation, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_au, d_av, d_aw):
+    def initialize(self, d_idx, d_au, d_av, d_aw, d_dt_cfl):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
+        d_dt_cfl[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs,
              d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ,
              XIJ, HIJ, R2IJ, RHOIJ1, EPS,
-             DWIJ, DT_ADAPT, WIJ, WDP):
+             DWIJ, WIJ, WDP, d_dt_cfl):
 
         rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
         rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
@@ -224,7 +225,7 @@ class MomentumEquation(Equation):
         _dt_cfl = 0.0
         if R2IJ > 1e-12:
             _dt_cfl = abs(HIJ * vijdotxij/R2IJ) + self.c0
-            DT_ADAPT[0] = max(_dt_cfl, DT_ADAPT[0])
+            d_dt_cfl[d_idx] = max(_dt_cfl, d_dt_cfl[d_idx])
 
         tmpi = d_p[d_idx]*rhoi21
         tmpj = s_p[s_idx]*rhoj21
@@ -255,7 +256,7 @@ class MomentumEquation(Equation):
         d_av[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * (tmp + piij) * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw, DT_ADAPT):
+    def post_loop(self, d_idx, d_au, d_av, d_aw, d_dt_force):
         d_au[d_idx] += self.gx
         d_av[d_idx] += self.gy
         d_aw[d_idx] += self.gz
@@ -265,7 +266,7 @@ class MomentumEquation(Equation):
                 d_aw[d_idx]*d_aw[d_idx])
 
         # store the square of the max acceleration
-        DT_ADAPT[1] = max(acc2, DT_ADAPT[1])
+        d_dt_force[d_idx] = acc2
 
 
 class MomentumEquationDeltaSPH(Equation):
@@ -358,7 +359,7 @@ class MomentumEquationDeltaSPH(Equation):
         d_av[d_idx] += tmp * DWIJ[1]
         d_aw[d_idx] += tmp * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw, DT_ADAPT):
+    def post_loop(self, d_idx, d_au, d_av, d_aw, d_dt_force):
         d_au[d_idx] += self.gx
         d_av[d_idx] += self.gy
         d_aw[d_idx] += self.gz
@@ -368,7 +369,7 @@ class MomentumEquationDeltaSPH(Equation):
                 d_aw[d_idx]*d_aw[d_idx])
 
         # store the square of the max acceleration
-        DT_ADAPT[1] = max(acc2, DT_ADAPT[1])
+        d_dt_force[d_idx] = acc2
 
 
 class ContinuityEquationDeltaSPH(Equation):

@@ -7,6 +7,7 @@ from the `sph_eval` module.
 """
 
 from numpy import sqrt
+import numpy as np
 
 # Local imports.
 from .integrator_step import IntegratorStep
@@ -47,6 +48,20 @@ class Integrator(object):
         args = ', '.join(['%s=%s' % (k, s[k]) for k in s])
         return '%s(%s)' % (name, args)
 
+    def _get_dt_adapt_factors(self):
+        a_eval = self.c_integrator.acceleration_eval
+        factors = [-1.0, -1.0, -1.0]
+        for pa in a_eval.particle_arrays:
+            for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
+                if name in pa.properties:
+                    if pa.gpu:
+                        max_val = pa.gpu.max(name)
+                    else:
+                        max_val = np.max(pa.get(name))
+                    factors[i] = max(factors[i], max_val)
+        cfl_f, force_f, visc_f = factors
+        return cfl_f, force_f, visc_f
+
     ##########################################################################
     # Public interface.
     ##########################################################################
@@ -65,6 +80,8 @@ class Integrator(object):
 
         hmin = 1.0
         for pa in a_eval.particle_arrays:
+            if pa.gpu:
+                pa.gpu.pull('h')
             h = pa.get_carray('h')
             h.update_min_max()
 
@@ -77,42 +94,35 @@ class Integrator(object):
         """If there are any adaptive timestep constraints, the appropriate
         timestep is returned, else None is returned.
         """
-        a_eval = self.c_integrator.acceleration_eval
+        dt_cfl_fac, dt_force_fac, dt_visc_fac = self._get_dt_adapt_factors()
 
-        # different time step controls
-        dt_cfl_factor = a_eval.dt_cfl
-        dt_visc_factor = a_eval.dt_viscous
-
-        # force factor is acceleration squared
-        dt_force_factor = a_eval.dt_force
-
-        # iterate over particles and find hmin if using vatialbe h
+        # iterate over particles and find hmin if using variable h
         if not self.fixed_h:
             self.compute_h_minimum()
 
         hmin = self.h_minimum
 
         # default time steps set to some large value
-        dt_cfl = dt_force = dt_viscous = 1e20
+        dt_cfl = dt_force = dt_viscous = 1e10
 
         # stable time step based on courant condition
-        if dt_cfl_factor > 0:
-            dt_cfl = hmin/dt_cfl_factor
+        if dt_cfl_fac > 0:
+            dt_cfl = hmin/dt_cfl_fac
 
         # stable time step based on force criterion
-        if dt_force_factor > 0:
-            dt_force = sqrt(hmin/sqrt(dt_force_factor))
+        if dt_force_fac > 0:
+            dt_force = sqrt(hmin/sqrt(dt_force_fac))
 
         # stable time step based on viscous condition
-        if dt_visc_factor > 0:
-            dt_viscous = hmin/dt_visc_factor
+        if dt_visc_fac > 0:
+            dt_viscous = hmin/dt_visc_fac
 
         # minimum of all three
         dt_min = min(dt_cfl, dt_force, dt_viscous)
 
         # return the computed time steps. If dt factors aren't
         # defined, the default dt is returned
-        if dt_min <= 0.0:
+        if dt_min <= 0.0 or abs(dt_min - 1e10) < 1:
             return None
         else:
             return cfl*dt_min

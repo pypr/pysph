@@ -233,7 +233,7 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
-             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ, DT_ADAPT):
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ):
 
         vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 

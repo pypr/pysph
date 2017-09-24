@@ -317,8 +317,7 @@ def get_predefined_types(precomp):
     """Return a dictionary that can be used by a CythonGenerator for
     the precomputed symbols.
     """
-    result = {'DT_ADAPT': [0.0, 0.0, 0.0],
-              'dt': 0.0,
+    result = {'dt': 0.0,
               't': 0.0,
               'dst': KnownType('object'),
               'src': KnownType('ParticleArrayWrapper')}
