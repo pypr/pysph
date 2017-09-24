@@ -182,13 +182,13 @@ class RigidFluidCoupling(Application):
     def create_solver(self):
         kernel = CubicSpline(dim=2)
 
-        integrator = EPECIntegrator(fluid=WCSPHStep(), tank=WCSPHStep(),
+        integrator = EPECIntegrator(fluid=WCSPHStep(),
                                     cube=RK2StepRigidBody())
 
-        dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
-        # dt = 1e-4
+        # dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
+        dt = 5e-5
         print("DT: %s" % dt)
-        tf = 0.5
+        tf = 10
         solver = Solver(
             kernel=kernel,
             dim=2,
