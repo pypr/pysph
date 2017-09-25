@@ -185,10 +185,9 @@ class RigidFluidCoupling(Application):
         integrator = EPECIntegrator(fluid=WCSPHStep(),
                                     cube=RK2StepRigidBody())
 
-        # dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
-        dt = 5e-5
+        dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
         print("DT: %s" % dt)
-        tf = 10
+        tf = 5
         solver = Solver(
             kernel=kernel,
             dim=2,
