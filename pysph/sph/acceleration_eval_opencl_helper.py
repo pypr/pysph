@@ -1,3 +1,4 @@
+from functools import partial
 import inspect
 import os
 import re
@@ -64,16 +65,17 @@ class OpenCLAccelerationEval(object):
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
         call = info.get('method')
-        args = info.get('args')
+        args = list(info.get('args'))
         dest = info['dest']
         n = dest.get_number_of_particles(info.get('real', True))
         args[1] = (n,)
+        args[3:] = [x() for x in args[3:]]
         if info.get('loop'):
             nnps.set_context(info['src_idx'], info['dst_idx'])
             cache = nnps.current_cache
             cache.get_neighbors_gpu()
             self._queue.finish()
-            args = list(args) + [
+            args = args + [
                 cache._nbr_lengths_gpu.data,
                 cache._start_idx_gpu.data,
                 cache._neighbors_gpu.data
@@ -222,12 +224,21 @@ class AccelerationEvalOpenCLHelper(object):
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
         structs = self._gpu_structs
+
+        # This is needed for late binding on the device helper's attributes
+        # which may change at each iteration when particles are added/removed.
+        def _get_array(gpu_helper, attr):
+            return getattr(gpu_helper, attr).data
+
+        def _get_struct(obj):
+            return obj
+
         if arg.startswith('d_'):
-            return getattr(ary_map[dest].gpu, arg[2:]).data
+            return partial(_get_array, ary_map[dest].gpu, arg[2:])
         elif arg.startswith('s_'):
-            return getattr(ary_map[src].gpu, arg[2:]).data
+            return partial(_get_array, ary_map[src].gpu, arg[2:])
         else:
-            return structs[arg].data
+            return partial(_get_struct, structs[arg].data)
 
     def _setup_calls(self):
         calls = []
