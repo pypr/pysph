@@ -27,13 +27,14 @@ def get_kernel_definition(kernel, arg_list):
     sig = '__kernel void\n{kernel}\n({args})'.format(
         kernel=kernel, args=', '.join(arg_list),
     )
-    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
+    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4,
+                          break_long_words=False))
 
 
 def wrap_code(code, indent=' '*4):
     return wrap(
         code, width=74, initial_indent=indent,
-        subsequent_indent=indent + ' '*4
+        subsequent_indent=indent + ' '*4, break_long_words=False
     )
 
 

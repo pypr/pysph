@@ -205,7 +205,7 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,
-                args='0, ' + ', '.join(args)
+                args=', '.join(['0'] + args)
             ), indent=''
         )
 

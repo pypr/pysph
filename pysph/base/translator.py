@@ -377,7 +377,9 @@ class CConverter(ast.NodeVisitor):
         if len(declares) > 0:
             declares += '\n'
 
-        sig = '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
+        sig = '\n'.join(wrap(
+            sig, width=78, subsequent_indent=' '*4, break_long_words=False
+        ))
         self._known = orig_known
         self._declares = orig_declares
         return sig + '\n{\n' + declares + body + '\n}\n'

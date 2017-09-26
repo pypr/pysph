@@ -312,6 +312,8 @@ cdef class DomainManager:
         # appropriate parallel NNPS is responsible for the creation of
         # ghost particles.
         if self.is_periodic and not self.in_parallel:
+            self._update_from_gpu()
+
             # remove periodic ghost particles from a previous step
             self._remove_ghosts()
 
@@ -320,6 +322,9 @@ cdef class DomainManager:
 
             # create new periodic ghosts
             self._create_ghosts_periodic()
+
+            # Update GPU.
+            self._update_gpu()
 
     #### Private protocol ###############################################
     cdef _add_to_array(self, DoubleArray arr, double disp):
@@ -589,6 +594,41 @@ cdef class DomainManager:
         for array_index in range( narrays ):
             pa_wrapper = <NNPSParticleArrayWrapper>PyList_GetItem( pa_wrappers, array_index )
             pa_wrapper.remove_tagged_particles(Ghost)
+
+    def _update_gpu(self):
+        # FIXME: this is just done for correctness.  We should really
+        # implement a GPU Domain Manager and use that instead to do all
+        # this directly on the GPU.
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef list props
+
+        for pa_wrapper in pa_wrappers:
+            pa = pa_wrapper.pa
+            if pa.gpu is not None:
+                props = pa.output_property_arrays
+                if len(props) == 0:
+                    props = list(pa.properties.keys())
+                pa.gpu.resize(pa.get_number_of_particles(real=False))
+                pa.gpu.push(*props)
+
+    def _update_from_gpu(self):
+        # FIXME: this is just done for correctness.  We should really
+        # implement a GPU Domain Manager and use that instead to do all
+        # this directly on the GPU.
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef ParticleArray pa
+        cdef list props
+
+        for pa_wrapper in pa_wrappers:
+            pa = pa_wrapper.pa
+            if pa.gpu is not None:
+                props = pa.output_property_arrays
+                if len(props) == 0:
+                    props = list(pa.properties.keys())
+                pa.gpu.pull(*props)
 
 
 ##############################################################################
@@ -1021,6 +1061,13 @@ cdef class NNPSBase:
             arr.c_align_array(indices)
 
     def update_domain(self, *args, **kwargs):
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        for pa_wrapper in pa_wrappers:
+            if pa_wrapper.pa.gpu is not None:
+                # FIXME: find the max/min on the GPU instead.
+                pa_wrapper.pa.gpu.pull('x', 'y', 'z')
+
         self.domain.update()
 
     cdef _compute_bounds(self):
@@ -1033,9 +1080,6 @@ cdef class NNPSBase:
         cdef double lx, ly, lz
 
         for pa_wrapper in pa_wrappers:
-            if pa_wrapper.pa.gpu is not None:
-                # FIXME: find the max/min on the GPU instead.
-                pa_wrapper.pa.gpu.pull('x', 'y', 'z')
             x = pa_wrapper.x
             y = pa_wrapper.y
             z = pa_wrapper.z
