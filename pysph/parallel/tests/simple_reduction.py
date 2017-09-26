@@ -9,6 +9,8 @@ from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.integrator import EulerIntegrator
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
+from pysph.base.reduce_array import parallel_reduce_array, serial_reduce_array
+
 
 def create_particles():
     x = np.linspace(0, 10, 10)
@@ -21,13 +23,12 @@ def create_particles():
     fluid.add_constant('total_mass', 0.0)
     return [fluid]
 
+
 class TotalMass(Equation):
     def reduce(self, dst):
-        # Use the dst.array as we want to pass the real particles to do the sum
-        # passing the carray will send all the particles including ghosts
-        # which is incorrect.
-        m = serial_reduce_array(dst.array.m, op='sum')
+        m = serial_reduce_array(dst.m, op='sum')
         dst.total_mass[0] = parallel_reduce_array(m, op='sum')
+
 
 class DummyStepper(IntegratorStep):
     def initialize(self):

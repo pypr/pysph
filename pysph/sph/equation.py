@@ -33,6 +33,10 @@ def camel_to_underscore(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
+def declare(*args):
+    pass
+
+
 ##############################################################################
 # `Context` class.
 ##############################################################################
@@ -313,10 +317,9 @@ def get_predefined_types(precomp):
     """Return a dictionary that can be used by a CythonGenerator for
     the precomputed symbols.
     """
-    result = {'DT_ADAPT': [0.0, 0.0, 0.0],
-              'dt': 0.0,
+    result = {'dt': 0.0,
               't': 0.0,
-              'dst': KnownType('ParticleArrayWrapper'),
+              'dst': KnownType('object'),
               'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.items():
         result[sym] = value.context[sym]
@@ -653,6 +656,8 @@ class CythonGroup(Group):
                 args = inspect.getargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
+                if kind == 'reduce':
+                    args = ['dst.array']
                 call_args = ', '.join(args)
                 c = 'self.{eq_name}.{method}({args})'\
                     .format(eq_name=eq.var_name, method=kind, args=call_args)
@@ -776,7 +781,8 @@ class OpenCLGroup(Group):
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
         code_gen = OpenCLConverter(known_types=predefined)
+        ignore = ['reduce']
         for cls in sorted(classes.keys()):
-            src = code_gen.parse_instance(eqs[cls])
+            src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
             wrappers.append(src)
         return '\n'.join(wrappers)

@@ -570,12 +570,6 @@ precomputed quantites are available and may be passed into any equation:
 
     - ``EPS = 0.01 * HIJ * HIJ``
 
-    - ``DT_ADAPT``: is an array of three doubles that stores an adaptive
-      time-step, the first element is the CFL based time-step limit, the
-      second is the force-based limit and the third a viscosity based limit.
-      See :py:class:`pysph.sph.wc.basic.MomentumEquation` for an example of
-      how this is used.
-
 
 In addition if one requires the current time or the timestep in an equation,
 the following may be passed into any of the methods of an equation:
@@ -622,16 +616,14 @@ equation:
 
     class FindMaxU(Equation):
         def reduce(self, dst):
-            m = serial_reduce_array(dst.array.m, 'sum')
-            max_u = serial_reduce_array(dst.array.u, 'max')
+            m = serial_reduce_array(dst.m, 'sum')
+            max_u = serial_reduce_array(dst.u, 'max')
             dst.total_mass[0] = parallel_reduce_array(m, 'sum')
             dst.max_u[0] = parallel_reduce_array(u, 'max')
 
 where:
 
-    - ``dst``: refers to a destination ``ParticleArrayWrapper``.
-
-    - ``src``: refers to a the source ``ParticleArrayWrapper``.
+    - ``dst``: refers to a destination ``ParticleArray``.
 
     - ``serial_reduce_array``: is a special function provided that performs
       reductions correctly in serial. It currently supports ``sum, prod, max``
@@ -642,13 +634,6 @@ where:
       ``parallel_reduce_array`` is expensive as it is an all-to-all
       communication.  One can reduce these by using a single array and use
       that to reduce the communication.
-
-The ``ParticleArrayWrapper``, wraps a ``ParticleArray`` into a
-high-performance Cython object.  It has an ``array`` attribute which is a
-reference the the underlying ``ParticleArray`` and also attributes
-corresponding to each property that are ``DoubleArrays``.  For example in the
-Cython code one may access ``dst.x`` to get the raw arrays used by the
-particle array.  This is mainly done for performance reasons.
 
 Note that in the above example,
 :py:func:`pysph.base.reduce_array.serial_reduce_array` is passed a
@@ -667,6 +652,12 @@ any SPH problem.  A user can easily define a new equation and instantiate the
 equation in the list of equations to be passed to the application.  It is
 often easiest to look at the many existing equations in PySPH and learn the
 general patterns.
+
+If you wish to use adaptive time stepping, see the code
+:py:class:`pysph.sph.integrator.Integrator`. The integrator uses information
+from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
+particle arrays to determine the most suitable time step.
+
 
 
 Writing the Integrator

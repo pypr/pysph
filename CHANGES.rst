@@ -1,3 +1,11 @@
+1.0b1
+-----
+
+* Release date: not yet released, still under development.
+* Preliminary support for using OpenCL transparently.
+
+
+
 1.0a5
 -----
 

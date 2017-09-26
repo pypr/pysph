@@ -257,11 +257,10 @@ cdef class GPUNNPS(NNPSBase):
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint cache=True,
-            bint sort_gids=False, bint use_double=False, ctx=None):
+            bint sort_gids=False, ctx=None):
         GPUNNPS.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids, ctx)
 
-        self.use_double = use_double
         self.radius_scale2 = radius_scale*radius_scale
         self.src_index = -1
         self.dst_index = -1

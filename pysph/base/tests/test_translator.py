@@ -851,6 +851,35 @@ def test_wrapping_class():
     assert h.get_array() == expect
 
 
+def test_wrapping_class_with_ignore_methods():
+    # Given
+    class Dummy1(object):
+        '''Class Docstring'''
+        def f(self):
+            pass
+
+        def not_me(self):
+            pass
+
+    obj = Dummy1()
+
+    # When
+    c = CConverter()
+    result = c.parse_instance(obj, ignore_methods=['not_me'])
+
+    # Then
+    expect = dedent('''
+    typedef struct Dummy1 {
+    } Dummy1;
+
+    void Dummy1_f(Dummy1* self)
+    {
+        ;
+    }
+    ''')
+    assert result.strip() == expect.strip()
+
+
 def test_opencl_conversion():
     src = dedent('''
     def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
@@ -858,13 +887,14 @@ def test_opencl_conversion():
     ''')
 
     # When
-    converter = OpenCLConverter()
+    known_types = {'d_p': KnownType('__global int*')}
+    converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
     # Then
     expect = dedent('''
-void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p,
-    long J, double t, double* l, double* xx)
+void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
+    J, double t, double* l, double* xx)
 {
     ;
 }
@@ -888,6 +918,43 @@ def test_opencl_class():
     void Foo_g(__global Foo* self, double x)
     {
         ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_handles_parsing_functions():
+    # Given
+    def f(x=1.0):
+        return x + 1
+
+    # When
+    t = CConverter()
+    code = t.parse_function(f)
+
+    # Then
+    expect = dedent('''
+    double f(double x)
+    {
+        return (x + 1);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+    # Given
+    class A(object):
+        def f(self, x=1.0):
+            return x + 1.0
+
+    # When
+    t = CConverter()
+    code = t.parse_function(A)
+
+    # Then
+    expect = dedent('''
+    double A_f(A* self, double x)
+    {
+        return (x + 1.0);
     }
     ''')
     assert code.strip() == expect.strip()

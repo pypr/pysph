@@ -5,6 +5,7 @@ Basic SPH Equations
 
 from pysph.sph.equation import Equation
 
+
 class SummationDensity(Equation):
     r"""Good old Summation density:
 
@@ -16,6 +17,7 @@ class SummationDensity(Equation):
 
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
+
 
 class BodyForce(Equation):
     r"""Add a body force to the particles:
@@ -85,6 +87,7 @@ class VelocityGradient2D(Equation):
         d_v10[d_idx] += tmp * -VIJ[1] * DWIJ[0]
         d_v11[d_idx] += tmp * -VIJ[1] * DWIJ[1]
 
+
 class VelocityGradient3D(Equation):
     r""" Compute the SPH evaluation for the velocity gradient tensor in 2D.
 
@@ -100,7 +103,8 @@ class VelocityGradient3D(Equation):
     component. Thus v_21 is :math:`\frac{\partial v}{\partial x}`
 
     """
-    def initialize(self, d_idx, d_v00, d_v01, d_v02, d_v10, d_v11, d_v12, d_v20, d_v21, d_v22):
+    def initialize(self, d_idx, d_v00, d_v01, d_v02, d_v10, d_v11, d_v12,
+                   d_v20, d_v21, d_v22):
         d_v00[d_idx] = 0.0
         d_v01[d_idx] = 0.0
         d_v02[d_idx] = 0.0
@@ -133,6 +137,7 @@ class VelocityGradient3D(Equation):
         d_v21[d_idx] += tmp * -VIJ[2] * DWIJ[1]
         d_v22[d_idx] += tmp * -VIJ[2] * DWIJ[2]
 
+
 class IsothermalEOS(Equation):
     r""" Compute the pressure using the Isothermal equation of state:
 
@@ -161,6 +166,7 @@ class IsothermalEOS(Equation):
     def loop(self, d_idx, d_rho, d_p):
         d_p[d_idx] = self.p0 + self.c02 * (d_rho[d_idx] - self.rho0)
 
+
 class ContinuityEquation(Equation):
     r"""Density rate:
 
@@ -174,6 +180,7 @@ class ContinuityEquation(Equation):
     def loop(self, d_idx, d_arho, s_idx, s_m, DWIJ, VIJ):
         vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
         d_arho[d_idx] += s_m[s_idx]*vijdotdwij
+
 
 class MonaghanArtificialViscosity(Equation):
     r"""Classical Monaghan style artificial viscosity [Monaghan2005]_
@@ -226,10 +233,7 @@ class MonaghanArtificialViscosity(Equation):
         d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
-             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ, DT_ADAPT):
-
-        rhoi21 = 1.0/(d_rho[d_idx]*d_rho[d_idx])
-        rhoj21 = 1.0/(s_rho[s_idx]*s_rho[s_idx])
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ):
 
         vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 
@@ -245,6 +249,7 @@ class MonaghanArtificialViscosity(Equation):
         d_au[d_idx] += -s_m[s_idx] * piij * DWIJ[0]
         d_av[d_idx] += -s_m[s_idx] * piij * DWIJ[1]
         d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
+
 
 class XSPHCorrection(Equation):
     r"""Position stepping with XSPH correction [Monaghan1992]_

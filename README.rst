@@ -8,12 +8,12 @@ PySPH: a Python-based SPH framework
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in
 `Python <http://www.python.org>`_ and the performance critical parts
-are implemented in `Cython <http://www.cython.org>`_.
+are implemented in `Cython <http://www.cython.org>`_ and PyOpenCL_.
 
-PySPH allows users to write their high-level code in pure Python.  This
-Python code is automatically converted to high-performance Cython which
-is compiled and executed.  PySPH can also be configured to work
-seamlessly with OpenMP and MPI.
+PySPH allows users to write their high-level code in pure Python. This Python
+code is automatically converted to high-performance Cython or OpenCL which is
+compiled and executed. PySPH can also be configured to work seamlessly with
+OpenMP, OpenCL, and MPI.
 
 The latest documentation for PySPH is available at
 `pysph.readthedocs.org <http://pysph.readthedocs.org>`_.
@@ -32,6 +32,8 @@ Here are `videos
 of some example problems solved using PySPH.
 
 
+.. _PyOpenCL: https://documen.tician.de/pyopencl/
+
 Features
 --------
 
@@ -41,6 +43,7 @@ Features
 - High-performance: our performance is comparable to hand-written
   solvers implemented in FORTRAN.
 - Seamless multi-core support with OpenMP.
+- Seamless GPU support with PyOpenCL_.
 - Seamless parallel support using
   `Zoltan <http://www.cs.sandia.gov/zoltan/>`_.
 
@@ -155,12 +158,11 @@ to IIT Bombay for their support.  Our primary goal is to build a
 powerful SPH based tool for both application and research. We hope that
 this makes it easy to perform reproducible computational research.
 
-Lead developers:
+To see the list of contributors the see `github contributors page
+<https://github.com/pypr/pysph/graphs/contributors>`_
 
-- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`_
-- Kunal Puri
 
-Earlier developers:
+Some earlier developers not listed on the above are:
 
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)

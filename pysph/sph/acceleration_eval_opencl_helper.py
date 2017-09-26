@@ -1,16 +1,4 @@
-"""
-TODO:
-
-Advanced:
-- DT_ADAPT.
-- Reduction.
-- support get_code for helper functions.
-
-General OpenCL issues:
-- Periodicity.
-- Cleanup the code generation
-
-"""
+from functools import partial
 import inspect
 import os
 import re
@@ -39,14 +27,30 @@ def get_kernel_definition(kernel, arg_list):
     sig = '__kernel void\n{kernel}\n({args})'.format(
         kernel=kernel, args=', '.join(arg_list),
     )
-    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4))
+    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4,
+                          break_long_words=False))
 
 
 def wrap_code(code, indent=' '*4):
     return wrap(
         code, width=74, initial_indent=indent,
-        subsequent_indent=indent + ' '*4
+        subsequent_indent=indent + ' '*4, break_long_words=False
     )
+
+
+def get_code(obj, transpiler=None):
+    """This function looks at the object and gets any additional code to
+    wrap from the `_get_helpers_` method.
+    """
+    result = []
+    if hasattr(obj, '_get_helpers_'):
+        if transpiler is None:
+            transpiler = OpenCLConverter()
+        doc = '\n// Helpers from %s' % obj.__class__.__name__
+        result.append(doc)
+        for helper in obj._get_helpers_():
+            result.append(transpiler.parse_function(helper))
+    return result
 
 
 class OpenCLAccelerationEval(object):
@@ -54,6 +58,7 @@ class OpenCLAccelerationEval(object):
     """
     def __init__(self, helper):
         self.helper = helper
+        self.particle_arrays = helper.object.particle_arrays
         self.nnps = None
         self._queue = helper._queue
         self._use_double = get_config().use_double
@@ -61,16 +66,17 @@ class OpenCLAccelerationEval(object):
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
         call = info.get('method')
-        args = info.get('args')
+        args = list(info.get('args'))
         dest = info['dest']
         n = dest.get_number_of_particles(info.get('real', True))
         args[1] = (n,)
+        args[3:] = [x() for x in args[3:]]
         if info.get('loop'):
             nnps.set_context(info['src_idx'], info['dst_idx'])
             cache = nnps.current_cache
             cache.get_neighbors_gpu()
             self._queue.finish()
-            args = list(args) + [
+            args = args + [
                 cache._nbr_lengths_gpu.data,
                 cache._start_idx_gpu.data,
                 cache._neighbors_gpu.data
@@ -104,7 +110,7 @@ class OpenCLAccelerationEval(object):
             type = info['type']
             if type == 'method':
                 method = getattr(self, info.get('method'))
-                method()
+                method(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -131,6 +137,10 @@ class OpenCLAccelerationEval(object):
     def update_nnps(self):
         self.nnps.update_domain()
         self.nnps.update()
+
+    def do_reduce(self, eqs, dest):
+        for eq in eqs:
+            eq.reduce(dest)
 
 
 def add_address_space(known_types):
@@ -215,12 +225,21 @@ class AccelerationEvalOpenCLHelper(object):
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
         structs = self._gpu_structs
+
+        # This is needed for late binding on the device helper's attributes
+        # which may change at each iteration when particles are added/removed.
+        def _get_array(gpu_helper, attr):
+            return getattr(gpu_helper, attr).data
+
+        def _get_struct(obj):
+            return obj
+
         if arg.startswith('d_'):
-            return getattr(ary_map[dest].gpu, arg[2:]).data
+            return partial(_get_array, ary_map[dest].gpu, arg[2:])
         elif arg.startswith('s_'):
-            return getattr(ary_map[src].gpu, arg[2:]).data
+            return partial(_get_array, ary_map[src].gpu, arg[2:])
         else:
-            return structs[arg].data
+            return partial(_get_struct, structs[arg].data)
 
     def _setup_calls(self):
         calls = []
@@ -246,7 +265,14 @@ class AccelerationEvalOpenCLHelper(object):
                     dst_idx=array_index[dest], type='kernel'
                 )
             elif type == 'method':
-                info = dict(method=item.get('method'), type='method')
+                info = dict(item)
+                if info.get('method') == 'do_reduce':
+                    args = info.get('args')
+                    grp = args[0]
+                    args[0] = [x for x in grp.equations
+                               if hasattr(x, 'reduce')]
+                    args[1] = self._array_map[args[1]]
+
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -293,13 +319,15 @@ class AccelerationEvalOpenCLHelper(object):
     # Mako interface.
     ##########################################################################
     def get_header(self):
-        # FIXME
-        # Write the equivalent for get_code in cython where any extra code,
-        # helpers are suitably wrapped as well.
         object = self.object
 
-        headers = []
         transpiler = OpenCLConverter(known_types=self.known_types)
+
+        headers = []
+        headers.extend(get_code(object.kernel, transpiler))
+        for equation in object.all_group.equations:
+            headers.extend(get_code(equation, transpiler))
+
         headers.append(transpiler.parse_instance(object.kernel))
 
         headers.append(object.all_group.get_equation_wrappers(
@@ -343,7 +371,6 @@ class AccelerationEvalOpenCLHelper(object):
         all_args = []
         py_args = []
         code = [
-            'double DT_ADAPT[3];',
             'int d_idx = get_global_id(0);'
         ]
         for eq in all_eqs.equations:
@@ -425,8 +452,13 @@ class AccelerationEvalOpenCLHelper(object):
         else:
             return code
 
+    def call_reduce(self, all_eq_group, dest):
+        self.data.append(dict(method='do_reduce', type='method',
+                              args=[all_eq_group, dest]))
+
     def call_update_nnps(self, group):
-        self.data.append(dict(method='update_nnps', type='method'))
+        self.data.append(dict(method='update_nnps',
+                              type='method', args=[]))
 
     def get_initialize_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
@@ -451,7 +483,6 @@ class AccelerationEvalOpenCLHelper(object):
         )
         context = eq_group.context
         code = self._declare_precomp_vars(context)
-        code.append('double DT_ADAPT[3];')
         code.append('int d_idx = get_global_id(0);')
         code.append('int s_idx, i;')
         code.append('int start = start_idx[d_idx];')

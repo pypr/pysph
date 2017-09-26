@@ -58,7 +58,9 @@ class OpenCLIntegrator(object):
         for name, (call, args, dest) in call_info.items():
             n = dest.get_number_of_particles(real=True)
             args[1] = (n,)
-            call(*(args + extra_args))
+            # Compute the remaining arguments.
+            rest = [x() for x in args[3:]]
+            call(*(args[:3] + rest + extra_args))
 
     def set_nnps(self, nnps):
         self.nnps = nnps
@@ -120,8 +122,15 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         for method, info in self.data.items():
             for dest_name, (kernel, args) in info.items():
                 dest = array_map[dest_name]
+
+                # Note: This is done to do some late binding. Instead of just
+                # directly storing the dest.gpu.x, we compute it on the fly
+                # as the number of particles and the actual buffer may change.
+                def _getter(dest_gpu, x):
+                    return getattr(dest_gpu, x).data
+
                 _args = [
-                    getattr(dest.gpu, x[2:]).data for x in args
+                    functools.partial(_getter, dest.gpu, x[2:]) for x in args
                 ]
                 all_args = [q, None, None] + _args
                 calls[method][dest] = (
@@ -196,7 +205,7 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,
-                args='0, ' + ', '.join(args)
+                args=', '.join(['0'] + args)
             ), indent=''
         )
 
