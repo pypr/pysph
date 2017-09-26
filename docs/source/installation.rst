@@ -114,6 +114,9 @@ The optional dependencies are:
  - OpenMP_: PySPH can use OpenMP if it is available.  Installation instructions
    are available below.
 
+ - PyOpenCL_: PySPH can use OpenCL if it is available. This requires
+   installing PyOpenCL_.
+
  - Mayavi_: PySPH provides a convenient viewer to visualize the output
    of simulations. This viewer can be launched using the command
    ``pysph view`` and requires Mayavi_ to be installed.  Since this is
@@ -133,6 +136,8 @@ Zoltan_ is very unlikely to be already packaged and will need to be compiled.
 .. _mpi4py: http://mpi4py.scipy.org/
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 .. _OpenMP: http://openmp.org/
+.. _PyOpenCL: https://documen.tician.de/pyopencl/
+.. _OpenCL: https://www.khronos.org/opencl/
 
 Building and linking PyZoltan on OSX/Linux
 -------------------------------------------
@@ -818,6 +823,32 @@ requires access to the location of the script.  For example, if a script
 
 The ``pysph run`` command is just a convenient way to run the
 pre-installed examples that ship with PySPH.
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Running the examples with OpenCL
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you have PyOpenCL_ installed and working with an appropriate device setup,
+then you can transparently use OpenCL as well with PySPH. This feature is very
+new and still fairly experimental. You may run into issues but using it is
+simple. You may run any of the supported examples as follows::
+
+    $ pysph run elliptical_drop --opencl
+
+Yes, thats it, just use the ``--opencl`` option and code will be
+auto-generated and run for you. By default it uses single-precision but you
+can also run the code with double precision using::
+
+    $ pysph run elliptical_drop --opencl --use-double
+
+Currently inlets and outlets are not supported, periodicity is slow and many
+optimizations still need to be made but this is rapidly improving. If you want
+to see an example that runs pretty fast, try the cube example::
+
+    $ pysph run cube --disable-output --np 1e6 --opencl
+
+You may compare the execution time with that of OpenMP.
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
