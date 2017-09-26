@@ -120,7 +120,7 @@ class Tsunami2D(Application):
                             c0=co, h0=0.05, hdx=1.3, hg_correction=True,
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['wall', 'obstacle'], dim=2, rho0=ro,
-                          c0=co, gy=-9.81, alpha=alp, nu=0.0, h=0.05,
+                          c0=co, gy=-9.81, alpha=0.0, nu=0.0, h=0.05,
                           clamp_p=True)
         return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
 
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     h_fluid = 3.0
     co = 10.0 * np.sqrt(2.0 * 9.81 * h_fluid)
     ro = 100.0
-    alp = 0.1
+    alp = 0.2
     gamma = 7.0
     app = Tsunami2D()
     app.run()
