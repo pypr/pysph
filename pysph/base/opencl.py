@@ -35,6 +35,47 @@ def set_queue(q):
     _queue = q
 
 
+class DeviceArray(cl.array.Array):
+    def __init__(self, queue, dtype, n=0):
+        self.queue = queue
+        self.length = 0
+        if n == 0:
+            n = 16
+        self.alloc = n
+        self.dtype = dtype
+        self._array = cl.array.empty(queue, n, dtype)
+
+    @property
+    def data(self):
+        return self._array[:self.length]
+
+    def resize(self, size):
+        self.reserve(size)
+        self.length = size
+
+    def reserve(self, size):
+        if size > self.alloc:
+            self._array = cl.array.empty(self.queue, size, self.dtype)
+            self.alloc = size
+
+    def get_array(self):
+        return self._array
+
+    def set_array(self, array):
+        self._array = array
+        self.length = array.size
+        self.alloc = array.size
+        self.dtype = array.dtype
+
+    def copy(self):
+        arr_copy = DeviceArray(self.queue, self.dtype)
+        arr_copy.set_array(self.data.copy())
+        return arr_copy
+
+    def fill(self, value):
+        self.data.fill(value)
+
+
 class DeviceHelper(object):
     def __init__(self, particle_array):
         self._particle_array = pa = particle_array
