@@ -5,14 +5,15 @@ Overview
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics (SPH)
 simulations.  It is implemented in Python_ and the performance critical parts
-are implemented in Cython_.
+are implemented in Cython_ and PyOpenCL_.
 
 PySPH is implemented in a way that allows a user to specify the entire SPH
 simulation in pure Python. High-performance code is generated from this
-high-level Python code, compiled on the fly and executed.  PySPH can use OpenMP
-to utilize multi-core CPUs effectively.  PySPH also features optional automatic
-parallelization (multi-CPU) using mpi4py_ and Zoltan_.  If you wish to use the
-parallel capabilities you will need to have these installed.
+high-level Python code, compiled on the fly and executed. PySPH can use OpenMP
+to utilize multi-core CPUs effectively. PySPH can work with OpenCL and use
+your GPGPUs. PySPH also features optional automatic parallelization
+(multi-CPU) using mpi4py_ and Zoltan_. If you wish to use the parallel
+capabilities you will need to have these installed.
 
 Here are videos of simulations made with PySPH.
 
@@ -31,6 +32,7 @@ site for development details.
 
 .. _Python: http://www.python.org
 .. _Cython: http://www.cython.org
+.. _PyOpenCL: https://documen.tician.de/pyopencl/
 .. _mpi4py: http://mpi4py.scipy.org
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
@@ -45,6 +47,7 @@ Features
   - High-performance: our performance is comparable to hand-written solvers
     implemented in FORTRAN.
   - Seamless multi-core support with OpenMP.
+  - Seamless GPU support with PyOpenCL_.
   - Seamless parallel integration using Zoltan_.
   - `BSD license <https://github.com/pypr/pysph/tree/master/LICENSE.txt>`_.
 
@@ -104,19 +107,15 @@ to IIT Bombay for the support.  Our primary goal is to build a
 powerful SPH-based tool for both application and research. We hope that
 this makes it easy to perform reproducible computational research.
 
-Lead developers:
+To see the list of contributors the see `github contributors page
+<https://github.com/pypr/pysph/graphs/contributors>`_
 
-- `Prabhu Ramachandran <http://www.aero.iitb.ac.in/~prabhu>`__
-- Kunal Puri
 
-Earlier developers:
+Some earlier developers not listed on the above are:
 
 - Pankaj Pandey (stress solver and improved load balancing, 2011)
 - Chandrashekhar Kaushik (original parallel and serial implementation in 2009)
 
-The following have contributed bug-fixes, features, documentation etc.
-
-- Arkopal Dutt, Arpit Agarwal, Sarang Minhas, S Saravanan, Vishnu Sivadasan
 
 -------------
 Citing PySPH

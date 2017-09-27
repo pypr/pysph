@@ -38,12 +38,14 @@ class NumberDensity(Equation):
     def loop(self, d_idx, d_V, WIJ):
         d_V[d_idx] += WIJ
 
+
 class SummationDensity(Equation):
     def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
 
     def loop(self, d_idx, d_rho, s_idx, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
+
 
 class SummationDensityBoundary(Equation):
     def __init__(self, dest, sources, rho0):
@@ -52,6 +54,7 @@ class SummationDensityBoundary(Equation):
 
     def loop(self, d_idx, d_rho, s_idx, s_V, WIJ):
         d_rho[d_idx] += self.rho0/s_V[s_idx]*WIJ
+
 
 class NormalizedSummationDensity(Equation):
     def initialize(self, d_idx, d_rho, d_rho_adv, d_rho0, d_V):
@@ -94,6 +97,7 @@ class AdvectionAcceleration(Equation):
         d_vadv[d_idx] = d_v[d_idx] + dt*d_av[d_idx]
         d_wadv[d_idx] = d_w[d_idx] + dt*d_aw[d_idx]
 
+
 class ViscosityAcceleration(Equation):
     def __init__(self, dest, sources, nu):
         self.nu = nu
@@ -106,6 +110,7 @@ class ViscosityAcceleration(Equation):
         d_au[d_idx] += fac*VIJ[0]
         d_av[d_idx] += fac*VIJ[1]
         d_aw[d_idx] += fac*VIJ[2]
+
 
 class ViscosityAccelerationBoundary(Equation):
     """The acceleration on the fluid due to a boundary.
@@ -161,8 +166,8 @@ class ComputeRhoAdvection(Equation):
         d_p0[d_idx] = d_p[d_idx]
         d_piter[d_idx] = 0.5*d_p[d_idx]
 
-    def loop(self, d_idx, d_rho, d_rho_adv, d_uadv, d_vadv, d_wadv, d_u, d_v, d_w,
-             s_idx, s_m, s_uadv, s_vadv, s_wadv, DWIJ, dt=0.0):
+    def loop(self, d_idx, d_rho, d_rho_adv, d_uadv, d_vadv, d_wadv, d_u,
+             d_v, d_w, s_idx, s_m, s_uadv, s_vadv, s_wadv, DWIJ, dt=0.0):
 
         vijdotdwij = (d_uadv[d_idx] - s_uadv[s_idx])*DWIJ[0] + \
                      (d_vadv[d_idx] - s_vadv[s_idx])*DWIJ[1] + \
@@ -212,8 +217,8 @@ class ComputeAIIBoundary(Equation):
     def loop(self, d_idx, d_aii, d_dii0, d_dii1, d_dii2, d_rho,
              s_idx, s_m, s_V, DWIJ, dt=0.0):
         phi_b = self.rho0/s_V[s_idx]
-        dijdotdwij = d_dii0[d_idx]*DWIJ[0] + d_dii1[d_idx]*DWIJ[1] + \
-                     d_dii2[d_idx]*DWIJ[2]
+        dijdotdwij = (d_dii0[d_idx]*DWIJ[0] + d_dii1[d_idx]*DWIJ[1] +
+                      d_dii2[d_idx]*DWIJ[2])
         d_aii[d_idx] += phi_b*dijdotdwij
 
 
@@ -246,8 +251,8 @@ class PressureSolve(Equation):
         d_p[d_idx] = 0.0
         d_compression[d_idx] = 0.0
 
-    def loop(self, d_idx, d_p, d_piter, d_rho, d_m, d_dijpj0, d_dijpj1, d_dijpj2,
-             s_idx, s_m, s_dii0, s_dii1, s_dii2,
+    def loop(self, d_idx, d_p, d_piter, d_rho, d_m, d_dijpj0, d_dijpj1,
+             d_dijpj2, s_idx, s_m, s_dii0, s_dii1, s_dii2,
              s_piter, s_dijpj0, s_dijpj1, s_dijpj2, DWIJ, dt=0.0):
 
         # Note that a good way to check this is to see that when
@@ -268,7 +273,6 @@ class PressureSolve(Equation):
 
     def post_loop(self, d_idx, d_piter, d_p0, d_p, d_aii, d_rho_adv, d_rho,
                   d_compression, dt=0.0):
-        #tmp = d_rho[d_idx] - d_rho_adv[d_idx] - d_p[d_idx]
         tmp = self.rho0 - d_rho_adv[d_idx] - d_p[d_idx]
         p = (1.0 - self.omega)*d_piter[d_idx] + self.omega/d_aii[d_idx]*tmp
 
@@ -277,7 +281,7 @@ class PressureSolve(Equation):
         # Clamp pressure to positive values.
         if p < 0.0:
             p = 0.0
-        elif abs(d_aii[d_idx]) < aii_min :
+        elif abs(d_aii[d_idx]) < aii_min:
             p = 0.0
         else:
             d_compression[d_idx] = abs(p*d_aii[d_idx] - tmp)
@@ -286,8 +290,8 @@ class PressureSolve(Equation):
         d_p[d_idx] = p
 
     def reduce(self, dst):
-        dst.tmp_comp[0] = serial_reduce_array(dst.array.compression > 0.0, 'sum')
-        dst.tmp_comp[1] = serial_reduce_array(dst.array.compression, 'sum')
+        dst.tmp_comp[0] = serial_reduce_array(dst.compression > 0.0, 'sum')
+        dst.tmp_comp[1] = serial_reduce_array(dst.compression, 'sum')
         dst.tmp_comp.set_data(parallel_reduce_array(dst.tmp_comp, 'sum'))
         if dst.tmp_comp[0] > 0:
             comp = dst.tmp_comp[1]/dst.tmp_comp[0]/self.rho0
@@ -308,6 +312,7 @@ class PressureSolve(Equation):
                 print("Converged:", compression)
             return 1.0
 
+
 class PressureSolveBoundary(Equation):
     def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
@@ -316,9 +321,9 @@ class PressureSolveBoundary(Equation):
     def loop(self, d_idx, d_p, d_rho, d_dijpj0, d_dijpj1, d_dijpj2,
              s_idx, s_V, DWIJ):
         phi_b = self.rho0/s_V[s_idx]
-        dijdotwij = d_dijpj0[d_idx]*DWIJ[0] + \
-                    d_dijpj1[d_idx]*DWIJ[1] + \
-                    d_dijpj2[d_idx]*DWIJ[2]
+        dijdotwij = (d_dijpj0[d_idx]*DWIJ[0] +
+                     d_dijpj1[d_idx]*DWIJ[1] +
+                     d_dijpj2[d_idx]*DWIJ[2])
         d_p[d_idx] += phi_b*dijdotwij
 
 
@@ -338,13 +343,13 @@ class PressureForce(Equation):
         d_aw[d_idx] += fac*DWIJ[2]
 
     def post_loop(self, d_idx, d_au, d_av, d_aw,
-                  d_uadv, d_vadv, d_wadv, DT_ADAPT):
+                  d_uadv, d_vadv, d_wadv, d_dt_cfl, d_dt_force):
         fac = d_au[d_idx]*d_au[d_idx] + d_av[d_idx]*d_av[d_idx] +\
                    d_aw[d_idx]*d_aw[d_idx]
         vmag = sqrt(d_uadv[d_idx]*d_uadv[d_idx] + d_vadv[d_idx]*d_vadv[d_idx] +
                     d_wadv[d_idx]*d_wadv[d_idx])
-        DT_ADAPT[0] = max(2.0*vmag, DT_ADAPT[0])
-        DT_ADAPT[1] = max(2.0*fac, DT_ADAPT[1])
+        d_dt_cfl[d_idx] = 2.0*vmag
+        d_dt_force[d_idx] = 2.0*fac
 
 
 class PressureForceBoundary(Equation):

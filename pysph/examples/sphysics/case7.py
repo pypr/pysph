@@ -133,7 +133,7 @@ if __name__ == '__main__':
     h_fluid = 0.43
     co = 10.0 * np.sqrt(2.0 * 9.81 * h_fluid)
     ro = 100.0
-    alp = 0.1
+    alp = 0.2
     gamma = 7.0
     flat_l = 1.0
     amplitude = 1.0

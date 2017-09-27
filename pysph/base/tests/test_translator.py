@@ -204,6 +204,22 @@ def test_calling_function():
     assert code == expect.strip()
 
 
+def test_calling_printf_with_string():
+    # Given
+    src = dedent(r'''
+    printf('%s %d %f\n', 'hello', 1, 2.0)
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    printf("%s %d %f\n", "hello", 1, 2.0);
+    ''')
+    assert code == expect.strip()
+
+
 def test_subscript():
     # Given
     src = dedent('''
@@ -217,6 +233,33 @@ def test_subscript():
     expect = dedent('''
     double x;
     x[1];
+    ''')
+    assert code == expect.strip()
+
+
+def test_known_math_constants():
+    # Given
+    src = dedent('''
+    x = M_E + M_LOG2E + M_LOG10E + M_LN2 + M_LN10
+    x += M_PI + M_PI_2 + M_PI_4 + M_1_PI * M_2_PI
+    x += M_2_SQRTPI * M_SQRT2 * M_SQRT1_2 * pi
+    x = INFINITY
+    x = NAN
+    x = HUGE_VALF
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x;
+    x = ((((M_E + M_LOG2E) + M_LOG10E) + M_LN2) + M_LN10);
+    x += (((M_PI + M_PI_2) + M_PI_4) + (M_1_PI * M_2_PI));
+    x += (((M_2_SQRTPI * M_SQRT2) * M_SQRT1_2) * pi);
+    x = INFINITY;
+    x = NAN;
+    x = HUGE_VALF;
     ''')
     assert code == expect.strip()
 
@@ -235,7 +278,8 @@ def test_simple_function_with_return():
 
     # Then
     expect = dedent('''
-    double f(double x) {
+    double f(double x)
+    {
         double y;
         y = (x + 1);
         return y;
@@ -257,7 +301,8 @@ def test_simple_function_without_return():
 
     # Then
     expect = dedent('''
-    void f(double y, double x) {
+    void f(double y, double x)
+    {
         double z;
         z = (y + x);
         y = z;
@@ -278,9 +323,11 @@ def test_function_argument_types():
 
     # Then
     expect = dedent('''
-    void f(long s_idx, double* s_p, long d_idx, double* d_p, long J, double t, double* l, double* xx) {
-        ;
-    }
+void f(long s_idx, double* s_p, long d_idx, double* d_p, long J, double t,
+    double* l, double* xx)
+{
+    ;
+}
     ''')
     assert code.strip() == expect.strip()
 
@@ -298,7 +345,8 @@ def test_known_types_in_funcargs():
 
     # Then
     expect = dedent('''
-    void f(float32 x, foo* xx, int cond) {
+    void f(float32 x, foo* xx, int cond)
+    {
         ;
     }
     ''')
@@ -353,7 +401,8 @@ def test_user_supplied_detect_type():
 
     # Then
     expect = dedent('''
-    void f(double x, double xx, double cond) {
+    void f(double x, double xx, double cond)
+    {
         ;
     }
     ''')
@@ -583,17 +632,6 @@ def test_try_block_raises_error():
         py2c(src)
 
 
-def test_strings_raise_error():
-    # Given
-    src = dedent('''
-    x = 'hello'
-    ''')
-
-    # When/Then
-    with pytest.raises(NotImplementedError):
-        py2c(src)
-
-
 def test_attribute_access():
     # Given
     src = dedent('''
@@ -681,11 +719,13 @@ def test_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(Foo* self, double x) {
+    void Foo_g(Foo* self, double x)
+    {
         ;
     }
 
-    void Foo_f(Foo* self, double x) {
+    void Foo_f(Foo* self, double x)
+    {
         double y;
         y = (x + 1);
         do(self->a, x);
@@ -795,7 +835,8 @@ def test_wrapping_class():
     } Dummy;
 
 
-    void Dummy_method(Dummy* self) {
+    void Dummy_method(Dummy* self)
+    {
         ;
     }
     ''')
@@ -810,6 +851,35 @@ def test_wrapping_class():
     assert h.get_array() == expect
 
 
+def test_wrapping_class_with_ignore_methods():
+    # Given
+    class Dummy1(object):
+        '''Class Docstring'''
+        def f(self):
+            pass
+
+        def not_me(self):
+            pass
+
+    obj = Dummy1()
+
+    # When
+    c = CConverter()
+    result = c.parse_instance(obj, ignore_methods=['not_me'])
+
+    # Then
+    expect = dedent('''
+    typedef struct Dummy1 {
+    } Dummy1;
+
+    void Dummy1_f(Dummy1* self)
+    {
+        ;
+    }
+    ''')
+    assert result.strip() == expect.strip()
+
+
 def test_opencl_conversion():
     src = dedent('''
     def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
@@ -817,14 +887,17 @@ def test_opencl_conversion():
     ''')
 
     # When
-    converter = OpenCLConverter()
+    known_types = {'d_p': KnownType('__global int*')}
+    converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
     # Then
     expect = dedent('''
-    void f(long s_idx, __global double* s_p, long d_idx, __global double* d_p, long J, double t, double* l, double* xx) {
-        ;
-    }
+void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
+    J, double t, double* l, double* xx)
+{
+    ;
+}
     ''')
     assert code.strip() == expect.strip()
 
@@ -842,8 +915,46 @@ def test_opencl_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(__global Foo* self, double x) {
+    void Foo_g(__global Foo* self, double x)
+    {
         ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_handles_parsing_functions():
+    # Given
+    def f(x=1.0):
+        return x + 1
+
+    # When
+    t = CConverter()
+    code = t.parse_function(f)
+
+    # Then
+    expect = dedent('''
+    double f(double x)
+    {
+        return (x + 1);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+    # Given
+    class A(object):
+        def f(self, x=1.0):
+            return x + 1.0
+
+    # When
+    t = CConverter()
+    code = t.parse_function(A)
+
+    # Then
+    expect = dedent('''
+    double A_f(A* self, double x)
+    {
+        return (x + 1.0);
     }
     ''')
     assert code.strip() == expect.strip()

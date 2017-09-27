@@ -13,7 +13,7 @@ import ast
 import inspect
 import re
 import sys
-from textwrap import dedent
+from textwrap import dedent, wrap
 
 import numpy as np
 from mako.template import Template
@@ -119,13 +119,19 @@ class CStructHelper(object):
 class CConverter(ast.NodeVisitor):
     def __init__(self, detect_type=detect_type, known_types=None):
         self._declares = {}
-        self._known = set(('M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI'))
+        self._known = set((
+            'M_E', 'M_LOG2E', 'M_LOG10E', 'M_LN2', 'M_LN10',
+            'M_PI', 'M_PI_2', 'M_PI_4', 'M_1_PI', 'M_2_PI',
+            'M_2_SQRTPI', 'M_SQRT2', 'M_SQRT1_2',
+            'INFINITY', 'NAN', 'HUGE_VALF', 'pi'
+        ))
         self._name_ctx = (ast.Load, ast.Store)
         self._indent = ''
         self._detect_type = detect_type
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._ignore_methods = []
         self._replacements = {
             'True': '1', 'False': '0', 'None': 'NULL',
             True: '1', False: '0', None: 'NULL',
@@ -186,10 +192,14 @@ class CConverter(ast.NodeVisitor):
         else:
             return body
 
-    def convert(self, src):
+    def convert(self, src, ignore_methods=None):
+        if ignore_methods is not None:
+            self._ignore_methods = ignore_methods
         self._src = src.splitlines()
         code = ast.parse(src)
-        return self.visit(code)
+        result = self.visit(code)
+        self._ignore_methods = []
+        return result
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -213,11 +223,15 @@ class CConverter(ast.NodeVisitor):
         helper = CStructHelper(obj)
         return helper.get_code() + '\n'
 
-    def parse_instance(self, obj):
+    def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
         src = dedent(inspect.getsource(obj.__class__))
-        code += self.convert(src)
+        code += self.convert(src, ignore_methods)
         return code
+
+    def parse_function(self, obj):
+        src = dedent(inspect.getsource(obj))
+        return self.convert(src)
 
     def visit_Add(self, node):
         return '+'
@@ -335,7 +349,8 @@ class CConverter(ast.NodeVisitor):
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
 
-        if self._class_name and node.name.startswith('_'):
+        if self._class_name and (node.name.startswith('_') or
+                                 node.name in self._ignore_methods):
             return ''
 
         orig_declares = self._declares
@@ -354,17 +369,20 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         if self._body_has_return(body):
-            sig = 'double %s(%s) {\n' % (func_name, args)
+            sig = 'double %s(%s)' % (func_name, args)
         else:
-            sig = 'void %s(%s) {\n' % (func_name, args)
+            sig = 'void %s(%s)' % (func_name, args)
 
         declares = self._indent_block(self.get_declarations())
         if len(declares) > 0:
             declares += '\n'
 
+        sig = '\n'.join(wrap(
+            sig, width=78, subsequent_indent=' '*4, break_long_words=False
+        ))
         self._known = orig_known
         self._declares = orig_declares
-        return sig + declares + body + '\n}\n'
+        return sig + '\n{\n' + declares + body + '\n}\n'
 
     def visit_Gt(self, node):
         return '>'
@@ -433,7 +451,7 @@ class CConverter(ast.NodeVisitor):
         return '!='
 
     def visit_Num(self, node):
-        return node.n
+        return str(node.n)
 
     def visit_Or(self, node):
         return '||'
@@ -448,7 +466,7 @@ class CConverter(ast.NodeVisitor):
         return '-'
 
     def visit_Str(self, node):
-        self.error("Strings are not yet supported.", node)
+        return r'"%s"' % node.s
 
     def visit_Subscript(self, node):
         return '%s[%s]' % (
@@ -478,7 +496,9 @@ class CConverter(ast.NodeVisitor):
 
 
 def ocl_detect_type(name, value):
-    if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+    if isinstance(value, KnownType):
+        return value.type
+    elif name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
         return '__global double*'
     else:
         return detect_type(name, value)

@@ -172,8 +172,13 @@ class MixedTypeEquation(Equation):
 
 
 class SimpleReduction(Equation):
+    def initialize(self, d_idx, d_au):
+        d_au[d_idx] = 0.0
+
     def reduce(self, dst):
-        dst.total_mass[0] = serial_reduce_array(dst.array.m, op='sum')
+        dst.total_mass[0] = serial_reduce_array(dst.m, op='sum')
+        if dst.gpu is not None:
+            dst.gpu.push('total_mass')
 
 
 class TestAccelerationEval1D(unittest.TestCase):
@@ -340,6 +345,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         )
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
+        self.sph_compiler = comp
         nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
         nnps.update()
         a_eval.set_nnps(nnps)
@@ -411,3 +417,181 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa.gpu.pull('au')
         print(pa.au, expect)
         self.assertTrue(np.allclose(expect, pa.au))
+
+    def test_update_nnps_is_called_for_opencl(self):
+        # Given
+        equations = [
+            Group(
+                equations=[
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                ],
+                update_nnps=True
+            ),
+            Group(
+                equations=[EqWithTime(dest='fluid', sources=['fluid'])]
+            ),
+        ]
+
+        # When
+        a_eval = self._make_accel_eval(equations)
+
+        # Then
+        h = a_eval.c_acceleration_eval.helper
+        assert len(h.calls) == 5
+        call = h.calls[0]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g0_fluid_initialize'
+        assert call['loop'] is False
+
+        call = h.calls[1]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g0_fluid_on_fluid_loop'
+        assert call['loop'] is True
+
+        call = h.calls[2]
+        assert call['type'] == 'method'
+        assert call['method'] == 'update_nnps'
+
+        call = h.calls[3]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g1_fluid_initialize'
+        assert call['loop'] is False
+
+        call = h.calls[4]
+        assert call['type'] == 'kernel'
+        assert call['method'].function_name == 'g1_fluid_on_fluid_loop'
+        assert call['loop'] is True
+
+    def test_should_stop_iteration_with_max_iteration_on_gpu(self):
+        pa = self.pa
+
+        class SillyEquation(Equation):
+            def loop(self, d_idx, d_au, s_idx, s_m):
+                d_au[d_idx] += s_m[s_idx]
+
+            def converged(self):
+                return 0
+
+        equations = [Group(
+            equations=[
+                Group(
+                    equations=[SillyEquation(dest='fluid', sources=['fluid'])]
+                ),
+                Group(
+                    equations=[SillyEquation(dest='fluid', sources=['fluid'])]
+                ),
+            ],
+            iterate=True, max_iterations=2,
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*4.0
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_stop_iteration_with_converged_on_gpu(self):
+        pa = self.pa
+
+        class SillyEquation1(Equation):
+            def __init__(self, dest, sources):
+                super(SillyEquation1, self).__init__(dest, sources)
+                self.conv = 0
+
+            def loop(self, d_idx, d_au, s_idx, s_m):
+                d_au[d_idx] += s_m[s_idx]
+
+            def post_loop(self, d_idx, d_au):
+                if d_au[d_idx] > 19.0:
+                    self.conv = 1
+
+            def converged(self):
+                return self.conv
+
+        equations = [Group(
+            equations=[
+                Group(
+                    equations=[SillyEquation1(dest='fluid', sources=['fluid'])]
+                ),
+                Group(
+                    equations=[SillyEquation1(dest='fluid', sources=['fluid'])]
+                ),
+            ],
+            iterate=True, max_iterations=10,
+        )]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*6.0
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_handle_helper_functions_on_gpu(self):
+        pa = self.pa
+
+        def helper(x=1.0):
+            return x*1.5
+
+        class SillyEquation2(Equation):
+            def initialize(self, d_idx, d_au, d_m):
+                d_au[d_idx] += helper(d_m[d_idx])
+
+            def _get_helpers_(self):
+                return [helper]
+
+        equations = [SillyEquation2(dest='fluid', sources=['fluid'])]
+
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.ones(10)*1.5
+        pa.gpu.pull('au')
+        self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_run_reduce_when_using_gpu(self):
+        # Given.
+        pa = self.pa
+        pa.add_constant('total_mass', 0.0)
+        equations = [SimpleReduction(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.sum(pa.m)
+        pa.gpu.pull('total_mass')
+        self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_get_equations_with_converged(self):
+        pytest.importorskip('pysph.base.gpu_nnps')
+        from pysph.sph.acceleration_eval_opencl_helper import \
+            get_equations_with_converged
+        # Given
+        se = SimpleEquation(dest='fluid', sources=['fluid'])
+        se1 = SimpleEquation(dest='fluid', sources=['fluid'])
+        sd = SummationDensity(dest='fluid', sources=['fluid'])
+        me = MixedTypeEquation(dest='fluid', sources=['fluid'])
+        eq_t = EqWithTime(dest='fluid', sources=['fluid'])
+        g = Group(
+            equations=[
+                Group(equations=[Group(equations=[se, sd])],
+                      iterate=True, max_iterations=10),
+                Group(equations=[me, eq_t, se1]),
+            ],
+        )
+
+        # When
+        eqs = get_equations_with_converged(g)
+
+        # Then
+        assert eqs == [se, se1]

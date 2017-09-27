@@ -15,10 +15,11 @@ References
 """
 
 from pysph.sph.equation import Equation
-from math import sin, cos, pi
+from math import sin, pi
 
 # constants
 M_PI = pi
+
 
 class SummationDensity(Equation):
     r"""**Summation density with volume summation**
@@ -37,8 +38,8 @@ class SummationDensity(Equation):
     Notes
     -----
 
-    Note that in the pysph implementation, V is the inverse volume of a particle,
-    i.e. the equation computes V as follows:
+    Note that in the pysph implementation, V is the inverse volume of a
+    particle, i.e. the equation computes V as follows:
 
     .. math::
 
@@ -56,6 +57,7 @@ class SummationDensity(Equation):
         d_V[d_idx] += WIJ
         d_rho[d_idx] += d_m[d_idx]*WIJ
 
+
 class VolumeSummation(Equation):
     """**Number density for volume computation**
 
@@ -72,10 +74,12 @@ class VolumeSummation(Equation):
     def loop(self, d_idx, d_V, WIJ):
         d_V[d_idx] += WIJ
 
+
 class VolumeFromMassDensity(Equation):
     """**Set the inverse volume using mass density**"""
     def loop(self, d_idx, d_V, d_rho, d_m):
         d_V[d_idx] = d_rho[d_idx]/d_m[d_idx]
+
 
 class SetWallVelocity(Equation):
     r"""**Extrapolating the fluid velocity on to the wall**
@@ -113,7 +117,7 @@ class SetWallVelocity(Equation):
         d_wf[d_idx] += s_w[s_idx] * WIJ
 
     def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx,
-            d_ug, d_vg, d_wg, d_u, d_v, d_w):
+                  d_ug, d_vg, d_wg, d_u, d_v, d_w):
 
         # calculation is done only for the relevant boundary particles.
         # d_wij (and d_uf) is 0 for particles sufficiently away from the
@@ -128,6 +132,7 @@ class SetWallVelocity(Equation):
         d_ug[d_idx] = 2*d_u[d_idx] - d_uf[d_idx]
         d_vg[d_idx] = 2*d_v[d_idx] - d_vf[d_idx]
         d_wg[d_idx] = 2*d_w[d_idx] - d_wf[d_idx]
+
 
 class ContinuityEquation(Equation):
     r"""**Conservation of mass equation**
@@ -147,6 +152,7 @@ class ContinuityEquation(Equation):
         vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
 
         d_arho[d_idx] += d_rho[d_idx] * s_m[s_idx]/s_rho[s_idx] * vijdotdwij
+
 
 class StateEquation(Equation):
     r"""**Generalized Weakly Compressible Equation of State**
@@ -182,13 +188,14 @@ class StateEquation(Equation):
             constant (default 1.0).
         """
 
-        self.b=b
+        self.b = b
         self.p0 = p0
         self.rho0 = rho0
         super(StateEquation, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_p, d_rho):
-        d_p[d_idx] = self.p0 * ( d_rho[d_idx]/self.rho0 - self.b )
+        d_p[d_idx] = self.p0 * (d_rho[d_idx]/self.rho0 - self.b)
+
 
 class MomentumEquationPressureGradient(Equation):
     r"""**Momentum equation for the Transport Velocity Formulation: Pressure**
@@ -232,8 +239,8 @@ class MomentumEquationPressureGradient(Equation):
         This function also computes the contribution to the background
         pressure and accelerations due to a body force or gravity.
 
-        The body forces are damped according to Eq. (13) in [Adami2012] to avoid
-        instantaneous accelerations. By default, damping is neglected.
+        The body forces are damped according to Eq. (13) in [Adami2012] to
+        avoid instantaneous accelerations. By default, damping is neglected.
         """
 
         self.pb = pb
@@ -257,15 +264,19 @@ class MomentumEquationPressureGradient(Equation):
              d_auhat, d_avhat, d_awhat, d_V, s_V, DWIJ):
 
         # averaged pressure Eq. (7)
-        rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
-        pi = d_p[d_idx]; pj = s_p[s_idx]
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        p_i = d_p[d_idx]
+        p_j = s_p[s_idx]
 
-        pij = rhoj * pi + rhoi * pj
+        pij = rhoj * p_i + rhoi * p_j
         pij /= (rhoj + rhoi)
 
         # particle volumes; d_V is inverse volume
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # inverse mass of destination particle
         mi1 = 1.0/d_m[d_idx]
@@ -288,11 +299,12 @@ class MomentumEquationPressureGradient(Equation):
         # damped accelerations due to body or external force
         damping_factor = 1.0
         if t < self.tdamp:
-            damping_factor = 0.5 * ( sin((-0.5 + t/self.tdamp)*M_PI)+ 1.0 )
+            damping_factor = 0.5 * (sin((-0.5 + t/self.tdamp)*M_PI) + 1.0)
 
         d_au[d_idx] += self.gx * damping_factor
         d_av[d_idx] += self.gy * damping_factor
         d_aw[d_idx] += self.gz * damping_factor
+
 
 class MomentumEquationViscosity(Equation):
     r"""**Momentum equation for the Transport Velocity Formulation: Viscosity**
@@ -342,8 +354,10 @@ class MomentumEquationViscosity(Equation):
         Fij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
 
         # particle volumes, d_V is inverse volume.
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # accelerations 3rd term in Eq. (8)
         tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * etaij * Fij/(R2IJ + EPS)
@@ -351,6 +365,7 @@ class MomentumEquationViscosity(Equation):
         d_au[d_idx] += tmp * VIJ[0]
         d_av[d_idx] += tmp * VIJ[1]
         d_aw[d_idx] += tmp * VIJ[2]
+
 
 class MomentumEquationArtificialViscosity(Equation):
     r"""**Artificial viscosity for the momentum equation**
@@ -386,7 +401,9 @@ class MomentumEquationArtificialViscosity(Equation):
 
         self.alpha = alpha
         self.c0 = c0
-        super(MomentumEquationArtificialViscosity, self).__init__(dest, sources)
+        super(MomentumEquationArtificialViscosity, self).__init__(
+            dest, sources
+        )
 
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
@@ -437,34 +454,49 @@ class MomentumEquationArtificialStress(Equation):
     def loop(self, d_idx, s_idx, d_rho, d_u, d_v, d_w, d_V,
              d_uhat, d_vhat, d_what, d_au, d_av, d_aw, d_m,
              s_rho, s_u, s_v, s_w, s_V, s_uhat, s_vhat, s_what, DWIJ):
-        rhoi = d_rho[d_idx]; rhoj = s_rho[s_idx]
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
 
         # physical and advection velocities
-        ui = d_u[d_idx]; uhati = d_uhat[d_idx]
-        vi = d_v[d_idx]; vhati = d_vhat[d_idx]
-        wi = d_w[d_idx]; whati = d_what[d_idx]
+        ui = d_u[d_idx]
+        uhati = d_uhat[d_idx]
+        vi = d_v[d_idx]
+        vhati = d_vhat[d_idx]
+        wi = d_w[d_idx]
+        whati = d_what[d_idx]
 
-        uj = s_u[s_idx]; uhatj = s_uhat[s_idx]
-        vj = s_v[s_idx]; vhatj = s_vhat[s_idx]
-        wj = s_w[s_idx]; whatj = s_what[s_idx]
+        uj = s_u[s_idx]
+        uhatj = s_uhat[s_idx]
+        vj = s_v[s_idx]
+        vhatj = s_vhat[s_idx]
+        wj = s_w[s_idx]
+        whatj = s_what[s_idx]
 
         # particle volumes; d_V is inverse volume.
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # artificial stress tensor
-        Axxi = rhoi*ui*(uhati - ui); Axyi = rhoi*ui*(vhati - vi)
+        Axxi = rhoi*ui*(uhati - ui)
+        Axyi = rhoi*ui*(vhati - vi)
         Axzi = rhoi*ui*(whati - wi)
-        Ayxi = rhoi*vi*(uhati - ui); Ayyi = rhoi*vi*(vhati - vi)
+        Ayxi = rhoi*vi*(uhati - ui)
+        Ayyi = rhoi*vi*(vhati - vi)
         Ayzi = rhoi*vi*(whati - wi)
-        Azxi = rhoi*wi*(uhati - ui); Azyi = rhoi*wi*(vhati - vi)
+        Azxi = rhoi*wi*(uhati - ui)
+        Azyi = rhoi*wi*(vhati - vi)
         Azzi = rhoi*wi*(whati - wi)
 
-        Axxj = rhoj*uj*(uhatj - uj); Axyj = rhoj*uj*(vhatj - vj)
+        Axxj = rhoj*uj*(uhatj - uj)
+        Axyj = rhoj*uj*(vhatj - vj)
         Axzj = rhoj*uj*(whatj - wj)
-        Ayxj = rhoj*vj*(uhatj - uj); Ayyj = rhoj*vj*(vhatj - vj)
+        Ayxj = rhoj*vj*(uhatj - uj)
+        Ayyj = rhoj*vj*(vhatj - vj)
         Ayzj = rhoj*vj*(whatj - wj)
-        Azxj = rhoj*wj*(uhatj - uj); Azyj = rhoj*wj*(vhatj - vj)
+        Azxj = rhoj*wj*(uhatj - uj)
+        Azyj = rhoj*wj*(vhatj - vj)
         Azzj = rhoj*wj*(whatj - wj)
 
         # contraction of stress tensor with kernel gradient
@@ -492,6 +524,7 @@ class MomentumEquationArtificialStress(Equation):
         d_au[d_idx] += tmp * Ax
         d_av[d_idx] += tmp * Ay
         d_aw[d_idx] += tmp * Az
+
 
 class SolidWallNoSlipBC(Equation):
     r"""**Solid wall boundary condition** [Adami2012]_
@@ -569,8 +602,10 @@ class SolidWallNoSlipBC(Equation):
         etaij = 2 * (etai * etaj)/(etai + etaj)
 
         # particle volumes; d_V inverse volume.
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # scalar part of the kernel gradient
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
@@ -582,6 +617,7 @@ class SolidWallNoSlipBC(Equation):
         d_au[d_idx] += tmp * (d_u[d_idx] - s_ug[s_idx])
         d_av[d_idx] += tmp * (d_v[d_idx] - s_vg[s_idx])
         d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
+
 
 class SolidWallPressureBC(Equation):
     r"""**Solid wall pressure boundary condition** [Adami2012]_
@@ -639,8 +675,8 @@ class SolidWallPressureBC(Equation):
         source.
 
         The boundary particle array must additionally define a property
-        :math:`wij` for the denominator in Eq. (27) from [Adami2012]. This array
-        sums the kernel terms from the ghost particle to the fluid
+        :math:`wij` for the denominator in Eq. (27) from [Adami2012]. This
+        array sums the kernel terms from the ghost particle to the fluid
         particle.
         """
 

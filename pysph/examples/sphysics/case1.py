@@ -68,7 +68,7 @@ class Dambreak2D(Application):
                             h0=0.03, hdx=1.3, hg_correction=True,
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['dam'], dim=2, rho0=ro, c0=co, gy=-9.81,
-                          alpha=alp, nu=0.0, h=0.03, clamp_p=True)
+                          alpha=0.0, nu=0.0, h=0.03, clamp_p=True)
         return SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
 
     def configure_scheme(self):
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     h_fluid = 2.0
     l_fluid = 1.0
     gamma = 7.0
-    alp = 0.1
+    alp = 0.2
     ro = 100.0
     co = 10.0 * np.sqrt(2.0 * 9.81 * h_fluid)
     app = Dambreak2D()

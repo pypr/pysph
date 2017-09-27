@@ -252,10 +252,10 @@ class MomentumEquation(Equation):
 
         rhoi = d_rho[d_idx]
         rhoj = s_rho[s_idx]
-        pi = d_p[d_idx]
-        pj = s_p[s_idx]
+        p_i = d_p[d_idx]
+        p_j = s_p[s_idx]
 
-        pij = rhoj * pi + rhoi * pj
+        pij = rhoj * p_i + rhoi * p_j
         pij /= (rhoj + rhoi)
 
         Vi = 1./d_V[d_idx]
@@ -272,20 +272,13 @@ class MomentumEquation(Equation):
         d_av[d_idx] += tmp * DWIJ[1]
         d_aw[d_idx] += tmp * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw, t, DT_ADAPT):
+    def post_loop(self, d_idx, d_au, d_av, d_aw, t):
         damping_factor = 1.0
         if t < self.tdamp:
             damping_factor = 0.5 * (sin((-0.5 + t/self.tdamp)*M_PI) + 1.0)
         d_au[d_idx] += damping_factor*self.gx
         d_av[d_idx] += damping_factor*self.gy
         d_aw[d_idx] += damping_factor*self.gz
-
-        acc2 = (d_au[d_idx]*d_au[d_idx] +
-                d_av[d_idx]*d_av[d_idx] +
-                d_aw[d_idx]*d_aw[d_idx])
-
-        # store the square of the max acceleration
-        DT_ADAPT[1] = max(acc2, DT_ADAPT[1])
 
 
 class EDACEquation(Equation):

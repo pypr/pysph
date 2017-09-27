@@ -802,6 +802,8 @@ cdef class ParticleArray:
 
         array_data = numpy.ravel(data)
         self.constants[name] = self._create_c_array_from_npy_array(array_data)
+        if self.gpu is not None:
+            self.gpu.add_prop(name, self.constants[name])
 
     cpdef add_property(self, str name, str type='double', default=None, data=None):
         """Add a new property to the particle array.
@@ -953,7 +955,8 @@ cdef class ParticleArray:
                         np_arr = arr.get_npy_array()
                         arr.get_npy_array()[:] = numpy.asarray(data)
                         self.properties[prop_name] = arr
-
+        if self.gpu is not None:
+            self.gpu.add_prop(prop_name, self.properties[prop_name])
 
     ######################################################################
     # Non-public interface
@@ -1302,6 +1305,8 @@ cdef class ParticleArray:
             self.default_values.pop(prop_name)
         if prop_name in self.output_property_arrays:
             self.output_property_arrays.remove(prop_name)
+        if self.gpu is not None:
+            self.gpu.remove_prop(prop_name)
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """

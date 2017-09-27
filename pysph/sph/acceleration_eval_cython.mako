@@ -61,7 +61,6 @@ nnps.set_context(src_array_index, dst_array_index)
 
 ${helper.get_parallel_block()}
     thread_id = threadid()
-    DT_ADAPT = &_DT_ADAPT.data[thread_id*aligned(3, 8)]
     ${indent(eq_group.get_variable_array_setup(), 1)}
     for d_idx in prange(NP_DEST):
         ###############################################################
@@ -85,7 +84,6 @@ ${helper.get_parallel_block()}
 ###################################################################
 % if all_eqs.has_post_loop():
 # Post loop for destination ${dest}.
-DT_ADAPT = _DT_ADAPT.data
 for d_idx in range(NP_DEST):
     ${indent(all_eqs.get_post_loop_code(helper.object.kernel), 1)}
 % endif
@@ -112,6 +110,7 @@ nnps.update()
 % endfor
 </%def>
 
+from libc.stdio cimport printf
 from libc.math cimport *
 from libc.math cimport fabs as abs
 from libc.math cimport M_PI as pi
@@ -201,31 +200,6 @@ cdef class AccelerationEval:
     def __dealloc__(self):
         aligned_free(self.nbrs)
 
-    cdef _initialize_dt_adapt(self, double* DT_ADAPT):
-        self.dt_cfl = self.dt_force = self.dt_viscous = -1e20
-        cdef int i, _idx, offset
-        cdef double* dta = DT_ADAPT
-        offset = aligned(3, sizeof(double))
-        for i in range(self.n_threads):
-            _idx = i*offset
-            dta[_idx + 0] = self.dt_cfl
-            dta[_idx + 1] = self.dt_force
-            dta[_idx + 2] = self.dt_viscous
-
-    cdef _set_dt_adapt(self, double* DT_ADAPT):
-        cdef int i, _idx, offset
-        cdef double* dta = DT_ADAPT
-        offset = aligned(3, sizeof(double))
-        for i in range(self.n_threads):
-            _idx = i*offset
-            dta[0] = max(dta[0], dta[_idx + 0])
-            dta[1] = max(dta[1], dta[_idx + 1])
-            dta[2] = max(dta[2], dta[_idx + 2])
-
-        self.dt_cfl = dta[0]
-        self.dt_force = dta[1]
-        self.dt_viscous = dta[2]
-
     def set_nnps(self, NNPS nnps):
         self.nnps = nnps
 
@@ -239,9 +213,6 @@ cdef class AccelerationEval:
         cdef int s_idx, d_idx, thread_id
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
-        cdef DoubleArray _DT_ADAPT = DoubleArray(aligned(3, 8)*self.n_threads)
-        self._initialize_dt_adapt(_DT_ADAPT.data)
-        cdef double* DT_ADAPT = _DT_ADAPT.data
 
         cdef int max_iterations, min_iterations, _iteration_count
 
@@ -301,4 +272,3 @@ cdef class AccelerationEval:
         # ---------------------------------------------------------------------
         % endif # (if len(group.data) > 0)
         % endfor
-        self._set_dt_adapt(_DT_ADAPT.data)
