@@ -21,6 +21,8 @@ import numpy as np
 cimport numpy as np
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
+from pysph.base.opencl import DeviceArray
+
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
@@ -51,6 +53,24 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.src_index = -1
         self.dst_index = -1
         self.sort_gids = sort_gids
+
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef int i, num_particles
+        self.pids = []
+        self.pid_keys = []
+        self.cids = []
+
+        for i from 0<=i<self.narrays:
+            pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
+            num_particles = pa_wrapper.get_number_of_particles()
+
+            self.pids.append(DeviceArray(self.queue, np.uint32,
+                n=num_particles))
+            self.pid_keys.append(DeviceArray(self.queue, np.uint64,
+                n=num_particles))
+            self.cids.append(DeviceArray(self.queue, np.uint32,
+                n=num_particles))
+
         self.domain.update()
         self.update()
 
@@ -62,7 +82,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         pa_gpu = pa_wrapper.pa.gpu
         fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z,
                 self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
-                self.pid_keys[pa_index], self.pids[pa_index])
+                self.pid_keys[pa_index].data, self.pids[pa_index].data)
 
         if self.radix_sort is None:
             self.radix_sort = cl.algorithm.RadixSort(
@@ -74,16 +94,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
         (sorted_indices, sorted_keys), evnt = self.radix_sort(
-            self.pids[pa_index], self.pid_keys[pa_index], key_bits=64
+            self.pids[pa_index].data, self.pid_keys[pa_index].data, key_bits=64
         )
-        self.pids[pa_index] = sorted_indices
-        self.pid_keys[pa_index] = sorted_keys
+        self.pids[pa_index].set_array(sorted_indices)
+        self.pid_keys[pa_index].set_array(sorted_keys)
 
         curr_cid = 1 + cl.array.zeros(self.queue, 1, dtype=np.uint32)
 
         fill_unique_cids = self.helper.get_kernel("fill_unique_cids")
 
-        fill_unique_cids(self.pid_keys[pa_index], self.cids[pa_index],
+        fill_unique_cids(self.pid_keys[pa_index].data, self.cids[pa_index].data,
                 curr_cid)
 
         cdef unsigned int num_cids = <unsigned int> (curr_cid.get())
@@ -101,22 +121,19 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             pa_gpu.x, pa_gpu.y, pa_gpu.z,
             pa_wrapper.get_number_of_particles(), self.cell_size,
             make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-            self.pids[pa_index], self.pid_keys[pa_index], self.cids[pa_index],
-            self.cid_to_idx[pa_index]
+            self.pids[pa_index].data, self.pid_keys[pa_index].data,
+            self.cids[pa_index].data, self.cid_to_idx[pa_index]
         )
 
         fill_cids = self.helper.get_kernel("fill_cids")
 
-        fill_cids(self.pid_keys[pa_index], self.cids[pa_index],
+        fill_cids(self.pid_keys[pa_index].data, self.cids[pa_index].data,
                 pa_wrapper.get_number_of_particles())
 
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
-        self.pids = []
-        self.pid_keys = []
-        self.cids = []
         self.cid_to_idx = [None for i in range(self.narrays)]
         self.max_cid = []
         self._sorted = False
@@ -125,12 +142,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.pids.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint32))
-            self.pid_keys.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint64))
-            self.cids.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint32))
+            self.pids[i].resize(num_particles)
+            self.pid_keys[i].resize(num_particles)
+            self.cids[i].resize(num_particles)
             self.max_cid.append(0)
 
     cpdef set_context(self, int src_index, int dst_index):
@@ -163,9 +177,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             max_cid_src = self.max_cid[src_index] + \
                     cl.array.zeros(self.queue, 1, dtype=np.int32)
 
-            map_dst_to_src(self.dst_to_src, self.cids[dst_index],
-                    self.cid_to_idx[dst_index], self.pid_keys[dst_index],
-                    self.pid_keys[src_index], self.cids[src_index],
+            map_dst_to_src(self.dst_to_src, self.cids[dst_index].data,
+                    self.cid_to_idx[dst_index], self.pid_keys[dst_index].data,
+                    self.pid_keys[src_index].data, self.cids[src_index].data,
                     self.src.get_number_of_particles(), max_cid_src)
 
             overflow_size = <unsigned int>(max_cid_src.get()) - \
@@ -184,7 +198,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     dst_gpu.x, dst_gpu.y, dst_gpu.z,
                     self.src.get_number_of_particles(), self.cell_size,
                     make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                    self.pid_keys[src_index], self.pids[dst_index],
+                    self.pid_keys[src_index].data, self.pids[dst_index].data,
                     self.overflow_cid_to_idx, <unsigned int> self.max_cid[src_index])
 
         else:
@@ -205,9 +219,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index],
-                self.pids[self.dst_index], self.pids[self.src_index],
-                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.src.get_number_of_particles(), self.pid_keys[self.src_index].data,
+                self.pids[self.dst_index].data, self.pids[self.src_index].data,
+                self.max_cid[self.src_index], self.cids[self.dst_index].data,
                 self.cid_to_idx[self.src_index], self.overflow_cid_to_idx,
                 self.dst_to_src, nbr_lengths, self.radius_scale2, self.cell_size)
 
@@ -223,8 +237,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
                 make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index],
-                self.pids[self.dst_index], self.pids[self.src_index],
-                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.src.get_number_of_particles(), self.pid_keys[self.src_index].data,
+                self.pids[self.dst_index].data, self.pids[self.src_index].data,
+                self.max_cid[self.src_index], self.cids[self.dst_index].data,
                 self.cid_to_idx[self.src_index], self.overflow_cid_to_idx,
                 self.dst_to_src, start_indices, nbrs, self.radius_scale2, self.cell_size)
