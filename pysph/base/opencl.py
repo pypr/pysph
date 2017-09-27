@@ -38,7 +38,7 @@ def set_queue(q):
 class DeviceArray(cl.array.Array):
     def __init__(self, queue, dtype, n=0):
         self.queue = queue
-        self.length = 0
+        self.length = n
         if n == 0:
             n = 16
         self.alloc = n

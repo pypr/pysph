@@ -37,8 +37,14 @@ class TestDeviceArray(TestCase):
         assert self.dev_array.length == 64
 
     def test_copy(self):
+        self.dev_array = DeviceArray(self.queue, np.int32, n=16)
+        self.dev_array.fill(0)
         dev_array_copy = self.dev_array.copy()
         assert np.all(self.dev_array.data.get() == dev_array_copy.data.get())
+
+        dev_array_copy.data[0] = 1
+
+        assert self.dev_array.data[0] != dev_array_copy.data[0]
 
 
 class TestDeviceHelper(TestCase):
