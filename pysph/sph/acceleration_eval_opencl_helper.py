@@ -77,9 +77,9 @@ class OpenCLAccelerationEval(object):
             cache.get_neighbors_gpu()
             self._queue.finish()
             args = args + [
-                cache._nbr_lengths_gpu.data,
-                cache._start_idx_gpu.data,
-                cache._neighbors_gpu.data
+                cache._nbr_lengths_gpu.data.data,
+                cache._start_idx_gpu.data.data,
+                cache._neighbors_gpu.data.data
             ] + extra_args
             call(*args)
         else:
