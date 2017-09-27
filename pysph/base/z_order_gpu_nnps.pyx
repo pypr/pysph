@@ -111,8 +111,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         fill_unique_cids = self.helper.get_kernel("fill_unique_cids")
 
-        fill_unique_cids(self.pid_keys[pa_index].data, self.cids[pa_index].data,
-                self.curr_cid)
+        fill_unique_cids(self.pid_keys[pa_index].data,
+                self.cids[pa_index].data, self.curr_cid)
 
         cdef unsigned int num_cids = <unsigned int> (self.curr_cid.get())
         self.cid_to_idx[pa_index].resize(27 * num_cids)
@@ -137,7 +137,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         fill_cids(self.pid_keys[pa_index].data, self.cids[pa_index].data,
                 pa_wrapper.get_number_of_particles())
-
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
@@ -182,7 +181,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.max_cid_src.fill(self.max_cid[src_index])
 
             map_dst_to_src(self.dst_to_src.data, self.cids[dst_index].data,
-                    self.cid_to_idx[dst_index].data, self.pid_keys[dst_index].data,
+                    self.cid_to_idx[dst_index].data,
+                    self.pid_keys[dst_index].data,
                     self.pid_keys[src_index].data, self.cids[src_index].data,
                     self.src.get_number_of_particles(), self.max_cid_src)
 
@@ -198,12 +198,15 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     else cl.array.vec.make_float3
 
             dst_gpu = self.dst.pa.gpu
-            fill_overflow_map(self.dst_to_src.data, self.cid_to_idx[dst_index].data,
-                    dst_gpu.x, dst_gpu.y, dst_gpu.z,
-                    self.src.get_number_of_particles(), self.cell_size,
-                    make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+            fill_overflow_map(self.dst_to_src.data,
+                    self.cid_to_idx[dst_index].data, dst_gpu.x, dst_gpu.y,
+                    dst_gpu.z, self.src.get_number_of_particles(),
+                    self.cell_size,
+                    make_vec(self.xmin.data[0], self.xmin.data[1],
+                        self.xmin.data[2]),
                     self.pid_keys[src_index].data, self.pids[dst_index].data,
-                    self.overflow_cid_to_idx.data, <unsigned int> self.max_cid[src_index])
+                    self.overflow_cid_to_idx.data,
+                    <unsigned int> self.max_cid[src_index])
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
@@ -217,12 +220,14 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         src_gpu = self.src.pa.gpu
         z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index].data,
+                make_vec(self.xmin.data[0], self.xmin.data[1],
+                    self.xmin.data[2]), self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index].data,
                 self.pids[self.dst_index].data, self.pids[self.src_index].data,
                 self.max_cid[self.src_index], self.cids[self.dst_index].data,
-                self.cid_to_idx[self.src_index].data, self.overflow_cid_to_idx.data,
-                self.dst_to_src.data, nbr_lengths, self.radius_scale2, self.cell_size)
+                self.cid_to_idx[self.src_index].data,
+                self.overflow_cid_to_idx.data, self.dst_to_src.data,
+                nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         z_order_nbrs = self.helper.get_kernel("z_order_nbrs",
@@ -235,9 +240,12 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         src_gpu = self.src.pa.gpu
         z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index].data,
+                make_vec(self.xmin.data[0], self.xmin.data[1],
+                    self.xmin.data[2]),
+                self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index].data,
                 self.pids[self.dst_index].data, self.pids[self.src_index].data,
                 self.max_cid[self.src_index], self.cids[self.dst_index].data,
-                self.cid_to_idx[self.src_index].data, self.overflow_cid_to_idx.data,
-                self.dst_to_src.data, start_indices, nbrs, self.radius_scale2, self.cell_size)
+                self.cid_to_idx[self.src_index].data,
+                self.overflow_cid_to_idx.data, self.dst_to_src.data,
+                start_indices, nbrs, self.radius_scale2, self.cell_size)
