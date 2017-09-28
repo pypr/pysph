@@ -294,11 +294,11 @@ class ADKEAccelerations(Equation):
              DWIJ, HIJ, XIJ, VIJ, R2IJ, EPS, RHOIJ, RHOIJ1):
 
         # particle pressure
-        pi = d_p[d_idx]
+        p_i = d_p[d_idx]
         pj = s_p[s_idx]
-        # pi/rhoi**2
+        # p_i/rhoi**2
         rhoi2 = d_rho[d_idx]*d_rho[d_idx]
-        pibrhoi2 = pi/rhoi2
+        pibrhoi2 = p_i/rhoi2
 
         # pj/rhoj**2
         rhoj2 = s_rho[s_idx]*s_rho[s_idx]
@@ -378,12 +378,12 @@ class MPMAccelerations(Equation):
              EPS, RIJ, R2IJ, RHOIJ, d_dt_cfl):
 
         # particle pressure
-        pi = d_p[d_idx]
+        p_i = d_p[d_idx]
         pj = s_p[s_idx]
 
-        # pi/rhoi**2
+        # p_i/rhoi**2
         rhoi2 = d_rho[d_idx]*d_rho[d_idx]
-        pibrhoi2 = pi/rhoi2
+        pibrhoi2 = p_i/rhoi2
 
         # pj/rhoj**2
         rhoj2 = s_rho[s_idx]*s_rho[s_idx]
@@ -416,7 +416,7 @@ class MPMAccelerations(Equation):
         Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
 
         # signal velocities
-        pdiff = abs(pi - pj)
+        pdiff = abs(p_i - pj)
         vsig1 = 0.5 * max(cij - self.beta*dot, 0.0)
         vsig2 = sqrt(pdiff/RHOIJ)
 

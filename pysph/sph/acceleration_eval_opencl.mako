@@ -17,7 +17,7 @@ ${helper.get_initialize_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 % if len(eqs_with_no_source.equations) > 0:
 % if eqs_with_no_source.has_loop():
 // Equations with no sources.
-${helper.get_simple_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
+${helper.get_simple_loop_kernel(g_idx, sg_idx, group, dest, eqs_with_no_source)}
 % endif
 % endif
 #######################################################################
@@ -56,6 +56,8 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 </%def>
 
 #define abs fabs
+#define max(x, y) fmax((double)(x), (double)(y))
+
 __constant double pi=M_PI;
 ${helper.get_header()}
 
