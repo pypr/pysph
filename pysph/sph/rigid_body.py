@@ -256,19 +256,6 @@ class SummationDensityBoundary(Equation):
         d_rho[d_idx] += self.fluid_rho * s_V[s_idx] * WIJ
 
 
-class CutoffDensity(Equation):
-    """Limit density to real fluid density
-
-
-    """
-    def __init__(self, dest, sources, fluid_rho=1000.0):
-        self.fluid_rho = fluid_rho
-        super(CutoffDensity, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_rho):
-        d_rho[d_idx] = max(d_rho[d_idx], self.fluid_rho)
-
-
 class NumberDensity(Equation):
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0

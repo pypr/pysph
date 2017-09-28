@@ -5,11 +5,9 @@ Check basic equations of SPH to throw a ball inside the vessel
 from __future__ import print_function
 import numpy as np
 
-# domain manager for periodicity
-from pysph.base.nnps import DomainManager
-# PySPH base and carray imports
 from pysph.base.utils import (get_particle_array_wcsph,
                               get_particle_array_rigid_body)
+# PySPH base and carray imports
 from pysph.base.kernels import CubicSpline
 
 from pysph.solver.solver import Solver
@@ -17,114 +15,90 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
-                                       SummationDensity)
+from pysph.sph.basic_equations import (XSPHCorrection, SummationDensity)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
 from pysph.sph.rigid_body import (
-    BodyForce, SummationDensityBoundary, CutoffDensity, RigidBodyCollision,
-    LiuFluidForce, RigidBodyMoments, RigidBodyMotion, AkinciRigidFluidCoupling,
-    RK2StepRigidBody)
-
-# geometry tools imports
-from pysph.tools.geometry import extrude
+    BodyForce, SummationDensityBoundary, RigidBodyCollision, RigidBodyMoments,
+    RigidBodyMotion, AkinciRigidFluidCoupling, RK2StepRigidBody)
 
 
-def create_boundary():
-    dx = 2
+def get_3d_dam(length=10, height=15, depth=10, dx=0.1, layers=2):
+    _x = np.arange(0, length, dx)
+    _y = np.arange(0, height, dx)
+    _z = np.arange(0, depth, dx)
 
-    # bottom particles in tank
-    xb = np.arange(-2 * dx, 100 + 2 * dx, dx)
-    yb = np.arange(-2 * dx, 0, dx)
-    xb, yb = np.meshgrid(xb, yb)
-    xb = xb.ravel()
-    yb = yb.ravel()
+    x, y, z = np.meshgrid(_x, _y, _z)
+    x, y, z = x.ravel(), y.ravel(), z.ravel()
 
-    xl = np.arange(-2 * dx, 0, dx)
-    yl = np.arange(0, 250, dx)
-    xl, yl = np.meshgrid(xl, yl)
-    xl = xl.ravel()
-    yl = yl.ravel()
+    # get particles inside the tank
+    tmp = layers - 1
+    cond_1 = (x > tmp * dx) & (x < _x[-1] - tmp * dx) & (y > tmp * dx)
 
-    xr = np.arange(100, 100 + 2 * dx, dx)
-    yr = np.arange(0, 250, dx)
-    xr, yr = np.meshgrid(xr, yr)
-    xr = xr.ravel()
-    yr = yr.ravel()
+    cond_2 = (z > tmp * dx) & (z < z[-1] - tmp * dx)
 
-    x = np.concatenate([xl, xb, xr])
-    y = np.concatenate([yl, yb, yr])
+    cond = cond_1 & cond_2
+    # exclude inside particles
+    x, y, z = x[~cond], y[~cond], z[~cond]
 
-    x, y, z = extrude(x, y, dx=dx, extrude_dist=500)
-    return x * 1e-3, y * 1e-3, z * 1e-3
+    return x, y, z
 
 
-def create_fluid():
-    dx = 2
-    xf = np.arange(0, 100, dx)
-    yf = np.arange(0, 150, dx)
-    xf, yf = np.meshgrid(xf, yf)
-    xf = xf.ravel()
-    yf = yf.ravel()
+def get_3d_block(length=10, height=15, depth=10, dx=0.1):
+    x = np.arange(0, length, dx)
+    y = np.arange(0, height, dx)
+    z = np.arange(0, depth, dx)
 
-    xf, yf, zf = extrude(xf, yf, dx=2, extrude_dist=500)
-    return xf * 1e-3, yf * 1e-3, zf * 1e-3
+    x, y, z = np.meshgrid(x, y, z)
+    x, y, z = x.ravel(), y.ravel(), z.ravel()
+    return x, y, z
 
 
-def create_sphere(dx=1):
-    x = np.arange(0, 100, dx)
-    y = np.arange(151, 251, dx)
-    x, y = np.meshgrid(x, y)
-    x = x.ravel()
-    y = y.ravel()
+def get_fluid_and_dam_geometry_3d(d_l, d_h, d_d, f_l, f_h, f_d, d_layers, d_dx,
+                                  f_dx, fluid_left_extreme=None):
+    xd, yd, zd = get_3d_dam(d_l, d_h, d_d, d_dx, d_layers)
+    xf, yf, zf = get_3d_block(f_l, f_h, f_d, f_dx)
 
-    p = ((x - 50)**2 + (y - 200)**2) < 20**2
-    x = x[p]
-    y = y[p]
+    if fluid_left_extreme:
+        x_trans, y_trans, z_trans = fluid_left_extreme
+        xf += x_trans
+        yf += y_trans
+        zf += z_trans
 
-    # lower sphere a little
-    # y = y - 20
+    else:
+        xf += 2 * d_dx
+        yf += 2 * d_dx
+        zf += 2 * d_dx
 
-    x, y, z = extrude(x, y, dx=dx, extrude_dist=100)
-    return x * 1e-3, y * 1e-3, z * 1e-3
-
-
-def get_density(y):
-    height = 150
-    c_0 = 2 * np.sqrt(2 * 9.81 * height * 1e-3)
-    rho_0 = 1000
-    height_water_clmn = height * 1e-3
-    gamma = 7.
-    _tmp = gamma / (rho_0 * c_0**2)
-
-    rho = np.zeros_like(y)
-    for i in range(len(rho)):
-        p_i = rho_0 * 9.81 * (height_water_clmn - y[i])
-        rho[i] = rho_0 * (1 + p_i * _tmp)**(1. / gamma)
-    return rho
+    return xd, yd, zd, xf, yf, zf
 
 
-def geometry():
-    import matplotlib.pyplot as plt
-    # please run this function to know how
-    # geometry looks like
-    x_tank, y_tank = create_boundary()
-    x_fluid, y_fluid = create_fluid()
-    x_cube, y_cube = create_sphere()
-    plt.scatter(x_fluid, y_fluid)
-    plt.scatter(x_tank, y_tank)
-    plt.scatter(x_cube, y_cube)
-    plt.axes().set_aspect('equal', 'datalim')
-    print("done")
-    plt.show()
+def get_sphere(centre=[0, 0, 0], radius=1, dx=0.1):
+    x = np.arange(0, radius * 2, dx)
+    y = np.arange(0, radius * 2, dx)
+    z = np.arange(0, radius * 2, dx)
+
+    x, y, z = np.meshgrid(x, y, z)
+    x, y, z = x.ravel(), y.ravel(), z.ravel()
+
+    cond = ((x - radius)**2 + (y - radius)**2) + (z - radius)**2 <= radius**2
+
+    x, y, z = x[cond], y[cond], z[cond]
+
+    x_trans = centre[0] - radius
+    y_trans = centre[1] - radius
+    z_trans = centre[2] - radius
+
+    x = x + x_trans
+    y = y + y_trans
+    z = z + z_trans
+
+    return x, y, z
 
 
 class RigidFluidCoupling(Application):
-    def create_domain(self):
-        return DomainManager(zmin=-250*1e-3, zmax=250*1e-3, periodic_in_z=True)
-
     def initialize(self):
-        self.dx = 2 * 1e-3
+        self.dx = 0.05
         self.hdx = 1.2
         self.ro = 1000
         self.solid_rho = 500
@@ -133,44 +107,46 @@ class RigidFluidCoupling(Application):
         self.alpha = 0.1
 
     def create_particles(self):
-        """Create the circular patch of fluid."""
-        xf, yf, zf = create_fluid()
+        # get coordinates of tank and fluid
+        xt, yt, zt, xf, yf, zf = get_fluid_and_dam_geometry_3d(
+            3, 3, 3, 2.8, 2, 2.8, 2, self.dx, self.dx)
+
+        # get coordinates of cube
+        xc, yc, zc = get_sphere(centre=[1.5, 3.5, 1.5], radius=0.3, dx=self.dx)
+
         m = self.ro * self.dx * self.dx * self.dx
         rho = self.ro
         h = self.hdx * self.dx
         fluid = get_particle_array_wcsph(x=xf, y=yf, z=zf, h=h, m=m, rho=rho,
                                          name="fluid")
 
-        dx = 2
-        xt, yt, zt = create_boundary()
         m = 1000 * self.dx * self.dx * self.dx
         rho = 1000
-        rad_s = 2 / 2. * 1e-3
+        rad_s = self.dx / 2.
         h = self.hdx * self.dx
-        V = dx * dx * dx * 1e-9
+        V = self.dx**3
         tank = get_particle_array_wcsph(x=xt, y=yt, z=zt, h=h, m=m, rho=rho,
                                         rad_s=rad_s, V=V, name="tank")
         for name in ['fx', 'fy', 'fz']:
             tank.add_property(name)
 
-        dx = 1
-        xc, yc, zc = create_sphere(1)
-        m = self.solid_rho * dx * 1e-3 * dx * 1e-3 * dx * 1e-3
+        m = self.solid_rho * self.dx**3
         rho = self.solid_rho
         h = self.hdx * self.dx
-        rad_s = dx / 2. * 1e-3
-        V = dx * dx * dx * 1e-9
+        rad_s = self.dx / 2.
+        V = self.dx**3
         cs = 0.0
         cube = get_particle_array_rigid_body(x=xc, y=yc, z=zc, h=h, m=m,
                                              rho=rho, rad_s=rad_s, V=V, cs=cs,
                                              name="cube")
 
+        # get coordinates of fluid and tank
         return [fluid, tank, cube]
 
     def create_solver(self):
         kernel = CubicSpline(dim=3)
 
-        integrator = EPECIntegrator(fluid=WCSPHStep(), tank=WCSPHStep(),
+        integrator = EPECIntegrator(fluid=WCSPHStep(),
                                     cube=RK2StepRigidBody())
 
         dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
