@@ -54,11 +54,10 @@ cdef class GPUNeighborCache:
         self._cached = False
         self._copied_to_cpu = False
 
-        self._nbr_lengths_gpu = DeviceArray(self._nnps.queue,
-                np.uint32, n=n_p)
+        self._nbr_lengths_gpu = DeviceArray(np.uint32, n=n_p)
         self._nbr_lengths_gpu.fill(0)
 
-        self._neighbors_gpu = DeviceArray(self._nnps.queue, np.uint32)
+        self._neighbors_gpu = DeviceArray(np.uint32)
 
     #### Public protocol ################################################
 
@@ -77,12 +76,12 @@ cdef class GPUNeighborCache:
     #### Private protocol ################################################
 
     cdef void _find_neighbors(self):
-        self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu.data)
+        self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu.array)
         # FIXME:
         # - Store sum kernel
         # - don't allocate neighbors_gpu each time.
         # - Don't allocate _nbr_lengths and start_idx.
-        total_size_gpu = cl.array.sum(self._nbr_lengths_gpu.data)
+        total_size_gpu = cl.array.sum(self._nbr_lengths_gpu.array)
         cdef unsigned long total_size = <unsigned long>(total_size_gpu.get())
 
         # Allocate _neighbors_cpu and neighbors_gpu
@@ -96,18 +95,18 @@ cdef class GPUNeighborCache:
                 self._nnps.ctx, np.uint32, scan_expr="a+b", neutral="0"
             )
 
-        self._get_start_indices(self._start_idx_gpu.data)
-        self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu.data,
-                self._start_idx_gpu.data)
+        self._get_start_indices(self._start_idx_gpu.array)
+        self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu.array,
+                self._start_idx_gpu.array)
         self._cached = True
 
     cdef void copy_to_cpu(self):
         self._copied_to_cpu = True
-        self._neighbors_cpu = self._neighbors_gpu.data.get()
+        self._neighbors_cpu = self._neighbors_gpu.array.get()
         self._neighbors_cpu_ptr = <unsigned int*> self._neighbors_cpu.data
-        self._nbr_lengths = self._nbr_lengths_gpu.data.get()
+        self._nbr_lengths = self._nbr_lengths_gpu.array.get()
         self._nbr_lengths_ptr = <unsigned int*> self._nbr_lengths.data
-        self._start_idx = self._start_idx_gpu.data.get()
+        self._start_idx = self._start_idx_gpu.array.get()
         self._start_idx_ptr = <unsigned int*> self._start_idx.data
 
     cpdef update(self):

@@ -36,18 +36,18 @@ def set_queue(q):
 
 
 class DeviceArray(cl.array.Array):
-    def __init__(self, queue, dtype, n=0):
-        self.queue = queue
+    def __init__(self, dtype, n=0):
+        self.queue = get_queue()
         self.length = n
         if n == 0:
             n = 16
         self.alloc = n
         self.dtype = dtype
-        self._array = cl.array.empty(queue, n, dtype)
+        self._data = cl.array.empty(self.queue, n, dtype)
 
     @property
-    def data(self):
-        return self._array[:self.length]
+    def array(self):
+        return self._data[:self.length]
 
     def resize(self, size):
         self.reserve(size)
@@ -55,25 +55,26 @@ class DeviceArray(cl.array.Array):
 
     def reserve(self, size):
         if size > self.alloc:
-            self._array = cl.array.empty(self.queue, size, self.dtype)
+            old_data = self.array.copy()
+            self._data = cl.array.empty(self.queue, size, self.dtype)
             self.alloc = size
 
-    def get_array(self):
-        return self._array
+    def set_data(self, data):
+        self._data = data
+        self.length = data.size
+        self.alloc = data.size
+        self.dtype = data.dtype
 
-    def set_array(self, array):
-        self._array = array
-        self.length = array.size
-        self.alloc = array.size
-        self.dtype = array.dtype
+    def get_data(self):
+        return self._data
 
     def copy(self):
-        arr_copy = DeviceArray(self.queue, self.dtype)
-        arr_copy.set_array(self.data.copy())
+        arr_copy = DeviceArray(self.dtype)
+        arr_copy.set_data(self.array.copy())
         return arr_copy
 
     def fill(self, value):
-        self.data.fill(value)
+        self.array.fill(value)
 
 
 class DeviceHelper(object):

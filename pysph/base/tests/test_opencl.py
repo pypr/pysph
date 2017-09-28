@@ -7,44 +7,39 @@ pytest.importorskip("pysph.base.opencl")
 import pyopencl as cl
 
 from pysph.base.utils import get_particle_array  # noqa: E402
-from pysph.base.opencl import DeviceHelper, DeviceArray  # noqa: E402
+from pysph.base.opencl import DeviceHelper, DeviceArray, \
+        get_queue  # noqa: E402
 
 
 class TestDeviceArray(TestCase):
-    def setUp(self):
-        self.ctx = cl.create_some_context(interactive=False)
-        self.queue = cl.CommandQueue(self.ctx)
-        self.dev_array = DeviceArray(self.queue, np.int32)
-
-    def tearDown(self):
-        self.dev_array = DeviceArray(self.queue, np.int32)
-
     def test_reserve(self):
+        self.dev_array = DeviceArray(np.int32)
         self.dev_array.reserve(64)
-        assert len(self.dev_array.get_array()) == 64
+        assert len(self.dev_array.get_data()) == 64
         assert self.dev_array.length == 0
 
     def test_resize_with_reallocation(self):
+        self.dev_array = DeviceArray(np.int32)
         self.dev_array.resize(64)
-        assert len(self.dev_array.get_array()) == 64
+        assert len(self.dev_array.get_data()) == 64
         assert self.dev_array.length == 64
 
     def test_resize_without_reallocation(self):
-        self.dev_array = DeviceArray(self.queue, np.int32, n=128)
+        self.dev_array = DeviceArray(np.int32, n=128)
 
         self.dev_array.resize(64)
-        assert len(self.dev_array.get_array()) == 128
+        assert len(self.dev_array.get_data()) == 128
         assert self.dev_array.length == 64
 
     def test_copy(self):
-        self.dev_array = DeviceArray(self.queue, np.int32, n=16)
+        self.dev_array = DeviceArray(np.int32, n=16)
         self.dev_array.fill(0)
         dev_array_copy = self.dev_array.copy()
-        assert np.all(self.dev_array.data.get() == dev_array_copy.data.get())
+        assert np.all(self.dev_array.array.get() == dev_array_copy.array.get())
 
-        dev_array_copy.data[0] = 1
+        dev_array_copy.array[0] = 1
 
-        assert self.dev_array.data[0] != dev_array_copy.data[0]
+        assert self.dev_array.array[0] != dev_array_copy.array[0]
 
 
 class TestDeviceHelper(TestCase):
