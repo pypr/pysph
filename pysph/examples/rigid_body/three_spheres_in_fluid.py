@@ -187,7 +187,7 @@ class RigidFluidCoupling(Application):
 
         dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
         print("DT: %s" % dt)
-        tf = 5
+        tf = 2.8
         solver = Solver(
             kernel=kernel,
             dim=2,
