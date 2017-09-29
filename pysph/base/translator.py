@@ -240,11 +240,12 @@ class CConverter(ast.NodeVisitor):
         return '&&'
 
     def visit_Assign(self, node):
-        assert len(node.targets) == 1, "Assignments can have only one target."
+        if len(node.targets) != 1:
+            self.error("Assignments can have only one target.", node)
         left, right = node.targets[0], node.value
         if isinstance(right, ast.Call) and right.func.id == 'declare':
-            assert isinstance(right.args[0], ast.Str), \
-                "Argument to declare should be a string."
+            if not isinstance(right.args[0], ast.Str):
+                self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
             self._known.add(left.id)
             return self._get_variable_declaration(type, self.visit(left))

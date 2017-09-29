@@ -14,5 +14,5 @@ build:
         - rm -rf ~/.pysph/source
         - rm -rf ~/.cache
         - mkdir -p $SHIPPABLE_BUILD_DIR/shippable/testresults
-        - tox -e py27,py35
+        - tox -e py35 -- -m "'not slow or slow'"
         - cp $SHIPPABLE_BUILD_DIR/.tox/*.xml $SHIPPABLE_BUILD_DIR/shippable/testresults

@@ -344,7 +344,7 @@ class MomentumEquationDeltaSPH(Equation):
         # src paricle volume mj/rhoj
         Vj = s_m[s_idx]/s_rho[s_idx]
 
-        pi = d_p[d_idx]
+        p_i = d_p[d_idx]
         pj = s_p[s_idx]
 
         # viscous contribution second part of eqn (5b) in [Maronne2011]
@@ -352,7 +352,7 @@ class MomentumEquationDeltaSPH(Equation):
         piij = self.alpha * HIJ * self.c0 * self.rho0 * vijdotxij/(R2IJ + EPS)
 
         # gradient and viscous terms eqn 5b in [Maronne2011]
-        tmp = -Vj/d_rho[d_idx] * (pi + pj) + piij * Vj/d_rho[d_idx]
+        tmp = -Vj/d_rho[d_idx] * (p_i + pj) + piij * Vj/d_rho[d_idx]
 
         # accelerations
         d_au[d_idx] += tmp * DWIJ[0]
@@ -497,9 +497,9 @@ class PressureGradientUsingNumberDensity(Equation):
         Vj2 = Vj * Vj
 
         # pressure gradient term
-        pi = d_p[d_idx]
+        p_i = d_p[d_idx]
         pj = s_p[s_idx]
-        pij = pi*Vi2 + pj*Vj2
+        pij = p_i*Vi2 + pj*Vj2
 
         # accelerations
         tmp = -pij * 1.0/(d_m[d_idx])

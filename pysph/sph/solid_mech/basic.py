@@ -115,9 +115,12 @@ class MonaghanArtificialStress(Equation):
         S[1][1] = d_s11[d_idx] - d_p[d_idx]
         S[2][2] = d_s22[d_idx] - d_p[d_idx]
 
-        S[1][2] = S[2][1] = d_s12[d_idx]
-        S[0][2] = S[2][0] = d_s02[d_idx]
-        S[0][1] = S[1][0] = d_s01[d_idx]
+        S[1][2] = d_s12[d_idx]
+        S[2][1] = d_s12[d_idx]
+        S[0][2] = d_s02[d_idx]
+        S[2][0] = d_s02[d_idx]
+        S[0][1] = d_s01[d_idx]
+        S[1][0] = d_s01[d_idx]
 
         # compute the principle stresses
         eigen_decomposition(S, R, cython.address(V[0]))
@@ -474,7 +477,6 @@ class EnergyEquationWithStress(Equation):
 
     def post_loop(self, d_idx, d_rho,
                   d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                  s_s00, s_s01, s_s02, s_s11, s_s12, s_s22,
                   d_v00, d_v01, d_v02,
                   d_v10, d_v11, d_v12,
                   d_v20, d_v21, d_v22,
