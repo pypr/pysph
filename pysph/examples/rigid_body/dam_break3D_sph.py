@@ -21,9 +21,11 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 from pysph.tools.gmsh import vtk_file_to_points
 
-from pysph.sph.rigid_body import (BodyForce, NumberDensity, RigidBodyCollision,
+from pysph.sph.rigid_body import (
+    BodyForce, NumberDensity, RigidBodyForceGPUGems,
     RigidBodyMoments, RigidBodyMotion,
-    RK2StepRigidBody, ViscosityRigidBody, PressureRigidBody)
+    RK2StepRigidBody, PressureRigidBody
+)
 
 
 dim = 3
@@ -33,9 +35,10 @@ tf = 2.0
 
 # parameter to chane the resolution
 dx = 0.02
-nboundary_layers=3
+nboundary_layers = 3
 hdx = 1.2
 rho0 = 1000.0
+
 
 class DamBreak3DSPH(Application):
     def initialize(self):
@@ -54,14 +57,17 @@ class DamBreak3DSPH(Application):
         h = np.ones_like(x)*fluid.h[0]
         rho = np.ones_like(x)*fluid.rho[0]
 
-        obstacle = get_particle_array_rigid_body(name='obstacle', x=x, y=y, z=z,
-            m=m, h=h, rho=rho, rho0=rho)
+        obstacle = get_particle_array_rigid_body(
+            name='obstacle', x=x, y=y, z=z, m=m, h=h, rho=rho, rho0=rho
+        )
         obstacle.total_mass[0] = np.sum(m)
         obstacle.add_property('cs')
         obstacle.add_property('arho')
-        obstacle.set_lb_props( list(obstacle.properties.keys()) )
-        obstacle.set_output_arrays( ['x', 'y', 'z', 'u', 'v', 'w', 'fx', 'fy', 'fz',
-                                     'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'] )
+        obstacle.set_lb_props(list(obstacle.properties.keys()))
+        obstacle.set_output_arrays(
+            ['x', 'y', 'z', 'u', 'v', 'w', 'fx', 'fy', 'fz',
+             'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid']
+        )
 
         boundary.add_property('V')
         boundary.add_property('fx')
@@ -76,18 +82,16 @@ class DamBreak3DSPH(Application):
         integrator = EPECIntegrator(fluid=WCSPHStep(),
                                     obstacle=RK2StepRigidBody(),
                                     boundary=WCSPHStep())
-        solver = Solver(kernel=kernel, dim=dim, integrator=integrator, tf=tf, dt=dt,
-                        adaptive_timestep=True, n_damp=0)
+        solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
+                        tf=tf, dt=dt, adaptive_timestep=True, n_damp=0)
         return solver
 
     def create_equations(self):
-        h0 = dx * hdx
         co = 10.0 * self.geom.get_max_speed(g=9.81)
 
         gamma = 7.0
         alpha = 0.5
         beta = 0.0
-        B = co*co*rho0/gamma
 
         equations = [
 
@@ -100,29 +104,43 @@ class DamBreak3DSPH(Application):
             # Equation of state
             Group(equations=[
 
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=co, gamma=gamma),
-                    TaitEOSHGCorrection(dest='boundary', sources=None, rho0=rho0, c0=co, gamma=gamma),
-                    TaitEOSHGCorrection(dest='obstacle', sources=None, rho0=rho0, c0=co, gamma=gamma),
+                    TaitEOS(
+                        dest='fluid', sources=None, rho0=rho0, c0=co,
+                        gamma=gamma
+                    ),
+                    TaitEOSHGCorrection(
+                        dest='boundary', sources=None, rho0=rho0, c0=co,
+                        gamma=gamma
+                    ),
+                    TaitEOSHGCorrection(
+                        dest='obstacle', sources=None, rho0=rho0, c0=co,
+                        gamma=gamma
+                    ),
 
                     ], real=False),
 
             # Continuity, momentum and xsph equations
             Group(equations=[
-
-                    ContinuityEquation(dest='fluid', sources=['fluid', 'boundary', 'obstacle']),
+                    ContinuityEquation(
+                        dest='fluid', sources=['fluid', 'boundary', 'obstacle']
+                    ),
                     ContinuityEquation(dest='boundary', sources=['fluid']),
                     ContinuityEquation(dest='obstacle', sources=['fluid']),
 
-                    MomentumEquation(dest='fluid', sources=['fluid', 'boundary'],
+                    MomentumEquation(dest='fluid',
+                                     sources=['fluid', 'boundary'],
                                      alpha=alpha, beta=beta, gz=-9.81, c0=co,
                                      tensile_correction=True),
 
-                    PressureRigidBody(dest='fluid', sources=['obstacle'], rho0=rho0),
+                    PressureRigidBody(
+                        dest='fluid', sources=['obstacle'], rho0=rho0
+                    ),
 
                     XSPHCorrection(dest='fluid', sources=['fluid']),
 
-                    RigidBodyCollision(
-                        dest='obstacle', sources=['boundary'], k=1.0, d=2.0, eta=0.1, kt=0.1
+                    RigidBodyForceGPUGems(
+                        dest='obstacle', sources=['boundary'], k=1.0, d=2.0,
+                        eta=0.1, kt=0.1
                     ),
 
                     ]),
@@ -131,6 +149,7 @@ class DamBreak3DSPH(Application):
 
         ]
         return equations
+
 
 if __name__ == '__main__':
     app = DamBreak3DSPH()

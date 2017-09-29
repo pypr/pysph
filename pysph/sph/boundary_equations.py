@@ -60,7 +60,7 @@ class MonaghanBoundaryForce(Equation):
             if (0 < q) and (q <= 2.0/3.0):
                 nforce =  2.0/3.0
 
-            elif (2.0/3.0 < q) and (a <= 1.0):
+            elif (2.0/3.0 < q) and (q <= 1.0):
                 nforce = 2*q*(1.0 - 0.75*q)
 
             elif (1.0 < q) and (q <= 2.0):

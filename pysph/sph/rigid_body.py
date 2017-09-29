@@ -372,7 +372,7 @@ class RigidBodyForceGPUGems(Equation):
         self.d = d
         self.eta = eta
         self.kt = kt
-        super(RigidBodyCollision, self).__init__(dest, sources)
+        super(RigidBodyForceGPUGems, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_fx, d_fy, d_fz, d_h, d_total_mass, XIJ,
              RIJ, R2IJ, VIJ):
