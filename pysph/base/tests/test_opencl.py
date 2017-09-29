@@ -13,32 +13,45 @@ from pysph.base.opencl import DeviceHelper, DeviceArray, \
 
 class TestDeviceArray(TestCase):
     def test_reserve(self):
-        self.dev_array = DeviceArray(np.int32)
+        # Given
+        self.dev_array = DeviceArray(np.int32, n=16)
+        self.dev_array.fill(0)
+        self.dev_array.array[0] = 1
+        # When
         self.dev_array.reserve(64)
+        # Then
         assert len(self.dev_array.get_data()) == 64
-        assert self.dev_array.length == 0
+        assert self.dev_array.length == 16
+        assert self.dev_array.array[0] == 1
 
     def test_resize_with_reallocation(self):
+        # Given
         self.dev_array = DeviceArray(np.int32)
+        # When
         self.dev_array.resize(64)
+        # Then
         assert len(self.dev_array.get_data()) == 64
         assert self.dev_array.length == 64
 
     def test_resize_without_reallocation(self):
+        # Given
         self.dev_array = DeviceArray(np.int32, n=128)
-
+        # When
         self.dev_array.resize(64)
+        # Then
         assert len(self.dev_array.get_data()) == 128
         assert self.dev_array.length == 64
 
     def test_copy(self):
+        # Given
         self.dev_array = DeviceArray(np.int32, n=16)
         self.dev_array.fill(0)
+        # When
         dev_array_copy = self.dev_array.copy()
+        # Then
         assert np.all(self.dev_array.array.get() == dev_array_copy.array.get())
 
         dev_array_copy.array[0] = 1
-
         assert self.dev_array.array[0] != dev_array_copy.array[0]
 
 

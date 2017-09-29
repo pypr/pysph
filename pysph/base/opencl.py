@@ -44,26 +44,30 @@ class DeviceArray(cl.array.Array):
         self.alloc = n
         self.dtype = dtype
         self._data = cl.array.empty(self.queue, n, dtype)
+        self._update_array_ref()
 
-    @property
-    def array(self):
-        return self._data[:self.length]
+    def _update_array_ref(self):
+        self.array = self._data[:self.length]
 
     def resize(self, size):
         self.reserve(size)
         self.length = size
+        self._update_array_ref()
 
     def reserve(self, size):
         if size > self.alloc:
-            old_data = self.array.copy()
-            self._data = cl.array.empty(self.queue, size, self.dtype)
+            new_data = cl.array.empty(self.queue, size, self.dtype)
+            new_data[:self.alloc] = self._data
+            self._data = new_data
             self.alloc = size
+            self._update_array_ref()
 
     def set_data(self, data):
         self._data = data
         self.length = data.size
         self.alloc = data.size
         self.dtype = data.dtype
+        self._update_array_ref()
 
     def get_data(self):
         return self._data
