@@ -41,8 +41,8 @@ class DeviceArray(cl.array.Array):
         length = n
         if n == 0:
             n = 16
-        _data = cl.array.empty(self.queue, n, dtype)
-        self.set_data(_data)
+        data = cl.array.empty(self.queue, n, dtype)
+        self.set_data(data)
         self.length = length
         self._update_array_ref()
 
