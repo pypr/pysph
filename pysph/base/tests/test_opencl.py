@@ -4,8 +4,68 @@ import numpy as np
 
 pytest.importorskip("pysph.base.opencl")
 
+import pyopencl as cl
+
 from pysph.base.utils import get_particle_array  # noqa: E402
-from pysph.base.opencl import DeviceHelper  # noqa: E402
+from pysph.base.opencl import DeviceHelper, DeviceArray, \
+        get_queue  # noqa: E402
+
+
+class TestDeviceArray(TestCase):
+    def make_dev_array(self, n=16):
+        dev_array = DeviceArray(np.int32, n=n)
+        dev_array.fill(0)
+        dev_array.array[0] = 1
+        return dev_array
+
+    def test_reserve(self):
+        # Given
+        dev_array = self.make_dev_array()
+
+        # When
+        dev_array.reserve(64)
+
+        # Then
+        assert len(dev_array.get_data()) == 64
+        assert dev_array.length == 16
+        assert dev_array.array[0] == 1
+
+    def test_resize_with_reallocation(self):
+        # Given
+        dev_array = self.make_dev_array()
+
+        # When
+        dev_array.resize(64)
+
+        # Then
+        assert len(dev_array.get_data()) == 64
+        assert dev_array.length == 64
+        assert dev_array.array[0] == 1
+
+    def test_resize_without_reallocation(self):
+        # Given
+        dev_array = self.make_dev_array(n=128)
+
+        # When
+        dev_array.resize(64)
+
+        # Then
+        assert len(dev_array.get_data()) == 128
+        assert dev_array.length == 64
+        assert dev_array.array[0] == 1
+
+    def test_copy(self):
+        # Given
+        dev_array = self.make_dev_array()
+
+        # When
+        dev_array_copy = dev_array.copy()
+
+        # Then
+        assert np.all(dev_array.array.get() == dev_array_copy.array.get())
+
+        dev_array_copy.array[0] = 2
+        assert dev_array.array[0] != dev_array_copy.array[0]
 
 
 class TestDeviceHelper(TestCase):
