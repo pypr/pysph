@@ -38,12 +38,12 @@ def set_queue(q):
 class DeviceArray(cl.array.Array):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()
-        self.length = n
+        length = n
         if n == 0:
             n = 16
-        self.alloc = n
-        self.dtype = dtype
-        self._data = cl.array.empty(self.queue, n, dtype)
+        _data = cl.array.empty(self.queue, n, dtype)
+        self.set_data(_data)
+        self.length = length
         self._update_array_ref()
 
     def _update_array_ref(self):

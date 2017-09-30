@@ -12,47 +12,60 @@ from pysph.base.opencl import DeviceHelper, DeviceArray, \
 
 
 class TestDeviceArray(TestCase):
+    def make_dev_array(self, n=16):
+        dev_array = DeviceArray(np.int32, n=n)
+        dev_array.fill(0)
+        dev_array.array[0] = 1
+        return dev_array
+
     def test_reserve(self):
         # Given
-        self.dev_array = DeviceArray(np.int32, n=16)
-        self.dev_array.fill(0)
-        self.dev_array.array[0] = 1
+        dev_array = self.make_dev_array()
+
         # When
-        self.dev_array.reserve(64)
+        dev_array.reserve(64)
+
         # Then
-        assert len(self.dev_array.get_data()) == 64
-        assert self.dev_array.length == 16
-        assert self.dev_array.array[0] == 1
+        assert len(dev_array.get_data()) == 64
+        assert dev_array.length == 16
+        assert dev_array.array[0] == 1
 
     def test_resize_with_reallocation(self):
         # Given
-        self.dev_array = DeviceArray(np.int32)
+        dev_array = self.make_dev_array()
+
         # When
-        self.dev_array.resize(64)
+        dev_array.resize(64)
+
         # Then
-        assert len(self.dev_array.get_data()) == 64
-        assert self.dev_array.length == 64
+        assert len(dev_array.get_data()) == 64
+        assert dev_array.length == 64
+        assert dev_array.array[0] == 1
 
     def test_resize_without_reallocation(self):
         # Given
-        self.dev_array = DeviceArray(np.int32, n=128)
+        dev_array = self.make_dev_array(n=128)
+
         # When
-        self.dev_array.resize(64)
+        dev_array.resize(64)
+
         # Then
-        assert len(self.dev_array.get_data()) == 128
-        assert self.dev_array.length == 64
+        assert len(dev_array.get_data()) == 128
+        assert dev_array.length == 64
+        assert dev_array.array[0] == 1
 
     def test_copy(self):
         # Given
-        self.dev_array = DeviceArray(np.int32, n=16)
-        self.dev_array.fill(0)
-        # When
-        dev_array_copy = self.dev_array.copy()
-        # Then
-        assert np.all(self.dev_array.array.get() == dev_array_copy.array.get())
+        dev_array = self.make_dev_array()
 
-        dev_array_copy.array[0] = 1
-        assert self.dev_array.array[0] != dev_array_copy.array[0]
+        # When
+        dev_array_copy = dev_array.copy()
+
+        # Then
+        assert np.all(dev_array.array.get() == dev_array_copy.array.get())
+
+        dev_array_copy.array[0] = 2
+        assert dev_array.array[0] != dev_array_copy.array[0]
 
 
 class TestDeviceHelper(TestCase):
