@@ -13,7 +13,7 @@ import pyopencl.tools  # noqa: 401
 from pysph.base.config import get_config
 from pysph.base.utils import is_overloaded_method
 from pysph.base.ext_module import get_platform_dir
-from pysph.base.opencl import get_context, get_queue, DeviceHelper
+from pysph.base.opencl import profile, get_context, get_queue, DeviceHelper
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
@@ -81,9 +81,13 @@ class OpenCLAccelerationEval(object):
                 cache._start_idx_gpu.array.data,
                 cache._neighbors_gpu.array.data
             ] + extra_args
-            call(*args)
+            event = call(*args)
+            profile(call.get_info(cl.kernel_info.FUNCTION_NAME),
+                    event)
         else:
-            call(*(args + extra_args))
+            event = call(*(args + extra_args))
+            profile(call.get_info(cl.kernel_info.FUNCTION_NAME),
+                    event)
         self._queue.finish()
 
     def _sync_from_gpu(self, eq):
