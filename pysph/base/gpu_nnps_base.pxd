@@ -72,6 +72,11 @@ cdef class GPUNNPS(NNPSBase):
     cdef public GPUNeighborCache current_cache  # The current cache
     cdef public bint sort_gids        # Sort neighbors by their gids.
     cdef public bint use_double
+    cdef public dtype
+    cdef public dtype_max
+
+    cdef public np.ndarray xmin
+    cdef public np.ndarray xmax
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
             size_t d_idx, UIntArray nbrs)
@@ -85,6 +90,8 @@ cdef class GPUNNPS(NNPSBase):
     cdef void find_neighbor_lengths(self, nbr_lengths)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
+
+    cdef _compute_bounds(self)
 
     cpdef update(self)
 
