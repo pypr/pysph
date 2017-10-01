@@ -274,7 +274,6 @@ cdef class DomainManager:
     def update(self):
         self.manager.update()
 
-
 ##############################################################################
 cdef class CPUDomainManager:
     """This class determines the limits of the solution domain.
@@ -1129,6 +1128,9 @@ cdef class NNPS(NNPSBase):
 
     def set_in_parallel(self, bint in_parallel):
         self.domain.in_parallel = in_parallel
+
+    def update_domain(self, *args, **kwargs):
+        self.domain.update()
 
     cpdef update(self):
         """Update the local data after particles have moved.
