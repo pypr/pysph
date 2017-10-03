@@ -1,16 +1,16 @@
 """Common OpenCL related functionality.
 """
 
-import pandas
 import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
+from collections import defaultdict
 
 from .config import get_config
 
 _ctx = None
 _queue = None
-_profile_info = {}
+_profile_info = defaultdict()
 
 
 def get_context():
@@ -28,8 +28,10 @@ def set_context(ctx):
 def get_queue():
     global _queue
     if _queue is None:
-        _queue = cl.CommandQueue(get_context(),
-                properties=cl.command_queue_properties.PROFILING_ENABLE)
+        properties = None
+        if get_config().profile:
+            properties = cl.command_queue_properties.PROFILING_ENABLE
+        _queue = cl.CommandQueue(get_context(), properties=properties)
     return _queue
 
 
@@ -50,8 +52,17 @@ def profile(name, event):
 
 def profile_info():
     global _profile_info
-    print pandas.DataFrame(_profile_info.items(),
-            columns=['Kernel', 'Time'])
+    _profile_info = sorted(_profile_info.items(), key=lambda(k, v): v,
+            reverse=True)
+    print_profile(_profile_info)
+
+
+def print_profile(info):
+    if len(info) == 0:
+        return
+    print "{:<30} {:<30}".format('Kernel', 'Time')
+    for kernel, time in info:
+        print "{:<30} {:<30}".format(kernel, time)
 
 
 class DeviceArray(cl.array.Array):

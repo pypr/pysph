@@ -30,6 +30,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef bint _sorted
     cdef bint dst_src
 
+    cdef object _profile
+
     cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
 
     cpdef _bin(self, int pa_index)

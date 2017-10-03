@@ -395,6 +395,14 @@ class Application(object):
             default=False,
             help="Use OpenCL to run the simulation.")
 
+        # --profile
+        parser.add_argument(
+            "--profile",
+            action="store_true",
+            dest="profile",
+            default=False,
+            help="Enable profiling with OpenCL.")
+
         # --use-double
         parser.add_argument(
             "--use-double",
@@ -810,6 +818,8 @@ class Application(object):
             get_config().use_opencl = True
         if options.use_double:
             get_config().use_double = options.use_double
+        if options.profile:
+            get_config().profile = options.profile
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 
