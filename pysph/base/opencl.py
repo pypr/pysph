@@ -53,7 +53,7 @@ def profile(name, event):
 def profile_info():
     global _profile_info
     _profile_info = sorted(_profile_info.items(), key=lambda(k, v): v,
-            reverse=True)
+                            reverse=True)
     print_profile(_profile_info)
 
 
