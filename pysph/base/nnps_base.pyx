@@ -1128,7 +1128,7 @@ cdef class NNPS(NNPSBase):
     #### Public protocol #################################################
 
     def set_in_parallel(self, bint in_parallel):
-        self.domain.in_parallel = in_parallel
+        self.domain.manager.in_parallel = in_parallel
 
     def update_domain(self, *args, **kwargs):
         self.domain.update()
