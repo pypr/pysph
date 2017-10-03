@@ -163,7 +163,7 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         src_gpu = self.src.pa.gpu
         find_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+                make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index], nbr_lengths,
                 self.radius_scale, self.hmin, self.interval_size,
@@ -181,7 +181,7 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         src_gpu = self.src.pa.gpu
         find_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+                make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
                 self.src.get_number_of_particles(), self.pid_keys[self.src_index],
                 self.pids[self.dst_index], self.pids[self.src_index],
                 start_indices, nbrs, self.radius_scale, self.hmin, self.interval_size,
