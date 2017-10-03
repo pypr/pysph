@@ -1,6 +1,7 @@
 """Common OpenCL related functionality.
 """
 
+from __future__ import print_function
 import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
@@ -60,9 +61,9 @@ def profile_info():
 def print_profile(info):
     if len(info) == 0:
         return
-    print "{:<30} {:<30}".format('Kernel', 'Time')
+    print("{:<30} {:<30}".format('Kernel', 'Time'))
     for kernel, time in info:
-        print "{:<30} {:<30}".format(kernel, time)
+        print("{:<30} {:<30}".format(kernel, time))
 
 
 class DeviceArray(cl.array.Array):
