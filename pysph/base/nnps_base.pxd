@@ -173,7 +173,7 @@ cdef class CPUDomainManager:
     cdef public int narrays             # number of arrays
     cdef public double cell_size        # distance to create ghosts
     cdef public double hmin             # minimum h
-    cdef bint in_parallel               # Flag to determine if in parallel
+    cdef public bint in_parallel        # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
 
     cdef double dbl_max                 # Maximum value of double
