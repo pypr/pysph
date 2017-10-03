@@ -52,8 +52,8 @@ def profile(name, event):
 
 def profile_info():
     global _profile_info
-    _profile_info = sorted(_profile_info.items(), key=lambda(k, v): v,
-                            reverse=True)
+    _profile_info = sorted(_profile_info.items(), key=lambda k_v: k_v[1],
+                           reverse=True)
     print_profile(_profile_info)
 
 
@@ -119,6 +119,7 @@ class DeviceHelper(object):
     constants and properties do not clash.
 
     """
+
     def __init__(self, particle_array):
         self._particle_array = pa = particle_array
         self._queue = get_queue()
