@@ -197,19 +197,6 @@ cdef class GPUNNPS(NNPSBase):
         self.cache = _cache
         self.use_double = get_config().use_double
 
-        if domain is None:
-            self.domain = DomainManager(use_gpu=True)
-
-        # set the particle array wrappers for the domain manager
-        self.domain.set_pa_wrappers(self.pa_wrappers)
-
-        # set the radius scale to determine the cell size
-        self.domain.set_radius_scale(self.radius_scale)
-
-        # periodicity
-        self.is_periodic = self.domain.manager.is_periodic
-
-
 
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs):
         if self.use_cache:

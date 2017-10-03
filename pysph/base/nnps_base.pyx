@@ -24,7 +24,8 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 # Cython for compiler directives
 cimport cython
 
-from pysph.base.gpu_domain_manager import GPUDomainManager
+from pysph.base.config import get_config
+
 
 IF OPENMP:
     cimport openmp
@@ -238,9 +239,9 @@ cdef class NNPSParticleArrayWrapper:
 cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
-                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 use_gpu=False):
-        if use_gpu:
+                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
+        if get_config().use_opencl:
+            from pysph.base.gpu_domain_manager import GPUDomainManager
             domain_manager = GPUDomainManager
         else:
             domain_manager = CPUDomainManager
