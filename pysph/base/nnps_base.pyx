@@ -1151,7 +1151,7 @@ cdef class NNPS(NNPSBase):
         cdef ParticleArray pa
         cdef UIntArray indices
 
-        domain = self.domain
+        cdef DomainManager domain = self.domain
 
         # use cell sizes computed by the domain.
         self.cell_size = domain.manager.cell_size

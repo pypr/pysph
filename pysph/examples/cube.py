@@ -22,7 +22,6 @@ from pysph.base.kernels import CubicSpline
 from pysph.base.utils import get_particle_array_wcsph
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme
-from pysph.base.opencl import profile_info
 
 rho0 = 1000.0
 
@@ -87,4 +86,3 @@ class Cube(Application):
 if __name__ == '__main__':
     app = Cube()
     app.run()
-    profile_info()

@@ -72,9 +72,9 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
         domain = self.domain
         self.assertTrue(nnps.is_periodic)
 
-        self.assertTrue(domain.periodic_in_x)
-        self.assertTrue( not domain.periodic_in_y )
-        self.assertTrue( not domain.periodic_in_z )
+        self.assertTrue(domain.manager.periodic_in_x)
+        self.assertTrue( not domain.manager.periodic_in_y )
+        self.assertTrue( not domain.manager.periodic_in_z )
 
     def _test_summation_density(self):
         "NNPS :: testing for summation density"

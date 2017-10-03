@@ -341,7 +341,7 @@ cdef class LinkedListNNPS(NNPS):
 
     cpdef _refresh(self):
         """Refresh the head and next arrays locally"""
-        domain = self.domain
+        cdef DomainManager domain = self.domain
         cdef int narrays = self.narrays
         cdef list pa_wrappers = self.pa_wrappers
         cdef NNPSParticleArrayWrapper pa_wrapper

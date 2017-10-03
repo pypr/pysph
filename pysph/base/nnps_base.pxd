@@ -260,7 +260,7 @@ cdef class NNPSBase:
     cdef list cache                   # The neighbor cache.
     cdef int src_index, dst_index     # The current source and dest indices
 
-    cdef public object domain  # Domain manager
+    cdef public DomainManager domain  # Domain manager
     cdef public bint is_periodic      # flag for periodicity
 
     cdef public int dim               # Dimensionality of the problem
