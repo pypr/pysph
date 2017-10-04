@@ -743,5 +743,5 @@ def show_3d(points, **kw):
 
     """
     from mayavi import mlab
-    mlab.points3d(element[0], element[1], element[2], **kw)
+    mlab.points3d(points[0], points[1], points[2], **kw)
     mlab.axes(xlabel='X', ylabel='Y', zlabel='Z')
