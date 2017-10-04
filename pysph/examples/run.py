@@ -52,8 +52,9 @@ def get_all_examples():
     _ignore = [['run.py'], ['ghia_cavity_data.py'], ['db_exp_data.py'],
                ['tests', 'test_examples.py'],
                ['tests', 'test_riemann_solver.py'],
-               ['gas_dynamics', 'shocktube_setup.py'], 
-               ['sphysics', 'beach_geometry.py']]
+               ['gas_dynamics', 'shocktube_setup.py'],
+               ['sphysics', 'beach_geometry.py'],
+               ['sphysics', 'periodic_rigidbody.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]
     for dirpath, dirs, files in os.walk(basedir):
@@ -126,7 +127,7 @@ def cat_example(module):
 
 def list_examples(examples):
     for idx, (module, doc) in enumerate(examples):
-        print("%d. %s" % (idx+1, module[len('pysph.examples.'):]))
+        print("%d. %s" % (idx + 1, module[len('pysph.examples.'):]))
         print("   %s" % doc)
 
 
@@ -197,8 +198,8 @@ def main(argv=None):
         args = str(get_input(
             "Enter additional arguments (leave blank to skip): "
         ))
-        module, doc = examples[ans-1]
-        print("-"*80)
+        module, doc = examples[ans - 1]
+        print("-" * 80)
         run_command(module, args.split())
 
 if __name__ == '__main__':
