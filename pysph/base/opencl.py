@@ -6,6 +6,7 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
 from collections import defaultdict
+from operator import itemgetter
 
 from .config import get_config
 
@@ -53,7 +54,7 @@ def profile(name, event):
 
 def profile_info():
     global _profile_info
-    _profile_info = sorted(_profile_info.items(), key=lambda k, v: v,
+    _profile_info = sorted(_profile_info.iteritems(), key=itemgetter(1),
                            reverse=True)
     print_profile(_profile_info)
 
