@@ -53,7 +53,8 @@ def get_all_examples():
                ['tests', 'test_examples.py'],
                ['tests', 'test_riemann_solver.py'],
                ['gas_dynamics', 'shocktube_setup.py'], 
-               ['sphysics', 'beach_geometry.py']]
+               ['sphysics', 'beach_geometry.py'], 
+               ['sphysics', 'periodic_rigidbody.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]
     for dirpath, dirs, files in os.walk(basedir):
