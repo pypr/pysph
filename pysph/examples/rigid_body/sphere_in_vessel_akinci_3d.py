@@ -100,7 +100,7 @@ def get_sphere(centre=[0, 0, 0], radius=1, dx=0.1):
 
 class RigidFluidCoupling(Application):
     def initialize(self):
-        self._spacing = 8
+        self._spacing = 4
         self.spacing = self._spacing * 1e-3
         self.dx = self.spacing
         self.hdx = 1.2
@@ -129,8 +129,15 @@ class RigidFluidCoupling(Application):
                                   yf * 1e-3, zf * 1e-3)
 
         # get coordinates of cube
-        xc, yc, zc = get_3d_block(20, 20, 20, self._spacing)
-        xc, yc, zc = ((xc+70)*1e-3, (yc+90)*1e-3, (zc+70)*1e-3)
+        xc, yc, zc = get_3d_block(30, 30, 30, self._spacing)
+        xc1, yc1, zc1 = ((xc + 70) * 1e-3, (yc + 120) * 1e-3, (zc + 70) * 1e-3)
+        xc2, yc2, zc2 = ((xc + 4 * self._spacing) * 1e-3, (yc + 120) * 1e-3,
+                         (zc + 70) * 1e-3)
+        xc3, yc3, zc3 = ((xc + 120) * 1e-3, (yc + 120) * 1e-3,
+                         (zc + 70) * 1e-3)
+
+        xc, yc, zc = (np.concatenate((xc1, xc2, xc3)), np.concatenate(
+            (yc1, yc2, yc3)), np.concatenate((zc1, zc2, zc3)))
 
         # Create particle array for fluid
         m = self.ro * self.spacing * self.spacing * self.spacing
@@ -154,11 +161,24 @@ class RigidFluidCoupling(Application):
         m = self.solid_rho * self.spacing**3
         rho = self.solid_rho
         h = self.hdx * self.spacing
+
+        # assign  density of three spheres
+        rho1 = np.ones_like(xc1) * 2000
+        rho2 = np.ones_like(xc1) * 1000
+        rho3 = np.ones_like(xc1) * 500
+        rho = np.concatenate((rho1, rho2, rho3))
+
+        # assign body id's
+        body1 = np.ones_like(xc1, dtype=int) * 0
+        body2 = np.ones_like(xc1, dtype=int) * 1
+        body3 = np.ones_like(xc1, dtype=int) * 2
+        body = np.concatenate((body1, body2, body3))
         rad_s = self.spacing / 2.
         V = self.spacing**3
         cs = 0.0
         cube = get_particle_array_rigid_body(x=xc, y=yc, z=zc, h=h, m=m,
                                              rho=rho, rad_s=rad_s, V=V, cs=cs,
+                                             body_id=body,
                                              name="cube")
 
         print(
@@ -210,12 +230,12 @@ class RigidFluidCoupling(Application):
                 MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
                                  alpha=self.alpha, beta=0.0, c0=self.co,
                                  gy=-9.81),
-                AkinciRigidFluidCoupling(dest='fluid',
-                                         sources=['cube']),
+                AkinciRigidFluidCoupling(dest='fluid', sources=['cube']),
                 XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
             ]),
             Group(equations=[
-                RigidBodyCollision(dest='cube', sources=['tank'], kn=1e5)
+                RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
+                                   kn=1e5)
             ]),
             Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
