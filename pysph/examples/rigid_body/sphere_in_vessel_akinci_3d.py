@@ -1,6 +1,7 @@
-"""A sphere of density 500 falling into a hydrostatic tank (15 minutes)
+"""Three cubes of different density falling into a static tank of
+water.(20 minutes)
 
-Check basic equations of SPH to throw a ball inside the vessel
+An example to illustrate 3d pysph framework
 """
 from __future__ import print_function
 import numpy as np
@@ -129,11 +130,11 @@ class RigidFluidCoupling(Application):
                                   yf * 1e-3, zf * 1e-3)
 
         # get coordinates of cube
-        xc, yc, zc = get_3d_block(30, 30, 30, self._spacing)
-        xc1, yc1, zc1 = ((xc + 70) * 1e-3, (yc + 120) * 1e-3, (zc + 70) * 1e-3)
+        xc, yc, zc = get_3d_block(20, 20, 20, self._spacing/2.)
+        xc1, yc1, zc1 = ((xc + 60) * 1e-3, (yc + 120) * 1e-3, (zc + 70) * 1e-3)
         xc2, yc2, zc2 = ((xc + 4 * self._spacing) * 1e-3, (yc + 120) * 1e-3,
                          (zc + 70) * 1e-3)
-        xc3, yc3, zc3 = ((xc + 120) * 1e-3, (yc + 120) * 1e-3,
+        xc3, yc3, zc3 = ((xc + 100) * 1e-3, (yc + 120) * 1e-3,
                          (zc + 70) * 1e-3)
 
         xc, yc, zc = (np.concatenate((xc1, xc2, xc3)), np.concatenate(
@@ -158,13 +159,11 @@ class RigidFluidCoupling(Application):
             tank.add_property(name)
 
         # Create particle array for cube
-        m = self.solid_rho * self.spacing**3
-        rho = self.solid_rho
-        h = self.hdx * self.spacing
+        h = self.hdx * self.spacing/2.
 
         # assign  density of three spheres
         rho1 = np.ones_like(xc1) * 2000
-        rho2 = np.ones_like(xc1) * 1000
+        rho2 = np.ones_like(xc1) * 800
         rho3 = np.ones_like(xc1) * 500
         rho = np.concatenate((rho1, rho2, rho3))
 
@@ -173,8 +172,10 @@ class RigidFluidCoupling(Application):
         body2 = np.ones_like(xc1, dtype=int) * 1
         body3 = np.ones_like(xc1, dtype=int) * 2
         body = np.concatenate((body1, body2, body3))
-        rad_s = self.spacing / 2.
-        V = self.spacing**3
+
+        m = rho * (self.spacing/2.)**3
+        rad_s = self.spacing / 4.
+        V = (self.spacing/2.)**3
         cs = 0.0
         cube = get_particle_array_rigid_body(x=xc, y=yc, z=zc, h=h, m=m,
                                              rho=rho, rad_s=rad_s, V=V, cs=cs,
@@ -196,7 +197,7 @@ class RigidFluidCoupling(Application):
         # dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
         dt = 1e-4
         print("DT: %s" % dt)
-        tf = 2
+        tf = 0.6
         solver = Solver(
             kernel=kernel,
             dim=3,
