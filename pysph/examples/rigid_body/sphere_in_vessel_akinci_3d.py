@@ -105,7 +105,7 @@ class RigidFluidCoupling(Application):
         self.dx = self.spacing
         self.hdx = 1.2
         self.ro = 1000
-        self.solid_rho = 500
+        self.solid_rho = 800
         self.m = 1000 * self.dx * self.dx * self.dx
         self.co = 2 * np.sqrt(2 * 9.81 * 150 * 1e-3)
         self.alpha = 0.1
@@ -119,7 +119,7 @@ class RigidFluidCoupling(Application):
 
         flu_len = 150 - 2 * layers * self._spacing
         flu_hei = 52
-        flu_dep = 150 - layers * self._spacing
+        flu_dep = 150 - 2 * layers * self._spacing
 
         xt, yt, zt, xf, yf, zf = get_fluid_and_dam_geometry_3d(
             d_l=tank_len, d_h=tank_hei, d_d=tank_dep, f_l=flu_len, f_h=flu_hei,
@@ -130,7 +130,7 @@ class RigidFluidCoupling(Application):
 
         # get coordinates of cube
         xc, yc, zc = get_3d_block(20, 20, 20, self._spacing)
-        xc, yc, zc = (xc*1e-3, yc*1e-3, zc*1e-3)
+        xc, yc, zc = ((xc+70)*1e-3, (yc+90)*1e-3, (zc+70)*1e-3)
 
         # Create particle array for fluid
         m = self.ro * self.spacing * self.spacing * self.spacing
@@ -176,7 +176,7 @@ class RigidFluidCoupling(Application):
         # dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
         dt = 1e-4
         print("DT: %s" % dt)
-        tf = 0.5
+        tf = 2
         solver = Solver(
             kernel=kernel,
             dim=3,
