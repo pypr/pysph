@@ -1,4 +1,5 @@
-"""A sphere of density 500 falling into a hydrostatic tank (15 minutes)
+"""Three sphere of different density falling into a hydrostatic tank
+implemented using Akinci in 2d. (15 minutes)
 
 Check basic equations of SPH to throw a ball inside the vessel
 """
