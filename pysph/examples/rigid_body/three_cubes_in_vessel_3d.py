@@ -1,5 +1,5 @@
 """Three cubes of different density falling into a static tank of
-water.(20 minutes)
+water in 3d.(20 minutes)
 
 An example to illustrate 3d pysph framework
 """
@@ -16,12 +16,11 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import (XSPHCorrection, SummationDensity,
-                                       ContinuityEquation)
+from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
 from pysph.sph.rigid_body import (
-    BodyForce, SummationDensityBoundary, RigidBodyCollision, RigidBodyMoments,
+    BodyForce, RigidBodyCollision, RigidBodyMoments,
     RigidBodyMotion, AkinciRigidFluidCoupling, RK2StepRigidBody)
 
 
