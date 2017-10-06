@@ -62,7 +62,6 @@ class OpenCLAccelerationEval(object):
         self.nnps = None
         self._queue = helper._queue
         self._use_double = get_config().use_double
-        self._profile = get_config().profile
 
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
@@ -82,15 +81,11 @@ class OpenCLAccelerationEval(object):
                 cache._start_idx_gpu.array.data,
                 cache._neighbors_gpu.array.data
             ] + extra_args
-            event = call(*args)
-            if self._profile:
-                profile(call.get_info(cl.kernel_info.FUNCTION_NAME),
-                        event)
+            call = profile_kernel(call)
+            call(*args)
         else:
-            event = call(*(args + extra_args))
-            if self._profile:
-                profile(call.get_info(cl.kernel_info.FUNCTION_NAME),
-                        event)
+            call = profile_kernel(call)
+            call(*(args + extra_args))
         self._queue.finish()
 
     def _sync_from_gpu(self, eq):

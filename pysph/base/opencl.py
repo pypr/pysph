@@ -67,6 +67,14 @@ def print_profile(info):
         print("{:<30} {:<30}".format(kernel, time))
 
 
+def profile_kernel(self, kernel):
+    def _profile_knl(*args):
+        event = kernel(*args)
+        if get_config().profile:
+            profile(kernel.name, event)
+    return _profile_knl
+
+
 class DeviceArray(cl.array.Array):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()
