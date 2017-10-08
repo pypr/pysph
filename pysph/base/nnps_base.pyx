@@ -275,6 +275,7 @@ cdef class DomainManager:
     def update(self):
         self.manager.update()
 
+
 ##############################################################################
 cdef class CPUDomainManager:
     """This class determines the limits of the solution domain.

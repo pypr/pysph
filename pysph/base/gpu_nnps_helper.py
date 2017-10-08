@@ -48,7 +48,7 @@ class GPUNNPSHelper(object):
     def get_kernel(self, kernel_name, **kwargs):
         data = kernel_name, tuple(kwargs.items())
         if data in self.cache:
-            return self.cache[data]
+            return self.cache[data], kernel_name
         else:
             args, src = self._get_code(kernel_name, **kwargs)
             knl = ElementwiseKernel(
@@ -56,7 +56,7 @@ class GPUNNPSHelper(object):
                 kernel_name, preamble=self.preamble
             )
             self.cache[data] = knl
-            return knl
+            return knl, kernel_name
 
     def profile_kernel(self, kernel):
         def _profile_knl(*args):

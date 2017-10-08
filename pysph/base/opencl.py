@@ -12,7 +12,7 @@ from .config import get_config
 
 _ctx = None
 _queue = None
-_profile_info = defaultdict()
+_profile_info = defaultdict(float)
 
 
 def get_context():
@@ -46,40 +46,25 @@ def profile(name, event):
     global _profile_info
     event.wait()
     time = (event.profile.end - event.profile.start) * 1e-9
-    if name in _profile_info:
-        _profile_info[name] += time
-    else:
-        _profile_info[name] = time
+    _profile_info[name] += time
 
 
-def profile_info():
+def print_profile():
     global _profile_info
     _profile_info = sorted(_profile_info.iteritems(), key=itemgetter(1),
                            reverse=True)
-    print_profile(_profile_info)
-
-
-def print_profile(info):
-    if len(info) == 0:
-        return
+    if len(_profile_info) == 0:
+        print("No profile information available")
     print("{:<30} {:<30}".format('Kernel', 'Time'))
-    for kernel, time in info:
+    for kernel, time in _profile_info:
         print("{:<30} {:<30}".format(kernel, time))
 
 
-def profile_elwise_kernel(kernel):
+def profile_kernel(kernel, name):
     def _profile_knl(*args):
         event = kernel(*args)
         if get_config().profile:
-            profile(kernel.name, event)
-    return _profile_knl
-
-
-def profile_kernel(kernel):
-    def _profile_knl(*args):
-        event = kernel(*args)
-        if get_config().profile:
-            profile(kernel.function_name, event)
+            profile(name, event)
     return _profile_knl
 
 
