@@ -57,8 +57,11 @@ def print_profile():
         print("No profile information available")
         return
     print("{:<30} {:<30}".format('Kernel', 'Time'))
+    tot_time = 0
     for kernel, time in _profile_info:
         print("{:<30} {:<30}".format(kernel, time))
+        tot_time += time
+    print("Total profiled time: %g secs" % tot_time)
 
 
 def profile_kernel(kernel, name):
