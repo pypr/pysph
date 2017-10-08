@@ -55,6 +55,7 @@ def print_profile():
                            reverse=True)
     if len(_profile_info) == 0:
         print("No profile information available")
+        return
     print("{:<30} {:<30}".format('Kernel', 'Time'))
     for kernel, time in _profile_info:
         print("{:<30} {:<30}".format(kernel, time))
