@@ -187,6 +187,8 @@ class RigidFluidCoupling(Application):
 
         # simulation properties
         self.hdx = 1.2
+        self.co = 2 * np.sqrt(2 * 9.81 * self.fluid_height * 1e-3)
+        self.alpha = 0.1
 
     def create_particles(self):
         # get the geometry
@@ -238,9 +240,9 @@ class RigidFluidCoupling(Application):
 
         integrator = EPECIntegrator(fluid=WCSPHStep(), cube=RK2StepRigidBody())
 
-        dt = 0.125 * self.dx * self.hdx / (self.co * 1.1) / 2.
+        dt = 5 * 1e-5
         print("DT: %s" % dt)
-        tf = 2.8
+        tf = 1
         solver = Solver(
             kernel=kernel,
             dim=2,
@@ -261,7 +263,7 @@ class RigidFluidCoupling(Application):
                     dest='fluid',
                     sources=['fluid'], ),
                 SummationDensityBoundary(
-                    dest='fluid', sources=['tank', 'cube'], fluid_rho=1000.0)
+                    dest='fluid', sources=['tank', 'cube'], fluid_rho=self.fluid_rho)
             ]),
 
             # Tait equation of state
@@ -308,6 +310,4 @@ class RigidFluidCoupling(Application):
 
 if __name__ == '__main__':
     app = RigidFluidCoupling()
-    app.create_particles()
-    # app.geometry()
-    # app.run()
+    app.run()
