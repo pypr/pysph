@@ -45,12 +45,12 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import (XSPHCorrection, SummationDensity)
+from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
-from pysph.sph.rigid_body import (
-    BodyForce, SummationDensityBoundary, RigidBodyCollision, RigidBodyMoments,
-    RigidBodyMotion, AkinciRigidFluidCoupling, RK2StepRigidBody)
+from pysph.sph.rigid_body import (BodyForce, RigidBodyCollision,
+                                  RigidBodyMoments, RigidBodyMotion,
+                                  AkinciRigidFluidCoupling, RK2StepRigidBody)
 
 
 def get_2d_dam(length=10, height=15, dx=0.1, layers=2):
@@ -179,7 +179,7 @@ class RigidFluidCoupling(Application):
         self.fluid_length = (
             1000 * 1e-3 - 3 * self.dam_layers * self.dam_spacing)
         self.fluid_height = 300 * 1e-3
-        self.fluid_spacing = 2 * 1e-3
+        self.fluid_spacing = 4 * 1e-3
         self.fluid_rho = 1000.
 
         self.sphere_radius = 30 * 1e-3
@@ -187,7 +187,7 @@ class RigidFluidCoupling(Application):
 
         # simulation properties
         self.hdx = 1.2
-        self.co = 2 * np.sqrt(2 * 9.81 * self.fluid_height * 1e-3)
+        self.co = 2 * np.sqrt(2 * 9.81 * self.fluid_height)
         self.alpha = 0.1
 
     def create_particles(self):
@@ -238,7 +238,8 @@ class RigidFluidCoupling(Application):
     def create_solver(self):
         kernel = CubicSpline(dim=2)
 
-        integrator = EPECIntegrator(fluid=WCSPHStep(), cube=RK2StepRigidBody())
+        integrator = EPECIntegrator(fluid=WCSPHStep(), cube=RK2StepRigidBody(),
+                                    tank=WCSPHStep())
 
         dt = 5 * 1e-5
         print("DT: %s" % dt)
@@ -259,24 +260,26 @@ class RigidFluidCoupling(Application):
                 BodyForce(dest='cube', sources=None, gy=-9.81),
             ], real=False),
             Group(equations=[
-                SummationDensity(
-                    dest='fluid',
-                    sources=['fluid'], ),
-                SummationDensityBoundary(
-                    dest='fluid', sources=['tank', 'cube'], fluid_rho=self.fluid_rho)
+                ContinuityEquation(dest='fluid',
+                                   sources=['fluid', 'tank', 'cube']),
+                ContinuityEquation(dest='tank',
+                                   sources=['tank', 'fluid', 'cube'])
             ]),
 
             # Tait equation of state
             Group(equations=[
-                TaitEOSHGCorrection(dest='fluid', sources=None, rho0=self.ro,
-                                    c0=self.co, gamma=7.0),
+                TaitEOSHGCorrection(dest='fluid', sources=None,
+                                    rho0=self.fluid_rho, c0=self.co,
+                                    gamma=7.0),
+                TaitEOSHGCorrection(dest='tank', sources=None,
+                                    rho0=self.fluid_rho, c0=self.co,
+                                    gamma=7.0),
             ], real=False),
             Group(equations=[
-                MomentumEquation(dest='fluid', sources=['fluid'],
+                MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
                                  alpha=self.alpha, beta=0.0, c0=self.co,
                                  gy=-9.81),
-                AkinciRigidFluidCoupling(dest='fluid',
-                                         sources=['cube', 'tank']),
+                AkinciRigidFluidCoupling(dest='fluid', sources=['cube']),
                 XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
             ]),
             Group(equations=[
@@ -311,3 +314,4 @@ class RigidFluidCoupling(Application):
 if __name__ == '__main__':
     app = RigidFluidCoupling()
     app.run()
+    # app.geometry()
