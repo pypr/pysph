@@ -67,11 +67,19 @@ def print_profile(info):
         print("{:<30} {:<30}".format(kernel, time))
 
 
-def profile_kernel(self, kernel):
+def profile_elwise_kernel(kernel):
     def _profile_knl(*args):
         event = kernel(*args)
         if get_config().profile:
             profile(kernel.name, event)
+    return _profile_knl
+
+
+def profile_kernel(kernel):
+    def _profile_knl(*args):
+        event = kernel(*args)
+        if get_config().profile:
+            profile(kernel.function_name, event)
     return _profile_knl
 
 

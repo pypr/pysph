@@ -13,7 +13,7 @@ import pyopencl.tools  # noqa: 401
 from pysph.base.config import get_config
 from pysph.base.utils import is_overloaded_method
 from pysph.base.ext_module import get_platform_dir
-from pysph.base.opencl import profile, get_context, get_queue, DeviceHelper
+from pysph.base.opencl import profile_kernel, get_context, get_queue, DeviceHelper
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
