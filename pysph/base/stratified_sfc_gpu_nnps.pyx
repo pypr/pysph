@@ -23,6 +23,9 @@ cimport cython
 import numpy as np
 cimport numpy as np
 
+from pysph.base.opencl import profile_kernel
+
+
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
         return x if x < y else y
@@ -102,15 +105,16 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
 
-        fill_pids = self.helper.get_kernel("fill_pids")
+        fill_pids = profile_kernel(*self.helper.get_kernel("fill_pids"))
 
-        levels = cl.array.empty(self.queue, pa_wrapper.get_number_of_particles(),
-                dtype=np.int32)
+        levels = cl.array.empty(self.queue,
+                                pa_wrapper.get_number_of_particles(),
+                                dtype=np.int32)
 
         pa_gpu = pa_wrapper.pa.gpu
         fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z, pa_gpu.h,
-                self.interval_size, self.xmin[0], self.xmin[1], self.xmin[2], self.hmin,
-                self.pid_keys[pa_index], self.pids[pa_index],
+                self.interval_size, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.hmin, self.pid_keys[pa_index], self.pids[pa_index],
                 self.radius_scale, self.max_num_bits)
 
         radix_sort = cl.algorithm.RadixSort(self.ctx,
@@ -127,9 +131,11 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
         self.start_idx_levels[pa_index][key >> self.max_num_bits] = 0
 
-        fill_start_indices = self.helper.get_kernel("fill_start_indices")
+        fill_start_indices = profile_kernel(
+                *self.helper.get_kernel("fill_start_indices"))
 
-        fill_start_indices(self.pid_keys[pa_index], self.start_idx_levels[pa_index],
+        fill_start_indices(self.pid_keys[pa_index],
+                self.start_idx_levels[pa_index],
                 self.max_num_bits, self.num_particles_levels[pa_index])
 
     cpdef set_context(self, int src_index, int dst_index):
@@ -150,8 +156,9 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        find_nbr_lengths = self.helper.get_kernel("find_nbr_lengths",
-                sorted=self._sorted)
+        find_nbr_lengths = profile_kernel(
+                *self.helper.get_kernel("find_nbr_lengths",
+                sorted=self._sorted))
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
@@ -171,8 +178,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
                 self.max_num_bits, self.num_levels, self.num_particles_levels[self.src_index])
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        find_nbrs = self.helper.get_kernel("find_nbrs",
-                sorted=self._sorted)
+        find_nbrs = profile_kernel(*self.helper.get_kernel("find_nbrs",
+                sorted=self._sorted))
 
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3

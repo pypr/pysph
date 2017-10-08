@@ -27,14 +27,14 @@ def get_kernel_definition(kernel, arg_list):
     sig = '__kernel void\n{kernel}\n({args})'.format(
         kernel=kernel, args=', '.join(arg_list),
     )
-    return '\n'.join(wrap(sig, width=78, subsequent_indent=' '*4,
+    return '\n'.join(wrap(sig, width=78, subsequent_indent=' ' * 4,
                           break_long_words=False))
 
 
-def wrap_code(code, indent=' '*4):
+def wrap_code(code, indent=' ' * 4):
     return wrap(
         code, width=74, initial_indent=indent,
-        subsequent_indent=indent + ' '*4, break_long_words=False
+        subsequent_indent=indent + ' ' * 4, break_long_words=False
     )
 
 
@@ -56,6 +56,7 @@ def get_code(obj, transpiler=None):
 class OpenCLAccelerationEval(object):
     """Does the actual work of performing the evaluation.
     """
+
     def __init__(self, helper):
         self.helper = helper
         self.particle_arrays = helper.object.particle_arrays
@@ -404,7 +405,7 @@ class AccelerationEvalOpenCLHelper(object):
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
 
-        body = '\n'.join([' '*4 + x for x in code])
+        body = '\n'.join([' ' * 4 + x for x in code])
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, loop=False,
             real=group.real, type='kernel'
@@ -419,8 +420,7 @@ class AccelerationEvalOpenCLHelper(object):
 
     def _declare_precomp_vars(self, context):
         decl = []
-        names = list(context.keys())
-        names.sort()
+        names = sorted(context.keys())
         for var in names:
             value = context[var]
             if isinstance(value, int):
@@ -494,7 +494,7 @@ class AccelerationEvalOpenCLHelper(object):
         pre = []
         for p, cb in eq_group.precomputed.items():
             src = cb.code.strip().splitlines()
-            pre.extend([' '*4 + x + ';' for x in src])
+            pre.extend([' ' * 4 + x + ';' for x in src])
         if len(pre) > 0:
             pre.append('')
         code.extend(pre)
@@ -530,7 +530,7 @@ class AccelerationEvalOpenCLHelper(object):
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
 
-        body = '\n'.join([' '*4 + x for x in code])
+        body = '\n'.join([' ' * 4 + x for x in code])
         body = self._set_kernel(body, self.object.kernel)
         k_name = self.object.kernel.__class__.__name__
         all_args.extend(
