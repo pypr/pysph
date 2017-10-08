@@ -223,8 +223,8 @@ class RigidFluidCoupling(Application):
         rho = get_rho_of_each_sphere(xc, yc, radius=self.sphere_radius,
                                      spacing=self.sphere_spacing)
         # get bodyid for each sphere
-        rho = get_body_id_of_each_sphere(xc, yc, radius=self.sphere_radius,
-                                         spacing=self.sphere_spacing)
+        body_id = get_body_id_of_each_sphere(xc, yc, radius=self.sphere_radius,
+                                             spacing=self.sphere_spacing)
         m = rho * self.sphere_spacing**2
         h = self.hdx * self.sphere_spacing
         rad_s = self.sphere_spacing / 2.
@@ -232,7 +232,7 @@ class RigidFluidCoupling(Application):
         cs = 0.0
         cube = get_particle_array_rigid_body(x=xc, y=yc, h=h, m=m, rho=rho,
                                              rad_s=rad_s, V=V, cs=cs,
-                                             name="cube")
+                                             body_id=body_id, name="cube")
         return [fluid, tank, cube]
 
     def create_solver(self):
