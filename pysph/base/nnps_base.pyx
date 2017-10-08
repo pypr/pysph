@@ -240,7 +240,8 @@ cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
-        if get_config().use_opencl:
+        is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
+        if get_config().use_opencl and not is_periodic:
             from pysph.base.gpu_domain_manager import GPUDomainManager
             domain_manager = GPUDomainManager
         else:
