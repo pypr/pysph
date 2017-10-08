@@ -160,7 +160,7 @@ def get_body_id_of_each_sphere(xc, yc, radius=20 * 1e-3, spacing=1 * 1e-3):
     x1, y1 = get_circle(radius=radius, dx=spacing)
     pars = len(x1)
 
-    body_id = np.ones_like(xc)
+    body_id = np.ones_like(xc, dtype=int)
     no_of_spheres = len(body_id) / len(x1)
 
     for i in range(no_of_spheres):
