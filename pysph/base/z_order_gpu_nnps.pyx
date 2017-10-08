@@ -109,7 +109,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.curr_cid.fill(1)
 
-        fill_unique_cids = profile_kernel(*self.helper.get_kernel("fill_unique_cids"))
+        fill_unique_cids = profile_kernel(
+                *self.helper.get_kernel("fill_unique_cids"))
 
         fill_unique_cids(self.pid_keys[pa_index].array,
                 self.cids[pa_index].array, self.curr_cid)
@@ -120,7 +121,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.max_cid[pa_index] = num_cids
 
-        map_cid_to_idx = profile_kernel(*self.helper.get_kernel("map_cid_to_idx"))
+        map_cid_to_idx = profile_kernel(
+                *self.helper.get_kernel("map_cid_to_idx"))
 
         map_cid_to_idx(
             pa_gpu.x, pa_gpu.y, pa_gpu.z,
@@ -130,7 +132,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.cids[pa_index].array, self.cid_to_idx[pa_index].array
         )
 
-        fill_cids = profile_kernel(*self.helper.get_kernel("fill_cids"))
+        fill_cids = profile_kernel(*
+                self.helper.get_kernel("fill_cids"))
 
         fill_cids(self.pid_keys[pa_index].array, self.cids[pa_index].array,
                 pa_wrapper.get_number_of_particles())
@@ -173,7 +176,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         if self.dst_src:
             self.dst_to_src.resize(self.max_cid[dst_index])
 
-            map_dst_to_src = profile_kernel(*self.helper.get_kernel("map_dst_to_src"))
+            map_dst_to_src = profile_kernel(
+                    *self.helper.get_kernel("map_dst_to_src"))
 
             self.max_cid_src.fill(self.max_cid[src_index])
 
@@ -189,8 +193,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.overflow_cid_to_idx.resize(max(1, 27 * overflow_size))
             self.overflow_cid_to_idx.fill(-1)
 
-            fill_overflow_map = profile_kernel(*self.helper.get_kernel(
-                "fill_overflow_map"))
+            fill_overflow_map = profile_kernel(
+                    *self.helper.get_kernel("fill_overflow_map"))
 
             dst_gpu = self.dst.pa.gpu
             fill_overflow_map(self.dst_to_src.array,
@@ -216,7 +220,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.make_vec(self.xmin[0], self.xmin[1],
                     self.xmin[2]), self.src.get_number_of_particles(),
                 self.pid_keys[self.src_index].array,
-                self.pids[self.dst_index].array, self.pids[self.src_index].array,
+                self.pids[self.dst_index].array,
+                self.pids[self.src_index].array,
                 self.max_cid[self.src_index], self.cids[self.dst_index].array,
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,
@@ -234,7 +239,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                     self.xmin[2]),
                 self.src.get_number_of_particles(),
                 self.pid_keys[self.src_index].array,
-                self.pids[self.dst_index].array, self.pids[self.src_index].array,
+                self.pids[self.dst_index].array,
+                self.pids[self.src_index].array,
                 self.max_cid[self.src_index], self.cids[self.dst_index].array,
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,

@@ -4,8 +4,6 @@ from pyopencl.elementwise import ElementwiseKernel
 from mako.template import Template
 import os
 
-from pysph.base.opencl import get_config, profile
-
 
 class GPUNNPSHelper(object):
     def __init__(self, ctx, tpl_filename, use_double=False):
@@ -34,7 +32,6 @@ class GPUNNPSHelper(object):
         self.preamble = "\n".join([helper_preamble, preamble])
         self.ctx = ctx
         self.cache = {}
-        self._profile = get_config().profile
 
     def _get_code(self, kernel_name, **kwargs):
         arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
@@ -57,10 +54,3 @@ class GPUNNPSHelper(object):
             )
             self.cache[data] = knl
             return knl, kernel_name
-
-    def profile_kernel(self, kernel):
-        def _profile_knl(*args):
-            event = kernel(*args)
-            if self._profile:
-                profile(kernel.name, event)
-        return _profile_knl
