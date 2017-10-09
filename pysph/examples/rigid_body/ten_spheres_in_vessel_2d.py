@@ -155,7 +155,7 @@ def get_rho_of_each_sphere(xc, yc, radius=20 * 1e-3, spacing=1 * 1e-3):
     for i in range(no_of_spheres):
         if i < 5:
             rho[i * pars:(i + 1) * pars] = 500
-        if i > 5:
+        if i >= 5:
             rho[i * pars:(i + 1) * pars] = 1500
 
     return rho
