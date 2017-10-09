@@ -246,7 +246,7 @@ class RigidFluidCoupling(Application):
         integrator = EPECIntegrator(fluid=WCSPHStep(), cube=RK2StepRigidBody(),
                                     tank=WCSPHStep())
 
-        dt = 1 * 1e-5
+        dt = 1 * 1e-4
         print("DT: %s" % dt)
         tf = 1
         solver = Solver(
@@ -321,7 +321,7 @@ class RigidFluidCoupling(Application):
             ]),
             Group(equations=[
                 RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
-                                   kn=1e4)
+                                   kn=1e5)
             ]),
             Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
