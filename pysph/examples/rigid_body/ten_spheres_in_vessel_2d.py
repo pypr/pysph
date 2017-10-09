@@ -274,8 +274,9 @@ class RigidFluidCoupling(Application):
 
             # Tait equation of state
             Group(equations=[
-                TaitEOSHGCorrection(dest='fluid', sources=None, rho0=self.fluid_rho,
-                                    c0=self.co, gamma=7.0),
+                TaitEOSHGCorrection(dest='fluid', sources=None,
+                                    rho0=self.fluid_rho, c0=self.co,
+                                    gamma=7.0),
             ], real=False),
             Group(equations=[
                 MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
@@ -286,7 +287,8 @@ class RigidFluidCoupling(Application):
                 XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
             ]),
             Group(equations=[
-                RigidBodyCollision(dest='cube', sources=['tank'], kn=1e5)
+                RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
+                                   kn=1e5)
             ]),
             Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
