@@ -47,12 +47,13 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation)
+from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
+                                       SummationDensity)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
-from pysph.sph.rigid_body import (BodyForce, RigidBodyCollision,
-                                  RigidBodyMoments, RigidBodyMotion,
-                                  AkinciRigidFluidCoupling, RK2StepRigidBody)
+from pysph.sph.rigid_body import (
+    BodyForce, RigidBodyCollision, SummationDensityBoundary, RigidBodyMoments,
+    RigidBodyMotion, AkinciRigidFluidCoupling, RK2StepRigidBody)
 
 
 def get_2d_dam(length=10, height=15, dx=0.1, layers=2):
@@ -134,13 +135,13 @@ def create_ten_circles(radius=20 * 1e-3, spacing=1 * 1e-3,
     x_left = np.concatenate([x1, x2, x3, x4, x5])
     y_left = np.concatenate([y1, y2, y3, y4, y5])
 
-    x_middle, y_middle = x1 + 400 * 1e-3, y1 + 300 * 1e-3
+    # x_middle, y_middle = x1 + 400 * 1e-3, y1 + 300 * 1e-3
 
     x_right = x_left + 500 * 1e-3
     y_right = y_left
 
-    x = np.concatenate([x_left, x_middle, x_right])
-    y = np.concatenate([y_left, y_middle, y_right])
+    x = np.concatenate([x_left, x_right])
+    y = np.concatenate([y_left, y_right])
     return x, y
 
 
@@ -151,9 +152,11 @@ def get_rho_of_each_sphere(xc, yc, radius=20 * 1e-3, spacing=1 * 1e-3):
     rho = np.ones_like(xc)
     no_of_spheres = len(rho) / len(x1)
 
-    rho_init = 100
     for i in range(no_of_spheres):
-        rho[i * pars:(i + 1) * pars] = rho_init
+        if i < 5:
+            rho[i * pars:(i + 1) * pars] = 500
+        if i > 5:
+            rho[i * pars:(i + 1) * pars] = 1500
 
     return rho
 
@@ -175,17 +178,17 @@ class RigidFluidCoupling(Application):
     def initialize(self):
         self.dam_length = 1000 * 1e-3
         self.dam_height = 500 * 1e-3
-        self.dam_spacing = 2 * 1e-3
+        self.dam_spacing = 3 * 1e-3
         self.dam_layers = 2
 
         self.fluid_length = (
             1000 * 1e-3 - 3 * self.dam_layers * self.dam_spacing)
         self.fluid_height = 300 * 1e-3
-        self.fluid_spacing = 4 * 1e-3
+        self.fluid_spacing = 5 * 1e-3
         self.fluid_rho = 1000.
 
         self.sphere_radius = 30 * 1e-3
-        self.sphere_spacing = 1 * 1e-3
+        self.sphere_spacing = 3 * 1e-3
 
         # simulation properties
         self.hdx = 1.2
@@ -243,7 +246,7 @@ class RigidFluidCoupling(Application):
         integrator = EPECIntegrator(fluid=WCSPHStep(), cube=RK2StepRigidBody(),
                                     tank=WCSPHStep())
 
-        dt = 5 * 1e-5
+        dt = 1 * 1e-5
         print("DT: %s" % dt)
         tf = 1
         solver = Solver(
@@ -257,6 +260,38 @@ class RigidFluidCoupling(Application):
         return solver
 
     def create_equations(self):
+        equations = [
+            Group(equations=[
+                BodyForce(dest='cube', sources=None, gy=-9.81),
+            ], real=False),
+            Group(equations=[
+                SummationDensity(
+                    dest='fluid',
+                    sources=['fluid'], ),
+                SummationDensityBoundary(
+                    dest='fluid', sources=['tank', 'cube'], fluid_rho=1000.0)
+            ]),
+
+            # Tait equation of state
+            Group(equations=[
+                TaitEOSHGCorrection(dest='fluid', sources=None, rho0=self.fluid_rho,
+                                    c0=self.co, gamma=7.0),
+            ], real=False),
+            Group(equations=[
+                MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
+                                 alpha=self.alpha, beta=0.0, c0=self.co,
+                                 gy=-9.81),
+                AkinciRigidFluidCoupling(dest='fluid',
+                                         sources=['cube', 'tank']),
+                XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
+            ]),
+            Group(equations=[
+                RigidBodyCollision(dest='cube', sources=['tank'], kn=1e5)
+            ]),
+            Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
+            Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
+        ]
+        return equations
         equations = [
             Group(equations=[
                 BodyForce(dest='cube', sources=None, gy=-9.81),
@@ -286,7 +321,7 @@ class RigidFluidCoupling(Application):
             ]),
             Group(equations=[
                 RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
-                                   kn=1e5)
+                                   kn=1e4)
             ]),
             Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
