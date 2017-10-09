@@ -178,8 +178,8 @@ class RigidFluidCoupling(Application):
     def initialize(self):
         self.dam_length = 1000 * 1e-3
         self.dam_height = 500 * 1e-3
-        self.dam_spacing = 3 * 1e-3
-        self.dam_layers = 2
+        self.dam_spacing = 2 * 1e-3
+        self.dam_layers = 3
 
         self.fluid_length = (
             1000 * 1e-3 - 3 * self.dam_layers * self.dam_spacing)
@@ -188,7 +188,7 @@ class RigidFluidCoupling(Application):
         self.fluid_rho = 1000.
 
         self.sphere_radius = 30 * 1e-3
-        self.sphere_spacing = 3 * 1e-3
+        self.sphere_spacing = 4 * 1e-3
 
         # simulation properties
         self.hdx = 1.2
@@ -279,12 +279,13 @@ class RigidFluidCoupling(Application):
                                     gamma=7.0),
             ], real=False),
             Group(equations=[
-                MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
+                MomentumEquation(dest='fluid', sources=['fluid'],
                                  alpha=self.alpha, beta=0.0, c0=self.co,
                                  gy=-9.81),
                 AkinciRigidFluidCoupling(dest='fluid',
                                          sources=['cube', 'tank']),
-                XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
+                XSPHCorrection(dest='fluid', sources=['fluid', 'tank',
+                                                      'cube']),
             ]),
             Group(equations=[
                 RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
@@ -294,41 +295,41 @@ class RigidFluidCoupling(Application):
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
         ]
         return equations
-        equations = [
-            Group(equations=[
-                BodyForce(dest='cube', sources=None, gy=-9.81),
-            ], real=False),
-            Group(equations=[
-                ContinuityEquation(dest='fluid',
-                                   sources=['fluid', 'tank', 'cube']),
-                ContinuityEquation(dest='tank',
-                                   sources=['tank', 'fluid', 'cube'])
-            ]),
+        # equations = [
+        #     Group(equations=[
+        #         BodyForce(dest='cube', sources=None, gy=-9.81),
+        #     ], real=False),
+        #     Group(equations=[
+        #         ContinuityEquation(dest='fluid',
+        #                            sources=['fluid', 'tank', 'cube']),
+        #         ContinuityEquation(dest='tank',
+        #                            sources=['tank', 'fluid', 'cube'])
+        #     ]),
 
-            # Tait equation of state
-            Group(equations=[
-                TaitEOSHGCorrection(dest='fluid', sources=None,
-                                    rho0=self.fluid_rho, c0=self.co,
-                                    gamma=7.0),
-                TaitEOSHGCorrection(dest='tank', sources=None,
-                                    rho0=self.fluid_rho, c0=self.co,
-                                    gamma=7.0),
-            ], real=False),
-            Group(equations=[
-                MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
-                                 alpha=self.alpha, beta=0.0, c0=self.co,
-                                 gy=-9.81),
-                AkinciRigidFluidCoupling(dest='fluid', sources=['cube']),
-                XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
-            ]),
-            Group(equations=[
-                RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
-                                   kn=1e5)
-            ]),
-            Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
-            Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
-        ]
-        return equations
+        #     # Tait equation of state
+        #     Group(equations=[
+        #         TaitEOSHGCorrection(dest='fluid', sources=None,
+        #                             rho0=self.fluid_rho, c0=self.co,
+        #                             gamma=7.0),
+        #         TaitEOSHGCorrection(dest='tank', sources=None,
+        #                             rho0=self.fluid_rho, c0=self.co,
+        #                             gamma=7.0),
+        #     ], real=False),
+        #     Group(equations=[
+        #         MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
+        #                          alpha=self.alpha, beta=0.0, c0=self.co,
+        #                          gy=-9.81),
+        #         AkinciRigidFluidCoupling(dest='fluid', sources=['cube']),
+        #         XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
+        #     ]),
+        #     Group(equations=[
+        #         RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
+        #                            kn=1e5)
+        #     ]),
+        #     Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
+        #     Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
+        # ]
+        # return equations
 
     def geometry(self):
         import matplotlib.pyplot as plt
