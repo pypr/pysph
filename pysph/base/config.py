@@ -10,6 +10,7 @@ class Config(object):
         self._use_openmp = None
         self._use_opencl = None
         self._use_double = None
+        self._profile = None
 
     @property
     def use_openmp(self):
@@ -52,6 +53,19 @@ class Config(object):
         self._use_double = value
 
     def _use_double_default(self):
+        return False
+
+    @property
+    def profile(self):
+        if self._profile is None:
+            self._profile = self._profile_default()
+        return self._profile
+
+    @profile.setter
+    def profile(self, value):
+        self._profile = value
+
+    def _profile_default(self):
         return False
 
 

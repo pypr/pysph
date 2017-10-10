@@ -152,8 +152,11 @@ cdef class NNPSParticleArrayWrapper:
     # get the number of particles
     cdef int get_number_of_particles(self)
 
-# Domain limits for the simulation
 cdef class DomainManager:
+    cdef public object manager
+
+# Domain limits for the simulation
+cdef class CPUDomainManager:
     cdef public double xmin, xmax
     cdef public double ymin, ymax
     cdef public double zmin, zmax
@@ -170,7 +173,7 @@ cdef class DomainManager:
     cdef public int narrays             # number of arrays
     cdef public double cell_size        # distance to create ghosts
     cdef public double hmin             # minimum h
-    cdef bint in_parallel               # Flag to determine if in parallel
+    cdef public bint in_parallel        # Flag to determine if in parallel
     cdef public double radius_scale     # Radius scale for kernel
 
     cdef double dbl_max                 # Maximum value of double
@@ -261,8 +264,6 @@ cdef class NNPSBase:
     cdef public bint is_periodic      # flag for periodicity
 
     cdef public int dim               # Dimensionality of the problem
-    cdef public DoubleArray xmin      # co-ordinate min values
-    cdef public DoubleArray xmax      # co-ordinate max values
     cdef public double cell_size      # Cell size for binning
     cdef public double hmin           # Minimum h
     cdef public double radius_scale   # Radius scale for kernel
@@ -285,13 +286,14 @@ cdef class NNPSBase:
                                 size_t d_idx, UIntArray nbrs)
     cpdef set_context(self, int src_index, int dst_index)
     cpdef spatially_order_particles(self, int pa_index)
-    cdef _compute_bounds(self)
 
 # Nearest neighbor locator
 cdef class NNPS(NNPSBase):
     ##########################################################################
     # Data Attributes
     ##########################################################################
+    cdef public DoubleArray xmin      # co-ordinate min values
+    cdef public DoubleArray xmax      # co-ordinate max values
     cdef public NeighborCache current_cache  # The current cache
 
     cdef public bint sort_gids        # Sort neighbors by their gids.

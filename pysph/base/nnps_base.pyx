@@ -24,6 +24,9 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 # Cython for compiler directives
 cimport cython
 
+from pysph.base.config import get_config
+
+
 IF OPENMP:
     cimport openmp
     cpdef int get_number_of_threads():
@@ -234,6 +237,48 @@ cdef class NNPSParticleArrayWrapper:
 
 ##############################################################################
 cdef class DomainManager:
+    def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
+                 double ymax=0, double zmin=0, double zmax=0,
+                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
+        is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
+        if get_config().use_opencl and not is_periodic:
+            from pysph.base.gpu_domain_manager import GPUDomainManager
+            domain_manager = GPUDomainManager
+        else:
+            domain_manager = CPUDomainManager
+        self.manager = domain_manager(xmin=xmin, xmax=xmax, ymin=ymin,
+                ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
+                periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z)
+
+    def set_pa_wrappers(self, wrappers):
+        self.manager.set_pa_wrappers(wrappers)
+
+    def set_cell_size(self, cell_size):
+        self.manager.set_cell_size(cell_size)
+
+    def set_in_parallel(self, in_parallel):
+        self.manager.set_in_parallel(in_parallel)
+
+    def set_radius_scale(self, radius_scale):
+        self.manager.set_radius_scale(radius_scale)
+
+    def compute_cell_size_for_binning(self):
+        """Compute the cell size for the binning.
+
+        The cell size is chosen as the kernel radius scale times the
+        maximum smoothing length in the local processor. For parallel
+        runs, we would need to communicate the maximum 'h' on all
+        processors to decide on the appropriate binning size.
+
+        """
+        self.manager.compute_cell_size_for_binning()
+
+    def update(self):
+        self.manager.update()
+
+
+##############################################################################
+cdef class CPUDomainManager:
     """This class determines the limits of the solution domain.
 
     We expect all simulations to have well defined domain limits
@@ -925,7 +970,7 @@ cdef class NNPSBase:
         self.domain.set_radius_scale(self.radius_scale)
 
         # periodicity
-        self.is_periodic = self.domain.is_periodic
+        self.is_periodic = self.domain.manager.is_periodic
 
         # The total number of cells.
         self.n_cells = 0
@@ -936,10 +981,6 @@ cdef class NNPSBase:
         self.cell_shifts.data[0] = -1
         self.cell_shifts.data[1] = 0
         self.cell_shifts.data[2] = 1
-
-        # min and max coordinate values
-        self.xmin = DoubleArray(3)
-        self.xmax = DoubleArray(3)
 
     cpdef brute_force_neighbors(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -1060,16 +1101,89 @@ cdef class NNPSBase:
         for arr in pa.properties.values():
             arr.c_align_array(indices)
 
-    def update_domain(self, *args, **kwargs):
-        cdef list pa_wrappers = self.pa_wrappers
-        cdef NNPSParticleArrayWrapper pa_wrapper
-        for pa_wrapper in pa_wrappers:
-            if pa_wrapper.pa.gpu is not None:
-                # FIXME: find the max/min on the GPU instead.
-                pa_wrapper.pa.gpu.pull('x', 'y', 'z')
+cdef class NNPS(NNPSBase):
+    """Nearest neighbor query class using the box-sort algorithm.
 
+    NNPS bins all local particles using the box sort algorithm in
+    Cells. The cells are stored in a dictionary 'cells' which is keyed
+    on the spatial index (IntPoint) of the cell.
+
+    """
+    def __init__(self, int dim, list particles, double radius_scale=2.0,
+                 int ghost_layers=1, domain=None, bint cache=False,
+                 bint sort_gids=False):
+        NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
+                domain, cache, sort_gids)
+
+        # min and max coordinate values
+        self.xmin = DoubleArray(3)
+        self.xmax = DoubleArray(3)
+
+        # The cache.
+        self.use_cache = cache
+        _cache = []
+        for d_idx in range(len(particles)):
+            for s_idx in range(len(particles)):
+                _cache.append(NeighborCache(self, d_idx, s_idx))
+        self.cache = _cache
+
+    #### Public protocol #################################################
+
+    def set_in_parallel(self, bint in_parallel):
+        self.domain.manager.in_parallel = in_parallel
+
+    def update_domain(self, *args, **kwargs):
         self.domain.update()
 
+    cpdef update(self):
+        """Update the local data after particles have moved.
+
+        For parallel runs, we want the NNPS to be independent of the
+        ParallelManager which is solely responsible for distributing
+        particles across available processors. We assume therefore
+        that after a parallel update, each processor has all the local
+        particle information it needs and this operation is carried
+        out locally.
+
+        For serial runs, this method should be called when the
+        particles have moved.
+
+        """
+        cdef int i, num_particles
+        cdef ParticleArray pa
+        cdef UIntArray indices
+
+        cdef DomainManager domain = self.domain
+
+        # use cell sizes computed by the domain.
+        self.cell_size = domain.manager.cell_size
+        self.hmin = domain.manager.hmin
+
+        # compute bounds and refresh the data structure
+        self._compute_bounds()
+        self._refresh()
+
+        # indices on which to bin. We bin all local particles
+        for i in range(self.narrays):
+            pa = self.particles[i]
+            num_particles = pa.get_number_of_particles()
+            indices = arange_uint(num_particles)
+
+            # bin the particles
+            self._bin( pa_index=i, indices=indices )
+
+        if self.use_cache:
+            for cache in self.cache:
+                cache.update()
+
+    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
+        if self.use_cache:
+            self.current_cache.get_neighbors_raw(d_idx, nbrs)
+        else:
+            nbrs.c_reset()
+            self.find_nearest_neighbors(d_idx, nbrs)
+
+    #### Private protocol ################################################
     cdef _compute_bounds(self):
         """Compute coordinate bounds for the particles"""
         cdef list pa_wrappers = self.pa_wrappers
@@ -1113,83 +1227,6 @@ cdef class NNPSBase:
         # store the minimum and maximum of physical coordinates
         self.xmin.set_data(np.asarray([xmin, ymin, zmin]))
         self.xmax.set_data(np.asarray([xmax, ymax, zmax]))
-
-
-cdef class NNPS(NNPSBase):
-    """Nearest neighbor query class using the box-sort algorithm.
-
-    NNPS bins all local particles using the box sort algorithm in
-    Cells. The cells are stored in a dictionary 'cells' which is keyed
-    on the spatial index (IntPoint) of the cell.
-
-    """
-    def __init__(self, int dim, list particles, double radius_scale=2.0,
-                 int ghost_layers=1, domain=None, bint cache=False,
-                 bint sort_gids=False):
-        NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
-                domain, cache, sort_gids)
-        # The cache.
-        self.use_cache = cache
-        _cache = []
-        for d_idx in range(len(particles)):
-            for s_idx in range(len(particles)):
-                _cache.append(NeighborCache(self, d_idx, s_idx))
-        self.cache = _cache
-
-    #### Public protocol #################################################
-
-    def set_in_parallel(self, bint in_parallel):
-        self.domain.in_parallel = in_parallel
-
-    cpdef update(self):
-        """Update the local data after particles have moved.
-
-        For parallel runs, we want the NNPS to be independent of the
-        ParallelManager which is solely responsible for distributing
-        particles across available processors. We assume therefore
-        that after a parallel update, each processor has all the local
-        particle information it needs and this operation is carried
-        out locally.
-
-        For serial runs, this method should be called when the
-        particles have moved.
-
-        """
-        cdef int i, num_particles
-        cdef ParticleArray pa
-        cdef UIntArray indices
-
-        cdef DomainManager domain = self.domain
-
-        # use cell sizes computed by the domain.
-        self.cell_size = domain.cell_size
-        self.hmin = domain.hmin
-
-        # compute bounds and refresh the data structure
-        self._compute_bounds()
-        self._refresh()
-
-        # indices on which to bin. We bin all local particles
-        for i in range(self.narrays):
-            pa = self.particles[i]
-            num_particles = pa.get_number_of_particles()
-            indices = arange_uint(num_particles)
-
-            # bin the particles
-            self._bin( pa_index=i, indices=indices )
-
-        if self.use_cache:
-            for cache in self.cache:
-                cache.update()
-
-    cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil:
-        if self.use_cache:
-            self.current_cache.get_neighbors_raw(d_idx, nbrs)
-        else:
-            nbrs.c_reset()
-            self.find_nearest_neighbors(d_idx, nbrs)
-
-    #### Private protocol ################################################
 
     cdef void _sort_neighbors(self, unsigned int* nbrs, size_t length,
                               unsigned int *gids) nogil:

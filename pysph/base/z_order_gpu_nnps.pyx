@@ -21,7 +21,7 @@ import numpy as np
 cimport numpy as np
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.base.opencl import DeviceArray
+from pysph.base.opencl import DeviceArray, get_config
 
 
 IF UNAME_SYSNAME == "Windows":
@@ -46,6 +46,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
         self.radix_sort = None
+        self.make_vec = cl.array.vec.make_double3 if self.use_double \
+                else cl.array.vec.make_float3
 
         self.helper = GPUNNPSHelper(self.ctx, "z_order_gpu_nnps.mako",
                                     self.use_double)
@@ -86,7 +88,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         pa_gpu = pa_wrapper.pa.gpu
         fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z,
-                self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
+                self.cell_size,
+                self.make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
                 self.pid_keys[pa_index].array, self.pids[pa_index].array)
 
         if self.radix_sort is None:
@@ -119,13 +122,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         map_cid_to_idx = self.helper.get_kernel("map_cid_to_idx")
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
-
         map_cid_to_idx(
             pa_gpu.x, pa_gpu.y, pa_gpu.z,
             pa_wrapper.get_number_of_particles(), self.cell_size,
-            make_vec(self.xmin.data[0], self.xmin.data[1], self.xmin.data[2]),
+            self.make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
             self.pids[pa_index].array, self.pid_keys[pa_index].array,
             self.cids[pa_index].array, self.cid_to_idx[pa_index].array
         )
@@ -191,58 +191,54 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
             fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
 
-            make_vec = cl.array.vec.make_double3 if self.use_double \
-                    else cl.array.vec.make_float3
-
             dst_gpu = self.dst.pa.gpu
             fill_overflow_map(self.dst_to_src.array,
                     self.cid_to_idx[dst_index].array, dst_gpu.x, dst_gpu.y,
                     dst_gpu.z, self.src.get_number_of_particles(),
                     self.cell_size,
-                    make_vec(self.xmin.data[0], self.xmin.data[1],
-                        self.xmin.data[2]),
+                    self.make_vec(self.xmin[0], self.xmin[1],
+                        self.xmin[2]),
                     self.pid_keys[src_index].array, self.pids[dst_index].array,
                     self.overflow_cid_to_idx.array,
                     <unsigned int> self.max_cid[src_index])
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        z_order_nbr_lengths = self.helper.get_kernel("z_order_nbr_lengths",
-                sorted=self._sorted, dst_src=self.dst_src)
-
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        z_order_nbr_lengths = self.helper.get_kernel(
+                "z_order_nbr_lengths", sorted=self._sorted,
+                dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
         z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1],
-                    self.xmin.data[2]), self.src.get_number_of_particles(),
+                self.make_vec(self.xmin[0], self.xmin[1],
+                    self.xmin[2]), self.src.get_number_of_particles(),
                 self.pid_keys[self.src_index].array,
-                self.pids[self.dst_index].array, self.pids[self.src_index].array,
+                self.pids[self.dst_index].array,
+                self.pids[self.src_index].array,
                 self.max_cid[self.src_index], self.cids[self.dst_index].array,
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,
                 nbr_lengths, self.radius_scale2, self.cell_size)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        z_order_nbrs = self.helper.get_kernel("z_order_nbrs",
-                sorted=self._sorted, dst_src=self.dst_src)
-
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        z_order_nbrs = self.helper.get_kernel(
+                "z_order_nbrs", sorted=self._sorted,
+                dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
         z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
-                make_vec(self.xmin.data[0], self.xmin.data[1],
-                    self.xmin.data[2]),
+                self.make_vec(self.xmin[0], self.xmin[1],
+                    self.xmin[2]),
                 self.src.get_number_of_particles(),
                 self.pid_keys[self.src_index].array,
-                self.pids[self.dst_index].array, self.pids[self.src_index].array,
+                self.pids[self.dst_index].array,
+                self.pids[self.src_index].array,
                 self.max_cid[self.src_index], self.cids[self.dst_index].array,
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,
                 start_indices, nbrs, self.radius_scale2, self.cell_size)
+

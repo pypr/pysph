@@ -9,16 +9,15 @@
 
 <%def name="fill_pids_args(data_t)" cached="True">
     ${data_t}* x, ${data_t}* y, ${data_t}* z, ${data_t} cell_size,
-    ${data_t} xmin, ${data_t} ymin, ${data_t} zmin,
-    unsigned long* keys, unsigned int* pids
+    ${data_t}3 min, unsigned long* keys, unsigned int* pids
 </%def>
 
 <%def name="fill_pids_src(data_t)" cached="True">
     unsigned long c_x, c_y, c_z;
     FIND_CELL_ID(
-        x[i] - xmin,
-        y[i] - ymin,
-        z[i] - zmin,
+        x[i] - min.x,
+        y[i] - min.y,
+        z[i] - min.z,
         cell_size, c_x, c_y, c_z
         );
     unsigned long key;

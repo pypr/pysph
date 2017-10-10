@@ -180,6 +180,8 @@ cdef class GPUNNPS(NNPSBase):
             set_queue(self.queue)
 
         self.use_double = get_config().use_double
+        self.dtype = np.float64 if self.use_double else np.float32
+        self.dtype_max = np.finfo(self.dtype).max
 
         # Set the device helper if needed.
         for pa in particles:
@@ -193,6 +195,8 @@ cdef class GPUNNPS(NNPSBase):
             for s_idx in range(len(particles)):
                 _cache.append(GPUNeighborCache(self, d_idx, s_idx))
         self.cache = _cache
+        self.use_double = get_config().use_double
+
 
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs):
         if self.use_cache:
@@ -233,8 +237,8 @@ cdef class GPUNNPS(NNPSBase):
         cdef DomainManager domain = self.domain
 
         # use cell sizes computed by the domain.
-        self.cell_size = domain.cell_size
-        self.hmin = domain.hmin
+        self.cell_size = domain.manager.cell_size
+        self.hmin = domain.manager.hmin
 
         # compute bounds and refresh the data structure
         self._compute_bounds()
@@ -248,6 +252,52 @@ cdef class GPUNNPS(NNPSBase):
         if self.use_cache:
             for cache in self.cache:
                 cache.update()
+
+    def update_domain(self, *args, **kwargs):
+        self.domain.update()
+
+    cdef _compute_bounds(self):
+        """Compute coordinate bounds for the particles"""
+        cdef list pa_wrappers = self.pa_wrappers
+        cdef NNPSParticleArrayWrapper pa_wrapper
+        xmax = -self.dtype_max
+        ymax = -self.dtype_max
+        zmax = -self.dtype_max
+
+        xmin = self.dtype_max
+        ymin = self.dtype_max
+        zmin = self.dtype_max
+
+        for pa_wrapper in pa_wrappers:
+            x = pa_wrapper.pa.gpu.x
+            y = pa_wrapper.pa.gpu.y
+            z = pa_wrapper.pa.gpu.z
+
+            # find min and max of variables
+            xmax = np.maximum(cl.array.max(x), xmax)
+            ymax = np.maximum(cl.array.max(y), ymax)
+            zmax = np.maximum(cl.array.max(z), zmax)
+
+            xmin = np.minimum(cl.array.min(x), xmin)
+            ymin = np.minimum(cl.array.min(y), ymin)
+            zmin = np.minimum(cl.array.min(z), zmin)
+
+        # Add a small offset to the limits.
+        lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
+        xmin -= lx*0.01; ymin -= ly*0.01; zmin -= lz*0.01
+        xmax += lx*0.01; ymax += ly*0.01; zmax += lz*0.01
+
+        # If all of the dimensions have very small extent give it a unit size.
+        _eps = 1e-12
+        if (np.abs(xmax - xmin) < _eps) and (np.abs(ymax - ymin) < _eps) \
+            and (np.abs(zmax - zmin) < _eps):
+            xmin -= 0.5; xmax += 0.5
+            ymin -= 0.5; ymax += 0.5
+            zmin -= 0.5; zmax += 0.5
+
+        # store the minimum and maximum of physical coordinates
+        self.xmin = np.asarray([xmin.get(), ymin.get(), zmin.get()])
+        self.xmax = np.asarray([xmax.get(), ymax.get(), zmax.get()])
 
     cpdef _bin(self, int pa_index):
         raise NotImplementedError("NNPS :: _bin called")
