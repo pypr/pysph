@@ -150,7 +150,7 @@ def get_rho_of_each_sphere(xc, yc, radius=20 * 1e-3, spacing=1 * 1e-3):
     pars = len(x1)
 
     rho = np.ones_like(xc)
-    no_of_spheres = len(rho) / len(x1)
+    no_of_spheres = int(len(rho) / len(x1))
 
     for i in range(no_of_spheres):
         if i < 5:
@@ -295,41 +295,6 @@ class RigidFluidCoupling(Application):
             Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
         ]
         return equations
-        # equations = [
-        #     Group(equations=[
-        #         BodyForce(dest='cube', sources=None, gy=-9.81),
-        #     ], real=False),
-        #     Group(equations=[
-        #         ContinuityEquation(dest='fluid',
-        #                            sources=['fluid', 'tank', 'cube']),
-        #         ContinuityEquation(dest='tank',
-        #                            sources=['tank', 'fluid', 'cube'])
-        #     ]),
-
-        #     # Tait equation of state
-        #     Group(equations=[
-        #         TaitEOSHGCorrection(dest='fluid', sources=None,
-        #                             rho0=self.fluid_rho, c0=self.co,
-        #                             gamma=7.0),
-        #         TaitEOSHGCorrection(dest='tank', sources=None,
-        #                             rho0=self.fluid_rho, c0=self.co,
-        #                             gamma=7.0),
-        #     ], real=False),
-        #     Group(equations=[
-        #         MomentumEquation(dest='fluid', sources=['fluid', 'tank'],
-        #                          alpha=self.alpha, beta=0.0, c0=self.co,
-        #                          gy=-9.81),
-        #         AkinciRigidFluidCoupling(dest='fluid', sources=['cube']),
-        #         XSPHCorrection(dest='fluid', sources=['fluid', 'tank']),
-        #     ]),
-        #     Group(equations=[
-        #         RigidBodyCollision(dest='cube', sources=['tank', 'cube'],
-        #                            kn=1e5)
-        #     ]),
-        #     Group(equations=[RigidBodyMoments(dest='cube', sources=None)]),
-        #     Group(equations=[RigidBodyMotion(dest='cube', sources=None)]),
-        # ]
-        # return equations
 
     def geometry(self):
         import matplotlib.pyplot as plt
