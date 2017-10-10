@@ -63,9 +63,11 @@ def print_profile():
 def profile_kernel(kernel, name):
     def _profile_knl(*args):
         event = kernel(*args)
-        if get_config().profile:
-            profile(name, event)
-    return _profile_knl
+        profile(name, event)
+        return event
+    if get_config().profile:
+        return _profile_knl
+    return kernel
 
 
 class DeviceArray(cl.array.Array):
