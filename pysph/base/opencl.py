@@ -71,7 +71,8 @@ def profile_kernel(kernel, name):
         return event
     if get_config().profile:
         return _profile_knl
-    return kernel
+    else:
+        return kernel
 
 
 class DeviceArray(cl.array.Array):
