@@ -5,10 +5,10 @@ Check basic equations of SPH to throw a ball inside the vessel
 
 Geometry will be like
 
-                                         ___
-                                        /   \
-                                        |   |
-    ^  ||        ___      ___           \___/            ___      ___       ||
+
+
+
+    ^  ||        ___      ___                            ___      ___       ||
     |  ||       /   \    /   \                          /   \    /   \      ||
     |  ||       |   |    |   |                          |   |    |   |      ||
     |  ||    ___\___/ ___\___/  ___                 ___ \___/ ___\___/ ___  ||
@@ -47,8 +47,7 @@ from pysph.sph.integrator import EPECIntegrator
 from pysph.sph.integrator_step import WCSPHStep
 
 from pysph.sph.equation import Group
-from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation,
-                                       SummationDensity)
+from pysph.sph.basic_equations import (XSPHCorrection, SummationDensity)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation
 from pysph.solver.application import Application
 from pysph.sph.rigid_body import (

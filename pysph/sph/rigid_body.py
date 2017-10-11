@@ -243,9 +243,10 @@ class BodyForce(Equation):
 
 
 class SummationDensityBoundary(Equation):
-    r"""Good old Summation density:
+    r"""Equation to find the density of the
+    fluid particle due to any boundary or a rigid body
 
-    :math:`\rho_a = \sum_b m_b W_{ab}`
+    :math:`\rho_a = \sum_b {\rho}_fluid V_b W_{ab}`
 
     """
     def __init__(self, dest, sources, fluid_rho=1000.0):
