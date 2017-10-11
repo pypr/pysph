@@ -137,14 +137,11 @@ class DeviceHelper(object):
         self._dtype = np.float64 if use_double else np.float32
         self._data = {}
         self._props = []
-        self._alloc = 0
 
         for prop, ary in pa.properties.items():
             self.add_prop(prop, ary)
         for prop, ary in pa.constants.items():
             self.add_prop(prop, ary)
-        if self._data:
-            self._alloc = len(self._data['x'])
 
     def _get_array(self, ary):
         ctype = ary.get_c_type()
@@ -163,11 +160,10 @@ class DeviceHelper(object):
         particle array.
         """
         np_array = self._get_array(carray)
-        g_ary = cl.array.empty(self._queue, carray.alloc, np_array.dtype)
-        view = g_ary[:carray.length]
-        view.set(np_array)
+        g_ary = DeviceArray(np_array.dtype, n=carray.length)
+        g_ary.array.set(np_array)
         self._data[name] = g_ary
-        setattr(self, name, view)
+        setattr(self, name, g_ary.array)
         if name in self._particle_array.properties:
             self._props.append(name)
 
@@ -198,16 +194,6 @@ class DeviceHelper(object):
             delattr(self, name)
 
     def resize(self, new_size):
-        if new_size > self._alloc:
-            for prop in self._props:
-                old_prop = self._data[prop]
-                new_prop = cl.array.empty(
-                    self._queue, new_size, dtype=old_prop.dtype
-                )
-                sz = min(len(old_prop), new_size)
-                new_prop[:sz] = old_prop[:sz]
-                self._data[prop] = new_prop
-            self._alloc = new_size
-
         for prop in self._props:
-            setattr(self, prop, self._data[prop][:new_size])
+            self._data[prop].resize(new_size)
+            setattr(self, prop, self._data[prop].array)
