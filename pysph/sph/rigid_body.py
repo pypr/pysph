@@ -242,6 +242,21 @@ class BodyForce(Equation):
         d_fz[d_idx] = d_m[d_idx]*self.gz
 
 
+class SummationDensityBoundary(Equation):
+    r"""Equation to find the density of the
+    fluid particle due to any boundary or a rigid body
+
+    :math:`\rho_a = \sum_b {\rho}_fluid V_b W_{ab}`
+
+    """
+    def __init__(self, dest, sources, fluid_rho=1000.0):
+        self.fluid_rho = fluid_rho
+        super(SummationDensityBoundary, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_rho, s_idx, s_m, s_V, WIJ):
+        d_rho[d_idx] += self.fluid_rho * s_V[s_idx] * WIJ
+
+
 class NumberDensity(Equation):
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0
@@ -318,6 +333,46 @@ class PressureRigidBody(Equation):
         s_fx[s_idx] += -d_m[d_idx]*ax
         s_fy[s_idx] += -d_m[d_idx]*ay
         s_fz[s_idx] += -d_m[d_idx]*az
+
+
+class AkinciRigidFluidCoupling(Equation):
+    """Force between a solid sphere and a SPH fluid particle.  This is
+    implemented using Akinci's[1] force and additional force from solid
+    bodies pressure which is implemented by Liu[2]
+
+    [1]'Versatile Rigid-Fluid Coupling for Incompressible SPH'
+
+    URL: https://graphics.ethz.ch/~sobarbar/papers/Sol12/Sol12.pdf
+
+    [2]A 3D Simulation of a Moving Solid in Viscous Free-Surface Flows by
+    Coupling SPH and DEM
+
+    https://doi.org/10.1155/2017/3174904
+
+
+    Note: Here forces for both the phases are added at once.
+          Please make sure that this force is applied only once
+          for both the particle properties.
+
+    """
+    def __init__(self, dest, sources, fluid_rho=1000):
+        super(AkinciRigidFluidCoupling, self).__init__(dest, sources)
+        self.fluid_rho = fluid_rho
+
+    def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
+             s_idx, s_V, s_fx, s_fy, s_fz, DWIJ, s_m, s_p, s_rho):
+
+        psi = s_V[s_idx] * self.fluid_rho
+
+        _t1 = 2 * d_p[d_idx] / (d_rho[d_idx]**2)
+
+        d_au[d_idx] += -psi * _t1 * DWIJ[0]
+        d_av[d_idx] += -psi * _t1 * DWIJ[1]
+        d_aw[d_idx] += -psi * _t1 * DWIJ[2]
+
+        s_fx[s_idx] += d_m[d_idx] * psi * _t1 * DWIJ[0]
+        s_fy[s_idx] += d_m[d_idx] * psi * _t1 * DWIJ[1]
+        s_fz[s_idx] += d_m[d_idx] * psi * _t1 * DWIJ[2]
 
 
 class LiuFluidForce(Equation):
