@@ -75,7 +75,7 @@ def profile_kernel(kernel, name):
         return kernel
 
 
-class DeviceArray(cl.array.Array):
+class DeviceArray(object):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()
         length = n
