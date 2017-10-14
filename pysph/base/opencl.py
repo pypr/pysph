@@ -51,7 +51,7 @@ def profile(name, event):
 
 def print_profile():
     global _profile_info
-    _profile_info = sorted(_profile_info.iteritems(), key=itemgetter(1),
+    _profile_info = sorted(_profile_info.items(), key=itemgetter(1),
                            reverse=True)
     if len(_profile_info) == 0:
         print("No profile information available")

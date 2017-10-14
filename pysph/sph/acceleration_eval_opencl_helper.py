@@ -2,6 +2,7 @@ from functools import partial
 import inspect
 import os
 import re
+import sys
 from textwrap import wrap
 
 import numpy as np
@@ -14,7 +15,7 @@ from pysph.base.config import get_config
 from pysph.base.utils import is_overloaded_method
 from pysph.base.ext_module import get_platform_dir
 from pysph.base.opencl import (profile_kernel, get_context, get_queue,
-                                DeviceHelper)
+                               DeviceHelper)
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
@@ -314,7 +315,8 @@ class AccelerationEvalOpenCLHelper(object):
         with open(fname, 'w') as fp:
             fp.write(code)
             print("OpenCL code written to %s" % fname)
-        self.program = cl.Program(self._ctx, code.encode('ascii')).build(
+        code = code.encode('ascii') if sys.version_info.major < 3 else code
+        self.program = cl.Program(self._ctx, code).build(
             options=['-w']
         )
         return self.program

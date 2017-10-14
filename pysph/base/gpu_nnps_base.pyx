@@ -274,13 +274,13 @@ cdef class GPUNNPS(NNPSBase):
             z = pa_wrapper.pa.gpu.z
 
             # find min and max of variables
-            xmax = np.maximum(cl.array.max(x), xmax)
-            ymax = np.maximum(cl.array.max(y), ymax)
-            zmax = np.maximum(cl.array.max(z), zmax)
+            xmax = np.maximum(cl.array.max(x).get(), xmax)
+            ymax = np.maximum(cl.array.max(y).get(), ymax)
+            zmax = np.maximum(cl.array.max(z).get(), zmax)
 
-            xmin = np.minimum(cl.array.min(x), xmin)
-            ymin = np.minimum(cl.array.min(y), ymin)
-            zmin = np.minimum(cl.array.min(z), zmin)
+            xmin = np.minimum(cl.array.min(x).get(), xmin)
+            ymin = np.minimum(cl.array.min(y).get(), ymin)
+            zmin = np.minimum(cl.array.min(z).get(), zmin)
 
         # Add a small offset to the limits.
         lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
@@ -296,8 +296,8 @@ cdef class GPUNNPS(NNPSBase):
             zmin -= 0.5; zmax += 0.5
 
         # store the minimum and maximum of physical coordinates
-        self.xmin = np.asarray([xmin.get(), ymin.get(), zmin.get()])
-        self.xmax = np.asarray([xmax.get(), ymax.get(), zmax.get()])
+        self.xmin = np.asarray([xmin, ymin, zmin])
+        self.xmax = np.asarray([xmax, ymax, zmax])
 
     cpdef _bin(self, int pa_index):
         raise NotImplementedError("NNPS :: _bin called")
