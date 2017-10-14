@@ -103,15 +103,15 @@ class GPUDomainManager(object):
         for pa_wrapper in self.pa_wrappers:
             h = pa_wrapper.pa.gpu.h
 
-            _hmax = cl.array.max(h)
-            _hmin = cl.array.min(h)
+            _hmax = float(cl.array.max(h).get())
+            _hmin = float(cl.array.min(h).get())
             if _hmax > hmax:
                 hmax = _hmax
             if _hmin < hmin:
                 hmin = _hmin
 
-        cell_size = self.radius_scale * hmax.get()
-        self.hmin = self.radius_scale * hmin.get()
+        cell_size = self.radius_scale * hmax
+        self.hmin = self.radius_scale * hmin
 
         if cell_size < 1e-6:
             cell_size = 1.0
