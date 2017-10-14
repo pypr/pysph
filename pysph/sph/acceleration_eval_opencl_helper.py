@@ -84,10 +84,8 @@ class OpenCLAccelerationEval(object):
                 cache._start_idx_gpu.array.data,
                 cache._neighbors_gpu.array.data
             ] + extra_args
-            call = profile_kernel(call, call.function_name)
             call(*args)
         else:
-            call = profile_kernel(call, call.function_name)
             call(*(args + extra_args))
         self._queue.finish()
 
@@ -255,6 +253,7 @@ class AccelerationEvalOpenCLHelper(object):
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
+                method = profile_kernel(method, method.function_name)
                 dest = item['dest']
                 src = item.get('source', dest)
                 args = [self._queue, None, None]
