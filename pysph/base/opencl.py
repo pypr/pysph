@@ -120,6 +120,9 @@ class DeviceArray(object):
     def fill(self, value):
         self.array.fill(value)
 
+    def align(self, indices):
+        self.set_data(cl.array.take(self.array, indices))
+
 
 class DeviceHelper(object):
     """Manages the arrays contained in a particle array on the device.
@@ -153,6 +156,12 @@ class DeviceHelper(object):
     def _get_prop_or_const(self, prop):
         pa = self._particle_array
         return pa.properties.get(prop, pa.constants.get(prop))
+
+    def align(self, indices):
+        pa = self._particle_array
+        for prop in pa.properties.keys():
+            self._data[prop].align(indices)
+            setattr(self, prop, self._data[prop].array)
 
     def add_prop(self, name, carray):
         """Add a new property or constant given the name and carray, note

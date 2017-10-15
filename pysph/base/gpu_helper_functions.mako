@@ -1,7 +1,7 @@
 //CL//
 
 <%def name="get_helpers()" cached="True">
-    #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+    #define NORM2(X, Y, Z) mad(X, X, mad(Y, Y, Z*Z))
 
     #define FIND_CELL_ID(x, y, z, h, c_x, c_y, c_z) \
         c_x = floor((x)/h); c_y = floor((y)/h); c_z = floor((z)/h)

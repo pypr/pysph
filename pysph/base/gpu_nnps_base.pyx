@@ -212,17 +212,15 @@ cdef class GPUNNPS(NNPSBase):
             self.set_context(src_index, dst_index)
         self.cache[idx].get_neighbors_gpu()
 
+    cpdef get_spatially_ordered_indices(self, int pa_index):
+        raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
+
     cpdef spatially_order_particles(self, int pa_index):
         """Spatially order particles such that nearby particles have indices
         nearer each other.  This may improve pre-fetching on the CPU.
         """
-        cdef LongArray indices = LongArray()
-        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
-        self.get_spatially_ordered_indices(pa_index, indices)
-        cdef BaseArray arr
-
-        for arr in pa.properties.values():
-            arr.c_align_array(indices)
+        indices = self.get_spatially_ordered_indices(pa_index)
+        self.particles[pa_index].gpu.align(indices)
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
@@ -304,6 +302,7 @@ cdef class GPUNNPS(NNPSBase):
 
     cpdef _refresh(self):
         raise NotImplementedError("NNPS :: _refresh called")
+
 
 cdef class BruteForceNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,

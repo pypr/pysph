@@ -81,6 +81,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.domain.update()
         self.update()
 
+    cpdef get_spatially_ordered_indices(self, int pa_index):
+        self._sorted = True
+        return self.pids[pa_index].array
+
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
 
