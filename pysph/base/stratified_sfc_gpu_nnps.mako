@@ -98,6 +98,8 @@
 <%def name="find_nbr_lengths_src(data_t, sorted)" cached="True">
     ${find_nbrs_prep(data_t, sorted)}
 
+    unsigned int length = 0;
+
     #pragma unroll
     for(level=0; level<num_levels; level++)
     {
@@ -141,13 +143,15 @@
                         dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
                                 q.z - s_z[pid]);
                         if(dist < h_i || dist < h_j)
-                            nbr_lengths[qid] += 1;
+                            length++;
                         idx++;
                     }
                 }
             }
         }
     }
+
+    nbr_lengths[qid] = length;
 
 </%def>
 

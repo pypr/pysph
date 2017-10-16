@@ -352,6 +352,7 @@ cdef class BruteForceNNPS(GPUNNPS):
 
         src = """
                 unsigned int j;
+                unsigned int length = 0;
                 %(data_t)s dist;
                 %(data_t)s h_i = radius_scale2*d_h[i]*d_h[i];
                 %(data_t)s h_j;
@@ -360,8 +361,9 @@ cdef class BruteForceNNPS(GPUNNPS):
                     h_j = radius_scale2*s_h[j]*s_h[j];
                     dist = NORM2(d_x[i] - s_x[j], d_y[i] - s_y[j], d_z[i] - s_z[j]);
                     if(dist < h_i || dist < h_j)
-                        nbr_lengths[i] += 1;
+                        length += 1;
                 }
+                nbr_lengths[i] = length;
                 """ % {"data_t" : ("double" if self.use_double else "float")}
 
         brute_force_nbr_lengths = ElementwiseKernel(
