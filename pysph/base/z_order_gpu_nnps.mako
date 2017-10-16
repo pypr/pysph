@@ -215,6 +215,8 @@
 <%def name="z_order_nbr_lengths_src(data_t, sorted, dst_src)" cached="False">
     ${z_order_nbrs_prep(data_t, sorted, dst_src)}
 
+    unsigned int length = 0;
+
     #pragma unroll
     for(j=0; j<27; j++)
     {
@@ -230,10 +232,12 @@
             dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
                     q.z - s_z[pid]);
             if(dist < h_i || dist < h_j)
-                nbr_lengths[qid] += 1;
+                length++;
             idx++;
         }
     }
+
+    nbr_lengths[qid] = length;
 
 </%def>
 
