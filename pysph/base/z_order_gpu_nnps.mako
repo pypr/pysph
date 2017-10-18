@@ -227,7 +227,11 @@
 
         while(idx < num_particles && keys[idx] == key)
         {
-            pid = pids_src[idx];
+            % if sorted:
+                pid = pids_src[idx];
+            % else:
+                pid = idx;
+            % endif
             h_j = radius_scale2*s_h[pid]*s_h[pid];
             dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
                     q.z - s_z[pid]);
@@ -269,12 +273,17 @@
 
         while(idx < num_particles && keys[idx] == key)
         {
-            pid = pids_src[idx];
+            % if sorted:
+                pid = pids_src[idx];
+            % else:
+                pid = idx;
+            % endif
             h_j = radius_scale2*s_h[pid]*s_h[pid];
             dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
                     q.z - s_z[pid]);
             if(dist < h_i || dist < h_j)
             {
+                // This should be pids[idx]
                 nbrs[start_idx + curr_idx] = pid;
                 curr_idx++;
             }
@@ -282,6 +291,14 @@
         }
     }
 
+</%def>
+
+<%def name="sort_cid_to_idx_args(data_t)" cached="False">
+    int* cid_to_idx, unsigned int* pids
+</%def>
+
+<%def name="sort_cid_to_idx_src(data_t)" cached="False">
+    cid_to_idx[i] = (cid_to_idx[i] != -1) ? pids[cid_to_idx[i]] : -1;
 </%def>
 
 

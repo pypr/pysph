@@ -83,6 +83,12 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cpdef get_spatially_ordered_indices(self, int pa_index):
         self._sorted = True
+        self.cids[pa_index].align(self.pids[pa_index].array)
+        #self.pid_keys[pa_index].align(self.pids[pa_index].array)
+
+        #sort_cid_to_idx = self.helper.get_kernel("sort_cid_to_idx")
+        #sort_cid_to_idx(self.cid_to_idx[pa_index].array,
+        #        self.pids[pa_index].array)
         return self.pids[pa_index].array
 
     cpdef _bin(self, int pa_index):
