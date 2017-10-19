@@ -217,6 +217,8 @@
 
     unsigned int length = 0;
 
+    ${data_t}4 s;
+
     #pragma unroll
     for(j=0; j<27; j++)
     {
@@ -228,10 +230,10 @@
         while(idx < num_particles && keys[idx] == key)
         {
             pid = pids_src[idx];
-            h_j = radius_scale2*s_h[pid]*s_h[pid];
-            dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
-                    q.z - s_z[pid]);
-            if(dist < h_i || dist < h_j)
+            s = (${data_t}4)(s_x[pid], s_y[pid], s_z[pid], s_h[pid]);
+            h_j = radius_scale2 * s.w * s.w;
+            dist = NORM2(q.x - s.x, q.y - s.y, q.z - s.z);
+           if(dist < h_i || dist < h_j)
                 length++;
             idx++;
         }
@@ -259,6 +261,8 @@
     unsigned long start_idx = (unsigned long) start_indices[qid];
     unsigned long curr_idx = 0;
 
+    ${data_t}4 s;
+
     #pragma unroll
     for(j=0; j<27; j++)
     {
@@ -270,9 +274,9 @@
         while(idx < num_particles && keys[idx] == key)
         {
             pid = pids_src[idx];
-            h_j = radius_scale2*s_h[pid]*s_h[pid];
-            dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
-                    q.z - s_z[pid]);
+            s = (${data_t}4)(s_x[pid], s_y[pid], s_z[pid], s_h[pid]);
+            h_j = radius_scale2 * s.w * s.w;
+            dist = NORM2(q.x - s.x, q.y - s.y, q.z - s.z);
             if(dist < h_i || dist < h_j)
             {
                 nbrs[start_idx + curr_idx] = pid;
