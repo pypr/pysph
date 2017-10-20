@@ -5,14 +5,26 @@ from __future__ import print_function
 import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
+import pyopencl.algorithm
+import pyopencl.tools
+from pyopencl.scan import GenericScanKernel
+from pyopencl.elementwise import ElementwiseKernel
 from collections import defaultdict
 from operator import itemgetter
+from mako.template import Template
 
 from .config import get_config
 
 _ctx = None
 _queue = None
 _profile_info = defaultdict(float)
+
+
+# args: uint* indices, dtype array, int length
+REMOVE_KNL = Template(r"""//CL//
+        unsigned int idx = indices[n - 1 - i];
+        array[idx] = array[length - 1 - i];
+""", disable_unicode=True)
 
 
 def get_context():
@@ -75,9 +87,19 @@ def profile_kernel(kernel, name):
         return kernel
 
 
+def get_elwise_kernel(kernel_name, args, src, preamble=""):
+    ctx = get_context()
+    knl = ElementwiseKernel(
+        ctx, args, src,
+        kernel_name, preamble=preamble
+    )
+    return profile_kernel(knl, kernel_name)
+
+
 class DeviceArray(object):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()
+        self.ctx = get_context()
         length = n
         if n == 0:
             n = 16
@@ -120,6 +142,49 @@ class DeviceArray(object):
     def fill(self, value):
         self.array.fill(value)
 
+    def append(self, value):
+        if self.length >= self.alloc:
+            self.reserve(2 * self.length)
+        self._data[self.length] = value
+        self.length += 1
+        self._update_array_ref()
+
+    def extend(self, cl_arr):
+        if self.length + len(cl_arr) > self.alloc:
+            self.reserve(self.length + len(cl_arr))
+        self._data[-len(cl_arr):] = cl_arr
+        self.length += len(cl_arr)
+        self._update_array_ref()
+
+    def remove(self, indices, input_sorted=False):
+        if len(indices) > self.length:
+            return
+
+        if not input_sorted:
+            radix_sort = cl.algorithm.RadixSort(
+                self.ctx,
+                "unsigned int* indices",
+                scan_kernel=GenericScanKernel, key_expr="indices[i]",
+                sort_arg_names=["indices"]
+                )
+
+            (sorted_indices,), event = radix_sort(indices)
+
+        else:
+            sorted_indices = indices
+
+        args = "uint* indices, %(dtype)s* array, uint length" % \
+                {"dtype" : cl.tools.dtype_to_ctype(self.dtype)}
+        src = REMOVE_KNL.render()
+        remove = get_elwise_kernel("remove", args, src)
+
+        remove(sorted_indices, self.array, self.length)
+        self.length -= len(indices)
+        self._update_array_ref()
+
+    def align(self, indices):
+        self.set_data(cl.array.take(self.array, indices))
+
 
 class DeviceHelper(object):
     """Manages the arrays contained in a particle array on the device.
@@ -153,6 +218,12 @@ class DeviceHelper(object):
     def _get_prop_or_const(self, prop):
         pa = self._particle_array
         return pa.properties.get(prop, pa.constants.get(prop))
+
+    def align(self, indices):
+        pa = self._particle_array
+        for prop in pa.properties.keys():
+            self._data[prop].align(indices)
+            setattr(self, prop, self._data[prop].array)
 
     def add_prop(self, name, carray):
         """Add a new property or constant given the name and carray, note

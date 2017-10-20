@@ -67,6 +67,66 @@ class TestDeviceArray(TestCase):
         dev_array_copy.array[0] = 2
         assert dev_array.array[0] != dev_array_copy.array[0]
 
+    def test_append_with_reallocation(self):
+        # Given
+        dev_array = self.make_dev_array()
+
+        # When
+        dev_array.append(2)
+
+        # Then
+        assert dev_array.array[-1] == 2
+        assert len(dev_array.get_data()) == 32
+
+    def test_append_without_reallocation(self):
+        # Given
+        dev_array = self.make_dev_array()
+        dev_array.reserve(20)
+
+        # When
+        dev_array.append(2)
+
+        # Then
+        assert dev_array.array[-1] == 2
+        assert len(dev_array.get_data()) == 20
+
+    def test_extend(self):
+        # Given
+        dev_array = self.make_dev_array()
+        cl_array = 2 + cl.array.zeros(get_queue(), 64, dtype=np.int32)
+
+        # When
+        dev_array.extend(cl_array)
+
+        # Then
+        assert np.all(dev_array.array[-len(cl_array)].get() == cl_array.get())
+
+    def test_remove(self):
+        # Given
+        dev_array = DeviceArray(np.int32)
+        orig_array = cl.array.arange(get_queue(), 0, 16, 1, dtype=np.int32)
+        dev_array.set_data(orig_array)
+        indices = cl.array.arange(get_queue(), 0, 8, 1, dtype=np.int32)
+
+        # When
+        dev_array.remove(indices)
+
+        # Then
+        assert np.all(dev_array.array.get() == (8 + indices).get())
+
+    def test_align(self):
+        # Given
+        dev_array = DeviceArray(np.int32)
+        orig_array = cl.array.arange(get_queue(), 0, 16, 1, dtype=np.int32)
+        dev_array.set_data(orig_array)
+        indices = cl.array.arange(get_queue(), 15, -1, -1, dtype=np.int32)
+
+        # When
+        dev_array.align(indices)
+
+        # Then
+        assert np.all(dev_array.array.get() == indices.get())
+
 
 class TestDeviceHelper(TestCase):
     def setUp(self):
