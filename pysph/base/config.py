@@ -37,7 +37,7 @@ class Config(object):
         if len(value) != 2 or \
            value[0].lower() not in ("static", "dynamic", "guided"):
             raise ValueError("Invalid OpenMP Schedule")
-        
+
         self._omp_schedule = value
 
     def set_omp_schedule(self, omp_schedule):
@@ -53,7 +53,7 @@ class Config(object):
 
     def _omp_schedule_default(self):
         return ("dynamic", 64)
-    
+
     @property
     def use_opencl(self):
         if self._use_opencl is None:

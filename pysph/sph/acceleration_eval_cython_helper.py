@@ -244,15 +244,15 @@ class AccelerationEvalCythonHelper(object):
 
             if chunksize is not None:
                 args = args + ", chunksize={chunksize}"
-            
+
             args = args.format(start=start, stop=stop, step=step,
                                schedule=schedule, chunksize=chunksize)
             return "prange({})".format(args)
-        
+
         else:
             args = args.format(start=start, stop=stop, step=step)
             return "range({})".format(args)
-        
+
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)

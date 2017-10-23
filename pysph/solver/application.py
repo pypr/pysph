@@ -17,8 +17,8 @@ from pysph.base import utils
 from pysph.base.utils import is_overloaded_method
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
-        StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
+    ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
+    StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -396,7 +396,7 @@ class Application(object):
             default="dynamic,64",
             help="""Schedule how loop iterations 
             are divided amongst multiple threads""")
-        
+
         # --opencl
         parser.add_argument(
             "--opencl",
