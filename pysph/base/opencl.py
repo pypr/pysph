@@ -372,7 +372,7 @@ class DeviceHelper(object):
         if len(indices) > self.get_number_of_particles():
             msg = 'Number of particles to be removed is greater than'
             msg += 'number of particles in array'
-            raise ValueError, msg
+            raise ValueError(msg)
 
         radix_sort = cl.algorithm.RadixSort(
             self._ctx,
