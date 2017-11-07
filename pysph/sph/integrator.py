@@ -90,10 +90,7 @@ class Integrator(object):
             if h.minimum < hmin:
                 hmin = h.minimum
 
-        if pa.gpu:
-            self.h_minimum = hmin.get()
-        else:
-            self.h_minimum = hmin
+        self.h_minimum = hmin
 
     def compute_time_step(self, dt, cfl):
         """If there are any adaptive timestep constraints, the appropriate
