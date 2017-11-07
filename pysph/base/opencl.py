@@ -152,8 +152,8 @@ class DeviceArray(object):
         return arr_copy
 
     def update_min_max(self):
-        self.minimum = cl.array.min(self.array).get()
-        self.maximum = cl.array.max(self.array).get()
+        self.minimum = float(cl.array.min(self.array).get())
+        self.maximum = float(cl.array.max(self.array).get())
 
     def fill(self, value):
         self.array.fill(value)
@@ -247,7 +247,7 @@ class DeviceHelper(object):
         if prop in self._props:
             return
         else:
-            raise AttributeError, 'property %s not present'%(prop)
+            raise AttributeError('property %s not present' % (prop))
 
     def get_number_of_particles(self, real=False):
         if real:
