@@ -127,6 +127,46 @@ class TestDeviceArray(TestCase):
         # Then
         assert np.all(dev_array.array.get() == indices.get())
 
+    def test_squeeze(self):
+        # Given
+        dev_array = self.make_dev_array()
+        dev_array.fill(2)
+        dev_array.reserve(32)
+        assert dev_array.alloc == 32
+
+        # When
+        dev_array.squeeze()
+
+        # Then
+        assert dev_array.alloc == 16
+
+    def test_copy_values(self):
+        # Given
+        dev_array = self.make_dev_array()
+        dev_array.fill(2)
+
+        dest = cl.array.empty(get_queue(), 8, dtype=np.int32)
+        indices = cl.array.arange(get_queue(), 0, 8, 1, dtype=np.int32)
+
+        # When
+        dev_array.copy_values(indices, dest)
+
+        # Then
+        assert np.all(dev_array.array[:len(indices)].get() == dest.get())
+
+    def test_min_max(self):
+        # Given
+        dev_array = self.make_dev_array()
+        dev_array.fill(2)
+        dev_array.array[0], dev_array.array[1] = 1, 10
+
+        # When
+        dev_array.update_min_max()
+
+        # Then
+        assert dev_array.minimum == 1
+        assert dev_array.maximum == 10
+
 
 class TestDeviceHelper(TestCase):
     def setUp(self):
@@ -285,3 +325,102 @@ class TestDeviceHelper(TestCase):
         self.assertTrue(np.allclose(pa.m, h.m.get()))
         self.assertTrue(np.allclose(pa.rho, h.rho.get()))
         self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+
+    def test_get_number_of_particles(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        h.resize(5)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+        h.tag.set(np.array([0, 0, 1, 0, 1], h.tag.dtype))
+
+        h.align_particles()
+
+        # Then
+        assert h.get_number_of_particles() == 5
+        assert h.get_number_of_particles(real=True) == 3
+
+    def test_align(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        h.resize(5)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+
+        indices = cl.array.arange(get_queue(), 4, -1, -1, dtype=np.int32)
+
+        h.align(indices)
+
+        # Then
+        assert np.all(h.x.get() == np.array([6., 5., 4., 3., 2.]))
+
+    def test_align_particles(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        h.resize(5)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+        h.tag.set(np.array([0, 0, 1, 0, 1], h.tag.dtype))
+
+        h.align_particles()
+
+        # Then
+        x = h.x.get()
+        assert np.all(np.sort(x[:-2]) == np.array([2., 3., 5.]))
+
+    def test_remove_particles(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        h.resize(5)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+
+        indices = np.array([1, 2], dtype=np.uint32)
+        indices = cl.array.to_device(get_queue(), indices)
+
+        h.remove_particles(indices)
+
+        # Then
+        assert np.all(np.sort(h.x.get()) == np.array([2., 5., 6.]))
+
+    def test_remove_tagged_particles(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        h.resize(5)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+        h.tag.set(np.array([0, 0, 1, 0, 1], h.tag.dtype))
+
+        h.remove_tagged_particles(1)
+
+        # Then
+        assert np.all(np.sort(h.x.get()) == np.array([2., 3., 5.]))
+
+    def test_add_particles(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+        x = cl.array.zeros(get_queue(), 4, np.float32)
+
+        h.add_particles(x=x)
+
+        # Then
+        assert np.all(np.sort(h.x.get()) == np.array([0., 0., 0., 0., 0., 1.]))

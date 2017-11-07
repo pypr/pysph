@@ -1105,7 +1105,7 @@ cdef class ParticleArray:
                 index_array.data[i] = i
 
         self.num_real_particles = num_real_particles
-        # we now have the aligned indices. Rearrage the particles particles
+        # we now have the aligned indices. Rearrange the particles
         # accordingly.
         arrays = list(self.properties.values())
         num_arrays = len(arrays)

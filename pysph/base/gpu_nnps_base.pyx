@@ -267,18 +267,22 @@ cdef class GPUNNPS(NNPSBase):
         zmin = self.dtype_max
 
         for pa_wrapper in pa_wrappers:
-            x = pa_wrapper.pa.gpu.x
-            y = pa_wrapper.pa.gpu.y
-            z = pa_wrapper.pa.gpu.z
+            x = pa_wrapper.pa.gpu.get_device_array('x')
+            y = pa_wrapper.pa.gpu.get_device_array('y')
+            z = pa_wrapper.pa.gpu.get_device_array('z')
+
+            x.update_min_max()
+            y.update_min_max()
+            z.update_min_max()
 
             # find min and max of variables
-            xmax = np.maximum(cl.array.max(x), xmax)
-            ymax = np.maximum(cl.array.max(y), ymax)
-            zmax = np.maximum(cl.array.max(z), zmax)
+            xmax = np.maximum(x.maximum, xmax)
+            ymax = np.maximum(y.maximum, ymax)
+            zmax = np.maximum(z.maximum, zmax)
 
-            xmin = np.minimum(cl.array.min(x), xmin)
-            ymin = np.minimum(cl.array.min(y), ymin)
-            zmin = np.minimum(cl.array.min(z), zmin)
+            xmin = np.minimum(x.minimum, xmin)
+            ymin = np.minimum(y.minimum, ymin)
+            zmin = np.minimum(z.minimum, zmin)
 
         # Add a small offset to the limits.
         lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin

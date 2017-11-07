@@ -233,7 +233,7 @@
             s = (${data_t}4)(s_x[pid], s_y[pid], s_z[pid], s_h[pid]);
             h_j = radius_scale2 * s.w * s.w;
             dist = NORM2(q.x - s.x, q.y - s.y, q.z - s.z);
-           if(dist < h_i || dist < h_j)
+            if(dist < h_i || dist < h_j)
                 length++;
             idx++;
         }
