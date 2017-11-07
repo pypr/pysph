@@ -298,8 +298,8 @@ cdef class GPUNNPS(NNPSBase):
             zmin -= 0.5; zmax += 0.5
 
         # store the minimum and maximum of physical coordinates
-        self.xmin = np.asarray([xmin.get(), ymin.get(), zmin.get()])
-        self.xmax = np.asarray([xmax.get(), ymax.get(), zmax.get()])
+        self.xmin = np.asarray([xmin, ymin, zmin])
+        self.xmax = np.asarray([xmax, ymax, zmax])
 
     cpdef _bin(self, int pa_index):
         raise NotImplementedError("NNPS :: _bin called")

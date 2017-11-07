@@ -106,13 +106,14 @@ class GPUDomainManager(object):
 
             _hmax = h.maximum
             _hmin = h.minimum
+
             if _hmax > hmax:
                 hmax = _hmax
             if _hmin < hmin:
                 hmin = _hmin
 
-        cell_size = self.radius_scale * hmax.get()
-        self.hmin = self.radius_scale * hmin.get()
+        cell_size = self.radius_scale * hmax
+        self.hmin = self.radius_scale * hmin
 
         if cell_size < 1e-6:
             cell_size = 1.0

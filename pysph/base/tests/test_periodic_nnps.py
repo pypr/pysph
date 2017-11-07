@@ -7,8 +7,8 @@ import numpy as np
 from pysph.base.nnps import DomainManager, BoxSortNNPS, LinkedListNNPS, \
     SpatialHashNNPS, ExtendedSpatialHashNNPS
 from pysph.base.utils import get_particle_array
-from pysph.base.point import Point
 from pysph.base.kernels import Gaussian, get_compiled_kernel
+import pysph.tools.geometry as G
 
 # PyZoltan CArrays
 from pyzoltan.core.carray import UIntArray
@@ -70,9 +70,9 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
         channel = get_particle_array(name='channel', x=x, y=y, h=h, m=m, V=V)
 
         # particles and domain
-        self.particles = particles = [fluid, channel]
-        self.domain = domain = DomainManager(xmin=0, xmax=L,
-                                             periodic_in_x=True)
+        self.particles = [fluid, channel]
+        self.domain = DomainManager(xmin=0, xmax=L,
+                                    periodic_in_x=True)
         self.kernel = get_compiled_kernel(Gaussian(dim=2))
 
     def _test_periodicity_flags(self):
@@ -115,7 +115,6 @@ class PeriodicChannel2DTestCase(unittest.TestCase):
 
             for indexj in range(nnbrs):
                 j = nbrs[indexj]
-                xj = Point(sx[j], sy[j])
                 hij = 0.5 * (hi + sh[j])
 
                 frho[i] += sm[j] * \
@@ -207,12 +206,95 @@ class PeriodicChannel2DExtendedSpatialHash(PeriodicChannel2DTestCase):
             radius_scale=self.kernel.radius_scale)
 
     def test_periodicity_flags(self):
-        "ExtendedSpatialHashNNPS :: test periodicity flags"
         self._test_periodicity_flags()
 
     def test_summation_density(self):
-        "ExtendedSpatialHashNNPS :: test summation density"
         self._test_summation_density()
+
+
+class TestPeriodicChannel3D(unittest.TestCase):
+
+    def setUp(self):
+        self.l = l = 1.0
+        n = 20
+        dx = l / n
+        hdx = 1.5
+
+        x, y, z = G.get_3d_block(dx, l, l, l)
+        h = np.ones_like(x) * hdx * dx
+        m = np.ones_like(x) * dx * dx * dx
+        V = np.zeros_like(x)
+        fluid = get_particle_array(name='fluid', x=x, y=y, z=z, h=h, m=m, V=V)
+
+        x, y = G.get_2d_block(dx, l, l)
+        z = np.ones_like(x) * (l + 5 * dx) / 2.0
+        z = np.concatenate([z, -z])
+        x = np.tile(x, 2)
+        y = np.tile(y, 2)
+        m = np.ones_like(x) * dx * dx * dx
+        h = np.ones_like(x) * hdx * dx
+        V = np.zeros_like(x)
+        channel = get_particle_array(
+            name='channel', x=x, y=y, z=z, h=h, m=m, V=V)
+
+        self.particles = [fluid, channel]
+        self.kernel = get_compiled_kernel(Gaussian(dim=3))
+
+    def _test_periodic_flags(self, bool1, bool2, bool3):
+        nnps = self.nnps
+        domain = self.domain.manager
+        self.assertTrue(nnps.is_periodic)
+        self.assertTrue(domain.periodic_in_x == bool1)
+        self.assertTrue(domain.periodic_in_y == bool2)
+        self.assertTrue(domain.periodic_in_z == bool3)
+
+
+class TestPeriodicXYZ3D(TestPeriodicChannel3D):
+
+    def setUp(self):
+        TestPeriodicChannel3D.setUp(self)
+        l = self.l
+        self.domain = DomainManager(
+            xmin=-l / 2.0, xmax=l / 2.0, ymin=-l / 2.0, ymax=l / 2.0,
+            zmin=-l / 2.0, zmax=l / 2.0, periodic_in_x=True,
+            periodic_in_y=True, periodic_in_z=True)
+        self.nnps = LinkedListNNPS(
+            dim=3, particles=self.particles, domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_periodicity_flags(self):
+        self._test_periodic_flags(True, True, True)
+
+
+class TestPeriodicZ3D(TestPeriodicChannel3D):
+
+    def setUp(self):
+        TestPeriodicChannel3D.setUp(self)
+        l = self.l
+        self.domain = DomainManager(
+            zmin=-l / 2.0, zmax=l / 2.0, periodic_in_z=True)
+        self.nnps = LinkedListNNPS(
+            dim=3, particles=self.particles, domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_periodicity_flags(self):
+        self._test_periodic_flags(False, False, True)
+
+
+class TestPeriodicXY3D(TestPeriodicChannel3D):
+
+    def setUp(self):
+        TestPeriodicChannel3D.setUp(self)
+        l = self.l
+        self.domain = DomainManager(
+            xmin=-l / 2.0, xmax=l / 2.0, ymin=-l / 2.0, ymax=l / 2.0,
+            periodic_in_x=True, periodic_in_y=True)
+        self.nnps = LinkedListNNPS(
+            dim=3, particles=self.particles, domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_periodicity_flags(self):
+        self._test_periodic_flags(True, True, False)
 
 
 if __name__ == '__main__':

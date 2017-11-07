@@ -73,7 +73,7 @@ def profile(name, event):
 
 def print_profile():
     global _profile_info
-    _profile_info = sorted(_profile_info.iteritems(), key=itemgetter(1),
+    _profile_info = sorted(_profile_info.items(), key=itemgetter(1),
                            reverse=True)
     if len(_profile_info) == 0:
         print("No profile information available")
@@ -152,8 +152,8 @@ class DeviceArray(object):
         return arr_copy
 
     def update_min_max(self):
-        self.minimum = cl.array.min(self.array)
-        self.maximum = cl.array.max(self.array)
+        self.minimum = cl.array.min(self.array).get()
+        self.maximum = cl.array.max(self.array).get()
 
     def fill(self, value):
         self.array.fill(value)
