@@ -424,3 +424,16 @@ class TestDeviceHelper(TestCase):
 
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([0., 0., 0., 0., 0., 1.]))
+
+    def test_extend(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+
+        h.extend(4)
+
+        # Then
+        assert h.get_number_of_particles() == 6

@@ -27,14 +27,14 @@ _profile_info = defaultdict(float)
 REMOVE_KNL = Template(r"""//CL//
         unsigned int idx = indices[n - 1 - i];
         array[idx] = array[length - 1 - i];
-""", disable_unicode=True)
+""")
 
 
 # args: tag_array, tag, indices, head
 REMOVE_INDICES_KNL = Template(r"""//CL//
         if(tag_array[i] == tag)
             indices[atomic_inc(&head[0])] = i;
-""", disable_unicode=True)
+""")
 
 
 def get_context():
@@ -471,3 +471,20 @@ class DeviceHelper(object):
         if num_extra_particles > 0:
             # make sure particles are aligned properly.
             self.align_particles()
+
+    def extend(self, num_particles):
+        """ Increase the total number of particles by the requested amount
+
+        New particles are added at the end of the list, you may have to manually
+        call align_particles later.
+        """
+        if num_particles <= 0:
+            return
+
+        old_size = self.get_number_of_particles()
+        new_size = old_size + num_particles
+
+        for prop in self._props:
+            arr = self._data[prop]
+            arr.resize(new_size)
+            arr.array[old_size:] = self._particle_array.default_values[prop]
