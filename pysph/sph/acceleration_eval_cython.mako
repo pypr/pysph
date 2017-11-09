@@ -62,7 +62,7 @@ nnps.set_context(src_array_index, dst_array_index)
 ${helper.get_parallel_block()}
     thread_id = threadid()
     ${indent(eq_group.get_variable_array_setup(), 1)}
-    for d_idx in prange(NP_DEST):
+    for d_idx in ${helper.get_parallel_range("NP_DEST")}:
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
