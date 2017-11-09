@@ -31,6 +31,30 @@ class ConfigTestCase(TestCase):
         # Then
         self.assertEqual(config.use_openmp, 10)
 
+    def test_set_get_omp_schedule_config(self):
+        # Given
+        config = self.config
+        # When
+        config.omp_schedule = ("static", 10)
+        # Then
+        self.assertEqual(config.omp_schedule, ("static", 10))
+
+    def test_set_string_omp_schedule(self):
+        # Given
+        config = self.config
+        # When
+        config.set_omp_schedule("dynamic,20")
+        # Then
+        self.assertEqual(config.omp_schedule, ("dynamic", 20))
+
+    def test_set_omp_schedule_config_exception(self):
+        # Given
+        config = self.config
+        # When
+        # Then
+        with self.assertRaises(ValueError):
+            config.omp_schedule = ("random", 20)
+
     def test_use_opencl_config_default(self):
         # Given
         config = self.config
