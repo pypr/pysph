@@ -5,7 +5,7 @@ python:
   
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install pocl
+  - sudo apt-get install opencl-headers
   - sudo apt-get install python-pyopencl
 
 install:
