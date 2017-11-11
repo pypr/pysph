@@ -1,5 +1,5 @@
 os:
-  linux
+  osx
   
 language: python
 python:
@@ -7,8 +7,6 @@ python:
   - 3.5
   
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install pocl-opencl-icd
   - pip install pyopencl
 
 install:
