@@ -224,12 +224,13 @@ class DeviceHelper(object):
         use_double = get_config().use_double
         self._dtype = np.float64 if use_double else np.float32
         self._data = {}
-        self._props = []
+        self.properties = []
+        self.constants = []
 
         for prop, ary in pa.properties.items():
             self.add_prop(prop, ary)
         for prop, ary in pa.constants.items():
-            self.add_prop(prop, ary)
+            self.add_const(prop, ary)
 
     def _get_array(self, ary):
         ctype = ary.get_c_type()
@@ -253,8 +254,8 @@ class DeviceHelper(object):
         if real:
             return self.num_real_particles
         else:
-            if len(self._props) > 0:
-                prop0 = self._data[self._props[0]]
+            if len(self.properties) > 0:
+                prop0 = self._data[self.properties[0]]
                 return len(prop0.array)
             else:
                 return 0
@@ -264,7 +265,7 @@ class DeviceHelper(object):
             self._data[prop].align(indices)
             setattr(self, prop, self._data[prop].array)
 
-    def add_prop(self, name, carray):
+    def _add_prop_or_const(self, name, carray):
         """Add a new property or constant given the name and carray, note
         that this assumes that this property is already added to the
         particle array.
@@ -274,11 +275,41 @@ class DeviceHelper(object):
         g_ary.array.set(np_array)
         self._data[name] = g_ary
         setattr(self, name, g_ary.array)
+
+    def add_prop(self, name, carray):
+        """Add a new property given the name and carray, note
+        that this assumes that this property is already added to the
+        particle array.
+        """
+        self._add_prop_or_const(name, carray)
         if name in self._particle_array.properties:
-            self._props.append(name)
+            self.properties.append(name)
+
+    def add_const(self, name, carray):
+        """Add a new property given the name and carray, note
+        that this assumes that this property is already added to the
+        particle array.
+        """
+        self._add_prop_or_const(name, carray)
+        if name in self._particle_array.constants:
+            self.constants.append(name)
+
+    def add_prop_gpu(self, name, dev_array):
+        self._data[name] = dev_array
+        setattr(self, name, dev_array.array)
+        # FIXME: does the property have to be in particle array
+        # to be in DeviceHelper
+        self.properties.append(name)
+
+    def add_const_gpu(self, name, dev_array):
+        self._data[name] = dev_array
+        setattr(self, name, dev_array.array)
+        # FIXME: does the property have to be in particle array
+        # to be in DeviceHelper
+        self.constants.append(name)
 
     def get_device_array(self, prop):
-        if prop in self._props:
+        if prop in self.properties or prop in self.constants:
             return self._data[prop]
 
     def max(self, arg):
@@ -291,7 +322,7 @@ class DeviceHelper(object):
                 array = self._data[prop]
                 array.update_min_max()
         else:
-            for prop in self._props:
+            for prop in self.properties:
                 array = self._data[prop]
                 array.update_min_max()
 
@@ -312,14 +343,14 @@ class DeviceHelper(object):
             )
 
     def remove_prop(self, name):
-        if name in self._props:
-            self._props.remove(name)
+        if name in self.properties:
+            self.properties.remove(name)
         if name in self._data:
             del self._data[name]
             delattr(self, name)
 
     def resize(self, new_size):
-        for prop in self._props:
+        for prop in self.properties:
             self._data[prop].resize(new_size)
             setattr(self, prop, self._data[prop].array)
 
@@ -383,7 +414,7 @@ class DeviceHelper(object):
 
         (sorted_indices,), event = radix_sort(indices)
 
-        for prop in self._props:
+        for prop in self.properties:
             self._data[prop].remove(sorted_indices, 1)
             setattr(self, prop, self._data[prop].array)
 
@@ -488,3 +519,46 @@ class DeviceHelper(object):
             arr = self._data[prop]
             arr.resize(new_size)
             arr.array[old_size:] = self._particle_array.default_values[prop]
+
+    def append_parray(self, parr_gpu) except -1:
+        """ Add particles from a particle array
+
+        properties that are not there in self will be added
+        """
+        if parr_gpu.get_number_of_particles() == 0:
+            return 0
+
+        num_extra_particles = parr_gpu.get_number_of_particles()
+        old_num_particles = self.get_number_of_particles()
+        new_num_particles = num_extra_particles + old_num_particles
+
+        # extend current arrays by the required number of particles
+        self.extend(num_extra_particles)
+
+        for prop_name in parr_gpu.properties:
+            if prop_name in self._props:
+                arr = self._data[prop_name]
+            else:
+                arr = None
+
+            if arr is not None:
+                source = parr_gpu.get_device_array(prop_name)
+                arr.array[old_num_particles:] = source.array
+            else:
+                # meaning this property is not there in self.
+                arr = DeviceArray(dtype, n=new_num_particles)
+                arr.fill(parr_gpu._particle_array.default_values[prop_name])
+                self.add_prop_gpu(prop_name, arr)
+
+                # now add the values to the end of the created array
+                dest = self._data[prop_name]
+                source = parr_gpu.get_device_array(prop_name)
+                dest.array[old_num_particles:] = source.array
+
+        for const in parray.constants:
+            self.constants.setdefault(const, parray.constants[const])
+
+        if num_extra_particles > 0:
+            self.align_particles()
+
+        return 0
