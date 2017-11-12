@@ -293,12 +293,3 @@
 
 </%def>
 
-<%def name="sort_cid_to_idx_args(data_t)" cached="False">
-    int* cid_to_idx, unsigned int* pids
-</%def>
-
-<%def name="sort_cid_to_idx_src(data_t)" cached="False">
-    cid_to_idx[i] = (cid_to_idx[i] != -1) ? pids[cid_to_idx[i]] : -1;
-</%def>
-
-
