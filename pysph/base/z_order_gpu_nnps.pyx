@@ -82,7 +82,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.update()
 
     cpdef get_spatially_ordered_indices(self, int pa_index):
-        self._sorted = True
+        self.sorted = True
         self.cids[pa_index].align(self.pids[pa_index].array)
         #self.pid_keys[pa_index].align(self.pids[pa_index].array)
 
@@ -149,7 +149,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
         self.max_cid = []
-        self._sorted = False
+        self.sorted = False
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -215,7 +215,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         z_order_nbr_lengths = self.helper.get_kernel(
-                "z_order_nbr_lengths", sorted=self._sorted,
+                "z_order_nbr_lengths", sorted=self.sorted,
                 dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu
@@ -234,7 +234,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         z_order_nbrs = self.helper.get_kernel(
-                "z_order_nbrs", sorted=self._sorted,
+                "z_order_nbrs", sorted=self.sorted,
                 dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu

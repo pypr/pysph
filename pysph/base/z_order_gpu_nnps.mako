@@ -201,7 +201,7 @@
 
 </%def>
 
-<%def name="z_order_nbr_lengths_args(data_t)" cached="True">
+<%def name="z_order_nbr_lengths_args(data_t)" cached="False">
     ${data_t}* d_x, ${data_t}* d_y, ${data_t}* d_z,
     ${data_t}* d_h, ${data_t}* s_x, ${data_t}* s_y,
     ${data_t}* s_z, ${data_t}* s_h,
@@ -228,9 +228,9 @@
         while(idx < num_particles && keys[idx] == key)
         {
             % if sorted:
-                pid = pids_src[idx];
-            % else:
                 pid = idx;
+            % else:
+                pid = pids_src[idx];
             % endif
             h_j = radius_scale2*s_h[pid]*s_h[pid];
             dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \
@@ -274,9 +274,9 @@
         while(idx < num_particles && keys[idx] == key)
         {
             % if sorted:
-                pid = pids_src[idx];
-            % else:
                 pid = idx;
+            % else:
+                pid = pids_src[idx];
             % endif
             h_j = radius_scale2*s_h[pid]*s_h[pid];
             dist = NORM2(q.x - s_x[pid], q.y - s_y[pid], \

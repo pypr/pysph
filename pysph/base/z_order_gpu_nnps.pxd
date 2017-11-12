@@ -27,7 +27,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
     cdef object radix_sort
     cdef object make_vec
 
-    cdef bint _sorted
+    cdef public bint sorted
     cdef bint dst_src
 
     cpdef get_spatially_ordered_indices(self, int pa_index)
