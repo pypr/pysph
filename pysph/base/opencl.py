@@ -245,7 +245,7 @@ class DeviceHelper(object):
 
     def _check_property(self, prop):
         """Check if a property is present or not """
-        if prop in self._props:
+        if prop in self.properties:
             return
         else:
             raise AttributeError('property %s not present' % (prop))
@@ -261,7 +261,7 @@ class DeviceHelper(object):
                 return 0
 
     def align(self, indices):
-        for prop in self._props:
+        for prop in self.properties:
             self._data[prop].align(indices)
             setattr(self, prop, self._data[prop].array)
 
