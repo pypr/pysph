@@ -159,7 +159,7 @@ class DeviceHelper(object):
 
     def align(self, indices):
         pa = self._particle_array
-        for prop in pa.properties.keys():
+        for prop in self._props:
             self._data[prop].align(indices)
             setattr(self, prop, self._data[prop].array)
 

@@ -283,7 +283,6 @@
                     q.z - s_z[pid]);
             if(dist < h_i || dist < h_j)
             {
-                // This should be pids[idx]
                 nbrs[start_idx + curr_idx] = pid;
                 curr_idx++;
             }
