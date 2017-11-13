@@ -83,7 +83,7 @@ cdef class GPUNNPS(NNPSBase):
 
     cpdef get_nearest_particles_gpu(self, int src_index, int dst_index)
 
-    cpdef get_spatially_ordered_indices(self, int pa_index)
+    #cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef spatially_order_particles(self, int pa_index)
 
