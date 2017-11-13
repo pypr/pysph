@@ -8,6 +8,7 @@ from mako.template import Template
 import numpy as np
 
 from pysph.base.config import get_config
+from pysph.base.opencl import profile_kernel
 from pysph.base.translator import OpenCLConverter
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
@@ -133,9 +134,9 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
                     functools.partial(_getter, dest.gpu, x[2:]) for x in args
                 ]
                 all_args = [q, None, None] + _args
-                calls[method][dest] = (
-                    getattr(self.program, kernel), all_args, dest
-                )
+                call = getattr(self.program, kernel)
+                call = profile_kernel(call, call.function_name)
+                calls[method][dest] = (call, all_args, dest)
 
     def get_code(self):
         if self.object is not None:

@@ -489,6 +489,7 @@ cdef class CPUDomainManager:
 
             # reset the length of the arrays
             x_low.reset(); x_high.reset(); y_high.reset(); y_low.reset()
+            z_low.reset(); z_high.reset()
 
             np = x.length
             for i in range(np):

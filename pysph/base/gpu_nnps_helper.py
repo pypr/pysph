@@ -1,19 +1,20 @@
-#!/usr/bin/env python
 
 from pyopencl.elementwise import ElementwiseKernel
 from mako.template import Template
 import os
+import sys
 
-from pysph.base.opencl import profile_kernel
+from pysph.base.opencl import profile_kernel, get_elwise_kernel
 
 
 class GPUNNPSHelper(object):
     def __init__(self, ctx, tpl_filename, use_double=False):
+        disable_unicode = False if sys.version_info.major > 2 else True
         self.src_tpl = Template(
             filename=os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
                 tpl_filename),
-            disable_unicode=True
+            disable_unicode=disable_unicode
         )
 
         self.data_t = "double" if use_double else "float"
@@ -22,7 +23,7 @@ class GPUNNPSHelper(object):
             filename=os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
                 "gpu_helper_functions.mako"),
-            disable_unicode=True
+            disable_unicode=disable_unicode
         )
 
         helper_preamble = helper_tpl.get_def("get_helpers").render(
@@ -47,12 +48,10 @@ class GPUNNPSHelper(object):
     def get_kernel(self, kernel_name, **kwargs):
         data = kernel_name, tuple(kwargs.items())
         if data in self.cache:
-            return profile_kernel(self.cache[data], kernel_name)
+            return self.cache[data]
         else:
             args, src = self._get_code(kernel_name, **kwargs)
-            knl = ElementwiseKernel(
-                self.ctx, args, src,
-                kernel_name, preamble=self.preamble
-            )
+            knl = get_elwise_kernel(kernel_name, args, src,
+                                    preamble=self.preamble)
             self.cache[data] = knl
-            return profile_kernel(knl, kernel_name)
+            return knl

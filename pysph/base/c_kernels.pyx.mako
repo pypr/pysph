@@ -6,15 +6,18 @@ from kernels import (
     WendlandQuinticC4, WendlandQuinticC6, WendlandQuinticC2_1D,
     WendlandQuinticC4_1D, WendlandQuinticC6_1D
 )
+CLASSES = (
+    CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, SuperGaussian,
+    WendlandQuinticC4, WendlandQuinticC6, WendlandQuinticC2_1D,
+    WendlandQuinticC4_1D, WendlandQuinticC6_1D
+)
 generator = CythonGenerator(python_methods=True)
 %>
 
 from libc.math cimport *
 import numpy as np
 
-% for cls in (CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, \
-             SuperGaussian, WendlandQuinticC4, WendlandQuinticC6, \
-             WendlandQuinticC2_1D,WendlandQuinticC4_1D, WendlandQuinticC6_1D):
+% for cls in CLASSES:
 <%
 generator.parse(cls())
 classname = cls.__name__
