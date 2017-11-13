@@ -57,7 +57,6 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 
 #define abs fabs
 #define max(x, y) fmax((double)(x), (double)(y))
-#define M_PI 3.14159
 
 __constant double pi=M_PI;
 ${helper.get_header()}
