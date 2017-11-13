@@ -19,6 +19,7 @@ from pyopencl.elementwise import ElementwiseKernel
 
 import numpy as np
 cimport numpy as np
+from mako.template import Template
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
 from pysph.base.opencl import DeviceArray, get_config
@@ -82,14 +83,14 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.update()
 
     def get_spatially_ordered_indices(self, int pa_index):
-        def set_new_pids():
+        def update_pids():
             pids_new = cl.array.arange(self.queue, 0, num_particles, 1, dtype=np.uint32)
             self.pids[pa_index].set_data(pids_new)
 
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
         num_particles = pa_wrapper.get_number_of_particles()
         self.sorted = True
-        return self.pids[pa_index].array, set_new_pids
+        return self.pids[pa_index].array, update_pids
 
     cpdef _bin(self, int pa_index):
         self.sorted = False
