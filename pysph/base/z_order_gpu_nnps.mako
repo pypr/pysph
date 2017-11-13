@@ -155,11 +155,7 @@
 <%def name="z_order_nbrs_prep(data_t, sorted, dst_src)", cached="False">
      unsigned int qid;
 
-    % if sorted:
-        qid = i;
-    % else:
-        qid = pids_dst[i];
-    % endif
+    qid = pids_dst[i];
 
     ${data_t}4 q = (${data_t}4)(d_x[qid], d_y[qid], d_z[qid], d_h[qid]);
 
@@ -229,11 +225,7 @@
 
         while(idx < num_particles && keys[idx] == key)
         {
-            % if sorted:
-                pid = idx;
-            % else:
-                pid = pids_src[idx];
-            % endif
+            pid = pids_src[idx];
             s = (${data_t}4)(s_x[pid], s_y[pid], s_z[pid], s_h[pid]);
             h_j = radius_scale2 * s.w * s.w;
             dist = NORM2(q.x - s.x, q.y - s.y, q.z - s.z);
@@ -277,11 +269,7 @@
 
         while(idx < num_particles && keys[idx] == key)
         {
-            % if sorted:
-                pid = idx;
-            % else:
-                pid = pids_src[idx];
-            % endif
+            pid = pids_src[idx];
             s = (${data_t}4)(s_x[pid], s_y[pid], s_z[pid], s_h[pid]);
             h_j = radius_scale2 * s.w * s.w;
             dist = NORM2(q.x - s.x, q.y - s.y, q.z - s.z);
