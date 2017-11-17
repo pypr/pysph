@@ -466,5 +466,3 @@ class TestDeviceHelper(TestCase):
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
-
-
