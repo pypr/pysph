@@ -195,7 +195,6 @@ cdef class GPUNNPS(NNPSBase):
         self.cache = _cache
         self.use_double = get_config().use_double
 
-
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs):
         if self.use_cache:
             self.current_cache.get_neighbors_raw(d_idx, nbrs)
@@ -209,9 +208,6 @@ cdef class GPUNNPS(NNPSBase):
             or self.dst_index != dst_index:
             self.set_context(src_index, dst_index)
         self.cache[idx].get_neighbors_gpu()
-
-    #cpdef get_spatially_ordered_indices(self, int pa_index):
-    #    raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
 
     cpdef spatially_order_particles(self, int pa_index):
         """Spatially order particles such that nearby particles have indices
