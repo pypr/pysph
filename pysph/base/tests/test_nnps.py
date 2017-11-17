@@ -666,7 +666,6 @@ class TestMultipleLevelsStratifiedSFCNNPSWithSorting(
         return pa, nps
 
 
-
 def test_large_number_of_neighbors_linked_list():
     x = numpy.random.random(1 << 14)*0.1
     y = x.copy()
