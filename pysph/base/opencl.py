@@ -39,6 +39,16 @@ REMOVE_INDICES_KNL = Template(r"""//CL//
 """)
 
 
+# args: tag_array, num_real_particles
+NUM_REAL_PARTICLES_KNL = Template(r"""//CL//
+        if(i != 0 && tag_array[i] != tag_array[i-1])
+        {
+            num_real_particles[0] = i;
+            return;
+        }
+""")
+
+
 def get_context():
     global _ctx
     if _ctx is None:
@@ -361,9 +371,8 @@ class DeviceHelper(object):
 
     def align_particles(self):
         tag_arr = self._data['tag'].array
-        num_particles = self.get_number_of_particles()
-        self.num_real_particles = cl.array.sum(tag_arr == 0)
 
+        num_particles = self.get_number_of_particles()
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
                 dtype=np.uint32)
 
@@ -376,6 +385,16 @@ class DeviceHelper(object):
 
         (sorted_indices,), event = radix_sort(indices, tag_arr)
         self.align(sorted_indices)
+
+        tag_arr = self._data['tag'].array
+
+        num_real_particles = cl.array.zeros(self._queue, 1, np.uint32)
+        args = "uint* tag_array, uint* num_real_particles"
+        src = NUM_REAL_PARTICLES_KNL.render()
+        get_num_real_particles = get_elwise_kernel("get_num_real_particles", args, src)
+
+        get_num_real_particles(tag_arr, num_real_particles)
+        self.num_real_particles = int(num_real_particles.get())
 
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
