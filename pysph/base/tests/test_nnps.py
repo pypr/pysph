@@ -398,6 +398,30 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class TestZOrderGPUNNPSWithSorting(DictBoxSortNNPSTestCase):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            ctx=ctx
+        )
+        self.nps.spatially_order_particles(0)
+        self.nps.spatially_order_particles(1)
+
+        for pa in self.particles:
+            pa.gpu.pull()
+
+    def tearDown(self):
+        super(TestZOrderGPUNNPSWithSorting, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC based OpenCL algorithm"""
     def setUp(self):

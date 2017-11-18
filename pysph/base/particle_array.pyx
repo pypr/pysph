@@ -1184,7 +1184,7 @@ cdef class ParticleArray:
             result_array.constants[const] = self.constants[const]
 
         result_array.align_particles()
-        result_array.name = self.name
+        result_array.set_name(self.name)
         if props is None:
             output_arrays = list(self.output_property_arrays)
         else:

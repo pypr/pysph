@@ -94,11 +94,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
         self.max_num_bits = 1 + 3*(<int> ceil(log2(max_num_cells)))
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
-        cdef np.ndarray current_pids = (self.pids[pa_index].get()).astype(np.int64)
-        indices.resize(current_pids.size)
-        indices.set_data(current_pids)
-        self._sorted = True
+    cpdef get_spatially_ordered_indices(self, int pa_index):
+        pass
 
     cpdef _bin(self, int pa_index):
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
