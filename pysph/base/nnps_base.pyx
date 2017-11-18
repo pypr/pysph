@@ -1267,5 +1267,3 @@ cdef class NNPS(NNPSBase):
 
         for arr in pa.properties.values():
             arr.c_align_array(indices)
-
-

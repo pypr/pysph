@@ -589,7 +589,7 @@ class DeviceHelper(object):
             self.align_particles()
 
     def extract_particles(self, indices, props=None):
-        """Create new particle array for particles with indices in index_array
+        """Create new particle array for particles with given indices
 
         Parameters
         ----------
@@ -600,15 +600,6 @@ class DeviceHelper(object):
         props : list
             the list of properties to extract, if None all properties
             are extracted.
-
-        Notes
-        -----
-
-        The algorithm is as follows:
-
-             - create a new particle array with the required properties.
-             - resize the new array to the desired length (index_array.length)
-             - copy the properties from the existing array to the new array.
 
         """
         result_array = ParticleArray()
