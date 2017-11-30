@@ -66,7 +66,7 @@ cdef class GPUNeighborCache:
 cdef class GPUNNPS(NNPSBase):
 
     cdef object ctx
-    cdef object queue
+    cdef public object queue
 
     cdef public double radius_scale2
     cdef public GPUNeighborCache current_cache  # The current cache
