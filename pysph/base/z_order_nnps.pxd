@@ -43,6 +43,11 @@ cdef class ZOrderNNPS(NNPS):
     cdef double radius_scale2
     cdef NNPSParticleArrayWrapper dst, src
 
+    cdef int H
+    cdef double h_sub
+
+    cdef int mask_len
+
     ##########################################################################
     # Member functions
     ##########################################################################
@@ -81,4 +86,27 @@ cdef class ZOrderNNPS(NNPS):
 
     cpdef _bin(self, int pa_index, UIntArray indices)
 
+cdef class ExtendedZOrderNNPS(ZOrderNNPS):
+    ############################################################################
+    # Data Attributes
+    ############################################################################
+    cdef double** hmax
+    cdef double* current_hmax
+
+    ##########################################################################
+    # Member functions
+    ##########################################################################
+
+    cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
+
+    cdef int _neighbor_boxes_sym(self, int i, int j, int k,
+            uint64_t* current_keys, uint32_t* current_cids,
+            double* current_hmax, int num_particles,
+            uint64_t** found_ptrs, double h) nogil
+
+    cdef void _fill_nbr_boxes(self)
+
+    cpdef _refresh(self)
+
+    cpdef set_context(self, int src_index, int dst_index)
 
