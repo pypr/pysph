@@ -43,8 +43,8 @@ cdef class ZOrderNNPS(NNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
-        self.H = 1
-        self.mask_len = 27
+        self.H = H
+        self.mask_len = (2 * H + 1) ** 3
 
         self.src_index = 0
         self.dst_index = 0
@@ -501,6 +501,8 @@ cdef class ZOrderNNPS(NNPS):
         cdef uint64_t* current_keys
         cdef uint32_t* current_cids
 
+        self.h_sub = self.cell_size / self.H
+
         for i from 0<=i<self.narrays:
             if self.pids[i] != NULL:
                 free(self.pids[i])
@@ -529,10 +531,9 @@ cdef class ZOrderNNPS(NNPS):
             if self.lengths[i] != NULL:
                 free(self.lengths[i])
             self.nbr_boxes[i] = <int*> malloc(self.mask_len * max_cid * sizeof(int))
-            self.lengths[i] = <int*> malloc(max_cid*sizeof(int))
+            self.lengths[i] = <int*> malloc(max_cid * sizeof(int))
 
         self.max_cid = max_cid # this is max_cid + 1
-        self.h_sub = self.cell_size / self.H
 
         self._fill_nbr_boxes()
 
@@ -549,19 +550,13 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             bint cache = False, bint sort_gids = False, int H=3):
         ZOrderNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids
+            cache, sort_gids, H=H
         )
 
-        self.H = H
-        self.mask_len = (2 * H + 1) ** 3
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
             bint cache = False, bint sort_gids = False, int H=3):
-        #ZOrderNNPS.__cinit__(
-        #    self, dim, particles, radius_scale, ghost_layers, domain,
-        #    cache, sort_gids
-        #)
 
         narrays = len(particles)
 
@@ -768,6 +763,8 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
         cdef uint64_t* current_keys
         cdef uint32_t* current_cids
 
+        self.h_sub = self.cell_size / self.H
+
         for i from 0<=i<self.narrays:
             if self.pids[i] != NULL:
                 free(self.pids[i])
@@ -802,7 +799,6 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             self.hmax[i] = <double*> malloc(max_cid*sizeof(double))
 
         self.max_cid = max_cid # this is max_cid + 1
-        self.h_sub = self.cell_size / self.H
 
         self._fill_nbr_boxes()
 
