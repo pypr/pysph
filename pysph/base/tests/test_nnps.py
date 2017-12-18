@@ -316,6 +316,14 @@ class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
             dim=3, particles=self.particles, radius_scale=2.0
         )
 
+class ExtendedZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Z-Order SFC based algorithm"""
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        self.nps = nnps.ExtendedZOrderNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0, H=1
+        )
+
 class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
     def setUp(self):

@@ -567,6 +567,13 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
         for i from 0<=i<narrays:
             self.hmax[i] = NULL
 
+    def __dealloc__(self):
+        cdef int i
+        for i from 0<=i<self.narrays:
+            if self.hmax[i] != NULL:
+                free(self.hmax[i])
+        free(self.hmax)
+
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil:
         cdef int length = 0
         cdef int s, t, u
