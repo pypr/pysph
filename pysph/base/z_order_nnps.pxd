@@ -90,7 +90,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef bint fixed_h
+    cdef bint asymmetric
     cdef double** hmax
     cdef double* current_hmax
 

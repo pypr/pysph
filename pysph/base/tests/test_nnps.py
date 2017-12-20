@@ -321,7 +321,8 @@ class ExtendedZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ExtendedZOrderNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0, H=1
+            dim=3, particles=self.particles, radius_scale=2.0, H=1,
+            asymmetric=True
         )
 
 class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):

@@ -33,7 +33,8 @@ cdef class ZOrderNNPS(NNPS):
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int H=1):
+            bint cache = False, bint sort_gids = False, int H=1,
+            bint asymmetric=False):
         NNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids
@@ -54,7 +55,8 @@ cdef class ZOrderNNPS(NNPS):
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int H=1):
+            bint cache = False, bint sort_gids = False, int H=1,
+            bint asymmetric=False):
         cdef int narrays = len(particles)
 
         self.pids = <uint32_t**> malloc(narrays*sizeof(uint32_t*))
@@ -547,17 +549,19 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
 
     def __init__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int H=3):
+            bint cache = False, bint sort_gids = False, int H=3,
+            bint asymmetric=False):
         ZOrderNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids, H=H
         )
 
-        self.fixed_h = fixed_h
+        self.asymmetric = asymmetric
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
-            bint cache = False, bint sort_gids = False, int H=3):
+            bint cache = False, bint sort_gids = False, int H=3,
+            bint asymmetric=False):
 
         narrays = len(particles)
 
@@ -594,15 +598,14 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             uint64_t* current_keys, uint32_t* current_cids,
             double* current_hmax, int num_particles,
             uint64_t** found_ptrs, double h) nogil:
-        if self.fixed_h:
-            self._neighbor_boxes_asym(i, j, k, current_keys, current_cids,
+        if self.asymmetric:
+            return self._neighbor_boxes_asym(i, j, k, current_keys, current_cids,
                     current_hmax, num_particles, found_ptrs, h)
         else:
-            self._neighbor_boxes_sym(i, j, k, current_keys, current_cids,
+            return self._neighbor_boxes_sym(i, j, k, current_keys, current_cids,
                     current_hmax, num_particles, found_ptrs, h)
 
 
-    @cython.cdivision(True)
     cdef int _neighbor_boxes_asym(self, int i, int j, int k,
             uint64_t* current_keys, uint32_t* current_cids,
             double* current_hmax, int num_particles,
