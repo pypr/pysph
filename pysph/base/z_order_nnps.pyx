@@ -22,10 +22,7 @@ cdef extern from "<algorithm>" namespace "std" nogil:
 #############################################################################
 
 cdef inline int cmp_func(const void* a, const void* b) nogil:
-    #return (<uint64_t*>a)[0] - (<uint64_t*>b)[0]
-    if (<uint64_t*>a)[0] < (<uint64_t*>b)[0]: return -1
-    if (<uint64_t*>a)[0] == (<uint64_t*>b)[0]: return 0
-    if (<uint64_t*>a)[0] > (<uint64_t*>b)[0]: return 1
+    return (<uint64_t*>a)[0] - (<uint64_t*>b)[0]
 
 cdef class ZOrderNNPS(NNPS):
 
