@@ -553,6 +553,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             cache, sort_gids, H=H
         )
 
+        self.fixed_h = fixed_h
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
@@ -588,6 +589,59 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                     length += 1
 
         return length
+
+    cdef int _neighbor_boxes_func(self, int i, int j, int k,
+            uint64_t* current_keys, uint32_t* current_cids,
+            double* current_hmax, int num_particles,
+            uint64_t** found_ptrs, double h) nogil:
+        if self.fixed_h:
+            self._neighbor_boxes_asym(i, j, k, current_keys, current_cids,
+                    current_hmax, num_particles, found_ptrs, h)
+        else:
+            self._neighbor_boxes_sym(i, j, k, current_keys, current_cids,
+                    current_hmax, num_particles, found_ptrs, h)
+
+
+    @cython.cdivision(True)
+    cdef int _neighbor_boxes_asym(self, int i, int j, int k,
+            uint64_t* current_keys, uint32_t* current_cids,
+            double* current_hmax, int num_particles,
+            uint64_t** found_ptrs, double h) nogil:
+        cdef int length = 0
+        cdef int p
+
+        cdef uint64_t key
+        cdef uint64_t* found_ptr
+
+        cdef int x_temp, y_temp, z_temp
+
+        cdef int* x_mask = <int*> malloc(self.mask_len*sizeof(int))
+        cdef int* y_mask = <int*> malloc(self.mask_len*sizeof(int))
+        cdef int* z_mask = <int*> malloc(self.mask_len*sizeof(int))
+
+        cdef int mask_len = self._h_mask_exact(x_mask, y_mask, z_mask)
+
+        for p from 0<=p<mask_len:
+            x_temp = i + x_mask[p]
+            y_temp = j + y_mask[p]
+            z_temp = k + z_mask[p]
+
+            if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
+                key = get_key(x_temp, y_temp, z_temp)
+                found_ptr = self.find(key, current_keys, num_particles)
+
+                if found_ptr == NULL:
+                    continue
+
+                found_ptrs[length] = found_ptr
+                length += 1
+
+        free(x_mask)
+        free(y_mask)
+        free(z_mask)
+
+        return length
+
 
     @cython.cdivision(True)
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
@@ -717,7 +771,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                 &c_x, &c_y, &c_z
                 )
 
-            num_boxes = self._neighbor_boxes_sym(c_x, c_y, c_z, current_keys,
+            num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z, current_keys,
                     current_cids, current_hmax, num_particles, found_ptrs, h_ptr[pid])
 
             for k from 0<=k<num_boxes:
@@ -742,7 +796,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                         &c_x, &c_y, &c_z
                         )
 
-                    num_boxes = self._neighbor_boxes_sym(c_x, c_y, c_z, current_keys,
+                    num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z, current_keys,
                             current_cids, current_hmax, num_particles, found_ptrs, h_ptr[pid])
 
                     for k from 0<=k<num_boxes:

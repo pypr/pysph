@@ -90,6 +90,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
+    cdef bint fixed_h
     cdef double** hmax
     cdef double* current_hmax
 
@@ -98,6 +99,16 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     ##########################################################################
 
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
+
+    cdef int _neighbor_boxes_func(self, int i, int j, int k,
+            uint64_t* current_keys, uint32_t* current_cids,
+            double* current_hmax, int num_particles,
+            uint64_t** found_ptrs, double h) nogil
+
+    cdef int _neighbor_boxes_asym(self, int i, int j, int k,
+            uint64_t* current_keys, uint32_t* current_cids,
+            double* current_hmax, int num_particles,
+            uint64_t** found_ptrs, double h) nogil
 
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
             uint64_t* current_keys, uint32_t* current_cids,
