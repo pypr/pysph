@@ -4,6 +4,7 @@
 from libc.stdlib cimport malloc, free
 from libcpp.vector cimport vector
 from libcpp.map cimport map
+from libcpp.algorithm cimport lower_bound
 from libc.stdlib cimport bsearch
 from libc.stdio cimport printf
 
@@ -98,13 +99,11 @@ cdef class ZOrderNNPS(NNPS):
 
     cdef inline uint64_t* find(self, uint64_t query, uint64_t* array,
             int num_particles) nogil:
-        cdef uint64_t* found_ptr = <uint64_t*> bsearch(&query,
-                array, num_particles, sizeof(uint64_t),
-                <int(*)(const void *, const void *) nogil> cmp_func)
+        cdef uint64_t* last = array + num_particles
+        cdef uint64_t* found_ptr = lower_bound(array, last, query)
 
-        if found_ptr != NULL:
-            while found_ptr != array and found_ptr[0] == (found_ptr - 1)[0]:
-                found_ptr -= 1
+        if found_ptr == last or found_ptr[0] != query:
+            return NULL
 
         return found_ptr
 
