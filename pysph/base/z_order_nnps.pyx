@@ -42,6 +42,8 @@ cdef class ZOrderNNPS(NNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
 
+        self.asymmetric = asymmetric
+
         self.H = H
         self.mask_len = (2 * H + 1) ** 3
 
@@ -62,6 +64,7 @@ cdef class ZOrderNNPS(NNPS):
         self.cids = <uint32_t**> malloc(narrays*sizeof(uint32_t*))
         self.nbr_boxes = <int**> malloc(narrays*sizeof(int*))
         self.lengths = <int**> malloc(narrays*sizeof(int*))
+        self.key_to_idx = <int**> malloc(narrays*sizeof(int*))
 
         cdef int i
         for i from 0<=i<narrays:
@@ -70,6 +73,7 @@ cdef class ZOrderNNPS(NNPS):
             self.cids[i] = NULL
             self.nbr_boxes[i] = NULL
             self.lengths[i] = NULL
+            self.key_to_idx[i] = NULL
 
         self.current_pids = NULL
         self.current_cids_src = NULL
@@ -77,6 +81,7 @@ cdef class ZOrderNNPS(NNPS):
         self.current_keys = NULL
         self.current_nbr_boxes = NULL
         self.current_lengths = NULL
+        self.current_key_to_idx = NULL
 
     def __dealloc__(self):
         cdef int i
@@ -85,6 +90,8 @@ cdef class ZOrderNNPS(NNPS):
                 free(self.pids[i])
             if self.keys[i] != NULL:
                 free(self.keys[i])
+            if self.key_to_idx[i] != NULL:
+                free(self.key_to_idx[i])
             if self.cids[i] != NULL:
                 free(self.cids[i])
             if self.nbr_boxes[i] != NULL:
@@ -93,19 +100,10 @@ cdef class ZOrderNNPS(NNPS):
                 free(self.lengths[i])
         free(self.pids)
         free(self.keys)
+        free(self.key_to_idx)
         free(self.cids)
         free(self.nbr_boxes)
         free(self.lengths)
-
-    cdef inline uint64_t* find(self, uint64_t query, uint64_t* array,
-            int num_particles) nogil:
-        cdef uint64_t* last = array + num_particles
-        cdef uint64_t* found_ptr = lower_bound(array, last, query)
-
-        if found_ptr == last or found_ptr[0] != query:
-            return NULL
-
-        return found_ptr
 
     cpdef set_context(self, int src_index, int dst_index):
         """Set context for nearest neighbor searches.
@@ -122,6 +120,7 @@ cdef class ZOrderNNPS(NNPS):
         NNPS.set_context(self, src_index, dst_index)
         self.current_pids = self.pids[src_index]
         self.current_keys = self.keys[src_index]
+        self.current_key_to_idx = self.key_to_idx[src_index]
         self.current_cids_dst = self.cids[dst_index]
         self.current_cids_src = self.cids[src_index]
         self.current_nbr_boxes = self.nbr_boxes[src_index]
@@ -281,14 +280,30 @@ cdef class ZOrderNNPS(NNPS):
 
         sort_wrapper.compare_sort()
 
+        ################################################################
+
+        current_key_to_idx = self.key_to_idx[pa_index]
+
+        key = current_keys[0]
+        current_key_to_idx[key] = 0;
+
+        for i from 0<i<curr_num_particles:
+            key = current_keys[i]
+            if key != current_keys[i-1]:
+                current_key_to_idx[key] = i;
+
+        ################################################################
+
         cdef uint32_t found_cid = UINT_MAX
         cdef int num_particles
         cdef uint64_t* found_ptr = NULL
+        cdef int found_idx
 
         cdef uint32_t pid
 
         cdef uint32_t* iter_cids
         cdef uint64_t* iter_keys
+        cdef int* iter_key_to_idx
 
         cdef uint32_t* sorted_cids = <uint32_t*> malloc(
                 curr_num_particles*sizeof(uint32_t))
@@ -296,13 +311,14 @@ cdef class ZOrderNNPS(NNPS):
         for j from 0<=j<pa_index:
             iter_cids = self.cids[j]
             iter_keys = self.keys[j]
+            iter_key_to_idx = self.key_to_idx[j]
             iter_pids = self.pids[j]
             num_particles = (<NNPSParticleArrayWrapper> \
                     self.pa_wrappers[j]).get_number_of_particles()
-            found_ptr = self.find(current_keys[0], iter_keys, num_particles)
+            found_idx = iter_key_to_idx[current_keys[0]]
 
-            if found_ptr != NULL:
-                pid = iter_pids[found_ptr - iter_keys]
+            if found_idx != -1:
+                pid = iter_pids[found_idx]
                 found_cid = iter_cids[pid]
                 break
 
@@ -320,13 +336,14 @@ cdef class ZOrderNNPS(NNPS):
                 for j from 0<=j<pa_index:
                     iter_cids = self.cids[j]
                     iter_keys = self.keys[j]
+                    iter_key_to_idx = self.key_to_idx[j]
                     iter_pids = self.pids[j]
                     num_particles = (<NNPSParticleArrayWrapper> \
                             self.pa_wrappers[j]).get_number_of_particles()
-                    found_ptr = self.find(current_keys[i], iter_keys, num_particles)
+                    found_idx = iter_key_to_idx[current_keys[i]]
 
-                    if found_ptr != NULL:
-                        pid = iter_pids[found_ptr - iter_keys]
+                    if found_idx != -1:
+                        pid = iter_pids[found_idx]
                         found_cid = iter_cids[pid]
                         break
 
@@ -382,11 +399,13 @@ cdef class ZOrderNNPS(NNPS):
         cdef uint32_t* current_cids
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
+        cdef int* current_key_to_idx
         cdef int found_idx
 
         cdef double* x_ptr
         cdef double* y_ptr
         cdef double* z_ptr
+        cdef double* h_ptr
 
         cdef int c_x, c_y, c_z
         cdef int num_boxes
@@ -394,7 +413,8 @@ cdef class ZOrderNNPS(NNPS):
         cdef int n = 0
         cdef uint32_t cid, pid
 
-        cdef uint64_t* found_ptrs[27]
+        cdef int found_indices[27]
+
         cdef uint64_t key
 
         for i from 0<=i<self.narrays:
@@ -404,9 +424,11 @@ cdef class ZOrderNNPS(NNPS):
             x_ptr = pa_wrapper.x.data
             y_ptr = pa_wrapper.y.data
             z_ptr = pa_wrapper.z.data
+            h_ptr = pa_wrapper.h.data
             xmin = self.xmin.data
 
             current_keys = self.keys[i]
+            current_key_to_idx = self.key_to_idx[i]
             current_cids = self.cids[i]
             current_pids = self.pids[i]
             current_nbr_boxes = self.nbr_boxes[i]
@@ -430,12 +452,11 @@ cdef class ZOrderNNPS(NNPS):
                 &c_x, &c_y, &c_z
                 )
 
-            num_boxes = self._neighbor_boxes(c_x, c_y, c_z, current_keys,
-                    num_particles, found_ptrs)
+            num_boxes = self._neighbor_boxes(c_x, c_y, c_z, current_key_to_idx,
+                    num_particles, found_indices)
 
             for k from 0<=k<num_boxes:
-                found_ptr = found_ptrs[k]
-                found_idx = found_ptr - current_keys
+                found_idx = found_indices[k]
                 current_nbr_boxes[self.mask_len*cid + n] = found_idx
                 n += 1
 
@@ -455,40 +476,43 @@ cdef class ZOrderNNPS(NNPS):
                         &c_x, &c_y, &c_z
                         )
 
-                    num_boxes = self._neighbor_boxes(c_x, c_y, c_z, current_keys,
-                            num_particles, found_ptrs)
+                    num_boxes = self._neighbor_boxes(c_x, c_y, c_z, current_key_to_idx,
+                            num_particles, found_indices)
 
                     for k from 0<=k<num_boxes:
-                        found_ptr = found_ptrs[k]
-                        found_idx = found_ptr - current_keys
+                        found_idx = found_indices[k]
                         current_nbr_boxes[self.mask_len*cid + n] = found_idx
                         n += 1
                 else:
                     current_lengths[cid] += 1
 
+    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) nogil:
+        return -1 if key >= self.max_key else key_to_idx[key]
+
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            uint64_t* current_keys, int num_particles,
-            uint64_t** found_ptrs) nogil:
+            int* current_key_to_idx, int num_particles,
+            int* found_indices) nogil:
         cdef int length = 0
         cdef int p, q, r
         cdef uint64_t key
-        cdef uint64_t* found_ptr
+        cdef int found_idx
         for p from -1<=p<2:
             for q from -1<=q<2:
                 for r from -1<=r<2:
                     if i+r>=0 and j+q>=0 and k+p>=0:
                         key = get_key(i+r, j+q, k+p)
-                        found_ptr = self.find(key, current_keys,
-                                num_particles)
-                        if found_ptr != NULL:
-                            found_ptrs[length] = found_ptr
+                        found_idx = self.get_idx(key, current_key_to_idx)
+                        if found_idx != -1:
+                            found_indices[length] = found_idx
                             length += 1
         return length
 
+    @cython.cdivision(True)
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
 
-        cdef int i, num_particles
+        cdef int i, j, num_particles
+        cdef int c_x, c_y, c_z
 
         cdef double* xmax = self.xmax.data
         cdef double* xmin = self.xmin.data
@@ -497,15 +521,29 @@ cdef class ZOrderNNPS(NNPS):
 
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
+        cdef int* current_key_to_idx
         cdef uint32_t* current_cids
 
         self.h_sub = self.cell_size / self.H
+
+        find_cell_id_raw(
+                xmax[0] - xmin[0],
+                xmax[1] - xmin[1],
+                xmax[2] - xmin[2],
+                self.h_sub,
+                &c_x, &c_y, &c_z
+                )
+
+        cdef uint64_t max_key = 1 + get_key(c_x, c_y, c_z)
+        self.max_key = max_key
 
         for i from 0<=i<self.narrays:
             if self.pids[i] != NULL:
                 free(self.pids[i])
             if self.keys[i] != NULL:
                 free(self.keys[i])
+            if self.key_to_idx[i] != NULL:
+                free(self.key_to_idx[i])
             if self.cids[i] != NULL:
                 free(self.cids[i])
 
@@ -514,11 +552,16 @@ cdef class ZOrderNNPS(NNPS):
 
             self.pids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
             self.keys[i] = <uint64_t*> malloc(num_particles*sizeof(uint64_t))
+            self.key_to_idx[i] = <int*> malloc(max_key*sizeof(int))
             self.cids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
 
             current_pids = self.pids[i]
             current_cids = self.cids[i]
             current_keys = self.keys[i]
+            current_key_to_idx = self.key_to_idx[i]
+
+            for j from 0<=j<max_key:
+                current_key_to_idx[j] = -1
 
             max_cid = self.fill_array(pa_wrapper, i, current_pids,
                     current_keys, current_cids, max_cid)
@@ -529,7 +572,7 @@ cdef class ZOrderNNPS(NNPS):
             if self.lengths[i] != NULL:
                 free(self.lengths[i])
             self.nbr_boxes[i] = <int*> malloc(self.mask_len * max_cid * sizeof(int))
-            self.lengths[i] = <int*> malloc(max_cid * sizeof(int))
+            self.lengths[i] = <int*> malloc(max_cid*sizeof(int))
 
         self.max_cid = max_cid # this is max_cid + 1
 
@@ -549,10 +592,8 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             bint asymmetric=False):
         ZOrderNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, H=H
+            cache, sort_gids, H=H, asymmetric=asymmetric
         )
-
-        self.asymmetric = asymmetric
 
     def __cinit__(self, int dim, list particles, double radius_scale = 2.0,
             int ghost_layers = 1, domain=None, bint fixed_h = False,
@@ -591,106 +632,92 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
         return length
 
     cdef int _neighbor_boxes_func(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil:
+            int* found_indices, double h):
         if self.asymmetric:
-            return self._neighbor_boxes_asym(i, j, k, current_keys, current_cids,
-                    current_hmax, num_particles, found_ptrs, h)
+            return self._neighbor_boxes_asym(i, j, k, current_key_to_idx,
+                    current_cids, current_hmax, num_particles,
+                    found_indices, h)
         else:
-            return self._neighbor_boxes_sym(i, j, k, current_keys, current_cids,
-                    current_hmax, num_particles, found_ptrs, h)
-
+            return self._neighbor_boxes_sym(i, j, k, current_key_to_idx,
+                    current_cids, current_hmax, num_particles,
+                    found_indices, h)
 
     cdef int _neighbor_boxes_asym(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil:
+            int* found_indices, double h) nogil:
         cdef int length = 0
-        cdef int p
 
         cdef uint64_t key
-        cdef uint64_t* found_ptr
+        cdef int found_idx
 
         cdef int x_temp, y_temp, z_temp
 
-        cdef int* x_mask = <int*> malloc(self.mask_len*sizeof(int))
-        cdef int* y_mask = <int*> malloc(self.mask_len*sizeof(int))
-        cdef int* z_mask = <int*> malloc(self.mask_len*sizeof(int))
+        cdef int s, t, u
 
-        cdef int mask_len = self._h_mask_exact(x_mask, y_mask, z_mask)
+        for s from -self.H<=s<=self.H:
+            for t from -self.H<=t<=self.H:
+                for u from -self.H<=u<=self.H:
 
-        for p from 0<=p<mask_len:
-            x_temp = i + x_mask[p]
-            y_temp = j + y_mask[p]
-            z_temp = k + z_mask[p]
+                    x_temp = i + u
+                    y_temp = j + t
+                    z_temp = k + s
 
-            if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
-                key = get_key(x_temp, y_temp, z_temp)
-                found_ptr = self.find(key, current_keys, num_particles)
+                    if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
+                        key = get_key(x_temp, y_temp, z_temp)
+                        found_idx = self.get_idx(key, current_key_to_idx)
 
-                if found_ptr == NULL:
-                    continue
+                        if found_idx == -1:
+                            continue
 
-                found_ptrs[length] = found_ptr
-                length += 1
-
-        free(x_mask)
-        free(y_mask)
-        free(z_mask)
+                        found_indices[length] = found_idx
+                        length += 1
 
         return length
 
-
     @cython.cdivision(True)
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil:
+            int* found_indices, double h) nogil:
         cdef int length = 0
-        cdef int p
 
         cdef uint64_t key
-        cdef uint64_t* found_ptr
 
         cdef int x_temp, y_temp, z_temp
 
         cdef double h_local
         cdef int H
 
-        cdef int* x_mask = <int*> malloc(self.mask_len*sizeof(int))
-        cdef int* y_mask = <int*> malloc(self.mask_len*sizeof(int))
-        cdef int* z_mask = <int*> malloc(self.mask_len*sizeof(int))
+        cdef int s, t, u
 
-        cdef int mask_len = self._h_mask_exact(x_mask, y_mask, z_mask)
+        for s from -self.H<=s<=self.H:
+            for t from -self.H<=t<=self.H:
+                for u from -self.H<=u<=self.H:
 
-        for p from 0<=p<mask_len:
-            x_temp = i + x_mask[p]
-            y_temp = j + y_mask[p]
-            z_temp = k + z_mask[p]
+                    x_temp = i + u
+                    y_temp = j + t
+                    z_temp = k + s
 
-            if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
-                key = get_key(x_temp, y_temp, z_temp)
-                found_ptr = self.find(key, current_keys, num_particles)
+                    if x_temp >= 0 and y_temp >= 0 and z_temp >= 0:
+                        key = get_key(x_temp, y_temp, z_temp)
+                        found_idx = self.get_idx(key, current_key_to_idx)
 
-                if found_ptr == NULL:
-                    continue
+                        if found_idx == -1:
+                            continue
 
-                cid = current_cids[found_ptr - current_keys]
+                        cid = current_cids[found_idx]
 
-                h_local = self.radius_scale*fmax(current_hmax[cid], h)
-                H = <int> ceil(h_local/self.h_sub)
+                        h_local = self.radius_scale * fmax(current_hmax[cid], h)
+                        H = <int> ceil(h_local / self.h_sub)
 
-                if abs(x_mask[p]) <= H and abs(y_mask[p]) <= H and abs(z_mask[p]) <= H:
-                    found_ptrs[length] = found_ptr
-                    length += 1
-
-        free(x_mask)
-        free(y_mask)
-        free(z_mask)
+                        if abs(u) <= H and abs(t) <= H and abs(s) <= H:
+                            found_indices[length] = found_idx
+                            length += 1
 
         return length
-
 
     cdef void _fill_nbr_boxes(self):
         cdef int i, j, k
@@ -701,6 +728,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
         cdef uint32_t* current_cids
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
+        cdef int* current_key_to_idx
         cdef double* current_hmax
         cdef int found_idx
 
@@ -715,8 +743,8 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
         cdef int n = 0
         cdef uint32_t cid, pid
 
-        cdef uint64_t** found_ptrs = <uint64_t**> malloc(self.mask_len * \
-                sizeof(uint64_t*))
+        cdef int* found_indices = <int*> malloc(self.mask_len * \
+                sizeof(int))
         cdef uint64_t key
 
         for i from 0<=i<self.narrays:
@@ -730,6 +758,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             xmin = self.xmin.data
 
             current_keys = self.keys[i]
+            current_key_to_idx = self.key_to_idx[i]
             current_cids = self.cids[i]
             current_pids = self.pids[i]
             current_nbr_boxes = self.nbr_boxes[i]
@@ -770,12 +799,12 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                 &c_x, &c_y, &c_z
                 )
 
-            num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z, current_keys,
-                    current_cids, current_hmax, num_particles, found_ptrs, h_ptr[pid])
+            num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z,
+                    current_key_to_idx, current_cids, current_hmax,
+                    num_particles, found_indices, h_ptr[pid])
 
             for k from 0<=k<num_boxes:
-                found_ptr = found_ptrs[k]
-                found_idx = found_ptr - current_keys
+                found_idx = found_indices[k]
                 current_nbr_boxes[self.mask_len*cid + n] = found_idx
                 n += 1
 
@@ -795,24 +824,25 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
                         &c_x, &c_y, &c_z
                         )
 
-                    num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z, current_keys,
-                            current_cids, current_hmax, num_particles, found_ptrs, h_ptr[pid])
+                    num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z,
+                            current_key_to_idx, current_cids, current_hmax,
+                            num_particles, found_indices, h_ptr[pid])
 
                     for k from 0<=k<num_boxes:
-                        found_ptr = found_ptrs[k]
-                        found_idx = found_ptr - current_keys
+                        found_idx = found_indices[k]
                         current_nbr_boxes[self.mask_len*cid + n] = found_idx
                         n += 1
                 else:
                     current_lengths[cid] += 1
 
-        free(found_ptrs)
+        free(found_indices)
 
     @cython.cdivision(True)
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
 
-        cdef int i, num_particles
+        cdef int i, j, num_particles
+        cdef int c_x, c_y, c_z
 
         cdef double* xmax = self.xmax.data
         cdef double* xmin = self.xmin.data
@@ -821,15 +851,29 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
 
         cdef uint32_t* current_pids
         cdef uint64_t* current_keys
+        cdef int* current_key_to_idx
         cdef uint32_t* current_cids
 
         self.h_sub = self.cell_size / self.H
+
+        find_cell_id_raw(
+                xmax[0] - xmin[0],
+                xmax[1] - xmin[1],
+                xmax[2] - xmin[2],
+                self.h_sub,
+                &c_x, &c_y, &c_z
+                )
+
+        cdef uint64_t max_key = 1 + get_key(c_x, c_y, c_z)
+        self.max_key = max_key
 
         for i from 0<=i<self.narrays:
             if self.pids[i] != NULL:
                 free(self.pids[i])
             if self.keys[i] != NULL:
                 free(self.keys[i])
+            if self.key_to_idx[i] != NULL:
+                free(self.key_to_idx[i])
             if self.cids[i] != NULL:
                 free(self.cids[i])
 
@@ -838,11 +882,16 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
 
             self.pids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
             self.keys[i] = <uint64_t*> malloc(num_particles*sizeof(uint64_t))
+            self.key_to_idx[i] = <int*> malloc(max_key*sizeof(int))
             self.cids[i] = <uint32_t*> malloc(num_particles*sizeof(uint32_t))
 
             current_pids = self.pids[i]
             current_cids = self.cids[i]
             current_keys = self.keys[i]
+            current_key_to_idx = self.key_to_idx[i]
+
+            for j from 0<=j<max_key:
+                current_key_to_idx[j] = -1
 
             max_cid = self.fill_array(pa_wrapper, i, current_pids,
                     current_keys, current_cids, max_cid)
@@ -874,16 +923,6 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
             Index in the list of particle arrays to which the query point belongs
 
         """
-        NNPS.set_context(self, src_index, dst_index)
-        self.current_pids = self.pids[src_index]
-        self.current_keys = self.keys[src_index]
-        self.current_cids_dst = self.cids[dst_index]
-        self.current_cids_src = self.cids[src_index]
-        self.current_nbr_boxes = self.nbr_boxes[src_index]
-        self.current_lengths = self.lengths[src_index]
+        ZOrderNNPS.set_context(self, src_index, dst_index)
         self.current_hmax = self.hmax[src_index]
-
-        self.dst = <NNPSParticleArrayWrapper> self.pa_wrappers[dst_index]
-        self.src = <NNPSParticleArrayWrapper> self.pa_wrappers[src_index]
-
 

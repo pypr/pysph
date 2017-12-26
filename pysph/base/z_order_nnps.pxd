@@ -28,6 +28,9 @@ cdef class ZOrderNNPS(NNPS):
     cdef uint64_t** keys
     cdef uint64_t* current_keys
 
+    cdef int** key_to_idx
+    cdef int* current_key_to_idx
+
     cdef uint32_t** cids
     cdef uint32_t* current_cids_dst
     cdef uint32_t* current_cids_src
@@ -47,19 +50,21 @@ cdef class ZOrderNNPS(NNPS):
     cdef double h_sub
 
     cdef int mask_len
+    cdef uint64_t max_key
+
+    cdef bint asymmetric
 
     ##########################################################################
     # Member functions
     ##########################################################################
 
-    cdef inline uint64_t* find(self, uint64_t query, uint64_t* array,
-            int num_particles) nogil
-
     cdef inline int _neighbor_boxes(self, int i, int j, int k,
-            uint64_t* current_keys, int num_particles,
-            uint64_t** found_ptrs) nogil
+            int* current_key_to_idx, int num_particles,
+            int* found_indices) nogil
 
     cpdef set_context(self, int src_index, int dst_index)
+
+    cdef inline int get_idx(self, uint64_t key, int* key_to_idx) nogil
 
     cpdef np.ndarray get_nbr_boxes(self, pa_index, cid)
 
@@ -90,7 +95,6 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     ############################################################################
     # Data Attributes
     ############################################################################
-    cdef bint asymmetric
     cdef double** hmax
     cdef double* current_hmax
 
@@ -101,19 +105,19 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
     cdef inline int _h_mask_exact(self, int* x, int* y, int* z) nogil
 
     cdef int _neighbor_boxes_func(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil
+            int* found_indices, double h)
 
     cdef int _neighbor_boxes_asym(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil
+            int* found_indices, double h) nogil
 
     cdef int _neighbor_boxes_sym(self, int i, int j, int k,
-            uint64_t* current_keys, uint32_t* current_cids,
+            int* current_key_to_idx, uint32_t* current_cids,
             double* current_hmax, int num_particles,
-            uint64_t** found_ptrs, double h) nogil
+            int* found_indices, double h) nogil
 
     cdef void _fill_nbr_boxes(self)
 
