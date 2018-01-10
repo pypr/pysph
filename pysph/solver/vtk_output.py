@@ -163,7 +163,7 @@ def run(options):
         if options.outdir is not None:
             filename = options.outdir + os.path.split(filename)[1]
         dump_vtk(filename, particles, scalars=options.scalars,
-                 V=['u', 'v', 'w'])
+                 velocity=['u', 'v', 'w'])
 
 
 def main(argv=None):
