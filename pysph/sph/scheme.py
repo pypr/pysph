@@ -406,10 +406,15 @@ class WCSPHScheme(Scheme):
                 gamma=self.gamma
             ))
 
-        if self.hg_correction:
-            # This correction applies only to solids.
-            for name in self.solids:
+        # This correction applies only to solids.
+        for name in self.solids:
+            if self.hg_correction:
                 g1.append(TaitEOSHGCorrection(
+                    dest=name, sources=None, rho0=self.rho0, c0=self.c0,
+                    gamma=self.gamma
+                ))
+            else:
+                g1.append(TaitEOS(
                     dest=name, sources=None, rho0=self.rho0, c0=self.c0,
                     gamma=self.gamma
                 ))
