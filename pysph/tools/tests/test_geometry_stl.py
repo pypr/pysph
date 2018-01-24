@@ -95,8 +95,8 @@ endsolid cube"""
 
 class TestGeometry(unittest.TestCase):
     def test_in_triangle(self):
-        assert G.in_triangle(0.5, 0.5, 0.0, 0.0, 1.5, 0.0, 0.0, 1.5) == True
-        assert G.in_triangle(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0) == False
+        assert(G.in_triangle(0.5, 0.5, 0.0, 0.0, 1.5, 0.0, 0.0, 1.5) is True)
+        assert(G.in_triangle(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0) is False)
 
     def test_interp_2d(self):
         # Check interpolation between two points on line y=x
@@ -132,12 +132,12 @@ class TestGeometry(unittest.TestCase):
         p2 = get_particle_array(x=x2, y=y2, z=z2, h=h)
         x, y, z = G.get_neighbouring_particles(p2, p1, h)
 
-        for i in xrange(x.shape[0]):
+        for i in range(x.shape[0]):
             assert((1. - 2 * h) ** 2 < (x[i] ** 2 + y[i] ** 2 + z[i] ** 2) <
                    (1. + 2 * h) ** 2)
 
     def _generate_cube_stl(self):
-        f = tempfile.NamedTemporaryFile(delete=False)
+        f = tempfile.NamedTemporaryFile(mode='w', delete=False)
         f.write(cube_stl)
         f.close()
         return f.name
@@ -150,7 +150,7 @@ class TestGeometry(unittest.TestCase):
         def on_surface(x, y, z): return surface1(x, y, z) or \
             surface1(y, x, z) or surface1(z, x, y)
 
-        for i in xrange(x.shape[0]):
+        for i in range(x.shape[0]):
             assert on_surface(x[i], y[i], z[i])
 
     def test_get_stl_mesh(self):
