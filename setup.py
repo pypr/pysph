@@ -26,9 +26,9 @@ import sys
 if len(os.environ.get('COVERAGE', '')) > 0:
     MACROS = [("CYTHON_TRACE", "1"), ("CYTHON_TRACE_NOGIL", "1")]
     COMPILER_DIRECTIVES = {"linetrace": True}
-    print("-"*80)
+    print("-" * 80)
     print("Enabling linetracing for cython and setting CYTHON_TRACE = 1")
-    print("-"*80)
+    print("-" * 80)
 else:
     MACROS = []
     COMPILER_DIRECTIVES = {}
@@ -85,7 +85,7 @@ def get_openmp_flags():
 
     env_var = os.environ.get('USE_OPENMP', '')
     if env_var.lower() in ("0", 'false', 'n'):
-        print("-"*70)
+        print("-" * 70)
         print("OpenMP disabled by environment variable (USE_OPENMP).")
         return [], [], False
 
@@ -119,18 +119,18 @@ def get_openmp_flags():
     has_omp = True
     try:
         pyxbuild.pyx_to_dll(fname, extension, pyxbuild_dir=tmp_dir)
-        print("-"*70)
+        print("-" * 70)
         print("Using OpenMP.")
-        print("-"*70)
+        print("-" * 70)
     except CompileError:
-        print("*"*70)
+        print("*" * 70)
         print("Unable to compile OpenMP code. Not using OpenMP.")
-        print("*"*70)
+        print("*" * 70)
         has_omp = False
     except LinkError:
-        print("*"*70)
+        print("*" * 70)
         print("Unable to link OpenMP code. Not using OpenMP.")
-        print("*"*70)
+        print("*" * 70)
         has_omp = False
     finally:
         shutil.rmtree(tmp_dir)
@@ -150,9 +150,9 @@ def get_zoltan_directory(varname):
     else:
         USE_ZOLTAN = True
     if not path.exists(d):
-        print("*"*80)
+        print("*" * 80)
         print("%s incorrectly set to %s, not using ZOLTAN!" % (varname, d))
-        print("*"*80)
+        print("*" * 80)
         USE_ZOLTAN = False
         return ''
     return d
@@ -186,9 +186,9 @@ def get_mpi_flags():
                 [mpic, '--showme:compile'], universal_newlines=True
             ).strip()
     except:  # noqa: E722
-        print('-'*80)
+        print('-' * 80)
         print("Unable to run mpic++ correctly, skipping parallel build")
-        print('-'*80)
+        print('-' * 80)
         HAVE_MPI = False
     else:
         mpi_link_args.extend(link_args.split())
@@ -220,14 +220,14 @@ def get_zoltan_args():
         lib = get_zoltan_directory('ZOLTAN_LIBRARY')
 
     if (not USE_ZOLTAN):
-        print("*"*80)
+        print("*" * 80)
         print("Zoltan Environment variable not set, not using ZOLTAN!")
-        print("*"*80)
+        print("*" * 80)
         HAVE_MPI = False
     else:
-        print('-'*70)
+        print('-' * 70)
         print("Using Zoltan from:\n%s\n%s" % (inc, lib))
-        print('-'*70)
+        print('-' * 70)
         zoltan_include_dirs = [inc]
         zoltan_library_dirs = [lib]
 
@@ -447,6 +447,17 @@ def get_basic_extensions():
             language="c++",
             define_macros=MACROS,
         ),
+
+        # STL tool
+        Extension(
+            name="pysph.tools.geometry_stl",
+            sources=["pysph/tools/geometry_stl.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++",
+            define_macros=MACROS,
+        ),
+
     ]
 
     if HAVE_OPENCL:
@@ -535,11 +546,11 @@ def get_parallel_extensions():
                 "pyzoltan/czoltan/czoltan",
                 "pyzoltan/czoltan/czoltan_types",
             ),
-            include_dirs=include_dirs+zoltan_include_dirs+mpi_inc_dirs,
+            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
             library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args+extra_compile_args,
+            extra_compile_args=mpi_compile_args + extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
             language="c++",
             define_macros=MACROS,
@@ -557,7 +568,7 @@ def get_parallel_extensions():
             library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args+extra_compile_args,
+            extra_compile_args=mpi_compile_args + extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
             language="c++",
             define_macros=MACROS,
@@ -574,7 +585,7 @@ def get_parallel_extensions():
             library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args+extra_compile_args,
+            extra_compile_args=mpi_compile_args + extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
             language="c++",
             define_macros=MACROS,
@@ -596,7 +607,7 @@ def get_parallel_extensions():
             library_dirs=zoltan_library_dirs,
             libraries=[zoltan_lib, 'mpi'],
             extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args+extra_compile_args,
+            extra_compile_args=mpi_compile_args + extra_compile_args,
             cython_compile_time_env=cython_compile_time_env,
             language="c++",
             define_macros=MACROS,
@@ -703,7 +714,7 @@ def setup_package():
           },
           # exclude package data in installation.
           exclude_package_data={
-            '': ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
+              '': ['Makefile', '*.bat', '*.cfg', '*.rst', '*.sh', '*.yml'],
           },
           ext_modules=ext_modules,
           include_package_data=True,
