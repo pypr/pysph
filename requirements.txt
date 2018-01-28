@@ -2,5 +2,3 @@ numpy
 setuptools>=6.0
 Cython>=0.20,<0.27
 mako
-pytest>=3.0
-mock>=1.0
