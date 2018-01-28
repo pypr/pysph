@@ -95,13 +95,13 @@ endsolid cube"""
 
 class TestGeometry(unittest.TestCase):
     def test_in_triangle(self):
-        assert(G.in_triangle(0.5, 0.5, 0.0, 0.0, 1.5, 0.0, 0.0, 1.5) is True)
-        assert(G.in_triangle(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0) is False)
+        assert(G._in_triangle(0.5, 0.5, 0.0, 0.0, 1.5, 0.0, 0.0, 1.5) is True)
+        assert(G._in_triangle(1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0) is False)
 
     def test_interp_2d(self):
         # Check interpolation between two points on line y=x
         dx = 0.1
-        r = G.interp_2d(np.array([0., 0.]), np.array([1., 1.]), dx)
+        r = G._interp_2d(np.array([0., 0.]), np.array([1., 1.]), dx)
         # Check if all points satisfy y=x
         np.testing.assert_array_almost_equal(
             r[:, 0] - r[:, 1], np.zeros(r.shape[0]))
@@ -114,12 +114,20 @@ class TestGeometry(unittest.TestCase):
                              [1., 0., 0.],
                              [0., 1., 0.]])
         dx_triangle = 0.1
-        x, y, z = G.fill_triangle(triangle, dx_triangle)
+        x, y, z = G._fill_triangle(triangle, dx_triangle)
         EPS = np.finfo(float).eps
         np.testing.assert_array_less(-x, np.zeros(x.shape[0]) + EPS)
         np.testing.assert_array_less(-y, np.zeros(x.shape[0]) + EPS)
         np.testing.assert_array_less(-(x + y), np.ones(x.shape[0]) + EPS)
         np.testing.assert_almost_equal(z, np.zeros(x.shape[0]))
+
+    def test_fill_triangle_throws_zero_area_triangle_exception(self):
+        self.assertRaises(G.ZeroAreaTriangleException, G._fill_triangle,
+                          np.zeros((3, 3)), 0.5)
+
+    def test_fill_triangle_throws_polygon_mesh_error(self):
+        self.assertRaises(G.PolygonMeshError, G._fill_triangle,
+                          np.zeros((4, 3)), 0.5)
 
     def test_get_neighbouring_particles(self):
         """Find neighbouring particles around a unit sphere"""
@@ -130,7 +138,7 @@ class TestGeometry(unittest.TestCase):
         x2, y2, z2 = x1[mask], y1[mask], z1[mask]
         p1 = get_particle_array(x=x1, y=y1, z=z1, h=h)
         p2 = get_particle_array(x=x2, y=y2, z=z2, h=h)
-        x, y, z = G.get_neighbouring_particles(p2, p1, h)
+        x, y, z = G._get_neighbouring_particles(p2, p1, h)
 
         for i in range(x.shape[0]):
             assert((1. - 2 * h) ** 2 < (x[i] ** 2 + y[i] ** 2 + z[i] ** 2) <
@@ -156,7 +164,7 @@ class TestGeometry(unittest.TestCase):
     def test_get_stl_mesh(self):
         """Check if mesh is generated correctly for unit cube"""
         cube_fname = self._generate_cube_stl()
-        x, y, z = G.get_stl_mesh(cube_fname, 0.1)
+        x, y, z = G._get_stl_mesh(cube_fname, 0.1)
         h = np.finfo(float).eps
         self._cube_assert(x, y, z, h)
 
