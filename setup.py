@@ -448,6 +448,17 @@ def get_basic_extensions():
             language="c++",
             define_macros=MACROS,
         ),
+
+        # STL tool
+        Extension(
+            name="pysph.tools.geometry_stl",
+            sources=["pysph/tools/geometry_stl.pyx"],
+            include_dirs=include_dirs,
+            extra_compile_args=extra_compile_args,
+            language="c++",
+            define_macros=MACROS,
+        ),
+
     ]
 
     if HAVE_OPENCL:

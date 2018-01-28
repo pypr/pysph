@@ -123,7 +123,10 @@ class WavesPaddle2D(Application):
         edac = EDACScheme(['fluid'], ['wall', 'paddle', 'obstacle'], dim=2,
                           rho0=ro, c0=co, gy=-9.81, alpha=alp, nu=0.0, h=0.01,
                           clamp_p=True)
-        return SchemeChooser(default='wcsph', wcsph=wcsph, edac=edac)
+        aha = AdamiHuAdamsScheme(['fluid'], ['wall', 'paddle', 'obstacle'],
+                                 dim=2, rho0=ro, h0=0.01, gamma=1.0,
+                                 alpha=alp, gy=-9.81, nu=0.0, c0=co)
+        return SchemeChooser(default='wcsph', aha=aha, wcsph=wcsph, edac=edac)
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
