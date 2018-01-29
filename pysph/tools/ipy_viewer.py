@@ -370,53 +370,58 @@ class Viewer2D(Viewer):
                 cmap = pa_widgets.scalar_cmap.value
                 colormap = getattr(mpl.cm, cmap)
                 sct = self._scatters[array_name]
-                sct.set_facecolors(colormap(c*1.0/np.max(c)))
+                cmax = np.max(c)
+                if cmax != 0:
+                    sct.set_facecolors(colormap(c*1.0/cmax))
+                else:
+                    sct.set_facecolors(colormap(c*0))
         self._scatter_ax.axis('equal')
         self._legend_handler(None)
 
     def _plot_vectors(self):
 
-        try:
-            temp_data = self.get_frame(self._widgets.frame.value)
-            temp_data = temp_data['arrays']
-            self.figure.delaxes(self._vector_ax)
-            self._vector_ax = self.figure.add_axes(
-                self._scatter_ax.get_position(),
-                frameon=False
-                )
-            self._vector_ax.get_xaxis().set_visible(False)
-            self._vector_ax.get_yaxis().set_visible(False)
-            self._vectors = {}
+        temp_data = self.get_frame(self._widgets.frame.value)
+        temp_data = temp_data['arrays']
+        self.figure.delaxes(self._vector_ax)
+        self._vector_ax = self.figure.add_axes(
+            self._scatter_ax.get_position(),
+            frameon=False
+            )
+        self._vector_ax.get_xaxis().set_visible(False)
+        self._vector_ax.get_yaxis().set_visible(False)
+        self._vectors = {}
 
-            for array_name in self._widgets.particles.keys():
-                if self._widgets.particles[array_name].vector.value != '':
-                    pa_widgets = self._widgets.particles[array_name]
-                    temp_data = temp_data[array_name]
-                    x = temp_data.x
-                    y = temp_data.y
+        for array_name in self._widgets.particles.keys():
+            if self._widgets.particles[array_name].vector.value != '':
+                pa_widgets = self._widgets.particles[array_name]
+                temp_data_arr = temp_data[array_name]
+                x = temp_data_arr.x
+                y = temp_data_arr.y
+
+                try:
                     v1 = getattr(
-                        temp_data,
+                        temp_data_arr,
                         pa_widgets.vector.value.split(",")[0]
                         )
                     v2 = getattr(
-                        temp_data,
+                        temp_data_arr,
                         pa_widgets.vector.value.split(",")[1]
                         )
-                    vmag = (v1**2 + v2**2)**0.5
-                    self._vectors[array_name] = self._vector_ax.quiver(
-                        x,
-                        y,
-                        v1,
-                        v2,
-                        vmag,
-                        scale=pa_widgets.vector_scale.value,
-                        width=(pa_widgets.vector_width.value)/10000,
-                    )
-            self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
-            self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
+                except AttributeError:
+                    continue
 
-        except AttributeError:
-            pass
+                vmag = (v1**2 + v2**2)**0.5
+                self._vectors[array_name] = self._vector_ax.quiver(
+                    x,
+                    y,
+                    v1,
+                    v2,
+                    vmag,
+                    scale=pa_widgets.vector_scale.value,
+                    width=(pa_widgets.vector_width.value)/10000,
+                )
+        self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
+        self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
 
     def _frame_handler(self, change):
 
@@ -441,7 +446,11 @@ class Viewer2D(Viewer):
                 # making it non-zero so that it scales properly from 0 to 1
                 cmap = pa_widgets.scalar_cmap.value
                 colormap = getattr(mpl.cm, cmap)
-                sct.set_facecolors(colormap(c*1.0/np.max(c)))
+                cmax = np.max(c)
+                if cmax != 0:
+                    sct.set_facecolors(colormap(c*1.0/cmax))
+                else:
+                    sct.set_facecolors(colormap(c*0))
 
         self._legend_handler(None)
         self._vector_handler(None)
@@ -477,7 +486,11 @@ class Viewer2D(Viewer):
             c = c + abs(np.min(c))
             cmap = pa_widgets.scalar_cmap.value
             colormap = getattr(mpl.cm, cmap)
-            sct.set_facecolors(colormap(c*1.0/np.max(c)))
+            cmax = np.max(c)
+            if cmax != 0:
+                sct.set_facecolors(colormap(c*1.0/cmax))
+            else:
+                sct.set_facecolors(colormap(c*0))
 
         else:
             c = getattr(
@@ -487,7 +500,11 @@ class Viewer2D(Viewer):
             c = c + abs(np.min(c))
             cmap = pa_widgets.scalar_cmap.value
             colormap = getattr(mpl.cm, cmap)
-            sct.set_facecolors(colormap(c*1.0/np.max(c)))
+            cmax = np.max(c)
+            if cmax != 0:
+                sct.set_facecolors(colormap(c*1.0/cmax))
+            else:
+                sct.set_facecolors(colormap(c*0))
 
         self._legend_handler(None)
 
@@ -534,7 +551,11 @@ class Viewer2D(Viewer):
         cmap = pa_widgets.scalar_cmap.value
         colormap = getattr(mpl.cm, cmap)
         sct = self._scatters[array_name]
-        sct.set_facecolors(colormap(c*1.0/np.max(c)))
+        cmax = np.max(c)
+        if cmax != 0:
+            sct.set_facecolors(colormap(c*1.0/cmax))
+        else:
+            sct.set_facecolors(colormap(c*0))
         self._legend_handler(None)
 
     def _legend_handler(self, change):
