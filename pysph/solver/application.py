@@ -17,8 +17,8 @@ from pysph.base import utils
 from pysph.base.utils import is_overloaded_method
 
 from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
-        ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
-        StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
+    ExtendedSpatialHashNNPS, CellIndexingNNPS, StratifiedHashNNPS, \
+    StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
 from pysph.solver.controller import CommandManager
@@ -387,6 +387,16 @@ class Application(object):
             default=None,
             help="Do not use OpenMP to run the "
             "simulation using multiple cores.")
+
+        # --omp-schedule
+        parser.add_argument(
+            "--omp-schedule",
+            action="store",
+            dest="omp_schedule",
+            default="dynamic,64",
+            help="""Schedule how loop iterations 
+            are divided amongst multiple threads""")
+
         # --opencl
         parser.add_argument(
             "--opencl",
@@ -814,6 +824,8 @@ class Application(object):
         # Setup configuration options.
         if options.with_openmp is not None:
             get_config().use_openmp = options.with_openmp
+        if options.omp_schedule is not None:
+            get_config().set_omp_schedule(options.omp_schedule)
         if options.with_opencl:
             get_config().use_opencl = True
         if options.use_double:

@@ -14,7 +14,7 @@ initial velocity field was simulated using a weaky-compressible SPH scheme.
 In that example, a ``WCSPHScheme`` object was created in the ``create_scheme``
 method.  The details of what exactly the scheme does was not discussed.  This
 tutorial explains some of those details by solving the same problem using a
-lower-level approach where the actual SPH equations, the integrator and the
+lower-level approach where the actual SPH equations, the integrator, and the
 solver are created manually.  This should help a user write their own schemes
 or modify an existing scheme.  The full code for this example can be seen in `elliptical_drop_no_scheme.py
 <https://github.com/pypr/pysph/tree/master/pysph/examples/elliptical_drop_no_scheme.py>`_.

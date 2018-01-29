@@ -211,6 +211,24 @@ short do the following::
     $ source pysph_env/bin/activate
     $ pip install cython --upgrade # if you have an old version.
 
+If you wish to use a compiler which is not currently your default compiler,
+simply update the ``CC`` and ``CXX`` environment variables. For example, to use
+icc run the following commands `before` building PySPH::
+  
+    $ export CC=icc
+    $ export CXX=icpc
+
+.. note::
+
+    In this case, you will additionally have to ensure that the relevant intel
+    shared libraries can be found when `running` PySPH code. Most intel
+    installations come along with shell scripts that load relevant environment
+    variables with the right values automatically. This shell script is
+    generally named ``compilervars.sh`` and can be found in
+    ``/path/to/icc/bin``. If you didn't get this file along with your
+    installation, you can try running ``export
+    LD_LIBRARY_PATH=/path/to/icc/lib``.
+    
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
 

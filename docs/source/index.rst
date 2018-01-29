@@ -59,6 +59,7 @@ The framework and library
    :maxdepth: 2
 
    design/overview.rst
+   design/equations.rst
    starcluster/overview
    using_pysph.rst
    pyzoltan/overview

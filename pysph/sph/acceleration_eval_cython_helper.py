@@ -229,6 +229,30 @@ class AccelerationEvalCythonHelper(object):
         else:
             return "if True: # Placeholder used for OpenMP."
 
+    def get_parallel_range(self, start, stop=None, step=1):
+        if stop is None:
+            stop = start
+            start = 0
+
+        args = "{start},{stop},{step}"
+        if self.config.use_openmp:
+            schedule = self.config.omp_schedule[0]
+            chunksize = self.config.omp_schedule[1]
+
+            if schedule is not None:
+                args = args + ", schedule='{schedule}'"
+
+            if chunksize is not None:
+                args = args + ", chunksize={chunksize}"
+
+            args = args.format(start=start, stop=stop, step=step,
+                               schedule=schedule, chunksize=chunksize)
+            return "prange({})".format(args)
+
+        else:
+            args = args.format(start=start, stop=stop, step=step)
+            return "range({})".format(args)
+
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)

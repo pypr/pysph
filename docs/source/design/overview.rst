@@ -635,16 +635,10 @@ where:
       communication.  One can reduce these by using a single array and use
       that to reduce the communication.
 
-Note that in the above example,
-:py:func:`pysph.base.reduce_array.serial_reduce_array` is passed a
-``dst.array.m``, this is important as in parallel the ``dst.m`` will contain
-all particle properties including ghost properties.  On the other hand
-``dst.array.m`` will be a numpy array of only the real particles.
-
 We recommend that for any kind of reductions one always use the
 ``serial_reduce_array`` function and the ``parallel_reduce_array`` inside a
-``reduce`` method.  One should not worry about parallel/serial modes in this
-case as this is automatically taken care of by the code generator.  In serial,
+``reduce`` method. One should not worry about parallel/serial modes in this
+case as this is automatically taken care of by the code generator. In serial,
 the parallel reduction does nothing.
 
 With this machinery, we are able to write complex equations to solve almost
@@ -658,6 +652,8 @@ If you wish to use adaptive time stepping, see the code
 from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
 particle arrays to determine the most suitable time step.
 
+For a more focused discussion on how you should write equations, please see
+:ref:`writing_equations`.
 
 
 Writing the Integrator
