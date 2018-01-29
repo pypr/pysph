@@ -51,6 +51,8 @@ class VTKOutput(Output):
 
         if self.scalars is None:
             properties = list(arrays.keys())
+        else:
+            properties = self.scalars
 
         scalars = []
         for prop_name in properties:
