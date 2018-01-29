@@ -61,3 +61,13 @@ Mayavi Viewer
 .. automodule:: pysph.tools.mayavi_viewer
    :members:
    :undoc-members:
+
+STL Converter
+-------------
+
+The following function can be used to convert an STL file to a set of grid
+points.
+
+.. autofunction:: pysph.tools.geometry_stl.get_stl_surface
+
+
