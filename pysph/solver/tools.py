@@ -105,8 +105,8 @@ class DensityCorrection(Tool):
         self.particles = app.particles
 
     def _set_sph_eval_shepard(self):
-        from pysph.sph.densitycorrection import ShepardFilterPreStep,
-            ShepardFilter
+        from pysph.sph.densitycorrection import (ShepardFilterPreStep,
+                                                 ShepardFilter)
         from pysph.tools.sph_evaluator import SPHEvaluator
         if self._sph_eval is None:
             arrs = [self.particles[i] for i in self.arr_ind]
