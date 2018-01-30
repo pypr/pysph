@@ -475,12 +475,12 @@ Viewing the data in an IPython notebook
 
 PySPH makes it relatively easy to view the data inside an IPython notebook
 with minimal additional dependencies. A simple UI is provided to view the
-saved data using this interface. It requires jupyter_ and ipywidgets_.
+saved data using this interface. It requires jupyter_,  ipywidgets_ and ipympl_.
 Currently, a 2D and 3D viewer are provided for the data. Here is a simple
 example of how one may use this in a notebook. Inside a notebook, one needs
 the following::
 
-    %matplotlib notebook
+    %matplotlib ipympl
     from pysph.tools.ipy_viewer import Viewer2D
     viewer = Viewer2D('dam_break_2d_output')
 
@@ -499,9 +499,8 @@ on the browser. The different saved snapshots can be viewed using a convenient
 slider. The viewer shows both the particles as well as simple vector plots.
 This is convenient when one wishes to share and show the data without
 requiring Mayavi. It does require pysph to be installed in order to be able to
-load the files. It is useful although not mandatory to have the first line
-that sets the matplotlib backend to the ``notebook``. What this does is to
-allow you to zoom and interact with the interactive plots.
+load the files. It is mandatory to have the first line that sets the matplotlib
+backend to ``ipympl``.
 
 There is also a 3D viewer which may be used using ``Viewer3D`` instead of the
 ``Viewer2D`` above.  This viewer requires ipyvolume_ to be installed.
@@ -510,6 +509,7 @@ There is also a 3D viewer which may be used using ``Viewer3D`` instead of the
 .. _jupyter: https://jupyter.org
 .. _ipywidgets: https://github.com/jupyter-widgets/ipywidgets
 .. _ipyvolume: https://pypi.python.org/pypi/ipyvolume
+.. _ipympl: https://pypi.python.org/pypi/ipympl
 
 
 A slightly more complex example
