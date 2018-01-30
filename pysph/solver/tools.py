@@ -32,11 +32,11 @@ class Tool(object):
         pass
 
 
-
 class SimpleRemesher(Tool):
     """A simple tool to periodically remesh a given array of particles onto an
     initial set of points.
     """
+
     def __init__(self, app, array_name, props, freq=100, xi=None, yi=None,
                  zi=None, kernel=None):
         """Constructor.
@@ -81,9 +81,51 @@ class SimpleRemesher(Tool):
         )
 
     def post_step(self, solver):
-        if solver.count%self.freq == 0 and solver.count > 0:
+        if solver.count % self.freq == 0 and solver.count > 0:
             self.interp.nnps.update()
             data = dict(x=self.xi, y=self.yi, z=self.zi)
             for prop in self.props:
                 data[prop] = self.interp.interpolate(prop)
             self.array.set(**data)
+
+
+class DensityCorrection(Tool):
+    """
+    A tool to reinitialize the density of the fluid particles
+    """
+
+    def __init__(self, app, m=5, corr=0, arr_ind=[0], dim=2, kernel=None):
+        self.m = m
+        self.corr = corr
+        self.arr_ind = arr_ind
+        self.count = 1
+        self._sph_eval = None
+        self.dim = dim
+        self.kernel = kernel
+        self.particles = app.particles
+
+    def _set_sph_eval_shepard(self):
+        from pysph.sph.densitycorrection import ShepardFilterPreStep,
+            ShepardFilter
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        if self._sph_eval is None:
+            arrs = [self.particles[i] for i in self.arr_ind]
+            eqns = []
+            for arr in arrs:
+                name = arr.name
+                eqns.append(Group(equations=[
+                    ShepardFilterPreStep(dest=name, sources=[name])],
+                    real=False))
+                eqns.append(Group(equations=[
+                    ShepardFilter(dest=name, sources=[name])], real=False))
+            self._sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+
+    def post_step(self, solver):
+        if self.count % self.m == 0 and self.corr == 1:
+            arrs = [self.particles[i] for i in self.arr_ind]
+            _set_sph_eval_shepard()
+            _sph_eval.update_particle_arrays(arrs)
+            _sph_eval.evaluate()
+        self.count += 1
