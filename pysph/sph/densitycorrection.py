@@ -22,7 +22,7 @@ class ShepardFilterPreStep(Equation):
         d_tw[d_idx] += WIJ * s_m[s_idx] / s_rho[s_idx]
 
 
-class ShepartFilter(Equation):
+class ShepardFilter(Equation):
     r"""
     .. math::
             \rho_{a} = \sum_{b} \m_{b}\tilde{W_{ab}}
