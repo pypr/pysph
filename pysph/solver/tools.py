@@ -94,38 +94,61 @@ class DensityCorrection(Tool):
     A tool to reinitialize the density of the fluid particles
     """
 
-    def __init__(self, app, m=5, corr=0, arr_ind=[0], dim=2, kernel=None):
-        self.m = m
+    def __init__(self, app, arr_names, corr='shepard', freq=10, kernel=None):
+        """
+        Parameters
+        ----------
+
+        app : pysph.solver.application.Application.
+            The application instance.
+        arr_names : array
+            Names of the particle arrays whose densities needs to be
+            reinitialized.
+        corr : str
+            Name of the density reinitialization operation
+        freq : int
+            Frequency of reinitialization.
+        kernel: any kernel from pysph.base.kernels
+
+        """
+        self.freq = freq
         self.corr = corr
-        self.arr_ind = arr_ind
+        self.arr_names = arr_names
         self.count = 1
         self._sph_eval = None
-        self.dim = dim
         self.kernel = kernel
+        self.dim = app.solver.dim
         self.particles = app.particles
 
-    def _set_sph_eval_shepard(self):
+    def _get_sph_eval_shepard(self):
         from pysph.sph.densitycorrection import (ShepardFilterPreStep,
                                                  ShepardFilter)
         from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.solver.utils import get_array_by_name
         if self._sph_eval is None:
-            arrs = [self.particles[i] for i in self.arr_ind]
+            arrs = [get_array_by_name(self.particles, i) for i in self.arr_ind]
             eqns = []
             for arr in arrs:
+                arr.add_property('tw')
                 name = arr.name
                 eqns.append(Group(equations=[
                     ShepardFilterPreStep(dest=name, sources=[name])],
                     real=False))
                 eqns.append(Group(equations=[
                     ShepardFilter(dest=name, sources=[name])], real=False))
-            self._sph_eval = SPHEvaluator(
+            sph_eval = SPHEvaluator(
                 arrays=arrs, equations=eqns, dim=self.dim,
                 kernel=self.kernel(dim=self.dim))
+            return sph_eval
+
+    def _get_sph_eval(self, corr):
+        if corr == 'shepard':
+            return self._get_sph_eval_shepard()
 
     def post_step(self, solver):
-        if self.count % self.m == 0 and self.corr == 1:
-            arrs = [self.particles[i] for i in self.arr_ind]
-            _set_sph_eval_shepard()
-            _sph_eval.update_particle_arrays(arrs)
-            _sph_eval.evaluate()
+        if self.count % self.freq == 0:
+            arrs = [get_array_by_name(self.particles, i) for i in self.arr_ind]
+            self._sph_eval = _get_sph_eval(self.corr)
+            self._sph_eval.update_particle_arrays(arrs)
+            self._sph_eval.evaluate()
         self.count += 1
