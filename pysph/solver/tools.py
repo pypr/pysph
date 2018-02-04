@@ -94,7 +94,7 @@ class DensityCorrection(Tool):
     A tool to reinitialize the density of the fluid particles
     """
 
-    def __init__(self, app, arr_names, corr='', freq=10, kernel=None):
+    def __init__(self, app, arr_names, corr='shepard', freq=10, kernel=None):
         """
         Parameters
         ----------
@@ -113,6 +113,7 @@ class DensityCorrection(Tool):
         kernel: any kernel from pysph.base.kernels
 
         """
+        from pysph.solver.utils import get_array_by_name
         self.freq = freq
         self.corr = corr
         self.names = arr_names
@@ -132,7 +133,6 @@ class DensityCorrection(Tool):
         from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
                                                      ShepardFilter)
         from pysph.tools.sph_evaluator import SPHEvaluator
-        from pysph.solver.utils import get_array_by_name
         from pysph.sph.equation import Group
         if self._sph_eval is None:
             arrs = self.arrs
@@ -157,8 +157,9 @@ class DensityCorrection(Tool):
             return self._get_sph_eval_shepard()
 
     def post_step(self, solver):
-        from pysph.solver.utils import get_array_by_name
-        if self.count % self.freq == 0:
+        if self.freq == 0:
+            pass
+        elif self.count % self.freq == 0:
             arrs = self.arrs
             self._sph_eval = self._get_sph_eval(self.corr)
             self._sph_eval.update_particle_arrays(arrs)
