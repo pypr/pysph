@@ -32,11 +32,11 @@ class Tool(object):
         pass
 
 
-
 class SimpleRemesher(Tool):
     """A simple tool to periodically remesh a given array of particles onto an
     initial set of points.
     """
+
     def __init__(self, app, array_name, props, freq=100, xi=None, yi=None,
                  zi=None, kernel=None):
         """Constructor.
@@ -81,9 +81,86 @@ class SimpleRemesher(Tool):
         )
 
     def post_step(self, solver):
-        if solver.count%self.freq == 0 and solver.count > 0:
+        if solver.count % self.freq == 0 and solver.count > 0:
             self.interp.nnps.update()
             data = dict(x=self.xi, y=self.yi, z=self.zi)
             for prop in self.props:
                 data[prop] = self.interp.interpolate(prop)
             self.array.set(**data)
+
+
+class DensityCorrection(Tool):
+    """
+    A tool to reinitialize the density of the fluid particles
+    """
+
+    def __init__(self, app, arr_names, corr='shepard', freq=10, kernel=None):
+        """
+        Parameters
+        ----------
+
+        app : pysph.solver.application.Application.
+            The application instance.
+        arr_names : array
+            Names of the particle arrays whose densities needs to be
+            reinitialized.
+        corr : str
+            Name of the density reinitialization operation.
+            corr='shepard' for using zeroth order shepard filter
+        freq : int
+            Frequency of reinitialization.
+        kernel: any kernel from pysph.base.kernels
+
+        """
+        from pysph.solver.utils import get_array_by_name
+        self.freq = freq
+        self.corr = corr
+        self.names = arr_names
+        self.count = 1
+        self._sph_eval = None
+        self.kernel = kernel
+        self.dim = app.solver.dim
+        self.particles = app.particles
+        self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
+        try:
+            assert self.corr in ['shepard']
+        except:
+            error = 'Given corr argument not in acceptable corr arguments'
+            raise AssertionError(error)
+
+    def _get_sph_eval_shepard(self):
+        from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
+                                                     ShepardFilter)
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.equation import Group
+        if self._sph_eval is None:
+            arrs = self.arrs
+            eqns = []
+            for arr in arrs:
+                arr.add_property('tmp_w')
+                name = arr.name
+                eqns.append(Group(equations=[
+                    ShepardFilterPreStep(dest=name, sources=[name])],
+                    real=False))
+                eqns.append(Group(equations=[
+                    ShepardFilter(dest=name, sources=[name])], real=False))
+            sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+            return sph_eval
+        else:
+            return self._sph_eval
+
+    def _get_sph_eval(self, corr):
+        if corr == 'shepard':
+            return self._get_sph_eval_shepard()
+
+    def post_step(self, solver):
+        if self.freq == 0:
+            pass
+        elif self.count % self.freq == 0:
+            arrs = self.arrs
+            self._sph_eval = self._get_sph_eval(self.corr)
+            self._sph_eval.update_particle_arrays(arrs)
+            self._sph_eval.evaluate()
+        self.count += 1
