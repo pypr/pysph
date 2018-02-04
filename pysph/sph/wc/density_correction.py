@@ -10,16 +10,15 @@ class ShepardFilterPreStep(Equation):
             {\rho_{b}}}
     References
     ----------
-    .. [Panizzo, 2004] Panizzo, Physical and Numerical Modelling of Subaerial
-        Landslide Generated Waves, PhD thesis.
-
+    .. [Panizzo, 2004] Panizzo, Physical and Numerical Modelling of
+        Subaerial Landslide Generated Waves, PhD thesis.
     """
 
-    def initialize(self, d_idx, d_tw):
-        d_tw[d_idx] = 0.0
+    def initialize(self, d_idx, d_tmp_w):
+        d_tmp_w[d_idx] = 0.0
 
-    def loop(self, d_idx, d_tw, s_m, s_rho, s_idx, WIJ):
-        d_tw[d_idx] += WIJ * s_m[s_idx] / s_rho[s_idx]
+    def loop(self, d_idx, d_tmp_w, s_m, s_rho, s_idx, WIJ):
+        d_tmp_w[d_idx] += WIJ * s_m[s_idx] / s_rho[s_idx]
 
 
 class ShepardFilter(Equation):
@@ -31,5 +30,5 @@ class ShepardFilter(Equation):
     def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
 
-    def loop(self, s_idx, d_idx, s_m, d_tw, d_rho, WIJ):
-        d_rho[d_idx] += WIJ * s_m[s_idx] / d_tw[d_idx]
+    def loop(self, s_idx, d_idx, s_m, d_tmp_w, d_rho, WIJ):
+        d_rho[d_idx] += WIJ * s_m[s_idx] / d_tmp_w[d_idx]
