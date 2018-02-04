@@ -94,7 +94,7 @@ class DensityCorrection(Tool):
     A tool to reinitialize the density of the fluid particles
     """
 
-    def __init__(self, app, arr_names, corr='shepard', freq=10, kernel=None):
+    def __init__(self, app, arr_names, corr='', freq=10, kernel=None):
         """
         Parameters
         ----------
@@ -105,7 +105,9 @@ class DensityCorrection(Tool):
             Names of the particle arrays whose densities needs to be
             reinitialized.
         corr : str
-            Name of the density reinitialization operation
+            Name of the density reinitialization operation.
+            corr='' for no density reinitialization
+            corr='shepard' for using zeroth order shepard filter
         freq : int
             Frequency of reinitialization.
         kernel: any kernel from pysph.base.kernels
@@ -119,6 +121,12 @@ class DensityCorrection(Tool):
         self.kernel = kernel
         self.dim = app.solver.dim
         self.particles = app.particles
+        self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
+        try:
+            assert self.corr in ['', 'shepard']
+        except:
+            error = 'Given corr argument not in acceptable corr arguments'
+            raise AssertionError(error)
 
     def _get_sph_eval_shepard(self):
         from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
@@ -127,10 +135,10 @@ class DensityCorrection(Tool):
         from pysph.solver.utils import get_array_by_name
         from pysph.sph.equation import Group
         if self._sph_eval is None:
-            arrs = [get_array_by_name(self.particles, i) for i in self.names]
+            arrs = self.arrs
             eqns = []
             for arr in arrs:
-                arr.add_property('tw')
+                arr.add_property('tmp_w')
                 name = arr.name
                 eqns.append(Group(equations=[
                     ShepardFilterPreStep(dest=name, sources=[name])],
@@ -151,7 +159,7 @@ class DensityCorrection(Tool):
     def post_step(self, solver):
         from pysph.solver.utils import get_array_by_name
         if self.count % self.freq == 0:
-            arrs = [get_array_by_name(self.particles, i) for i in self.names]
+            arrs = self.arrs
             self._sph_eval = self._get_sph_eval(self.corr)
             self._sph_eval.update_particle_arrays(arrs)
             self._sph_eval.evaluate()
