@@ -106,7 +106,6 @@ class DensityCorrection(Tool):
             reinitialized.
         corr : str
             Name of the density reinitialization operation.
-            corr='' for no density reinitialization
             corr='shepard' for using zeroth order shepard filter
         freq : int
             Frequency of reinitialization.
@@ -124,7 +123,7 @@ class DensityCorrection(Tool):
         self.particles = app.particles
         self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
         try:
-            assert self.corr in ['', 'shepard']
+            assert self.corr in ['shepard']
         except:
             error = 'Given corr argument not in acceptable corr arguments'
             raise AssertionError(error)
