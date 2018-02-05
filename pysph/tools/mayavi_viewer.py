@@ -337,9 +337,10 @@ class ParticleArrayHelper(HasTraits):
     def _add_vmag(self, pa):
         if 'vmag' not in pa.properties:
             if 'vmag2' in pa.output_property_arrays:
-                vmag = numpy.sqrt(pa.vmag2)
+                vmag = numpy.sqrt(pa.get('vmag2', only_real_particles=False))
             else:
-                vmag = numpy.sqrt(pa.u**2 + pa.v**2 + pa.w**2)
+                u, v, w = pa.get('u', 'v', 'w', only_real_particles=False)
+                vmag = numpy.sqrt(u**2 + v**2 + w**2)
             pa.add_property(name='vmag', data=vmag)
             if len(pa.output_property_arrays) > 0:
                 # We do not call add_output_arrays when the default is empty
@@ -358,7 +359,7 @@ class ParticleArrayHelper(HasTraits):
             method_name = '_add_' + scalar
             method = getattr(self, method_name)
             method(pa)
-        return getattr(pa, scalar)
+        return pa.get(scalar, only_real_particles=False)
 
     #  Traits handlers #############################################
     def _edit_scalars_fired(self):
@@ -373,12 +374,16 @@ class ParticleArrayHelper(HasTraits):
         self._list_all_scalars_changed(self.list_all_scalars)
 
         # Update the plot.
-        x, y, z = pa.x, pa.y, pa.z
+        x, y, z = pa.get('x', 'y', 'z', only_real_particles=False)
         s = self._get_scalar(pa, self.scalar)
         p = self.plot
         mlab = self.scene.mlab
         empty = len(x) == 0
-        old_empty = len(old.x) == 0 if old is not None else True
+        if old is None:
+            old_empty = True
+        else:
+            old_x = old.get('x', only_real_particles=False)
+            old_empty = len(old_x) == 0
         if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
             p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
@@ -462,7 +467,7 @@ class ParticleArrayHelper(HasTraits):
         comps = [x.strip() for x in vectors.split(',')]
         if len(comps) == 3:
             try:
-                vec = tuple(getattr(pa, x) for x in comps)
+                vec = pa.get(*comps, only_real_particles=False)
             except AttributeError:
                 return None
             else:
@@ -1024,8 +1029,25 @@ class MayaviViewer(HasTraits):
         if self._particle_array_updated and self._file_name:
             sd = self._solver_data
             arrays = [x.particle_array for x in self.particle_arrays]
-            dump(self._file_name, arrays, sd)
+            detailed = self._requires_detailed_output(arrays)
+            dump(self._file_name, arrays, sd, detailed_output=detailed,
+                 only_real=False)
             self._particle_array_updated = False
+
+    def _requires_detailed_output(self, arrays):
+        detailed = False
+        for pa in arrays:
+            props = set(pa.properties.keys())
+            output = set(pa.output_property_arrays)
+            diff = props - output
+            for prop in diff:
+                array = pa.get(prop)
+                if (array.max() - array.min()) > 0:
+                    detailed = True
+                    break
+            if detailed:
+                break
+        return detailed
 
     def _make_particle_array_helper(self, scene, name):
         pah = ParticleArrayHelper(scene=scene, name=name, scalar=self.scalar)
