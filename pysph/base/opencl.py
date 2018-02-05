@@ -7,7 +7,7 @@ import pyopencl as cl
 import pyopencl.array  # noqa: 401
 import pyopencl.algorithm
 import pyopencl.tools
-from pyopencl.scan import GenericScanKernel
+from pyopencl.scan import GenericScanKernel, ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 from collections import defaultdict
 from operator import itemgetter
@@ -18,6 +18,8 @@ logger = logging.getLogger()
 
 from .config import get_config
 
+from pysph.base.particle_array import ParticleArray
+
 _ctx = None
 _queue = None
 _profile_info = defaultdict(float)
@@ -27,14 +29,22 @@ _profile_info = defaultdict(float)
 REMOVE_KNL = Template(r"""//CL//
         unsigned int idx = indices[n - 1 - i];
         array[idx] = array[length - 1 - i];
-""", disable_unicode=True)
+""")
 
 
 # args: tag_array, tag, indices, head
 REMOVE_INDICES_KNL = Template(r"""//CL//
         if(tag_array[i] == tag)
             indices[atomic_inc(&head[0])] = i;
-""", disable_unicode=True)
+""")
+
+
+# args: tag_array, num_real_particles, prescan_arr, aligned_indices
+ALIGN_PARTICLES = Template(r"""//CL//
+        uint p = prescan_arr[i];
+        uint t = i - p + num_real_particles;
+        aligned_indices[i] = tag_array[i] ? t : p;
+""")
 
 
 def get_context():
@@ -110,6 +120,7 @@ class DeviceArray(object):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()
         self.ctx = get_context()
+        self.dtype = dtype
         length = n
         if n == 0:
             n = 16
@@ -182,7 +193,7 @@ class DeviceArray(object):
                 "unsigned int* indices",
                 scan_kernel=GenericScanKernel, key_expr="indices[i]",
                 sort_arg_names=["indices"]
-                )
+            )
 
             (sorted_indices,), event = radix_sort(indices)
 
@@ -190,7 +201,7 @@ class DeviceArray(object):
             sorted_indices = indices
 
         args = "uint* indices, %(dtype)s* array, uint length" % \
-                {"dtype" : cl.tools.dtype_to_ctype(self.dtype)}
+            {"dtype": cl.tools.dtype_to_ctype(self.dtype)}
         src = REMOVE_KNL.render()
         remove = get_elwise_kernel("remove", args, src)
 
@@ -205,7 +216,7 @@ class DeviceArray(object):
         self.set_data(self._data[:self.length])
 
     def copy_values(self, indices, dest):
-        dest[:len(indices)] = self.array[indices]
+        dest[:len(indices)] = cl.array.take(self.array, indices)
 
 
 class DeviceHelper(object):
@@ -224,12 +235,13 @@ class DeviceHelper(object):
         use_double = get_config().use_double
         self._dtype = np.float64 if use_double else np.float32
         self._data = {}
-        self._props = []
+        self.properties = []
+        self.constants = []
 
         for prop, ary in pa.properties.items():
             self.add_prop(prop, ary)
         for prop, ary in pa.constants.items():
-            self.add_prop(prop, ary)
+            self.add_const(prop, ary)
 
     def _get_array(self, ary):
         ctype = ary.get_c_type()
@@ -242,29 +254,7 @@ class DeviceHelper(object):
         pa = self._particle_array
         return pa.properties.get(prop, pa.constants.get(prop))
 
-    def _check_property(self, prop):
-        """Check if a property is present or not """
-        if prop in self._props:
-            return
-        else:
-            raise AttributeError('property %s not present' % (prop))
-
-    def get_number_of_particles(self, real=False):
-        if real:
-            return self.num_real_particles
-        else:
-            if len(self._props) > 0:
-                prop0 = self._data[self._props[0]]
-                return len(prop0.array)
-            else:
-                return 0
-
-    def align(self, indices):
-        for prop in self._props:
-            self._data[prop].align(indices)
-            setattr(self, prop, self._data[prop].array)
-
-    def add_prop(self, name, carray):
+    def _add_prop_or_const(self, name, carray):
         """Add a new property or constant given the name and carray, note
         that this assumes that this property is already added to the
         particle array.
@@ -274,11 +264,65 @@ class DeviceHelper(object):
         g_ary.array.set(np_array)
         self._data[name] = g_ary
         setattr(self, name, g_ary.array)
+
+    def _check_property(self, prop):
+        """Check if a property is present or not """
+        if prop in self.properties:
+            return
+        else:
+            raise AttributeError('property %s not present' % (prop))
+
+    def get_number_of_particles(self, real=False):
+        if real:
+            return self.num_real_particles
+        else:
+            if len(self.properties) > 0:
+                prop0 = self._data[self.properties[0]]
+                return len(prop0.array)
+            else:
+                return 0
+
+    def align(self, indices):
+        for prop in self.properties:
+            self._data[prop].align(indices)
+            setattr(self, prop, self._data[prop].array)
+
+    def add_prop(self, name, carray):
+        """Add a new property given the name and carray, note
+        that this assumes that this property is already added to the
+        particle array.
+        """
+        self._add_prop_or_const(name, carray)
         if name in self._particle_array.properties:
-            self._props.append(name)
+            self.properties.append(name)
+
+    def add_const(self, name, carray):
+        """Add a new constant given the name and carray, note
+        that this assumes that this property is already added to the
+        particle array.
+        """
+        self._add_prop_or_const(name, carray)
+        if name in self._particle_array.constants:
+            self.constants.append(name)
+
+    def update_prop(self, name, dev_array):
+        """Add a new property to DeviceHelper. Note that this property
+        is not added to the particle array itself"""
+        self._data[name] = dev_array
+        setattr(self, name, dev_array.array)
+        if name not in self.properties:
+            self.properties.append(name)
+
+    def update_const(self, name, dev_array):
+        """Add a new constant to DeviceHelper. Note that this property
+        is not added to the particle array itself"""
+        self._data[name] = dev_array
+        setattr(self, name, dev_array.array)
+        if name not in self.constants:
+            self.constants.append(name)
 
     def get_device_array(self, prop):
-        if prop in self._props:
+        if prop in self.properties or prop in self.constants:
             return self._data[prop]
 
     def max(self, arg):
@@ -291,7 +335,7 @@ class DeviceHelper(object):
                 array = self._data[prop]
                 array.update_min_max()
         else:
-            for prop in self._props:
+            for prop in self.properties:
                 array = self._data[prop]
                 array.update_min_max()
 
@@ -312,41 +356,57 @@ class DeviceHelper(object):
             )
 
     def remove_prop(self, name):
-        if name in self._props:
-            self._props.remove(name)
+        if name in self.properties:
+            self.properties.remove(name)
         if name in self._data:
             del self._data[name]
             delattr(self, name)
 
     def resize(self, new_size):
-        for prop in self._props:
+        for prop in self.properties:
             self._data[prop].resize(new_size)
             setattr(self, prop, self._data[prop].array)
 
     def align_particles(self):
-        tag_arr = getattr(self, 'tag')
+        tag_arr = self._data['tag'].array
+
         num_particles = self.get_number_of_particles()
-        self.num_real_particles = cl.array.sum(tag_arr == 0)
-
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
-                dtype=np.uint32)
+                                  dtype=np.uint32)
 
-        radix_sort = cl.algorithm.RadixSort(
-            self._ctx,
-            "unsigned int* indices, unsigned int* tags",
-            scan_kernel=GenericScanKernel, key_expr="tags[i]",
-            sort_arg_names=["indices"]
-        )
+        # FIXME: This will only work is elements of tag_arr are 0, 1
+        # Will need to be changed when adding multi-gpu support
+        inv_tag_arr = 1 - tag_arr
 
-        (sorted_indices,), event = radix_sort(indices, tag_arr)
-        self.align(sorted_indices)
+        prescan_knl = ExclusiveScanKernel(
+            self._ctx, np.uint32, "a+b", neutral="0")
+        prescan_knl(inv_tag_arr)
+        prescan_arr = inv_tag_arr
+
+        num_real_particles = prescan_arr[-1] + 1 - tag_arr[-1]
+        self.num_real_particles = int(num_real_particles.get())
+
+        args = "uint* tag_array, int num_real_particles, uint* prescan_arr, \
+                uint* aligned_indices"
+
+        src = ALIGN_PARTICLES.render()
+
+        # find the indices of the particles to be removed.
+        align_particles = get_elwise_kernel("align_particles", args, src)
+
+        aligned_indices = DeviceArray(np.uint32, n=num_particles)
+
+        align_particles(tag_arr, self.num_real_particles,
+                        prescan_arr, aligned_indices.array)
+
+        self.align(aligned_indices.array)
 
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
-        We repeatedly interchange the values of the last element and values from
-        the index_list and reduce the size of the array by one. This is done for
-        every property that is being maintained.
+        We repeatedly interchange the values of the last element and values
+        from the index_list and reduce the size of the array by one.
+        This is done for every property that is being maintained.
 
         Parameters
         ----------
@@ -379,11 +439,11 @@ class DeviceHelper(object):
             "unsigned int* indices",
             scan_kernel=GenericScanKernel, key_expr="indices[i]",
             sort_arg_names=["indices"]
-            )
+        )
 
         (sorted_indices,), event = radix_sort(indices)
 
-        for prop in self._props:
+        for prop in self.properties:
             self._data[prop].remove(sorted_indices, 1)
             setattr(self, prop, self._data[prop].array)
 
@@ -455,7 +515,7 @@ class DeviceHelper(object):
         old_num_particles = self.get_number_of_particles()
         new_num_particles = num_extra_particles + old_num_particles
 
-        for prop in self._props:
+        for prop in self.properties:
             arr = self._data[prop]
 
             if prop in particle_props.keys():
@@ -466,8 +526,125 @@ class DeviceHelper(object):
                 # set the properties of the new particles to the default ones.
                 arr.array[old_num_particles:] = pa.default_values[prop]
 
-            setattr(self, prop, arr.array)
+            self.update_prop(prop, arr)
 
         if num_extra_particles > 0:
             # make sure particles are aligned properly.
             self.align_particles()
+
+    def extend(self, num_particles):
+        """ Increase the total number of particles by the requested amount
+
+        New particles are added at the end of the list, you may have to
+        manually call align_particles later.
+        """
+        if num_particles <= 0:
+            return
+
+        old_size = self.get_number_of_particles()
+        new_size = old_size + num_particles
+
+        for prop in self.properties:
+            arr = self._data[prop]
+            arr.resize(new_size)
+            arr.array[old_size:] = self._particle_array.default_values[prop]
+            self.update_prop(prop, arr)
+
+    def append_parray(self, parray):
+        """ Add particles from a particle array
+
+        properties that are not there in self will be added
+        """
+        if parray.gpu is None:
+            parray.set_device_helper(DeviceHelper(parray))
+
+        if parray.gpu.get_number_of_particles() == 0:
+            return
+
+        num_extra_particles = parray.gpu.get_number_of_particles()
+        old_num_particles = self.get_number_of_particles()
+        new_num_particles = num_extra_particles + old_num_particles
+
+        # extend current arrays by the required number of particles
+        self.extend(num_extra_particles)
+
+        for prop_name in parray.gpu.properties:
+            if prop_name in self.properties:
+                arr = self._data[prop_name]
+                source = parray.gpu.get_device_array(prop_name)
+                arr.array[old_num_particles:] = source.array
+            else:
+                # meaning this property is not there in self.
+                dtype = self._data[prop_name].dtype
+                arr = DeviceArray(dtype, n=new_num_particles)
+                arr.fill(parray.gpu._particle_array.default_values[prop_name])
+                self.update_prop(prop_name, arr)
+
+                # now add the values to the end of the created array
+                dest = self._data[prop_name]
+                source = parray.gpu.get_device_array(prop_name)
+                dest.array[old_num_particles:] = source.array
+
+        for const in parray.gpu.constants:
+            if const not in self.constants:
+                arr = parray.gpu.get_device_array(const)
+                self.update_const(const, arr.copy())
+
+        if num_extra_particles > 0:
+            self.align_particles()
+
+    def extract_particles(self, indices, props=None):
+        """Create new particle array for particles with given indices
+
+        Parameters
+        ----------
+
+        indices : cl.array.Array
+            indices of particles to be extracted.
+
+        props : list
+            the list of properties to extract, if None all properties
+            are extracted.
+
+        """
+        result_array = ParticleArray()
+        result_array.set_device_helper(DeviceHelper(result_array))
+
+        if props is None:
+            prop_names = self.properties
+        else:
+            prop_names = props
+
+        if len(indices) == 0:
+            return result_array
+
+        for prop_name in prop_names:
+            src_arr = self._data[prop_name]
+            dst_arr = DeviceArray(src_arr.dtype, n=len(indices))
+            src_arr.copy_values(indices, dst_arr.array)
+
+            prop_type = cl.tools.dtype_to_ctype(src_arr.dtype)
+            prop_default = self._particle_array.default_values[prop_name]
+            result_array.add_property(name=prop_name,
+                                      type=prop_type,
+                                      default=prop_default)
+
+            result_array.gpu.update_prop(prop_name, dst_arr)
+
+        for const in self.constants:
+            result_array.gpu.update_const(const, self._data[const].copy())
+
+        result_array.gpu.align_particles()
+        result_array.set_name(self._particle_array.name)
+
+        if props is None:
+            output_arrays = list(self._particle_array.output_property_arrays)
+        else:
+            output_arrays = list(
+                set(props).intersection(
+                    self._particle_array.output_property_arrays
+                )
+            )
+
+        result_array.set_output_arrays(output_arrays)
+        return result_array

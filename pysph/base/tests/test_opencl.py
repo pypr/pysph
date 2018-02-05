@@ -293,7 +293,7 @@ class TestDeviceHelper(TestCase):
         # Then
         self.assertFalse(hasattr(h, 'test'))
         self.assertFalse('test' in h._data)
-        self.assertFalse('test' in h._props)
+        self.assertFalse('test' in h.properties)
 
     def test_resize_works(self):
         # Given
@@ -424,3 +424,45 @@ class TestDeviceHelper(TestCase):
 
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([0., 0., 0., 0., 0., 1.]))
+
+    def test_extend(self):
+        # Given
+        pa = self.pa
+        h = DeviceHelper(pa)
+
+        # When
+        pa.set_device_helper(h)
+
+        h.extend(4)
+
+        # Then
+        assert h.get_number_of_particles() == 6
+
+    def test_append_parray(self):
+        # Given
+        pa1 = self.pa
+        pa2 = get_particle_array(name='s', x=[0.0, 1.0], m=1.0, rho=2.0)
+        h = DeviceHelper(pa1)
+        pa1.set_device_helper(h)
+
+        # When
+        h.append_parray(pa2)
+
+        # Then
+        assert h.get_number_of_particles() == 4
+
+    def test_extract_particles(self):
+        # Given
+        pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
+                                m=1.0, rho=2.0)
+        h = DeviceHelper(pa)
+        pa.set_device_helper(h)
+
+        # When
+        indices = np.array([1, 2], dtype=np.uint32)
+        indices = cl.array.to_device(get_queue(), indices)
+
+        result_pa = h.extract_particles(indices)
+
+        # Then
+        assert result_pa.gpu.get_number_of_particles() == 2

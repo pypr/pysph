@@ -155,11 +155,7 @@
 <%def name="z_order_nbrs_prep(data_t, sorted, dst_src)", cached="False">
      unsigned int qid;
 
-    % if sorted:
-        qid = i;
-    % else:
-        qid = pids_dst[i];
-    % endif
+    qid = pids_dst[i];
 
     ${data_t}4 q = (${data_t}4)(d_x[qid], d_y[qid], d_z[qid], d_h[qid]);
 
@@ -201,7 +197,7 @@
 
 </%def>
 
-<%def name="z_order_nbr_lengths_args(data_t)" cached="True">
+<%def name="z_order_nbr_lengths_args(data_t)" cached="False">
     ${data_t}* d_x, ${data_t}* d_y, ${data_t}* d_z,
     ${data_t}* d_h, ${data_t}* s_x, ${data_t}* s_y,
     ${data_t}* s_z, ${data_t}* s_h,
@@ -287,5 +283,4 @@
     }
 
 </%def>
-
 
