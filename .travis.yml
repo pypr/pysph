@@ -20,7 +20,7 @@ install:
     - conda update -q conda
     - conda info -a
     - conda config --add channels conda-forge
-    - conda install -c inducer pyopencl-pocl
+    - conda install -c conda-forge pocl pyopencl
     - pip install tox tox-travis
 
 script:
