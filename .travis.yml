@@ -6,9 +6,6 @@ python:
     - 2.7
     - 3.5
 
-before_install:
-    - pyenv global system 3.5
-  
 install:
     - sudo apt-get update 
     - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -24,6 +21,7 @@ install:
     - conda info -a
     - conda config --add channels conda-forge
     - conda install -c conda-forge pocl pyopencl
+    - python -c 'import pyopencl as cl'
     - pip install tox tox-travis
 
 script:
