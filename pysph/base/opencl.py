@@ -193,7 +193,7 @@ class DeviceArray(object):
                 "unsigned int* indices",
                 scan_kernel=GenericScanKernel, key_expr="indices[i]",
                 sort_arg_names=["indices"]
-                )
+            )
 
             (sorted_indices,), event = radix_sort(indices)
 
@@ -201,7 +201,7 @@ class DeviceArray(object):
             sorted_indices = indices
 
         args = "uint* indices, %(dtype)s* array, uint length" % \
-                {"dtype" : cl.tools.dtype_to_ctype(self.dtype)}
+            {"dtype": cl.tools.dtype_to_ctype(self.dtype)}
         src = REMOVE_KNL.render()
         remove = get_elwise_kernel("remove", args, src)
 
@@ -372,13 +372,14 @@ class DeviceHelper(object):
 
         num_particles = self.get_number_of_particles()
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
-                dtype=np.uint32)
+                                  dtype=np.uint32)
 
         # FIXME: This will only work is elements of tag_arr are 0, 1
         # Will need to be changed when adding multi-gpu support
         inv_tag_arr = 1 - tag_arr
 
-        prescan_knl = ExclusiveScanKernel(self._ctx, np.uint32, "a+b", neutral="0")
+        prescan_knl = ExclusiveScanKernel(
+            self._ctx, np.uint32, "a+b", neutral="0")
         prescan_knl(inv_tag_arr)
         prescan_arr = inv_tag_arr
 
@@ -396,7 +397,7 @@ class DeviceHelper(object):
         aligned_indices = DeviceArray(np.uint32, n=num_particles)
 
         align_particles(tag_arr, self.num_real_particles,
-                prescan_arr, aligned_indices.array)
+                        prescan_arr, aligned_indices.array)
 
         self.align(aligned_indices.array)
 
@@ -438,7 +439,7 @@ class DeviceHelper(object):
             "unsigned int* indices",
             scan_kernel=GenericScanKernel, key_expr="indices[i]",
             sort_arg_names=["indices"]
-            )
+        )
 
         (sorted_indices,), event = radix_sort(indices)
 
