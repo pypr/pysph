@@ -375,6 +375,7 @@ class DeviceHelper(object):
                 dtype=np.uint32)
 
         # FIXME: This will only work is elements of tag_arr are 0, 1
+        # Will need to be changed when adding multi-gpu support
         inv_tag_arr = 1 - tag_arr
 
         prescan_knl = ExclusiveScanKernel(self._ctx, np.uint32, "a+b", neutral="0")
