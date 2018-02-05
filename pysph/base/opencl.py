@@ -7,7 +7,7 @@ import pyopencl as cl
 import pyopencl.array  # noqa: 401
 import pyopencl.algorithm
 import pyopencl.tools
-from pyopencl.scan import GenericScanKernel
+from pyopencl.scan import GenericScanKernel, ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 from collections import defaultdict
 from operator import itemgetter
@@ -39,13 +39,11 @@ REMOVE_INDICES_KNL = Template(r"""//CL//
 """)
 
 
-# args: tag_array, num_real_particles
-NUM_REAL_PARTICLES_KNL = Template(r"""//CL//
-        if(i != 0 && tag_array[i] != tag_array[i-1])
-        {
-            num_real_particles[0] = i;
-            return;
-        }
+# args: tag_array, num_real_particles, prescan_arr, aligned_indices
+ALIGN_PARTICLES = Template(r"""//CL//
+        uint p = prescan_arr[i];
+        uint t = i - p + num_real_particles;
+        aligned_indices[i] = tag_array[i] ? t : p;
 """)
 
 
@@ -376,25 +374,30 @@ class DeviceHelper(object):
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
                 dtype=np.uint32)
 
-        radix_sort = cl.algorithm.RadixSort(
-            self._ctx,
-            "unsigned int* indices, unsigned int* tags",
-            scan_kernel=GenericScanKernel, key_expr="tags[i]",
-            sort_arg_names=["indices"]
-        )
+        # FIXME: This will only work is elements of tag_arr are 0, 1
+        inv_tag_arr = 1 - tag_arr
 
-        (sorted_indices,), event = radix_sort(indices, tag_arr)
-        self.align(sorted_indices)
+        prescan_knl = ExclusiveScanKernel(self._ctx, np.uint32, "a+b", neutral="0")
+        prescan_knl(inv_tag_arr)
+        prescan_arr = inv_tag_arr
 
-        tag_arr = self._data['tag'].array
-
-        num_real_particles = cl.array.zeros(self._queue, 1, np.uint32)
-        args = "uint* tag_array, uint* num_real_particles"
-        src = NUM_REAL_PARTICLES_KNL.render()
-        get_num_real_particles = get_elwise_kernel("get_num_real_particles", args, src)
-
-        get_num_real_particles(tag_arr, num_real_particles)
+        num_real_particles = prescan_arr[-1] + 1 - tag_arr[-1]
         self.num_real_particles = int(num_real_particles.get())
+
+        args = "uint* tag_array, int num_real_particles, uint* prescan_arr, \
+                uint* aligned_indices"
+
+        src = ALIGN_PARTICLES.render()
+
+        # find the indices of the particles to be removed.
+        align_particles = get_elwise_kernel("align_particles", args, src)
+
+        aligned_indices = DeviceArray(np.uint32, n=num_particles)
+
+        align_particles(tag_arr, self.num_real_particles,
+                prescan_arr, aligned_indices.array)
+
+        self.align(aligned_indices.array)
 
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
