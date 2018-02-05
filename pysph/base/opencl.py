@@ -404,9 +404,9 @@ class DeviceHelper(object):
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
-        We repeatedly interchange the values of the last element and values from
-        the index_list and reduce the size of the array by one. This is done for
-        every property that is being maintained.
+        We repeatedly interchange the values of the last element and values
+        from the index_list and reduce the size of the array by one.
+        This is done for every property that is being maintained.
 
         Parameters
         ----------
@@ -535,8 +535,8 @@ class DeviceHelper(object):
     def extend(self, num_particles):
         """ Increase the total number of particles by the requested amount
 
-        New particles are added at the end of the list, you may have to manually
-        call align_particles later.
+        New particles are added at the end of the list, you may have to
+        manually call align_particles later.
         """
         if num_particles <= 0:
             return
