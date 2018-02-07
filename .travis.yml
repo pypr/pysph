@@ -20,12 +20,9 @@ install:
     - conda update -q conda
     - conda info -a
     - conda config --add channels conda-forge
-    - conda install -c conda-forge pocl pyopencl
+    - conda install -c conda-forge pocl pyopencl tox
     - python -c 'import pyopencl as cl'
-    - pip install -r requirements.txt
-    - make install
-    #- pip install tox tox-travis
+    - pip install tox-travis
 
 script:
-    - pytest -v
-    #- tox
+    - tox
