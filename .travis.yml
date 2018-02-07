@@ -19,7 +19,8 @@ install:
     - conda config --set always_yes yes --set changeps1 no
     - conda update -q conda
     - conda info -a
-    - conda config --add channels conda-forge anaconda
+    - conda config --add channels conda-forge
+    - conda config --add channels anaconda
     - conda install -c conda-forge pocl pyopencl
     - conda install -c anaconda virtualenv
     - python -c 'import pyopencl as cl'
