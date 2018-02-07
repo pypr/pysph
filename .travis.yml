@@ -22,6 +22,7 @@ install:
     - conda config --add channels conda-forge
     - conda install -c conda-forge pocl pyopencl
     - python -c 'import pyopencl as cl'
+    - make install
     #- pip install tox tox-travis
 
 script:
