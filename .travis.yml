@@ -24,7 +24,7 @@ install:
     - conda install -c conda-forge pocl pyopencl
     - conda install -c anaconda virtualenv
     - python -c 'import pyopencl as cl'
-    - pip install tox tox-travis
+    - pip install beaker tox tox-travis
 
 script:
     - tox
