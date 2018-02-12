@@ -383,7 +383,7 @@ class DeviceHelper(object):
             sort_arg_names=["indices"]
         )
 
-        (sorted_indices,), event = radix_sort(indices, tag_arr)
+        (sorted_indices,), event = radix_sort(indices, tag_arr, key_bits=2)
         self.align(sorted_indices)
 
         tag_arr = self._data['tag'].array
