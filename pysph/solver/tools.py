@@ -124,7 +124,7 @@ class DensityCorrection(Tool):
         self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
         try:
             assert self.corr in ['shepard', 'mls2d_1', 'mls3d_1']
-        except:
+        except Exception:
             error = 'Given corr argument not in acceptable corr arguments'
             raise AssertionError(error)
 
