@@ -6,7 +6,7 @@ import unittest
 class TestGjSolve(unittest.TestCase):
 
     def test_gj_solve(self):
-        for _ in xrange(10):
+        for i in range(10):
             n = np.random.choice([3, 4])
             mat = 10.0 * (np.random.random_sample((n, n)))
             b = [0.0] * n
