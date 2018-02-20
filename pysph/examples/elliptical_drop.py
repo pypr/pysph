@@ -173,7 +173,8 @@ class EllipticalDrop(Application):
         plt.ylim(-2, 2)
         plt.xlim(plt.ylim())
         plt.title("Particles at %s secs" % tf)
-        plt.xlabel('x'); plt.ylabel('y')
+        plt.xlabel('x')
+        plt.ylabel('y')
         fig = os.path.join(self.output_dir, "comparison.png")
         plt.savefig(fig, dpi=300)
         print("Figure written to %s." % fig)
@@ -202,7 +203,7 @@ class EllipticalDrop(Application):
     def post_process(self, info_file_or_dir):
         if self.rank > 0:
             return
-        info = self.read_info(info_file_or_dir)
+        self.read_info(info_file_or_dir)
         if len(self.output_files) == 0:
             return
         self._compute_results()

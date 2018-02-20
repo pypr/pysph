@@ -22,7 +22,6 @@ fluid_column_width = 1.0
 container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
-#h = 0.0156
 nu = 0.0
 h = 0.039
 g = 9.81
@@ -46,7 +45,7 @@ class DamBreak2D(Application):
 
     def consume_user_options(self):
         self.h = h/self.options.h_factor
-        print("Using h = %f"%self.h)
+        print("Using h = %f" % self.h)
         if self.options.scheme == 'wcsph':
             self.hdx = self.hdx
         else:
@@ -78,7 +77,7 @@ class DamBreak2D(Application):
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
         elif self.options.scheme == 'edac':
             self.scheme.configure(h=self.h)
             kernel = QuinticSpline(dim=2)
@@ -88,7 +87,7 @@ class DamBreak2D(Application):
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
         elif self.options.scheme == 'iisph':
             kernel = QuinticSpline(dim=2)
             dt = 0.125*10*self.h/co
@@ -97,7 +96,7 @@ class DamBreak2D(Application):
                     kernel=kernel, dt=dt, adaptive_timestep=True
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
 
         self.scheme.configure_solver(**kw)
 
@@ -151,7 +150,7 @@ class DamBreak2D(Application):
         return [fluid, boundary]
 
     def post_process(self, info_fname):
-        info = self.read_info(info_fname)
+        self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
 
@@ -175,11 +174,14 @@ class DamBreak2D(Application):
         plt.plot(t, x_max, label='Computed')
         te, xe = dbd.get_koshizuka_oka_data()
         plt.plot(te, xe, 'o', label='Koshizuka & Oka (1996)')
-        plt.xlim(0, 0.7*factor); plt.ylim(0, 4.5)
-        plt.xlabel('$T$'); plt.ylabel('$Z/L$')
+        plt.xlim(0, 0.7*factor)
+        plt.ylim(0, 4.5)
+        plt.xlabel('$T$')
+        plt.ylabel('$Z/L$')
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
+
 
 if __name__ == '__main__':
     app = DamBreak2D()
