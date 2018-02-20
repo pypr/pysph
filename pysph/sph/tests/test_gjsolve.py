@@ -1,5 +1,4 @@
-# from pysph.sph.wc.density_correction import gj_Solve
-from density_correction import gj_Solve
+from pysph.sph.wc.density_correction import gj_Solve
 import numpy as np
 import unittest
 
