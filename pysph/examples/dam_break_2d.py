@@ -15,13 +15,13 @@ from pysph.examples._db_geometry import DamBreak2DGeometry
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
 from pysph.sph.wc.edac import EDACScheme
+from pysph.sph.iisph import IISPHScheme
 
 fluid_column_height = 2.0
 fluid_column_width = 1.0
 container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
-#h = 0.0156
 nu = 0.0
 h = 0.039
 g = 9.81
@@ -45,7 +45,7 @@ class DamBreak2D(Application):
 
     def consume_user_options(self):
         self.h = h/self.options.h_factor
-        print("Using h = %f"%self.h)
+        print("Using h = %f" % self.h)
         if self.options.scheme == 'wcsph':
             self.hdx = self.hdx
         else:
@@ -77,7 +77,7 @@ class DamBreak2D(Application):
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
         elif self.options.scheme == 'edac':
             self.scheme.configure(h=self.h)
             kernel = QuinticSpline(dim=2)
@@ -87,7 +87,16 @@ class DamBreak2D(Application):
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
+        elif self.options.scheme == 'iisph':
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125*10*self.h/co
+            kw.update(
+                dict(
+                    kernel=kernel, dt=dt, adaptive_timestep=True
+                )
+            )
+            print("dt = %f" % dt)
 
         self.scheme.configure_solver(**kw)
 
@@ -105,7 +114,12 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, c0=co, nu=nu,
             rho0=ro, h=h, pb=0.0, gy=-g, eps=0.0, clamp_p=True
         )
-        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
+        iisph = IISPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            rho0=ro, gy=-g
+        )
+        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
+                          iisph=iisph)
         return s
 
     def create_particles(self):
@@ -129,11 +143,14 @@ class DamBreak2D(Application):
             nfluid_offset=nfluid_offset,
         )
         self.scheme.setup_properties([fluid, boundary])
-
+        if self.options.scheme == 'iisph':
+            # the default position tends to cause the particles to be pushed
+            # away from the wall, so displacing it by a tiny amount helps.
+            fluid.x += self.dx/4
         return [fluid, boundary]
 
     def post_process(self, info_fname):
-        info = self.read_info(info_fname)
+        self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
 
@@ -157,11 +174,14 @@ class DamBreak2D(Application):
         plt.plot(t, x_max, label='Computed')
         te, xe = dbd.get_koshizuka_oka_data()
         plt.plot(te, xe, 'o', label='Koshizuka & Oka (1996)')
-        plt.xlim(0, 0.7*factor); plt.ylim(0, 4.5)
-        plt.xlabel('$T$'); plt.ylabel('$Z/L$')
+        plt.xlim(0, 0.7*factor)
+        plt.ylim(0, 4.5)
+        plt.xlabel('$T$')
+        plt.ylabel('$Z/L$')
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
+
 
 if __name__ == '__main__':
     app = DamBreak2D()
