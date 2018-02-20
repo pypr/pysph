@@ -73,21 +73,19 @@ ro = 1000.0
 """
 
 import numpy as np
-import sys
-import os
-# Need this to import db_geometry.
-sys.path.append(os.pardir)
-from db_geometry import DamBreak2DGeometry
+from pysph.examples._db_geometry import DamBreak2DGeometry
 
 from pysph.base.kernels import CubicSpline
 from pysph.sph.equation import Group
 
-from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII,
+from pysph.sph.iisph import (
+    AdvectionAcceleration, ComputeAII,
     ComputeAIIBoundary, ComputeDII, ComputeDIIBoundary, ComputeDIJPJ,
     ComputeRhoAdvection, ComputeRhoBoundary, IISPHStep, NumberDensity,
     PressureSolve, PressureSolveBoundary, PressureForce,
     PressureForceBoundary, SummationDensity, SummationDensityBoundary,
-    ViscosityAcceleration, ViscosityAccelerationBoundary)
+    ViscosityAcceleration, ViscosityAccelerationBoundary
+)
 
 from pysph.sph.integrator import EulerIntegrator
 
@@ -97,10 +95,10 @@ from pysph.solver.solver import Solver
 
 dim = 2
 fluid_column_height = 2.0
-fluid_column_width  = 1.0
+fluid_column_width = 1.0
 container_height = 3.0
-container_width  = 4.0
-nboundary_layers=2
+container_width = 4.0
+nboundary_layers = 2
 
 dt = 1e-3
 tf = 2.5
@@ -116,23 +114,23 @@ geom = DamBreak2DGeometry(
     container_width=container_width, container_height=container_height,
     fluid_column_height=fluid_column_height,
     fluid_column_width=fluid_column_width, dx=dx, dy=dy,
-    nboundary_layers=1, ro=ro, co=1.0,
+    nboundary_layers=nboundary_layers, ro=ro, co=1.0,
     with_obstacle=False,
     beta=1.0, nfluid_offset=1, hdx=hdx, iisph=True)
 
 
 def create_particles(**kw):
     fluid, boundary = geom.create_particles(**kw)
-    boundary.x -= 0.1
-    boundary.y -= 0.1
+    boundary.x -= 0.05
+    boundary.y -= 0.05
     return [fluid, boundary]
+
 
 # Create the application.
 app = Application()
 
 # Create the kernel
 kernel = CubicSpline(dim=2)
-
 
 # Create the Integrator. Currently, PySPH supports multi-stage,
 # predictor corrector and a TVD-RK3 integrators.
@@ -141,7 +139,7 @@ integrator = EulerIntegrator(fluid=IISPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=True,
+                dt=dt, tf=tf, adaptive_timestep=False,
                 fixed_h=False)
 solver.set_print_freq(10)
 
@@ -179,7 +177,7 @@ equations = [
                 dest='fluid', sources=['boundary'], nu=nu, rho0=ro,
             ),
             ComputeDII(dest='fluid', sources=['fluid']),
-            #ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
+            ComputeDIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
         ]
     ),
 
@@ -188,7 +186,7 @@ equations = [
             ComputeRhoAdvection(dest='fluid', sources=['fluid']),
             ComputeRhoBoundary(dest='fluid', sources=['boundary'], rho0=ro),
             ComputeAII(dest='fluid', sources=['fluid']),
-            #ComputeAIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
+            ComputeAIIBoundary(dest='fluid', sources=['boundary'], rho0=ro),
         ]
     ),
 
@@ -203,16 +201,16 @@ equations = [
                 equations=[
                     PressureSolve(
                         dest='fluid', sources=['fluid'], rho0=ro,
-                        tolerance=1e-3, debug=False
+                        tolerance=1e-2, debug=False
                     ),
-                    #PressureSolveBoundary(
-                    #    dest='fluid', sources=['boundary'], rho0=ro,
-                    #),
+                    PressureSolveBoundary(
+                        dest='fluid', sources=['boundary'], rho0=ro,
+                    ),
                   ]
             ),
         ],
         iterate=True,
-        max_iterations=30,
+        max_iterations=25,
         min_iterations=2
     ),
 

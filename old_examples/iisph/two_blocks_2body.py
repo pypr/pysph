@@ -5,20 +5,18 @@ how they can be treated as different fluids.
 
 """
 
-import sys
-import os
-# Need this to import db_geometry.
-sys.path.append(os.pardir)
 import numpy
-from db_geometry import create_2D_filled_region
+from pysph.examples._db_geometry import create_2D_filled_region
 
 from pysph.base.kernels import CubicSpline
 from pysph.base.utils import get_particle_array_iisph
 
 from pysph.sph.equation import Group
-from pysph.sph.iisph import (AdvectionAcceleration, ComputeAII, ComputeDII,
+from pysph.sph.iisph import (
+    AdvectionAcceleration, ComputeAII, ComputeDII,
     ComputeDIJPJ, ComputeRhoAdvection, IISPHStep, PressureSolve,
-    PressureForce, SummationDensity, ViscosityAcceleration)
+    PressureForce, SummationDensity, ViscosityAcceleration
+)
 from pysph.sph.integrator import EulerIntegrator
 
 from pysph.solver.application import Application
@@ -49,7 +47,7 @@ def create_particles():
 
 
 dim = 2
-dt = 1e-2
+dt = 2.5e-3
 tf = 1.0
 
 # Create the application.
@@ -67,7 +65,7 @@ integrator = EulerIntegrator(fluid1=IISPHStep(), fluid2=IISPHStep())
 
 # Create a solver.
 solver = Solver(kernel=kernel, dim=dim, integrator=integrator,
-                dt=dt, tf=tf, adaptive_timestep=True,
+                dt=dt, tf=tf, adaptive_timestep=False,
                 fixed_h=False)
 solver.set_print_freq(10)
 
@@ -86,10 +84,10 @@ equations = [
     Group(
         equations=[
             AdvectionAcceleration(
-                dest='fluid1', sources=None, gx=0.0, gy=0.81, gz=0.0
+                dest='fluid1', sources=None, gx=0.0, gy=0.0, gz=0.0
             ),
             AdvectionAcceleration(
-                dest='fluid2', sources=None, gx=0.0, gy=0.81, gz=0.0
+                dest='fluid2', sources=None, gx=0.0, gy=0.0, gz=0.0
             ),
             #ViscosityAcceleration(dest='fluid1', sources=['fluid1', 'fluid2'], nu=8.9e-4),
             ComputeDII(dest='fluid1', sources=['fluid1', 'fluid2']),

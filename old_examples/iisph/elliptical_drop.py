@@ -110,7 +110,7 @@ integrator = EulerIntegrator(fluid=IISPHStep())
 
 # Construct the solver. Use the output_at_times list to specify instants of
 # time at which the output solution is  required.
-dt = 2e-4;
+dt = 1e-4;
 tf = 0.0075
 solver = Solver(kernel=kernel, dim=2, integrator=integrator,
                 dt=dt, tf=tf, adaptive_timestep=False,
