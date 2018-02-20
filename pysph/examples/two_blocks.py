@@ -1,4 +1,4 @@
-""" This simulates two square blocks of water colliding with each other.
+"""Two square blocks of water colliding with each other. (20 seconds)
 """
 
 import numpy
