@@ -11,7 +11,7 @@ from numpy import sqrt, fabs
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
-from pysph.sph.scheme import Scheme
+from pysph.sph.scheme import Scheme, add_bool_argument
 
 
 class IISPHStep(IntegratorStep):
@@ -412,6 +412,27 @@ class IISPHScheme(Scheme):
         self.omega = omega
         self.tolerance = tolerance
         self.debug = debug
+
+    def add_user_options(self, group):
+        group.add_argument(
+            '--omega', action="store", type=float, dest="omega",
+            default=None, help="Relaxation parameter for Jacobi iterations."
+        )
+        group.add_argument(
+            '--tolerance', action='store', type=float, dest='tolerance',
+            default=None,
+            help='Tolerance for convergence of iterations as a fraction'
+        )
+        add_bool_argument(
+            group, 'iisph-debug', dest='debug', default=None,
+            help="Produce some debugging output on convergence of iterations."
+        )
+
+    def consume_user_options(self, options):
+        vars = ['omega', 'tolerance', 'debug']
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
+        self.configure(**data)
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
