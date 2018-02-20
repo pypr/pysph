@@ -123,7 +123,7 @@ class DensityCorrection(Tool):
         self.particles = app.particles
         self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
         try:
-            assert self.corr in ['shepard']
+            assert self.corr in ['shepard', 'mls2d_1', 'mls3d_1']
         except:
             error = 'Given corr argument not in acceptable corr arguments'
             raise AssertionError(error)
@@ -151,9 +151,65 @@ class DensityCorrection(Tool):
         else:
             return self._sph_eval
 
+    def _get_sph_eval_mls2d_1(self):
+        if self._sph_eval is None:
+            from pysph.sph.wc.density_correction import (
+                MLSFirstOrderPreStep2D, MLSFirstOrder)
+            from pysph.tools.sph_evaluator import SPHEvaluator
+            from pysph.sph.equation import Group
+            arrs = self.arrs
+            eqns = []
+            n = 3
+            for arr in arrs:
+                lenga = len(arr.x) * n * n
+                lengb = len(arr.x) * n
+                arr.add_constant('a', [0.] * lenga)
+                arr.add_constant('b', [0.] * lengb)
+                name = arr.name
+            eqns.append(Group(equations=[
+                MLSFirstOrderPreStep2D(name, [name])], real=False))
+            eqns.append(Group(equations=[
+                MLSFirstOrder(name, [name], self.dim)], real=False))
+            sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+            return sph_eval
+        else:
+            return self._sph_eval
+
+    def _get_sph_eval_mls3d_1(self):
+        if self._sph_eval is None:
+            from pysph.sph.wc.density_correction import (
+                MLSFirstOrderPreStep3D, MLSFirstOrder)
+            from pysph.tools.sph_evaluator import SPHEvaluator
+            from pysph.sph.equation import Group
+            arrs = self.arrs
+            eqns = []
+            n = 4
+            for arr in arrs:
+                lenga = len(arr.x) * n * n
+                lengb = len(arr.x) * n
+                arr.add_constant('a', [0.] * lenga)
+                arr.add_constant('b', [0.] * lengb)
+                name = arr.name
+            eqns.append(Group(equations=[
+                MLSFirstOrderPreStep3D(name, [name])], real=False))
+            eqns.append(Group(equations=[
+                MLSFirstOrder(name, [name], self.dim)], real=False))
+            sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+            return sph_eval
+        else:
+            return self._sph_eval
+
     def _get_sph_eval(self, corr):
         if corr == 'shepard':
             return self._get_sph_eval_shepard()
+        elif corr == 'mls2d_1':
+            return self._get_sph_eval_mls2d_1()
+        elif corr == 'mls3d_1':
+            return self._get_sph_eval_mls3d_1()
 
     def post_step(self, solver):
         if self.freq == 0:
