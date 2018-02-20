@@ -1,7 +1,7 @@
-from pysph.sph.wc.density_correction import gj_Solve
+# from pysph.sph.wc.density_correction import gj_Solve
+from density_correction import gj_Solve
 import numpy as np
 import unittest
-from scipy import linalg
 
 
 class TestGjSolve(unittest.TestCase):
@@ -15,9 +15,9 @@ class TestGjSolve(unittest.TestCase):
             result = [0.0] * n
             gj_Solve(np.ravel(mat), b, n, result)
             mat = np.matrix(mat)
-            new_res = linalg.inv(mat) * np.transpose(np.matrix(b))
-            new_res = np.ravel(np.array(new_res))
-            assert np.allclose(new_res, np.array(result))
+            new_b = mat * np.transpose(np.matrix(result))
+            new_b = np.ravel(np.array(new_b))
+            assert np.allclose(new_b, np.array(b))
 
 
 if __name__ == '__main__':
