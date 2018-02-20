@@ -25,7 +25,8 @@ from pysph.base.kernels import Gaussian
 # PySPH solver and integrator
 from pysph.solver.application import Application
 from pysph.sph.integrator import EPECIntegrator
-from pysph.sph.scheme import WCSPHScheme
+from pysph.sph.scheme import WCSPHScheme, SchemeChooser
+from pysph.sph.iisph import IISPHScheme
 
 
 def _derivative(x, t):
@@ -87,18 +88,33 @@ class EllipticalDrop(Application):
         self.alpha = 0.1
 
     def create_scheme(self):
-        s = WCSPHScheme(
+        wcsph = WCSPHScheme(
             ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
             h0=self.dx*self.hdx, hdx=self.hdx, gamma=7.0, alpha=0.1, beta=0.0
         )
-        kernel = Gaussian(dim=2)
-        dt = 5e-6; tf = 0.0076
-        s.configure_solver(
-            kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
-            adaptive_timestep=True, cfl=0.3, n_damp=50,
-            output_at_times=[0.0008, 0.0038]
+        iisph = IISPHScheme(
+            ['fluid'], [], dim=2, rho0=self.ro
         )
+        s = SchemeChooser(default='wcsph', wcsph=wcsph, iisph=iisph)
         return s
+
+    def configure_scheme(self):
+        scheme = self.scheme
+        kernel = Gaussian(dim=2)
+        dt = 5e-6
+        tf = 0.0076
+        if self.options.scheme == 'wcsph':
+            scheme.configure_solver(
+                kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
+                adaptive_timestep=True, cfl=0.3, n_damp=50,
+                output_at_times=[0.0008, 0.0038]
+            )
+        elif self.options.scheme == 'iisph':
+            scheme.configure_solver(
+                kernel=kernel, dt=dt, tf=tf,
+                adaptive_timestep=True,
+                output_at_times=[0.0008, 0.0038]
+            )
 
     def create_particles(self):
         """Create the circular patch of fluid."""

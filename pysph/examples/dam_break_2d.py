@@ -15,6 +15,7 @@ from pysph.examples._db_geometry import DamBreak2DGeometry
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
 from pysph.sph.wc.edac import EDACScheme
+from pysph.sph.iisph import IISPHScheme
 
 fluid_column_height = 2.0
 fluid_column_width = 1.0
@@ -88,6 +89,15 @@ class DamBreak2D(Application):
                 )
             )
             print("dt = %f"%dt)
+        elif self.options.scheme == 'iisph':
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125*10*self.h/co
+            kw.update(
+                dict(
+                    kernel=kernel, dt=dt, adaptive_timestep=True
+                )
+            )
+            print("dt = %f"%dt)
 
         self.scheme.configure_solver(**kw)
 
@@ -105,7 +115,12 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, c0=co, nu=nu,
             rho0=ro, h=h, pb=0.0, gy=-g, eps=0.0, clamp_p=True
         )
-        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
+        iisph = IISPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            rho0=ro, gy=-g
+        )
+        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
+                          iisph=iisph)
         return s
 
     def create_particles(self):
@@ -129,7 +144,10 @@ class DamBreak2D(Application):
             nfluid_offset=nfluid_offset,
         )
         self.scheme.setup_properties([fluid, boundary])
-
+        if self.options.scheme == 'iisph':
+            # the default position tends to cause the particles to be pushed
+            # away from the wall, so displacing it by a tiny amount helps.
+            fluid.x += self.dx/4
         return [fluid, boundary]
 
     def post_process(self, info_fname):
