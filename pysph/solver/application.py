@@ -394,7 +394,7 @@ class Application(object):
             action="store",
             dest="omp_schedule",
             default="dynamic,64",
-            help="""Schedule how loop iterations 
+            help="""Schedule how loop iterations
             are divided amongst multiple threads""")
 
         # --opencl
@@ -711,7 +711,8 @@ class Application(object):
         if self.scheme is not None:
             self.scheme.consume_user_options(self.options)
         self.consume_user_options()
-        self.configure_scheme()
+        if self.scheme is not None:
+            self.configure_scheme()
 
     def _setup_logging(self):
         """Setup logging for the application.
