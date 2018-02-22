@@ -129,6 +129,14 @@ class MLSFirstOrderPreStep2D(Equation):
 
     .. math::
             A = \sum_{b}W_{ab}\tilde{A}\frac{m_{b}}{\rho_{b}}
+
+    .. math::
+            \tilde{A} = pp^{T}
+
+    where
+
+    .. math::
+            p = \left[1 x y\right]^{T}
     References
     ----------
     .. [Dilts, 1999] Dilts, G. A. Moving-Least-Squares-Particle
@@ -152,9 +160,15 @@ class MLSFirstOrderPreStep2D(Equation):
         i = declare('int')
         j = declare('int')
         for i in range(n):
+            if i == 0:
+                fac1 = 1.0
+            else:
+                fac1 = XIJ[i - 1]
             for j in range(n):
-                fac1 = 1.0 if i == 0 else XIJ[i - 1]
-                fac2 = 1.0 if j == 0 else XIJ[j - 1]
+                if j == 0:
+                    fac2 = 1.0
+                else:
+                    fac2 = XIJ[j - 1]
                 d_a[n * n * d_idx + n * i + j] += fac1 * \
                     fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
 
@@ -195,9 +209,15 @@ class MLSFirstOrderPreStep3D(Equation):
         i = declare('int')
         j = declare('int')
         for i in range(n):
+            if i == 0:
+                fac1 = 1.0
+            else:
+                fac1 = XIJ[i - 1]
             for j in range(n):
-                fac1 = 1.0 if i == 0 else XIJ[i - 1]
-                fac2 = 1.0 if j == 0 else XIJ[j - 1]
+                if j == 0:
+                    fac2 = 1.0
+                else:
+                    fac2 = XIJ[j - 1]
                 d_a[n * n * d_idx + n * i + j] += fac1 * \
                     fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
 
@@ -245,6 +265,9 @@ class MLSFirstOrder(Equation):
         wmls = declare('double')
         wmls = 0.0
         for i in range(n):
-            fac = 1.0 if i == 0 else XIJ[i - 1]
+            if i == 0:
+                fac = 1.0
+            else:
+                fac = XIJ[i - 1]
             wmls += d_b[n * d_idx + i] * fac * WIJ
         d_rho[d_idx] += s_m[s_idx] * wmls
