@@ -122,11 +122,8 @@ class DensityCorrection(Tool):
         self.dim = app.solver.dim
         self.particles = app.particles
         self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
-        try:
-            assert self.corr in ['shepard', 'mls2d_1', 'mls3d_1']
-        except Exception:
-            error = 'Given corr argument not in acceptable corr arguments'
-            raise AssertionError(error)
+        options = ['shepard', 'mls2d_1', 'mls3d_1']
+        assert self.corr in options, 'corr should be one of %s' % options
 
     def _get_sph_eval_shepard(self):
         from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
@@ -210,6 +207,8 @@ class DensityCorrection(Tool):
             return self._get_sph_eval_mls2d_1()
         elif corr == 'mls3d_1':
             return self._get_sph_eval_mls3d_1()
+        else:
+            pass
 
     def post_step(self, solver):
         if self.freq == 0:
