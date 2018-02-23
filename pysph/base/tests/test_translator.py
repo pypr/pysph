@@ -355,8 +355,11 @@ def test_known_types_in_funcargs():
 
 def test_calling_method_of_known_type():
     # Given
-    src = 'obj.method(1, 2)'
-    known = {'obj': KnownType('SomeClass*', base_typr='SomeClass')}
+    src = dedent('''
+    obj.method(1, 2)
+    obj.meth()
+    ''')
+    known = {'obj': KnownType('SomeClass*', base_type='SomeClass')}
 
     # When
     code = py2c(src, known_types=known)
@@ -364,6 +367,38 @@ def test_calling_method_of_known_type():
     # Then
     expect = dedent('''
     SomeClass_method(obj, 1, 2);
+    SomeClass_meth(obj);
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_calling_method_of_known_type_in_method():
+    # Given
+    src = dedent('''
+    class Foo(object):
+        def g(self):
+            pass
+        def f(self, obj):
+            obj.method(1, 2)
+            self.g()
+    ''')
+
+    # When
+    known = {'obj': KnownType('SomeClass*', base_type='SomeClass')}
+    code = py2c(src, known_types=known)
+
+    # Then
+    expect = dedent('''
+    void Foo_g(Foo* self)
+    {
+        ;
+    }
+
+    void Foo_f(Foo* self, SomeClass* obj)
+    {
+        SomeClass_method(obj, 1, 2);
+        Foo_g(self);
+    }
     ''')
     assert code.strip() == expect.strip()
 

@@ -282,18 +282,19 @@ class CConverter(ast.NodeVisitor):
                 args=', '.join(self.visit(x) for x in node.args)
             )
         elif isinstance(node.func, ast.Attribute):
-            if len(self._class_name) > 0:
+            if node.func.value.id in self._known_types:
+                name = node.func.value.id
+                cls = self._known_types[name].base_type
+                args = [name] + [self.visit(x) for x in node.args]
+                return '{func}({args})'.format(
+                    func='%s_%s' % (cls, node.func.attr),
+                    args=', '.join(args)
+                )
+            elif len(self._class_name) > 0:
+                args = ['self'] + [self.visit(x) for x in node.args]
                 return '{func}({args})'.format(
                     func='%s_%s' % (self._class_name, node.func.attr),
-                    args='self, ' + ', '.join(self.visit(x) for x in node.args)
-                )
-            elif node.func.value.id in self._known_types:
-                name = node.func.value.id
-                cls = self._known_types[name].base
-                return '{func}({obj}, {args})'.format(
-                    func='%s_%s' % (cls, node.func.attr),
-                    obj=name,
-                    args=', '.join(self.visit(x) for x in node.args)
+                    args=', '.join(args)
                 )
             else:
                 self.error('Unsupported function call', node)
