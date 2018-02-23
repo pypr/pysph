@@ -353,6 +353,21 @@ def test_known_types_in_funcargs():
     assert code.strip() == expect.strip()
 
 
+def test_calling_method_of_known_type():
+    # Given
+    src = 'obj.method(1, 2)'
+    known = {'obj': KnownType('SomeClass*', base_typr='SomeClass')}
+
+    # When
+    code = py2c(src, known_types=known)
+
+    # Then
+    expect = dedent('''
+    SomeClass_method(obj, 1, 2);
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_raises_error_when_unknown_args_are_given():
     # Given
     src = dedent('''

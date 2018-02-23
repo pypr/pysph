@@ -85,11 +85,24 @@ class KnownType(object):
     Smells but is convenient as the type may be one available only inside
     Cython without a corresponding Python type.
     """
-    def __init__(self, type_str):
+    def __init__(self, type_str, base_type=''):
+        """Constructor
+
+        The ``base_type`` argument is optional and used to represent the base
+        type, i.e. the type_str may be 'Foo*' but the base type will be 'Foo'
+        if specified.
+
+        Parameters
+        ----------
+        type_str: str: A string representation of how the type is declared.
+        base_type: str: The base type of this entity. (optional)
+
+        """
         self.type = type_str
+        self.base_type = base_type
 
     def __repr__(self):
-        return 'KnownType("%s")'%self.type
+        return 'KnownType("%s")' % self.type
 
 
 class CythonGenerator(object):
