@@ -1,3 +1,76 @@
+'''This helper module orchestrates the generation of OpenCL code, compiles it
+and makes it available for use.
+
+Overview
+~~~~~~~~~
+
+Look first at sph/tests/test_acceleration_eval.py to see the big picture. The
+general idea when using AccelerationEval instances is:
+
+- Create the particle arrays.
+- Specify any equations and the SPH kernel.
+- Construct the AccelerationEval with the particles, equations and kernel.
+- Compile this with SPHCompiler and hand in an NNPS.
+  - For the GPU all that changes is the backend and the NNPS.
+
+So the difference in the CPU version and GPU version is the choice of the
+backend. The AccelerationEval delegates its actual high-performance work to its
+`self.c_acceleration_eval` instance. This instance is either compiled with
+Cython or OpenCL. With Cython this is actually a compiled extension module
+created with Cython and with OpenCL this is the Python class
+OpenCLAccelerationEval in this file. This is where the helpers come in.
+
+
+The AccelerationEvalCythonHelper and AccelerationEvalOpenCLHelper have three
+main methods:
+
+- get_code(): returns the code to be compiled.
+
+- compile(code): compile the code and return the compiled module/opencl
+  Program.
+
+- setup_compiled_module(module): sets the AccelerationEval's
+  c_acceleration_eval to an instance based on the helper.
+
+The helper basically uses mako templates, code generation via simple string
+manipulations, and transpilation to generate HPC code automatically from the
+given particle arrays, equations, and kernel.
+
+In this module, an OpenCLAccelerationEval is defined which does the work of
+calling the compiled opencl kernels. The AccelerationEvalOpenCLHelper generates
+the OpenCL kernels. The general idea of how we generate OpenCL kernels is quite
+simple.
+
+We transpile pure Python code using `pysph.base.translator` which generates C
+from a subset of pure Python.
+
+- We do not support inheritance but convert classes to simple C-structs and
+  functions which take the struct as the first argument.
+- Python functions are also transpiled.
+- Type inference is done using either conventions like s_idx, d_idx, s_x, d_x,
+  WIJ etc. or by type hints given using default arguments. Lists are treated as
+  raw pointers to the contained type. One can also set certain predefined
+  known_types and the code generator will generate suitable code. There are
+  plenty of tests illustrating what is supported in
+  ``pysph.base.tests.test_translator``.
+- One can also use the ``declare`` function to declare any types in the Python
+  code.
+
+This is enough to do what we need. We transpile the kernel, all required
+equations, and generate suitable kernels. All structs are converted to suitable
+GPU types and the data from the Python classes is converted into suitably
+aligned numpy dtypes (using cl.tools.match_dtype_to_c_struct). These are
+constructed for each class and stored in an _gpu attribute on the Python
+object.  When calling kernels these are passed and pushed/pulled from the GPU.
+
+When the user calls AccelerationEval.compute, this in turn calls the
+c_acceleration_eval's compute method. For OpenCL, this is provided by the
+OpenCLAccelerationEval class below.
+
+While the implementation is a bit complex, the details a bit hairy, the general
+idea is very simple.
+
+'''
 from functools import partial
 import inspect
 import os
@@ -19,7 +92,7 @@ from pysph.base.opencl import (profile_kernel, get_context, get_queue,
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
-from .equation import get_predefined_types
+from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
@@ -187,6 +260,7 @@ class AccelerationEvalOpenCLHelper(object):
             self.object.all_group.pre_comp
         ))
         self.known_types.update(predefined)
+        self.known_types['NBRS'] = KnownType('__global unsigned int*')
         self.data = []
         self._ctx = get_context()
         self._queue = get_queue()
@@ -260,8 +334,7 @@ class AccelerationEvalOpenCLHelper(object):
                 for arg in item['args']:
                     args.append(self._get_argument(arg, dest, src))
                 loop = item['loop']
-                if loop:
-                    args.append(self._get_argument('kern', dest, src))
+                args.append(self._get_argument('kern', dest, src))
                 info = dict(
                     method=method, dest=self._array_map[dest],
                     src=self._array_map[src], args=args,
@@ -335,6 +408,10 @@ class AccelerationEvalOpenCLHelper(object):
 
         headers.append(transpiler.parse_instance(object.kernel))
 
+        cls_name = object.kernel.__class__.__name__
+        self.known_types['KERNEL'] = KnownType(
+            '__global %s*' % cls_name, base_type=cls_name
+        )
         headers.append(object.all_group.get_equation_wrappers(
             self.known_types
         ))
@@ -373,39 +450,27 @@ class AccelerationEvalOpenCLHelper(object):
         kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
             g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
         )
-        all_args = []
-        py_args = []
+
+        sph_k_name = self.object.kernel.__class__.__name__
         code = [
             'int d_idx = get_global_id(0);'
+            '__global %s* KERNEL = kern;' % sph_k_name
         ]
-        for eq in all_eqs.equations:
-            method = getattr(eq, kind, None)
-            if method is not None:
-                cls = eq.__class__.__name__
-                arg = '__global {cls}* {name}'.format(
-                    cls=cls, name=eq.var_name
-                )
-                all_args.append(arg)
-                py_args.append(eq.var_name)
+        all_args, py_args, _calls = self._get_equation_method_calls(
+            all_eqs, kind, indent=''
+        )
+        code.extend(_calls)
 
-                call_args = list(inspect.getargspec(method).args)
-                if 'self' in call_args:
-                    call_args.remove('self')
-                call_args.insert(0, eq.var_name)
-                code.extend(
-                    wrap_code(
-                        '{cls}_{kind}({args});'.format(
-                            cls=cls, kind=kind, args=', '.join(call_args)
-                        ),
-                        indent=''
-                    )
-                )
         s_ary, d_ary = all_eqs.get_array_names()
         # We only need the dest arrays here as these are simple kernels
         # without a loop so there is no "source".
         _args = list(d_ary)
         py_args.extend(_args)
-        all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
+        all_args.extend(self._get_typed_args(_args))
+        all_args.extend(
+            ['__global {kernel}* kern'.format(kernel=sph_k_name),
+             'double t', 'double dt']
+        )
 
         body = '\n'.join([' ' * 4 + x for x in code])
         self.data.append(dict(
@@ -419,6 +484,35 @@ class AccelerationEvalOpenCLHelper(object):
                 sig=sig, body=body
             )
         )
+
+    def _get_equation_method_calls(self, eq_group, kind, indent=''):
+        all_args = []
+        py_args = []
+        code = []
+        for eq in eq_group.equations:
+            method = getattr(eq, kind, None)
+            if method is not None:
+                cls = eq.__class__.__name__
+                arg = '__global {cls}* {name}'.format(
+                    cls=cls, name=eq.var_name
+                )
+                all_args.append(arg)
+                py_args.append(eq.var_name)
+                call_args = list(inspect.getargspec(method).args)
+                if 'self' in call_args:
+                    call_args.remove('self')
+                call_args.insert(0, eq.var_name)
+
+                code.extend(
+                    wrap_code(
+                        '{cls}_{kind}({args});'.format(
+                            cls=cls, kind=kind, args=', '.join(call_args)
+                        ),
+                        indent=indent
+                    )
+                )
+
+        return all_args, py_args, code
 
     def _declare_precomp_vars(self, context):
         decl = []
@@ -485,46 +579,48 @@ class AccelerationEvalOpenCLHelper(object):
         kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
             g_idx=g_idx, sg=sub_grp, source=source, dest=dest
         )
+        sph_k_name = self.object.kernel.__class__.__name__
         context = eq_group.context
+        all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
-        code.append('int d_idx = get_global_id(0);')
-        code.append('int s_idx, i;')
-        code.append('int start = start_idx[d_idx];')
-        code.append('int end = start + nbr_length[d_idx];')
-        code.append('for (i=start; i<end; i++) {')
-        code.append('    s_idx = neighbors[i];')
-        pre = []
-        for p, cb in eq_group.precomputed.items():
-            src = cb.code.strip().splitlines()
-            pre.extend([' ' * 4 + x + ';' for x in src])
-        if len(pre) > 0:
-            pre.append('')
-        code.extend(pre)
+        code.append('unsigned int d_idx = get_global_id(0);')
+        code.append('unsigned int s_idx, i;')
+        code.append('__global %s* KERNEL = kern;' % sph_k_name)
+        code.append('unsigned int start = start_idx[d_idx];')
+        code.append('__global unsigned int* NBRS = &(neighbors[start]);')
+        code.append('int N_NBRS = nbr_length[d_idx];')
+        code.append('unsigned int end = start + N_NBRS;')
+        if eq_group.has_loop_all():
+            _all_args, _py_args, _calls = self._get_equation_method_calls(
+                eq_group, kind='loop_all', indent=''
+            )
+            code.extend(['', '// Calling loop_all of equations.'])
+            code.extend(_calls)
+            code.append('')
+            all_args.extend(_all_args)
+            py_args.extend(_py_args)
 
-        all_args = []
-        py_args = []
-        for eq in eq_group.equations:
-            method = getattr(eq, kind, None)
-            if method is not None:
-                cls = eq.__class__.__name__
-                arg = '__global {cls}* {name}'.format(
-                    cls=cls, name=eq.var_name
-                )
-                all_args.append(arg)
-                py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
-                if 'self' in call_args:
-                    call_args.remove('self')
-                call_args.insert(0, eq.var_name)
+        if eq_group.has_loop():
+            code.append('// Calling loop of equations.')
+            code.append('for (i=start; i<end; i++) {')
+            code.append('    s_idx = neighbors[i];')
+            pre = []
+            for p, cb in eq_group.precomputed.items():
+                src = cb.code.strip().splitlines()
+                pre.extend([' ' * 4 + x + ';' for x in src])
+            if len(pre) > 0:
+                pre.append('')
+            code.extend(pre)
 
-                code.extend(
-                    wrap_code(
-                        '{cls}_{kind}({args});'.format(
-                            cls=cls, kind=kind, args=', '.join(call_args)
-                        ),
-                        indent='    '
-                    )
-                )
+            _all_args, _py_args, _calls = self._get_equation_method_calls(
+                eq_group, kind, indent='    '
+            )
+            code.extend(_calls)
+            for arg, py_arg in zip(_all_args, _py_args):
+                if arg not in all_args:
+                    all_args.append(arg)
+                    py_args.append(py_arg)
+            code.append('}')
 
         s_ary, d_ary = eq_group.get_array_names()
         s_ary.update(d_ary)
@@ -534,9 +630,8 @@ class AccelerationEvalOpenCLHelper(object):
 
         body = '\n'.join([' ' * 4 + x for x in code])
         body = self._set_kernel(body, self.object.kernel)
-        k_name = self.object.kernel.__class__.__name__
         all_args.extend(
-            ['__global {kernel}* kern'.format(kernel=k_name),
+            ['__global {kernel}* kern'.format(kernel=sph_k_name),
              '__global unsigned int *nbr_length',
              '__global unsigned int *start_idx',
              '__global unsigned int *neighbors',
@@ -549,7 +644,7 @@ class AccelerationEvalOpenCLHelper(object):
 
         sig = get_kernel_definition(kernel, all_args)
         return (
-            '{sig}\n{{\n{body}\n    }}\n}}\n'.format(
+            '{sig}\n{{\n{body}\n\n}}\n'.format(
                 sig=sig, body=body
             )
         )
