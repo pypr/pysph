@@ -261,8 +261,7 @@ class AccelerationEvalOpenCLHelper(object):
                 for arg in item['args']:
                     args.append(self._get_argument(arg, dest, src))
                 loop = item['loop']
-                if loop:
-                    args.append(self._get_argument('kern', dest, src))
+                args.append(self._get_argument('kern', dest, src))
                 info = dict(
                     method=method, dest=self._array_map[dest],
                     src=self._array_map[src], args=args,
@@ -379,8 +378,10 @@ class AccelerationEvalOpenCLHelper(object):
             g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
         )
 
+        sph_k_name = self.object.kernel.__class__.__name__
         code = [
             'int d_idx = get_global_id(0);'
+            '__global %s* KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
             all_eqs, kind, indent=''
@@ -392,7 +393,11 @@ class AccelerationEvalOpenCLHelper(object):
         # without a loop so there is no "source".
         _args = list(d_ary)
         py_args.extend(_args)
-        all_args.extend(self._get_typed_args(_args + ['t', 'dt']))
+        all_args.extend(self._get_typed_args(_args))
+        all_args.extend(
+            ['__global {kernel}* kern'.format(kernel=sph_k_name),
+             'double t', 'double dt']
+        )
 
         body = '\n'.join([' ' * 4 + x for x in code])
         self.data.append(dict(
