@@ -22,6 +22,7 @@ from pysph.base.config import get_config
 
 logger = logging.getLogger(__name__)
 
+
 class CythonClassHelper(object):
     def __init__(self, name='', public_vars=None, methods=None):
         self.name = name
@@ -51,6 +52,7 @@ ${line}
                         public_vars=self.public_vars,
                         methods=self.methods)
 
+
 def get_func_definition(sourcelines):
     """Given a block of source lines for a method or function,
     get the lines for the function block.
@@ -73,11 +75,14 @@ def all_numeric(seq):
         types = [int, float]
     return all(type(x) in types for x in seq)
 
+
 class CodeGenerationError(Exception):
     pass
 
+
 class Undefined(object):
     pass
+
 
 class KnownType(object):
     """Simple object to specify a known type as a string.
@@ -126,7 +131,7 @@ class CythonGenerator(object):
         self.known_types = known_types if known_types is not None else {}
         self._config = get_config()
 
-    ##### Public protocol #####################################################
+    # ### Public protocol #####################################################
 
     def ctype_to_python(self, type_str):
         """Given a c-style type declaration obtained from the `detect_type`
@@ -144,7 +149,7 @@ class CythonGenerator(object):
         if name in ['s_idx', 'd_idx']:
             return 'long'
         if value is Undefined or isinstance(value, Undefined):
-            raise CodeGenerationError('Unknown type, for %s'%name)
+            raise CodeGenerationError('Unknown type, for %s' % name)
 
         if isinstance(value, bool):
             return 'int'
@@ -168,14 +173,14 @@ class CythonGenerator(object):
 
     def parse(self, obj):
         obj_type = type(obj)
-        if obj_type is types.FunctionType:
+        if isinstance(obj, types.FunctionType):
             self._parse_function(obj)
         elif hasattr(obj, '__class__'):
             self._parse_instance(obj)
         else:
-            raise TypeError('Unsupport type to wrap: %s'%obj_type)
+            raise TypeError('Unsupport type to wrap: %s' % obj_type)
 
-    ###### Private protocol ###################################################
+    # #### Private protocol ###################################################
 
     def _analyze_method(self, meth, lines):
         """Returns information about the method.
@@ -266,7 +271,7 @@ class CythonGenerator(object):
         dedented_body = dedent(body)
         symbols = get_assigned(dedented_body)
         undefined = symbols - set(declared) - args
-        declare = [indent +'cdef double %s\n'%x for x in sorted(undefined)]
+        declare = [indent + 'cdef double %s\n' % x for x in sorted(undefined)]
         code = ''.join(declare) + cython_body
         return code
 
@@ -288,7 +293,7 @@ class CythonGenerator(object):
         # For now get it all from the dict.
         data = obj.__dict__
         vars = OrderedDict((name, self.detect_type(name, data[name]))
-                            for name in sorted(data.keys()))
+                           for name in sorted(data.keys()))
         return vars
 
     def _get_py_method_spec(self, name, returns, args, indent=' '*8):
@@ -314,26 +319,28 @@ class CythonGenerator(object):
 
         py_ret = ' double' if returns else ''
         py_arg_def = ', '.join(py_args)
-        pydefn = 'cpdef{ret} py_{name}({arg_def}):'\
-                     .format(ret=py_ret, name=name, arg_def=py_arg_def)
+        pydefn = 'cpdef{ret} py_{name}({arg_def}):'.format(
+            ret=py_ret, name=name, arg_def=py_arg_def
+        )
         call = ', '.join(call_sig)
         py_ret = 'return ' if returns else ''
         py_self = 'self.' if is_method else ''
-        body = indent + '{ret}{self}{name}({call})'\
-                    .format(name=name, call=call, ret=py_ret, self=py_self)
+        body = indent + '{ret}{self}{name}({call})'.format(
+            name=name, call=call, ret=py_ret, self=py_self
+        )
 
         return pydefn, body
 
     def _handle_declare_statement(self, name, declare):
         def matrix(size):
-            sz = ''.join(['[%d]'%n for n in size])
+            sz = ''.join(['[%d]' % n for n in size])
             return sz
 
         # Remove the "declare('" and the trailing "')".
         code = declare[9:-2]
         if code.startswith('matrix'):
             sz = matrix(eval(code[7:-1]))
-            defn = 'cdef double %s%s'%(name, sz)
+            defn = 'cdef double %s%s' % (name, sz)
             return defn
         else:
             defn = 'cdef {type} {name}'.format(type=code, name=name)

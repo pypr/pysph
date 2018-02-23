@@ -26,7 +26,8 @@ main methods:
 
 - get_code(): returns the code to be compiled.
 
-- compile(code): compile the code and return the compiled module/opencl Program.
+- compile(code): compile the code and return the compiled module/opencl
+  Program.
 
 - setup_compiled_module(module): sets the AccelerationEval's
   c_acceleration_eval to an instance based on the helper.
