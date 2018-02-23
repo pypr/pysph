@@ -1,3 +1,75 @@
+'''This helper module orchestrates the generation of OpenCL code, compiles it
+and makes it available for use.
+
+Overview
+~~~~~~~~~
+
+Look first at sph/tests/test_acceleration_eval.py to see the big picture. The
+general idea when using AccelerationEval instances is:
+
+- Create the particle arrays.
+- Specify any equations and the SPH kernel.
+- Construct the AccelerationEval with the particles, equations and kernel.
+- Compile this with SPHCompiler and hand in an NNPS.
+  - For the GPU all that changes is the backend and the NNPS.
+
+So the difference in the CPU version and GPU version is the choice of the
+backend. The AccelerationEval delegates its actual high-performance work to its
+`self.c_acceleration_eval` instance. This instance is either compiled with
+Cython or OpenCL. With Cython this is actually a compiled extension module
+created with Cython and with OpenCL this is the Python class
+OpenCLAccelerationEval in this file. This is where the helpers come in.
+
+
+The AccelerationEvalCythonHelper and AccelerationEvalOpenCLHelper have three
+main methods:
+
+- get_code(): returns the code to be compiled.
+
+- compile(code): compile the code and return the compiled module/opencl Program.
+
+- setup_compiled_module(module): sets the AccelerationEval's
+  c_acceleration_eval to an instance based on the helper.
+
+The helper basically uses mako templates, code generation via simple string
+manipulations, and transpilation to generate HPC code automatically from the
+given particle arrays, equations, and kernel.
+
+In this module, an OpenCLAccelerationEval is defined which does the work of
+calling the compiled opencl kernels. The AccelerationEvalOpenCLHelper generates
+the OpenCL kernels. The general idea of how we generate OpenCL kernels is quite
+simple.
+
+We transpile pure Python code using `pysph.base.translator` which generates C
+from a subset of pure Python.
+
+- We do not support inheritance but convert classes to simple C-structs and
+  functions which take the struct as the first argument.
+- Python functions are also transpiled.
+- Type inference is done using either conventions like s_idx, d_idx, s_x, d_x,
+  WIJ etc. or by type hints given using default arguments. Lists are treated as
+  raw pointers to the contained type. One can also set certain predefined
+  known_types and the code generator will generate suitable code. There are
+  plenty of tests illustrating what is supported in
+  ``pysph.base.tests.test_translator``.
+- One can also use the ``declare`` function to declare any types in the Python
+  code.
+
+This is enough to do what we need. We transpile the kernel, all required
+equations, and generate suitable kernels. All structs are converted to suitable
+GPU types and the data from the Python classes is converted into suitably
+aligned numpy dtypes (using cl.tools.match_dtype_to_c_struct). These are
+constructed for each class and stored in an _gpu attribute on the Python
+object.  When calling kernels these are passed and pushed/pulled from the GPU.
+
+When the user calls AccelerationEval.compute, this in turn calls the
+c_acceleration_eval's compute method. For OpenCL, this is provided by the
+OpenCLAccelerationEval class below.
+
+While the implementation is a bit complex, the details a bit hairy, the general
+idea is very simple.
+
+'''
 from functools import partial
 import inspect
 import os
