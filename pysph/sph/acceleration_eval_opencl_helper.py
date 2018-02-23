@@ -19,7 +19,7 @@ from pysph.base.opencl import (profile_kernel, get_context, get_queue,
 from pysph.base.translator import (CStructHelper, OpenCLConverter,
                                    ocl_detect_type)
 
-from .equation import get_predefined_types
+from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
@@ -187,6 +187,7 @@ class AccelerationEvalOpenCLHelper(object):
             self.object.all_group.pre_comp
         ))
         self.known_types.update(predefined)
+        self.known_types['NBRS'] = KnownType('__global unsigned int*')
         self.data = []
         self._ctx = get_context()
         self._queue = get_queue()
@@ -335,6 +336,10 @@ class AccelerationEvalOpenCLHelper(object):
 
         headers.append(transpiler.parse_instance(object.kernel))
 
+        cls_name = object.kernel.__class__.__name__
+        self.known_types['KERNEL'] = KnownType(
+            '__global %s*' % cls_name, base_type=cls_name
+        )
         headers.append(object.all_group.get_equation_wrappers(
             self.known_types
         ))
@@ -373,33 +378,15 @@ class AccelerationEvalOpenCLHelper(object):
         kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
             g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
         )
-        all_args = []
-        py_args = []
+
         code = [
             'int d_idx = get_global_id(0);'
         ]
-        for eq in all_eqs.equations:
-            method = getattr(eq, kind, None)
-            if method is not None:
-                cls = eq.__class__.__name__
-                arg = '__global {cls}* {name}'.format(
-                    cls=cls, name=eq.var_name
-                )
-                all_args.append(arg)
-                py_args.append(eq.var_name)
+        all_args, py_args, _calls = self._get_equation_method_calls(
+            all_eqs, kind, indent=''
+        )
+        code.extend(_calls)
 
-                call_args = list(inspect.getargspec(method).args)
-                if 'self' in call_args:
-                    call_args.remove('self')
-                call_args.insert(0, eq.var_name)
-                code.extend(
-                    wrap_code(
-                        '{cls}_{kind}({args});'.format(
-                            cls=cls, kind=kind, args=', '.join(call_args)
-                        ),
-                        indent=''
-                    )
-                )
         s_ary, d_ary = all_eqs.get_array_names()
         # We only need the dest arrays here as these are simple kernels
         # without a loop so there is no "source".
@@ -419,6 +406,35 @@ class AccelerationEvalOpenCLHelper(object):
                 sig=sig, body=body
             )
         )
+
+    def _get_equation_method_calls(self, eq_group, kind, indent=''):
+        all_args = []
+        py_args = []
+        code = []
+        for eq in eq_group.equations:
+            method = getattr(eq, kind, None)
+            if method is not None:
+                cls = eq.__class__.__name__
+                arg = '__global {cls}* {name}'.format(
+                    cls=cls, name=eq.var_name
+                )
+                all_args.append(arg)
+                py_args.append(eq.var_name)
+                call_args = list(inspect.getargspec(method).args)
+                if 'self' in call_args:
+                    call_args.remove('self')
+                call_args.insert(0, eq.var_name)
+
+                code.extend(
+                    wrap_code(
+                        '{cls}_{kind}({args});'.format(
+                            cls=cls, kind=kind, args=', '.join(call_args)
+                        ),
+                        indent=indent
+                    )
+                )
+
+        return all_args, py_args, code
 
     def _declare_precomp_vars(self, context):
         decl = []
@@ -485,46 +501,48 @@ class AccelerationEvalOpenCLHelper(object):
         kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
             g_idx=g_idx, sg=sub_grp, source=source, dest=dest
         )
+        sph_k_name = self.object.kernel.__class__.__name__
         context = eq_group.context
+        all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
-        code.append('int d_idx = get_global_id(0);')
-        code.append('int s_idx, i;')
-        code.append('int start = start_idx[d_idx];')
-        code.append('int end = start + nbr_length[d_idx];')
-        code.append('for (i=start; i<end; i++) {')
-        code.append('    s_idx = neighbors[i];')
-        pre = []
-        for p, cb in eq_group.precomputed.items():
-            src = cb.code.strip().splitlines()
-            pre.extend([' ' * 4 + x + ';' for x in src])
-        if len(pre) > 0:
-            pre.append('')
-        code.extend(pre)
+        code.append('unsigned int d_idx = get_global_id(0);')
+        code.append('unsigned int s_idx, i;')
+        code.append('__global %s* KERNEL = kern;' % sph_k_name)
+        code.append('unsigned int start = start_idx[d_idx];')
+        code.append('__global unsigned int* NBRS = &(neighbors[start]);')
+        code.append('int N_NBRS = nbr_length[d_idx];')
+        code.append('unsigned int end = start + N_NBRS;')
+        if eq_group.has_loop_all():
+            _all_args, _py_args, _calls = self._get_equation_method_calls(
+                eq_group, kind='loop_all', indent=''
+            )
+            code.extend(['', '// Calling loop_all of equations.'])
+            code.extend(_calls)
+            code.append('')
+            all_args.extend(_all_args)
+            py_args.extend(_py_args)
 
-        all_args = []
-        py_args = []
-        for eq in eq_group.equations:
-            method = getattr(eq, kind, None)
-            if method is not None:
-                cls = eq.__class__.__name__
-                arg = '__global {cls}* {name}'.format(
-                    cls=cls, name=eq.var_name
-                )
-                all_args.append(arg)
-                py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
-                if 'self' in call_args:
-                    call_args.remove('self')
-                call_args.insert(0, eq.var_name)
+        if eq_group.has_loop():
+            code.append('// Calling loop of equations.')
+            code.append('for (i=start; i<end; i++) {')
+            code.append('    s_idx = neighbors[i];')
+            pre = []
+            for p, cb in eq_group.precomputed.items():
+                src = cb.code.strip().splitlines()
+                pre.extend([' ' * 4 + x + ';' for x in src])
+            if len(pre) > 0:
+                pre.append('')
+            code.extend(pre)
 
-                code.extend(
-                    wrap_code(
-                        '{cls}_{kind}({args});'.format(
-                            cls=cls, kind=kind, args=', '.join(call_args)
-                        ),
-                        indent='    '
-                    )
-                )
+            _all_args, _py_args, _calls = self._get_equation_method_calls(
+                eq_group, kind, indent='    '
+            )
+            code.extend(_calls)
+            for arg, py_arg in zip(_all_args, _py_args):
+                if arg not in all_args:
+                    all_args.append(arg)
+                    py_args.append(py_arg)
+            code.append('}')
 
         s_ary, d_ary = eq_group.get_array_names()
         s_ary.update(d_ary)
@@ -534,9 +552,8 @@ class AccelerationEvalOpenCLHelper(object):
 
         body = '\n'.join([' ' * 4 + x for x in code])
         body = self._set_kernel(body, self.object.kernel)
-        k_name = self.object.kernel.__class__.__name__
         all_args.extend(
-            ['__global {kernel}* kern'.format(kernel=k_name),
+            ['__global {kernel}* kern'.format(kernel=sph_k_name),
              '__global unsigned int *nbr_length',
              '__global unsigned int *start_idx',
              '__global unsigned int *neighbors',
@@ -549,7 +566,7 @@ class AccelerationEvalOpenCLHelper(object):
 
         sig = get_kernel_definition(kernel, all_args)
         return (
-            '{sig}\n{{\n{body}\n    }}\n}}\n'.format(
+            '{sig}\n{{\n{body}\n\n}}\n'.format(
                 sig=sig, body=body
             )
         )

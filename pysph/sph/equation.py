@@ -35,7 +35,7 @@ def camel_to_underscore(name):
 
 def declare(type):
     if type.startswith('matrix'):
-        return numpy.zeros(eval(type[6:]))
+        return numpy.zeros(eval(type[7:-1]))
     else:
         return 0
 
@@ -794,6 +794,7 @@ class OpenCLGroup(Group):
         wrappers = []
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
+        predefined['NBRS'] = KnownType('__global unsigned int*')
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):

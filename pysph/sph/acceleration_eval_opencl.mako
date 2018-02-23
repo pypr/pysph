@@ -28,7 +28,7 @@ ${helper.get_simple_loop_kernel(g_idx, sg_idx, group, dest, eqs_with_no_source)}
 ###################################################################
 ## Do any loop interactions between source and destination.
 ###################################################################
-% if eq_group.has_loop():
+% if eq_group.has_loop() or eq_group.has_loop_all():
 ${helper.get_loop_kernel(g_idx, sg_idx, group, dest, source, eq_group)}
 % endif
 % endfor

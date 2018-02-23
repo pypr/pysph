@@ -637,3 +637,25 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
         # Then
         assert eqs == [se, se1]
+
+    def test_should_support_loop_all_and_loop_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+        pa.gpu.pull('rho')
+        ref_rho = pa.rho.copy()
+
+        # When
+        pa.rho[:] = 0.0
+        pa.gpu.push('rho')
+        equations = [LoopAllEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        # 2*ref_rho as we are doing both the loop and loop_all to test if
+        # both are called.
+        pa.gpu.pull('rho')
+        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
