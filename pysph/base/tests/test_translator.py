@@ -139,6 +139,26 @@ def test_conditionals():
     assert code.strip() == expect.strip()
 
 
+def test_ternary_operator():
+    # Given
+    src = dedent('''
+    y = 2.0
+    x = 1.0 if y >= 2.0 else 0.0
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    double x;
+    double y;
+    y = 2.0;
+    x = (y >= 2.0) ? 1.0 : 0.0;
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_multiple_boolops():
     # Given
     src = dedent('''
