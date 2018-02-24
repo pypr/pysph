@@ -12,7 +12,7 @@ import numpy as np
 # Local imports.
 from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
-from pysph.sph.equation import Equation, Group
+from pysph.sph.equation import Equation, Group, declare
 from pysph.sph.acceleration_eval import (AccelerationEval,
                                          check_equation_array_properties)
 from pysph.sph.basic_equations import SummationDensity
@@ -30,8 +30,8 @@ class DummyEquation(Equation):
     def loop(self, d_idx, d_rho, s_idx, s_m, s_u, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
-    def post_loop(self, d_idx, d_rho, s_idx, s_m, s_V, WIJ):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+    def post_loop(self, d_idx, d_rho, s_idx, s_m, s_V):
+        d_rho[d_idx] += s_m[d_idx]
 
 
 class FindTotalMass(Equation):
@@ -181,6 +181,29 @@ class SimpleReduction(Equation):
             dst.gpu.push('total_mass')
 
 
+class LoopAllEquation(Equation):
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
+    def loop(self, d_idx, d_rho, s_m, s_idx, WIJ):
+        d_rho[d_idx] += s_m[s_idx]*WIJ
+
+    def loop_all(self, d_idx, d_x, d_rho, s_m, s_x, s_h, KERNEL, NBRS, N_NBRS):
+        i = declare('int')
+        s_idx = declare('long')
+        xij = declare('matrix((3,))')
+        rij = 0.0
+        sum = 0.0
+        xij[1] = 0.0
+        xij[2] = 0.0
+        for i in range(N_NBRS):
+            s_idx = NBRS[i]
+            xij[0] = d_x[d_idx] - s_x[s_idx]
+            rij = fabs(xij[0])
+            sum += s_m[s_idx]*KERNEL.kernel(xij, rij, s_h[s_idx])
+        d_rho[d_idx] += sum
+
+
 class TestAccelerationEval1D(unittest.TestCase):
     def setUp(self):
         self.dim = 1
@@ -311,6 +334,25 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_support_loop_all_and_loop(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+        ref_rho = pa.rho.copy()
+
+        # When
+        pa.rho[:] = 0.0
+        equations = [LoopAllEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        # 2*ref_rho as we are doing both the loop and loop_all to test if
+        # both are called.
+        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
 
 
 class EqWithTime(Equation):
@@ -595,3 +637,25 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
         # Then
         assert eqs == [se, se1]
+
+    def test_should_support_loop_all_and_loop_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+        pa.gpu.pull('rho')
+        ref_rho = pa.rho.copy()
+
+        # When
+        pa.rho[:] = 0.0
+        pa.gpu.push('rho')
+        equations = [LoopAllEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        # 2*ref_rho as we are doing both the loop and loop_all to test if
+        # both are called.
+        pa.gpu.pull('rho')
+        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
