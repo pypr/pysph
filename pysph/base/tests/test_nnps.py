@@ -779,8 +779,8 @@ def test_1D_get_valid_cell_index():
     ncells_per_dim = IntArray(3)
 
     ncells_per_dim[0] = n_cells
-    ncells_per_dim[1] = 0
-    ncells_per_dim[2] = 0
+    ncells_per_dim[1] = 1
+    ncells_per_dim[2] = 1
 
     # target cell
     cx = 1
@@ -800,6 +800,12 @@ def test_1D_get_valid_cell_index():
             index = nnps.py_get_valid_cell_index(
                 IntPoint(cx, cy+j, cz+k), ncells_per_dim, dim, n_cells)
             assert index == -1
+
+    # When the cx > n_cells or < -1 it should be invalid
+    for i in [-2, -1, n_cells, n_cells+1]:
+        index = nnps.py_get_valid_cell_index(
+            IntPoint(i, cy, cz), ncells_per_dim, dim, n_cells)
+        assert index == -1
 
 
 def test_get_centroid():

@@ -44,23 +44,17 @@ cdef class BoxSortNNPS(LinkedListNNPS):
     cdef inline long _get_valid_cell_index(self, int cid_x, int cid_y, int cid_z,
             int* ncells_per_dim, int dim, int n_cells) nogil:
         """Return the flattened index for a valid cell"""
+        cdef long ncx = ncells_per_dim[0]
         cdef long ncy = ncells_per_dim[1]
         cdef long ncz = ncells_per_dim[2]
 
-        cdef long cell_id
         cdef long cell_index = -1
 
         # basic test for valid indices. Since we bin the particles with
         # respect to the origin, negative indices can never occur.
-        cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
-
-        # additional check for 1D. This is because we search in all 26
-        # neighboring cells for neighbors. In 1D this can be problematic
-        # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
-        # result in a valid cell with a flattened index < ncells
-        if dim == 1:
-            if ( (cid_y > ncy) or (cid_z > ncz) ):
-                is_valid = False
+        cdef bint is_valid = (
+            (ncx > cid_x > -1) and (ncy > cid_y > -1) and (ncz > cid_z > -1)
+        )
 
         # Given the validity of the cells, return the flattened cell index
         cdef map[long, int].iterator it
@@ -362,4 +356,3 @@ cdef class DictBoxSortNNPS(NNPS):
 
         self.n_cells = <int>len(cells)
         self._cell_keys = list(cells.keys())
-
