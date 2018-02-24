@@ -164,14 +164,15 @@ cdef class CPUDomainManager:
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
 
-    cdef public list pa_wrappers        # NNPS particle array wrappers
-    cdef public int narrays             # number of arrays
-    cdef public double cell_size        # distance to create ghosts
-    cdef public double hmin             # minimum h
-    cdef public bint in_parallel        # Flag to determine if in parallel
-    cdef public double radius_scale     # Radius scale for kernel
+    cdef public list pa_wrappers     # NNPS particle array wrappers
+    cdef public int narrays          # number of arrays
+    cdef public double cell_size     # distance to create ghosts
+    cdef public double hmin          # minimum h
+    cdef public bint in_parallel     # Flag to determine if in parallel
+    cdef public double radius_scale  # Radius scale for kernel
+    cdef public double n_layers      # Number of layers of ghost particles
 
-    cdef double dbl_max                 # Maximum value of double
+    cdef double dbl_max              # Maximum value of double
 
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
