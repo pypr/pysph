@@ -160,8 +160,8 @@ class DensityCorrection(Tool):
             for arr in arrs:
                 lenga = len(arr.x) * n * n
                 lengb = len(arr.x) * n
-                arr.add_constant('a', [0.] * lenga)
-                arr.add_constant('b', [0.] * lengb)
+                arr.add_constant('amls', [0.] * lenga)
+                arr.add_constant('bmls', [0.] * lengb)
                 name = arr.name
             eqns.append(Group(equations=[
                 MLSFirstOrderPreStep2D(name, [name])], real=False))
@@ -186,8 +186,8 @@ class DensityCorrection(Tool):
             for arr in arrs:
                 lenga = len(arr.x) * n * n
                 lengb = len(arr.x) * n
-                arr.add_constant('a', [0.] * lenga)
-                arr.add_constant('b', [0.] * lengb)
+                arr.add_constant('amls', [0.] * lenga)
+                arr.add_constant('bmls', [0.] * lengb)
                 name = arr.name
             eqns.append(Group(equations=[
                 MLSFirstOrderPreStep3D(name, [name])], real=False))
