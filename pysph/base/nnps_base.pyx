@@ -239,16 +239,31 @@ cdef class NNPSParticleArrayWrapper:
 cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
-                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
+                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
+                 double n_layers=2.0):
+        """Constructor
+
+        Parameters
+        ----------
+
+        xmin, xmax, ymin, ymax, zmin, zmax: double: extents of the domain.
+        periodic_in_x, periodic_in_y, periodic_in_z: bool: axis periodicity.
+
+        n_layers: double: number of ghost layers as a multiple of
+            h_max*radius_scale
+        """
         is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
         if get_config().use_opencl and not is_periodic:
             from pysph.base.gpu_domain_manager import GPUDomainManager
             domain_manager = GPUDomainManager
         else:
             domain_manager = CPUDomainManager
-        self.manager = domain_manager(xmin=xmin, xmax=xmax, ymin=ymin,
-                ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
-                periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z)
+        self.manager = domain_manager(
+            xmin=xmin, xmax=xmax, ymin=ymin,
+            ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
+            periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z,
+            n_layers=n_layers
+        )
 
     def set_pa_wrappers(self, wrappers):
         self.manager.set_pa_wrappers(wrappers)
@@ -292,8 +307,14 @@ cdef class CPUDomainManager:
     """
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
-                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False):
-        """Constructor"""
+                 periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
+                 double n_layers=2.0):
+        """Constructor
+
+        The n_layers argument specifies the number of ghost layers as multiples
+        of hmax*radius_scale.
+
+        """
         self._check_limits(xmin, xmax, ymin, ymax, zmin, zmax)
 
         self.xmin = xmin; self.xmax = xmax
@@ -305,6 +326,7 @@ cdef class CPUDomainManager:
         self.periodic_in_y = periodic_in_y
         self.periodic_in_z = periodic_in_z
         self.is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
+        self.n_layers = n_layers
 
         # get the translates in each coordinate direction
         self.xtranslate = xmax - xmin
@@ -448,10 +470,10 @@ cdef class CPUDomainManager:
         cdef list pa_wrappers = self.pa_wrappers
         cdef int narrays = self.narrays
 
-        # cell size used to check for periodic ghosts. For summation
-        # density like operations, we need to create two layers of
-        # ghost images.
-        cdef double cell_size = 2.0 * self.cell_size
+        # cell size used to check for periodic ghosts. For summation density
+        # like operations, we need to create two layers of ghost images, this
+        # is configurable via the n_layers argument to the constructor.
+        cdef double cell_size = self.n_layers * self.cell_size
 
         # periodic domain values
         cdef double xmin = self.xmin, xmax = self.xmax

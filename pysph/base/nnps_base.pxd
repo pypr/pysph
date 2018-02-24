@@ -109,6 +109,7 @@ cdef inline long flatten(cIntPoint cid, IntArray ncells_per_dim, int dim) nogil:
 cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
         int* ncells_per_dim, int dim, int n_cells) nogil:
     """Return the flattened index for a valid cell"""
+    cdef long ncx = ncells_per_dim[0]
     cdef long ncy = ncells_per_dim[1]
     cdef long ncz = ncells_per_dim[2]
 
@@ -116,15 +117,9 @@ cdef inline long get_valid_cell_index(int cid_x, int cid_y, int cid_z,
 
     # basic test for valid indices. Since we bin the particles with
     # respect to the origin, negative indices can never occur.
-    cdef bint is_valid = (cid_x > -1) and (cid_y > -1) and (cid_z > -1)
-
-    # additional check for 1D. This is because we search in all 26
-    # neighboring cells for neighbors. In 1D this can be problematic
-    # since (ncy = ncz = 0) which means (ncy=1 or ncz=1) will also
-    # result in a valid cell with a flattened index < ncells
-    if dim == 1:
-        if ( (cid_y > ncy) or (cid_z > ncz) ):
-            is_valid = False
+    cdef bint is_valid = (
+        (ncx > cid_x > -1) and (ncy > cid_y > -1) and (ncz > cid_z > -1)
+    )
 
     # Given the validity of the cells, return the flattened cell index
     if is_valid:
@@ -169,14 +164,15 @@ cdef class CPUDomainManager:
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
 
-    cdef public list pa_wrappers        # NNPS particle array wrappers
-    cdef public int narrays             # number of arrays
-    cdef public double cell_size        # distance to create ghosts
-    cdef public double hmin             # minimum h
-    cdef public bint in_parallel        # Flag to determine if in parallel
-    cdef public double radius_scale     # Radius scale for kernel
+    cdef public list pa_wrappers     # NNPS particle array wrappers
+    cdef public int narrays          # number of arrays
+    cdef public double cell_size     # distance to create ghosts
+    cdef public double hmin          # minimum h
+    cdef public bint in_parallel     # Flag to determine if in parallel
+    cdef public double radius_scale  # Radius scale for kernel
+    cdef public double n_layers      # Number of layers of ghost particles
 
-    cdef double dbl_max                 # Maximum value of double
+    cdef double dbl_max              # Maximum value of double
 
     # remove ghost particles from a previous iteration
     cdef _remove_ghosts(self)
