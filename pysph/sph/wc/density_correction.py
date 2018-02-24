@@ -85,40 +85,55 @@ def gj_Solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
         result[i] = m[i][n]
 
 
-class ShepardFilterPreStep(Equation):
+class ShepardFilter(Equation):
     r"""**Shepard Filter density reinitialization**
     This is a zeroth order density reinitialization
 
     .. math::
             \tilde{W_{ab}} = \frac{W_{ab}}{\sum_{b} W_{ab}\frac{m_{b}}
             {\rho_{b}}}
+
+    .. math::
+            \rho_{a} = \sum_{b} \m_{b}\tilde{W_{ab}}
+
     References
     ----------
     .. [Panizzo, 2004] Panizzo, Physical and Numerical Modelling of
         Subaerial Landslide Generated Waves, PhD thesis.
     """
 
-    def initialize(self, d_idx, d_tmp_w):
-        d_tmp_w[d_idx] = 0.0
+    def initialize(self, d_idx, d_rho, d_rhotmp):
+        d_rhotmp[d_idx] = d_rho[d_idx]
 
-    def loop(self, d_idx, d_tmp_w, s_m, s_rho, s_idx, WIJ):
-        d_tmp_w[d_idx] += WIJ * s_m[s_idx] / s_rho[s_idx]
-
-
-class ShepardFilter(Equation):
-    r"""
-    .. math::
-            \rho_{a} = \sum_{b} \m_{b}\tilde{W_{ab}}
-    """
-
-    def initialize(self, d_idx, d_rho):
+    def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_m, s_rhotmp, s_x, s_y,
+                 s_z, s_h, KERNEL, NBRS, N_NBRS):
+        i = declare('int')
+        s_idx = declare('long')
+        xij = declare('matrix((3,))')
+        tmp_w = 0.0
+        x = d_x[d_idx]
+        y = d_y[d_idx]
+        z = d_z[d_idx]
+        for i in range(N_NBRS):
+            s_idx = NBRS[i]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            tmp_w += wij * s_m[s_idx] / s_rhotmp[s_idx]
         d_rho[d_idx] = 0.0
+        for i in range(N_NBRS):
+            s_idx = NBRS[i]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            d_rho[d_idx] += wij * s_m[s_idx] / tmp_w
 
-    def loop(self, s_idx, d_idx, s_m, d_tmp_w, d_rho, WIJ):
-        d_rho[d_idx] += WIJ * s_m[s_idx] / d_tmp_w[d_idx]
 
-
-class MLSFirstOrderPreStep2D(Equation):
+class MLSFirstOrder2D(Equation):
     r"""**Moving Least Squares density reinitialization**
     This is a first order density reinitialization
 
@@ -142,6 +157,9 @@ class MLSFirstOrderPreStep2D(Equation):
 
     .. math::
             p = \left[1 x_{a}-x_{b} y_{a}-y_{b}\right]^{T}
+
+    .. math::
+            \rho_{a} = \sum_{b} \m_{b}W_{ab}^{MLS}
     References
     ----------
     .. [Dilts, 1999] Dilts, G. A. Moving-Least-Squares-Particle
@@ -152,127 +170,116 @@ class MLSFirstOrderPreStep2D(Equation):
     def _get_helpers_(self):
         return [gj_Solve]
 
-    def initialize(self, d_idx, d_amls):
-        n = declare('int')
-        n = 3
-        i = declare('int')
-        for i in range(n * n):
-            d_amls[n * n * d_idx + i] = 0.0
+    def initialize(self, d_idx, d_rho, d_rhotmp):
+        d_rhotmp[d_idx] = d_rho[d_idx]
 
-    def loop(self, s_idx, d_idx, d_amls, s_m, s_rho, WIJ, XIJ):
+    def loop_all(self, d_idx, d_rho, d_x, d_y, s_x, s_y, s_h, s_m, s_rhotmp,
+                 KERNEL, NBRS, N_NBRS):
         n = declare('int')
         n = 3
         i = declare('int')
         j = declare('int')
+        k = declare('long')
+        s_idx = declare('int')
+        amls = declare('matrix((9,))')
+        x = d_x[d_idx]
+        y = d_y[d_idx]
+        xij = declare('matrix((3,))')
         for i in range(n):
-            if i == 0:
-                fac1 = 1.0
-            else:
-                fac1 = XIJ[i - 1]
             for j in range(n):
-                if j == 0:
-                    fac2 = 1.0
+                amls[n * i + j] = 0.0
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = 0.
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            for i in range(n):
+                if i == 0:
+                    fac1 = 1.0
                 else:
-                    fac2 = XIJ[j - 1]
-                d_amls[n * n * d_idx + n * i + j] += fac1 * \
-                    fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
-
-    def post_loop(self, d_idx, d_amls, d_bmls):
-        a = declare('matrix((9, ))')
-        i = declare('int')
-        j = declare('int')
-        n = declare('int')
-        n = 3
-        for i in range(n):
-            for j in range(n):
-                a[n * i + j] = d_amls[n * n * d_idx + n * i + j]
+                    fac1 = xij[i - 1]
+                for j in range(n):
+                    if j == 0:
+                        fac2 = 1.0
+                    else:
+                        fac2 = xij[j - 1]
+                    amls[n * i + j] += fac1 * fac2 * \
+                        s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix((3,))')
-        res[0] = 1.0
-        for i in range(1, n):
-            res[i] = 0.0
-        gj_Solve(a, [1., 0., 0.], n, res)
-        d_bmls[n * d_idx] = res[0]
-        d_bmls[n * d_idx + 1] = res[1]
-        d_bmls[n * d_idx + 2] = res[2]
+        gj_Solve(amls, [1., 0., 0.], n, res)
+        b0 = res[0]
+        b1 = res[1]
+        b2 = res[2]
+        d_rho[d_idx] = 0.0
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = 0.
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            wmls = (b0 + b1 * xij[0] + b2 * xij[1]) * wij
+            d_rho[d_idx] += s_m[s_idx] * wmls
 
 
-class MLSFirstOrderPreStep3D(Equation):
+class MLSFirstOrder3D(Equation):
 
     def _get_helpers_(self):
         return [gj_Solve]
 
-    def initialize(self, d_idx, d_amls):
-        n = declare('int')
-        n = 4
-        i = declare('int')
-        for i in range(n * n):
-            d_amls[n * n * d_idx + i] = 0.0
+    def initialize(self, d_idx, d_rho, d_rhotmp):
+        d_rhotmp[d_idx] = d_rho[d_idx]
 
-    def loop(self, s_idx, d_idx, d_amls, s_m, s_rho, WIJ, XIJ):
+    def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_x, s_y, s_z, s_h, s_m,
+                 s_rhotmp, KERNEL, NBRS, N_NBRS):
         n = declare('int')
         n = 4
         i = declare('int')
         j = declare('int')
+        k = declare('long')
+        s_idx = declare('int')
+        amls = declare('matrix((16,))')
+        x = d_x[d_idx]
+        y = d_y[d_idx]
+        z = d_z[d_idx]
+        xij = declare('matrix((4,))')
         for i in range(n):
-            if i == 0:
-                fac1 = 1.0
-            else:
-                fac1 = XIJ[i - 1]
             for j in range(n):
-                if j == 0:
-                    fac2 = 1.0
+                amls[n * i + j] = 0.0
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            for i in range(n):
+                if i == 0:
+                    fac1 = 1.0
                 else:
-                    fac2 = XIJ[j - 1]
-                d_amls[n * n * d_idx + n * i + j] += fac1 * \
-                    fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
-
-    def post_loop(self, d_idx, d_amls, d_bmls):
-        a = declare('matrix((16, ))')
-        i = declare('int')
-        j = declare('int')
-        n = declare('int')
-        n = 4
-        for i in range(n):
-            for j in range(n):
-                a[n * i + j] = d_amls[n * n * d_idx + n * i + j]
+                    fac1 = xij[i - 1]
+                for j in range(n):
+                    if j == 0:
+                        fac2 = 1.0
+                    else:
+                        fac2 = xij[j - 1]
+                    amls[n * i + j] += fac1 * fac2 * \
+                        s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix((4,))')
-        res[0] = 1.0
-        for i in range(1, n):
-            res[i] = 0.0
-        gj_Solve(a, [1., 0., 0., 0.], n, res)
-        d_bmls[n * d_idx] = res[0]
-        d_bmls[n * d_idx + 1] = res[1]
-        d_bmls[n * d_idx + 2] = res[2]
-        d_bmls[n * d_idx + 3] = res[3]
-
-
-class MLSFirstOrder(Equation):
-    r"""
-    .. math::
-            \rho_{a} = \sum_{b} \m_{b}W_{ab}^{MLS}
-    """
-
-    def __init__(self, dest, sources, dim):
-        if dim == 2:
-            self.n = 3
-        elif dim == 3:
-            self.n = 4
-
-        super(MLSFirstOrder, self).__init__(dest, sources)
-
-    def initialize(self, d_rho, d_idx):
+        gj_Solve(amls, [1., 0., 0., 0.], n, res)
+        b0 = res[0]
+        b1 = res[1]
+        b2 = res[2]
+        b3 = res[3]
         d_rho[d_idx] = 0.0
-
-    def loop(self, d_bmls, d_rho, d_idx, s_idx, s_m, XIJ, WIJ):
-        n = declare('int')
-        i = declare('int')
-        n = self.n
-        wmls = declare('double')
-        wmls = 0.0
-        for i in range(n):
-            if i == 0:
-                fac = 1.0
-            else:
-                fac = XIJ[i - 1]
-            wmls += d_bmls[n * d_idx + i] * fac * WIJ
-        d_rho[d_idx] += s_m[s_idx] * wmls
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            wmls = (b0 + b1 * xij[0] + b2 * xij[1] + b3 * xij[2]) * wij
+            d_rho[d_idx] += s_m[s_idx] * wmls
