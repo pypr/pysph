@@ -126,21 +126,17 @@ class DensityCorrection(Tool):
         assert self.corr in options, 'corr should be one of %s' % options
 
     def _get_sph_eval_shepard(self):
-        from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
-                                                     ShepardFilter)
+        from pysph.sph.wc.density_correction import ShepardFilter
         from pysph.tools.sph_evaluator import SPHEvaluator
         from pysph.sph.equation import Group
         if self._sph_eval is None:
             arrs = self.arrs
             eqns = []
             for arr in arrs:
-                arr.add_property('tmp_w')
                 name = arr.name
+                arr.add_property('rhotmp')
                 eqns.append(Group(equations=[
-                    ShepardFilterPreStep(dest=name, sources=[name])],
-                    real=False))
-                eqns.append(Group(equations=[
-                    ShepardFilter(dest=name, sources=[name])], real=False))
+                            ShepardFilter(name, [name])], real=False))
             sph_eval = SPHEvaluator(
                 arrays=arrs, equations=eqns, dim=self.dim,
                 kernel=self.kernel(dim=self.dim))
@@ -149,24 +145,17 @@ class DensityCorrection(Tool):
             return self._sph_eval
 
     def _get_sph_eval_mls2d_1(self):
+        from pysph.sph.wc.density_correction import MLSFirstOrder2D
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.equation import Group
         if self._sph_eval is None:
-            from pysph.sph.wc.density_correction import (
-                MLSFirstOrderPreStep2D, MLSFirstOrder)
-            from pysph.tools.sph_evaluator import SPHEvaluator
-            from pysph.sph.equation import Group
             arrs = self.arrs
             eqns = []
-            n = 3
             for arr in arrs:
-                lenga = len(arr.x) * n * n
-                lengb = len(arr.x) * n
-                arr.add_constant('amls', [0.] * lenga)
-                arr.add_constant('bmls', [0.] * lengb)
                 name = arr.name
-            eqns.append(Group(equations=[
-                MLSFirstOrderPreStep2D(name, [name])], real=False))
-            eqns.append(Group(equations=[
-                MLSFirstOrder(name, [name], self.dim)], real=False))
+                arr.add_property('rhotmp')
+                eqns.append(Group(equations=[
+                            MLSFirstOrder2D(name, [name])], real=False))
             sph_eval = SPHEvaluator(
                 arrays=arrs, equations=eqns, dim=self.dim,
                 kernel=self.kernel(dim=self.dim))
@@ -175,24 +164,17 @@ class DensityCorrection(Tool):
             return self._sph_eval
 
     def _get_sph_eval_mls3d_1(self):
+        from pysph.sph.wc.density_correction import MLSFirstOrder3D
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.equation import Group
         if self._sph_eval is None:
-            from pysph.sph.wc.density_correction import (
-                MLSFirstOrderPreStep3D, MLSFirstOrder)
-            from pysph.tools.sph_evaluator import SPHEvaluator
-            from pysph.sph.equation import Group
             arrs = self.arrs
             eqns = []
-            n = 4
             for arr in arrs:
-                lenga = len(arr.x) * n * n
-                lengb = len(arr.x) * n
-                arr.add_constant('amls', [0.] * lenga)
-                arr.add_constant('bmls', [0.] * lengb)
                 name = arr.name
-            eqns.append(Group(equations=[
-                MLSFirstOrderPreStep3D(name, [name])], real=False))
-            eqns.append(Group(equations=[
-                MLSFirstOrder(name, [name], self.dim)], real=False))
+                arr.add_property('rhotmp')
+                eqns.append(Group(equations=[
+                            MLSFirstOrder3D(name, [name])], real=False))
             sph_eval = SPHEvaluator(
                 arrays=arrs, equations=eqns, dim=self.dim,
                 kernel=self.kernel(dim=self.dim))
