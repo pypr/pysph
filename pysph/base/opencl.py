@@ -195,7 +195,7 @@ class DeviceArray(object):
                 "unsigned int* indices",
                 scan_kernel=GenericScanKernel, key_expr="indices[i]",
                 sort_arg_names=["indices"]
-                )
+            )
 
             (sorted_indices,), event = radix_sort(indices)
 
@@ -203,7 +203,7 @@ class DeviceArray(object):
             sorted_indices = indices
 
         args = "uint* indices, %(dtype)s* array, uint length" % \
-                {"dtype" : cl.tools.dtype_to_ctype(self.dtype)}
+            {"dtype": cl.tools.dtype_to_ctype(self.dtype)}
         src = REMOVE_KNL.render()
         remove = get_elwise_kernel("remove", args, src)
 
@@ -374,7 +374,7 @@ class DeviceHelper(object):
 
         num_particles = self.get_number_of_particles()
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
-                dtype=np.uint32)
+                                  dtype=np.uint32)
 
         radix_sort = cl.algorithm.RadixSort(
             self._ctx,
@@ -383,7 +383,7 @@ class DeviceHelper(object):
             sort_arg_names=["indices"]
         )
 
-        (sorted_indices,), event = radix_sort(indices, tag_arr)
+        (sorted_indices,), event = radix_sort(indices, tag_arr, key_bits=2)
         self.align(sorted_indices)
 
         tag_arr = self._data['tag'].array
@@ -391,7 +391,8 @@ class DeviceHelper(object):
         num_real_particles = cl.array.zeros(self._queue, 1, np.uint32)
         args = "uint* tag_array, uint* num_real_particles"
         src = NUM_REAL_PARTICLES_KNL.render()
-        get_num_real_particles = get_elwise_kernel("get_num_real_particles", args, src)
+        get_num_real_particles = get_elwise_kernel(
+            "get_num_real_particles", args, src)
 
         get_num_real_particles(tag_arr, num_real_particles)
         self.num_real_particles = int(num_real_particles.get())
@@ -399,9 +400,9 @@ class DeviceHelper(object):
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
-        We repeatedly interchange the values of the last element and values from
-        the index_list and reduce the size of the array by one. This is done for
-        every property that is being maintained.
+        We repeatedly interchange the values of the last element and
+        values from the index_list and reduce the size of the array
+        by one. This is done for every property that is being maintained.
 
         Parameters
         ----------
@@ -434,7 +435,7 @@ class DeviceHelper(object):
             "unsigned int* indices",
             scan_kernel=GenericScanKernel, key_expr="indices[i]",
             sort_arg_names=["indices"]
-            )
+        )
 
         (sorted_indices,), event = radix_sort(indices)
 
@@ -530,8 +531,8 @@ class DeviceHelper(object):
     def extend(self, num_particles):
         """ Increase the total number of particles by the requested amount
 
-        New particles are added at the end of the list, you may have to manually
-        call align_particles later.
+        New particles are added at the end of the list, you may
+        have to manually call align_particles later.
         """
         if num_particles <= 0:
             return
