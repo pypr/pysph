@@ -371,7 +371,8 @@ class CythonGenerator(object):
         """
         if '=' in line:
             words = [x.strip() for x in line.split('=')]
-            if words[1].startswith('declare'):
+            if words[1].startswith('declare') and \
+               not line.strip().startswith('#'):
                 name = words[0]
                 declare = words[1]
                 defn = self._handle_declare_statement(name, declare)
