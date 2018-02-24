@@ -417,6 +417,14 @@ class CConverter(ast.NodeVisitor):
             )
         return code
 
+    def visit_IfExp(self, node):
+        code = '{cond} ? {true} : {false}'.format(
+            cond=self.visit(node.test),
+            true=self.visit(node.body),
+            false=self.visit(node.orelse)
+        )
+        return code
+
     def visit_Is(self, node):
         return '=='
 
