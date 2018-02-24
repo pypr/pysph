@@ -11,8 +11,13 @@ def declare(s):
 
 
 def gj_Solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
-    """ A gauss-jordan method to solve an augmented matrix for the
+    r""" A gauss-jordan method to solve an augmented matrix for the
         unknown variables, x, in Ax = b.
+
+    References
+    ----------
+    https://ricardianambivalence.com/2012/10/20/pure-python-gauss-jordan
+    -solve-ax-b-invert-a/
     """
 
     i = declare('int')
@@ -136,7 +141,7 @@ class MLSFirstOrderPreStep2D(Equation):
     where
 
     .. math::
-            p = \left[1 x y\right]^{T}
+            p = \left[1 x_{a}-x_{b} y_{a}-y_{b}\right]^{T}
     References
     ----------
     .. [Dilts, 1999] Dilts, G. A. Moving-Least-Squares-Particle
@@ -147,14 +152,14 @@ class MLSFirstOrderPreStep2D(Equation):
     def _get_helpers_(self):
         return [gj_Solve]
 
-    def initialize(self, d_idx, d_a):
+    def initialize(self, d_idx, d_amls):
         n = declare('int')
         n = 3
         i = declare('int')
         for i in range(n * n):
-            d_a[n * n * d_idx + i] = 0.0
+            d_amls[n * n * d_idx + i] = 0.0
 
-    def loop(self, s_idx, d_idx, d_a, s_m, s_rho, WIJ, XIJ):
+    def loop(self, s_idx, d_idx, d_amls, s_m, s_rho, WIJ, XIJ):
         n = declare('int')
         n = 3
         i = declare('int')
@@ -169,10 +174,10 @@ class MLSFirstOrderPreStep2D(Equation):
                     fac2 = 1.0
                 else:
                     fac2 = XIJ[j - 1]
-                d_a[n * n * d_idx + n * i + j] += fac1 * \
+                d_amls[n * n * d_idx + n * i + j] += fac1 * \
                     fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
 
-    def post_loop(self, d_idx, s_idx, d_a, d_b):
+    def post_loop(self, d_idx, d_amls, d_bmls):
         a = declare('matrix((9, ))')
         i = declare('int')
         j = declare('int')
@@ -180,15 +185,15 @@ class MLSFirstOrderPreStep2D(Equation):
         n = 3
         for i in range(n):
             for j in range(n):
-                a[n * i + j] = d_a[n * n * d_idx + n * i + j]
+                a[n * i + j] = d_amls[n * n * d_idx + n * i + j]
         res = declare('matrix((3,))')
         res[0] = 1.0
         for i in range(1, n):
             res[i] = 0.0
         gj_Solve(a, [1., 0., 0.], n, res)
-        d_b[n * d_idx] = res[0]
-        d_b[n * d_idx + 1] = res[1]
-        d_b[n * d_idx + 2] = res[2]
+        d_bmls[n * d_idx] = res[0]
+        d_bmls[n * d_idx + 1] = res[1]
+        d_bmls[n * d_idx + 2] = res[2]
 
 
 class MLSFirstOrderPreStep3D(Equation):
@@ -196,14 +201,14 @@ class MLSFirstOrderPreStep3D(Equation):
     def _get_helpers_(self):
         return [gj_Solve]
 
-    def initialize(self, d_idx, d_a):
+    def initialize(self, d_idx, d_amls):
         n = declare('int')
         n = 4
         i = declare('int')
         for i in range(n * n):
-            d_a[n * n * d_idx + i] = 0.0
+            d_amls[n * n * d_idx + i] = 0.0
 
-    def loop(self, s_idx, d_idx, d_a, s_m, s_rho, WIJ, XIJ):
+    def loop(self, s_idx, d_idx, d_amls, s_m, s_rho, WIJ, XIJ):
         n = declare('int')
         n = 4
         i = declare('int')
@@ -218,10 +223,10 @@ class MLSFirstOrderPreStep3D(Equation):
                     fac2 = 1.0
                 else:
                     fac2 = XIJ[j - 1]
-                d_a[n * n * d_idx + n * i + j] += fac1 * \
+                d_amls[n * n * d_idx + n * i + j] += fac1 * \
                     fac2 * WIJ * s_m[s_idx] / s_rho[s_idx]
 
-    def post_loop(self, d_idx, s_idx, d_a, d_b):
+    def post_loop(self, d_idx, d_amls, d_bmls):
         a = declare('matrix((16, ))')
         i = declare('int')
         j = declare('int')
@@ -229,16 +234,16 @@ class MLSFirstOrderPreStep3D(Equation):
         n = 4
         for i in range(n):
             for j in range(n):
-                a[n * i + j] = d_a[n * n * d_idx + n * i + j]
+                a[n * i + j] = d_amls[n * n * d_idx + n * i + j]
         res = declare('matrix((4,))')
         res[0] = 1.0
         for i in range(1, n):
             res[i] = 0.0
         gj_Solve(a, [1., 0., 0., 0.], n, res)
-        d_b[n * d_idx] = res[0]
-        d_b[n * d_idx + 1] = res[1]
-        d_b[n * d_idx + 2] = res[2]
-        d_b[n * d_idx + 3] = res[3]
+        d_bmls[n * d_idx] = res[0]
+        d_bmls[n * d_idx + 1] = res[1]
+        d_bmls[n * d_idx + 2] = res[2]
+        d_bmls[n * d_idx + 3] = res[3]
 
 
 class MLSFirstOrder(Equation):
@@ -258,7 +263,7 @@ class MLSFirstOrder(Equation):
     def initialize(self, d_rho, d_idx):
         d_rho[d_idx] = 0.0
 
-    def loop(self, d_b, d_rho, d_idx, s_idx, s_m, XIJ, WIJ):
+    def loop(self, d_bmls, d_rho, d_idx, s_idx, s_m, XIJ, WIJ):
         n = declare('int')
         i = declare('int')
         n = self.n
@@ -269,5 +274,5 @@ class MLSFirstOrder(Equation):
                 fac = 1.0
             else:
                 fac = XIJ[i - 1]
-            wmls += d_b[n * d_idx + i] * fac * WIJ
+            wmls += d_bmls[n * d_idx + i] * fac * WIJ
         d_rho[d_idx] += s_m[s_idx] * wmls
