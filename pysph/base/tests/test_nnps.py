@@ -18,6 +18,7 @@ from pyzoltan.core.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest
+import pytest
 from pytest import importorskip
 
 
@@ -654,6 +655,33 @@ def test_large_number_of_neighbors_linked_list():
     nps.get_nearest_particles(0, 0, 0, nbrs)
     # print(nbrs.length)
     assert nbrs.length == len(x)
+
+
+nnps_classes = [
+    nnps.BoxSortNNPS,
+    nnps.CellIndexingNNPS,
+    nnps.CompressedOctreeNNPS,
+    nnps.ExtendedSpatialHashNNPS,
+    nnps.LinkedListNNPS,
+    nnps.OctreeNNPS,
+    nnps.SpatialHashNNPS,
+    nnps.StratifiedHashNNPS,
+    nnps.StratifiedSFCNNPS,
+    nnps.ZOrderNNPS
+]
+
+
+@pytest.mark.parametrize("cls", nnps_classes)
+def test_corner_case_1d_few_cells(cls):
+    x, y, z = [0.131, 0.359], [1.544, 1.809], [-3.6489999, -2.8559999]
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=1.0)
+    nbrs = UIntArray()
+    bf_nbrs = UIntArray()
+    nps = cls(dim=3, particles=[pa], radius_scale=0.7)
+    for i in range(2):
+        nps.get_nearest_particles(0, 0, i, nbrs)
+        nps.brute_force_neighbors(0, 0, i, bf_nbrs)
+        assert sorted(nbrs) == sorted(bf_nbrs), 'Failed for particle: %d' % i
 
 
 def test_use_2d_for_1d_data_with_llnps():
