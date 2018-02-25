@@ -1,16 +1,8 @@
-from pysph.sph.equation import Equation
+from pysph.sph.equation import Equation, declare
 import numpy as np
 
 
-def declare(s):
-    if s == 'int':
-        return 0
-    if s[:6] == 'matrix':
-        tup = s[7:-1]
-        return np.zeros(eval(tup))
-
-
-def gj_Solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
+def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
     r""" A gauss-jordan method to solve an augmented matrix for the
         unknown variables, x, in Ax = b.
 
@@ -22,22 +14,22 @@ def gj_Solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
 
     i = declare('int')
     j = declare('int')
+    eqns = declare('int')
+    colrange = declare('int')
+    augCol = declare('int')
+    col = declare('int')
+    row = declare('int')
+    bigrow = declare('int')
     m = declare('matrix((4, 5))')
     for i in range(n):
         for j in range(n):
             m[i][j] = A[n * i + j]
         m[i][n] = b[i]
 
-    eqns = declare('int')
-    colrange = declare('int')
-    augCol = declare('int')
     eqns = n
     colrange = n
     augCol = n + 1
 
-    col = declare('int')
-    row = declare('int')
-    bigrow = declare('int')
     for col in range(colrange):
         bigrow = col
         for row in range(col + 1, colrange):
@@ -106,7 +98,7 @@ class ShepardFilter(Equation):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_m, s_rhotmp, s_x, s_y,
-                 s_z, s_h, KERNEL, NBRS, N_NBRS):
+                 s_z, d_h, s_h, KERNEL, NBRS, N_NBRS):
         i = declare('int')
         s_idx = declare('long')
         xij = declare('matrix((3,))')
@@ -114,14 +106,6 @@ class ShepardFilter(Equation):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
-        for i in range(N_NBRS):
-            s_idx = NBRS[i]
-            xij[0] = x - s_x[s_idx]
-            xij[1] = y - s_y[s_idx]
-            xij[2] = z - s_z[s_idx]
-            rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
-            tmp_w += wij * s_m[s_idx] / s_rhotmp[s_idx]
         d_rho[d_idx] = 0.0
         for i in range(N_NBRS):
             s_idx = NBRS[i]
@@ -129,8 +113,11 @@ class ShepardFilter(Equation):
             xij[1] = y - s_y[s_idx]
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
-            d_rho[d_idx] += wij * s_m[s_idx] / tmp_w
+            hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
+            wij = KERNEL.kernel(xij, rij, hij)
+            tmp_w += wij * s_m[s_idx] / s_rhotmp[s_idx]
+            d_rho[d_idx] += wij * s_m[s_idx]
+        d_rho[d_idx] /= tmp_w
 
 
 class MLSFirstOrder2D(Equation):
@@ -168,18 +155,15 @@ class MLSFirstOrder2D(Equation):
     """
 
     def _get_helpers_(self):
-        return [gj_Solve]
+        return [gj_solve]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
-    def loop_all(self, d_idx, d_rho, d_x, d_y, s_x, s_y, s_h, s_m, s_rhotmp,
-                 KERNEL, NBRS, N_NBRS):
-        n = declare('int')
+    def loop_all(self, d_idx, d_rho, d_x, d_y, s_x, s_y, d_h, s_h, s_m,
+                 s_rhotmp, KERNEL, NBRS, N_NBRS):
+        n, i, j, k = declare('int')
         n = 3
-        i = declare('int')
-        j = declare('int')
-        k = declare('long')
         s_idx = declare('int')
         amls = declare('matrix((9,))')
         x = d_x[d_idx]
@@ -194,7 +178,8 @@ class MLSFirstOrder2D(Equation):
             xij[1] = y - s_y[s_idx]
             xij[2] = 0.
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
+            wij = KERNEL.kernel(xij, rij, hij)
             for i in range(n):
                 if i == 0:
                     fac1 = 1.0
@@ -208,7 +193,7 @@ class MLSFirstOrder2D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix((3,))')
-        gj_Solve(amls, [1., 0., 0.], n, res)
+        gj_solve(amls, [1., 0., 0.], n, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]
@@ -219,7 +204,8 @@ class MLSFirstOrder2D(Equation):
             xij[1] = y - s_y[s_idx]
             xij[2] = 0.
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
+            wij = KERNEL.kernel(xij, rij, hij)
             wmls = (b0 + b1 * xij[0] + b2 * xij[1]) * wij
             d_rho[d_idx] += s_m[s_idx] * wmls
 
@@ -227,18 +213,15 @@ class MLSFirstOrder2D(Equation):
 class MLSFirstOrder3D(Equation):
 
     def _get_helpers_(self):
-        return [gj_Solve]
+        return [gj_solve]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
-    def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_x, s_y, s_z, s_h, s_m,
-                 s_rhotmp, KERNEL, NBRS, N_NBRS):
-        n = declare('int')
+    def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_x, s_y, s_z, d_h, s_h,
+                 s_m, s_rhotmp, KERNEL, NBRS, N_NBRS):
+        n, i, j, k = declare('int')
         n = 4
-        i = declare('int')
-        j = declare('int')
-        k = declare('long')
         s_idx = declare('int')
         amls = declare('matrix((16,))')
         x = d_x[d_idx]
@@ -254,7 +237,8 @@ class MLSFirstOrder3D(Equation):
             xij[1] = y - s_y[s_idx]
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
+            wij = KERNEL.kernel(xij, rij, hij)
             for i in range(n):
                 if i == 0:
                     fac1 = 1.0
@@ -268,7 +252,7 @@ class MLSFirstOrder3D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix((4,))')
-        gj_Solve(amls, [1., 0., 0., 0.], n, res)
+        gj_solve(amls, [1., 0., 0., 0.], n, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]
@@ -280,6 +264,7 @@ class MLSFirstOrder3D(Equation):
             xij[1] = y - s_y[s_idx]
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            wij = KERNEL.kernel(xij, rij, s_h[s_idx])
+            hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
+            wij = KERNEL.kernel(xij, rij, hij)
             wmls = (b0 + b1 * xij[0] + b2 * xij[1] + b3 * xij[2]) * wij
             d_rho[d_idx] += s_m[s_idx] * wmls
