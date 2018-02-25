@@ -209,20 +209,20 @@ writing:
 
 .. code-block:: python
 
-    vec = declare("matrix(3)")
+    vec, vec1 = declare("matrix(3)")
     mat = declare("matrix((3,3))")
-    ii = declare('int')
+    i, j = declare('int')
 
 When the Cython code is generated, this gets translated to:
 
 .. code-block:: cython
 
-    cdef double[3] vec
-    cdef double[3][3] mat
-    cdef int ii
+    cdef double vec[3], vec1[3]
+    cdef double mat[3][3]
+    cdef int i, j
 
 One can also declare any valid c-type using the same approach, for example if
-one desires a ``long`` data type, one may use ``ii = declare("long")``.
+one desires a ``long`` data type, one may use ``i = declare("long")``.
 
 Writing the reduce method
 -------------------------
@@ -283,7 +283,7 @@ perform what the ``loop`` method usually does ourselves.
        def initialize(self, d_idx, d_rho):
            d_rho[d_idx] = 0.0
 
-       def loop_all(self, d_idx, d_x, d_y, d_z, d_rho,
+       def loop_all(self, d_idx, d_x, d_y, d_z, d_rho, d_h,
                     s_m, s_x, s_y, s_z, s_h,
                     KERNEL, NBRS, N_NBRS):
            i = declare('int')
@@ -297,7 +297,7 @@ perform what the ``loop`` method usually does ourselves.
                xij[1] = d_y[d_idx] - s_y[s_idx]
                xij[2] = d_z[d_idx] - s_z[s_idx]
                rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
-               sum += s_m[s_idx]*KERNEL.kernel(xij, rij, s_h[s_idx])
+               sum += s_m[s_idx]*KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
            d_rho[d_idx] += sum
 
 This seems a bit complex but let us look at what is being done. ``initialize``
