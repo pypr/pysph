@@ -265,7 +265,10 @@ class CythonGenerator(object):
     def _get_method_body(self, meth, lines, indent=' '*8):
         args = set(inspect.getargspec(meth).args)
         src = [self._process_body_line(line) for line in lines]
-        declared = [x[0] for x in src if len(x[0]) > 0]
+        declared = []
+        for names, defn in src:
+            if names:
+                declared.extend(x.strip() for x in names.split(','))
         cython_body = ''.join([x[1] for x in src])
         body = ''.join(lines)
         dedented_body = dedent(body)
