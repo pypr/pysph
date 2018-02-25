@@ -343,7 +343,8 @@ class CythonGenerator(object):
         code = declare[9:-2]
         if code.startswith('matrix'):
             sz = matrix(eval(code[7:-1]))
-            defn = 'cdef double %s%s' % (name, sz)
+            vars = ['%s%s' % (x.strip(), sz) for x in name.split(',')]
+            defn = 'cdef double %s' % ', '.join(vars)
             return defn
         else:
             defn = 'cdef {type} {name}'.format(type=code, name=name)

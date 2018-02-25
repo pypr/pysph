@@ -172,13 +172,16 @@ class CConverter(ast.NodeVisitor):
 
         return ', '.join(call_sig)
 
-    def _get_variable_declaration(self, type_str, name):
+    def _get_variable_declaration(self, type_str, names):
         if type_str.startswith('matrix'):
             shape = ast.literal_eval(type_str[7:-1])
+            if not isinstance(shape, tuple):
+                shape = (shape,)
             sz = ''.join('[%d]' % x for x in shape)
-            return 'double %s%s;' % (name, sz)
+            vars = ['%s%s' % (x, sz) for x in names]
+            return 'double %s;' % ', '.join(vars)
         else:
-            return '%s %s;' % (type_str, name)
+            return '%s %s;' % (type_str, ', '.join(names))
 
     def _indent_block(self, code):
         lines = code.splitlines()
@@ -247,8 +250,14 @@ class CConverter(ast.NodeVisitor):
             if not isinstance(right.args[0], ast.Str):
                 self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
-            self._known.add(left.id)
-            return self._get_variable_declaration(type, self.visit(left))
+            if isinstance(left, ast.Name):
+                self._known.add(left.id)
+                return self._get_variable_declaration(type, [self.visit(left)])
+            elif isinstance(left, ast.Tuple):
+                names = [x.id for x in left.elts]
+                self._known.update(names)
+                return self._get_variable_declaration(type, names)
+
         return '%s = %s;' % (self.visit(left), self.visit(right))
 
     def visit_Attribute(self, node):
