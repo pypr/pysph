@@ -40,13 +40,13 @@ class EqWithMatrix:
     def func(self, d_idx, d_x=[0.0, 0.0]):
         mat = declare('matrix((2,2))')
         mat[0][0] = d_x[d_idx]
-        vec = declare('matrix((3,))')
+        vec, vec1 = declare('matrix((3,))')
         vec[0] = d_x[d_idx]
 
 
 class EqWithDeclare:
     def func(self, d_idx, d_x=[0.0, 0.0]):
-        val = declare('float')
+        val, val1 = declare('float')
         # val1 = declare('double')
         val = d_x[d_idx]
         index = declare('unsigned int')
@@ -261,7 +261,7 @@ class TestCythonCodeGenerator(TestBase):
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double mat[2][2]
                 mat[0][0] = d_x[d_idx]
-                cdef double vec[3]
+                cdef double vec[3], vec1[3]
                 vec[0] = d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -276,7 +276,7 @@ class TestCythonCodeGenerator(TestBase):
                     setattr(self, key, value)
 
             cdef inline void func(self, long d_idx, double* d_x):
-                cdef float val
+                cdef float val, val1
                 # val1 = declare('double')
                 val = d_x[d_idx]
                 cdef unsigned int index
