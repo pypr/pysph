@@ -209,7 +209,7 @@ writing:
 
 .. code-block:: python
 
-    vec, vec1 = declare("matrix(3)")
+    vec, vec1 = declare("matrix(3)", 2)
     mat = declare("matrix((3,3))")
     i, j = declare('int')
 
@@ -223,6 +223,30 @@ When the Cython code is generated, this gets translated to:
 
 One can also declare any valid c-type using the same approach, for example if
 one desires a ``long`` data type, one may use ``i = declare("long")``.
+
+Note that the additional (optional) argument in the declare specifies the
+number of variables. While this is ignored during transpilation, this is
+useful when writing functions in pure Python, the
+:py:func:`pysph.base.cython_generator.declare` function provides a pure Python
+implementation of this so that the code works both when compiled as well as
+when run from pure Python. For example::
+
+.. code-block:: python
+
+   i, j = declare("int", 2)
+
+In this case, the declare function call returns two integers so that the code
+runs correctly in pure Python also. The second argument is optional and
+defaults to 1. If we defined a matrix, then this returns two NumPy arrays of
+the appropriate shape.
+
+.. code-block:: python
+
+   >>> declare("matrix(2)", 2)
+   (array([ 0.,  0.]), array([ 0.,  0.]))
+
+Thus the code one writes can be used in pure Python and can also be safely
+transpiled into other languages.
 
 Writing the reduce method
 -------------------------
