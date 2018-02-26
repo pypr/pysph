@@ -33,13 +33,6 @@ def camel_to_underscore(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
-def declare(type):
-    if type.startswith('matrix'):
-        return numpy.zeros(eval(type[7:-1]))
-    else:
-        return 0
-
-
 ##############################################################################
 # `Context` class.
 ##############################################################################

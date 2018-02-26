@@ -5,16 +5,18 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+import ast
 try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
 import inspect
 import logging
-from mako.template import Template
 from textwrap import dedent
 import types
 
+from mako.template import Template
+import numpy
 
 from pysph.base.ast_utils import get_assigned, has_return
 from pysph.base.config import get_config
@@ -76,12 +78,65 @@ def all_numeric(seq):
     return all(type(x) in types for x in seq)
 
 
+def _declare(type):
+    if type.startswith('matrix'):
+        return numpy.zeros(eval(type[7:-1]))
+    elif type in ['double', 'float']:
+        return 0.0
+    else:
+        return 0
+
+
+def declare(type, num=1):
+    """Declare the variable to be of the given type.
+
+    The additional optional argument num is the number of items to return.
+
+    Normally, the declare function only defines a variable when compiled,
+    however, this function here is a pure Python implementation so that the
+    same code can be executed in Python.
+
+    Parameters
+    ----------
+
+    type: str: String representing the type.
+    num: int: the number of values to return
+
+    Examples
+    --------
+
+    >>> declare('int')
+    0
+    >>> declare('int', 3)
+    0, 0, 0
+    """
+    if num == 1:
+        return _declare(type)
+    else:
+        return tuple(_declare(type) for i in range(num))
+
+
 class CodeGenerationError(Exception):
     pass
 
 
 class Undefined(object):
     pass
+
+
+def parse_declare(code):
+    """Given a string with the source for the declare method,
+    return the type.
+    """
+    m = ast.parse(code)
+    call = m.body[0].value
+    if call.func.id != 'declare':
+        raise CodeGenerationError('Unknown declare statement: %s' % code)
+    arg0 = call.args[0]
+    if not isinstance(arg0, ast.Str):
+        err = 'Type should be a string, given :%r' % arg0.s
+        raise CodeGenerationError(err)
+    return arg0.s
 
 
 class KnownType(object):
@@ -336,11 +391,13 @@ class CythonGenerator(object):
 
     def _handle_declare_statement(self, name, declare):
         def matrix(size):
+            if not isinstance(size, tuple):
+                size = (size,)
             sz = ''.join(['[%d]' % n for n in size])
             return sz
 
         # Remove the "declare('" and the trailing "')".
-        code = declare[9:-2]
+        code = parse_declare(declare)
         if code.startswith('matrix'):
             sz = matrix(eval(code[7:-1]))
             vars = ['%s%s' % (x.strip(), sz) for x in name.split(',')]

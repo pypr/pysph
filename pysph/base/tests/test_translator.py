@@ -775,8 +775,8 @@ def test_declare_matrix():
 def test_declare_call_declares_multiple_variables():
     # Given
     src = dedent('''
-    x, y = declare('int')
-    u, v = declare('matrix(3)')
+    x, y = declare('int', 2)
+    u, v = declare('matrix(3)', 2)
     ''')
 
     # When

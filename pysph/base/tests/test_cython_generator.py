@@ -3,14 +3,11 @@
 import unittest
 from textwrap import dedent
 from math import pi, sin
+import numpy as np
 
 from pysph.base.config import get_config, set_config
 from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
-                                         KnownType, all_numeric)
-
-
-def declare(*args):
-    pass
+                                         KnownType, all_numeric, declare)
 
 
 class BasicEq:
@@ -40,13 +37,13 @@ class EqWithMatrix:
     def func(self, d_idx, d_x=[0.0, 0.0]):
         mat = declare('matrix((2,2))')
         mat[0][0] = d_x[d_idx]
-        vec, vec1 = declare('matrix((3,))')
+        vec, vec1 = declare('matrix(3)', 2)
         vec[0] = d_x[d_idx]
 
 
 class EqWithDeclare:
     def func(self, d_idx, d_x=[0.0, 0.0]):
-        val, val1 = declare('float')
+        val, val1 = declare('float', 2)
         # val1 = declare('double')
         val = d_x[d_idx]
         index = declare('unsigned int')
@@ -117,6 +114,27 @@ class TestMiscUtils(TestBase):
                 return x+1
         """)
         self.assert_code_equal(c.generate().strip(), expect.strip())
+
+    def test_declare(self):
+        self.assertEqual(declare('int'), 0)
+        self.assertEqual(declare('long'), 0)
+        self.assertEqual(declare('double'), 0.0)
+        self.assertEqual(declare('float'), 0.0)
+
+        self.assertEqual(declare('int', 2), (0, 0))
+        self.assertEqual(declare('long', 3), (0, 0, 0))
+        self.assertEqual(declare('double', 2), (0.0, 0.0))
+        self.assertEqual(declare('float', 3), (0.0, 0.0, 0.0))
+
+        res = declare('matrix(3)')
+        self.assertTrue(np.all(res == np.zeros(3)))
+        res = declare('matrix(3)', 3)
+        for i in range(3):
+            self.assertTrue(np.all(res[0] == np.zeros(3)))
+        res = declare('matrix((3,))')
+        self.assertTrue(np.all(res == np.zeros(3)))
+        res = declare('matrix((3, 3))')
+        self.assertTrue(np.all(res == np.zeros((3, 3))))
 
 
 class TestCythonCodeGenerator(TestBase):
