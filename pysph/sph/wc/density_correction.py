@@ -1,4 +1,5 @@
-from pysph.sph.equation import Equation, declare
+from pysph.sph.equation import Equation
+from pysph.base.cython_generator import declare
 import numpy as np
 
 
@@ -12,14 +13,7 @@ def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
     -solve-ax-b-invert-a/
     """
 
-    i = declare('int')
-    j = declare('int')
-    eqns = declare('int')
-    colrange = declare('int')
-    augCol = declare('int')
-    col = declare('int')
-    row = declare('int')
-    bigrow = declare('int')
+    i, j, eqns, colrange, augCol, col, row, bigrow = declare('int', 8)
     m = declare('matrix((4, 5))')
     for i in range(n):
         for j in range(n):
@@ -39,22 +33,14 @@ def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
                 m[row][col] = m[bigrow][col]
                 m[bigrow][col] = temp
 
-    rr = declare('int')
-    rrcol = declare('int')
+    rr, rrcol, rb, rbr, kup, kupr, kleft, kleftr = declare('int', 8)
     for rrcol in range(0, colrange):
         for rr in range(rrcol + 1, eqns):
             cc = -(float(m[rr][rrcol]) / float(m[rrcol][rrcol]))
             for j in range(augCol):
                 m[rr][j] = m[rr][j] + cc * m[rrcol][j]
 
-    rb = declare('int')
-    rbr = declare('int')
-    backCol = declare('int')
-    backColr = declare('int')
-    kup = declare('int')
-    kupr = declare('int')
-    kleft = declare('int')
-    kleftr = declare('int')
+    backCol, backColr = declare('int', 2)
     tol = 1.0e-05
     for rbr in range(eqns):
         rb = eqns - rbr - 1
@@ -99,9 +85,8 @@ class ShepardFilter(Equation):
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_m, s_rhotmp, s_x, s_y,
                  s_z, d_h, s_h, KERNEL, NBRS, N_NBRS):
-        i = declare('int')
-        s_idx = declare('long')
-        xij = declare('matrix((3,))')
+        i, s_idx = declare('int', 2)
+        xij = declare('matrix(3)')
         tmp_w = 0.0
         x = d_x[d_idx]
         y = d_y[d_idx]
@@ -162,13 +147,12 @@ class MLSFirstOrder2D(Equation):
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, s_x, s_y, d_h, s_h, s_m,
                  s_rhotmp, KERNEL, NBRS, N_NBRS):
-        n, i, j, k = declare('int')
+        n, i, j, k, s_idx = declare('int', 5)
         n = 3
-        s_idx = declare('int')
-        amls = declare('matrix((9,))')
+        amls = declare('matrix(9)')
         x = d_x[d_idx]
         y = d_y[d_idx]
-        xij = declare('matrix((3,))')
+        xij = declare('matrix(3)')
         for i in range(n):
             for j in range(n):
                 amls[n * i + j] = 0.0
@@ -192,7 +176,7 @@ class MLSFirstOrder2D(Equation):
                         fac2 = xij[j - 1]
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
-        res = declare('matrix((3,))')
+        res = declare('matrix(3)')
         gj_solve(amls, [1., 0., 0.], n, res)
         b0 = res[0]
         b1 = res[1]
@@ -220,14 +204,13 @@ class MLSFirstOrder3D(Equation):
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_x, s_y, s_z, d_h, s_h,
                  s_m, s_rhotmp, KERNEL, NBRS, N_NBRS):
-        n, i, j, k = declare('int')
+        n, i, j, k, s_idx = declare('int', 5)
         n = 4
-        s_idx = declare('int')
-        amls = declare('matrix((16,))')
+        amls = declare('matrix(16)')
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
-        xij = declare('matrix((4,))')
+        xij = declare('matrix(4)')
         for i in range(n):
             for j in range(n):
                 amls[n * i + j] = 0.0
@@ -251,7 +234,7 @@ class MLSFirstOrder3D(Equation):
                         fac2 = xij[j - 1]
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
-        res = declare('matrix((4,))')
+        res = declare('matrix(4)')
         gj_solve(amls, [1., 0., 0., 0.], n, res)
         b0 = res[0]
         b1 = res[1]
