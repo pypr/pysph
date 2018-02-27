@@ -1,12 +1,11 @@
 from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
-from pysph.sph.integrator import Integrator
 from pysph.tools.sph_evaluator import SPHEvaluator
 from pysph.base.reduce_array import serial_reduce_array
 
 
-def get_particle_array_pcisph(dt, dim, constants=None, **props):
+def get_particle_array_pcisph(dt, dim, delta=None, constants=None, **props):
     from pysph.sph.equation import Group
     from pysph.base.kernels import CubicSpline
     pcisph_props = [
@@ -38,8 +37,9 @@ def get_particle_array_pcisph(dt, dim, constants=None, **props):
                             kernel=CubicSpline(dim=dim))
     sph_eval.evaluate()
 
-    # set delta manually
-    # pa.delta[0] = constants['delta'][0]
+    if delta:
+        pa.delta[0] = delta
+
     print("Delta is ")
     print(pa.delta[0])
     return pa
@@ -60,7 +60,7 @@ class ComputeDelta(Equation):
 
     def post_loop(self, d_idx, d_local_delta, d_m, d_rho_base, d_sum_dwij_x,
                   d_sum_dwij_y, d_sum_dwij_z, d_sum_2dwij):
-        beta = 2. * d_m[d_idx] * self.dt**2. / d_rho_base[0]**2
+        beta = 2. * d_m[d_idx]**2 * self.dt**2. / d_rho_base[0]**2
         d_local_delta[d_idx] = 1. / (beta * (
             d_sum_2dwij[d_idx] +
             (d_sum_dwij_x[d_idx] * d_sum_dwij_x[d_idx] + d_sum_dwij_y[d_idx] *
@@ -68,6 +68,24 @@ class ComputeDelta(Equation):
 
     def reduce(self, dst):
         dst.delta[0] = serial_reduce_array(dst.local_delta, 'max')
+
+
+def get_particle_array_static_boundary(constants=None, **props):
+    extra_props = ['x', 'y', 'z', 'V']
+
+    # compression factor
+    consts = {}
+    if constants:
+        consts.update(constants)
+
+    pa = get_particle_array(constants=consts, additional_props=extra_props,
+                            **props)
+    pa.set_output_arrays([
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'h', 'm', 'p', 'pid', 'au', 'av',
+        'aw', 'tag', 'gid'
+    ])
+
+    return pa
 
 
 class SaveCurrentProps(Equation):
@@ -107,6 +125,11 @@ class ComputeDensityFluid(Equation):
 
     def loop(self, d_idx, s_idx, d_rho, s_m, WIJ):
         d_rho[d_idx] += s_m[s_idx] * WIJ
+
+
+class ComputeDensitySolid(Equation):
+    def loop(self, d_idx, s_idx, d_rho_base, d_rho, s_V, WIJ):
+        d_rho[d_idx] += s_V[s_idx] * d_rho_base[0] * WIJ
 
 
 class ComputeNonPressureForces(Equation):
@@ -183,17 +206,19 @@ class MomentumEquation(Equation):
         d_ap_z[d_idx] += -s_m[s_idx] * (dpi + dpj) * DWIJ[2]
 
 
-###############################################################################
-# `EulerIntegrator` class
-###############################################################################
-class LeapFrogIntegrator(Integrator):
-    def one_timestep(self, t, dt):
-        self.compute_accelerations()
-        self.stage1()
-        self.do_post_stage(dt, 1)
+class MomentumEquationStaticBoundary(Equation):
+    def loop(self, d_idx, s_idx, d_rho_base, d_p, d_ap_x, d_ap_y, d_ap_z, s_p,
+             s_V, DWIJ):
+        dpi = d_p[d_idx] / (d_rho_base[0]**2)
+        d_ap_x[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[0]
+        d_ap_y[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[1]
+        d_ap_z[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[2]
 
 
 class PCISPHStep(IntegratorStep):
+    def initialize(self):
+        pass
+
     def stage1(self, d_idx, d_x, d_y, d_z, d_ap_x, d_ap_y, d_ap_z, d_ao_x,
                d_ao_y, d_ao_z, d_u, d_v, d_w, dt):
         d_u[d_idx] = d_u[d_idx] + dt * (d_ap_x[d_idx] + d_ao_x[d_idx])
