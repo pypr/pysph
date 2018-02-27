@@ -122,28 +122,59 @@ class DensityCorrection(Tool):
         self.dim = app.solver.dim
         self.particles = app.particles
         self.arrs = [get_array_by_name(self.particles, i) for i in self.names]
-        try:
-            assert self.corr in ['shepard']
-        except:
-            error = 'Given corr argument not in acceptable corr arguments'
-            raise AssertionError(error)
+        options = ['shepard', 'mls2d_1', 'mls3d_1']
+        assert self.corr in options, 'corr should be one of %s' % options
 
     def _get_sph_eval_shepard(self):
-        from pysph.sph.wc.density_correction import (ShepardFilterPreStep,
-                                                     ShepardFilter)
+        from pysph.sph.wc.density_correction import ShepardFilter
         from pysph.tools.sph_evaluator import SPHEvaluator
         from pysph.sph.equation import Group
         if self._sph_eval is None:
             arrs = self.arrs
             eqns = []
             for arr in arrs:
-                arr.add_property('tmp_w')
                 name = arr.name
+                arr.add_property('rhotmp')
                 eqns.append(Group(equations=[
-                    ShepardFilterPreStep(dest=name, sources=[name])],
-                    real=False))
+                            ShepardFilter(name, [name])], real=False))
+            sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+            return sph_eval
+        else:
+            return self._sph_eval
+
+    def _get_sph_eval_mls2d_1(self):
+        from pysph.sph.wc.density_correction import MLSFirstOrder2D
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.equation import Group
+        if self._sph_eval is None:
+            arrs = self.arrs
+            eqns = []
+            for arr in arrs:
+                name = arr.name
+                arr.add_property('rhotmp')
                 eqns.append(Group(equations=[
-                    ShepardFilter(dest=name, sources=[name])], real=False))
+                            MLSFirstOrder2D(name, [name])], real=False))
+            sph_eval = SPHEvaluator(
+                arrays=arrs, equations=eqns, dim=self.dim,
+                kernel=self.kernel(dim=self.dim))
+            return sph_eval
+        else:
+            return self._sph_eval
+
+    def _get_sph_eval_mls3d_1(self):
+        from pysph.sph.wc.density_correction import MLSFirstOrder3D
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from pysph.sph.equation import Group
+        if self._sph_eval is None:
+            arrs = self.arrs
+            eqns = []
+            for arr in arrs:
+                name = arr.name
+                arr.add_property('rhotmp')
+                eqns.append(Group(equations=[
+                            MLSFirstOrder3D(name, [name])], real=False))
             sph_eval = SPHEvaluator(
                 arrays=arrs, equations=eqns, dim=self.dim,
                 kernel=self.kernel(dim=self.dim))
@@ -154,6 +185,12 @@ class DensityCorrection(Tool):
     def _get_sph_eval(self, corr):
         if corr == 'shepard':
             return self._get_sph_eval_shepard()
+        elif corr == 'mls2d_1':
+            return self._get_sph_eval_mls2d_1()
+        elif corr == 'mls3d_1':
+            return self._get_sph_eval_mls3d_1()
+        else:
+            pass
 
     def post_step(self, solver):
         if self.freq == 0:
