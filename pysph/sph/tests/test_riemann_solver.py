@@ -1,3 +1,4 @@
+import pytest
 from pytest import approx
 
 import pysph.sph.gas_dynamics.riemann_solver as R
@@ -96,3 +97,10 @@ def test_ducowicz():
 
 
 # Most other solvers seem rather poor in comparison.
+@pytest.mark.parametrize("solver", solvers)
+def test_all_solver_api(solver):
+    if solver.__name__ in ['roe', 'hllc']:
+        rel = 2.0
+    else:
+        rel = 1.0
+    _check_shock_tube(solver, rel=rel)
