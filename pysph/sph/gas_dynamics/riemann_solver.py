@@ -5,7 +5,7 @@ from math import sqrt
 from pysph.base.cython_generator import declare
 
 
-def SIGN(x, y):
+def SIGN(x=0.0, y=0.0):
     if y >= 0:
         return abs(x)
     else:
@@ -151,7 +151,7 @@ def van_leer(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
         return 1
 
 
-def _prefun_exact(p=0.0, dk=0.0, pk=0.0, ck=0.0, g1=0.0, g2=0.0,
+def prefun_exact(p=0.0, dk=0.0, pk=0.0, ck=0.0, g1=0.0, g2=0.0,
                   g4=0.0, g5=0.0, g6=0.0, result=[0.0, 0.0]):
     """The pressure function.  Updates result with f, fd.
     """
@@ -223,12 +223,11 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     # local variables
     qser, cup, ppv, pmin, pmax, qmax = declare('double', 6)
     pq, um, ptl, ptr, pm, gel, ger = declare('double', 7)
-    pstar, pold, udifff, fl, fld, fr, frd = declare('double', 7)
+    pstar, pold, udifff = declare('double', 3)
     p, change = declare('double', 2)
 
     # initialize variables
-    fl = 0.0
-    fr = 0.0
+    fl, fr = declare('matrix(2)', 2)
     p = 0.0
 
     # check the initial data
@@ -263,13 +262,12 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
 
     pold = pstart
     udifff = ur-ul
-    fl, fr = declare('matrix(2)', 2)
 
     for i in range(niter):
-        _prefun_exact(pold, rhol, pl, cl, gamma1, gamma2,
-                      gamma4, gamma5, gamma6, fl)
-        _prefun_exact(pold, rhor, pr, cr, gamma1, gamma2,
-                      gamma4, gamma5, gamma6, fr)
+        prefun_exact(pold, rhol, pl, cl, gamma1, gamma2,
+                     gamma4, gamma5, gamma6, fl)
+        prefun_exact(pold, rhor, pr, cr, gamma1, gamma2,
+                     gamma4, gamma5, gamma6, fr)
 
         p = pold - (fl[0] + fr[0] + udifff)/(fl[1] + fr[1])
         change = 2.0 * abs((p - pold)/(p + pold))
@@ -711,8 +709,7 @@ def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
         ustar = ur
 
     else:
-        msg = str((sl, sr, sm, csl, csr, rhol, rhor))
-        printf("Incorrect wave speeds: %s" % msg)
+        printf("Incorrect wave speeds")
         return 1
 
     result[0] = pstar
@@ -976,8 +973,8 @@ def hllsy(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
 
 
 HELPERS = [
-    SIGN, printf, riemann_solve, non_diffusive,
+    SIGN, riemann_solve, non_diffusive,
     ducowicz, exact, hll_ball, hllc,
     hllc_ball, hlle, hllsy, llxf, roe,
-    van_leer
+    van_leer, prefun_exact
 ]

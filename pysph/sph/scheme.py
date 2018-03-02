@@ -1064,6 +1064,225 @@ class GasDScheme(Scheme):
             pa.set_output_arrays(output_props)
 
 
+class GSPHScheme(Scheme):
+    def __init__(self, fluids, solids, dim, gamma, kernel_factor, g1=0.0,
+                 g2=0.0, rsolver=2, interpolation=1, monotonicity=1,
+                 interface_zero=True, niter=20, tol=1e-6):
+        """
+        Parameters
+        ----------
+
+        fluids: list
+            List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries), currently
+            not supported
+        dim: int
+            Dimensionality of the problem.
+        gamma: float
+            Gamma for Equation of state.
+        kernel_factor: float
+            Kernel scaling factor.
+        g1, g2 : double
+            ADKE style thermal conduction parameters
+        rsolver: int
+            Riemann solver to use.  See pysph.sph.gas_dynamics.gsph for
+            valid options.
+        interpolation: int
+            Kind of interpolation for the specific volume integrals.
+        monotonicity : int
+            Type of monotonicity algorithm to use:
+            0 : First order GSPH
+            1 : I02 algorithm
+            2 : IwIn algorithm
+        interface_zero : bool
+            Set Interface position s^*_{ij} = 0 for the Riemann problem.
+        niter: int
+            Max number of iterations for iterative Riemann solvers.
+        tol: double
+            Tolerance for iterative Riemann solvers.
+        """
+        self.fluids = fluids
+        self.solids = solids
+        self.dim = dim
+        self.solver = None
+        self.gamma = gamma
+        self.kernel_factor = kernel_factor
+        self.g1 = g1
+        self.g2 = g2
+        self.rsolver = rsolver
+        self.interpolation = interpolation
+        self.monotonicity = monotonicity
+        self.interface_zero = interface_zero
+        self.niter = niter
+        self.tol = tol
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--rsolver", action="store", type=int, dest="rsolver",
+            default=None,
+            help="Riemann solver to use."
+        )
+        group.add_argument(
+            "--interpolation", action="store", type=int, dest="interpolation",
+            default=None,
+            help="Interpolation algorithm to use."
+        )
+        group.add_argument(
+            "--monotonicity", action="store", type=int, dest="monotonicity",
+            default=None,
+            help="Monotonicity algorithm to use."
+        )
+        group.add_argument(
+            "--g1", action="store", type=float, dest="g1",
+            default=None,
+            help="ADKE style thermal conduction parameter."
+        )
+        group.add_argument(
+            "--g2", action="store", type=float, dest="g2",
+            default=None,
+            help="ADKE style thermal conduction parameter."
+        )
+        group.add_argument(
+            "--gamma", action="store", type=float, dest="gamma",
+            default=None,
+            help="Gamma for the state equation."
+        )
+        add_bool_argument(
+            group, "interface-zero", dest="interface_zero",
+            help="Set interface position to zero for Riemann problem.",
+            default=None
+        )
+
+    def consume_user_options(self, options):
+        self.adaptive_h_scheme = options.adaptive_h_scheme
+        vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
+                'monotonicity', 'interface_zero']
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
+        self.configure(**data)
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        Parameters
+        ----------
+
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import Gaussian
+        if kernel is None:
+            kernel = Gaussian(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        from pysph.sph.integrator import PECIntegrator
+        from pysph.sph.integrator_step import GasDFluidStep
+
+        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        step_cls = GasDFluidStep
+        for name in self.fluids:
+            if name not in steppers:
+                steppers[name] = step_cls()
+
+        integrator = cls(**steppers)
+
+        from pysph.solver.solver import Solver
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        from pysph.sph.gas_dynamics.basic import (
+            ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
+            SummationDensity, IdealGasEOS
+        )
+        from pysph.sph.gas_dynamics.gsph import (
+            GSPHGradients, GSPHAcceleration
+        )
+        equations = []
+        # Find the optimal 'h'
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                ScaleSmoothingLength(dest=fluid, sources=None, factor=2.0)
+            )
+        equations.append(Group(equations=group, update_nnps=True))
+
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                SummationDensity(
+                    dest=fluid, sources=self.fluids, dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=False))
+
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                UpdateSmoothingLengthFromVolume(
+                    dest=fluid, sources=None, k=self.kernel_factor,
+                    dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=True))
+
+        group = []
+        for fluid in self.fluids:
+            group.append(
+                SummationDensity(
+                    dest=fluid, sources=self.fluids, dim=self.dim
+                )
+            )
+        equations.append(Group(equations=group, update_nnps=False))
+        # Done with finding the optimal 'h'
+
+        g2 = []
+        for fluid in self.fluids:
+            g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
+            g2.append(GSPHGradients(dest=fluid, sources=self.fluids))
+
+        equations.append(Group(equations=g2))
+
+        g3 = []
+        for fluid in self.fluids:
+            g3.append(GSPHAcceleration(
+                dest=fluid, sources=self.fluids, g1=self.g1,
+                g2=self.g2, monotonicity=self.monotonicity,
+                rsolver=self.rsolver, interpolation=self.interpolation,
+                interface_zero=self.interface_zero,
+                gamma=self.gamma, niter=self.niter, tol=self.tol
+            ))
+        equations.append(Group(equations=g3))
+        return equations
+
+    def setup_properties(self, particles, clean=True):
+        from pysph.base.utils import get_particle_array_gasd
+        particle_arrays = dict([(p.name, p) for p in particles])
+        dummy = get_particle_array_gasd(name='junk')
+        props = (list(dummy.properties.keys()) +
+                 'px py pz ux uy uz vx vy vz wx wy wz'.split())
+
+        output_props = dummy.output_property_arrays
+        for fluid in self.fluids:
+            pa = particle_arrays[fluid]
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+
 class ADKEScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma=1.4, alpha=1.0, beta=2.0,
                  k=1.0, eps=0.0, g1=0, g2=0):
