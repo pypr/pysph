@@ -16,6 +16,41 @@ def printf(s):
     print(s)
 
 
+def riemann_solve(method=1, rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
+                  gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
+    if method == 0:
+        return non_diffusive(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol,
+                             result)
+    elif method == 1:
+        return van_leer(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 2:
+        return exact(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 3:
+        return hllc(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 4:
+        return ducowicz(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 5:
+        return hlle(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 6:
+        return roe(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 7:
+        return llxf(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 8:
+        return hllc_ball(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol,
+                         result)
+    elif method == 9:
+        return hll_ball(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+    elif method == 10:
+        return hllsy(rhol, rhor, pl, pr, ul, ur, gamma, niter, tol, result)
+
+
+def non_diffusive(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
+                  gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
+    result[0] = 0.5*(pl + pr)
+    result[1] = 0.5*(ul + ur)
+    return 0
+
+
 def van_leer(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
              ul=0.0, ur=1.0, gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
     """Van Leer Riemann solver.
@@ -39,7 +74,7 @@ def van_leer(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     either did not converge or if there is an error.
 
     """
-    if ((rhol < 0) or (rhor < 0) or (pl <0) or (pr < 0)):
+    if ((rhol < 0) or (rhor < 0) or (pl < 0) or (pr < 0)):
         result[0] = 0.0
         result[1] = 0.0
         return 1
@@ -55,11 +90,14 @@ def van_leer(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     smallp = 1e-25
 
     # initialize variables
-    wl = 0.0; wr = 0.0
-    zl = 0.0; zr = 0.0
+    wl = 0.0
+    wr = 0.0
+    zl = 0.0
+    zr = 0.0
 
     # specific volumes
-    Vl = 1./rhol; Vr = 1./rhor
+    Vl = 1./rhol
+    Vr = 1./rhor
 
     # Lagrangean sound speeds
     cl = sqrt(gamma * pl * rhol)
@@ -172,7 +210,6 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     gamma5 = 2 * tmp3
     gamma6 = tmp3/tmp2
     gamma7 = 0.5 * (gamma - 1.0)
-    gamma8 = gamma - 1.0
 
     # sound speed to the left and right based on the Ideal EOS
     cl, cr = declare('double', 2)
@@ -190,7 +227,8 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     p, change = declare('double', 2)
 
     # initialize variables
-    fl = 0.0; fr = 0.0
+    fl = 0.0
+    fr = 0.0
     p = 0.0
 
     # check the initial data
@@ -211,13 +249,13 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
         pm = ppv
     elif (ppv < pmin):
         pq = (pl/pr)**gamma1
-        um = ( pq*ul/cl + ur/cr + gamma4*(pq - 1.0) )/( pq/cl + 1.0/cr )
+        um = (pq*ul/cl + ur/cr + gamma4*(pq - 1.0))/(pq/cl + 1.0/cr)
         ptl = 1.0 + gamma7 * (ul - um)/cl
         ptr = 1.0 + gamma7 * (um - ur)/cr
         pm = 0.5*(pl*ptl**gamma3 + pr*ptr**gamma3)
     else:
-        gel = sqrt( (gamma5/rhol)/(gamma6*pl + ppv) )
-        ger = sqrt( (gamma5/rhor)/(gamma6*pr + ppv) )
+        gel = sqrt((gamma5/rhol)/(gamma6*pl + ppv))
+        ger = sqrt((gamma5/rhor)/(gamma6*pr + ppv))
         pm = (gel*pl + ger*pr - (ur-ul))/(gel + ger)
 
     # the guessed value is pm
@@ -296,7 +334,6 @@ def sample(pm=0.0, um=0.0, s=0.0, rhol=1.0, rhor=0.0, pl=1.0, pr=0.0,
     g5 = 2 * tmp3
     g6 = tmp3/tmp2
     g7 = 0.5 * (gamma - 1.0)
-    g8 = gamma - 1.0
 
     # sound speeds at the left and right data states
     cl = sqrt(gamma*pl/rhol)
@@ -310,14 +347,18 @@ def sample(pm=0.0, um=0.0, s=0.0, rhol=1.0, rhor=0.0, pl=1.0, pr=0.0,
 
             if (s <= shl):
                 # sampled point is left state
-                rho = rhol; u = ul; p = pl
+                rho = rhol
+                u = ul
+                p = pl
             else:
                 cml = cl*(pm/pl)**g1    # eqn (4.54)
                 stl = um - cml          # eqn (4.55)
 
                 if (s > stl):
                     # sampled point is Star left state. eqn (4.53)
-                    rho = rhol*(pm/pl)**(1.0/gamma); u = um; p = pm
+                    rho = rhol*(pm/pl)**(1.0/gamma)
+                    u = um
+                    p = pm
                 else:
                     # sampled point is inside left fan
                     u = g5 * (cl + g7*ul + s)
@@ -326,21 +367,23 @@ def sample(pm=0.0, um=0.0, s=0.0, rhol=1.0, rhor=0.0, pl=1.0, pr=0.0,
                     rho = rhol*(c/cl)**g4
                     p = pl * (c/cl)**g3
 
-        else: # pm <= pl
+        else:  # pm <= pl
             # left shock
             pml = pm/pl
             sl = ul - cl*sqrt(g2*pml + g1)
 
             if (s <= sl):
                 # sampled point is left data state
-                rho = rhol; u=ul; p=pl
+                rho = rhol
+                u = ul
+                p = pl
             else:
                 # sampled point is Star left state
                 rho = rhol*(pml + g6)/(pml*g6 + 1.0)
                 u = um
                 p = pm
 
-    else: # s < um
+    else:  # s < um
         # sampling point lies to the right of the contact discontinuity
         if (pm > pr):
             # right shock
@@ -348,29 +391,37 @@ def sample(pm=0.0, um=0.0, s=0.0, rhol=1.0, rhor=0.0, pl=1.0, pr=0.0,
             sr = ur + cr * sqrt(g2*pmr + g1)
 
             if (s >= sr):
-                #sampled point is right data state
-                rho = rhor; u = ur; p = pr
+                # sampled point is right data state
+                rho = rhor
+                u = ur
+                p = pr
             else:
                 # sampled point is star right state
-                rho = rhor*(pmr + g6)/(pmr*g6 + 1.0); u = um; p = pm
+                rho = rhor*(pmr + g6)/(pmr*g6 + 1.0)
+                u = um
+                p = pm
         else:
             # right rarefaction
             shr = ur + cr
 
             if (s >= shr):
                 # sampled point is right state
-                rho = rhor; u = ur; p = pr
+                rho = rhor
+                u = ur
+                p = pr
             else:
                 cmr = cr*(pm/pr)**g1
                 STR = um + cmr
 
                 if (s <= STR):
                     # sampled point is star right
-                    rho = rhor*(pm/pr)**(1.0/gamma); u = um; p = pm
+                    rho = rhor*(pm/pr)**(1.0/gamma)
+                    u = um
+                    p = pm
                 else:
                     # sampled point is inside left fan
                     u = g5*(-cr + g7*ur + s)
-                    c = g5*(cr - g7*(ur -s))
+                    c = g5*(cr - g7*(ur - s))
                     rho = rhor * (c/cr)**g4
                     p = pr*(c/cr)**g3
 
@@ -410,8 +461,8 @@ def ducowicz(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     csl, csr, umin, umax, plmin, prmin, bl, br = declare('double', 8)
     a, b, c, d, pstar, ustar, dd = declare('double', 7)
     # Lagrangian sound speeds
-    csl = sqrt( gamma * pl * rhol )
-    csr = sqrt( gamma * pr * rhor )
+    csl = sqrt(gamma * pl * rhol)
+    csr = sqrt(gamma * pr * rhor)
 
     umin = ur - 0.5 * csr/ar
     umax = ul + 0.5 * csl/al
@@ -431,7 +482,7 @@ def ducowicz(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     dd = sqrt(max(0.0, d-a))
     ustar = (b + prmin-plmin)/(c - SIGN(dd, umax-umin))
 
-    if ( ((ustar - umin) >= 0.0) and ((ustar - umax) <= 0) ):
+    if (((ustar - umin) >= 0.0) and ((ustar - umax) <= 0)):
         pstar = 0.5 * (plmin + prmin + br*abs(ustar-umin)*(ustar-umin) -
                        bl*abs(ustar-umax)*(ustar-umax))
         pstar = max(pstar, 0.0)
@@ -440,9 +491,9 @@ def ducowicz(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
         return 0
 
     # Case B: ustar - umin < 0, ustar - umax > 0
-    dd = sqrt( max(0.0, d+a) )
-    ustar = (b-prmin + plmin)/(c - SIGN(dd,umax-umin))
-    if ( ((ustar-umin) <= 0.0) and ((ustar-umax) >= 0.0)):
+    dd = sqrt(max(0.0, d+a))
+    ustar = (b - prmin + plmin)/(c - SIGN(dd, umax-umin))
+    if (((ustar-umin) <= 0.0) and ((ustar-umax) >= 0.0)):
         pstar = 0.5 * (plmin+prmin + br*abs(ustar-umin)*(ustar-umin) -
                        bl*abs(ustar-umax)*(ustar-umax))
         pstar = max(pstar, 0.0)
@@ -455,21 +506,21 @@ def ducowicz(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
     c = 1./(bl + br)
 
     # Case C : ustar-umin >0, ustar-umax > 0
-    dd = sqrt( max(0.0, a-d) )
+    dd = sqrt(max(0.0, a-d))
     ustar = (b+dd)*c
-    if ( ((ustar-umin) >= 0) and ( (ustar-umax) >=0.0) ):
+    if (((ustar-umin) >= 0) and ((ustar-umax) >= 0.0)):
         pstar = 0.5 * (plmin+prmin + br*abs(ustar-umin)*(ustar-umin)
-                       -bl*abs(ustar-umax)*(ustar-umax))
+                       - bl*abs(ustar-umax)*(ustar-umax))
         pstar = max(pstar, 0.0)
         result[0] = pstar
         result[1] = ustar
         return 0
 
     # Case D: ustar - umin < 0, ustar - umax < 0
-    dd = sqrt( max(0.0, -a-d) )
+    dd = sqrt(max(0.0, -a - d))
     ustar = (b-dd)*c
     pstar = 0.5 * (plmin+prmin + br*abs(ustar-umin)*(ustar-umin)
-                   -bl*abs(ustar-umax)*(ustar-umax))
+                   - bl*abs(ustar-umax)*(ustar-umax))
     pstar = max(pstar, 0.0)
     result[0] = pstar
     result[1] = ustar
@@ -513,18 +564,18 @@ def roe(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     ulr = (rrhol*ul + rrhor*ur) * denominator
 
     # average sound speed at the interface
-    cslr = sqrt( gamma * plr/vlr )
+    cslr = sqrt(gamma * plr/vlr)
     cslr1 = 1./cslr
 
     # the intermediate states
-    result[0] = plr  - 0.5 * (ur - ul) * cslr
-    result[1] = ulr  - 0.5 * (pr - pl) * cslr1
+    result[0] = plr - 0.5 * (ur - ul) * cslr
+    result[1] = ulr - 0.5 * (pr - pl) * cslr1
 
     return 0
 
 
 def llxf(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
-        gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
+         gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
     """Lax Friedrichs approximate Riemann solver for the Euler equations to
     determine the intermediate states.
 
@@ -551,9 +602,9 @@ def llxf(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     gamma1 = 1./(gamma - 1.0)
 
     # Lagrangian sound speeds
-    csl = sqrt( gamma * pl * rhol )
-    csr = sqrt( gamma * pr * rhor )
-    cslr = max( csr, csl )
+    csl = sqrt(gamma * pl * rhol)
+    csr = sqrt(gamma * pr * rhor)
+    cslr = max(csr, csl)
 
     # Total energy on either side
     el = pl*gamma1/rhol
@@ -563,15 +614,15 @@ def llxf(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     Er = er + 0.5 * ur*ur
 
     # the intermediate states
-    #cdef double ustar = 0.5 * ( ul + ur - 1./cslr * (pr - pl) ) # roe's average
-    pstar = 0.5 * ( pl + pr - cslr * (ur - ul) )
+    # cdef double ustar = 0.5 * ( ul + ur - 1./cslr * (pr - pl) )
+    pstar = 0.5 * (pl + pr - cslr * (ur - ul))
     result[0] = pstar
-    result[1] = 1./pstar * (0.5 * ( (pl*ul + pr*ur) - cslr*(Er - El) ))
+    result[1] = 1./pstar * (0.5 * ((pl*ul + pr*ur) - cslr*(Er - El)))
     return 0
 
 
 def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
-        gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
+         gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
     """Harten-Lax-van Leer-Contact approximate Riemann solver for the Euler
     equations to determine the intermediate states.
 
@@ -607,8 +658,8 @@ def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     vr = ur - ulr
 
     # Sound speeds at the interface
-    csl = sqrt( gamma * pl/rhol )
-    csr = sqrt( gamma * pr/rhor )
+    csl = sqrt(gamma * pl/rhol)
+    csr = sqrt(gamma * pr/rhor)
     cslr = (rrhol*csl + rrhor*csr)/(rrhol + rrhor)
 
     # wave speed estimates at the interface
@@ -616,46 +667,48 @@ def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     sr = max(vr + csr, 0 + cslr)
 
     sm = rhor*vr*(sr-vr) - rhol*vl*(sl-vl) + pl - pr
-    sm /= ( rhor*(sr-vr) - rhol*(sl-vl) )
+    sm /= (rhor*(sr-vr) - rhol*(sl-vl))
 
     # phat
     phat = rhol*(vl - sl)*(vl - sm) + pl
 
     # Total energy on either side
     el = pl*gamma1/rhol
-    El = rhol*(el + 0.5 * ul*ul )
+    El = rhol*(el + 0.5 * ul*ul)
 
     er = pr*gamma1/rhor
-    Er = rhor*(er + 0.5 * ur*ur )
+    Er = rhor*(er + 0.5 * ur*ur)
 
     # Momentum on either side
     Ml = rhol*ul
     Mr = rhor*ur
 
     # compute the values based on the wave speeds
-    if ( sl > 0 ):
-        pstar = pl; ustar = ul
+    if (sl > 0):
+        pstar = pl
+        ustar = ul
 
-    elif ( sl <= 0.0 < sm ):
-        mstar = 1./(sl - sm) * ( (sl - vl) * Ml + (phat - pl) )
-        estar = 1./(sl - sm) * ( (sl - vl) * El - pl*vl + phat*sm )
-
-        pstar = sm*mstar + phat
-
-        ustar = sm*estar + (sm + ulr)*phat
-        ustar /= pstar
-
-    elif ( sm <= 0 < sr ):
-        mstar = 1./(sr - sm) * ( (sr - vr) * Mr + (phat - pr) )
-        estar = 1./(sr - sm) * ( (sr - vr) * Er - pr*vr + phat*sm )
+    elif (sl <= 0.0) and (0.0 < sm):
+        mstar = 1./(sl - sm) * ((sl - vl) * Ml + (phat - pl))
+        estar = 1./(sl - sm) * ((sl - vl) * El - pl*vl + phat*sm)
 
         pstar = sm*mstar + phat
 
         ustar = sm*estar + (sm + ulr)*phat
         ustar /= pstar
 
-    elif ( sr < 0 ):
-        pstar = pr; ustar = ur
+    elif (sm <= 0) and (0 < sr):
+        mstar = 1./(sr - sm) * ((sr - vr) * Mr + (phat - pr))
+        estar = 1./(sr - sm) * ((sr - vr) * Er - pr*vr + phat*sm)
+
+        pstar = sm*mstar + phat
+
+        ustar = sm*estar + (sm + ulr)*phat
+        ustar /= pstar
+
+    elif (sr < 0):
+        pstar = pr
+        ustar = ur
 
     else:
         msg = str((sl, sr, sm, csl, csr, rhol, rhor))
@@ -704,23 +757,24 @@ def hllc_ball(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     rholr = 0.5 * (rhol + rhor)
 
     # provisional intermediate pressure
-    pstar = 0.5 * ( pl + pr - rholr*cslr*(ur - ul) )
+    pstar = 0.5 * (pl + pr - rholr*cslr*(ur - ul))
 
     # Wave speed estimates (ustar is taken as the intermediate velocity)
-    ustar = 0.5 * ( ul + ur - 1./(rholr*cslr)*(pr - pl) )
+    ustar = 0.5 * (ul + ur - 1./(rholr*cslr)*(pr - pl))
 
     Hl = pstar/pl
     Hr = pstar/pr
 
     ql = 1.0
-    if ( Hl > 1 ):
-        ql = sqrt( 1 + gamma1*(Hl - 1.0) )
+    if (Hl > 1):
+        ql = sqrt(1 + gamma1*(Hl - 1.0))
 
     qr = 1.0
-    if ( Hr > 1 ):
-        qr = sqrt( 1 + gamma1*(Hr - 1.0) )
+    if (Hr > 1):
+        qr = sqrt(1 + gamma1*(Hr - 1.0))
 
-    Sl = ul - csl*ql; Sr = ur + csr*qr
+    Sl = ul - csl*ql
+    Sr = ur + csr*qr
 
     # compute the intermediate pressure
     pstar_l = pl + rhol*(ul - Sl)*(ul - ustar)
@@ -762,21 +816,21 @@ def hlle(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     # Roe-averaged interface velocity
     rrhol = sqrt(rhol)
     rrhor = sqrt(rhor)
-    ulr = (rrhol*ul + rrhor*ur)/(rrhol + rrhor)
+    # ulr = (rrhol*ul + rrhor*ur)/(rrhol + rrhor)
 
     # lagrangian sound speeds
-    csl = sqrt( gamma * pl * rhol )
-    csr = sqrt( gamma * pr * rhor )
+    csl = sqrt(gamma * pl * rhol)
+    csr = sqrt(gamma * pr * rhor)
     cslr = (rrhol*csl + rrhor*csr)/(rrhol + rrhor)
 
     # wave speed estimates
     sl = min(ul - csl, -cslr)
     sr = max(ur + csr, +cslr)
 
-    smax = max( sl, sr )
-    smin = min( sl, sr )
-    #cdef double smax = max( (ur-ulr) + csr,  cslr )
-    #cdef double smin = max( (ul-ulr) - csl, -cslr )
+    smax = max(sl, sr)
+    smin = min(sl, sr)
+    # cdef double smax = max( (ur-ulr) + csr,  cslr )
+    # cdef double smin = max( (ul-ulr) - csl, -cslr )
 
     # Total energy on either side
     el = pl*gamma1/rhol
@@ -786,8 +840,8 @@ def hlle(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     Er = er + 0.5 * ur*ur
 
     # Momentum on either side
-    Ml = rhol*ul
-    Mr = rhor*ur
+    # Ml = rhol*ul
+    # Mr = rhor*ur
 
     # the intermediate states
     pstar = ((smax * pl - smin * pr)/(smax - smin) +
@@ -830,25 +884,26 @@ def hll_ball(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     denominator = 1./(rrhor + rrhol)
 
     # sound speeds
-    csl = sqrt( gamma * pl/rhol )
-    csr = sqrt( gamma * pr/rhor )
+    csl = sqrt(gamma * pl/rhol)
+    csr = sqrt(gamma * pr/rhor)
     # cslr2 = denominator * (rrhol*csl*csl + rrhor*csr*csr )
     eta = 0.5 * (gamma - 1.0) * (rrhor*rrhol) * denominator * denominator
-    betal = abs( ul )
-    betar = abs( ur )
+    betal = abs(ul)
+    betar = abs(ur)
 
     # averaged velocity and cs2
-    ulr = ( rrhol*ul + rrhor*ur )/( rrhol*rrhor )
-    cslr2 = ( rrhol*csl*csl + rrhor*csr*csr )/( rrhol*rrhor )
-    cslr = sqrt( cslr2 + eta * (betar - betal) * (betar - betal) )
+    ulr = (rrhol*ul + rrhor*ur)/(rrhol*rrhor)
+    cslr2 = (rrhol*csl*csl + rrhor*csr*csr)/(rrhol*rrhor)
+    cslr = sqrt(cslr2 + eta * (betar - betal) * (betar - betal))
 
     # wave speed estimates
-    Sl = min( ulr - cslr, ul - csl )
-    Sr = max( ulr + cslr, ur + csr )
+    Sl = min(ulr - cslr, ul - csl)
+    Sr = max(ulr + cslr, ur + csr)
 
     # intermediate states
-    rhostar = 1./(Sr - Sl) * ( rhor*(Sr-ur) - rhol*(Sl-ul) )
-    ustar = (Sr*Sl*(rhor-rhol) + rhol*ul*Sr - rhor*ur*Sl)/(rhol*(ul-Sl) + rhor*(Sr-ur))
+    # rhostar = 1./(Sr - Sl) * (rhor*(Sr-ur) - rhol*(Sl-ul))
+    ustar = ((Sr*Sl*(rhor-rhol) + rhol*ul*Sr - rhor*ur*Sl) /
+             (rhol*(ul-Sl) + rhor*(Sr-ur)))
     # pstar = 0.5 * (pl + pr - rhostar*ustar*( (Sr-ustar) + (Sl-ustar) ) + \
     #                                rhor*ur*(ur - Sr) + rhol*ul*(ul-Sl) )
     pstar = (pr*(ustar-Sl) - pl*(ustar-Sr) +
@@ -862,7 +917,7 @@ def hll_ball(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
 
 
 def hllsy(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
-             gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
+          gamma=1.4, niter=20, tol=1e-6, result=[0.0, 0.0]):
     """HLL Riemann solver defined by Sirotkin and Yoh in 'A Smoothed Particle
     Hydrodynamics method with approximate Riemann solvers for simulation of
     strong explosions' (2013), Computers and Fluids.
@@ -894,9 +949,9 @@ def hllsy(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     denominator = 1./(rrhor + rrhol)
 
     # Lagrangian sound speed Eq. (35) in SY13
-    csl = sqrt( gamma * pl*rhol )
-    csr = sqrt( gamma * pr*rhor )
-    cslr = denominator * (rrhol*csl + rrhor*csr )
+    csl = sqrt(gamma * pl*rhol)
+    csr = sqrt(gamma * pr*rhor)
+    cslr = denominator * (rrhol*csl + rrhor*csr)
 
     # weighting factors Eqs. (33 - 35) in SY13
     bl = max(csl, cslr)
@@ -918,3 +973,11 @@ def hllsy(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
     result[0] = pstar
     result[1] = ustar/pstar
     return 0
+
+
+HELPERS = [
+    SIGN, printf, riemann_solve, non_diffusive,
+    ducowicz, exact, hll_ball, hllc,
+    hllc_ball, hlle, hllsy, llxf, roe,
+    van_leer
+]
