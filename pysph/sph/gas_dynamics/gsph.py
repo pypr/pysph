@@ -25,7 +25,7 @@ Cubic = 2
 
 
 def sgn(x=0.0):
-    return -1.0 if x < 0.0 else 1.0
+    return (x > 0) - (x < 0)
 
 
 def monotonicity_min(_x1=0.0, _x2=0.0, _x3=0.0):
@@ -211,9 +211,12 @@ class GSPHAcceleration(Equation):
         pj = s_p[s_idx]
 
         if self.monotonicity == 0:  # First order scheme
-            rsi = rsj = 0.0
-            psi = psj = 0.0
-            vsi = vsj = 0.0
+            rsi = 0.0
+            rsj = 0.0
+            psi = 0.0
+            psj = 0.0
+            vsi = 0.0
+            vsj = 0.0
 
         if self.monotonicity == 1:  # I02 algorithm
             if (vsi * vsj) < 0:
@@ -257,6 +260,13 @@ class GSPHAcceleration(Equation):
             rsj = monotonicity_min(qijr, delr, delrp)/RIJ
             psj = monotonicity_min(qijp, delp, delpp)/RIJ
             vsj = monotonicity_min(qiju, delv, delvp)/RIJ
+        elif self.monotonicity == 2 and RIJ < 1e-14:  # IwIn algorithm
+            rsi = 0.0
+            rsj = 0.0
+            psi = 0.0
+            psj = 0.0
+            vsi = 0.0
+            vsj = 0.0
 
         # Input to the riemann solver
         sstar *= 2.0
@@ -296,8 +306,12 @@ class GSPHAcceleration(Equation):
 
         # blend of two intermediate states
         #if self.hybrid:
-        #    pstar2, ustar2 = self.rsolver2.compute_star(
-        #        rhoj, rhoi, pj, pi, vl, vr)
+        #    riemann_solve(
+        #        10, rhoj, rhoi, pj, pi, vl, vr, self.gamma,
+        #        self.niter self.tol, result
+        #    )
+        #    pstar2 = result[0]
+        #    ustar2 = result[1]
         #    ustar = ustar + blending_factor * (ustar2 - ustar)
         #    pstar = pstar + blending_factor * (pstar2 - pstar)
 
@@ -430,4 +444,4 @@ class GSPHAcceleration(Equation):
 
         result[0] = vij_i
         result[1] = vij_j
-        result[1] = sstar
+        result[2] = sstar

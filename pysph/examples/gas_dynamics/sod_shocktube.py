@@ -64,7 +64,7 @@ class SodShockTube(ShockTubeSetup):
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
+            beta=1.0, update_alpha1=True, update_alpha2=True
         )
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
