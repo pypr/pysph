@@ -67,7 +67,7 @@ class SodShockTube(ShockTubeSetup):
             beta=1.0, update_alpha1=True, update_alpha2=True
         )
         gsph = GSPHScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
             kernel_factor=1.2,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
             interface_zero=True, niter=20, tol=1e-6

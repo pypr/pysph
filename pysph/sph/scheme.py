@@ -1209,6 +1209,7 @@ class GSPHScheme(Scheme):
             ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
             SummationDensity, IdealGasEOS
         )
+        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
         from pysph.sph.gas_dynamics.gsph import (
             GSPHGradients, GSPHAcceleration
         )
@@ -1222,13 +1223,24 @@ class GSPHScheme(Scheme):
         equations.append(Group(equations=group, update_nnps=True))
 
         group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
+
+        all_pa = self.fluids + self.solids
+        group = []
         for fluid in self.fluids:
             group.append(
                 SummationDensity(
-                    dest=fluid, sources=self.fluids, dim=self.dim
+                    dest=fluid, sources=all_pa, dim=self.dim
                 )
             )
         equations.append(Group(equations=group, update_nnps=False))
+
+        group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
 
         group = []
         for fluid in self.fluids:
@@ -1244,23 +1256,28 @@ class GSPHScheme(Scheme):
         for fluid in self.fluids:
             group.append(
                 SummationDensity(
-                    dest=fluid, sources=self.fluids, dim=self.dim
+                    dest=fluid, sources=all_pa, dim=self.dim
                 )
             )
         equations.append(Group(equations=group, update_nnps=False))
         # Done with finding the optimal 'h'
 
+        group = []
+        for solid in self.solids:
+            group.append(WallBoundary(solid, sources=self.fluids))
+        equations.append(Group(equations=group))
+
         g2 = []
         for fluid in self.fluids:
             g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
-            g2.append(GSPHGradients(dest=fluid, sources=self.fluids))
+            g2.append(GSPHGradients(dest=fluid, sources=all_pa))
 
         equations.append(Group(equations=g2))
 
         g3 = []
         for fluid in self.fluids:
             g3.append(GSPHAcceleration(
-                dest=fluid, sources=self.fluids, g1=self.g1,
+                dest=fluid, sources=all_pa, g1=self.g1,
                 g2=self.g2, monotonicity=self.monotonicity,
                 rsolver=self.rsolver, interpolation=self.interpolation,
                 interface_zero=self.interface_zero,
@@ -1280,6 +1297,12 @@ class GSPHScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        solid_props = set(props) | set(('wij', 'htmp'))
+        for solid in self.solids:
+            pa = particle_arrays[solid]
+            self._ensure_properties(pa, solid_props, clean)
             pa.set_output_arrays(output_props)
 
 
