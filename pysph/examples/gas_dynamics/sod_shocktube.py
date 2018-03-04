@@ -70,7 +70,8 @@ class SodShockTube(ShockTubeSetup):
             fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
             kernel_factor=1.2,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
-            interface_zero=True, niter=20, tol=1e-6
+            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            niter=20, tol=1e-6
         )
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
         return s

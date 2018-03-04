@@ -1,3 +1,4 @@
+from math import exp
 from pysph.base.cython_generator import declare
 from pysph.sph.equation import Equation
 from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve,
@@ -74,28 +75,28 @@ class GSPHGradients(Equation):
     def loop(self, d_idx, d_px, d_py, d_pz, d_ux, d_uy, d_uz,
              d_vx, d_vy, d_vz, d_wx, d_wy, d_wz, d_p, d_u, d_v, d_w,
              s_idx, s_p, s_u, s_v, s_w, s_rho, s_m,
-             DWIJ):
+             DWI):
         rj1 = 1.0/s_rho[s_idx]
         pji = s_p[s_idx] - d_p[d_idx]
         uji = s_u[s_idx] - d_u[d_idx]
         vji = s_v[s_idx] - d_v[d_idx]
         wji = s_w[s_idx] - d_w[d_idx]
         tmp = rj1*s_m[s_idx]*pji
-        d_px[d_idx] += tmp*DWIJ[0]
-        d_py[d_idx] += tmp*DWIJ[1]
-        d_pz[d_idx] += tmp*DWIJ[2]
+        d_px[d_idx] += tmp*DWI[0]
+        d_py[d_idx] += tmp*DWI[1]
+        d_pz[d_idx] += tmp*DWI[2]
         tmp = rj1*s_m[s_idx]*uji
-        d_ux[d_idx] += tmp*DWIJ[0]
-        d_uy[d_idx] += tmp*DWIJ[1]
-        d_uz[d_idx] += tmp*DWIJ[2]
+        d_ux[d_idx] += tmp*DWI[0]
+        d_uy[d_idx] += tmp*DWI[1]
+        d_uz[d_idx] += tmp*DWI[2]
         tmp = rj1*s_m[s_idx]*vji
-        d_vx[d_idx] += tmp*DWIJ[0]
-        d_vy[d_idx] += tmp*DWIJ[1]
-        d_vz[d_idx] += tmp*DWIJ[2]
+        d_vx[d_idx] += tmp*DWI[0]
+        d_vy[d_idx] += tmp*DWI[1]
+        d_vz[d_idx] += tmp*DWI[2]
         tmp = rj1*s_m[s_idx]*wji
-        d_wx[d_idx] += tmp*DWIJ[0]
-        d_wy[d_idx] += tmp*DWIJ[1]
-        d_wz[d_idx] += tmp*DWIJ[2]
+        d_wx[d_idx] += tmp*DWI[0]
+        d_wy[d_idx] += tmp*DWI[1]
+        d_wz[d_idx] += tmp*DWI[2]
 
 
 class GSPHAcceleration(Equation):
@@ -114,8 +115,37 @@ class GSPHAcceleration(Equation):
     """
     def __init__(self, dest, sources, g1=0.0, g2=0.0,
                  monotonicity=0, rsolver=Exact,
-                 interpolation=Linear, interface_zero=True,
+                 interpolation=Linear, interface_zero=True, hybrid=False,
+                 blend_alpha=5.0, tf=1.0,
                  gamma=1.4, niter=20, tol=1e-6):
+        """
+        Parameters
+        ----------
+        g1, g2 : double
+            ADKE style thermal conduction parameters
+        rsolver: int
+            Riemann solver to use.  See pysph.sph.gas_dynamics.gsph for
+            valid options.
+        interpolation: int
+            Kind of interpolation for the specific volume integrals.
+        monotonicity : int
+            Type of monotonicity algorithm to use:
+            0 : First order GSPH
+            1 : I02 algorithm
+            2 : IwIn algorithm
+        interface_zero : bool
+            Set Interface position s^*_{ij} = 0 for the Riemann problem.
+        hybrid, blend_alpha : bool, double
+            Hybrid scheme and blending alpha value
+        tf: float
+            Final time of simulation for using in blending.
+        gamma: float
+            Gamma for Equation of state.
+        niter: int
+            Max number of iterations for iterative Riemann solvers.
+        tol: double
+            Tolerance for iterative Riemann solvers.
+        """
         self.gamma = gamma
         self.niter = niter
         self.tol = tol
@@ -131,6 +161,9 @@ class GSPHAcceleration(Equation):
         else:
             self.thermal_conduction = 1
         self.interface_zero = interface_zero
+        self.hybrid = hybrid
+        self.blend_alpha = blend_alpha
+        self.tf = tf
 
         super(GSPHAcceleration, self).__init__(dest, sources)
 
@@ -149,7 +182,8 @@ class GSPHAcceleration(Equation):
              s_idx, s_rho, s_m, s_h, s_cs, s_div, s_p, s_e, s_grhox,
              s_grhoy, s_grhoz, s_u, s_v, s_w, s_px, s_py, s_pz,
              s_ux, s_uy, s_uz, s_vx, s_vy, s_vz, s_wx, s_wy, s_wz,
-             XIJ, DWIJ, DWI, DWJ, RIJ, RHOIJ, EPS, dt):
+             XIJ, DWIJ, DWI, DWJ, RIJ, RHOIJ, EPS, dt, t):
+        blending_factor = exp(-self.blend_alpha*t/self.tf)
         g1 = self.g1
         g2 = self.g2
         hi = d_h[d_idx]
@@ -159,14 +193,15 @@ class GSPHAcceleration(Equation):
             eij[0] = 0.0
             eij[1] = 0.0
             eij[2] = 0.0
+            sij = 1.0/(RIJ + EPS)
         else:
             eij[0] = XIJ[0]/RIJ
             eij[1] = XIJ[1]/RIJ
             eij[2] = XIJ[2]/RIJ
+            sij = 1.0/RIJ
 
         vl = s_u[s_idx]*eij[0] + s_v[s_idx]*eij[1] + s_w[s_idx]*eij[2]
         vr = d_u[d_idx]*eij[0] + d_v[d_idx]*eij[1] + d_w[d_idx]*eij[2]
-        sij = 1.0/(RIJ + EPS)
 
         Hi = g1*hi*d_cs[d_idx] + g2*hi*hi*(abs(d_div[d_idx]) - d_div[d_idx])
 
@@ -305,15 +340,15 @@ class GSPHAcceleration(Equation):
         ustar = result[1]
 
         # blend of two intermediate states
-        #if self.hybrid:
-        #    riemann_solve(
-        #        10, rhoj, rhoi, pj, pi, vl, vr, self.gamma,
-        #        self.niter self.tol, result
-        #    )
-        #    pstar2 = result[0]
-        #    ustar2 = result[1]
-        #    ustar = ustar + blending_factor * (ustar2 - ustar)
-        #    pstar = pstar + blending_factor * (pstar2 - pstar)
+        if self.hybrid:
+            riemann_solve(
+                10, rhoj, rhoi, pl, pr, vl, vr, self.gamma,
+                self.niter, self.tol, result
+            )
+            pstar2 = result[0]
+            ustar2 = result[1]
+            ustar = ustar + blending_factor * (ustar2 - ustar)
+            pstar = pstar + blending_factor * (pstar2 - pstar)
 
         # three dimensional velocity (70)
         vstar = declare('matrix(3)')

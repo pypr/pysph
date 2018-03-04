@@ -1067,7 +1067,8 @@ class GasDScheme(Scheme):
 class GSPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, kernel_factor, g1=0.0,
                  g2=0.0, rsolver=2, interpolation=1, monotonicity=1,
-                 interface_zero=True, niter=20, tol=1e-6):
+                 interface_zero=True, hybrid=False, blend_alpha=5.0, tf=1.0,
+                 niter=20, tol=1e-6):
         """
         Parameters
         ----------
@@ -1097,6 +1098,10 @@ class GSPHScheme(Scheme):
             2 : IwIn algorithm
         interface_zero : bool
             Set Interface position s^*_{ij} = 0 for the Riemann problem.
+        hybrid, blend_alpha : bool, double
+            Hybrid scheme and blending alpha value
+        tf: double
+            Final time used for blending.
         niter: int
             Max number of iterations for iterative Riemann solvers.
         tol: double
@@ -1114,6 +1119,9 @@ class GSPHScheme(Scheme):
         self.interpolation = interpolation
         self.monotonicity = monotonicity
         self.interface_zero = interface_zero
+        self.hybrid = hybrid
+        self.blend_alpha = blend_alpha
+        self.tf = tf
         self.niter = niter
         self.tol = tol
 
@@ -1148,16 +1156,27 @@ class GSPHScheme(Scheme):
             default=None,
             help="Gamma for the state equation."
         )
+        group.add_argument(
+            "--blend-alpha", action="store", type=float, dest="blend_alpha",
+            default=None,
+            help="Blending factor for hybrid scheme."
+        )
         add_bool_argument(
             group, "interface-zero", dest="interface_zero",
             help="Set interface position to zero for Riemann problem.",
+            default=None
+        )
+        add_bool_argument(
+            group, "hybrid", dest="hybrid",
+            help="Use the hybrid scheme.",
             default=None
         )
 
     def consume_user_options(self, options):
         self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
-                'monotonicity', 'interface_zero']
+                'monotonicity', 'interface_zero', 'hybrid',
+                'blend_alpha']
         data = dict((var, self._smart_getattr(options, var))
                     for var in vars)
         self.configure(**data)
@@ -1187,11 +1206,11 @@ class GSPHScheme(Scheme):
         if extra_steppers is not None:
             steppers.update(extra_steppers)
 
-        from pysph.sph.integrator import PECIntegrator
-        from pysph.sph.integrator_step import GasDFluidStep
+        from pysph.sph.integrator import EulerIntegrator
+        from pysph.sph.integrator_step import GSPHStep
 
-        cls = integrator_cls if integrator_cls is not None else PECIntegrator
-        step_cls = GasDFluidStep
+        cls = integrator_cls if integrator_cls is not None else EulerIntegrator
+        step_cls = GSPHStep
         for name in self.fluids:
             if name not in steppers:
                 steppers[name] = step_cls()
@@ -1202,6 +1221,8 @@ class GSPHScheme(Scheme):
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel, **kw
         )
+        if 'tf' in kw:
+            self.tf = kw['tf']
 
     def get_equations(self):
         from pysph.sph.equation import Group
@@ -1263,13 +1284,18 @@ class GSPHScheme(Scheme):
         # Done with finding the optimal 'h'
 
         group = []
+        for fluid in self.fluids:
+            group.append(IdealGasEOS(dest=fluid, sources=None,
+                                     gamma=self.gamma))
+        equations.append(Group(equations=group))
+
+        group = []
         for solid in self.solids:
             group.append(WallBoundary(solid, sources=self.fluids))
         equations.append(Group(equations=group))
 
         g2 = []
         for fluid in self.fluids:
-            g2.append(IdealGasEOS(dest=fluid, sources=None, gamma=self.gamma))
             g2.append(GSPHGradients(dest=fluid, sources=all_pa))
 
         equations.append(Group(equations=g2))
@@ -1281,6 +1307,7 @@ class GSPHScheme(Scheme):
                 g2=self.g2, monotonicity=self.monotonicity,
                 rsolver=self.rsolver, interpolation=self.interpolation,
                 interface_zero=self.interface_zero,
+                hybrid=self.hybrid, blend_alpha=self.blend_alpha,
                 gamma=self.gamma, niter=self.niter, tol=self.tol
             ))
         equations.append(Group(equations=g3))
