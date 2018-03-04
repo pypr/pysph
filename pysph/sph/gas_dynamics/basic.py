@@ -1,5 +1,6 @@
 """Basic equations for Gas-dynamics"""
 
+from pysph.base.cython_generator import declare
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 from pysph.sph.equation import Equation
 from math import sqrt, exp, log
@@ -62,6 +63,7 @@ class SummationDensityADKE(Equation):
         sum_logrho = parallel_reduce_array(tmp_sum_logrho, 'sum')
         g = exp(sum_logrho/n)
 
+        lamda = declare('object')
         lamda = self.k*numpy.power(g/dst.rho, self.eps)
         dst.h[:] = lamda*dst.h0
 
@@ -100,14 +102,15 @@ class SummationDensity(Equation):
 
         super(SummationDensity, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_arho,
-                   d_dwdh):
+    def initialize(self, d_idx, d_rho, d_div, d_grhox, d_grhoy, d_grhoz,
+                   d_arho, d_dwdh):
 
         d_rho[d_idx] = 0.0
         d_div[d_idx] = 0.0
 
         d_grhox[d_idx] = 0.0
         d_grhoy[d_idx] = 0.0
+        d_grhoz[d_idx] = 0.0
         d_arho[d_idx] = 0.0
 
         d_dwdh[d_idx] = 0.0
@@ -117,7 +120,7 @@ class SummationDensity(Equation):
         # to False. The Group can therefore iterate till convergence.
         self.equation_has_converged = 1
 
-    def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_arho,
+    def loop(self, d_idx, s_idx, d_rho, d_grhox, d_grhoy, d_grhoz, d_arho,
              d_dwdh, s_m, d_converged, VIJ, WI, DWI, GHI):
 
         mj = s_m[s_idx]
@@ -132,6 +135,7 @@ class SummationDensity(Equation):
         # gradient of density
         d_grhox[d_idx] += mj * DWI[0]
         d_grhoy[d_idx] += mj * DWI[1]
+        d_grhoz[d_idx] += mj * DWI[2]
 
         # gradient of kernel w.r.t h
         d_dwdh[d_idx] += mj * GHI

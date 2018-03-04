@@ -82,7 +82,9 @@ class ShockTubeSetup(Application):
         from pysph.solver.utils import load
         data = load(last_output)
         pa = data['arrays']['fluid']
-        riemann_solver.set_gamma(self.options.gamma)
+        gamma = self.options.gamma if self.options.gamma else 1.4
+        riemann_solver.set_gamma(gamma)
+
         rho_e, u_e, p_e, e_e, x_e = riemann_solver.solve(
             x_min=self.xmin, x_max=self.xmax, x_0=self.x0,
             t=self.tf, p_l=self.pl, p_r=self.pr, rho_l=self.rhol,
@@ -145,5 +147,8 @@ class ShockTubeSetup(Application):
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
         elif self.options.scheme == 'adke':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+        elif self.options.scheme == 'gsph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
