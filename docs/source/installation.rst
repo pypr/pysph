@@ -262,23 +262,17 @@ if you installed XCode but can't find clang or gcc.
 OpenMP on OSX
 ^^^^^^^^^^^^^
 
-If you need to use OpenMP_, the default clang compiler on OSX does not support
-it.  There are some experimental versions available.  One easy to install
-option is to use brew_ to install gcc.  For example you can try::
+The default "gcc" available on OSX uses an LLVM backend and does not support 
+OpenMP_. To use OpenMP_ on OSX, you can install the GCC available on brew_ using    :: 
 
-    $ sudo brew install gcc
+    $ brew install gcc
 
-The build may not see ``omp.h`` and you can work around this by manually
-linking to it like so (modify this to suit your installation)::
+Once this is done, you need to use this as your default compiler. The ``gcc`` 
+formula on brew currently ships with gcc version 7. Therefore, you can 
+tell Python to use the GCC installed by brew by setting::
 
-    $ cd /usr/local/include
-    $ sudo ln -s ../Cellar/gcc/4.9.2_1/lib/gcc/4.9/gcc/x86_64-apple-darwin12.6.0/4.9.2/include/omp.h .
-
-Once this is done, you need to use this as your default compiler, you can tell
-the Python to use this by setting::
-
-    $ export CC=gcc-4.9
-    $ export CXX=g++-4.9
+    $ export CC=gcc-7
+    $ export CXX=g++-7
 
 .. _brew: http://brew.sh/
 
