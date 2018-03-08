@@ -186,7 +186,7 @@ class MorrisColorGradient(Equation):
             d_N[d_idx] = 1.0
 
             # compute the normals
-            mod_gradc = 1./sqrt( mod_gradc2 )
+            mod_gradc = 1./sqrt(mod_gradc2)
 
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
             d_ny[d_idx] = d_cy[d_idx] * mod_gradc
@@ -194,6 +194,7 @@ class MorrisColorGradient(Equation):
 
             # discretized Dirac Delta function
             d_ddelta[d_idx] = 1./mod_gradc
+
 
 class SY11ColorGradient(Equation):
     r"""Gradient of the color function using Eq. (13) of [SY11]:
@@ -236,7 +237,7 @@ class SY11ColorGradient(Equation):
              d_V, s_V, DWIJ):
 
         # average particle volume
-        psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
+        psiab1 = 2.0/(d_V[d_idx] + s_V[s_idx])
 
         # difference in color divided by psiab. Eq. (13) in [SY11]
         Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
@@ -259,7 +260,7 @@ class SY11ColorGradient(Equation):
             d_N[d_idx] = 1.0
 
             # compute the normals
-            mod_gradc = 1./sqrt( mod_gradc2 )
+            mod_gradc = 1./sqrt(mod_gradc2)
 
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
             d_ny[d_idx] = d_cy[d_idx] * mod_gradc
@@ -267,6 +268,7 @@ class SY11ColorGradient(Equation):
 
             # discretized Dirac Delta function
             d_ddelta[d_idx] = 1./mod_gradc
+
 
 class SY11DiracDelta(Equation):
     r"""Discretized dirac-delta for the SY11 formulation Eq. (14) in [SY11]
@@ -297,7 +299,7 @@ class SY11DiracDelta(Equation):
              d_V, s_V, DWIJ):
 
         # average particle volume
-        psiab1 = 2.0/( d_V[d_idx] + s_V[s_idx] )
+        psiab1 = 2.0/(d_V[d_idx] + s_V[s_idx])
 
         # difference in color divided by psiab. Eq. (13) in [SY11]
         Cba = (s_color[s_idx] - d_color[d_idx]) * psiab1
@@ -316,10 +318,11 @@ class SY11DiracDelta(Equation):
 
         # avoid sqrt computations on non-interface particles
         if mod_gradc2 > self.epsilon2:
-            mod_gradc = sqrt( mod_gradc2 )
+            mod_gradc = sqrt(mod_gradc2)
 
             # discretized Dirac Delta function
             d_ddelta[d_idx] = mod_gradc
+
 
 class InterfaceCurvatureFromNumberDensity(Equation):
     r"""Interface curvature using number density. Eq. (15) in [SY11]:
@@ -334,7 +337,8 @@ class InterfaceCurvatureFromNumberDensity(Equation):
     def __init__(self, dest, sources, with_morris_correction=True):
         self.with_morris_correction = with_morris_correction
 
-        super(InterfaceCurvatureFromNumberDensity,self).__init__(dest, sources)
+        super(InterfaceCurvatureFromNumberDensity, self).__init__(dest,
+                                                                  sources)
 
     def initialize(self, d_idx, d_kappa, d_wij_sum):
         d_kappa[d_idx] = 0.0
@@ -365,6 +369,7 @@ class InterfaceCurvatureFromNumberDensity(Equation):
         if self.with_morris_correction:
             if d_wij_sum[d_idx] > 1e-12:
                 d_kappa[d_idx] /= d_wij_sum[d_idx]
+
 
 class ShadlooYildizSurfaceTensionForce(Equation):
     r"""Acceleration due to surface tension force Eq. (7,9) in [SY11]:
@@ -404,6 +409,7 @@ class ShadlooYildizSurfaceTensionForce(Equation):
         d_av[d_idx] += tmp * d_ny[d_idx]
         d_aw[d_idx] += tmp * d_nz[d_idx]
 
+
 class CSFSurfaceTensionForce(Equation):
     r"""Acceleration due to surface tension force Eq. (25) in [JM00]:
 
@@ -440,6 +446,7 @@ class CSFSurfaceTensionForce(Equation):
         d_av[d_idx] += tmp * d_cy[d_idx]
         d_aw[d_idx] += tmp * d_cz[d_idx]
 
+
 class AdamiColorGradient(Equation):
     r"""Gradient of color Eq. (14) in [A10]
 
@@ -456,7 +463,8 @@ class AdamiColorGradient(Equation):
         \frac{\rho_a}{\rho_a + \rho_b}c_b
 
     """
-    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz, d_ddelta, d_N):
+    def initialize(self, d_idx, d_cx, d_cy, d_cz, d_nx, d_ny, d_nz, d_ddelta,
+                   d_N):
         d_cx[d_idx] = 0.0
         d_cy[d_idx] = 0.0
         d_cz[d_idx] = 0.0
@@ -475,8 +483,10 @@ class AdamiColorGradient(Equation):
              d_cx, d_cy, d_cz, d_color, s_color, DWIJ):
 
         # particle volumes
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
-        Vi2 = Vi * Vi; Vj2 = Vj * Vj
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
 
         # averaged particle color
         rhoi = d_rho[d_idx]
@@ -506,7 +516,7 @@ class AdamiColorGradient(Equation):
             d_N[d_idx] = 1.0
 
             # compute the normals
-            mod_gradc = 1./sqrt( mod_gradc2 )
+            mod_gradc = 1./sqrt(mod_gradc2)
 
             d_nx[d_idx] = d_cx[d_idx] * mod_gradc
             d_ny[d_idx] = d_cy[d_idx] * mod_gradc
@@ -517,6 +527,8 @@ class AdamiColorGradient(Equation):
 
 # FIXME: The implementation based on the formulation presented in
 # [A10] seems to be incorrect.
+
+
 class AdamiReproducingDivergence(Equation):
     r"""Reproducing divergence approximation Eq. (20) in [A10] to
     compute the curvature
@@ -530,7 +542,7 @@ class AdamiReproducingDivergence(Equation):
     """
     def __init__(self, dest, sources, dim):
         self.dim = dim
-        super(AdamiReproducingDivergence,self).__init__(dest, sources)
+        super(AdamiReproducingDivergence, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_kappa, d_wij_sum):
         d_kappa[d_idx] = 0.0
@@ -540,7 +552,8 @@ class AdamiReproducingDivergence(Equation):
              d_nx, d_ny, d_nz, s_nx, s_ny, s_nz, d_V, s_V,
              DWIJ, XIJ, RIJ, EPS):
         # particle volumes
-        Vi = 1./d_V[d_idx]; Vj = 1./s_V[s_idx]
+        Vi = 1./d_V[d_idx]
+        Vj = 1./s_V[s_idx]
 
         # dot product in the numerator of Eq. (20)
         nijdotdwij = (d_nx[d_idx] - s_nx[s_idx]) * DWIJ[0] + \
