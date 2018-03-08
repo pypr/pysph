@@ -31,7 +31,6 @@ class SmoothedColor(Equation):
 
     """
     def __init__(self, dest, sources):
-        self.smooth = smooth
         super(SmoothedColor, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_scolor):
