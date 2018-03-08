@@ -229,7 +229,7 @@ class TestMegaGroup(unittest.TestCase):
         expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
         self.assertEqual(all_eqs_order, expect)
 
-        self.assertEqual(list(sources.keys()), ['s', 'f'])
+        self.assertEqual(sorted(sources.keys()), ['f', 's'])
         s_eqs = [x.__class__.__name__ for x in sources['s'].equations]
         expect = ['SimpleEquation', 'DummyEquation']
         self.assertEqual(s_eqs, expect)
