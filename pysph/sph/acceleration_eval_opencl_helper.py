@@ -185,8 +185,13 @@ class OpenCLAccelerationEval(object):
             info = helper.calls[i]
             type = info['type']
             if type == 'method':
-                method = getattr(self, info.get('method'))
-                method(*info.get('args'))
+                method_name = info.get('method')
+                method = getattr(self, method_name)
+                if method_name == 'do_reduce':
+                    _args = info.get('args')
+                    method(_args[0], _args[1], t, dt)
+                else:
+                    method(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -214,9 +219,9 @@ class OpenCLAccelerationEval(object):
         self.nnps.update_domain()
         self.nnps.update()
 
-    def do_reduce(self, eqs, dest):
+    def do_reduce(self, eqs, dest, t, dt):
         for eq in eqs:
-            eq.reduce(dest)
+            eq.reduce(dest, t, dt)
 
 
 def add_address_space(known_types):

@@ -25,7 +25,7 @@ def create_particles():
 
 
 class TotalMass(Equation):
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         m = serial_reduce_array(dst.m, op='sum')
         dst.total_mass[0] = parallel_reduce_array(m, op='sum')
 

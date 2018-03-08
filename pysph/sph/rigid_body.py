@@ -67,7 +67,7 @@ def declare(*args): pass
 
 
 class RigidBodyMoments(Equation):
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         # FIXME: this will be slow in opencl
         nbody = declare('int')
         i = declare('int')

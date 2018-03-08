@@ -14,8 +14,10 @@ from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
 from pysph.base.cython_generator import declare
 from pysph.sph.equation import Equation, Group
-from pysph.sph.acceleration_eval import (AccelerationEval,
-                                         check_equation_array_properties)
+from pysph.sph.acceleration_eval import (
+    AccelerationEval, MegaGroup, CythonGroup,
+    check_equation_array_properties
+)
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
@@ -176,7 +178,7 @@ class SimpleReduction(Equation):
     def initialize(self, d_idx, d_au):
         d_au[d_idx] = 0.0
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         dst.total_mass[0] = serial_reduce_array(dst.m, op='sum')
         if dst.gpu is not None:
             dst.gpu.push('total_mass')
@@ -200,9 +202,41 @@ class LoopAllEquation(Equation):
         for i in range(N_NBRS):
             s_idx = NBRS[i]
             xij[0] = d_x[d_idx] - s_x[s_idx]
-            rij = fabs(xij[0])
+            rij = abs(xij[0])
             sum += s_m[s_idx]*KERNEL.kernel(xij, rij, s_h[s_idx])
         d_rho[d_idx] += sum
+
+
+class TestMegaGroup(unittest.TestCase):
+    def test_ensure_group_retains_user_order_of_equations(self):
+        # Given
+        group = Group(equations=[
+            SimpleEquation(dest='f', sources=['s', 'f']),
+            DummyEquation(dest='f', sources=['s', 'f']),
+            MixedTypeEquation(dest='f', sources=['f']),
+        ])
+
+        # When
+        mg = MegaGroup(group, CythonGroup)
+
+        # Then
+        data = mg.data
+        self.assertEqual(list(data.keys()), ['f'])
+        eqs_with_no_source, sources, all_eqs = data['f']
+        self.assertEqual(len(eqs_with_no_source.equations), 0)
+
+        all_eqs_order = [x.__class__.__name__ for x in all_eqs.equations]
+        expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
+        self.assertEqual(all_eqs_order, expect)
+
+        self.assertEqual(sorted(sources.keys()), ['f', 's'])
+        s_eqs = [x.__class__.__name__ for x in sources['s'].equations]
+        expect = ['SimpleEquation', 'DummyEquation']
+        self.assertEqual(s_eqs, expect)
+
+        f_eqs = [x.__class__.__name__ for x in sources['f'].equations]
+        expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
+        self.assertEqual(f_eqs, expect)
 
 
 class TestAccelerationEval1D(unittest.TestCase):
