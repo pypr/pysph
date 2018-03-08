@@ -664,7 +664,7 @@ class CythonGroup(Group):
                 if 'KERNEL' in args:
                     args[args.index('KERNEL')] = 'self.kernel'
                 if kind == 'reduce':
-                    args = ['dst.array']
+                    args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)
                 c = 'self.{eq_name}.{method}({args})'\
                     .format(eq_name=eq.var_name, method=kind, args=call_args)

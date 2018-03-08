@@ -615,7 +615,7 @@ equation:
 .. code-block:: python
 
     class FindMaxU(Equation):
-        def reduce(self, dst):
+        def reduce(self, dst, t, dt):
             m = serial_reduce_array(dst.m, 'sum')
             max_u = serial_reduce_array(dst.u, 'max')
             dst.total_mass[0] = parallel_reduce_array(m, 'sum')
@@ -624,6 +624,8 @@ equation:
 where:
 
     - ``dst``: refers to a destination ``ParticleArray``.
+
+    - ``t, dt``: are the current time and timestep respectively.
 
     - ``serial_reduce_array``: is a special function provided that performs
       reductions correctly in serial. It currently supports ``sum, prod, max``

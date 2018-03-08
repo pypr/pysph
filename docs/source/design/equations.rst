@@ -52,7 +52,7 @@ methods of a typical :py:class:`Equation` subclass::
       def post_loop(self, d_idx ...):
           # called after all looping is done.
 
-      def reduce(self, dst):
+      def reduce(self, dst, t, dt):
           # Called once for the destination array.
           # Any Python code can go here.
 
@@ -115,7 +115,8 @@ The reduce function is called only once every time the accelerations are
 evaluated. As such you may write any Python code there. The only caveat is
 that when using the CPU, one will have to declare any variables used a little
 carefully -- ideally declare any variables used in this as
-``declare('object')``.
+``declare('object')``. On the GPU, this function is not called via OpenCL and
+is a pure Python function.
 
 
 
@@ -258,7 +259,7 @@ equation:
 .. code-block:: python
 
     class FindMaxU(Equation):
-        def reduce(self, dst):
+        def reduce(self, dst, t, dt):
             m = serial_reduce_array(dst.m, 'sum')
             max_u = serial_reduce_array(dst.u, 'max')
             dst.total_mass[0] = parallel_reduce_array(m, 'sum')
@@ -267,6 +268,8 @@ equation:
 where:
 
     - ``dst``: refers to a destination ``ParticleArray``.
+
+    - ``t, dt``: are the current time and timestep respectively.
 
     - ``serial_reduce_array``: is a special function provided that performs
       reductions correctly in serial. It currently supports ``sum, prod, max``

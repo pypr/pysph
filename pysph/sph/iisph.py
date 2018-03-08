@@ -297,7 +297,7 @@ class PressureSolve(Equation):
         d_piter[d_idx] = p
         d_p[d_idx] = p
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         dst.tmp_comp[0] = serial_reduce_array(dst.compression > 0.0, 'sum')
         dst.tmp_comp[1] = serial_reduce_array(dst.compression, 'sum')
         dst.tmp_comp[:] = parallel_reduce_array(dst.tmp_comp, 'sum')
