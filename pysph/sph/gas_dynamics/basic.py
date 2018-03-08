@@ -57,7 +57,7 @@ class SummationDensityADKE(Equation):
         d_arho[d_idx] = 0
         d_logrho[d_idx] = log(d_rho[d_idx])
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         n = len(dst.x)
         tmp_sum_logrho = serial_reduce_array(dst.logrho, 'sum')
         sum_logrho = parallel_reduce_array(tmp_sum_logrho, 'sum')

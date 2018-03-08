@@ -176,7 +176,7 @@ class SimpleReduction(Equation):
     def initialize(self, d_idx, d_au):
         d_au[d_idx] = 0.0
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         dst.total_mass[0] = serial_reduce_array(dst.m, op='sum')
         if dst.gpu is not None:
             dst.gpu.push('total_mass')
