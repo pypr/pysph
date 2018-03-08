@@ -30,7 +30,7 @@ class SmoothedColor(Equation):
     particle.
 
     """
-    def __init__(self, dest, sources, smooth=False):
+    def __init__(self, dest, sources):
         self.smooth = smooth
         super(SmoothedColor, self).__init__(dest, sources)
 
