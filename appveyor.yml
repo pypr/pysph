@@ -22,7 +22,7 @@ install:
   - edm install -y numpy cython pytest mock h5py
 
   # Install pysph related dependencies.
-  - edm run -- pip install -r requirements.txt
+  - edm run -- pip install -r requirements.txt -r requirements-test.txt
 
   # Build pysph.
   - edm run -- python setup.py develop
