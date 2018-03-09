@@ -10,7 +10,7 @@ from pysph.base.ext_module import ExtModule
 
 
 ###############################################################################
-def get_code(obj):
+def get_cython_code(obj):
     """This function looks at the object and gets any additional code to
     wrap from either the `_cython_code_` method or the `_get_helpers_` method.
     """
@@ -19,13 +19,18 @@ def get_code(obj):
         code = obj._cython_code_()
         doc = '# From %s' % obj.__class__.__name__
         result.extend([doc, code] if len(code) > 0 else [])
-    if hasattr(obj, '_get_helpers_'):
-        cg = CythonGenerator()
-        doc = '# From %s' % obj.__class__.__name__
-        result.append(doc)
-        for helper in obj._get_helpers_():
-            cg.parse(helper)
-            result.append(cg.get_code())
+    return result
+
+
+def get_helper_code(helpers):
+    """Given a list of helpers, return the helper code suitably wrapped.
+    """
+    result = []
+    result.append('# Helpers')
+    cg = CythonGenerator()
+    for helper in helpers:
+        cg.parse(helper)
+        result.append(cg.get_code())
     return result
 
 
@@ -39,7 +44,7 @@ def get_all_array_names(particle_arrays):
     Parameters
     ----------
 
-    particle_arrays : list
+    particle_array : list
         A list of particle arrays.
 
     Examples
@@ -158,12 +163,21 @@ class AccelerationEvalCythonHelper(object):
 
     def get_header(self):
         object = self.object
+        helpers = []
         headers = []
-        headers.extend(get_code(object.kernel))
+        headers.extend(get_cython_code(object.kernel))
+        if hasattr(object.kernel, '_get_helpers_'):
+            helpers.extend(object.kernel._get_helpers_())
 
         # get headers from the Equations
         for equation in object.all_group.equations:
-            headers.extend(get_code(equation))
+            headers.extend(get_cython_code(equation))
+            if hasattr(equation, '_get_helpers_'):
+                for helper in equation._get_helpers_():
+                    if helper not in helpers:
+                        helpers.append(helper)
+
+        headers.extend(get_helper_code(helpers))
 
         # Kernel wrappers.
         cg = CythonGenerator(known_types=self.known_types)
