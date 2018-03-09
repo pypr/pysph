@@ -30,8 +30,6 @@ class SmoothedColor(Equation):
     particle.
 
     """
-    def __init__(self, dest, sources):
-        super(SmoothedColor, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_scolor):
         d_scolor[d_idx] = 0.0
