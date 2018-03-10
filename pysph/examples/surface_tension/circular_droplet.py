@@ -18,7 +18,8 @@ from pysph.sph.equation import Group
 
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
-from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
+from pysph.sph.wc.transport_velocity import SummationDensity, \
+    MomentumEquationPressureGradient,\
     SolidWallPressureBC, SolidWallNoSlipBC, \
     StateEquation, MomentumEquationArtificialStress, MomentumEquationViscosity
 
@@ -74,7 +75,7 @@ factor2 = 1./factor1
 epsilon = 0.01/h0
 
 # time steps
-dt_cfl = 0.25 * h0/( 1.1*c0 )
+dt_cfl = 0.25 * h0/(1.1*c0)
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
@@ -91,18 +92,21 @@ class CircularDroplet(Application):
 
     def create_particles(self):
         if staggered:
-            x1, y1 = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
-            x2, y2 = numpy.mgrid[ dx:domain_width:dx, dy:domain_height:dy ]
+            x1, y1 = numpy.mgrid[dxb2:domain_width:dx, dyb2:domain_height:dy]
+            x2, y2 = numpy.mgrid[dx:domain_width:dx, dy:domain_height:dy]
 
-            x1 = x1.ravel(); y1 = y1.ravel()
-            x2 = x2.ravel(); y2 = y2.ravel()
+            x1 = x1.ravel()
+            y1 = y1.ravel()
+            x2 = x2.ravel()
+            y2 = y2.ravel()
 
-            x = numpy.concatenate( [x1, x2] )
-            y = numpy.concatenate( [y1, y2] )
+            x = numpy.concatenate([x1, x2])
+            y = numpy.concatenate([y1, y2])
             volume = dx*dx/2
         else:
-            x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
-            x = x.ravel(); y = y.ravel()
+            x, y = numpy.mgrid[dxb2:domain_width:dx, dyb2:domain_height:dy]
+            x = x.ravel()
+            y = y.ravel()
             volume = dx*dx
 
         m = numpy.ones_like(x) * volume * rho0
@@ -149,25 +153,24 @@ class CircularDroplet(Application):
 
         # set the color of the inner circle
         for i in range(x.size):
-            if ( ((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) <= 0.25**2 ):
+            if (((fluid.x[i]-0.5)**2 + (fluid.y[i]-0.5)**2) <= 0.25**2):
                 fluid.color[i] = 1.0
 
         # particle volume
         fluid.V[:] = 1./volume
 
         # set additional output arrays for the fluid
-        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta', 'p',
-                                 'kappa', 'N', 'scolor'])
+        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny',
+                                 'ddelta', 'p', 'kappa', 'N', 'scolor'])
 
-        print("2D Circular droplet deformation with %d fluid particles"%(
+        print("2D Circular droplet deformation with %d fluid particles" % (
                 fluid.get_number_of_particles()))
 
-        return [fluid,]
-
+        return [fluid, ]
 
     def create_solver(self):
         kernel = QuinticSpline(dim=2)
-        integrator = PECIntegrator( fluid=TransportVelocityStep() )
+        integrator = PECIntegrator(fluid=TransportVelocityStep())
         solver = Solver(
             kernel=kernel, dim=dim, integrator=integrator,
             dt=dt, tf=tf, adaptive_timestep=False, pfreq=1)
@@ -181,8 +184,8 @@ class CircularDroplet(Application):
             # number density (1/volume) is explicitly set for the solid phase
             # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity( dest='fluid', sources=['fluid'] ),
-                    ] ),
+                    SummationDensity(dest='fluid', sources=['fluid']),
+                    ]),
 
             # Given the updated number density for the fluid, we can update
             # the fluid pressure. Also compute the smoothed color based on the
@@ -190,8 +193,8 @@ class CircularDroplet(Application):
             Group(equations=[
                     StateEquation(dest='fluid', sources=None, rho0=rho0,
                                   p0=p0, b=1.0),
-                    SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
-                    ] ),
+                    SmoothedColor(dest='fluid', sources=['fluid']),
+                    ]),
 
             #################################################################
             # Begin Surface tension formulation
@@ -199,34 +202,39 @@ class CircularDroplet(Application):
             # Scale the smoothing lengths to determine the interface
             # quantities.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=factor1)
-                    ], update_nnps=False ),
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=factor1)
+                    ], update_nnps=False),
 
             # Compute the gradient of the color function with respect to the
             # new smoothing length. At the end of this Group, we will have the
             # interface normals and the discretized dirac delta function for
             # the fluid-fluid interface.
             Group(equations=[
-                    MorrisColorGradient(dest='fluid', sources=['fluid'], epsilon=0.01/h0),
-                    #ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid'],
+                    MorrisColorGradient(dest='fluid', sources=['fluid'],
+                                        epsilon=0.01/h0),
+                    # ColorGradientUsingNumberDensity(dest='fluid',sources=['fluid'],
                     #                                epsilon=epsilon),
-                    #AdamiColorGradient(dest='fluid', sources=['fluid']),
+                    # AdamiColorGradient(dest='fluid', sources=['fluid']),
                     ],
                   ),
 
             # Compute the interface curvature using the modified smoothing
             # length and interface normals computed in the previous Group.
             Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
-                                                        with_morris_correction=True),
-                    #AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
+                    InterfaceCurvatureFromNumberDensity(
+                        dest='fluid', sources=['fluid'],
+                        with_morris_correction=True
+                    ),
+                    # AdamiReproducingDivergence(dest='fluid',sources=['fluid'],
                     #                           dim=2),
                     ], ),
 
             # Now rescale the smoothing length to the original value for the
             # rest of the computations.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=factor2)
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=factor2)
                     ], update_nnps=False,
                   ),
             #################################################################
@@ -247,14 +255,18 @@ class CircularDroplet(Application):
                         dest='fluid', sources=['fluid'], nu=nu),
 
                     # Surface tension force for the SY11 formulation
-                    ShadlooYildizSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+                    ShadlooYildizSurfaceTensionForce(dest='fluid',
+                                                     sources=None,
+                                                     sigma=sigma),
 
                     # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                    MomentumEquationArtificialStress(dest='fluid',
+                                                     sources=['fluid']),
 
                     ], )
         ]
         return equations
+
 
 if __name__ == '__main__':
     app = CircularDroplet()
