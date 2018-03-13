@@ -454,7 +454,7 @@ class GSPHAcceleration(Equation):
             # variable smoothing lengths
             if not self.interface_zero:
                 vij = 0.5 * (vij_i + vij_j)
-                sstar = 0.5 * hij*hij * cij*dij/vij
+                sstar = 0.5 * hij*hij * cij*dij/(vij*vij)
 
         # cubic spline interpolation
         elif self.interpolation == 2:
@@ -467,13 +467,27 @@ class GSPHAcceleration(Equation):
                 cij = 1.5 * (Vi - Vj)/sij - 0.25 * (Vip + Vjp)
                 dij = 0.5 * (Vi + Vj) - 0.125*(Vip - Vjp)*sij
 
-            vij_i = ((15.0)/(64.0)*hi**6 * aij*aij +
-                     (3.0)/(16.0) * hi**4 * (2*aij*cij + bij*bij) +
-                     0.25*hi*hi*(2*bij*dij + cij*cij) + dij * dij)
+            hi2 = hi*hi
+            hj2 = hj*hj
+            hi4 = hi2*hi2
+            hj4 = hj2*hj2
+            hi6 = hi4*hi2
+            hj6 = hj4*hj2
 
-            vij_j = ((15.0)/(64.0)*hj**6 * aij*aij +
-                     (3.0)/(16.0) * hj**4 * (2*aij*cij + bij*bij) +
-                     0.25*hj*hj * (2*bij*dij + cij*cij) + dij * dij)
+            vij_i = ((15.0)/(64.0)*hi6 * aij*aij +
+                     (3.0)/(16.0) * hi4 * (2*aij*cij + bij*bij) +
+                     0.25*hi2*(2*bij*dij + cij*cij) + dij * dij)
+
+            vij_j = ((15.0)/(64.0)*hj6 * aij*aij +
+                     (3.0)/(16.0) * hj4 * (2*aij*cij + bij*bij) +
+                     0.25*hj2 * (2*bij*dij + cij*cij) + dij * dij)
+            hij2 = hij*hij
+            hij4 = hij2*hij2
+            if not self.interface_zero:
+                vij = 0.5*(vij_i + vij_j)
+                sstar = ((15.0/32.0)*hij4*hij2*aij*bij +
+                         (3.0/8.0)*hij4*(aij*dij + bij*cij) +
+                         0.5*hij2*cij*dij)/(vij*vij)
         else:
             printf("Unknown interpolation type")
 
