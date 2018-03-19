@@ -145,13 +145,13 @@ class ContinuityEquation(Equation):
         \boldsymbol{v}_{ab} \cdot \nabla_a W_{ab}
 
     """
+
     def initialize(self, d_idx, d_arho):
         d_arho[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_arho, s_m, d_rho, s_rho, VIJ, DWIJ):
-        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
-
-        d_arho[d_idx] += d_rho[d_idx] * s_m[s_idx]/s_rho[s_idx] * vijdotdwij
+    def loop(self, d_idx, s_idx, d_arho, s_V, d_rho, VIJ, DWIJ):
+        vijdotdwij = VIJ[0] * DWIJ[0] + VIJ[1] * DWIJ[1] + VIJ[2] * DWIJ[2]
+        d_arho[d_idx] += d_rho[d_idx] * vijdotdwij / s_V[s_idx]
 
 
 class StateEquation(Equation):

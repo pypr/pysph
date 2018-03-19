@@ -116,7 +116,10 @@ class Dambreak2D(Application):
                             gy=-9.81, alpha=alp, gamma=gamma, update_h=True)
         edac = EDACScheme(['fluid'], ['wall', 'cube'], dim=2, rho0=ro, c0=co,
                           alpha=alp, nu=0.0, h=0.03, gy=-9.81, clamp_p=True)
-        return SchemeChooser(default='wcsph', wcsph=wcsph, edac=edac)
+        aha = AdamiHuAdamsScheme(['fluid'], ['wall', 'cube'], dim=2, rho0=ro,
+                                 h0=0.03, gamma=1.0, alpha=alp, gy=-9.81,
+                                 nu=0.0, c0=co)
+        return SchemeChooser(default='wcsph', aha=aha, wcsph=wcsph, edac=edac)
 
     def configure_scheme(self):
         s = self.scheme

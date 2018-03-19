@@ -10,6 +10,7 @@ class Config(object):
         self._use_openmp = None
         self._use_opencl = None
         self._use_double = None
+        self._omp_schedule = None
         self._profile = None
 
     @property
@@ -24,6 +25,34 @@ class Config(object):
 
     def _use_openmp_default(self):
         return False
+
+    @property
+    def omp_schedule(self):
+        if self._omp_schedule is None:
+            self._omp_schedule = self._omp_schedule_default()
+        return self._omp_schedule
+
+    @omp_schedule.setter
+    def omp_schedule(self, value):
+        if len(value) != 2 or \
+           value[0].lower() not in ("static", "dynamic", "guided"):
+            raise ValueError("Invalid OpenMP Schedule: {}".format(value))
+
+        self._omp_schedule = value
+
+    def set_omp_schedule(self, omp_schedule):
+        """
+        Expects input to be in the format used by OMP_SCHEDULE
+        i.e. "schedule_type, chunk_size"
+        """
+        temp = omp_schedule.split(",")
+        if len(temp) == 2:
+            self.omp_schedule = (temp[0], int(temp[1]))
+        else:
+            self.omp_schedule = (temp[0], None)
+
+    def _omp_schedule_default(self):
+        return ("dynamic", 64)
 
     @property
     def use_opencl(self):
