@@ -25,13 +25,6 @@ _queue = None
 _profile_info = defaultdict(float)
 
 
-# args: uint* indices, dtype array, int length
-REMOVE_KNL = Template(r"""//CL//
-        unsigned int idx = indices[n - 1 - i];
-        array[idx] = array[length - 1 - i];
-""")
-
-
 # args: tag_array, tag, indices, head
 REMOVE_INDICES_KNL = Template(r"""//CL//
         if(tag_array[i] == tag)
@@ -189,27 +182,31 @@ class DeviceArray(object):
         if len(indices) > self.length:
             return
 
-        if not input_sorted:
-            radix_sort = cl.algorithm.RadixSort(
-                self.ctx,
-                "unsigned int* indices",
-                scan_kernel=GenericScanKernel, key_expr="indices[i]",
-                sort_arg_names=["indices"]
-            )
+        if_remove = DeviceArray(np.int32, n=self.length)
+        if_remove.fill(0)
+        new_array = self.copy()
 
-            (sorted_indices,), event = radix_sort(indices)
+        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
+                "int* indices, int* if_remove",
+                "if_remove[indices[i]] = 1;")
 
-        else:
-            sorted_indices = indices
+        fill_if_remove_knl(indices, if_remove.array)
 
-        args = "uint* indices, %(dtype)s* array, uint length" % \
-            {"dtype": cl.tools.dtype_to_ctype(self.dtype)}
-        src = REMOVE_KNL.render()
-        remove = get_elwise_kernel("remove", args, src)
+        remove_knl = GenericScanKernel(
+                self.ctx, np.int32,
+                arguments="__global int *if_remove,\
+                            __global %(dtype)s *array,\
+                            __global %(dtype)s *new_array" % \
+                            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
+                input_expr="if_remove[i]",
+                scan_expr="a+b", neutral="0",
+                output_statement="""
+                    if(!if_remove[i]) new_array[i - item] = array[i];
+                    """)
 
-        remove(sorted_indices, self.array, self.length)
-        self.length -= len(indices)
-        self._update_array_ref()
+        remove_knl(if_remove.array, self.array, new_array.array)
+
+        self.set_data(new_array.array[:-len(indices)])
 
     def align(self, indices):
         self.set_data(cl.array.take(self.array, indices))
@@ -430,17 +427,31 @@ class DeviceHelper(object):
             msg += 'number of particles in array'
             raise ValueError(msg)
 
-        radix_sort = cl.algorithm.RadixSort(
-            self._ctx,
-            "unsigned int* indices",
-            scan_kernel=GenericScanKernel, key_expr="indices[i]",
-            sort_arg_names=["indices"]
-        )
+        if_remove = DeviceArray(np.int32,
+                                n=self.get_number_of_particles())
+        if_remove.fill(0)
+        new_indices = DeviceArray(np.uint32,
+                                  n=self.get_number_of_particles())
 
-        (sorted_indices,), event = radix_sort(indices)
+        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
+                "int* indices, uint* if_remove",
+                "if_remove[indices[i]] = 1;")
+
+        fill_if_remove_knl(indices, if_remove.array)
+
+        remove_knl = GenericScanKernel(
+                self._ctx, np.int32,
+                arguments="__global int *if_remove, __global uint *new_indices",
+                input_expr="if_remove[i]",
+                scan_expr="a+b", neutral="0",
+                output_statement="""
+                    if(!if_remove[i]) new_indices[i - item] = i;
+                    """)
+
+        remove_knl(if_remove.array, new_indices.array)
 
         for prop in self.properties:
-            self._data[prop].remove(sorted_indices, 1)
+            self._data[prop].align(new_indices.array[:-len(indices)])
             setattr(self, prop, self._data[prop].array)
 
         if len(indices) > 0:
