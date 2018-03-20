@@ -4,6 +4,7 @@ An interface to output the data in various format
 
 import numpy
 import os
+import sys
 
 from pysph.base.particle_array import ParticleArray
 from pysph.base.utils import get_particles_info, get_particle_array
@@ -13,7 +14,7 @@ output_formats = ('hdf5', 'npz')
 
 
 def _to_str(s):
-    if isinstance(s, bytes):
+    if isinstance(s, bytes) and sys.version_info[0] > 2:
         return s.decode('utf-8')
     else:
         return str(s)
