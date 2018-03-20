@@ -12,6 +12,13 @@ from pysph import has_h5py
 output_formats = ('hdf5', 'npz')
 
 
+def _to_str(s):
+    if isinstance(s, bytes):
+        return s.decode('utf-8')
+    else:
+        return str(s)
+
+
 class Output(object):
     """ Class that handles output for simulation """
     def __init__(self, detailed_output=False, only_real=True, mpi_comm=None,
@@ -168,14 +175,14 @@ class HDFOutput(Output):
             const_grp = prop_array['constants']
             arrays_grp = prop_array['arrays']
             constants = self._get_constants(const_grp)
-            array = ParticleArray(str(name), constants=constants)
+            array = ParticleArray(_to_str(name), constants=constants)
 
             for pname, h5obj in arrays_grp.items():
-                prop_name = str(h5obj.attrs['name'])
-                type_ = str(h5obj.attrs['type'])
+                prop_name = _to_str(h5obj.attrs['name'])
+                type_ = _to_str(h5obj.attrs['type'])
                 default = h5obj.attrs['default']
                 if h5obj.attrs['stored']:
-                    output_array.append(str(pname))
+                    output_array.append(_to_str(pname))
                     array.add_property(
                             prop_name, type_, default, numpy.array(h5obj))
                 else:
@@ -187,13 +194,13 @@ class HDFOutput(Output):
     def _get_solver_data(self, grp):
         solver_data = {}
         for name, value in grp.attrs.items():
-            solver_data[str(name)] = value
+            solver_data[_to_str(name)] = value
         return solver_data
 
     def _get_constants(self, grp):
         constants = {}
         for const_name, const_data in grp.items():
-            constants[str(const_name)] = numpy.array(const_data)
+            constants[_to_str(const_name)] = numpy.array(const_data)
         return constants
 
     def _set_constants(self, pdata, ptype_grp):
