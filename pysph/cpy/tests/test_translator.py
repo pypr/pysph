@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 
 from pysph.base.config import get_config
-from pysph.base.translator import (
+from ..translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
     OpenCLConverter, py2c
 )

@@ -5,8 +5,7 @@ from mako.template import Template
 from pyzoltan.core import carray
 
 from pysph.base.config import get_config
-from pysph.base.cython_generator import CythonGenerator, KnownType
-from pysph.base.ext_module import ExtModule
+from pysph.cpy.api import CythonGenerator, ExtModule, KnownType
 
 
 ###############################################################################

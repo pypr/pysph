@@ -6,7 +6,7 @@ import numpy as np
 
 # Local library imports.
 from pysph.base.particle_array import ParticleArray
-from pysph.base.cython_generator import KnownType
+from pysph.cpy.api import KnownType
 from pysph.sph.acceleration_eval_cython_helper import (get_all_array_names,
     get_known_types_for_arrays)
 
@@ -47,4 +47,3 @@ class TestGetKnownTypesForAllArrays(unittest.TestCase):
          's_x': KnownType("double*")}
         for key in expect:
             self.assertEqual(repr(result[key]), repr(expect[key]))
-

@@ -28,7 +28,7 @@ except ImportError:
 # Package imports.
 import pysph
 from pysph.base.config import get_config
-from pysph.base.capture_stream import CaptureMultipleStreams
+from .capture_stream import CaptureMultipleStreams
 
 
 def get_platform_dir():

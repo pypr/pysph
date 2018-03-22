@@ -12,7 +12,7 @@ import numpy as np
 # Local imports.
 from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
-from pysph.base.cython_generator import declare
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (
     AccelerationEval, MegaGroup, CythonGroup,

@@ -14,7 +14,7 @@ try:
 except ImportError:
     import mock
 
-from pysph.base.ext_module import get_md5, ExtModule
+from ..ext_module import get_md5, ExtModule
 
 
 def _check_write_source(root):
@@ -31,7 +31,7 @@ def _check_write_source(root):
         return orig_side_effect(*args, **kw)
     m.side_effect = _side_effect
 
-    with mock.patch('pysph.base.ext_module.open', m, create=True):
+    with mock.patch('pysph.cpy.ext_module.open', m, create=True):
         ExtModule("print('hello')", root=root)
     return m.call_count
 

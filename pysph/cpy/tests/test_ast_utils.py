@@ -3,8 +3,8 @@ import ast
 from textwrap import dedent
 import unittest
 
-from pysph.base.ast_utils import (get_assigned, get_aug_assign_symbols, get_symbols,
-    has_node, has_return)
+from ..ast_utils import (get_assigned, get_aug_assign_symbols,
+                         get_symbols, has_node, has_return)
 
 
 class TestASTUtils(unittest.TestCase):
