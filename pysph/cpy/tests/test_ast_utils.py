@@ -4,7 +4,7 @@ from textwrap import dedent
 import unittest
 
 from ..ast_utils import (get_assigned, get_aug_assign_symbols,
-                         get_symbols, has_node, has_return)
+                         get_symbols, get_calls, has_node, has_return)
 
 
 class TestASTUtils(unittest.TestCase):
@@ -93,6 +93,22 @@ class TestASTUtils(unittest.TestCase):
         assigned = list(sorted(get_assigned(code)))
         expect = ['u', 'v', 'x', 'y']
         self.assertEqual(assigned, expect)
+
+    def test_get_calls(self):
+        # Given
+        code = dedent('''
+        def f(x):
+            g(h(x))
+            func(x)
+            sin(x)
+        ''')
+
+        # When
+        calls = get_calls(code)
+
+        # Then
+        expect = ['g', 'h', 'func', 'sin']
+        self.assertSetEqual(set(expect), calls)
 
 
 if __name__ == '__main__':

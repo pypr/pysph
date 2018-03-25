@@ -14,6 +14,7 @@ import inspect
 import re
 import sys
 from textwrap import dedent, wrap
+import types
 
 import numpy as np
 from mako.template import Template
@@ -225,6 +226,15 @@ class CConverter(ast.NodeVisitor):
     def get_struct_from_instance(self, obj):
         helper = CStructHelper(obj)
         return helper.get_code() + '\n'
+
+    def parse(self, obj):
+        obj_type = type(obj)
+        if isinstance(obj, types.FunctionType):
+            return self.parse_function(obj)
+        elif hasattr(obj, '__class__'):
+            return self.parse_instance(obj)
+        else:
+            raise TypeError('Unsupport type to wrap: %s' % obj_type)
 
     def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
