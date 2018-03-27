@@ -24,6 +24,32 @@ from .ast_utils import get_assigned, has_return
 logger = logging.getLogger(__name__)
 
 
+def get_parallel_range(start, stop=None, step=1):
+    config = get_config()
+    if stop is None:
+        stop = start
+        start = 0
+
+    args = "{start},{stop},{step}"
+    if config.use_openmp:
+        schedule = config.omp_schedule[0]
+        chunksize = config.omp_schedule[1]
+
+        if schedule is not None:
+            args = args + ", schedule='{schedule}'"
+
+        if chunksize is not None:
+            args = args + ", chunksize={chunksize}"
+
+        args = args.format(start=start, stop=stop, step=step,
+                           schedule=schedule, chunksize=chunksize)
+        return "prange({})".format(args)
+
+    else:
+        args = args.format(start=start, stop=stop, step=step)
+        return "range({})".format(args)
+
+
 class CythonClassHelper(object):
     def __init__(self, name='', public_vars=None, methods=None):
         self.name = name

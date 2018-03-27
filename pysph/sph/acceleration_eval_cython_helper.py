@@ -5,7 +5,9 @@ from mako.template import Template
 from pyzoltan.core import carray
 
 from pysph.base.config import get_config
-from pysph.cpy.api import CythonGenerator, ExtModule, KnownType
+from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
+                                        get_parallel_range)
+from pysph.cpy.ext_module import ExtModule
 
 
 ###############################################################################
@@ -246,28 +248,7 @@ class AccelerationEvalCythonHelper(object):
             return "if True: # Placeholder used for OpenMP."
 
     def get_parallel_range(self, start, stop=None, step=1):
-        if stop is None:
-            stop = start
-            start = 0
-
-        args = "{start},{stop},{step}"
-        if self.config.use_openmp:
-            schedule = self.config.omp_schedule[0]
-            chunksize = self.config.omp_schedule[1]
-
-            if schedule is not None:
-                args = args + ", schedule='{schedule}'"
-
-            if chunksize is not None:
-                args = args + ", chunksize={chunksize}"
-
-            args = args.format(start=start, stop=stop, step=step,
-                               schedule=schedule, chunksize=chunksize)
-            return "prange({})".format(args)
-
-        else:
-            args = args.format(start=start, stop=stop, step=step)
-            return "range({})".format(args)
+        return get_parallel_range(start, stop, step)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
