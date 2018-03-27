@@ -158,6 +158,21 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
+    def test_func_signature(self):
+        # Given
+        def f(x=1, y=[1.0]):
+            pass
+
+        cg = CythonGenerator()
+        # When
+        py_data, c_data = cg.get_func_signature(f)
+
+        # Then
+        self.assertEqual(py_data[0], ['long x', 'double[:] y'])
+        self.assertEqual(py_data[1], ['x', '&y[0]'])
+        self.assertEqual(c_data[0], ['long x', 'double* y'])
+        self.assertEqual(c_data[1], ['x', 'y'])
+
     def test_simple_method(self):
         cg = CythonGenerator()
         cg.parse(EqWithMethod())

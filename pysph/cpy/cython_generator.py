@@ -232,7 +232,43 @@ class CythonGenerator(object):
         elif hasattr(obj, '__class__'):
             self._parse_instance(obj)
         else:
-            raise TypeError('Unsupport type to wrap: %s' % obj_type)
+            raise TypeError('Unsupported type to wrap: %s' % obj_type)
+
+    def get_func_signature(self, func):
+        """Given a function that is wrapped, return the Python wrapper definition
+        signature and the Python call signature and the C wrapper definition
+        and C call signature.
+
+        For example if we had
+
+        def f(x=1, y=[1.0]):
+            pass
+
+        If this were passed we would get back:
+
+        (['int x', 'double[:] y'], ['x', '&y[0]']),
+        (['int x', 'double* y'], ['x', 'y'])
+
+        """
+        sourcelines = inspect.getsourcelines(func)[0]
+        defn, lines = get_func_definition(sourcelines)
+        f_name, returns, args = self._analyze_method(func, lines)
+        py_args = []
+        py_call = []
+        c_args = []
+        c_call = []
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
+            c_call.append(arg)
+            py_type = self.ctype_to_python(c_type)
+            py_args.append('{type} {arg}'.format(type=py_type, arg=arg))
+            if c_type.endswith('*'):
+                py_call.append('&{arg}[0]'.format(arg=arg))
+            else:
+                py_call.append('{arg}'.format(arg=arg))
+
+        return (py_args, py_call), (c_args, c_call)
 
     # #### Private protocol ###################################################
 
