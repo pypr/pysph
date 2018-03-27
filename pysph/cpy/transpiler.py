@@ -11,7 +11,7 @@ from .ext_module import ExtModule
 
 BUILTINS = set(
     [x for x in dir(math) if not x.startswith('_')] +
-    ['max', 'abs', 'min']
+    ['max', 'abs', 'min', 'range', 'declare']
 )
 
 
