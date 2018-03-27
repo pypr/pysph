@@ -2,17 +2,12 @@
 TODO:
 
 - Support for OpenCL.
-- Add proper tests.
 - Support for known types and pluggable detect_types.
 - Decorator.
 - Function annotation.
 - Cleanup.
 """
 
-import inspect
-import importlib
-import math
-from textwrap import dedent
 
 from mako.template import Template
 
@@ -20,7 +15,6 @@ from pyzoltan.core.carray import BaseArray
 
 from pysph.base.config import get_config
 
-from .ast_utils import get_calls
 from .cython_generator import get_parallel_range
 from .transpiler import Transpiler
 
@@ -41,24 +35,6 @@ cpdef py_${name}(${py_arg_sig}):
     c_${name}(${py_args})
 '''
 
-BUILTINS = set(
-    [x for x in dir(math) if not x.startswith('_')] +
-    ['max', 'abs', 'min']
-)
-
-
-def filter_calls(calls):
-    '''Given a set of calls filter out the math and other builtin functions.
-    '''
-    return [x for x in calls if x not in BUILTINS]
-
-
-def get_all_functions(func):
-    src = dedent('\n'.join(inspect.getsourcelines(func)[0]))
-    calls = filter_calls(get_calls(src))
-    mod = importlib.import_module(func.__module__)
-    return [getattr(mod, call) for call in calls]
-
 
 class Elementwise(object):
     def __init__(self, func, backend='cython'):
@@ -66,9 +42,6 @@ class Elementwise(object):
         self.tp.add(func)
         self.name = func.__name__
         self.func = func
-        for f in get_all_functions(func):
-            self.tp.add(f)
-
         self._config = get_config()
 
         py_data, c_data = self.tp._cgen.get_func_signature(func)

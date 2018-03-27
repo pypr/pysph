@@ -1,8 +1,34 @@
+import inspect
+import importlib
+import math
 from textwrap import dedent
 
+from .ast_utils import get_calls
 from .cython_generator import CythonGenerator
 from .translator import OpenCLConverter
 from .ext_module import ExtModule
+
+
+BUILTINS = set(
+    [x for x in dir(math) if not x.startswith('_')] +
+    ['max', 'abs', 'min']
+)
+
+
+def filter_calls(calls):
+    '''Given a set of calls filter out the math and other builtin functions.
+    '''
+    return [x for x in calls if x not in BUILTINS]
+
+
+def get_all_functions(func):
+    '''Given a function, return a list of all functions
+    that it calls ignoring standard math functions.
+    '''
+    src = dedent('\n'.join(inspect.getsourcelines(func)[0]))
+    calls = filter_calls(get_calls(src))
+    mod = importlib.import_module(func.__module__)
+    return [getattr(mod, call) for call in calls]
 
 
 class CodeBlock(object):
@@ -50,6 +76,9 @@ class Transpiler(object):
     def add(self, obj):
         if obj in self.blocks:
             return
+        for f in get_all_functions(obj):
+            self.add(f)
+
         if self.backend == 'cython':
             self._cgen.parse(obj)
             code = self._cgen.get_code()
