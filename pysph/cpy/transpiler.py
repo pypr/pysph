@@ -67,7 +67,6 @@ class Transpiler(object):
         elif backend == 'opencl':
             self._cgen = OpenCLConverter()
             self.header = dedent('''
-            #define abs fabs
             #define max(x, y) fmax((double)(x), (double)(y))
 
             __constant double pi=M_PI;
