@@ -12,7 +12,18 @@ def get_backend(backend=None):
         return backend
 
 
-def wrap(*args, backend=None):
+def wrap(*args, **kw):
+    '''
+    Parameters
+    ----------
+
+    *args: any numpy arrays to be wrapped.
+
+    **kw: only one keyword arg called `backend` is supported.
+
+    backend: str: use appropriate backend for arrays.
+    '''
+    backend = get_backend(kw.get('backend'))
     return [Array(x, backend=backend) for x in args]
 
 
