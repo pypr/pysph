@@ -34,7 +34,7 @@ REMOVE_INDICES_KNL = Template(r"""//CL//
 
 # args: tag_array, num_real_particles
 NUM_REAL_PARTICLES_KNL = Template(r"""//CL//
-        if(i != 0 && tag_array[i] != tag_array[i-1])
+        if(i != 0 && tag_array[i] != tag_array[i-1] && tag_array[i-1] == 0)
         {
             num_real_particles[0] = i;
             return;
@@ -329,14 +329,10 @@ class DeviceHelper(object):
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
-        if props:
-            for prop in props:
-                array = self._data[prop]
-                array.update_min_max()
-        else:
-            for prop in self.properties:
-                array = self._data[prop]
-                array.update_min_max()
+        props = props if props else self.properties
+        for prop in props:
+            array = self._data[prop]
+            array.update_min_max()
 
     def pull(self, *args):
         if len(args) == 0:
@@ -467,7 +463,7 @@ class DeviceHelper(object):
             the type of particles that need to be removed.
 
         """
-        tag_array = getattr(self, 'tag')
+        tag_array = self.tag
 
         remove_places = tag_array == tag
         num_indices = int(cl.array.sum(remove_places).get())
