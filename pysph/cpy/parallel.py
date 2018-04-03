@@ -1,16 +1,15 @@
-"""
-TODO:
+"""A set of parallel algorithms that allow users to solve a variety of
+problems. These functions are heavily inspired by the same functionality
+provided in pyopencl. However, we also provide Cython implementations for these
+and unify the syntax in a transparent way which allows users to write the code
+once and have it run on different execution backends.
 
-- Support for known types and pluggable detect_types.
-- Support for float/double.
-- Decorator.
-- Function annotation.
-- Cleanup.
 """
 
 import re
-
+from functools import wraps
 from textwrap import wrap
+
 from mako.template import Template
 
 from pyzoltan.core.carray import BaseArray
@@ -88,11 +87,13 @@ class Elementwise(object):
                 func=name,
                 args=', '.join(c_data[1])
             )
+            arguments = convert_to_float_if_needed(', '.join(c_data[0][1:]))
+            preamble = convert_to_float_if_needed(self.tp.get_code())
             knl = ElementwiseKernel(
                 ctx,
-                arguments=', '.join(c_data[0][1:]),
+                arguments=arguments,
                 operation=expr,
-                preamble=self.tp.get_code()
+                preamble=preamble
             )
             self.c_func = knl
 
@@ -136,3 +137,12 @@ class Elementwise(object):
         elif self.backend == 'opencl':
             self.c_func(*c_args)
             self.queue.finish()
+
+
+def elementwise(func=None, backend=None):
+    def _wrapper(function):
+        return wraps(function)(Elementwise(function, backend=backend))
+    if func is None:
+        return _wrapper
+    else:
+        return _wrapper(func)

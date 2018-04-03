@@ -1,3 +1,5 @@
+import numpy as np
+
 from pysph.base.config import get_config
 
 
@@ -43,18 +45,29 @@ class Array(object):
     def __init__(self, ary, backend=None):
         self.backend = get_backend(backend)
         self.data = ary
+        self._convert = False
         if self.backend == 'opencl':
+            use_double = get_config().use_double
+            self._dtype = np.float64 if use_double else np.float32
+            if np.issubdtype(self.data.dtype, np.float):
+                self._convert = True
             from pyopencl.array import to_device
             from pysph.base.opencl import get_queue
             self.q = get_queue()
-            self.dev = to_device(self.q, self.data)
+            self.dev = to_device(self.q, self._get_data())
         else:
             self.dev = self.data
 
+    def _get_data(self):
+        if self._convert:
+            return self.data.astype(self._dtype)
+        else:
+            return self.data
+
     def pull(self):
         if self.backend == 'opencl':
-            self.data = self.dev.get()
+            self.data[:] = self.dev.get()
 
     def push(self):
         if self.backend == 'opencl':
-            self.dev.set(self.data)
+            self.dev.set(self._get_data())
