@@ -24,7 +24,7 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 # Cython for compiler directives
 cimport cython
 
-from pysph.base.config import get_config
+from pysph.cpy.config import get_config
 
 
 IF OPENMP:

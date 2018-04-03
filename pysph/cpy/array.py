@@ -1,6 +1,6 @@
 import numpy as np
 
-from pysph.base.config import get_config
+from .config import get_config
 
 
 def get_backend(backend=None):

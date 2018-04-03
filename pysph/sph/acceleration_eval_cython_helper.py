@@ -4,7 +4,7 @@ from os.path import dirname, join
 from mako.template import Template
 from pyzoltan.core import carray
 
-from pysph.base.config import get_config
+from pysph.cpy.config import get_config
 from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
                                         get_parallel_range)
 from pysph.cpy.ext_module import ExtModule

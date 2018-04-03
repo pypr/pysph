@@ -8,7 +8,7 @@ import pyopencl.array  # noqa: 401
 from collections import defaultdict
 from operator import itemgetter
 
-from .config import get_config
+from pysph.cpy.config import get_config
 
 _ctx = None
 _queue = None

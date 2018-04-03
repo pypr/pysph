@@ -13,7 +13,7 @@ from textwrap import wrap
 from mako.template import Template
 
 from pyzoltan.core.carray import BaseArray
-from pysph.base.config import get_config
+from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import Transpiler
 from .array import Array

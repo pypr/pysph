@@ -19,7 +19,7 @@ import types
 import numpy as np
 from mako.template import Template
 
-from pysph.base.config import get_config
+from .config import get_config
 from .cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )

@@ -5,7 +5,7 @@ from textwrap import dedent
 from math import pi, sin
 import numpy as np
 
-from pysph.base.config import get_config, set_config
+from ..config import get_config, set_config
 from ..cython_generator import (CythonGenerator, CythonClassHelper,
                                 KnownType, all_numeric, declare)
 

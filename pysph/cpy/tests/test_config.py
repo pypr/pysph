@@ -2,7 +2,7 @@
 """
 from unittest import TestCase, main
 
-from pysph.base.config import Config, get_config, set_config
+from ..config import Config, get_config, set_config
 
 
 class ConfigTestCase(TestCase):

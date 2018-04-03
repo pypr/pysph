@@ -18,7 +18,7 @@ import types
 from mako.template import Template
 import numpy
 
-from pysph.base.config import get_config
+from .config import get_config
 from .ast_utils import get_assigned, has_return
 
 logger = logging.getLogger(__name__)

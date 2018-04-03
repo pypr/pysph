@@ -27,7 +27,7 @@ except ImportError:
 
 # Package imports.
 import pysph
-from pysph.base.config import get_config
+from .config import get_config
 from .capture_stream import CaptureMultipleStreams
 
 
@@ -35,6 +35,7 @@ def get_platform_dir():
     return 'py{version}-{platform_dir}'.format(
         version=sys.version[:3], platform_dir=get_platform()
     )
+
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
