@@ -26,7 +26,10 @@ def wrap(*args, **kw):
     backend: str: use appropriate backend for arrays.
     '''
     backend = get_backend(kw.get('backend'))
-    return [Array(x, backend=backend) for x in args]
+    if len(args) == 1:
+        return Array(args[0], backend=backend)
+    else:
+        return [Array(x, backend=backend) for x in args]
 
 
 class Array(object):
