@@ -609,6 +609,27 @@ def test_for():
     assert code.strip() == expect.strip()
 
 
+def test_for_with_declare():
+    # Given
+    src = dedent('''
+    i = declare('int')
+    for i in range(5):
+        do(i)
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int i;
+    for (i=0; i<5; i+=1) {
+        do(i);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_two_fors():
     # Given
     src = dedent('''
@@ -992,9 +1013,11 @@ def test_wrapping_class_with_ignore_methods():
 
 
 def test_opencl_conversion():
+    # Note that LID_0 etc. are predefined symbols when we include the CLUDA
+    # preamble, therefore should be known.
     src = dedent('''
     def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
-        pass
+        s_p[s_idx] = LID_0*GID_0
     ''')
 
     # When
@@ -1007,7 +1030,7 @@ def test_opencl_conversion():
 void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
     J, double t, double* l, double* xx)
 {
-    ;
+    s_p[s_idx] = (LID_0 * GID_0);
 }
     ''')
     assert code.strip() == expect.strip()

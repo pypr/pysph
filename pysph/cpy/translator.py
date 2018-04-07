@@ -146,7 +146,7 @@ class CConverter(ast.NodeVisitor):
         annotations = self._annotations.get(node.name)
         if annotations:
             kt = annotations.get('return')
-            return kt.type
+            return kt.type if kt is not None else 'void'
         else:
             return 'double' if self._body_has_return(body) else 'void'
 
@@ -395,16 +395,25 @@ class CConverter(ast.NodeVisitor):
             start, stop, incr = [self.visit(x) for x in args]
         else:
             self.error('range should have either [1,2,3] args', node.iter)
-        if isinstance(node.target, ast.Name) and \
-           node.target.id not in self._known:
-            self._known.add(node.target.id)
-        r = ('for (long {i}={start}; {i}<{stop}; {i}+={incr})'
+        local_scope = False
+        if isinstance(node.target, ast.Name):
+            if node.target.id not in self._known:
+                type = 'long '
+                self._known.add(node.target.id)
+                local_scope = True
+            else:
+                type = ''
+
+        r = ('for ({type}{i}={start}; {i}<{stop}; {i}+={incr})'
              ' {{\n{block}\n}}\n').format(
-                 i=self.visit(node.target), start=start, stop=stop, incr=incr,
+                 i=self.visit(node.target), type=type,
+                 start=start, stop=stop, incr=incr,
                  block='\n'.join(
                      self._indent_block(self.visit(x)) for x in node.body
                  )
              )
+        if local_scope:
+            self._known.remove(node.target.id)
         return r
 
     def visit_FunctionDef(self, node):
@@ -579,6 +588,12 @@ def ocl_detect_type(name, value):
 class OpenCLConverter(CConverter):
     def __init__(self, detect_type=ocl_detect_type, known_types=None):
         super(OpenCLConverter, self).__init__(detect_type, known_types)
+        self._known.update((
+            'LID_0', 'LID_1', 'LID_2',
+            'GID_0', 'GID_1', 'GID_2',
+            'LDIM_0', 'LDIM_1', 'LDIM_2',
+            'GDIM_0', 'GDIM_1', 'GDIM_2'
+        ))
 
     def _get_self_type(self):
         return KnownType('__global %s*' % self._class_name)

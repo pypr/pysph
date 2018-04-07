@@ -3,6 +3,7 @@ import importlib
 import math
 from textwrap import dedent
 
+from mako.template import Template
 from .ast_utils import get_calls
 from .cython_generator import CythonGenerator
 from .translator import OpenCLConverter
@@ -11,7 +12,8 @@ from .ext_module import ExtModule
 
 BUILTINS = set(
     [x for x in dir(math) if not x.startswith('_')] +
-    ['max', 'abs', 'min', 'range', 'declare']
+    ['max', 'abs', 'min', 'range', 'declare', 'local_barrier',
+     'types', 'printf']
 )
 
 
@@ -59,14 +61,19 @@ class Transpiler(object):
         if backend == 'cython':
             self._cgen = CythonGenerator()
             self.header = dedent('''
+            from libc.stdio cimport printf
             from libc.math cimport *
             from libc.math cimport fabs as abs
             from libc.math cimport M_PI as pi
             from cython.parallel import parallel, prange
             ''')
         elif backend == 'opencl':
+            from pyopencl._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            self.header = dedent('''
+            cluda = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
+            self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
             __constant double pi=M_PI;

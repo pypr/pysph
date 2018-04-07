@@ -29,6 +29,15 @@ NP_C_TYPE_MAP = {
     np.int64: 'long', np.uint64: 'unsigned long'
 }
 
+LID_0 = LDIM_0 = GDIM_0 = 0
+
+def local_barrier():
+    """Dummy method to keep Python happy.
+
+    This is a valid function in OpenCL but has no meaning in Python for now.
+    """
+    pass
+
 
 def dtype_to_ctype(dtype):
     return NP_C_TYPE_MAP[dtype]
@@ -169,7 +178,7 @@ class Elementwise(object):
             ctx = get_context()
             self.queue = get_queue()
             name = self.func.__name__
-            expr = '{func}({args});'.format(
+            expr = '{func}({args})'.format(
                 func=name,
                 args=', '.join(c_data[1])
             )
@@ -286,7 +295,6 @@ class Reduction(object):
                 get_parallel_range=get_parallel_range
             )
             self.tp.add_code(src)
-            print(self.tp.get_code())
             self.tp.compile()
             self.c_func = getattr(self.tp.mod, 'py_' + self.name)
         elif self.backend == 'opencl':
