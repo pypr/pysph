@@ -1,9 +1,12 @@
 import inspect
 import importlib
 import math
+import re
 from textwrap import dedent
 
 from mako.template import Template
+
+from .config import get_config
 from .ast_utils import get_calls
 from .cython_generator import CythonGenerator
 from .translator import OpenCLConverter
@@ -31,6 +34,13 @@ def get_all_functions(func):
     calls = filter_calls(get_calls(src))
     mod = importlib.import_module(func.__module__)
     return [getattr(mod, call) for call in calls]
+
+
+def convert_to_float_if_needed(code):
+    use_double = get_config().use_double
+    if not use_double:
+        code = re.sub(r'\bdouble\b', 'float', code)
+    return code
 
 
 class CodeBlock(object):
@@ -110,6 +120,7 @@ class Transpiler(object):
             import pyopencl as cl
             from pysph.base.opencl import get_context
             ctx = get_context()
-            self.mod = cl.Program(ctx, self.get_code()).build(
+            code = convert_to_float_if_needed(self.get_code())
+            self.mod = cl.Program(ctx, code).build(
                 options=['-w']
             )

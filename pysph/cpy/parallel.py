@@ -6,7 +6,6 @@ once and have it run on different execution backends.
 
 """
 
-import re
 from functools import wraps
 from textwrap import wrap
 
@@ -16,7 +15,7 @@ import numpy as np
 from pyzoltan.core.carray import BaseArray
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
-from .transpiler import Transpiler
+from .transpiler import Transpiler, convert_to_float_if_needed
 from .array import Array, get_backend
 
 
@@ -31,6 +30,7 @@ NP_C_TYPE_MAP = {
 
 LID_0 = LDIM_0 = GDIM_0 = 0
 
+
 def local_barrier():
     """Dummy method to keep Python happy.
 
@@ -41,13 +41,6 @@ def local_barrier():
 
 def dtype_to_ctype(dtype):
     return NP_C_TYPE_MAP[dtype]
-
-
-def convert_to_float_if_needed(code):
-    use_double = get_config().use_double
-    if not use_double:
-        code = re.sub(r'\bdouble\b', 'float', code)
-    return code
 
 
 elementwise_cy_template = '''
@@ -381,3 +374,47 @@ class Reduction(object):
             result = self.c_func(*c_args)
             self.queue.finish()
             return result.get()
+
+
+class Kernel(object):
+    def __init__(self, func, backend='opencl'):
+        backend = get_backend(backend)
+        self.tp = Transpiler(backend=backend)
+        self.backend = backend
+        self.name = func.__name__
+        self.func = func
+        self._config = get_config()
+        from pysph.base.opencl import get_queue
+        self.queue = get_queue()
+        self._generate()
+
+    def _generate(self):
+        self.tp.add(self.func)
+        self._correct_opencl_address_space()
+
+        self.tp.compile()
+        self.c_func = getattr(self.tp.mod, self.name)
+
+    def _correct_opencl_address_space(self):
+        code = self.tp.blocks[-1].code.splitlines()
+        code[0] = 'KERNEL ' + code[0]
+        self.tp.blocks[-1].code = '\n'.join(code)
+
+    def _massage_arg(self, x):
+        if isinstance(x, BaseArray):
+            return x.get_npy_array()
+        elif isinstance(x, Array):
+            return x.dev.data
+        else:
+            return np.array(x)
+
+    def __call__(self, *args, **kw):
+        shape = args[0].data.shape
+        gs = kw.pop('global_size', shape)
+        ls = kw.pop('local_size', (32,))
+        c_args = [self._massage_arg(x) for x in args]
+        prepend = [self.queue, gs, ls]
+        c_args = prepend + c_args
+        if self.backend == 'opencl':
+            self.c_func(*c_args)
+            self.queue.finish()
