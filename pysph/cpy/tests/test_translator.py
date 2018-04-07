@@ -3,10 +3,17 @@ import pytest
 import numpy as np
 
 from ..config import get_config
+from ..types import types, declare
 from ..translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
     OpenCLConverter, py2c
 )
+
+
+@types(i='int', y='floatp', return_='float')
+def annotated_f(i, y):
+    x = declare('LOCAL_MEM matrix(64)')
+    return y[i]
 
 
 def test_simple_assignment_expression():
@@ -368,6 +375,22 @@ def test_known_types_in_funcargs():
     void f(float32 x, foo* xx, int cond)
     {
         ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_annotated_function():
+    # Given/When
+    t = CConverter()
+    code = t.parse_function(annotated_f)
+
+    # Then
+    expect = dedent('''
+    float annotated_f(int i, float* y)
+    {
+        LOCAL_MEM double x[64];
+        return y[i];
     }
     ''')
     assert code.strip() == expect.strip()

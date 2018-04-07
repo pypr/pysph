@@ -237,29 +237,39 @@ class CythonGenerator(object):
         and a list of [(arg_name, value),...].
         """
         name = meth.__name__
-        body = ''.join(lines)
-        returns = has_return(dedent(body))
-        argspec = inspect.getargspec(meth)
+        argspec = inspect.getfullargspec(meth)
         args = argspec.args
         is_method = False
         if args and args[0] == 'self':
             args = args[1:]
             is_method = True
-        defaults = argspec.defaults if argspec.defaults is not None else []
 
-        # The call_args dict is filled up with the defaults to detect
-        # the appropriate type of the arguments.
+        annotations = argspec.annotations
+
         call_args = {}
+        # Type annotations always take first precendence even over known
+        # types.
+        if len(annotations) > 0:
+            for arg in args:
+                call_args[arg] = annotations.get(arg, Undefined)
+            returns = annotations.get('return', False)
+        else:
+            body = ''.join(lines)
+            returns = has_return(dedent(body))
 
-        for i in range(1, len(defaults)+1):
-            call_args[args[-i]] = defaults[-i]
+            defaults = argspec.defaults if argspec.defaults is not None else []
 
-        # Set the rest to Undefined
-        for i in range(len(args) - len(defaults)):
-            call_args[args[i]] = Undefined
+            # The call_args dict is filled up with the defaults to detect
+            # the appropriate type of the arguments.
+            for i in range(1, len(defaults)+1):
+                call_args[args[-i]] = defaults[-i]
 
-        # Make sure any predefined quantities are suitably typed.
-        call_args.update(self.known_types)
+            # Set the rest to Undefined
+            for i in range(len(args) - len(defaults)):
+                call_args[args[i]] = Undefined
+
+            # Make sure any predefined quantities are suitably typed.
+            call_args.update(self.known_types)
 
         new_args = [('self', None)] if is_method else []
         for arg in args:
@@ -280,7 +290,10 @@ class CythonGenerator(object):
             c_type = self.detect_type(arg, value)
             c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
 
-        c_ret = 'double' if returns else 'void'
+        if isinstance(returns, KnownType):
+            c_ret = returns.type
+        else:
+            c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
         if self._config.use_openmp:
             ignore = ['reduce', 'converged']
@@ -311,7 +324,7 @@ class CythonGenerator(object):
         return methods
 
     def _get_method_body(self, meth, lines, indent=' '*8):
-        args = set(inspect.getargspec(meth).args)
+        args = set(inspect.getfullargspec(meth).args)
         src = [self._process_body_line(line) for line in lines]
         declared = []
         for names, defn in src:
@@ -368,7 +381,10 @@ class CythonGenerator(object):
             else:
                 call_sig.append('{arg}'.format(arg=arg))
 
-        py_ret = ' double' if returns else ''
+        if isinstance(returns, KnownType):
+            py_ret = returns.type
+        else:
+            py_ret = ' double' if returns else ''
         py_arg_def = ', '.join(py_args)
         pydefn = 'cpdef{ret} py_{name}({arg_def}):'.format(
             ret=py_ret, name=name, arg_def=py_arg_def
@@ -391,6 +407,8 @@ class CythonGenerator(object):
 
         # Remove the "declare('" and the trailing "')".
         code = parse_declare(declare)
+        if code.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
+            code = code[code.index(' ') + 1:]
         if code.startswith('matrix'):
             sz = matrix(eval(code[7:-1]))
             vars = ['%s%s' % (x.strip(), sz) for x in name.split(',')]

@@ -6,7 +6,7 @@ from math import pi, sin
 import numpy as np
 
 from ..config import get_config, set_config
-from ..types import declare, KnownType
+from ..types import declare, KnownType, types
 from ..cython_generator import (CythonGenerator, CythonClassHelper,
                                 all_numeric)
 
@@ -58,6 +58,12 @@ def func_with_return(d_idx, d_x, x=0.0):
 
 def simple_func(d_idx, d_x, x=0.0):
     d_x[d_idx] += x
+
+
+@types(i='int', y='floatp', return_='float')
+def annotated_f(i, y=[0.0]):
+    x = declare('LOCAL_MEM matrix(64)')
+    return y[i]
 
 
 class TestBase(unittest.TestCase):
@@ -152,6 +158,20 @@ class TestCythonCodeGenerator(TestBase):
         self.assertEqual(py_data[1], ['x', '&y[0]'])
         self.assertEqual(c_data[0], ['long x', 'double* y'])
         self.assertEqual(c_data[1], ['x', 'y'])
+
+    def test_function_with_annotation(self):
+        # Given
+        cg = CythonGenerator()
+        # When
+        cg.parse(annotated_f)
+
+        # Then
+        expect = dedent('''
+        cdef inline float annotated_f(int i, float* y):
+            cdef double x[64]
+            return y[i]
+        ''')
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
     def test_simple_method(self):
         cg = CythonGenerator()

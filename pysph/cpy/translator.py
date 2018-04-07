@@ -132,6 +132,7 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._annotations = {}
         self._ignore_methods = []
         self._replacements = {
             'True': '1', 'False': '0', 'None': 'NULL',
@@ -140,6 +141,14 @@ class CConverter(ast.NodeVisitor):
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
+
+    def _get_return_type(self, body, node):
+        annotations = self._annotations.get(node.name)
+        if annotations:
+            kt = annotations.get('return')
+            return kt.type
+        else:
+            return 'double' if self._body_has_return(body) else 'void'
 
     def _get_self_type(self):
         return KnownType('%s*' % self._class_name)
@@ -150,21 +159,27 @@ class CConverter(ast.NodeVisitor):
             args = [x.id for x in node_args]
         else:
             args = [x.arg for x in node_args]
-        defaults = [ast.literal_eval(x) for x in node.args.defaults]
-
-        # Fill up the call_args dict with the defaults.
+        annotations = self._annotations.get(node.name)
         call_args = {}
-        for i in range(1, len(defaults) + 1):
-            call_args[args[-i]] = defaults[-i]
+        if annotations:
+            for arg in args:
+                call_args[arg] = annotations.get(arg, Undefined)
+        else:
+            defaults = [ast.literal_eval(x) for x in node.args.defaults]
 
-        # Set the rest to Undefined.
-        for i in range(len(args) - len(defaults)):
-            call_args[args[i]] = Undefined
+            # Fill up the call_args dict with the defaults.
+            for i in range(1, len(defaults) + 1):
+                call_args[args[-i]] = defaults[-i]
+
+            # Set the rest to Undefined.
+            for i in range(len(args) - len(defaults)):
+                call_args[args[i]] = Undefined
+
+            call_args.update(self._known_types)
 
         if len(self._class_name) > 0:
             call_args['self'] = self._get_self_type()
 
-        call_args.update(self._known_types)
         call_sig = []
         for arg in args:
             value = call_args[arg]
@@ -174,15 +189,23 @@ class CConverter(ast.NodeVisitor):
         return ', '.join(call_sig)
 
     def _get_variable_declaration(self, type_str, names):
+        address_space = ''
+        if type_str.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
+            idx = type_str.index(' ')
+            address_space, type_str = type_str[:idx] + ' ', type_str[idx+1:]
         if type_str.startswith('matrix'):
             shape = ast.literal_eval(type_str[7:-1])
             if not isinstance(shape, tuple):
                 shape = (shape,)
             sz = ''.join('[%d]' % x for x in shape)
             vars = ['%s%s' % (x, sz) for x in names]
-            return 'double %s;' % ', '.join(vars)
+            return '{address}double {vars};'.format(
+                address=address_space, vars=', '.join(vars)
+            )
         else:
-            return '%s %s;' % (type_str, ', '.join(names))
+            return '{address}{type} {vars};'.format(
+                address=address_space, type=type_str, vars=', '.join(names)
+            )
 
     def _indent_block(self, code):
         lines = code.splitlines()
@@ -234,17 +257,27 @@ class CConverter(ast.NodeVisitor):
         elif hasattr(obj, '__class__'):
             return self.parse_instance(obj)
         else:
-            raise TypeError('Unsupport type to wrap: %s' % obj_type)
+            raise TypeError('Unsupported type to wrap: %s' % obj_type)
 
     def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
         src = dedent(inspect.getsource(obj.__class__))
+        ignore_methods = [] if ignore_methods is None else ignore_methods
+        for method in dir(obj):
+            if not method.startswith('_') and method not in ignore_methods:
+                ann = getattr(getattr(obj, method), '__annotations__', None)
+                self._annotations[method] = ann
         code += self.convert(src, ignore_methods)
+        self._annotations = {}
         return code
 
     def parse_function(self, obj):
         src = dedent(inspect.getsource(obj))
-        return self.convert(src)
+        fname = obj.__name__
+        self._annotations[fname] = getattr(obj, '__annotations__', None)
+        code = self.convert(src)
+        self._annotations = {}
+        return code
 
     def visit_Add(self, node):
         return '+'
@@ -399,10 +432,10 @@ class CConverter(ast.NodeVisitor):
             func_name = self._class_name + '_' + node.name
         else:
             func_name = node.name
-        if self._body_has_return(body):
-            sig = 'double %s(%s)' % (func_name, args)
-        else:
-            sig = 'void %s(%s)' % (func_name, args)
+        return_type = self._get_return_type(body, node)
+        sig = '{ret} {name}({args})'.format(
+            ret=return_type, name=func_name, args=args
+        )
 
         declares = self._indent_block(self.get_declarations())
         if len(declares) > 0:
