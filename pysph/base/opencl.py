@@ -180,7 +180,9 @@ class DeviceArray(object):
 
     def remove(self, indices, input_sorted=False):
         if len(indices) > self.length:
-            return
+            msg = 'Number of indices to be removed is greater than'
+            msg += 'number of indices in array'
+            raise ValueError(msg)
 
         if_remove = DeviceArray(np.int32, n=self.length)
         if_remove.fill(0)
