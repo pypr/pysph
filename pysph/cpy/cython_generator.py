@@ -16,8 +16,8 @@ from textwrap import dedent
 import types
 
 from mako.template import Template
-import numpy
 
+from .types import KnownType, Undefined
 from .config import get_config
 from .ast_utils import get_assigned, has_return
 
@@ -103,49 +103,7 @@ def all_numeric(seq):
     return all(type(x) in types for x in seq)
 
 
-def _declare(type):
-    if type.startswith('matrix'):
-        return numpy.zeros(eval(type[7:-1]))
-    elif type in ['double', 'float']:
-        return 0.0
-    else:
-        return 0
-
-
-def declare(type, num=1):
-    """Declare the variable to be of the given type.
-
-    The additional optional argument num is the number of items to return.
-
-    Normally, the declare function only defines a variable when compiled,
-    however, this function here is a pure Python implementation so that the
-    same code can be executed in Python.
-
-    Parameters
-    ----------
-
-    type: str: String representing the type.
-    num: int: the number of values to return
-
-    Examples
-    --------
-
-    >>> declare('int')
-    0
-    >>> declare('int', 3)
-    0, 0, 0
-    """
-    if num == 1:
-        return _declare(type)
-    else:
-        return tuple(_declare(type) for i in range(num))
-
-
 class CodeGenerationError(Exception):
-    pass
-
-
-class Undefined(object):
     pass
 
 
@@ -162,32 +120,6 @@ def parse_declare(code):
         err = 'Type should be a string, given :%r' % arg0.s
         raise CodeGenerationError(err)
     return arg0.s
-
-
-class KnownType(object):
-    """Simple object to specify a known type as a string.
-
-    Smells but is convenient as the type may be one available only inside
-    Cython without a corresponding Python type.
-    """
-    def __init__(self, type_str, base_type=''):
-        """Constructor
-
-        The ``base_type`` argument is optional and used to represent the base
-        type, i.e. the type_str may be 'Foo*' but the base type will be 'Foo'
-        if specified.
-
-        Parameters
-        ----------
-        type_str: str: A string representation of how the type is declared.
-        base_type: str: The base type of this entity. (optional)
-
-        """
-        self.type = type_str
-        self.base_type = base_type
-
-    def __repr__(self):
-        return 'KnownType("%s")' % self.type
 
 
 class CythonGenerator(object):

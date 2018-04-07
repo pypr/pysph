@@ -6,8 +6,9 @@ from math import pi, sin
 import numpy as np
 
 from ..config import get_config, set_config
+from ..types import declare, KnownType
 from ..cython_generator import (CythonGenerator, CythonClassHelper,
-                                KnownType, all_numeric, declare)
+                                all_numeric)
 
 
 class BasicEq:
@@ -114,27 +115,6 @@ class TestMiscUtils(TestBase):
                 return x+1
         """)
         self.assert_code_equal(c.generate().strip(), expect.strip())
-
-    def test_declare(self):
-        self.assertEqual(declare('int'), 0)
-        self.assertEqual(declare('long'), 0)
-        self.assertEqual(declare('double'), 0.0)
-        self.assertEqual(declare('float'), 0.0)
-
-        self.assertEqual(declare('int', 2), (0, 0))
-        self.assertEqual(declare('long', 3), (0, 0, 0))
-        self.assertEqual(declare('double', 2), (0.0, 0.0))
-        self.assertEqual(declare('float', 3), (0.0, 0.0, 0.0))
-
-        res = declare('matrix(3)')
-        self.assertTrue(np.all(res == np.zeros(3)))
-        res = declare('matrix(3)', 3)
-        for i in range(3):
-            self.assertTrue(np.all(res[0] == np.zeros(3)))
-        res = declare('matrix((3,))')
-        self.assertTrue(np.all(res == np.zeros(3)))
-        res = declare('matrix((3, 3))')
-        self.assertTrue(np.all(res == np.zeros((3, 3))))
 
 
 class TestCythonCodeGenerator(TestBase):
