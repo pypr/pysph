@@ -237,14 +237,20 @@ class CythonGenerator(object):
         and a list of [(arg_name, value),...].
         """
         name = meth.__name__
-        argspec = inspect.getfullargspec(meth)
+        getfullargspec = getattr(
+            inspect, 'getfullargspec', inspect.getargspec
+        )
+        argspec = getfullargspec(meth)
         args = argspec.args
         is_method = False
         if args and args[0] == 'self':
             args = args[1:]
             is_method = True
 
-        annotations = argspec.annotations
+        if hasattr(argspec, 'annotations'):
+            annotations = argspec.annotations
+        else:
+            annotations = meth.__annotations__ or {}
 
         call_args = {}
         # Type annotations always take first precendence even over known
@@ -324,7 +330,10 @@ class CythonGenerator(object):
         return methods
 
     def _get_method_body(self, meth, lines, indent=' '*8):
-        args = set(inspect.getfullargspec(meth).args)
+        getfullargspec = getattr(
+            inspect, 'getfullargspec', inspect.getargspec
+        )
+        args = set(getfullargspec(meth).args)
         src = [self._process_body_line(line) for line in lines]
         declared = []
         for names, defn in src:

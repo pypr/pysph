@@ -6,7 +6,9 @@ once and have it run on different execution backends.
 
 """
 
+import re
 from functools import wraps
+import inspect
 from textwrap import wrap
 
 from mako.template import Template
@@ -16,6 +18,7 @@ from pyzoltan.core.carray import BaseArray
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import Transpiler, convert_to_float_if_needed
+from .types import KnownType
 from .array import Array, get_backend
 
 
@@ -27,6 +30,21 @@ NP_C_TYPE_MAP = {
     np.int32: 'int', np.uint32: 'unsigned int',
     np.int64: 'long', np.uint64: 'unsigned long'
 }
+
+C_NP_TYPE_MAP = {
+    'bint': np.bool,
+    'char': np.int8,
+    'double': np.float64,
+    'float': np.float32,
+    'int': np.int32,
+    'long': np.int64,
+    'short': np.int16,
+    'unsigned char': np.uint8,
+    'unsigned int': np.uint32,
+    'unsigned long': np.uint64,
+    'unsigned short': np.uint16
+}
+
 
 LID_0 = LDIM_0 = GDIM_0 = 0
 
@@ -376,45 +394,192 @@ class Reduction(object):
             return result.get()
 
 
+class LocalMem(object):
+    '''A local memory specification for a GPU kernel.
+
+    An example illustrates this best::
+
+       >>> l = LocalMem(2)
+       >>> m = l.get('double', 128)
+       >>> m.size
+       2048
+
+    Note that this is basically ``sizeof(double) * 128 * 2``
+    '''
+    def __init__(self, size, backend=None):
+        '''
+        Constructor
+
+        Parameters
+        ----------
+
+        size: int: a multiple of the current work group size.
+        baackend: str: one of 'opencl', 'cuda'
+        '''
+        self.backend = get_backend(backend)
+        if backend == 'cython':
+            raise NotImplementedError(
+                'LocalMem is only meaningful for the opencl/cuda backends.'
+            )
+        self.size = size
+        self._cache = {}
+
+    def get(self, c_type, workgroup_size):
+        """Return the local memory required given the type and work group size.
+        """
+        key = (c_type, workgroup_size)
+        if key in self._cache:
+            return self._cache[key]
+        elif self.backend == 'opencl':
+            import pyopencl as cl
+            dtype = C_NP_TYPE_MAP[c_type]
+            sz = dtype().itemsize
+            mem = cl.LocalMemory(sz * self.size * workgroup_size)
+            self._cache[key] = mem
+            return mem
+        else:
+            raise NotImplementedError(
+                'Backend %s not implemented' % self.backend
+            )
+
+
+def splay(queue, n, kernel_specific_max_wg_size=None):
+    dev = queue.device
+    max_work_items = min(128, dev.max_work_group_size)
+
+    if kernel_specific_max_wg_size is not None:
+        max_work_items = min(max_work_items, kernel_specific_max_wg_size)
+
+    min_work_items = min(64, max_work_items)
+    full_groups = dev.max_compute_units * 4 * 8
+    # 4 to overfill the device
+    # 8 is an Nvidia constant--that's how many
+    # groups fit onto one compute device
+
+    if n < min_work_items:
+        group_count = 1
+        work_items_per_group = min_work_items
+    elif n < (full_groups * min_work_items):
+        group_count = (n + min_work_items - 1) // min_work_items
+        work_items_per_group = min_work_items
+    elif n < (full_groups * max_work_items):
+        group_count = full_groups
+        grp = (n + min_work_items - 1) // min_work_items
+        work_items_per_group = (
+            (grp + full_groups - 1) // full_groups) * min_work_items
+    else:
+        group_count = (n + max_work_items - 1) // max_work_items
+        work_items_per_group = max_work_items
+
+    return (group_count*work_items_per_group,), (work_items_per_group,)
+
+
 class Kernel(object):
+    """A simple abstraction to create GPU kernels with pure Python.
+
+    This will not work currently with the Cython backend.
+
+    The idea is that one can create a Python function with suitable type
+    annotations along with standard names from the CLUDA header (`LDIM_0,
+    LID_0, GID_0, local_barrier()`, )etc.) to write kernels in pure Python.
+
+    Note
+    ----
+
+    This works best with functions with annotations via the @types decorator or
+    with function annotation as we need the type information for some simple
+    type checking of the passed constants.
+
+    """
     def __init__(self, func, backend='opencl'):
         backend = get_backend(backend)
+        if backend == 'cython':
+            raise NotImplementedError(
+                'Kernels only work with opencl/cuda backends.'
+            )
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.name = func.__name__
         self.func = func
         self._config = get_config()
+        self._use_double = self._config.use_double
         from pysph.base.opencl import get_queue
         self.queue = get_queue()
+        self._func_info = self._get_func_info()
         self._generate()
+        import pyopencl as cl
+        self.cl = cl
+
+    def _to_float(self, s):
+        return re.sub(r'\bdouble\b', 'float', s)
+
+    def _get_func_info(self):
+        getfullargspec = getattr(inspect, 'getfullargspec', inspect.getargspec)
+        argspec = getfullargspec(self.func)
+        annotations = getattr(
+            argspec, 'annotations', self.func.__annotations__
+        )
+
+        arg_info = []
+        for arg in argspec.args:
+            kt = annotations[arg]
+            if not self._use_double:
+                kt = KnownType(
+                    self._to_float(kt.type), self._to_float(kt.base_type)
+                )
+            arg_info.append((arg, kt))
+        func_info = {
+            'args': arg_info,
+            'return': annotations.get('return', KnownType('void'))
+        }
+        return func_info
 
     def _generate(self):
         self.tp.add(self.func)
         self._correct_opencl_address_space()
 
         self.tp.compile()
-        self.c_func = getattr(self.tp.mod, self.name)
+        self.knl = getattr(self.tp.mod, self.name)
 
     def _correct_opencl_address_space(self):
         code = self.tp.blocks[-1].code.splitlines()
         code[0] = 'KERNEL ' + code[0]
         self.tp.blocks[-1].code = '\n'.join(code)
 
-    def _massage_arg(self, x):
+    def _massage_arg(self, x, type_info, workgroup_size):
         if isinstance(x, BaseArray):
             return x.get_npy_array()
         elif isinstance(x, Array):
             return x.dev.data
+        elif isinstance(x, LocalMem):
+            return x.get(type_info.base_type, workgroup_size)
         else:
-            return np.array(x)
+            dtype = C_NP_TYPE_MAP[type_info.type]
+            return np.array([x], dtype=dtype)
+
+    def _get_args(self, args, workgroup_size):
+        arg_info = self._func_info['args']
+        c_args = []
+        for arg, a_info in zip(args, arg_info):
+            c_args.append(self._massage_arg(arg, a_info[1], workgroup_size))
+        return c_args
+
+    def _get_workgroup_size(self, global_size):
+        sz = self.knl.get_work_group_info(
+            self.cl.kernel_work_group_info.WORK_GROUP_SIZE,
+            self.queue.device
+        )
+        gs, ls = splay(self.queue, global_size, sz)
+        return gs, ls
 
     def __call__(self, *args, **kw):
-        shape = args[0].data.shape
-        gs = kw.pop('global_size', shape)
-        ls = kw.pop('local_size', (32,))
-        c_args = [self._massage_arg(x) for x in args]
+        size = args[0].data.size
+        gs, ls = self._get_workgroup_size(size)
+        gs = kw.pop('global_size', gs)
+        ls = kw.pop('local_size', ls)
+        c_args = self._get_args(args, ls[0])
         prepend = [self.queue, gs, ls]
         c_args = prepend + c_args
         if self.backend == 'opencl':
-            self.c_func(*c_args)
+            self.knl(*c_args)
             self.queue.finish()

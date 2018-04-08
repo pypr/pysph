@@ -6,7 +6,9 @@ from .cython_generator import (
     CythonGenerator, get_func_definition
 )
 from .ext_module import ExtModule
-from .parallel import Elementwise, Kernel, Reduction, elementwise
+from .parallel import (
+    Elementwise, Kernel, LocalMem, Reduction, elementwise
+)
 from .translator import (
     CConverter, CStructHelper, OpenCLConverter, detect_type, ocl_detect_type,
     py2c,
