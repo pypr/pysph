@@ -3,14 +3,14 @@ import pytest
 import numpy as np
 
 from ..config import get_config
-from ..types import types, declare
+from ..types import annotate, declare
 from ..translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
     OpenCLConverter, py2c
 )
 
 
-@types(i='int', y='floatp', return_='float')
+@annotate(i='int', y='floatp', return_='float')
 def annotated_f(i, y):
     x = declare('LOCAL_MEM matrix(64)')
     return y[i]

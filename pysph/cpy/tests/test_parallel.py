@@ -6,7 +6,7 @@ from pytest import importorskip
 
 from ..config import get_config
 from ..array import wrap
-from ..types import types
+from ..types import annotate
 from ..parallel import Elementwise, Reduction, Kernel, LocalMem
 
 
@@ -115,7 +115,7 @@ class TestKernel(unittest.TestCase):
 
     def test_simple_kernel(self):
         # Given
-        @types(gdoublep='x, y', a='float')
+        @annotate(gdoublep='x, y', a='float')
         def knl(x, y, a):
             i = declare('int')
             i = GID_0*LDIM_0 + LID_0
@@ -136,7 +136,7 @@ class TestKernel(unittest.TestCase):
 
     def test_kernel_with_local_memory(self):
         # Given
-        @types(gdoublep='x, y', xc='ldoublep', a='float')
+        @annotate(gdoublep='x, y', xc='ldoublep', a='float')
         def knl(x, y, xc, a):
             i, lid = declare('int', 2)
             lid = LID_0

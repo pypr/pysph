@@ -6,7 +6,7 @@ from math import pi, sin
 import numpy as np
 
 from ..config import get_config, set_config
-from ..types import declare, KnownType, types
+from ..types import declare, KnownType, annotate
 from ..cython_generator import (CythonGenerator, CythonClassHelper,
                                 all_numeric)
 
@@ -60,7 +60,7 @@ def simple_func(d_idx, d_x, x=0.0):
     d_x[d_idx] += x
 
 
-@types(i='int', y='floatp', return_='float')
+@annotate(i='int', y='floatp', return_='float')
 def annotated_f(i, y=[0.0]):
     x = declare('LOCAL_MEM matrix(64)')
     return y[i]

@@ -11,6 +11,6 @@ from .parallel import (
 )
 from .translator import (
     CConverter, CStructHelper, OpenCLConverter, detect_type, ocl_detect_type,
-    py2c,
+    py2c
 )
-from .types import KnownType, declare, types
+from .types import KnownType, annotate, declare

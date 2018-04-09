@@ -155,7 +155,9 @@ class CythonGenerator(object):
         """Given the variable name and value, detect its type.
         """
         if isinstance(value, KnownType):
-            return value.type
+            return value.type.replace(
+                'GLOBAL_MEM ', ''
+            ).replace('LOCAL_MEM ', '')
         if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
             return 'double*'
         if name in ['s_idx', 'd_idx']:

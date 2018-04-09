@@ -105,19 +105,19 @@ TYPES = dict(
 )
 
 
-def types(func=None, **kw):
+def annotate(func=None, **kw):
     """A decorator to specify the types of a function. These types are injected
     into the functions, `__annotations__` attribute.
 
     An example describes this best:
 
-    @types(i='int', x='floatp', return_='float')
+    @annotate(i='int', x='floatp', return_='float')
     def f(i, x):
         return x[i]*2.0
 
     One could also do:
 
-    @types(i='int', floatp='x, y', return_='float')
+    @annotate(i='int', floatp='x, y', return_='float')
     def f(i, x, y):
        return x[i]*y[i]
 

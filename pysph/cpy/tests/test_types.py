@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from ..types import KnownType, declare, types
+from ..types import KnownType, declare, annotate
 
 
 class TestDeclare(unittest.TestCase):
@@ -38,10 +38,10 @@ class TestDeclare(unittest.TestCase):
         self.assertTrue(np.all(res == np.zeros(3)))
 
 
-class TestTypes(unittest.TestCase):
+class TestAnnotate(unittest.TestCase):
     def test_simple_annotation(self):
         # Given/When
-        @types(i='int', x='floatp', return_='float')
+        @annotate(i='int', x='floatp', return_='float')
         def f(i, x):
             return x[i]*2.0
 
@@ -53,7 +53,7 @@ class TestTypes(unittest.TestCase):
 
     def test_reversed_annotation(self):
         # Given/When
-        @types(i='int', floatp='x, y', return_='float')
+        @annotate(i='int', floatp='x, y', return_='float')
         def f(i, x, y):
             return x[i]*y[i]
 
@@ -66,7 +66,7 @@ class TestTypes(unittest.TestCase):
 
     def test_decorator_accepts_known_type_instance(self):
         # Given/When
-        @types(x=KnownType('Thing'))
+        @annotate(x=KnownType('Thing'))
         def f(x):
             x.f()
 
@@ -78,4 +78,4 @@ class TestTypes(unittest.TestCase):
         def f(x):
             pass
 
-        self.assertRaises(TypeError, types, f, x='alpha')
+        self.assertRaises(TypeError, annotate, f, x='alpha')

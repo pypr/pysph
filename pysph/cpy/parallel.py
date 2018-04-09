@@ -486,8 +486,8 @@ class Kernel(object):
     Note
     ----
 
-    This works best with functions with annotations via the @types decorator or
-    with function annotation as we need the type information for some simple
+    This works best with functions with annotations via the @annotate decorator
+    or with function annotation as we need the type information for some simple
     type checking of the passed constants.
 
     """
