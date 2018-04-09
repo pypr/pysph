@@ -46,7 +46,7 @@ C_NP_TYPE_MAP = {
 }
 
 
-LID_0 = LDIM_0 = GDIM_0 = 0
+LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
 
 
 def local_barrier():
@@ -234,14 +234,14 @@ class Elementwise(object):
         else:
             return x
 
-    def __call__(self, *args):
+    def __call__(self, *args, **kw):
         c_args = [self._massage_arg(x) for x in args]
         if self.backend == 'cython':
             size = len(c_args[0])
             c_args.insert(0, size)
-            self.c_func(*c_args)
+            self.c_func(*c_args, **kw)
         elif self.backend == 'opencl':
-            self.c_func(*c_args)
+            self.c_func(*c_args, **kw)
             self.queue.finish()
 
 
@@ -507,8 +507,6 @@ class Kernel(object):
         self.queue = get_queue()
         self._func_info = self._get_func_info()
         self._generate()
-        import pyopencl as cl
-        self.cl = cl
 
     def _to_float(self, s):
         return re.sub(r'\bdouble\b', 'float', s)
@@ -540,6 +538,11 @@ class Kernel(object):
 
         self.tp.compile()
         self.knl = getattr(self.tp.mod, self.name)
+        import pyopencl as cl
+        self._max_work_group_size = self.knl.get_work_group_info(
+            cl.kernel_work_group_info.WORK_GROUP_SIZE,
+            self.queue.device
+        )
 
     def _correct_opencl_address_space(self):
         code = self.tp.blocks[-1].code.splitlines()
@@ -565,18 +568,20 @@ class Kernel(object):
         return c_args
 
     def _get_workgroup_size(self, global_size):
-        sz = self.knl.get_work_group_info(
-            self.cl.kernel_work_group_info.WORK_GROUP_SIZE,
-            self.queue.device
-        )
-        gs, ls = splay(self.queue, global_size, sz)
+        gs, ls = splay(self.queue, global_size, self._max_work_group_size)
         return gs, ls
 
     def __call__(self, *args, **kw):
-        size = args[0].data.size
-        gs, ls = self._get_workgroup_size(size)
-        gs = kw.pop('global_size', gs)
-        ls = kw.pop('local_size', ls)
+        size = args[0].data.shape
+        gs = kw.pop('global_size', size)
+        n = np.prod(gs)
+        ls = kw.pop('local_size', None)
+        if ls is not None:
+            local_size = np.prod(ls)
+            global_size = ((n + local_size - 1) // local_size) * local_size
+            gs = (global_size, )
+        else:
+            gs, ls = self._get_workgroup_size(n)
         c_args = self._get_args(args, ls[0])
         prepend = [self.queue, gs, ls]
         c_args = prepend + c_args
