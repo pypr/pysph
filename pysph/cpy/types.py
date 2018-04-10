@@ -1,4 +1,4 @@
-import numpy
+import numpy as np
 
 
 def declare(type, num=1):
@@ -34,7 +34,7 @@ def _declare(type):
     if type.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
         type = type[type.index(' ') + 1:]
     if type.startswith('matrix'):
-        return numpy.zeros(eval(type[7:-1]))
+        return np.zeros(eval(type[7:-1]))
     elif type in ['double', 'float']:
         return 0.0
     else:
@@ -103,6 +103,41 @@ TYPES = dict(
     luintp=KnownType('LOCAL_MEM unsigned int*', 'unsigned int'),
     lulongp=KnownType('LOCAL_MEM unsigned long*', 'unsigned long'),
 )
+
+
+NP_C_TYPE_MAP = {
+    np.bool: 'bint',
+    np.float32: 'float', np.float64: 'double',
+    np.int8: 'char', np.uint8: 'unsigned char',
+    np.int16: 'short', np.uint16: 'unsigned short',
+    np.int32: 'int', np.uint32: 'unsigned int',
+    np.int64: 'long', np.uint64: 'unsigned long'
+}
+
+C_NP_TYPE_MAP = {
+    'bint': np.bool,
+    'char': np.int8,
+    'double': np.float64,
+    'float': np.float32,
+    'int': np.int32,
+    'long': np.int64,
+    'short': np.int16,
+    'unsigned char': np.uint8,
+    'unsigned int': np.uint32,
+    'unsigned long': np.uint64,
+    'unsigned short': np.uint16
+}
+
+
+LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
+
+
+def dtype_to_ctype(dtype):
+    return NP_C_TYPE_MAP[dtype]
+
+
+def ctype_to_dtype(ctype):
+    return C_NP_TYPE_MAP[ctype]
 
 
 def annotate(func=None, **kw):

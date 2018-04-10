@@ -7,7 +7,7 @@ from pytest import importorskip
 from ..config import get_config
 from ..array import wrap
 from ..types import annotate
-from ..parallel import Elementwise, Reduction, Kernel, LocalMem
+from ..parallel import Elementwise, Reduction
 
 
 class TestParallelUtils(unittest.TestCase):
@@ -22,7 +22,8 @@ class TestParallelUtils(unittest.TestCase):
 
     def _check_simple_elementwise(self, backend):
         # Given
-        def axpb(i=0, x=[0.0], y=[0.0], a=1.0, b=1.0):
+        @annotate(i='int', x='doublep', y='doublep', double='a,b')
+        def axpb(i, x, y, a, b):
             y[i] = a*sin(x[i]) + b
 
         x = np.linspace(0, 1, 10000)
@@ -76,6 +77,7 @@ class TestParallelUtils(unittest.TestCase):
         y = x.copy()
         x, y = wrap(x, y, backend=backend)
 
+        @annotate(i='int', doublep='x, y')
         def map(i=0, x=[0.0], y=[0.0]):
             return cos(x[i])*sin(y[i])
 
@@ -106,59 +108,3 @@ class TestParallelUtils(unittest.TestCase):
     def test_reduction_works_neutral_opencl(self):
         importorskip('pyopencl')
         self._check_reduction_min(backend='opencl')
-
-
-class TestKernel(unittest.TestCase):
-
-    def setUp(self):
-        importorskip('pyopencl')
-
-    def test_simple_kernel(self):
-        # Given
-        @annotate(gdoublep='x, y', a='float')
-        def knl(x, y, a):
-            i = declare('int')
-            i = GID_0*LDIM_0 + LID_0
-            y[i] = x[i]*a
-
-        x = np.linspace(0, 1, 1000)
-        y = np.zeros_like(x)
-        x, y = wrap(x, y, backend='opencl')
-
-        # When
-        k = Kernel(knl, backend='opencl')
-        a = 21.0
-        k(x, y, a)
-
-        # Then
-        y.pull()
-        self.assertTrue(np.allclose(y.data, x.data*a))
-
-    def test_kernel_with_local_memory(self):
-        # Given
-        @annotate(gdoublep='x, y', xc='ldoublep', a='float')
-        def knl(x, y, xc, a):
-            i, lid = declare('int', 2)
-            lid = LID_0
-            i = GID_0*LDIM_0 + lid
-
-            xc[lid] = x[i]
-
-            local_barrier()
-
-            y[i] = xc[lid]*a
-
-        x = np.linspace(0, 1, 1024)
-        y = np.zeros_like(x)
-        xc = LocalMem(1, backend='opencl')
-
-        x, y = wrap(x, y, backend='opencl')
-
-        # When
-        k = Kernel(knl, backend='opencl')
-        a = 21.0
-        k(x, y, xc, a)
-
-        # Then
-        y.pull()
-        self.assertTrue(np.allclose(y.data, x.data*a))
