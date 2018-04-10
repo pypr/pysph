@@ -4,8 +4,8 @@ import numpy as np
 from pytest import importorskip
 
 from ..array import wrap
-from ..types import annotate, declare, GID_0, LDIM_0, LID_0
-from ..low_level import Kernel, LocalMem, local_barrier
+from ..types import annotate, declare
+from ..low_level import Kernel, LocalMem, local_barrier, GID_0, LDIM_0, LID_0
 
 
 class TestKernel(unittest.TestCase):

@@ -15,6 +15,9 @@ from .transpiler import Transpiler
 from .types import KnownType, ctype_to_dtype
 
 
+LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
+
+
 def local_barrier():
     """Dummy method to keep Python happy.
 

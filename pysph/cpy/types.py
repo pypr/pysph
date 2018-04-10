@@ -129,9 +129,6 @@ C_NP_TYPE_MAP = {
 }
 
 
-LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
-
-
 def dtype_to_ctype(dtype):
     return NP_C_TYPE_MAP[dtype]
 
