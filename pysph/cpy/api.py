@@ -6,8 +6,9 @@ from .cython_generator import (
     CythonGenerator, get_func_definition
 )
 from .ext_module import ExtModule
+from .low_level import Kernel, LocalMem
 from .parallel import (
-    Elementwise, Kernel, LocalMem, Reduction, elementwise
+    Elementwise, Reduction, elementwise
 )
 from .translator import (
     CConverter, CStructHelper, OpenCLConverter, detect_type, ocl_detect_type,
