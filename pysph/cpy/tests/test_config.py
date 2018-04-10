@@ -2,7 +2,7 @@
 """
 from unittest import TestCase, main
 
-from ..config import Config, get_config, set_config
+from ..config import Config, get_config, set_config, use_config
 
 
 class ConfigTestCase(TestCase):
@@ -107,6 +107,24 @@ class ConfigTestCase(TestCase):
 
         # Then.
         self.assertEqual(config.use_openmp, 200)
+
+    def test_use_config(self):
+        # Given
+        self.config.use_openmp = 200
+        set_config(self.config)
+
+        # When/Then
+        with use_config(use_openmp=300) as cfg:
+            config = get_config()
+            self.assertEqual(config.use_openmp, 300)
+            self.assertEqual(cfg.use_openmp, 300)
+            cfg.use_openmp = 100
+            cfg.use_double = False
+            self.assertEqual(config.use_openmp, 100)
+            self.assertEqual(config.use_double, False)
+
+        # Then
+        self.assertEqual(get_config().use_openmp, 200)
 
 
 if __name__ == '__main__':

@@ -4,6 +4,8 @@ Do not import any PySPH specific extensions here, if you must, do the import
 inside the function/method.
 """
 
+from contextlib import contextmanager
+
 
 class Config(object):
     def __init__(self):
@@ -111,3 +113,31 @@ def get_config():
 def set_config(config):
     global _config
     _config = config
+
+
+@contextmanager
+def use_config(**kw):
+    """A context manager for the configuration.
+
+    One can do the following::
+
+        with use_config(use_openmp=True) as cfg:
+            do_something()
+            cfg.use_opencl = True
+            do_something_else()
+
+    The configuration will be restored to the original when one exits the
+    context. Inside the scope of the with statement the configuration ``cfg``
+    is the one operational and so can be changed.
+    """
+    orig_cfg = get_config()
+    cfg = Config()
+    for k, v in kw.items():
+        setattr(cfg, k, v)
+
+    set_config(cfg)
+
+    try:
+        yield cfg
+    finally:
+        set_config(orig_cfg)
