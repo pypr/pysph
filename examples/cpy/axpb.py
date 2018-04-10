@@ -51,7 +51,7 @@ def plot_timing(n, timing):
     plt.semilogx(n, timing[0]/timing[2], label='serial/opencl', marker='+')
     plt.grid()
     plt.xlabel('N')
-    plt.ylabel('Average time')
+    plt.ylabel('Speedup')
     plt.legend()
     plt.show()
 

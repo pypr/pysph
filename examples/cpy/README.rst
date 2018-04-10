@@ -126,3 +126,6 @@ directory.
   Python and use that. This also shows how you can allocate and use local (or
   shared) memory which is often very important for performance on GPGPUs. This
   code will only run via PyOpenCL.
+
+- ``bench_vm.py``: Benchmarks the various vortex method results above for a
+  comparison with numba.
