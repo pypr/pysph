@@ -132,6 +132,8 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._for_count = 0
+        self._added_loop_vars = set()
         self._annotations = {}
         self._ignore_methods = []
         self._replacements = {
@@ -379,6 +381,14 @@ class CConverter(ast.NodeVisitor):
     def visit_Expr(self, node):
         return self.visit(node.value) + ';'
 
+    def _check_if_integer(self, s):
+        try:
+            int(ast.literal_eval(s))
+        except ValueError:
+            return False
+        else:
+            return True
+
     def visit_For(self, node):
         if node.iter.func.id != 'range':
             self.error(
@@ -387,31 +397,111 @@ class CConverter(ast.NodeVisitor):
         if node.orelse:
             self.error('For/else not supported.', node.orelse[0])
         args = node.iter.args
+
+        # If the stop or step elements are not numbers, then the semantics of a
+        # for i in range can be very different from the translated C as in C,
+        # one could change the stop or increment at each step.  This is not
+        # possible in Python.
+        simple = True
+        positive_step = True
+        int_step = True
+        int_stop = True
         if len(args) == 1:
             start, stop, incr = 0, self.visit(args[0]), 1
+            int_stop = simple = self._check_if_integer(stop)
         elif len(args) == 2:
             start, stop, incr = self.visit(args[0]), self.visit(args[1]), 1
+            int_stop = simple = self._check_if_integer(stop)
         elif len(args) == 3:
             start, stop, incr = [self.visit(x) for x in args]
+            int_step = self._check_if_integer(incr)
+            int_stop = self._check_if_integer(stop)
+            simple = (int_stop and int_step)
+            if int_step:
+                positive_step = ast.literal_eval(incr) > 0
         else:
-            self.error('range should have either [1,2,3] args', node.iter)
+            self.error('range should have either 1, 2, or 3 args', node.iter)
+
         local_scope = False
         if isinstance(node.target, ast.Name):
             if node.target.id not in self._known:
-                type = 'long '
+                target_type = 'long '
                 self._known.add(node.target.id)
                 local_scope = True
             else:
-                type = ''
+                target_type = ''
 
-        r = ('for ({type}{i}={start}; {i}<{stop}; {i}+={incr})'
-             ' {{\n{block}\n}}\n').format(
-                 i=self.visit(node.target), type=type,
-                 start=start, stop=stop, incr=incr,
-                 block='\n'.join(
-                     self._indent_block(self.visit(x)) for x in node.body
+        target = self.visit(node.target)
+        if simple:
+            comparator = '<' if positive_step else '>'
+            r = ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
+                 ' {{\n{block}\n}}\n').format(
+                     i=target, type=target_type,
+                     start=start, stop=stop, incr=incr, comp=comparator,
+                     block='\n'.join(
+                         self._indent_block(self.visit(x)) for x in node.body
+                     )
                  )
-             )
+        else:
+            count = self._for_count
+            self._for_count += 1
+            r = ''
+            if not int_stop:
+                stop_var = '__cpy_stop_{count}'.format(count=count)
+                type = 'long ' if stop_var not in self._known else ''
+                self._known.add(stop_var)
+                if count > 0:
+                    self._added_loop_vars.add(stop_var)
+                r += '{type}{stop_var} = {stop};\n'.format(
+                    type=type, stop_var=stop_var, stop=stop
+                )
+                stop = stop_var
+            if int_step:
+                comparator = '<' if positive_step else '>'
+                block = '\n'.join(
+                    self._indent_block(self.visit(x)) for x in node.body
+                )
+                r += ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
+                      ' {{\n{block}\n}}\n').format(
+                          i=target, type=target_type,
+                          start=start, stop=stop, incr=incr,
+                          comp=comparator, block=block
+                      )
+            else:
+                step_var = '__cpy_step_{count}'.format(count=count)
+                type = 'long ' if step_var not in self._known else ''
+                self._known.add(step_var)
+                if count > 0:
+                    self._added_loop_vars.add(step_var)
+                r += '{type}{step_var} = {incr};\n'.format(
+                    type=type, step_var=step_var, incr=incr
+                )
+                incr = step_var
+                block = '\n'.join(
+                    self._indent_block(self.visit(x)) for x in node.body
+                )
+                r += dedent('''\
+                if ({incr} < 0) {{
+                    for ({type}{i}={start}; {i}>{stop}; {i}+={incr}) {{
+                    {block}
+                    }}
+                }}
+                else {{
+                    for ({type}{i}={start}; {i}<{stop}; {i}+={incr}) {{
+                    {block}
+                    }}
+                }}
+                ''').format(
+                    i=target, type=target_type,
+                    start=start, stop=stop, incr=incr,
+                    block=block
+                )
+
+            self._for_count -= 1
+            if count == 0:
+                self._known -= self._added_loop_vars
+                self._added_loop_vars = set()
+
         if local_scope:
             self._known.remove(node.target.id)
         return r
@@ -560,7 +650,7 @@ class CConverter(ast.NodeVisitor):
     visit_Try = visit_TryExcept
 
     def visit_UnaryOp(self, node):
-        return '(%s %s)' % (self.visit(node.op), self.visit(node.operand))
+        return '%s%s' % (self.visit(node.op), self.visit(node.operand))
 
     def visit_USub(self, node):
         return '-'

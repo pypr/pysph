@@ -29,7 +29,7 @@ def test_simple_assignment_expression():
     expect = dedent('''
     double a;
     double b;
-    b = ((((2 * a) + 1) * ((- a) / 1.5)) % 2);
+    b = ((((2 * a) + 1) * (-a / 1.5)) % 2);
     ''')
     assert code == expect.strip()
 
@@ -103,7 +103,7 @@ def test_conditionals():
     expect = dedent('''
     double x;
     double y;
-    if ((((x > 10) && (x < 20)) || (! ((x >= 10) && (x <= 20))))) {
+    if ((((x > 10) && (x < 20)) || !((x >= 10) && (x <= 20)))) {
         y;
     }
     ''')
@@ -609,6 +609,25 @@ def test_for():
     assert code.strip() == expect.strip()
 
 
+def test_for_with_decreasing_range():
+    # Given
+    src = dedent('''
+    for i in range(10, -1, -1):
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    for (long i=10; i>-1; i+=-1) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_for_with_declare():
     # Given
     src = dedent('''
@@ -653,6 +672,101 @@ def test_two_fors():
     }
     ''')
     assert code.strip() == expect.strip()
+
+
+def test_for_with_symbols():
+    # Given
+    src = dedent('''
+    n = declare('int')
+    n = 25
+    for i in range(n):
+        pass
+    for i in range(0, n+1, step()):
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int n;
+    n = 25;
+    long __cpy_stop_0 = n;
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        ;
+    }
+
+    __cpy_stop_0 = (n + 1);
+    long __cpy_step_0 = step();
+    if (__cpy_step_0 < 0) {
+        for (long i=0; i>__cpy_stop_0; i+=__cpy_step_0) {
+            ;
+        }
+    }
+    else {
+        for (long i=0; i<__cpy_stop_0; i+=__cpy_step_0) {
+            ;
+        }
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_nested_for_with_symbols():
+    # Given
+    src = dedent('''
+    n = declare('int')
+    n = 25
+    for i in range(n):
+        for j in range(0, n+1, step()):
+            pass
+    for i in range(n+1):
+        for j in range(0, n+2, step()):
+            pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int n;
+    n = 25;
+    long __cpy_stop_0 = n;
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        long __cpy_stop_1 = (n + 1);
+        long __cpy_step_1 = step();
+        if (__cpy_step_1 < 0) {
+            for (long j=0; j>__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+        else {
+            for (long j=0; j<__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+    }
+
+    __cpy_stop_0 = (n + 1);
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        long __cpy_stop_1 = (n + 2);
+        long __cpy_step_1 = step();
+        if (__cpy_step_1 < 0) {
+            for (long j=0; j>__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+        else {
+            for (long j=0; j<__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
 
 
 def test_for_with_break_continue():
