@@ -52,8 +52,6 @@ def compare(m=5):
 
 
 def plot_timing(n, timing):
-    import matplotlib
-    matplotlib.use('Qt5Agg')
     from matplotlib import pyplot as plt
     plt.plot(n, timing[0]/timing[1], label='numba/cython', marker='+')
     plt.plot(n, timing[0]/timing[2], label='numba/openmp', marker='+')

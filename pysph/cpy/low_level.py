@@ -133,6 +133,7 @@ class Kernel(object):
         self.backend = backend
         self.name = func.__name__
         self.func = func
+        self.source = ''  # The generated source.
         self._config = get_config()
         self._use_double = self._config.use_double
         from pysph.base.opencl import get_queue
@@ -169,6 +170,7 @@ class Kernel(object):
         self._correct_opencl_address_space()
 
         self.tp.compile()
+        self.source = self.tp.source
         self.knl = getattr(self.tp.mod, self.name)
         import pyopencl as cl
         self._max_work_group_size = self.knl.get_work_group_info(

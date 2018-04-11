@@ -44,8 +44,6 @@ def compare(m=20):
 
 
 def plot_timing(n, timing):
-    # import matplotlib
-    # matplotlib.use('Qt5Agg')
     from matplotlib import pyplot as plt
     plt.semilogx(n, timing[0]/timing[1], label='serial/openmp', marker='+')
     plt.semilogx(n, timing[0]/timing[2], label='serial/opencl', marker='+')

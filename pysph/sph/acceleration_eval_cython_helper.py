@@ -1,5 +1,5 @@
 from collections import defaultdict
-from os.path import dirname, join
+from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
 from pyzoltan.core import carray
@@ -7,7 +7,7 @@ from pyzoltan.core import carray
 from pysph.cpy.config import get_config
 from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
                                         get_parallel_range)
-from pysph.cpy.ext_module import ExtModule
+from pysph.cpy.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################
@@ -142,8 +142,15 @@ class AccelerationEvalCythonHelper(object):
     def compile(self, code):
         # Note, we do not add carray or particle_array as nnps_base would
         # have been rebuilt anyway if they changed.
+        root = expanduser(join('~', '.pypsh', 'source', get_platform_dir()))
         depends = ["pysph.base.nnps_base"]
-        self._ext_mod = ExtModule(code, verbose=True, depends=depends)
+        # Add pysph/base directory to inc_dirs for including spatial_hash.h
+        # for SpatialHashNNPS
+        extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
+        self._ext_mod = ExtModule(
+            code, verbose=True, root=root, depends=depends,
+            extra_inc_dirs=extra_inc_dirs
+        )
         self._module = self._ext_mod.load()
         return self._module
 
