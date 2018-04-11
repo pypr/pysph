@@ -57,9 +57,9 @@ class Dambreak2D(Application):
 
     def create_scheme(self):
         co = 10.0 * np.sqrt(2.0 * 9.81 * 2.0)
-        return WCSPHScheme(['fluid'], ['dam'], dim=2, rho0=100.0, c0=co, h0=0.075,
-                           hdx=1.5, hg_correction=True, gy=-9.81, alpha=0.2,
-                           gamma=7.0)
+        return WCSPHScheme(['fluid'], ['dam'], dim=2, rho0=100.0, c0=co,
+                           h0=0.075, hdx=1.5, hg_correction=True, gy=-9.81,
+                           alpha=0.2, gamma=7.0)
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
