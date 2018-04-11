@@ -14,7 +14,7 @@ try:
 except ImportError:
     import mock
 
-from pysph.base.ext_module import get_md5, ExtModule
+from ..ext_module import get_md5, ExtModule
 
 
 def _check_write_source(root):
@@ -31,7 +31,7 @@ def _check_write_source(root):
         return orig_side_effect(*args, **kw)
     m.side_effect = _side_effect
 
-    with mock.patch('pysph.base.ext_module.open', m, create=True):
+    with mock.patch('pysph.cpy.ext_module.open', m, create=True):
         ExtModule("print('hello')", root=root)
     return m.call_count
 
@@ -79,9 +79,9 @@ class TestExtModule(TestCase):
 
         self.assertEqual(s.hash, get_md5(data))
         self.assertEqual(s.code, data)
-        expect_name = 'm_%s'%(s.hash)
+        expect_name = 'm_%s' % (s.hash)
         self.assertEqual(s.name, expect_name)
-        self.assertEqual(s.src_path, join(self.root, expect_name +'.pyx'))
+        self.assertEqual(s.src_path, join(self.root, expect_name + '.pyx'))
         self.assertEqual(s.ext_path,
                          join(self.root, expect_name + get_config_var('SO')))
 

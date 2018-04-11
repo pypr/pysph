@@ -75,7 +75,7 @@ def test_exact_riemann():
     solver = R.exact
 
     _check_shock_tube(solver, rel=1e-4)
-    _check_blastwave(solver, rel=1e-4)
+    _check_blastwave(solver, rel=1e-3)
     _check_sjogreen(solver, abs=1e-4)
     _check_woodward_collela(solver, rel=1e-4)
 

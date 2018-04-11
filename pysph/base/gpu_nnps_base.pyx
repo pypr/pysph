@@ -30,9 +30,9 @@ from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
-from pysph.base.config import get_config
 from pysph.base.opencl import (DeviceArray, DeviceHelper, get_context,
                                 get_queue, set_context, set_queue)
+from pysph.cpy.config import get_config
 
 # Particle Tag information
 from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free

@@ -12,7 +12,6 @@ import sys
 import time
 
 # PySPH imports.
-from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.utils import is_overloaded_method
 
@@ -21,6 +20,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
     StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
+from pysph.cpy.config import get_config
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
 

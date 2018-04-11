@@ -1,28 +1,25 @@
 """Common OpenCL related functionality.
 """
 
-from __future__ import print_function
+import logging
 import numpy as np
 import pyopencl as cl
 import pyopencl.array  # noqa: 401
 import pyopencl.algorithm
-import pyopencl.tools
+import pyopencl.tools  # noqa: 401
 from pyopencl.scan import GenericScanKernel
 from pyopencl.elementwise import ElementwiseKernel
-from collections import defaultdict
-from operator import itemgetter
 from mako.template import Template
 
-import logging
+from pysph.cpy.config import get_config
+from pysph.cpy.opencl import (  # noqa: 401
+    get_context, get_queue, profile, profile_kernel,
+    print_profile, set_context, set_queue
+)
+from .particle_array import ParticleArray
+
+
 logger = logging.getLogger()
-
-from .config import get_config
-
-from pysph.base.particle_array import ParticleArray
-
-_ctx = None
-_queue = None
-_profile_info = defaultdict(float)
 
 
 # args: tag_array, tag, indices, head
@@ -40,66 +37,6 @@ NUM_REAL_PARTICLES_KNL = Template(r"""//CL//
             return;
         }
 """)
-
-
-def get_context():
-    global _ctx
-    if _ctx is None:
-        _ctx = cl.create_some_context()
-    return _ctx
-
-
-def set_context(ctx):
-    global _ctx
-    _ctx = ctx
-
-
-def get_queue():
-    global _queue
-    if _queue is None:
-        properties = None
-        if get_config().profile:
-            properties = cl.command_queue_properties.PROFILING_ENABLE
-        _queue = cl.CommandQueue(get_context(), properties=properties)
-    return _queue
-
-
-def set_queue(q):
-    global _queue
-    _queue = q
-
-
-def profile(name, event):
-    global _profile_info
-    event.wait()
-    time = (event.profile.end - event.profile.start) * 1e-9
-    _profile_info[name] += time
-
-
-def print_profile():
-    global _profile_info
-    _profile_info = sorted(_profile_info.items(), key=itemgetter(1),
-                           reverse=True)
-    if len(_profile_info) == 0:
-        print("No profile information available")
-        return
-    print("{:<30} {:<30}".format('Kernel', 'Time'))
-    tot_time = 0
-    for kernel, time in _profile_info:
-        print("{:<30} {:<30}".format(kernel, time))
-        tot_time += time
-    print("Total profiled time: %g secs" % tot_time)
-
-
-def profile_kernel(kernel, name):
-    def _profile_knl(*args):
-        event = kernel(*args)
-        profile(name, event)
-        return event
-    if get_config().profile:
-        return _profile_knl
-    else:
-        return kernel
 
 
 def get_elwise_kernel(kernel_name, args, src, preamble=""):
@@ -188,23 +125,25 @@ class DeviceArray(object):
         if_remove.fill(0)
         new_array = self.copy()
 
-        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
-                "int* indices, int* if_remove",
-                "if_remove[indices[i]] = 1;")
+        fill_if_remove_knl = get_elwise_kernel(
+            "fill_if_remove_knl",
+            "int* indices, int* if_remove",
+            "if_remove[indices[i]] = 1;"
+        )
 
         fill_if_remove_knl(indices, if_remove.array)
 
         remove_knl = GenericScanKernel(
-                self.ctx, np.int32,
-                arguments="__global int *if_remove,\
-                            __global %(dtype)s *array,\
-                            __global %(dtype)s *new_array" % \
-                            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
-                input_expr="if_remove[i]",
-                scan_expr="a+b", neutral="0",
-                output_statement="""
-                    if(!if_remove[i]) new_array[i - item] = array[i];
-                    """)
+            self.ctx, np.int32,
+            arguments="__global int *if_remove,\
+            __global %(dtype)s *array,\
+            __global %(dtype)s *new_array" %
+            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
+            input_expr="if_remove[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            if(!if_remove[i]) new_array[i - item] = array[i];
+            """)
 
         remove_knl(if_remove.array, self.array, new_array.array)
 
@@ -431,20 +370,23 @@ class DeviceHelper(object):
         new_indices = DeviceArray(np.uint32,
                                   n=self.get_number_of_particles())
 
-        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
-                "int* indices, uint* if_remove",
-                "if_remove[indices[i]] = 1;")
+        fill_if_remove_knl = get_elwise_kernel(
+            "fill_if_remove_knl",
+            "int* indices, uint* if_remove",
+            "if_remove[indices[i]] = 1;"
+        )
 
         fill_if_remove_knl(indices, if_remove.array)
 
         remove_knl = GenericScanKernel(
-                self._ctx, np.int32,
-                arguments="__global int *if_remove, __global uint *new_indices",
-                input_expr="if_remove[i]",
-                scan_expr="a+b", neutral="0",
-                output_statement="""
-                    if(!if_remove[i]) new_indices[i - item] = i;
-                    """)
+            self._ctx, np.int32,
+            arguments="__global int *if_remove, __global uint *new_indices",
+            input_expr="if_remove[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            if(!if_remove[i]) new_indices[i - item] = i;
+            """
+        )
 
         remove_knl(if_remove.array, new_indices.array)
 

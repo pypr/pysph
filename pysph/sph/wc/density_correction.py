@@ -1,6 +1,5 @@
 from pysph.sph.equation import Equation
-from pysph.base.cython_generator import declare
-import numpy as np
+from pysph.cpy.api import declare
 
 
 def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
