@@ -79,9 +79,9 @@ class TestExtModule(TestCase):
 
         self.assertEqual(s.hash, get_md5(data))
         self.assertEqual(s.code, data)
-        expect_name = 'm_%s'%(s.hash)
+        expect_name = 'm_%s' % (s.hash)
         self.assertEqual(s.name, expect_name)
-        self.assertEqual(s.src_path, join(self.root, expect_name +'.pyx'))
+        self.assertEqual(s.src_path, join(self.root, expect_name + '.pyx'))
         self.assertEqual(s.ext_path,
                          join(self.root, expect_name + get_config_var('SO')))
 

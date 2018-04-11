@@ -317,7 +317,7 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
-    def test_method_with_known_types(self):
+    def test_method_with_known_types(self):  # noqa
         cg = CythonGenerator(
             known_types={'WIJ': 0.0, 'DWIJ': [0.0, 0.0, 0.0],
                          'user': KnownType('ndarray'),

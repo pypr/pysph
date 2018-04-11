@@ -768,7 +768,6 @@ def test_nested_for_with_symbols():
     assert code.strip() == expect.strip()
 
 
-
 def test_for_with_break_continue():
     # Given
     src = dedent('''

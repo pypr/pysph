@@ -43,9 +43,7 @@ from libc.stdlib cimport abort, malloc, free
 from libc.math cimport INFINITY
 cimport openmp
 
-IF UNAME_SYSNAME == "Windows":
-    cdef double INFINITY = float('inf')
-
+cdef double INFTY = float('inf')
 
 cpdef int get_number_of_threads():
 % if openmp:
@@ -228,7 +226,12 @@ class Reduction(object):
         self.reduce_expr = reduce_expr
         self.dtype_out = dtype_out
         self.type = dtype_to_ctype(dtype_out)
-        self.neutral = neutral
+        if backend == 'cython':
+            # On Windows, INFINITY is not defined so we use INFTY which we
+            # internally define.
+            self.neutral = neutral.replace('INFINITY', 'INFTY')
+        else:
+            self.neutral = neutral
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None

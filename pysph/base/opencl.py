@@ -125,23 +125,25 @@ class DeviceArray(object):
         if_remove.fill(0)
         new_array = self.copy()
 
-        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
-                "int* indices, int* if_remove",
-                "if_remove[indices[i]] = 1;")
+        fill_if_remove_knl = get_elwise_kernel(
+            "fill_if_remove_knl",
+            "int* indices, int* if_remove",
+            "if_remove[indices[i]] = 1;"
+        )
 
         fill_if_remove_knl(indices, if_remove.array)
 
         remove_knl = GenericScanKernel(
-                self.ctx, np.int32,
-                arguments="__global int *if_remove,\
-                            __global %(dtype)s *array,\
-                            __global %(dtype)s *new_array" % \
-                            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
-                input_expr="if_remove[i]",
-                scan_expr="a+b", neutral="0",
-                output_statement="""
-                    if(!if_remove[i]) new_array[i - item] = array[i];
-                    """)
+            self.ctx, np.int32,
+            arguments="__global int *if_remove,\
+            __global %(dtype)s *array,\
+            __global %(dtype)s *new_array" %
+            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
+            input_expr="if_remove[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            if(!if_remove[i]) new_array[i - item] = array[i];
+            """)
 
         remove_knl(if_remove.array, self.array, new_array.array)
 
@@ -368,20 +370,23 @@ class DeviceHelper(object):
         new_indices = DeviceArray(np.uint32,
                                   n=self.get_number_of_particles())
 
-        fill_if_remove_knl = get_elwise_kernel("fill_if_remove_knl",
-                "int* indices, uint* if_remove",
-                "if_remove[indices[i]] = 1;")
+        fill_if_remove_knl = get_elwise_kernel(
+            "fill_if_remove_knl",
+            "int* indices, uint* if_remove",
+            "if_remove[indices[i]] = 1;"
+        )
 
         fill_if_remove_knl(indices, if_remove.array)
 
         remove_knl = GenericScanKernel(
-                self._ctx, np.int32,
-                arguments="__global int *if_remove, __global uint *new_indices",
-                input_expr="if_remove[i]",
-                scan_expr="a+b", neutral="0",
-                output_statement="""
-                    if(!if_remove[i]) new_indices[i - item] = i;
-                    """)
+            self._ctx, np.int32,
+            arguments="__global int *if_remove, __global uint *new_indices",
+            input_expr="if_remove[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            if(!if_remove[i]) new_indices[i - item] = i;
+            """
+        )
 
         remove_knl(if_remove.array, new_indices.array)
 

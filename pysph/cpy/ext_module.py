@@ -26,8 +26,8 @@ except ImportError:
     MPI = None
 
 # Package imports.
-from .config import get_config
-from .capture_stream import CaptureMultipleStreams
+from .config import get_config  # noqa: 402
+from .capture_stream import CaptureMultipleStreams  # noqa: 402
 
 
 def get_platform_dir():
@@ -109,11 +109,13 @@ class ExtModule(object):
     @contextmanager
     def _lock(self, timeout=90):
         t1 = time.time()
+
         def _is_timed_out():
             if timeout is None:
                 return False
             else:
                 return (time.time() - t1) > timeout
+
         def _try_to_lock():
             if not exists(self.lock_path):
                 try:
