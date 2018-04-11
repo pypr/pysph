@@ -142,7 +142,7 @@ class Elementwise(object):
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
 
-            from pysph.base.opencl import get_context, get_queue
+            from .opencl import get_context, get_queue
             from pyopencl.elementwise import ElementwiseKernel
             ctx = get_context()
             self.queue = get_queue()
@@ -283,7 +283,7 @@ class Reduction(object):
                 expr = None
                 preamble = ''
 
-            from pysph.base.opencl import get_context, get_queue
+            from .opencl import get_context, get_queue
             from pyopencl.reduction import ReductionKernel
             ctx = get_context()
             self.queue = get_queue()

@@ -55,7 +55,7 @@ class Array(object):
             if np.issubdtype(self.data.dtype, np.float):
                 self._convert = True
             from pyopencl.array import to_device
-            from pysph.base.opencl import get_queue
+            from .opencl import get_queue
             self.q = get_queue()
             self.dev = to_device(self.q, self._get_data())
         else:

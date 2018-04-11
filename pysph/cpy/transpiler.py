@@ -122,7 +122,7 @@ class Transpiler(object):
             self.mod = mod.load()
         elif self.backend == 'opencl':
             import pyopencl as cl
-            from pysph.base.opencl import get_context
+            from .opencl import get_context
             ctx = get_context()
             self.source = convert_to_float_if_needed(self.get_code())
             self.mod = cl.Program(ctx, self.source).build(

@@ -136,7 +136,7 @@ class Kernel(object):
         self.source = ''  # The generated source.
         self._config = get_config()
         self._use_double = self._config.use_double
-        from pysph.base.opencl import get_queue
+        from .opencl import get_queue
         self.queue = get_queue()
         self._func_info = self._get_func_info()
         self._generate()
