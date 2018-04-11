@@ -1,5 +1,4 @@
 from pysph.sph.equation import Equation
-from pysph.base.cython_generator import declare
 from pysph.sph.wc.density_correction import gj_solve
 
 
