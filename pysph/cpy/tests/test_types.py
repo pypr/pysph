@@ -27,6 +27,19 @@ class TestDeclare(unittest.TestCase):
         res = declare('matrix((3, 3))')
         self.assertTrue(np.all(res == np.zeros((3, 3))))
 
+    def test_declare_with_type(self):
+        res = declare('matrix(3, "int")')
+        self.assertTrue(np.all(res == np.zeros(3)))
+        self.assertEqual(res.dtype, np.int32)
+
+        res = declare('matrix((2, 2), "unsigned int")')
+        self.assertTrue(np.all(res == np.zeros((2, 2))))
+        self.assertEqual(res.dtype, np.uint32)
+
+        res = declare('matrix((3,), "float")')
+        self.assertTrue(np.all(res == np.zeros((3,))))
+        self.assertEqual(res.dtype, np.float32)
+
     def test_declare_with_address_space(self):
         self.assertEqual(declare('LOCAL_MEM int', 2), (0, 0))
         self.assertEqual(declare('GLOBAL_MEM float', 2), (0.0, 0.0))

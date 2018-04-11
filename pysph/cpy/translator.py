@@ -20,6 +20,7 @@ import numpy as np
 from mako.template import Template
 
 from .config import get_config
+from .types import get_declare_info
 from .cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )
@@ -191,22 +192,21 @@ class CConverter(ast.NodeVisitor):
         return ', '.join(call_sig)
 
     def _get_variable_declaration(self, type_str, names):
-        address_space = ''
-        if type_str.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
-            idx = type_str.index(' ')
-            address_space, type_str = type_str[:idx] + ' ', type_str[idx+1:]
-        if type_str.startswith('matrix'):
-            shape = ast.literal_eval(type_str[7:-1])
+        kind, address_space, ctype, shape = get_declare_info(type_str)
+        if address_space:
+            address_space += ' '
+
+        if kind == 'matrix':
             if not isinstance(shape, tuple):
-                shape = (shape,)
+                shape = (shape, )
             sz = ''.join('[%d]' % x for x in shape)
             vars = ['%s%s' % (x, sz) for x in names]
-            return '{address}double {vars};'.format(
-                address=address_space, vars=', '.join(vars)
+            return '{address}{type} {vars};'.format(
+                address=address_space, type=ctype, vars=', '.join(vars)
             )
         else:
             return '{address}{type} {vars};'.format(
-                address=address_space, type=type_str, vars=', '.join(names)
+                address=address_space, type=ctype, vars=', '.join(names)
             )
 
     def _indent_block(self, code):

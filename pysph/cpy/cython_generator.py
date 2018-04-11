@@ -17,7 +17,7 @@ import types
 
 from mako.template import Template
 
-from .types import KnownType, Undefined
+from .types import KnownType, Undefined, get_declare_info
 from .config import get_config
 from .ast_utils import get_assigned, has_return
 
@@ -109,7 +109,7 @@ class CodeGenerationError(Exception):
 
 def parse_declare(code):
     """Given a string with the source for the declare method,
-    return the type.
+    return the type information.
     """
     m = ast.parse(code)
     call = m.body[0].value
@@ -119,7 +119,8 @@ def parse_declare(code):
     if not isinstance(arg0, ast.Str):
         err = 'Type should be a string, given :%r' % arg0.s
         raise CodeGenerationError(err)
-    return arg0.s
+
+    return get_declare_info(arg0.s)
 
 
 class CythonGenerator(object):
@@ -416,17 +417,17 @@ class CythonGenerator(object):
             sz = ''.join(['[%d]' % n for n in size])
             return sz
 
-        # Remove the "declare('" and the trailing "')".
-        code = parse_declare(declare)
-        if code.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
-            code = code[code.index(' ') + 1:]
-        if code.startswith('matrix'):
-            sz = matrix(eval(code[7:-1]))
+        # Parse the declare statement.
+        kind, _address_space, ctype, shape = parse_declare(declare)
+        if kind == 'matrix':
+            sz = matrix(shape)
             vars = ['%s%s' % (x.strip(), sz) for x in name.split(',')]
-            defn = 'cdef double %s' % ', '.join(vars)
+            defn = 'cdef {type} {vars}'.format(
+                type=ctype, vars=', '.join(vars)
+            )
             return defn
         else:
-            defn = 'cdef {type} {name}'.format(type=code, name=name)
+            defn = 'cdef {type} {name}'.format(type=ctype, name=name)
             return defn
 
     def _parse_function(self, obj):

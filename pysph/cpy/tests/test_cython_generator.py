@@ -38,7 +38,7 @@ class EqWithMatrix:
     def func(self, d_idx, d_x=[0.0, 0.0]):
         mat = declare('matrix((2,2))')
         mat[0][0] = d_x[d_idx]
-        vec, vec1 = declare('matrix(3)', 2)
+        vec, vec1 = declare('matrix(3, "float")', 2)
         vec[0] = d_x[d_idx]
 
 
@@ -62,7 +62,7 @@ def simple_func(d_idx, d_x, x=0.0):
 
 @annotate(i='int', y='floatp', return_='float')
 def annotated_f(i, y=[0.0]):
-    x = declare('LOCAL_MEM matrix(64)')
+    x = declare('LOCAL_MEM matrix(64, "unsigned int")')
     return y[i]
 
 
@@ -168,7 +168,7 @@ class TestCythonCodeGenerator(TestBase):
         # Then
         expect = dedent('''
         cdef inline float annotated_f(int i, float* y):
-            cdef double x[64]
+            cdef unsigned int x[64]
             return y[i]
         ''')
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -294,7 +294,7 @@ class TestCythonCodeGenerator(TestBase):
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double mat[2][2]
                 mat[0][0] = d_x[d_idx]
-                cdef double vec[3], vec1[3]
+                cdef float vec[3], vec1[3]
                 vec[0] = d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())

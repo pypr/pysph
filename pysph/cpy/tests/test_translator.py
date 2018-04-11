@@ -929,12 +929,29 @@ def test_declare_matrix():
     ''')
     assert code.strip() == expect.strip()
 
+    # Given
+    src = dedent('''
+    x = declare('matrix((2, 3), "int")')
+    do(x[0][1])
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int x[2][3];
+    do(x[0][1]);
+    ''')
+    assert code.strip() == expect.strip()
+
 
 def test_declare_call_declares_multiple_variables():
     # Given
     src = dedent('''
     x, y = declare('int', 2)
     u, v = declare('matrix(3)', 2)
+    A = declare('matrix((2,2), "long")')
     ''')
 
     # When
@@ -944,6 +961,7 @@ def test_declare_call_declares_multiple_variables():
     expect = dedent('''
     int x, y;
     double u[3], v[3];
+    long A[2][2];
     ''')
     assert code.strip() == expect.strip()
 

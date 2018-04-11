@@ -1,3 +1,4 @@
+import ast
 import numpy as np
 
 
@@ -30,15 +31,49 @@ def declare(type, num=1):
         return tuple(_declare(type) for i in range(num))
 
 
-def _declare(type):
-    if type.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
-        type = type[type.index(' ') + 1:]
-    if type.startswith('matrix'):
-        return np.zeros(eval(type[7:-1]))
-    elif type in ['double', 'float']:
-        return 0.0
+def get_declare_info(arg):
+    """Given the first argument to the declare function, return the
+    (kind, address_space, type, shape), information.
+
+    kind: is a string, 'primitive' or 'matrix'
+    address_space: is the address space string.
+    type: is the c data type to use.
+    shape: is a tuple with the shape of the matrix.  It is None for primitives.
+    """
+    address_space = ''
+    shape = None
+    if arg.startswith(('LOCAL_MEM', 'GLOBAL_MEM')):
+        idx = arg.index(' ')
+        address_space = arg[:idx]
+        arg = arg[idx + 1:]
+    if arg.startswith('matrix'):
+        kind = 'matrix'
+        m_arg = ast.literal_eval(arg[7:-1])
+        if isinstance(m_arg, tuple) and \
+           len(m_arg) > 1 and \
+           isinstance(m_arg[1], str):
+            shape = m_arg[0]
+            type = m_arg[1]
+        else:
+            shape = m_arg
+            type = 'double'
     else:
-        return 0
+        kind = 'primitive'
+        type = arg
+
+    return kind, address_space, type, shape
+
+
+def _declare(arg):
+    kind, address_space, ctype, shape = get_declare_info(arg)
+    if kind == 'matrix':
+        dtype = C_NP_TYPE_MAP[ctype]
+        return np.zeros(shape, dtype=dtype)
+    else:
+        if ctype in ['double', 'float']:
+            return 0.0
+        else:
+            return 0
 
 
 class Undefined(object):
