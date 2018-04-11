@@ -43,6 +43,10 @@ from libc.stdlib cimport abort, malloc, free
 from libc.math cimport INFINITY
 cimport openmp
 
+IF UNAME_SYSNAME == "WINDOWS":
+     cdef double INFINITY = 1.0/0.0
+
+
 cpdef int get_number_of_threads():
 % if openmp:
     cdef int i, n
