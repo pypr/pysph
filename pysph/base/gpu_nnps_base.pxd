@@ -66,7 +66,7 @@ cdef class GPUNeighborCache:
 cdef class GPUNNPS(NNPSBase):
 
     cdef object ctx
-    cdef object queue
+    cdef public object queue
 
     cdef public double radius_scale2
     cdef public GPUNeighborCache current_cache  # The current cache
@@ -83,7 +83,7 @@ cdef class GPUNNPS(NNPSBase):
 
     cpdef get_nearest_particles_gpu(self, int src_index, int dst_index)
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+    cpdef spatially_order_particles(self, int pa_index)
 
     cdef void get_nearest_neighbors(self, size_t d_idx, UIntArray nbrs)
 

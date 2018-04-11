@@ -1105,7 +1105,7 @@ cdef class ParticleArray:
                 index_array.data[i] = i
 
         self.num_real_particles = num_real_particles
-        # we now have the aligned indices. Rearrage the particles particles
+        # we now have the aligned indices. Rearrange the particles
         # accordingly.
         arrays = list(self.properties.values())
         num_arrays = len(arrays)
@@ -1184,7 +1184,7 @@ cdef class ParticleArray:
             result_array.constants[const] = self.constants[const]
 
         result_array.align_particles()
-        result_array.name = self.name
+        result_array.set_name(self.name)
         if props is None:
             output_arrays = list(self.output_property_arrays)
         else:

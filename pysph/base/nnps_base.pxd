@@ -276,12 +276,9 @@ cdef class NNPSBase:
 
     cdef void find_nearest_neighbors(self, size_t d_idx, UIntArray nbrs) nogil
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
-
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs)
     cpdef set_context(self, int src_index, int dst_index)
-    cpdef spatially_order_particles(self, int pa_index)
 
 # Nearest neighbor locator
 cdef class NNPS(NNPSBase):
