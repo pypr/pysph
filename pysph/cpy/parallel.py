@@ -45,9 +45,7 @@ cimport openmp
 
 IF UNAME_SYSNAME == "Windows":
     cdef extern from *:
-        """
         #define INFINITY 1.0/0.0
-        """
         double INFINITY
 
 
