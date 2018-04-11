@@ -43,7 +43,7 @@ from libc.stdlib cimport abort, malloc, free
 from libc.math cimport INFINITY
 cimport openmp
 
-IF UNAME_SYSNAME == "WINDOWS":
+IF UNAME_SYSNAME == "Windows":
      cdef double INFINITY = 1.0/0.0
 
 
