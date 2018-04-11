@@ -81,8 +81,10 @@ class Integrator(object):
         hmin = 1.0
         for pa in a_eval.particle_arrays:
             if pa.gpu:
-                pa.gpu.pull('h')
-            h = pa.get_carray('h')
+                h = pa.gpu.get_device_array('h')
+            else:
+                h = pa.get_carray('h')
+
             h.update_min_max()
 
             if h.minimum < hmin:
