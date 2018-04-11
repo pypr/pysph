@@ -30,6 +30,7 @@ class AugAssignLister(ast.NodeVisitor):
             self.names.add(node.target.value.id)
         self.generic_visit(node)
 
+
 class AssignLister(ast.NodeVisitor):
     """Utility class to collect the augmented assignments.
     """
@@ -52,6 +53,16 @@ class AssignLister(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+class CallLister(ast.NodeVisitor):
+    def __init__(self):
+        self.names = set()
+
+    def visit_Call(self, node):
+        if isinstance(node.func, ast.Name):
+            self.names.add(node.func.id)
+        self.generic_visit(node)
+
+
 def get_symbols(code, ctx=(ast.Load, ast.Store)):
     """Given an AST or code string return the symbols used therein.
 
@@ -70,8 +81,8 @@ def get_symbols(code, ctx=(ast.Load, ast.Store)):
     n.visit(tree)
     return n.names
 
-def get_aug_assign_symbols(code):
 
+def get_aug_assign_symbols(code):
     """Given an AST or code string return the symbols that are augmented
     assign.
 
@@ -88,6 +99,7 @@ def get_aug_assign_symbols(code):
     n = AugAssignLister()
     n.visit(tree)
     return n.names
+
 
 def get_assigned(code):
     """Given an AST or code string return the symbols that are augmented
@@ -110,6 +122,25 @@ def get_assigned(code):
 
     return result
 
+
+def get_calls(code):
+    """Given an AST or code string return the function calls made.
+
+    Parameters
+    ----------
+
+    code: A code string or the result of an ast.parse.
+
+    """
+    if isinstance(code, str):
+        tree = ast.parse(code)
+    else:
+        tree = code
+    c = CallLister()
+    c.visit(tree)
+    return c.names
+
+
 def has_node(code, node):
     """Given an AST or code string returns True if the code contains
     any particular node statement.
@@ -119,14 +150,15 @@ def has_node(code, node):
 
     code: A code string or the result of an ast.parse.
 
-    node: A node type or tuple of node types to check for.  If a tuple is passed
-    it returns True if any one of them is in the code.
+    node: A node type or tuple of node types to check for.  If a tuple
+        is passed it returns True if any one of them is in the code.
     """
     tree = ast.parse(code) if isinstance(code, str) else code
     for n in ast.walk(tree):
         if isinstance(n, node):
             return True
     return False
+
 
 def has_return(code):
     """Returns True of the node has a return statement.

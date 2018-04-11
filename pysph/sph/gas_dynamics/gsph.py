@@ -1,5 +1,5 @@
 from math import exp
-from pysph.base.cython_generator import declare
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation
 from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve,
                                                    printf)

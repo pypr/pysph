@@ -18,9 +18,8 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from pysph.base.ast_utils import get_symbols
-from pysph.base.cython_generator import CythonGenerator, KnownType
-from pysph.base.translator import OpenCLConverter
+from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
+                           get_symbols)
 
 
 def camel_to_underscore(name):
