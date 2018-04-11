@@ -5,6 +5,8 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+from __future__ import absolute_import
+
 import ast
 try:
     from collections import OrderedDict
@@ -253,7 +255,7 @@ class CythonGenerator(object):
         if hasattr(argspec, 'annotations'):
             annotations = argspec.annotations
         else:
-            annotations = meth.__annotations__ or {}
+            annotations = getattr(meth, '__annotations__', {})
 
         call_args = {}
         # Type annotations always take first precendence even over known

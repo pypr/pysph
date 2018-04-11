@@ -9,6 +9,8 @@ tested and modified to be suitable for use with PySPH.
 
 '''
 
+from __future__ import absolute_import
+
 import ast
 import inspect
 import re
