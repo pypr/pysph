@@ -44,7 +44,11 @@ from libc.math cimport INFINITY
 cimport openmp
 
 IF UNAME_SYSNAME == "Windows":
-     cdef double INFINITY = 1.0/0.0
+    cdef extern from *:
+        """
+        #define INFINITY 1.0/0.0
+        """
+        double INFINITY
 
 
 cpdef int get_number_of_threads():
