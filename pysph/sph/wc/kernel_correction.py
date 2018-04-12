@@ -2,6 +2,13 @@ from pysph.sph.equation import Equation
 from pysph.sph.wc.density_correction import gj_solve
 
 
+class SetConstant(Equation):
+
+    def loop_all(self, d_idx, d_maxnbrs, N_NBRS):
+        if N_NBRS > d_maxnbrs[0]:
+            d_maxnbrs[0] = N_NBRS
+
+
 class KernelCorrection(Equation):
     r"""**Kernel Correction**
 
@@ -35,7 +42,7 @@ class GradientCorrectionPreStep(Equation):
             d_m_mat[9 * d_idx + i] = 0.0
 
     def loop_all(self, d_idx, d_m_mat, s_m, s_rho, d_x, d_y, d_z, d_h, s_x,
-                 s_y, s_z, s_h, KERNEL, NBRS, N_NBRS):
+                 s_y, s_z, s_h, KERNEL, NBRS, N_NBRS, d_maxnbrs):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -44,19 +51,19 @@ class GradientCorrectionPreStep(Equation):
         xij = declare('matrix(3)')
         dwij = declare('matrix(3)')
         n = self.dim
-        tol = 1.0e-09
-        if N_NBRS > 7:
+        if N_NBRS > (d_maxnbrs[0] / 4):
             for k in range(N_NBRS):
                 s_idx = NBRS[k]
                 xij[0] = x - s_x[s_idx]
                 xij[1] = y - s_y[s_idx]
                 xij[2] = z - s_z[s_idx]
                 hij = (h + s_h[s_idx]) * 0.5
+                eps = 0.001 * hij * hij
                 r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
                 KERNEL.gradient(xij, r, hij, dwij)
                 dw = sqrt(dwij[0] * dwij[0] + dwij[1]
                           * dwij[1] + dwij[2] * dwij[2])
-                r += tol
+                r += eps
                 V = s_m[s_idx] / s_rho[s_idx]
                 for i in range(n):
                     xi = xij[i]
@@ -126,7 +133,6 @@ class MixedKernelCorrectionPreStep(Equation):
         dwij = declare('matrix(3)')
         dwij1 = declare('matrix(3)')
         numerator = declare('matrix(3)')
-        tol = 1.0e-09
 
         for i in range(3):
             numerator[i] = 0.0
@@ -155,13 +161,14 @@ class MixedKernelCorrectionPreStep(Equation):
                 xij[1] = y - s_y[s_idx]
                 xij[2] = z - s_z[s_idx]
                 hij = (h + s_h[s_idx]) * 0.5
+                eps = 0.001 * hij * hij
                 r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
                 KERNEL.gradient(xij, r, hij, dwij)
                 for i in range(n):
                     dwij1[i] = (dwij[i] - numerator[i] / den) / den
                 dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
                           * dwij1[1] + dwij1[2] * dwij1[2])
-                r += tol
+                r += eps
                 V = s_m[s_idx] / s_rho[s_idx]
                 for i in range(n):
                     xi = xij[i]
