@@ -220,3 +220,29 @@ class Kernel(object):
         if self.backend == 'opencl':
             self.knl(*c_args)
             self.queue.finish()
+
+
+class Cython(object):
+    def __init__(self, func):
+        self.tp = Transpiler(backend='cython')
+        self.tp._cgen.set_make_python_methods(True)
+        self.name = func.__name__
+        self.func = func
+        self.source = ''  # The generated source.
+        self._generate()
+
+    def _generate(self):
+        self.tp.add(self.func)
+        self.tp.compile()
+        self.source = self.tp.source
+        self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+
+    def _massage_arg(self, x):
+        if isinstance(x, Array):
+            return x.data
+        else:
+            return x
+
+    def __call__(self, *args):
+        args = [self._massage_arg(x) for x in args]
+        return self.c_func(*args)

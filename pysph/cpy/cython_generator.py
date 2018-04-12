@@ -233,6 +233,11 @@ class CythonGenerator(object):
 
         return (py_args, py_call), (c_args, c_call)
 
+    def set_make_python_methods(self, value):
+        """Turn on/off the generation of Python methods.
+        """
+        self.python_methods = value
+
     # #### Private protocol ###################################################
 
     def _analyze_method(self, meth, lines):
@@ -396,17 +401,17 @@ class CythonGenerator(object):
                 call_sig.append('{arg}'.format(arg=arg))
 
         if isinstance(returns, KnownType):
-            py_ret = returns.type
+            py_ret = returns.type + ' '
         else:
-            py_ret = ' double' if returns else ''
+            py_ret = 'double ' if returns else ''
         py_arg_def = ', '.join(py_args)
-        pydefn = 'cpdef{ret} py_{name}({arg_def}):'.format(
+        pydefn = 'cpdef {ret}py_{name}({arg_def}):'.format(
             ret=py_ret, name=name, arg_def=py_arg_def
         )
         call = ', '.join(call_sig)
         py_ret = 'return ' if returns else ''
         py_self = 'self.' if is_method else ''
-        body = indent + '{ret}{self}{name}({call})'.format(
+        body = indent + '{ret}{self}{name}({call})\n'.format(
             name=name, call=call, ret=py_ret, self=py_self
         )
 

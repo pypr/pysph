@@ -5,7 +5,9 @@ from pytest import importorskip
 
 from ..array import wrap
 from ..types import annotate, declare
-from ..low_level import Kernel, LocalMem, local_barrier, GID_0, LDIM_0, LID_0
+from ..low_level import (
+    Cython, Kernel, LocalMem, local_barrier, GID_0, LDIM_0, LID_0
+)
 
 
 class TestKernel(unittest.TestCase):
@@ -62,3 +64,34 @@ class TestKernel(unittest.TestCase):
         # Then
         y.pull()
         self.assertTrue(np.allclose(y.data, x.data*a))
+
+
+@annotate(double='x, y, a', return_='double')
+def func(x, y, a):
+    return x*y*a
+
+
+@annotate(doublep='x, y', a='double', n='int', return_='double')
+def knl(x, y, a, n):
+    i = declare('int')
+    s = declare('double')
+    s = 0.0
+    for i in range(n):
+        s += func(x[i], y[i], a)
+    return s
+
+
+class TestCython(unittest.TestCase):
+    def test_cython_code_with_return_and_nested_call(self):
+        # Given
+        n = 1000
+        x = np.linspace(0, 1, n)
+        y = x.copy()
+        a = 2.0
+
+        # When
+        cy = Cython(knl)
+        result = cy(x, y, a, n)
+
+        # Then
+        self.assertAlmostEqual(result, np.sum(x*y*a))
