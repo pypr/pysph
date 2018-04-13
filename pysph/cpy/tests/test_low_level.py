@@ -3,9 +3,13 @@ import numpy as np
 
 from pytest import importorskip
 
+from ..config import use_config
 from ..array import wrap
 from ..types import annotate, declare
-from ..low_level import Kernel, LocalMem, local_barrier, GID_0, LDIM_0, LID_0
+from ..low_level import (
+    Cython, Kernel, LocalMem, local_barrier, GID_0, LDIM_0, LID_0,
+    nogil, prange, parallel
+)
 
 
 class TestKernel(unittest.TestCase):
@@ -62,3 +66,58 @@ class TestKernel(unittest.TestCase):
         # Then
         y.pull()
         self.assertTrue(np.allclose(y.data, x.data*a))
+
+
+@annotate(double='x, y, a', return_='double')
+def func(x, y, a):
+    return x*y*a
+
+
+@annotate(doublep='x, y', a='double', n='int', return_='double')
+def knl(x, y, a, n):
+    i = declare('int')
+    s = declare('double')
+    s = 0.0
+    for i in range(n):
+        s += func(x[i], y[i], a)
+    return s
+
+
+@annotate(n='int', doublep='x, y', a='double')
+def cy_extern(x, y, a, n):
+    i = declare('int')
+    with nogil, parallel():
+        for i in prange(n):
+            y[i] = x[i]*a
+
+
+class TestCython(unittest.TestCase):
+    def test_cython_code_with_return_and_nested_call(self):
+        # Given
+        n = 1000
+        x = np.linspace(0, 1, n)
+        y = x.copy()
+        a = 2.0
+
+        # When
+        cy = Cython(knl)
+        result = cy(x, y, a, n)
+
+        # Then
+        self.assertAlmostEqual(result, np.sum(x*y*a))
+
+    def test_cython_with_externs(self):
+        # Given
+        n = 1000
+        x = np.linspace(0, 1, n)
+        y = np.zeros_like(x)
+        a = 2.0
+
+        # When
+        with use_config(use_openmp=True):
+            cy = Cython(cy_extern)
+
+        cy(x, y, a, n)
+
+        # Then
+        self.assertTrue(np.allclose(y, x*a))

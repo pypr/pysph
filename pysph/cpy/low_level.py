@@ -13,6 +13,7 @@ from .config import get_config
 from .array import Array, get_backend
 from .transpiler import Transpiler
 from .types import KnownType, ctype_to_dtype
+from .extern import Extern
 
 
 LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
@@ -220,3 +221,65 @@ class Kernel(object):
         if self.backend == 'opencl':
             self.knl(*c_args)
             self.queue.finish()
+
+
+class _prange(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return 'from cython.parallel import prange'
+
+    def __call__(self, *args, **kw):
+        # Ignore the kwargs.
+        return range(*args)
+
+
+class _parallel(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return 'from cython.parallel import parallel'
+
+    def __call__(self, *args, **kw):
+        pass
+
+
+class _nogil(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return ''
+
+    def __call__(self, *args, **kw):
+        pass
+
+
+prange = _prange()
+parallel = _parallel()
+nogil = _nogil()
+
+
+class Cython(object):
+    def __init__(self, func):
+        self.tp = Transpiler(backend='cython')
+        self.tp._cgen.set_make_python_methods(True)
+        self.name = func.__name__
+        self.func = func
+        self.source = ''  # The generated source.
+        self._generate()
+
+    def _generate(self):
+        self.tp.add(self.func)
+        self.tp.compile()
+        self.source = self.tp.source
+        self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+
+    def _massage_arg(self, x):
+        if isinstance(x, Array):
+            return x.data
+        else:
+            return x
+
+    def __call__(self, *args):
+        args = [self._massage_arg(x) for x in args]
+        return self.c_func(*args)
