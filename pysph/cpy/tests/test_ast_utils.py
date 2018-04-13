@@ -3,8 +3,10 @@ import ast
 from textwrap import dedent
 import unittest
 
-from ..ast_utils import (get_assigned, get_aug_assign_symbols,
-                         get_symbols, get_calls, has_node, has_return)
+from ..ast_utils import (
+    get_assigned, get_symbols, get_unknown_names_and_calls,
+    has_node, has_return
+)
 
 
 class TestASTUtils(unittest.TestCase):
@@ -27,24 +29,6 @@ class TestASTUtils(unittest.TestCase):
         result = list(get_symbols(tree, ctx=ast.Store))
         result.sort()
         self.assertEqual(result, ['x'])
-
-    def test_get_aug_assign_symbols(self):
-        code = '''
-        x = 1
-        '''
-        result = list(get_aug_assign_symbols(dedent(code)))
-        result.sort()
-        expect = []
-        self.assertEqual(result, expect)
-
-        code = '''
-        x += 1
-        d_x[d_idx] += s_x[s_idx]
-        '''
-        result = list(get_aug_assign_symbols(dedent(code)))
-        result.sort()
-        expect = ['d_x', 'x']
-        self.assertEqual(result, expect)
 
     def test_has_return(self):
         code = dedent('''
@@ -94,21 +78,24 @@ class TestASTUtils(unittest.TestCase):
         expect = ['u', 'v', 'x', 'y']
         self.assertEqual(assigned, expect)
 
-    def test_get_calls(self):
-        # Given
+    def test_get_unknown_names_and_calls(self):
         code = dedent('''
         def f(x):
             g(h(x))
-            func(x)
+            y = x + SIZE
+            for i in range(y):
+                x += func(JUNK)
             sin(x)
         ''')
 
         # When
-        calls = get_calls(code)
+        names, calls = get_unknown_names_and_calls(code)
 
-        # Then
-        expect = ['g', 'h', 'func', 'sin']
-        self.assertSetEqual(set(expect), calls)
+        # Then.
+        e_names = {'SIZE', 'i', 'JUNK'}
+        e_calls = {'g', 'h', 'range', 'func', 'sin'}
+        self.assertSetEqual(names, e_names)
+        self.assertSetEqual(calls, e_calls)
 
 
 if __name__ == '__main__':

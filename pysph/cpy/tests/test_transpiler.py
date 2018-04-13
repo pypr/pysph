@@ -1,7 +1,9 @@
 from math import sin
 import unittest
 
-from ..transpiler import get_all_functions, Transpiler
+from ..transpiler import get_external_symbols_and_calls, Transpiler
+
+SIZE = 10
 
 
 def h(x=0.0):
@@ -16,14 +18,42 @@ def g(x=0.0):
     return f(x*2)
 
 
+def implicit_f(x, y):
+    # These should be ignored.
+    j = LID_0 + GID_0 + LDIM_0 + GDIM_0
+    s = y[SIZE-1]
+    for i in range(SIZE):
+        s += sin(x[i])
+
+    return s
+
+
+def undefined_call(x):
+    # An intentional error that should be caught.
+    foo(x)
+
+
 class TestTranspiler(unittest.TestCase):
-    def test_get_all_functions(self):
+    def test_get_external_symbols_and_calls(self):
         # Given/When
-        result = get_all_functions(g)
+        syms, implicit, calls = get_external_symbols_and_calls(g)
 
         # Then
         expect = [f]
-        self.assertEqual(expect, result)
+        self.assertEqual(syms, {})
+        self.assertEqual(expect, calls)
+
+        # Given/When
+        syms, implicit, calls = get_external_symbols_and_calls(implicit_f)
+
+        # Then
+        self.assertEqual(syms, {'SIZE': 10})
+        self.assertEqual(implicit, {'i'})
+        self.assertEqual(calls, [])
+
+        # Given/When
+        self.assertRaises(NameError, get_external_symbols_and_calls,
+                          undefined_call)
 
     def test_transpiler(self):
         # Given
