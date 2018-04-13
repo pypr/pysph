@@ -40,7 +40,9 @@ def undefined_call(x):
 class TestTranspiler(unittest.TestCase):
     def test_get_external_symbols_and_calls(self):
         # Given/When
-        syms, implicit, calls, ext = get_external_symbols_and_calls(g)
+        syms, implicit, calls, ext = get_external_symbols_and_calls(
+            g, 'cython'
+        )
 
         # Then
         expect = [f]
@@ -49,7 +51,9 @@ class TestTranspiler(unittest.TestCase):
         self.assertEqual(ext, [])
 
         # Given/When
-        syms, implicit, calls, ext = get_external_symbols_and_calls(implicit_f)
+        syms, implicit, calls, ext = get_external_symbols_and_calls(
+            implicit_f, 'cython'
+        )
 
         # Then
         self.assertEqual(syms, {'SIZE': 10})
@@ -59,7 +63,7 @@ class TestTranspiler(unittest.TestCase):
 
         # Given/When
         self.assertRaises(NameError, get_external_symbols_and_calls,
-                          undefined_call)
+                          undefined_call, 'cython')
 
     def test_transpiler(self):
         # Given

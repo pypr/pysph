@@ -20,6 +20,20 @@ BUILTINS = set(
      'annotate', 'printf']
 )
 
+BUILTIN_SYMBOLS = set(
+    'LID_0 LID_1 LID_2 GID_0 GID_1 GID_2 LDIM_0 LDIM_1 LDIM_2 '
+    'GDIM_0 GDIM_1 GDIM_2 '
+    'M_E M_LOG2E M_LOG10E M_LN2 M_LN10 M_PI M_PI_2 M_PI_4 '
+    'M_1_PI M_2_PI M_2_SQRTPI M_SQRT2 M_SQRT1_2 pi '
+    'INFINITY NAN HUGE_VALF'.split()
+)
+
+CY_BUILTIN_SYMBOLS = BUILTIN_SYMBOLS | set(
+    ['HUGE_VAL', 'HUGE_VALL', 'e']
+)
+
+OCL_BUILTIN_SYMBOLS = BUILTIN_SYMBOLS | set(['MAXFLOAT'])
+
 
 def filter_calls(calls):
     '''Given a set of calls filter out the math and other builtin functions.
@@ -27,7 +41,7 @@ def filter_calls(calls):
     return [x for x in calls if x not in BUILTINS]
 
 
-def get_external_symbols_and_calls(func):
+def get_external_symbols_and_calls(func, backend):
     '''Given a function, return a dictionary of all external names (with their
     values), a set of implicitly defined names, a list of functions that it
     calls ignoring standard math functions and a few other standard ones, and a
@@ -35,14 +49,23 @@ def get_external_symbols_and_calls(func):
 
     If a function is not defined it will raise a ``NameError``.
 
+    Parameters
+    ----------
+
+    func: Function to look at.
+    backend: str: The backend being used.
+
     Returns
     -------
 
     names, implicits, functions, externs
 
     '''
-    ignore = set('LID_0 LID_1 LID_2 GID_0 GID_1 GID_2 '
-                 'LDIM_0 LDIM_1 LDIM_2 GDIM_0 GDIM_1 GDIM_2'.split())
+    if backend == 'cython':
+        ignore = CY_BUILTIN_SYMBOLS
+    else:
+        ignore = OCL_BUILTIN_SYMBOLS
+
     src = dedent('\n'.join(inspect.getsourcelines(func)[0]))
     names, calls = get_unknown_names_and_calls(src)
     names -= ignore
@@ -157,7 +180,7 @@ class Transpiler(object):
             raise CodeGenerationError(msg)
 
         if self.backend == 'cython':
-            return 'cdef {type} {name} {value}'.format(
+            return 'cdef {type} {name} = {value}'.format(
                 type=ctype, name=name, value=value
             )
         elif self.backend == 'opencl':
@@ -193,7 +216,9 @@ class Transpiler(object):
             self.header += '\n'.join(lines)
 
     def _handle_external(self, func):
-        syms, implicit, calls, externs = get_external_symbols_and_calls(func)
+        syms, implicit, calls, externs = get_external_symbols_and_calls(
+            func, self.backend
+        )
         if implicit:
             msg = ('Warning: the following symbols are implicitly defined.\n'
                    '  %s\n'
