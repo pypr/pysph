@@ -2,9 +2,11 @@ from math import sin
 import unittest
 
 from ..transpiler import get_external_symbols_and_calls, Transpiler
+from ..extern import printf
 
 SIZE = 10
 
+my_printf = printf
 
 def h(x=0.0):
     return sin(x) + 1
@@ -25,6 +27,7 @@ def implicit_f(x, y):
     for i in range(SIZE):
         s += sin(x[i])
 
+    my_printf("%f", s)
     return s
 
 
@@ -36,20 +39,22 @@ def undefined_call(x):
 class TestTranspiler(unittest.TestCase):
     def test_get_external_symbols_and_calls(self):
         # Given/When
-        syms, implicit, calls = get_external_symbols_and_calls(g)
+        syms, implicit, calls, ext = get_external_symbols_and_calls(g)
 
         # Then
         expect = [f]
         self.assertEqual(syms, {})
         self.assertEqual(expect, calls)
+        self.assertEqual(ext, [])
 
         # Given/When
-        syms, implicit, calls = get_external_symbols_and_calls(implicit_f)
+        syms, implicit, calls, ext = get_external_symbols_and_calls(implicit_f)
 
         # Then
         self.assertEqual(syms, {'SIZE': 10})
         self.assertEqual(implicit, {'i'})
         self.assertEqual(calls, [])
+        self.assertEqual(ext, [my_printf])
 
         # Given/When
         self.assertRaises(NameError, get_external_symbols_and_calls,

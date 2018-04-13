@@ -11,6 +11,7 @@ from .ast_utils import get_unknown_names_and_calls
 from .cython_generator import CythonGenerator, CodeGenerationError
 from .translator import OpenCLConverter
 from .ext_module import ExtModule
+from .extern import Extern, get_extern_code
 
 
 BUILTINS = set(
@@ -28,10 +29,16 @@ def filter_calls(calls):
 
 def get_external_symbols_and_calls(func):
     '''Given a function, return a dictionary of all external names (with their
-    values), a set of implicitly defined names, and list of functions that it
-    calls ignoring standard math functions and a few other standard ones.
+    values), a set of implicitly defined names, a list of functions that it
+    calls ignoring standard math functions and a few other standard ones, and a
+    list of Extern instances.
 
     If a function is not defined it will raise a ``NameError``.
+
+    Returns
+    -------
+
+    names, implicits, functions, externs
 
     '''
     ignore = set('LID_0 LID_1 LID_2 GID_0 GID_1 GID_2 '
@@ -43,10 +50,14 @@ def get_external_symbols_and_calls(func):
     mod = importlib.import_module(func.__module__)
     symbols = {}
     implicit = set()
+    externs = []
     for name in names:
         if hasattr(mod, name):
             value = getattr(mod, name)
-            symbols[name] = value
+            if isinstance(value, Extern):
+                externs.append(value)
+            else:
+                symbols[name] = value
         else:
             implicit.add(name)
 
@@ -56,6 +67,8 @@ def get_external_symbols_and_calls(func):
         f = getattr(mod, call, None)
         if f is None:
             undefined.append(call)
+        elif isinstance(f, Extern):
+            externs.append(f)
         else:
             funcs.append(f)
     if undefined:
@@ -64,7 +77,7 @@ def get_external_symbols_and_calls(func):
         )
         raise NameError(msg)
 
-    return symbols, implicit, funcs
+    return symbols, implicit, funcs, externs
 
 
 def convert_to_float_if_needed(code):
@@ -152,9 +165,12 @@ class Transpiler(object):
                 name=name, value=value
             )
 
+    def _get_comment(self):
+        return '#' if self.backend == 'cython' else '//'
+
     def _handle_symbols(self, syms):
         lines = []
-        comment = '# ' if self.backend == 'cython' else '// '
+        comment = self._get_comment()
         if len(syms):
             hline = '{com} {line}'.format(com=comment, line='-'*70)
             code = '{com} Global constants from user namespace'.format(
@@ -166,14 +182,25 @@ class Transpiler(object):
             lines.extend(['', hline])
             self.header += '\n'.join(lines)
 
+    def _handle_externs(self, externs):
+        link, code = get_extern_code(externs, self.backend)
+        # Link is ignored for now until we have a concrete example.
+        if code:
+            comment = self._get_comment()
+            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            info = '{com} External definitions.'.format(com=comment)
+            lines = [hline, info, ''] + code + [hline]
+            self.header += '\n'.join(lines)
+
     def _handle_external(self, func):
-        syms, implicit, calls = get_external_symbols_and_calls(func)
+        syms, implicit, calls, externs = get_external_symbols_and_calls(func)
         if implicit:
             msg = ('Warning: the following symbols are implicitly defined.\n'
                    '  %s\n'
                    'You may want to explicitly declare/define them.')
             print(msg)
 
+        self._handle_externs(externs)
         self._handle_symbols(syms)
 
         for f in calls:

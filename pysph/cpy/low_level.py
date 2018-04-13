@@ -13,6 +13,7 @@ from .config import get_config
 from .array import Array, get_backend
 from .transpiler import Transpiler
 from .types import KnownType, ctype_to_dtype
+from .extern import Extern
 
 
 LID_0 = LDIM_0 = GDIM_0 = GID_0 = 0
@@ -220,6 +221,42 @@ class Kernel(object):
         if self.backend == 'opencl':
             self.knl(*c_args)
             self.queue.finish()
+
+
+class _prange(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return 'from cython.parallel import prange'
+
+    def __call__(self, *args, **kw):
+        # Ignore the kwargs.
+        return range(*args)
+
+
+class _parallel(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return 'from cython.parallel import parallel'
+
+    def __call__(self, *args, **kw):
+        pass
+
+
+class _nogil(Extern):
+    def code(self, backend):
+        if backend != 'cython':
+            raise NotImplementedError('prange only available with Cython')
+        return ''
+
+    def __call__(self, *args, **kw):
+        pass
+
+
+prange = _prange()
+parallel = _parallel()
+nogil = _nogil()
 
 
 class Cython(object):
