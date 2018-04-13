@@ -38,14 +38,14 @@ printf = _printf()
 
 
 def get_extern_code(externs, backend):
-    link = []
+    links = []
     code = []
     for ex in externs:
-        l = ex.link(backend)
-        if l:
-            link.extend(l)
+        link = ex.link(backend)
+        if link:
+            links.extend(link)
         c = ex.code(backend)
         if c:
             code.append(c)
 
-    return link, code
+    return links, code

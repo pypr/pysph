@@ -76,10 +76,10 @@ class SymbolParser(ast.NodeVisitor):
         self.func_name = node.name
         if PY_VER == 2:
             self.funcargs.update(x.id for x in node.args.args)
-            if node.vararg:
-                self.funcargs.add(node.vararg)
-                if node.kwarg:
-                    self.funcargs.add(node.kwarg)
+            if node.args.vararg:
+                self.funcargs.add(node.args.vararg)
+            if node.args.kwarg:
+                self.funcargs.add(node.args.kwarg)
         else:
             self.funcargs.update(x.arg for x in node.args.args)
             if node.args.vararg:

@@ -8,6 +8,7 @@ SIZE = 10
 
 my_printf = printf
 
+
 def h(x=0.0):
     return sin(x) + 1
 
