@@ -397,7 +397,7 @@ def test_annotated_function():
     assert code.strip() == expect.strip()
 
 
-@pytest.mark.skipIf(sys.version_info < (3, 4), reason='Requires Python3')
+@pytest.mark.skipif(sys.version_info < (3, 4), reason='Requires Python3')
 def test_py3_annotations():
     # Given/When
     from .py3_code import py3_f
