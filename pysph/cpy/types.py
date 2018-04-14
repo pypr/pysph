@@ -156,7 +156,7 @@ _inject_types_in_module()
 
 
 NP_C_TYPE_MAP = {
-    np.bool: 'bint',
+    np.bool: 'char',
     np.float32: 'float', np.float64: 'double',
     np.int8: 'char', np.uint8: 'unsigned char',
     np.int16: 'short', np.uint16: 'unsigned short',
@@ -165,7 +165,7 @@ NP_C_TYPE_MAP = {
 }
 
 C_NP_TYPE_MAP = {
-    'bint': np.bool,
+    'bool': np.bool,
     'char': np.int8,
     'double': np.float64,
     'float': np.float32,
