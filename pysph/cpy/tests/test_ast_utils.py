@@ -1,5 +1,6 @@
 
 import ast
+import sys
 from textwrap import dedent
 import unittest
 
@@ -94,6 +95,28 @@ class TestASTUtils(unittest.TestCase):
         # Then.
         e_names = {'SIZE', 'i', 'JUNK'}
         e_calls = {'g', 'h', 'range', 'func', 'sin'}
+        self.assertSetEqual(names, e_names)
+        self.assertSetEqual(calls, e_calls)
+
+    @unittest.skipIf(sys.version_info < (3, 4),
+                     reason='Test requires Python 3.')
+    def test_get_unknown_names_and_calls_with_py3_annotation(self):
+        code = dedent('''
+        from pysph.cpy import types as T
+
+        def f(x: T.doublep, n: T.int_)-> T.double:
+            s = declare('double')
+            for i in range(n):
+                s += func(x)
+            return s
+        ''')
+
+        # When
+        names, calls = get_unknown_names_and_calls(code)
+
+        # Then.
+        e_names = {'i'}
+        e_calls = {'declare', 'func', 'range'}
         self.assertSetEqual(names, e_names)
         self.assertSetEqual(calls, e_calls)
 

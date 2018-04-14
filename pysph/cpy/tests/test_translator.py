@@ -1,6 +1,7 @@
 from textwrap import dedent
 import pytest
 import numpy as np
+import sys
 
 from ..config import get_config
 from ..types import annotate, declare
@@ -391,6 +392,25 @@ def test_annotated_function():
     {
         LOCAL_MEM double x[64];
         return y[i];
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+@pytest.mark.skipIf(sys.version_info < (3, 4), reason='Requires Python3')
+def test_py3_annotations():
+    # Given/When
+    from .py3_code import py3_f
+    t = CConverter()
+    code = t.parse_function(py3_f)
+
+    # Then
+    expect = dedent('''
+    int py3_f(int x)
+    {
+        int y;
+        y = (x + 1);
+        return (x * y);
     }
     ''')
     assert code.strip() == expect.strip()

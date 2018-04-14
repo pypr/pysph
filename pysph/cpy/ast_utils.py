@@ -88,7 +88,8 @@ class SymbolParser(ast.NodeVisitor):
                 self.funcargs.add(node.args.kwarg.arg)
             if node.args.kwonlyargs:
                 self.funcargs.update(x.arg for x in node.args.kwonlyargs)
-        self.generic_visit(node)
+        for arg in node.body:
+            self.visit(arg)
 
 
 def _get_tree(code):
