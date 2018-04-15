@@ -103,7 +103,10 @@ class KnownType(object):
         self.base_type = base_type
 
     def __repr__(self):
-        return 'KnownType("%s")' % self.type
+        if self.base_type:
+            return 'KnownType("%s", "%s")' % (self.type, self.base_type)
+        else:
+            return 'KnownType("%s")' % self.type
 
     def __eq__(self, other):
         return self.type == other.type and self.base_type == other.base_type
@@ -140,8 +143,20 @@ TYPES = dict(
 )
 
 
+def _inject_types_in_module():
+    g = globals()
+    for name, type in TYPES.items():
+        if name in ['int', 'long', 'float']:
+            name = name + '_'
+        g[name] = type
+
+
+# A convenience so users can import types directly from the module.
+_inject_types_in_module()
+
+
 NP_C_TYPE_MAP = {
-    np.bool: 'bint',
+    np.bool: 'char',
     np.float32: 'float', np.float64: 'double',
     np.int8: 'char', np.uint8: 'unsigned char',
     np.int16: 'short', np.uint16: 'unsigned short',
@@ -150,7 +165,7 @@ NP_C_TYPE_MAP = {
 }
 
 C_NP_TYPE_MAP = {
-    'bint': np.bool,
+    'bool': np.bool,
     'char': np.int8,
     'double': np.float64,
     'float': np.float32,

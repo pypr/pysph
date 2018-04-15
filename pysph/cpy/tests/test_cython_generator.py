@@ -3,7 +3,8 @@
 import unittest
 from textwrap import dedent
 from math import pi, sin
-import numpy as np
+import sys
+
 
 from ..config import get_config, set_config
 from ..types import declare, KnownType, annotate
@@ -170,6 +171,22 @@ class TestCythonCodeGenerator(TestBase):
         cdef inline float annotated_f(int i, float* y):
             cdef unsigned int x[64]
             return y[i]
+        ''')
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    @unittest.skipIf(sys.version_info < (3, 4), reason='Requires Python3.')
+    def test_python3_annotation(self):
+        # Given
+        from .py3_code import py3_f
+        cg = CythonGenerator()
+
+        # When
+        cg.parse(py3_f)
+        expect = dedent('''
+        cdef inline int py3_f(int x):
+            cdef int y
+            y = x + 1
+            return x*y
         ''')
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 

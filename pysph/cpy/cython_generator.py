@@ -89,7 +89,7 @@ def get_func_definition(sourcelines):
     # For now return the line after the first.
     count = 1
     for line in sourcelines:
-        if line.rstrip().endswith('):'):
+        if line.rstrip().endswith(':'):
             break
         count += 1
     return sourcelines[:count], sourcelines[count:]
