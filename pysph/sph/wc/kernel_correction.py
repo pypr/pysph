@@ -2,13 +2,6 @@ from pysph.sph.equation import Equation
 from pysph.sph.wc.density_correction import gj_solve
 
 
-class SetConstant(Equation):
-
-    def loop_all(self, d_idx, d_maxnbrs, N_NBRS):
-        if N_NBRS > d_maxnbrs[0]:
-            d_maxnbrs[0] = N_NBRS
-
-
 class KernelCorrection(Equation):
     r"""**Kernel Correction**
 
@@ -42,7 +35,7 @@ class GradientCorrectionPreStep(Equation):
             d_m_mat[9 * d_idx + i] = 0.0
 
     def loop_all(self, d_idx, d_m_mat, s_m, s_rho, d_x, d_y, d_z, d_h, s_x,
-                 s_y, s_z, s_h, KERNEL, NBRS, N_NBRS, d_maxnbrs):
+                 s_y, s_z, s_h, KERNEL, NBRS, N_NBRS):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -51,30 +44,23 @@ class GradientCorrectionPreStep(Equation):
         xij = declare('matrix(3)')
         dwij = declare('matrix(3)')
         n = self.dim
-        if N_NBRS > (d_maxnbrs[0] / 4):
-            for k in range(N_NBRS):
-                s_idx = NBRS[k]
-                xij[0] = x - s_x[s_idx]
-                xij[1] = y - s_y[s_idx]
-                xij[2] = z - s_z[s_idx]
-                hij = (h + s_h[s_idx]) * 0.5
-                eps = 0.001 * hij * hij
-                r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-                KERNEL.gradient(xij, r, hij, dwij)
-                dw = sqrt(dwij[0] * dwij[0] + dwij[1]
-                          * dwij[1] + dwij[2] * dwij[2])
-                r += eps
-                V = s_m[s_idx] / s_rho[s_idx]
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            hij = (h + s_h[s_idx]) * 0.5
+            r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            KERNEL.gradient(xij, r, hij, dwij)
+            dw = sqrt(dwij[0] * dwij[0] + dwij[1]
+                      * dwij[1] + dwij[2] * dwij[2])
+            V = s_m[s_idx] / s_rho[s_idx]
+            if r >= 1.0e-09:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
                         xj = xij[j]
                         d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
-        else:
-            for i in range(n):
-                for j in range(n):
-                    if i == j:
-                        d_m_mat[9 * d_idx + 3 * i + j] = 1.0
 
 
 class GradientCorrection(Equation):
@@ -100,17 +86,52 @@ class GradientCorrection(Equation):
         self.dim = dim
         super(GradientCorrection, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_m_mat, s_idx, DWIJ):
+    def loop(self, d_idx, d_m_mat, DWIJ):
         i, j, n = declare('int', 3)
         n = self.dim
         temp = declare('matrix(9)')
+        res = declare('matrix(3)')
         for i in range(n):
             for j in range(n):
                 temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
-        gj_solve(temp, DWIJ, n, DWIJ)
+        gj_solve(temp, DWIJ, n, res)
+        change = 0.0
+        for i in range(n):
+            change += abs(DWIJ[i] - res[i]) / abs(DWIJ[i] + 1.0e-12)
+        if change <= 0.5:
+            for i in range(n):
+                DWIJ[i] = res[i]
 
 
 class MixedKernelCorrectionPreStep(Equation):
+    r"""**Kernel Correction**
+
+    .. math::
+            \tilde{W}_{ab} = \frac{W_{ab}}{\sum_{b} V_{b}W_{ab}}
+
+    .. math::
+            \nabla \tilde{W}_{ab} = L_{a}\nabla \bar{W}_{ab}
+
+    where,
+
+    .. math::
+            L_{a} = \left(\sum_{b} V_{b}}\nabla \bar{W}_{ab}
+            \mathbf{\times}x_{ab} \right)^{-1}
+
+    .. math::
+            \nabla \bar{W}_{ab} = \frac{\nabla W_{ab} - \gamma}
+            {\sum_{b} V_{b}W_{ab}}
+
+    ..math::
+            \gamma = \frac{\sum_{b} V_{b}\nabla W_{ab}}
+            {\sum_{b} V_{b}W_{ab}}
+    References
+    ----------
+    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
+        Variational and Momentum Preservation Aspects of Smoothed
+        Particle Hydrodynamic Formulations.
+
+    """
 
     def __init__(self, dest, sources, dim=2):
         self.dim = dim
@@ -154,29 +175,22 @@ class MixedKernelCorrectionPreStep(Equation):
                 numerator[i] += V * dwij[i]
         d_cwij[d_idx] = den
 
-        if N_NBRS > 5:
-            for k in range(N_NBRS):
-                s_idx = NBRS[k]
-                xij[0] = x - s_x[s_idx]
-                xij[1] = y - s_y[s_idx]
-                xij[2] = z - s_z[s_idx]
-                hij = (h + s_h[s_idx]) * 0.5
-                eps = 0.001 * hij * hij
-                r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-                KERNEL.gradient(xij, r, hij, dwij)
-                for i in range(n):
-                    dwij1[i] = (dwij[i] - numerator[i] / den) / den
-                dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
-                          * dwij1[1] + dwij1[2] * dwij1[2])
-                r += eps
-                V = s_m[s_idx] / s_rho[s_idx]
+        for k in range(N_NBRS):
+            s_idx = NBRS[k]
+            xij[0] = x - s_x[s_idx]
+            xij[1] = y - s_y[s_idx]
+            xij[2] = z - s_z[s_idx]
+            hij = (h + s_h[s_idx]) * 0.5
+            r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
+            KERNEL.gradient(xij, r, hij, dwij)
+            for i in range(n):
+                dwij1[i] = (dwij[i] - numerator[i] / den) / den
+            dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
+                      * dwij1[1] + dwij1[2] * dwij1[2])
+            V = s_m[s_idx] / s_rho[s_idx]
+            if r >= 1.0e-09:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
                         xj = xij[j]
                         d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
-        else:
-            for i in range(n):
-                for j in range(n):
-                    if i == j:
-                        d_m_mat[9 * d_idx + 3 * i + j] = 1.0
