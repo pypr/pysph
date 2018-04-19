@@ -52,8 +52,8 @@ class GradientCorrectionPreStep(Equation):
             hij = (h + s_h[s_idx]) * 0.5
             r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             KERNEL.gradient(xij, r, hij, dwij)
-            dw = sqrt(dwij[0] * dwij[0] + dwij[1]
-                      * dwij[1] + dwij[2] * dwij[2])
+            dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
+                      + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
             if r >= 1.0e-09:
                 for i in range(n):
@@ -82,23 +82,25 @@ class GradientCorrection(Equation):
     def _get_helpers_(self):
         return [gj_solve]
 
-    def __init__(self, dest, sources, dim=2):
+    def __init__(self, dest, sources, dim=2, tol=0.5):
         self.dim = dim
+        self.tol = tol
         super(GradientCorrection, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_m_mat, DWIJ):
+    def loop(self, d_idx, d_m_mat, DWIJ, HIJ):
         i, j, n = declare('int', 3)
         n = self.dim
         temp = declare('matrix(9)')
         res = declare('matrix(3)')
+        eps = 1.0e-04 * HIJ
         for i in range(n):
             for j in range(n):
                 temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
         gj_solve(temp, DWIJ, n, res)
         change = 0.0
         for i in range(n):
-            change += abs(DWIJ[i] - res[i]) / abs(DWIJ[i] + 1.0e-12)
-        if change <= 0.5:
+            change += abs(DWIJ[i] - res[i]) / (abs(DWIJ[i]) + eps)
+        if change <= self.tol:
             for i in range(n):
                 DWIJ[i] = res[i]
 
