@@ -142,7 +142,7 @@ class AccelerationEvalCythonHelper(object):
     def compile(self, code):
         # Note, we do not add carray or particle_array as nnps_base would
         # have been rebuilt anyway if they changed.
-        root = expanduser(join('~', '.pypsh', 'source', get_platform_dir()))
+        root = expanduser(join('~', '.pysph', 'source', get_platform_dir()))
         depends = ["pysph.base.nnps_base"]
         # Add pysph/base directory to inc_dirs for including spatial_hash.h
         # for SpatialHashNNPS
