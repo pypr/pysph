@@ -37,10 +37,10 @@ class DamBreak(Application):
 
         xf = f.x + 5 * model.dx
         yf = f.y + 5 * model.dy
-        h = 1.0 * model.dx
+        h = 1.2 * model.dx
         fluid = get_particle_array_pcisph(
             x=xf, y=yf, h=h, m=f.m, rho=self.rho, name="fluid",
-            constants=consts, dim=self.dim, dt=self.dt, delta=None)
+            constants=consts, dim=self.dim, dt=self.dt, delta=50)
 
         V = model.dx**2
         boundary = get_particle_array_static_boundary(x=b.x, y=b.y, V=V,
@@ -102,7 +102,7 @@ class DamBreak(Application):
                 ],
                 iterate=True,
                 min_iterations=1,
-                max_iterations=8)
+                max_iterations=4)
         ]
         return equations
 

@@ -61,13 +61,17 @@ class ComputeDelta(Equation):
     def post_loop(self, d_idx, d_local_delta, d_m, d_rho_base, d_sum_dwij_x,
                   d_sum_dwij_y, d_sum_dwij_z, d_sum_2dwij):
         beta = 2. * d_m[d_idx]**2 * self.dt**2. / d_rho_base[0]**2
-        d_local_delta[d_idx] = 1. / (beta * (
+        tmp = 1. / (
             d_sum_2dwij[d_idx] +
             (d_sum_dwij_x[d_idx] * d_sum_dwij_x[d_idx] + d_sum_dwij_y[d_idx] *
-             d_sum_dwij_y[d_idx] + d_sum_dwij_z[d_idx] * d_sum_dwij_z[d_idx])))
+             d_sum_dwij_y[d_idx] + d_sum_dwij_z[d_idx] * d_sum_dwij_z[d_idx]))
+        d_local_delta[d_idx] = tmp / beta
 
-    def reduce(self, dst):
-        dst.delta[0] = serial_reduce_array(dst.local_delta, 'max')
+    def reduce(self, dst, t, dt):
+        dst.delta[0] = serial_reduce_array(dst.local_delta, 'min')
+        p = serial_reduce_array(dst.local_delta, 'max')
+        print(dst.delta[0])
+        print(p)
 
 
 def get_particle_array_static_boundary(constants=None, **props):
@@ -167,7 +171,7 @@ class DensityDifference(Equation):
     def post_loop(self, d_idx, d_rho, d_drho, d_rho_base):
         d_drho[d_idx] = max(d_rho[d_idx] - d_rho_base[0], 0)
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         # first sum the density difference of all particles
         dst.tmp_comp[0] = serial_reduce_array(dst.drho, 'sum') / len(dst.drho)
         self.compression = dst.tmp_comp[0]
@@ -183,7 +187,7 @@ class DensityDifference(Equation):
         else:
             if debug:
                 print("Converged", compression)
-            return -1.0
+            return 1.0
 
 
 class CorrectPressure(Equation):
