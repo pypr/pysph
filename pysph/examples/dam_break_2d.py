@@ -44,6 +44,7 @@ class DamBreak2D(Application):
 
     def add_user_options(self, group):
         self.hdx = 1.3
+        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
             "--h-factor", action="store", type=float, dest="h_factor",
             default=1.0,
@@ -51,15 +52,12 @@ class DamBreak2D(Application):
         )
         group.add_argument(
             "--kernel-corr", action="store", type=str, dest='kernel_corr',
-            default='', help="Type of Kernel Correction"
+            default='', help="Type of Kernel Correction", choices=corrections
         )
 
     def consume_user_options(self):
         self.h = h / self.options.h_factor
         self.kernel_corr = self.options.kernel_corr
-        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
-        err_message = 'kernel-corr should be one of %s' % corrections
-        assert self.kernel_corr in corrections, err_message
         print("Using h = %f" % self.h)
         if self.options.scheme == 'wcsph':
             self.hdx = self.hdx
@@ -198,19 +196,27 @@ class DamBreak2D(Application):
             fluid.x += self.dx / 4
 
         # Adding extra properties for kernel correction
-        for p in ['cwij', 'ai']:
-            fluid.add_property(p)
-            boundary.add_property(p)
-        len_f = len(fluid.x) * 9
-        len_b = len(boundary.x) * 9
-        for const in ['gradbi', 'm_mat']:
-            fluid.add_constant(const, [0.0] * len_f)
-            boundary.add_constant(const, [0.0] * len_b)
-        len_f = len(fluid.x) * 3
-        len_b = len(boundary.x) * 3
-        for const in ['gradai', 'bi']:
-            fluid.add_constant(const, [0.0] * len_f)
-            boundary.add_constant(const, [0.0] * len_b)
+        corr = self.kernel_corr
+        if corr == 'kernel-corr' or corr == 'mixed-corr':
+            fluid.add_property('cwij')
+            boundary.add_property('cwij')
+        if corr == 'mixed-corr' or corr == 'grad-corr':
+            len_f = len(fluid.x) * 9
+            len_b = len(boundary.x) * 9
+            fluid.add_constant('m_mat', [0.0] * len_f)
+            boundary.add_constant('m_mat', [0.0] * len_b)
+        elif corr == 'crksph':
+            fluid.add_property('ai')
+            boundary.add_property('ai')
+            len_f = len(fluid.x) * 9
+            len_b = len(boundary.x) * 9
+            fluid.add_constant('gradbi', [0.0] * len_f)
+            boundary.add_constant('gradbi', [0.0] * len_b)
+            len_f = len(fluid.x) * 3
+            len_b = len(boundary.x) * 3
+            for const in ['gradai', 'bi']:
+                fluid.add_constant(const, [0.0] * len_f)
+                boundary.add_constant(const, [0.0] * len_b)
 
         return [fluid, boundary]
 
