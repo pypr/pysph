@@ -166,7 +166,8 @@ class CythonGenerator(object):
         if name in ['s_idx', 'd_idx']:
             return 'long'
         if value is Undefined or isinstance(value, Undefined):
-            raise CodeGenerationError('Unknown type, for %s' % name)
+            msg = 'Unknown type, for function argument named: %s' % name
+            raise CodeGenerationError(msg)
 
         if isinstance(value, bool):
             return 'int'
