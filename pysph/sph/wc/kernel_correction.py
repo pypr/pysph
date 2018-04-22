@@ -55,7 +55,7 @@ class GradientCorrectionPreStep(Equation):
             dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
                       + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-09:
+            if r >= 1.0e-12:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
@@ -190,7 +190,7 @@ class MixedKernelCorrectionPreStep(Equation):
             dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
                       * dwij1[1] + dwij1[2] * dwij1[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-09:
+            if r >= 1.0e-12:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
