@@ -18,7 +18,7 @@ class CRKSPHPreStep(Equation):
         xij = declare('matrix(3)')
         dwij = declare('matrix(3)')
         d = self.dim
-        tol = 1.0e-10
+        tol = 1.0e-12
 
         m0 = 0.0
         m1 = declare('matrix(3)')
@@ -122,6 +122,67 @@ class CRKSPHPreStep(Equation):
 
 
 class CRKSPH(Equation):
+    r"""**Conservative Reproducing Kernel SPH**
+
+    .. math::
+            W_{ij}^{R} = A_{i}\left(1+B_{i}^{\alpha}x_{ij}^{\alpha}
+            \right)W_{ij}
+    .. math::
+            \partial_{\gamma}W_{ij}^{R} = A_{i}\left(1+B_{i}^{\alpha}
+            x_{ij}^{\alpha}\right)\partial_{\gamma}W_{ij} +
+            \partial_{\gamma}A_{i}\left(1+B_{i}^{\alpha}x_{ij}^{\alpha}
+            \right)W_{ij} + A_{i}\left(\partial_{\gamma}B_{i}^{\alpha}
+            x_{ij}^{\alpha} + B_{i}^{\gamma}\right)W_{ij}
+    .. math::
+            \nabla\tilde{W}_{ij} = 0.5 * \left(\nabla W_{ij}^{R}-\nabla
+             W_{ji}^{R} \right)
+
+    where,
+
+    .. math::
+            A_{i} = \left[m_{0} - \left(m_{2}^{-1}\right)^{\alpha \beta}
+            m1_{\beta}m1_{\alpha}\right]^{-1}
+    .. math::
+            B_{i}^{\alpha} = -\left(m_{2}^{-1}\right)^{\alpha \beta}
+            m_{1}^{\beta}
+    .. math::
+            \partial_{\gamma}A_{i} = -A_{i}^{2}\left(\partial_{\gamma}
+            m_{0}-\left[m_{2}^{-1}\right]^{\alpha \beta}\left[
+            m_{1}^{\beta}\partial_{\gamma}m_{1}^{\beta}m_{1}^{\alpha} +
+            \partial_{\gamma}m_{1}^{\alpha}m_{1}^{\beta}\right] +
+            \left[m_{2}^{-1}\right]^{\alpha \phi}\partial_{\gamma}
+            m_{2}^{\phi \psi}\left[m_{2}^{-1}\right]^{\psi \beta}
+            m_{1}^{\beta}m_{1}^{\alpha} \right)
+    .. math::
+            \partial_{\gamma}B_{i}^{\alpha} = -\left[m_{2}^{-1}\right]^
+            {\alpha \beta}\left[m_{1}^{\beta} + \left(m_{2}^{-1}\right)^
+            {\alpha \phi}\partial_{\gamma}m_{2}^{\phi \psi}\left(m_{2}^
+            {-1}\right)^{\psi \beta}m_{1}^{\beta}
+    .. math::
+            m_{0} = \sum_{j}V_{j}W_{ij}
+    .. math::
+            m_{1}^{\alpha} = \sum_{j}V_{j}x_{ij}^{\alpha}W_{ij}
+    .. math::
+            m_{2}^{\alpha \beta} = \sum_{j}V_{j}x_{ij}^{\alpha}
+            x_{ij}^{\beta}W_{ij}
+    .. math::
+            \partial_{\gamma}m_{0} = \sum_{j}V_{j}\partial_{\gamma}
+            W_{ij}
+    .. math::
+            \partial_{\gamma}m_{1}^{\alpha} = \sum_{j}V_{j}\left[
+            x_{ij}^{\alpha}\partial_{\gamma}W_{ij}+\delta^
+            {\alpha \gamma}W_{ij} \right]
+    .. math::
+            \partial_{\gamma}m_{2}^{\alpha \beta} = \sum_{j}V_{j}\left[
+            x_{ij}^{\alpha}x_{ij}^{\beta}\partial_{\gamma}W_{ij} +
+            \left(x_{ij}^{\alpha}\delta^{\beta \gamma} + x_{ij}^{\beta}
+            \delta^{\alpha \gamma} \right)W_{ij} \right]
+    References
+    ----------
+    .. [N Frontiere, C D Raskin and J M Owen] Nicholas Frontiere,
+        Cody D. Raskin, J. Michael Owen (2017) CRKSPH – A Conservative
+        Reproducing Kernel Smoothed Particle Hydrodynamics Scheme.
+    """
 
     def __init__(self, dest, sources, dim=2, tol=0.5):
         self.dim = dim
