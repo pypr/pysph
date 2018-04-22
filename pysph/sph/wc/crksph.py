@@ -180,7 +180,7 @@ class CRKSPH(Equation):
     References
     ----------
     .. [N Frontiere, C D Raskin and J M Owen] Nicholas Frontiere,
-        Cody D. Raskin, J. Michael Owen (2017) CRKSPH – A Conservative
+        Cody D. Raskin, J. Michael Owen (2017) CRKSPH - A Conservative
         Reproducing Kernel Smoothed Particle Hydrodynamics Scheme.
     """
 
