@@ -106,7 +106,7 @@ class GradientCorrection(Equation):
 
 
 class MixedKernelCorrectionPreStep(Equation):
-    r"""**Kernel Correction**
+    r"""**Mixed Kernel Correction**
 
     .. math::
             \tilde{W}_{ab} = \frac{W_{ab}}{\sum_{b} V_{b}W_{ab}}
