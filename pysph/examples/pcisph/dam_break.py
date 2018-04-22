@@ -16,7 +16,7 @@ from pysph.sph.integrator import EulerIntegrator
 
 # equations
 from pysph.sph.equation import Group
-from pysph.sph.pcisph import (
+from pysph.sph.wc.pcisph import (
     get_particle_array_pcisph, get_particle_array_static_boundary,
     SaveCurrentProps, ClearAccelerationsAddGravity, SetUpPressureSolver,
     Advect, ComputeDensityFluid, ComputeDensitySolid, DensityDifference,
