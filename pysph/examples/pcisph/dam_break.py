@@ -21,30 +21,31 @@ from pysph.sph.pcisph import (
     SaveCurrentProps, ClearAccelerationsAddGravity, SetUpPressureSolver,
     Advect, ComputeDensityFluid, ComputeDensitySolid, DensityDifference,
     CorrectPressure, MomentumEquation, MomentumEquationStaticBoundary,
-    PCISPHStep)
+    MomentumEquationViscosity, PCISPHStep)
 
 
 class DamBreak(Application):
     def initialize(self):
         self.rho = 1000
         self.dim = 2
-        self.dt = 1e-3
+        self.dt = 2e-4
 
     def create_particles(self):
-        model = DamBreak2DGeometry()
-        [f, b] = model.create_particles()
+        model = DamBreak2DGeometry(wall_hex_pack=False)
+        [f, b] = model.create_particles(nfluid_offset=1)
         consts = {'rho_base': [1000.]}
 
-        xf = f.x + 5 * model.dx
-        yf = f.y + 5 * model.dy
+        xf = f.x  #+ 2 * model.dx
+        yf = f.y  #+ 2 * model.dy
         h = 1.2 * model.dx
-        fluid = get_particle_array_pcisph(
-            x=xf, y=yf, h=h, m=f.m, rho=self.rho, name="fluid",
-            constants=consts, dim=self.dim, dt=self.dt, delta=50)
+        V = model.dx**2
+        fluid = get_particle_array_pcisph(x=xf, y=yf, h=h, m=f.m, rho=self.rho,
+                                          V=V, name="fluid", constants=consts,
+                                          dim=self.dim, dt=self.dt, delta=None)
 
         V = model.dx**2
-        boundary = get_particle_array_static_boundary(x=b.x, y=b.y, V=V,
-                                                      name="boundary")
+        boundary = get_particle_array_static_boundary(
+            x=b.x, y=b.y, V=V, rho=self.rho, name="boundary")
 
         return [fluid, boundary]
 
@@ -55,7 +56,7 @@ class DamBreak(Application):
 
         dt = self.dt
         print("DT: %s" % dt)
-        tf = 1
+        tf = 2
         solver = Solver(kernel=kernel, dim=self.dim, integrator=integrator,
                         dt=dt, tf=tf, adaptive_timestep=False)
 
@@ -65,10 +66,15 @@ class DamBreak(Application):
         equations = [
             Group(equations=[
                 SaveCurrentProps(dest='fluid', sources=None),
-                ClearAccelerationsAddGravity(dest='fluid', sources=None, gy=-9.81),
+                ClearAccelerationsAddGravity(dest='fluid', sources=None,
+                                             gy=-9.81),
                 # Calculate densities to compute non-pressure forces
                 # -----------------------------------------------
+                ComputeDensityFluid(dest='fluid', sources=['fluid']),
+                ComputeDensitySolid(dest='fluid', sources=['boundary']),
                 # compute non pressure forces if any
+                MomentumEquationViscosity(
+                    dest='fluid', sources=['fluid', 'boundary'], nu=0.2),
                 # -----------------------------------------------
                 SetUpPressureSolver(dest='fluid', sources=None)
             ]),

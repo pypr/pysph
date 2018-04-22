@@ -68,10 +68,8 @@ class ComputeDelta(Equation):
         d_local_delta[d_idx] = tmp / beta
 
     def reduce(self, dst, t, dt):
-        dst.delta[0] = serial_reduce_array(dst.local_delta, 'min')
-        p = serial_reduce_array(dst.local_delta, 'max')
+        dst.delta[0] = serial_reduce_array(dst.local_delta, 'max')
         print(dst.delta[0])
-        print(p)
 
 
 def get_particle_array_static_boundary(constants=None, **props):
@@ -115,9 +113,6 @@ class ClearAccelerationsAddGravity(Equation):
         d_ao_x[d_idx] = self.gx
         d_ao_y[d_idx] = self.gy
         d_ao_z[d_idx] = self.gz
-        d_ap_x[d_idx] = 0
-        d_ap_y[d_idx] = 0
-        d_ap_z[d_idx] = 0
 
 
 class ComputeDensityFluid(Equation):
@@ -152,13 +147,21 @@ class Advect(Equation):
     def initialize(self, d_idx, d_ao_x, d_ao_y, d_ao_z, d_ap_x, d_ap_y, d_ap_z,
                    d_u, d_v, d_w, d_u0, d_v0, d_w0, d_x, d_y, d_z, d_x0, d_y0,
                    d_z0, dt):
-        d_u[d_idx] = d_u0[d_idx] + dt * (d_ap_x[d_idx] + d_ao_x[d_idx])
-        d_v[d_idx] = d_v0[d_idx] + dt * (d_ap_y[d_idx] + d_ao_y[d_idx])
-        d_w[d_idx] = d_w0[d_idx] + dt * (d_ap_z[d_idx] + d_ao_z[d_idx])
+        dtb2 = dt*0.5
+        ax = dtb2 * (d_ap_x[d_idx] + d_ao_x[d_idx])
+        ay = dtb2 * (d_ap_y[d_idx] + d_ao_y[d_idx])
+        az = dtb2 * (d_ap_z[d_idx] + d_ao_z[d_idx])
+        d_u[d_idx] = d_u0[d_idx] + ax
+        d_v[d_idx] = d_v0[d_idx] + ay
+        d_w[d_idx] = d_w0[d_idx] + az
 
         d_x[d_idx] = d_x0[d_idx] + dt * d_u[d_idx]
         d_y[d_idx] = d_y0[d_idx] + dt * d_v[d_idx]
         d_z[d_idx] = d_z0[d_idx] + dt * d_w[d_idx]
+
+        d_u[d_idx] += ax
+        d_v[d_idx] += ay
+        d_w[d_idx] += az
 
 
 class DensityDifference(Equation):
@@ -196,7 +199,7 @@ class CorrectPressure(Equation):
 
 
 class MomentumEquation(Equation):
-    def initialize(self, d_idx, d_ap_x, d_ap_y, d_ap_z, DWIJ):
+    def initialize(self, d_idx, d_ap_x, d_ap_y, d_ap_z):
         d_ap_x[d_idx] = 0
         d_ap_y[d_idx] = 0
         d_ap_z[d_idx] = 0
@@ -210,6 +213,36 @@ class MomentumEquation(Equation):
         d_ap_z[d_idx] += -s_m[s_idx] * (dpi + dpj) * DWIJ[2]
 
 
+class MonaghanArtificialViscosity(Equation):
+    def __init__(self, dest, sources, alpha=1.0, beta=1.0):
+        self.alpha = alpha
+        self.beta = beta
+        super(MonaghanArtificialViscosity, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_rho, d_cs, d_au, d_av, d_aw, s_m,
+             s_rho, s_cs, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, DWIJ):
+
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+
+        piij = 0.0
+        if vijdotxij < 0:
+            cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
+
+            muij = (HIJ * vijdotxij)/(R2IJ + EPS)
+
+            piij = -self.alpha*cij*muij + self.beta*muij*muij
+            piij = piij*RHOIJ1
+
+        d_au[d_idx] += -s_m[s_idx] * piij * DWIJ[0]
+        d_av[d_idx] += -s_m[s_idx] * piij * DWIJ[1]
+        d_aw[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
+
+
 class MomentumEquationStaticBoundary(Equation):
     def loop(self, d_idx, s_idx, d_rho_base, d_p, d_ap_x, d_ap_y, d_ap_z, s_p,
              s_V, DWIJ):
@@ -217,6 +250,37 @@ class MomentumEquationStaticBoundary(Equation):
         d_ap_x[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[0]
         d_ap_y[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[1]
         d_ap_z[d_idx] += -s_V[s_idx] * d_rho_base[0] * dpi * DWIJ[2]
+
+
+class MomentumEquationViscosity(Equation):
+    def __init__(self, dest, sources, nu):
+        self.nu = nu
+        super(MomentumEquationViscosity, self).__init__(dest, sources)
+
+    def loop(self, d_idx, s_idx, d_rho, s_rho, d_m, d_V, s_V,
+             d_ao_x, d_ao_y, d_ao_z,
+             R2IJ, EPS, DWIJ, VIJ, XIJ):
+        # averaged shear viscosity Eq. (6)
+        etai = self.nu * d_rho[d_idx]
+        etaj = self.nu * s_rho[s_idx]
+
+        etaij = 2 * (etai * etaj)/(etai + etaj)
+
+        # scalar part of the kernel gradient
+        Fij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
+
+        # particle volumes, d_V is inverse volume.
+        Vi = d_V[d_idx]
+        Vj = s_V[s_idx]
+        Vi2 = Vi * Vi
+        Vj2 = Vj * Vj
+
+        # accelerations 3rd term in Eq. (8)
+        tmp = 1./d_m[d_idx] * (Vi2 + Vj2) * etaij * Fij/(R2IJ + EPS)
+
+        d_ao_x[d_idx] += tmp * VIJ[0]
+        d_ao_y[d_idx] += tmp * VIJ[1]
+        d_ao_z[d_idx] += tmp * VIJ[2]
 
 
 class PCISPHStep(IntegratorStep):
