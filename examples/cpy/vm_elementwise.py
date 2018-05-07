@@ -6,6 +6,7 @@ from pysph.cpy.config import get_config
 from pysph.cpy.api import declare, annotate
 from pysph.cpy.parallel import Elementwise
 from pysph.cpy.array import wrap
+import pycuda.autoinit
 
 
 @annotate(double='xi, yi, xj, yj, gamma', result='doublep')
