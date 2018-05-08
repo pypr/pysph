@@ -52,9 +52,9 @@ def run(nv, backend):
     args = make_vortices(nv, backend)
     t1 = time.time()
     e(*args)
-    print(time.time() - t1)
     u = args[-3]
     u.pull()
+    print(time.time() - t1)
     print(u.data)
     return e, args
 

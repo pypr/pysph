@@ -534,7 +534,7 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         return_type = self._get_return_type(body, node)
-        sig = '{ret} {name}({args})'.format(
+        sig = 'WITHIN_KERNEL {ret} {name}({args})'.format(
             ret=return_type, name=func_name, args=args
         )
 

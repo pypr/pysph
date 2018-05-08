@@ -165,7 +165,6 @@ class Elementwise(object):
                 operation=expr,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            print c_data
             self.c_func = knl
         elif self.backend == 'cuda':
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
