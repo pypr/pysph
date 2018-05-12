@@ -172,10 +172,11 @@ equation:
 
     - ``EPS = 0.01 * HIJ * HIJ``
 
-    - ``KERNEL``: the kernel being used and one can call the kernel as
-      ``KERNEL.kernel(xij, rij, h)`` the gradient as ``KERNEL.gradient(...)``,
-      ``KERNEL.gradient_h(...)`` etc. The kernel is any one of the instances
-      of the kernel classes defined in :py:mod:`pysph.base.kernels`
+    - ``SPH_KERNEL``: the kernel being used and one can call the kernel as
+      ``SPH_KERNEL.kernel(xij, rij, h)`` the gradient as
+      ``SPH_KERNEL.gradient(...)``, ``SPH_KERNEL.gradient_h(...)`` etc. The
+      kernel is any one of the instances of the kernel classes defined in
+      :py:mod:`pysph.base.kernels`
 
 In addition if one requires the current time or the timestep in an equation,
 the following may be passed into any of the methods of an equation:
@@ -312,7 +313,7 @@ perform what the ``loop`` method usually does ourselves.
 
        def loop_all(self, d_idx, d_x, d_y, d_z, d_rho, d_h,
                     s_m, s_x, s_y, s_z, s_h,
-                    KERNEL, NBRS, N_NBRS):
+                    SPH_KERNEL, NBRS, N_NBRS):
            i = declare('int')
            s_idx = declare('long')
            xij = declare('matrix(3)')
@@ -324,7 +325,7 @@ perform what the ``loop`` method usually does ourselves.
                xij[1] = d_y[d_idx] - s_y[s_idx]
                xij[2] = d_z[d_idx] - s_z[s_idx]
                rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
-               sum += s_m[s_idx]*KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
+               sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
            d_rho[d_idx] += sum
 
 This seems a bit complex but let us look at what is being done. ``initialize``
@@ -332,14 +333,14 @@ is called once per particle and each of their densities is set to zero. Then
 when ``loop_all`` is called it is called once per destination particle (unlike
 ``loop`` which is called pairwise for each destination and source particle).
 The ``loop_all`` is passed arrays as is typical of most equations but is also
-passed the ``KERNEL`` itself, the list of neighbors, and the number of
+passed the ``SPH_KERNEL`` itself, the list of neighbors, and the number of
 neighbors.
 
 The code first declares the variables, ``i, s_idx`` as an integer and long,
 and then ``x_ij`` as a 3-element array. These are important for performance in
 the generated code. The code then loops over all neighbors and computes the
 summation density. Notice how the kernel is computed using
-``KERNEL.kernel(...)``. Notice also how the source index, ``s_idx`` is found
+``SPH_KERNEL.kernel(...)``. Notice also how the source index, ``s_idx`` is found
 from the neighbors.
 
 This above ``loop_all`` code does exactly what the following single line of
