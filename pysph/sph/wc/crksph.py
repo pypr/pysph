@@ -8,7 +8,7 @@ class CRKSPHPreStep(Equation):
         super(CRKSPHPreStep, self).__init__(dest, sources)
 
     def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, s_m,
-                 s_rho, KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi, d_gradbi):
+                 s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi, d_gradbi):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -50,8 +50,8 @@ class CRKSPHPreStep(Equation):
             xij[2] = z - s_z[s_idx]
             hij = (h + s_h[s_idx]) * 0.5
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            wij = KERNEL.kernel(xij, rij, hij)
-            KERNEL.gradient(xij, rij, hij, dwij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
+            SPH_KERNEL.gradient(xij, rij, hij, dwij)
             V = s_m[s_idx] / s_rho[s_idx]
 
             m0 += V * wij
