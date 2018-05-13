@@ -35,7 +35,7 @@ class GradientCorrectionPreStep(Equation):
             d_m_mat[9 * d_idx + i] = 0.0
 
     def loop_all(self, d_idx, d_m_mat, s_m, s_rho, d_x, d_y, d_z, d_h, s_x,
-                 s_y, s_z, s_h, KERNEL, NBRS, N_NBRS):
+                 s_y, s_z, s_h, SPH_KERNEL, NBRS, N_NBRS):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -51,7 +51,7 @@ class GradientCorrectionPreStep(Equation):
             xij[2] = z - s_z[s_idx]
             hij = (h + s_h[s_idx]) * 0.5
             r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            KERNEL.gradient(xij, r, hij, dwij)
+            SPH_KERNEL.gradient(xij, r, hij, dwij)
             dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
                       + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
@@ -144,7 +144,7 @@ class MixedKernelCorrectionPreStep(Equation):
         for i in range(9):
             d_m_mat[9 * d_idx + i] = 0.0
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, KERNEL,
+    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, SPH_KERNEL,
                  N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij):
         x = d_x[d_idx]
         y = d_y[d_idx]
@@ -170,8 +170,8 @@ class MixedKernelCorrectionPreStep(Equation):
             V = s_m[s_idx] / s_rho[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             hij = (h + s_h[s_idx]) * 0.5
-            KERNEL.gradient(xij, rij, hij, dwij)
-            wij = KERNEL.kernel(xij, rij, hij)
+            SPH_KERNEL.gradient(xij, rij, hij, dwij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             den += V * wij
             for i in range(n):
                 numerator[i] += V * dwij[i]
@@ -184,7 +184,7 @@ class MixedKernelCorrectionPreStep(Equation):
             xij[2] = z - s_z[s_idx]
             hij = (h + s_h[s_idx]) * 0.5
             r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
-            KERNEL.gradient(xij, r, hij, dwij)
+            SPH_KERNEL.gradient(xij, r, hij, dwij)
             for i in range(n):
                 dwij1[i] = (dwij[i] - numerator[i] / den) / den
             dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
