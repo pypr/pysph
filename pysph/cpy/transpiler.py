@@ -130,7 +130,7 @@ class Transpiler(object):
         ----------
 
         backend: str: Backend to use.
-            Can be one of 'cython', 'opencl', or 'python'
+            Can be one of 'cython', 'opencl', 'cuda' or 'python'
         """
         self.backend = backend
         self.blocks = []
@@ -167,7 +167,7 @@ class Transpiler(object):
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
-            __constant__ double pi=3.1415;
+            __constant__ double pi= 3.141592654f;
             ''')
 
 
@@ -279,3 +279,9 @@ class Transpiler(object):
             self.mod = cl.Program(ctx, self.source).build(
                 options=['-w']
             )
+        elif self.backend == 'cuda':
+            import pycuda as cu
+            from pycuda.compiler import SourceModule
+            from .opencl import get_context
+            self.source = convert_to_float_if_needed(self.get_code())
+            self.mod = SourceModule(self.source)

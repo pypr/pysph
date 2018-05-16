@@ -76,7 +76,7 @@ class LocalMem(object):
             )
 
 
-def splay(queue, n, kernel_specific_max_wg_size=None):
+def splay_cl(queue, n, kernel_specific_max_wg_size=None):
     dev = queue.device
     max_work_items = min(128, dev.max_work_group_size)
 
@@ -130,6 +130,10 @@ class Kernel(object):
             raise NotImplementedError(
                 'Kernels only work with opencl/cuda backends.'
             )
+        if backend == 'opencl':
+            from .opencl import get_queue
+            self.queue = get_queue()
+
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.name = func.__name__
@@ -137,8 +141,6 @@ class Kernel(object):
         self.source = ''  # The generated source.
         self._config = get_config()
         self._use_double = self._config.use_double
-        from .opencl import get_queue
-        self.queue = get_queue()
         self._func_info = self._get_func_info()
         self._generate()
 
@@ -172,12 +174,16 @@ class Kernel(object):
 
         self.tp.compile()
         self.source = self.tp.source
-        self.knl = getattr(self.tp.mod, self.name)
-        import pyopencl as cl
-        self._max_work_group_size = self.knl.get_work_group_info(
-            cl.kernel_work_group_info.WORK_GROUP_SIZE,
-            self.queue.device
-        )
+
+        if self.backend == 'opencl':
+            self.knl = getattr(self.tp.mod, self.name)
+            import pyopencl as cl
+            self._max_work_group_size = self.knl.get_work_group_info(
+                cl.kernel_work_group_info.WORK_GROUP_SIZE,
+                self.queue.device
+            )
+        elif self.backend == 'cuda':
+            self.knl = self.tp.mod.get_function(self.name)
 
     def _correct_opencl_address_space(self):
         code = self.tp.blocks[-1].code.splitlines()
@@ -201,7 +207,12 @@ class Kernel(object):
         return c_args
 
     def _get_workgroup_size(self, global_size):
-        gs, ls = splay(self.queue, global_size, self._max_work_group_size)
+        if self.backend == 'opencl':
+            gs, ls = splay_cl(self.queue, global_size,
+                              self._max_work_group_size)
+        elif self.backend == 'cuda':
+            from pycuda.gpuarray import splay
+            gs, ls = splay(global_size)
         return gs, ls
 
     def __call__(self, *args, **kw):
@@ -216,11 +227,15 @@ class Kernel(object):
         else:
             gs, ls = self._get_workgroup_size(n)
         c_args = self._get_args(args, ls[0])
-        prepend = [self.queue, gs, ls]
-        c_args = prepend + c_args
         if self.backend == 'opencl':
+            prepend = [self.queue, gs, ls]
+            c_args = prepend + c_args
             self.knl(*c_args)
             self.queue.finish()
+        elif self.backend == 'cuda':
+            num_blocks = (n + ls[0] - 1) / ls[0]
+            num_tpb = ls[0]
+            self.knl(*c_args, block=(num_blocks, num_tpb, 1))
 
 
 class _prange(Extern):
