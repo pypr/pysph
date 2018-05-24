@@ -244,7 +244,7 @@ class Kernel(object):
             self.knl(*c_args)
             self.queue.finish()
         elif self.backend == 'cuda':
-            num_blocks = (n + ls[0] - 1) / ls[0]
+            num_blocks = int((n + ls[0] - 1) / ls[0])
             num_tpb = ls[0]
             self.knl(*c_args, block=(num_blocks, num_tpb, 1))
 
