@@ -49,7 +49,7 @@ class TestParallelUtils(unittest.TestCase):
         self._check_simple_elementwise(backend='opencl')
 
     def test_elementwise_works_with_cuda(self):
-        importorskip('pyopencl')
+        importorskip('pycuda')
 
         self._check_simple_elementwise(backend='cuda')
 

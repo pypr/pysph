@@ -14,10 +14,8 @@ from ..low_level import (
 
 class TestKernel(unittest.TestCase):
 
-    def setUp(self):
-        importorskip('pyopencl')
-
     def test_simple_kernel_opencl(self):
+        importorskip('pyopencl')
         # Given
         @annotate(gdoublep='x, y', a='float')
         def knl(x, y, a):
@@ -39,6 +37,7 @@ class TestKernel(unittest.TestCase):
         self.assertTrue(np.allclose(y.data, x.data*a))
 
     def test_simple_kernel_cuda(self):
+        importorskip('pycuda')
         # Given
         @annotate(gdoublep='x, y', a='float')
         def knl(x, y, a):
@@ -60,6 +59,7 @@ class TestKernel(unittest.TestCase):
         self.assertTrue(np.allclose(y.data, x.data*a))
 
     def test_kernel_with_local_memory(self):
+        importorskip('pyopencl')
         # Given
         @annotate(gdoublep='x, y', xc='ldoublep', a='float')
         def knl(x, y, xc, a):
