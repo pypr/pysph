@@ -108,3 +108,16 @@ class TestParallelUtils(unittest.TestCase):
     def test_reduction_works_neutral_opencl(self):
         importorskip('pyopencl')
         self._check_reduction_min(backend='opencl')
+
+    def test_reduction_works_without_map_cuda(self):
+        importorskip('pycuda')
+        self._check_simple_reduction(backend='cuda')
+
+    def test_reduction_works_with_map_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_with_map(backend='cuda')
+
+    def test_reduction_works_neutral_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_min(backend='cuda')
+

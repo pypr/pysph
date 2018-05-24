@@ -282,6 +282,5 @@ class Transpiler(object):
         elif self.backend == 'cuda':
             import pycuda as cu
             from pycuda.compiler import SourceModule
-            from .opencl import get_context
             self.source = convert_to_float_if_needed(self.get_code())
             self.mod = SourceModule(self.source)
