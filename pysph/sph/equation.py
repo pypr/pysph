@@ -660,8 +660,8 @@ class CythonGroup(Group):
                 args = inspect.getargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
-                if 'KERNEL' in args:
-                    args[args.index('KERNEL')] = 'self.kernel'
+                if 'SPH_KERNEL' in args:
+                    args[args.index('SPH_KERNEL')] = 'self.kernel'
                 if kind == 'reduce':
                     args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)
