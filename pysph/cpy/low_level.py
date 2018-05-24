@@ -246,7 +246,7 @@ class Kernel(object):
         elif self.backend == 'cuda':
             num_blocks = int((n + ls[0] - 1) / ls[0])
             num_tpb = ls[0]
-            self.knl(*c_args, block=(num_blocks, num_tpb, 1))
+            self.knl(*c_args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
 
 
 class _prange(Extern):
