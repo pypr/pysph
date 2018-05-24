@@ -200,7 +200,10 @@ class Kernel(object):
 
     def _massage_arg(self, x, type_info, workgroup_size):
         if isinstance(x, Array):
-            return x.dev.data
+            if self.backend == 'opencl':
+                return x.dev.data
+            elif self.backend == 'cuda':
+                return x.dev
         elif isinstance(x, LocalMem):
             return x.get(type_info.base_type, workgroup_size)
         else:
