@@ -48,6 +48,11 @@ class TestParallelUtils(unittest.TestCase):
 
         self._check_simple_elementwise(backend='opencl')
 
+    def test_elementwise_works_with_cuda(self):
+        importorskip('pyopencl')
+
+        self._check_simple_elementwise(backend='cuda')
+
     def _check_simple_reduction(self, backend):
         x = np.linspace(0, 1, 1000)/1000
         x = wrap(x, backend=backend)
