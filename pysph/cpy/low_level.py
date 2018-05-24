@@ -170,7 +170,10 @@ class Kernel(object):
 
     def _generate(self):
         self.tp.add(self.func)
-        self._correct_opencl_address_space()
+        if self.backend == 'opencl':
+            self._correct_opencl_address_space()
+        elif self.backend == 'cuda':
+            self._correct_cuda_address_space()
 
         self.tp.compile()
         self.source = self.tp.source
@@ -188,6 +191,11 @@ class Kernel(object):
     def _correct_opencl_address_space(self):
         code = self.tp.blocks[-1].code.splitlines()
         code[0] = 'KERNEL ' + code[0]
+        self.tp.blocks[-1].code = '\n'.join(code)
+
+    def _correct_cuda_address_space(self):
+        code = self.tp.blocks[-1].code.splitlines()
+        code[0] = 'KERNEL ' + code[0][13:]
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x, type_info, workgroup_size):
