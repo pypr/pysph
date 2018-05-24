@@ -1176,8 +1176,6 @@ def test_opencl_conversion():
     converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
-    print code
-
     # Then
     expect = dedent('''
 WITHIN_KERNEL void f(long s_idx, __global double* s_p, long d_idx, __global
