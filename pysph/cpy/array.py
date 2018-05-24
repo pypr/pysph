@@ -135,6 +135,7 @@ class Array(object):
                 if self.data is not None:
                     self.dev = to_device(self.q, self._get_data())
             elif self.backend == 'cuda':
+                import pycuda.autoinit
                 from pycuda.gpuarray import to_gpu
                 if self.data is not None:
                     self.dev = to_gpu(self._get_data())
