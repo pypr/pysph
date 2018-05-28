@@ -1,3 +1,6 @@
+"""Taylor Green vortex flow (5 minutes).
+"""
+
 import numpy as np
 import os
 
