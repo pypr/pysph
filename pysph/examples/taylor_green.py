@@ -236,7 +236,7 @@ class TaylorGreen(Application):
         # return the particle list
         return [fluid]
 
-    #####  The following are all related to post-processing.  #####
+    # The following are all related to post-processing.
     def _get_post_process_props(self, array):
         """Return x, y, m, u, v, p.
         """
