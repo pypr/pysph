@@ -6,7 +6,6 @@ from pysph.cpy.config import get_config
 from pysph.cpy.api import declare, annotate
 from pysph.cpy.parallel import Elementwise
 from pysph.cpy.array import wrap
-import pycuda.autoinit
 
 
 @annotate(double='xi, yi, xj, yj, gamma', result='doublep')
@@ -52,10 +51,9 @@ def run(nv, backend):
     args = make_vortices(nv, backend)
     t1 = time.time()
     e(*args)
+    print(time.time() - t1)
     u = args[-3]
     u.pull()
-    print(time.time() - t1)
-    print(u.data)
     return e, args
 
 

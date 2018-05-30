@@ -38,7 +38,7 @@ def ones_like(array, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         dev_array = 1 + gpuarray.zeros_like(array)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         dev_array = gpuarray.ones_like(array)
     else:
@@ -52,7 +52,7 @@ def ones(n, dtype, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         dev_array = 1 + gpuarray.zeros(get_queue(), n, dtype)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         dev_array = np.array(1, dtype=dtype) + gpuarray.zeros(n, dtype)
     else:
@@ -66,7 +66,7 @@ def empty(n, dtype, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         dev_array = gpuarray.empty(get_queue(), n, dtype)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         dev_array = gpuarray.empty(n, dtype)
     else:
@@ -80,7 +80,7 @@ def zeros(n, dtype, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         dev_array = gpuarray.zeros(get_queue(), n, dtype)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         dev_array = gpuarray.zeros(n, dtype)
     else:
@@ -95,7 +95,7 @@ def arange(start, stop, step, dtype=None, backend='cython'):
         import pyopencl.array as gpuarray
         dev_array = gpuarray.arange(get_queue(), start, stop,
                                     step, dtype=dtype)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         dev_array = gpuarray.arange(start, stop, step, dtype=dtype)
     else:

@@ -2,7 +2,6 @@ from pysph.cpy.api import Elementwise, annotate, wrap, get_config
 import numpy as np
 from numpy import sin
 import time
-import pycuda.autoinit
 
 
 @annotate(i='int', doublep='x, y, a, b')
@@ -26,8 +25,19 @@ def data(n, backend):
 
 def compare(m=20):
     N = 2**np.arange(1, 25)
-    backends = [['cython', False], ['cython', True], ['opencl', False],
-            ['cuda', False]]
+    backends = [['cython', False], ['cython', True]]
+    try:
+        import pyopencl
+        backends.append(['opencl', False])
+    except ImportError, e:
+        pass
+
+    try:
+        import pycuda
+        backends.append(['cuda', False])
+    except ImportError, e:
+        pass
+
     timing = []
     for backend in backends:
         e = setup(*backend)
@@ -37,11 +47,11 @@ def compare(m=20):
             t = []
             for j in range(m):
                 if backend[0] == 'cuda':
+                    import pycuda.autoinit
                     import pycuda.driver as drv
                     start = drv.Event()
                     end = drv.Event()
                     start.record()
-                    #start.synchronize()
                     e(*args)
                     end.record()
                     end.synchronize()
@@ -52,19 +62,17 @@ def compare(m=20):
                     e(*args)
                     secs = time.time() - start
                     t.append(secs)
-            y = args[1]
-            print "ANS =", y.dev[0], y.dev[1]
             times.append(np.average(t))
         timing.append(times)
 
-    return N, np.array(timing)
+    return N, backends, np.array(timing)
 
 
-def plot_timing(n, timing):
+def plot_timing(n, timing, backends):
     from matplotlib import pyplot as plt
-    plt.semilogx(n, timing[0]/timing[1], label='serial/openmp', marker='+')
-    plt.semilogx(n, timing[0]/timing[2], label='serial/opencl', marker='+')
-    plt.semilogx(n, timing[0]/timing[3], label='serial/cuda', marker='+')
+    backends[1][0] = 'openmp'
+    for time, backend in zip(timing[1:], backends[1:]):
+        plt.semilogx(n, timing[0]/time, label='serial/' + backend[0], marker='+')
     plt.grid()
     plt.xlabel('N')
     plt.ylabel('Speedup')
@@ -73,5 +81,5 @@ def plot_timing(n, timing):
 
 
 if __name__ == '__main__':
-    n, times = compare()
-    plot_timing(n, times)
+    n, backends, times = compare()
+    plot_timing(n, times, backends)

@@ -143,7 +143,7 @@ class CConverter(ast.NodeVisitor):
             'True': '1', 'False': '0', 'None': 'NULL',
             True: '1', False: '0', None: 'NULL',
         }
-        self.pre_sig = ''
+        self.function_address_space = ''
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
@@ -535,7 +535,7 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         return_type = self._get_return_type(body, node)
-        sig = self.pre_sig + '{ret} {name}({args})'.format(
+        sig = self.function_address_space + '{ret} {name}({args})'.format(
             ret=return_type, name=func_name, args=args
         )
 
@@ -673,7 +673,7 @@ def ocl_detect_type(name, value):
     if isinstance(value, KnownType):
         return value.type
     elif name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
-        return '__global double*'
+        return 'GLOBAL_MEM double*'
     else:
         return detect_type(name, value)
 
@@ -681,7 +681,7 @@ def ocl_detect_type(name, value):
 class OpenCLConverter(CConverter):
     def __init__(self, detect_type=ocl_detect_type, known_types=None):
         super(OpenCLConverter, self).__init__(detect_type, known_types)
-        self.pre_sig = 'WITHIN_KERNEL '
+        self.function_address_space = 'WITHIN_KERNEL '
         self._known.update((
             'LID_0', 'LID_1', 'LID_2',
             'GID_0', 'GID_1', 'GID_2',
@@ -690,4 +690,4 @@ class OpenCLConverter(CConverter):
         ))
 
     def _get_self_type(self):
-        return KnownType('__global %s*' % self._class_name)
+        return KnownType('GLOBAL_MEM %s*' % self._class_name)

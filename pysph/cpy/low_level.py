@@ -130,7 +130,7 @@ class Kernel(object):
             raise NotImplementedError(
                 'Kernels only work with opencl/cuda backends.'
             )
-        if backend == 'opencl':
+        elif backend == 'opencl':
             from .opencl import get_queue
             self.queue = get_queue()
 
@@ -187,6 +187,7 @@ class Kernel(object):
 
     def _correct_opencl_address_space(self):
         code = self.tp.blocks[-1].code.splitlines()
+        # To remove WITHIN_KERNEL
         code[0] = 'KERNEL ' + code[0][13:]
         self.tp.blocks[-1].code = '\n'.join(code)
 

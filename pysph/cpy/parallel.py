@@ -170,7 +170,7 @@ class Elementwise(object):
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
 
-            #from .opencl import get_context, get_queue
+            import pycuda.autoinit
             from pycuda.elementwise import ElementwiseKernel
             from pycuda._cluda import CLUDA_PREAMBLE
             name = self.func.__name__
@@ -222,7 +222,6 @@ class Elementwise(object):
 
     def __call__(self, *args, **kw):
         c_args = [self._massage_arg(x) for x in args]
-        #print c_args
         if self.backend == 'cython':
             size = len(c_args[0])
             c_args.insert(0, size)
