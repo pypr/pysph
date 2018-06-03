@@ -29,13 +29,13 @@ def compare(m=20):
     try:
         import pyopencl
         backends.append(['opencl', False])
-    except ImportError, e:
+    except ImportError as e:
         pass
 
     try:
         import pycuda
         backends.append(['cuda', False])
-    except ImportError, e:
+    except ImportError as e:
         pass
 
     timing = []
@@ -46,21 +46,10 @@ def compare(m=20):
             args = data(n, backend[0])
             t = []
             for j in range(m):
-                if backend[0] == 'cuda':
-                    import pycuda.driver as drv
-                    start = drv.Event()
-                    end = drv.Event()
-                    start.record()
-                    e(*args)
-                    end.record()
-                    end.synchronize()
-                    secs = start.time_till(end) * 1e-3
-                    t.append(secs)
-                else:
-                    start = time.time()
-                    e(*args)
-                    secs = time.time() - start
-                    t.append(secs)
+                start = time.time()
+                e(*args)
+                secs = time.time() - start
+                t.append(secs)
             times.append(np.average(t))
         timing.append(times)
 
