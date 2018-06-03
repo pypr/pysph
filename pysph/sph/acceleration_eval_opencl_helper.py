@@ -371,6 +371,10 @@ class AccelerationEvalOpenCLHelper(object):
                             'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
+        from pyopencl._cluda import CLUDA_PREAMBLE
+        double_support = get_config().use_double
+        cluda = Template(CLUDA_PREAMBLE).render(double_support=double_support)
+        main = "\n".join([cluda, main])
         return main
 
     def setup_compiled_module(self, module):
