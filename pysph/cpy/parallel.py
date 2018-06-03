@@ -234,7 +234,7 @@ class Elementwise(object):
             import pycuda.driver as drv
             event = drv.Event()
             self.c_func(*c_args, **kw)
-            event.synchronise()
+            event.synchronize()
 
 
 def elementwise(func=None, backend=None):
