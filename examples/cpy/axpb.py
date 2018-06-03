@@ -47,7 +47,6 @@ def compare(m=20):
             t = []
             for j in range(m):
                 if backend[0] == 'cuda':
-                    import pycuda.autoinit
                     import pycuda.driver as drv
                     start = drv.Event()
                     end = drv.Event()

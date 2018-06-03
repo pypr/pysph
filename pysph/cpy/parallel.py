@@ -170,7 +170,8 @@ class Elementwise(object):
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
 
-            import pycuda.autoinit
+            from .cuda import set_context
+            set_context()
             from pycuda.elementwise import ElementwiseKernel
             from pycuda._cluda import CLUDA_PREAMBLE
             name = self.func.__name__
@@ -230,7 +231,10 @@ class Elementwise(object):
             self.c_func(*c_args, **kw)
             self.queue.finish()
         elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
             self.c_func(*c_args, **kw)
+            event.synchronise()
 
 
 def elementwise(func=None, backend=None):
@@ -358,6 +362,8 @@ class Reduction(object):
                 expr = None
                 preamble = ''
 
+            from .cuda import set_context
+            set_context()
             from pycuda.reduction import ReductionKernel
             from pycuda._cluda import CLUDA_PREAMBLE
             cluda_preamble = Template(text=CLUDA_PREAMBLE).render(
