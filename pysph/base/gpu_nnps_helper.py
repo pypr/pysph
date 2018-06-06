@@ -4,11 +4,22 @@ from mako.template import Template
 import os
 import sys
 
-from pysph.base.opencl import profile_kernel, get_elwise_kernel
+from pysph.base.opencl import profile_kernel, get_elwise_kernel, \
+    get_simple_kernel
 
 
 class GPUNNPSHelper(object):
-    def __init__(self, ctx, tpl_filename, use_double=False):
+    def __init__(self, ctx, tpl_filename, use_double=False, c_type=None):
+        """
+
+        Parameters
+        ----------
+        ctx
+        tpl_filename
+        use_double
+        c_type:
+            c_type to use. Overrides use_double
+        """
         disable_unicode = False if sys.version_info.major > 2 else True
         self.src_tpl = Template(
             filename=os.path.join(
@@ -18,6 +29,9 @@ class GPUNNPSHelper(object):
         )
 
         self.data_t = "double" if use_double else "float"
+
+        if c_type is not None:
+            self.data_t = c_type
 
         helper_tpl = Template(
             filename=os.path.join(
@@ -38,20 +52,28 @@ class GPUNNPSHelper(object):
 
     def _get_code(self, kernel_name, **kwargs):
         arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         src = self.src_tpl.get_def("%s_src" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         return arguments, src
 
     def get_kernel(self, kernel_name, **kwargs):
-        data = kernel_name, tuple(kwargs.items())
-        if data in self.cache:
-            return self.cache[data]
+        key = kernel_name, tuple(kwargs.items())
+        wgs = kwargs.get('wgs', None)
+
+        if key in self.cache:
+            return self.cache[key]
         else:
             args, src = self._get_code(kernel_name, **kwargs)
-            knl = get_elwise_kernel(kernel_name, args, src,
-                                    preamble=self.preamble)
-            self.cache[data] = knl
+
+            if wgs is None:
+                kernel_generator = get_elwise_kernel
+            else:
+                kernel_generator = get_simple_kernel
+
+            knl = kernel_generator(kernel_name, args, src,
+                                   preamble=self.preamble)
+            self.cache[key] = knl
             return knl

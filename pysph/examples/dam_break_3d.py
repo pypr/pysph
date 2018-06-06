@@ -19,13 +19,14 @@ tf = 6.0
 
 # parameter to change the resolution
 dx = 0.02
-nboundary_layers=3
+nboundary_layers = 3
 hdx = 1.2
 ro = 1000.0
 h0 = dx * hdx
 gamma = 7.0
 alpha = 0.5
 beta = 0.0
+
 
 class DamBreak3D(Application):
     def initialize(self):

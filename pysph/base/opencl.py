@@ -48,6 +48,73 @@ def get_elwise_kernel(kernel_name, args, src, preamble=""):
     return profile_kernel(knl, kernel_name)
 
 
+def get_simple_kernel(kernel_name, args, src, preamble=""):
+    ctx = get_context()
+    knl = SimpleKernel(
+        ctx, args, src,
+        kernel_name, preamble=preamble
+    )
+    return profile_kernel(knl, kernel_name)
+
+
+class SimpleKernel(object):
+    """ for ElementwiseKernel
+    """
+
+    def __init__(self, ctx, args, operation,
+                 name="", preamble="", options=[]):
+        self.args = args
+        self.operation = operation
+        self.name = name
+        self.preamble = preamble
+        self.options = options
+
+        self.prg = cl.Program(ctx, self._generate()).build(options)
+        self.knl = getattr(self.prg, name)
+
+    def _massage_arg(self, arg):
+        if '*' in arg:
+            return "__global " + arg
+        return arg
+
+    def _generate(self):
+        args = [self._massage_arg(arg) for arg in self.args.split(",")]
+
+        source = r"""
+        %(preamble)s
+
+        __kernel void %(name)s(%(args)s)
+        {
+          int lid = get_local_id(0);
+          int gsize = get_global_size(0);
+          int work_group_start = get_local_size(0)*get_group_id(0);
+          long i = get_global_id(0);
+
+          %(body)s
+        }
+        """ % {
+            "args": ",".join(args),
+            "name": self.name,
+            "preamble": self.preamble,
+            "body": self.operation
+        }
+
+        return source
+
+    def __call__(self, *args, queue, gs, ls, **kwargs):
+        wait_for = kwargs.pop("wait_for", None)
+        if kwargs:
+            raise TypeError("unknown keyword arguments: '%s'"
+                            % ", ".join(kwargs))
+
+        def unwrap(arg):
+            return arg.data if isinstance(arg, cl.array.Array) else arg
+
+        self.knl.set_args(*[unwrap(arg) for arg in args])
+        return cl.enqueue_nd_range_kernel(queue, self.knl, gs, ls,
+                                          wait_for=wait_for)
+
+
 class DeviceArray(object):
     def __init__(self, dtype, n=0):
         self.queue = get_queue()

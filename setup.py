@@ -492,8 +492,8 @@ def get_basic_extensions():
             ),
 
             Extension(
-                name="pysph.base.stratified_sfc_gpu_nnps",
-                sources=["pysph/base/stratified_sfc_gpu_nnps.pyx"],
+                name="pysph.base.octree_gpu_nnps",
+                sources=["pysph/base/octree_gpu_nnps.pyx"],
                 depends=get_deps(
                     "pysph/base/nnps_base"
                 ),

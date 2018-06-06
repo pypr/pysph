@@ -39,6 +39,7 @@ class LocalMem(object):
 
     Note that this is basically ``sizeof(double) * 128 * 2``
     '''
+
     def __init__(self, size, backend=None):
         '''
         Constructor
@@ -124,6 +125,7 @@ class Kernel(object):
     type checking of the passed constants.
 
     """
+
     def __init__(self, func, backend='opencl'):
         backend = get_backend(backend)
         if backend == 'cython':

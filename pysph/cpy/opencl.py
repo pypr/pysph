@@ -62,11 +62,26 @@ def print_profile():
 
 
 def profile_kernel(kernel, name):
-    def _profile_knl(*args):
-        event = kernel(*args)
+    def _profile_knl(*args, **kwargs):
+        event = kernel(*args, **kwargs)
         profile(name, event)
         return event
     if get_config().profile:
         return _profile_knl
     else:
         return kernel
+
+def named_profile(name):
+    def _decorator(f):
+        if name is None:
+            n = f.__name__
+        else:
+            n = name
+
+        def _profiled_kernel_generator(*args, **kwargs):
+            kernel = f(*args, **kwargs)
+            return profile_kernel(kernel, n)
+
+        return _profiled_kernel_generator
+
+    return _decorator

@@ -26,6 +26,7 @@ from pysph.solver.utils import mkdir, load, get_files
 
 # conditional parallel imports
 from pysph import has_mpi, has_zoltan, in_parallel
+
 if in_parallel():
     from pysph.parallel.parallel_manager import ZoltanParallelManagerGeometric
     import mpi4py.MPI as mpi
@@ -460,7 +461,7 @@ class Application(object):
             dest="nnps",
             choices=[
                 'box', 'll', 'sh', 'esh', 'ci', 'sfc', 'comp_tree',
-                'strat_hash', 'strat_sfc', 'tree'
+                'strat_hash', 'strat_sfc', 'tree', 'gpu_octree'
             ],
             default='ll',
             help="Use one of box-sort ('box') or "
@@ -472,7 +473,8 @@ class Application(object):
             "the stratified hash algorithm ('strat_hash') or "
             "the stratified sfc algorithm ('strat_sfc') or "
             "the octree algorithm ('tree') or "
-            "the compressed octree algorithm ('comp_tree')")
+            "the compressed octree algorithm ('comp_tree') or "
+            "the gpu octree algorithm ('gpu_octree')")
 
         nnps_options.add_argument(
             "--spatial-hash-sub-factor",
@@ -680,6 +682,23 @@ class Application(object):
             help=("Disable multiprocessing interface "
                   "to the solver"))
 
+        interfaces.add_argument(
+            "--octree-leaf-size",
+            dest="octree_leaf_size",
+            default=64,
+            help=("Specify leaf size of octree. "
+                  "Must be multiples of 32")
+        )
+
+        interfaces.add_argument(
+            "--octree-elementwise-nnps",
+            action="store_const",
+            dest="octree_elementwise",
+            const=True,
+            help=("Run NNPS for different particles "
+                  "on different threads")
+        )
+
         # Scheme options.
         if self.scheme is not None:
             scheme_options = parser.add_argument_group(
@@ -852,16 +871,37 @@ class Application(object):
 
         if self.nnps is None:
             cache = options.cache_nnps
+
             # create the NNPS object
             if options.with_opencl:
-                from pysph.base.gpu_nnps import ZOrderGPUNNPS
-                nnps = ZOrderGPUNNPS(
-                    dim=solver.dim,
-                    particles=self.particles,
-                    radius_scale=kernel.radius_scale,
-                    domain=self.domain,
-                    cache=True,
-                    sort_gids=options.sort_gids)
+                if options.nnps == 'gpu_octree':
+                    leaf_size = int(options.octree_leaf_size)
+                    if leaf_size % 32 != 0:
+                        raise ValueError("GPU Octree leaf size must "
+                                         "be a multiple of 32")
+
+                    from pysph.base.octree_gpu_nnps import OctreeGPUNNPS
+                    # Sorting enabled by default
+                    nnps = OctreeGPUNNPS(
+                        dim=solver.dim,
+                        particles=self.particles,
+                        radius_scale=kernel.radius_scale,
+                        domain=self.domain,
+                        cache=True,
+                        sort_gids=options.sort_gids,
+                        allow_sort=True,
+                        leaf_size=leaf_size,
+                        use_elementwise=options.octree_elementwise,
+                    )
+                else:
+                    from pysph.base.gpu_nnps import ZOrderGPUNNPS
+                    nnps = ZOrderGPUNNPS(
+                        dim=solver.dim,
+                        particles=self.particles,
+                        radius_scale=kernel.radius_scale,
+                        domain=self.domain,
+                        cache=True,
+                        sort_gids=options.sort_gids)
 
             elif options.nnps == 'box':
                 nnps = BoxSortNNPS(
