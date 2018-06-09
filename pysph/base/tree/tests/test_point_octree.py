@@ -1,11 +1,14 @@
 import numpy as np
 
-from pysph.base.tree.point_octree import OctreeGPU
+from pytest import importorskip
+cl = importorskip('pyopencl')
+
 from pysph.base.opencl import DeviceHelper, DeviceArray
 from pysph.base.utils import get_particle_array
 
 from pysph.base.nnps_base import NNPSParticleArrayWrapper
 from pysph.base.tests.test_nnps import NNPSTestCase
+from pysph.base.tree.point_octree import OctreeGPU
 
 import unittest
 

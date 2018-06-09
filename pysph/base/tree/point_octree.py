@@ -670,10 +670,12 @@ class OctreeGPU(object):
             node_operation="""
                 % for i in range(8):
                     % for d in range(3):
-                        xmin[${d}] = fmin(xmin[${d}],
-                                          node_xmin[child_offset + ${i}].s${d});
-                        xmax[${d}] = fmax(xmax[${d}],
-                                          node_xmax[child_offset + ${i}].s${d});
+                        xmin[${d}] = fmin(
+                            xmin[${d}], node_xmin[child_offset + ${i}].s${d}
+                        );
+                        xmax[${d}] = fmax(
+                            xmax[${d}], node_xmax[child_offset + ${i}].s${d}
+                        );
                     % endfor
                     hmax = fmax(hmax, node_hmax[child_offset + ${i}]);
                 % endfor

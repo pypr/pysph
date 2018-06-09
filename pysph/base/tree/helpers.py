@@ -35,7 +35,7 @@ def cache_result(cache_key):
 
     def _decorator(f):
         def _cached_f(*args):
-            key = (cache_key, *args)
+            key = (cache_key, args)
             if key not in _cache:
                 _cache[key] = f(*args)
             return _cache[key]

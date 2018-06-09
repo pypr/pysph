@@ -17,7 +17,6 @@ from pysph.base.opencl import DeviceArray
 from pysph.cpy.opencl import get_config, profile
 from pysph.base.tree.point_octree import OctreeGPU
 
-logger = logging.getLogger()
 
 cdef class OctreeGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
