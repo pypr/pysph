@@ -431,7 +431,11 @@ class Reduction(object):
             self.queue.finish()
             return result.get()
         elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
             result = self.c_func(*c_args)
+            event.record()
+            event.synchronize()
             return result.get()
 
 
