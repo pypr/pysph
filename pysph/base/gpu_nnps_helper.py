@@ -69,11 +69,11 @@ class GPUNNPSHelper(object):
             args, src = self._get_code(kernel_name, **kwargs)
 
             if wgs is None:
-                kernel_generator = get_elwise_kernel
+                knl = get_elwise_kernel(kernel_name, args, src,
+                                        preamble=self.preamble)
             else:
-                kernel_generator = get_simple_kernel
+                knl = get_simple_kernel(kernel_name, args, src, wgs,
+                                        preamble=self.preamble)
 
-            knl = kernel_generator(kernel_name, args, src,
-                                   preamble=self.preamble)
             self.cache[key] = knl
             return knl

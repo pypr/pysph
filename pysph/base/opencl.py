@@ -19,6 +19,10 @@ from pysph.cpy.opencl import (  # noqa: 401
 from .particle_array import ParticleArray
 
 
+class DeviceWGSException(Exception):
+    pass
+
+
 logger = logging.getLogger()
 
 
@@ -48,10 +52,10 @@ def get_elwise_kernel(kernel_name, args, src, preamble=""):
     return profile_kernel(knl, kernel_name)
 
 
-def get_simple_kernel(kernel_name, args, src, preamble=""):
+def get_simple_kernel(kernel_name, args, src, wgs, preamble=""):
     ctx = get_context()
     knl = SimpleKernel(
-        ctx, args, src,
+        ctx, args, src, wgs,
         kernel_name, preamble=preamble
     )
 
@@ -59,10 +63,11 @@ def get_simple_kernel(kernel_name, args, src, preamble=""):
 
 
 class SimpleKernel(object):
-    """ for ElementwiseKernel
+    """ElementwiseKernel substitute that supports
+    custom work group size.
     """
 
-    def __init__(self, ctx, args, operation,
+    def __init__(self, ctx, args, operation, wgs,
                  name="", preamble="", options=[]):
         self.args = args
         self.operation = operation
@@ -72,6 +77,9 @@ class SimpleKernel(object):
 
         self.prg = cl.Program(ctx, self._generate()).build(options)
         self.knl = getattr(self.prg, name)
+
+        if self.get_max_wgs() < wgs:
+            raise DeviceWGSException("")
 
     def _massage_arg(self, arg):
         if '*' in arg:
@@ -101,6 +109,12 @@ class SimpleKernel(object):
         }
 
         return source
+
+    def get_max_wgs(self):
+        return self.knl.get_work_group_info(
+            cl.kernel_work_group_info.WORK_GROUP_SIZE,
+            get_queue().device
+        )
 
     def __call__(self, *args, **kwargs):
         wait_for = kwargs.pop("wait_for", None)

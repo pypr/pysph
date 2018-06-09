@@ -8,7 +8,7 @@ from pyopencl.scan import GenericScanKernel
 import numpy as np
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.base.opencl import DeviceArray
+from pysph.base.opencl import DeviceArray, DeviceWGSException
 from pysph.cpy.opencl import get_context, get_queue, profile_kernel, \
     named_profile
 from pytools import memoize
@@ -832,6 +832,22 @@ class OctreeGPU(object):
                        neighbor_cids.array,
                        start_indices,
                        neighbors)
+
+    def _is_valid_nnps_wgs(self):
+        # Max work group size can only be found by building the
+        # kernel.
+        try:
+            find_neighbor_counts = self.helper.get_kernel(
+                'find_neighbor_counts', sorted=self.sorted, wgs=self.leaf_size
+            )
+
+            find_neighbor = self.helper.get_kernel(
+                'find_neighbors', sorted=self.sorted, wgs=self.leaf_size
+            )
+        except DeviceWGSException:
+            return False
+        else:
+            return True
 
     def _find_neighbor_lengths(self, neighbor_cid_count, neighbor_cids,
                                octree_src, neighbor_count,

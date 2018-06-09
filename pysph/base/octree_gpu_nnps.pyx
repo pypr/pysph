@@ -3,6 +3,7 @@
 import pyopencl as cl
 import pyopencl.array
 import pyopencl.algorithm
+
 from pyopencl.scan import GenericScanKernel
 from pyopencl.scan import GenericDebugScanKernel
 from pyopencl.elementwise import ElementwiseKernel
@@ -15,6 +16,8 @@ from pysph.base.gpu_nnps_helper import GPUNNPSHelper
 from pysph.base.opencl import DeviceArray
 from pysph.cpy.opencl import get_config, profile
 from pysph.base.tree.point_octree import OctreeGPU
+
+logger = logging.getLogger()
 
 cdef class OctreeGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
@@ -43,6 +46,15 @@ cdef class OctreeGPUNNPS(GPUNNPS):
         self.allow_sort = allow_sort
         self.domain.update()
         self.update()
+
+        # Check if device supports required workgroup size,
+        # else default to elementwise nnps
+        if not self.octrees[0]._is_valid_nnps_wgs():
+            from warnings import warn
+            warn("Octree NNPS with given leaf size (%d) is "
+                 "not recommended for given device" % leaf_size)
+
+            self.use_elementwise = True
 
     cpdef _bin(self, int pa_index):
         self.octrees[pa_index].refresh(self.xmin, self.xmax,
