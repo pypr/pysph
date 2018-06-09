@@ -54,6 +54,7 @@ def get_simple_kernel(kernel_name, args, src, preamble=""):
         ctx, args, src,
         kernel_name, preamble=preamble
     )
+
     return profile_kernel(knl, kernel_name)
 
 
@@ -101,8 +102,15 @@ class SimpleKernel(object):
 
         return source
 
-    def __call__(self, *args, queue, gs, ls, **kwargs):
+    def __call__(self, *args, **kwargs):
         wait_for = kwargs.pop("wait_for", None)
+        queue = kwargs.pop("queue", None)
+        gs = kwargs.pop("gs", None)
+        ls = kwargs.pop("ls", None)
+
+        if queue is None or gs is None or ls is None:
+            raise ValueError("queue, gs and ls can not be empty")
+
         if kwargs:
             raise TypeError("unknown keyword arguments: '%s'"
                             % ", ".join(kwargs))
