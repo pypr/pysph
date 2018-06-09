@@ -1,16 +1,14 @@
 import numpy as np
-
+import unittest
 from pytest import importorskip
 cl = importorskip('pyopencl')
 
-from pysph.base.opencl import DeviceHelper, DeviceArray
-from pysph.base.utils import get_particle_array
+from pysph.base.opencl import DeviceHelper, DeviceArray   # noqa: E402
+from pysph.base.utils import get_particle_array   # noqa: E402
 
-from pysph.base.nnps_base import NNPSParticleArrayWrapper
-from pysph.base.tests.test_nnps import NNPSTestCase
-from pysph.base.tree.point_octree import OctreeGPU
-
-import unittest
+from pysph.base.nnps_base import NNPSParticleArrayWrapper   # noqa: E402
+from pysph.base.tests.test_nnps import NNPSTestCase   # noqa: E402
+from pysph.base.tree.point_octree import OctreeGPU   # noqa: E402
 
 
 def _gen_uniform_dataset(n, h, seed=None):
