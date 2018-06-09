@@ -147,7 +147,8 @@ def _get_set_offset_kernel(ctx, leaf_size):
             'leaf_size': leaf_size},
         scan_expr="a + b",
         output_statement=r"""{
-            offsets[i] = ((pbounds[i].s1 - pbounds[i].s0 > %(leaf_size)s) ? csum_nodes_next + (8 * (i - item)) : -1);
+            offsets[i] = ((pbounds[i].s1 - pbounds[i].s0 > %(leaf_size)s) ? 
+                           csum_nodes_next + (8 * (i - item)) : -1);
             if (i == N - 1) { *leaf_count = item; }
         }""" % {'leaf_size': leaf_size}
     )
@@ -535,8 +536,9 @@ class OctreeGPU(object):
         """
 
         @cache_result('_leaf_tree_traverse')
-        def _leaf_tree_traverse(ctx, data_t, sorted, args, setup, node_operation,
-                                leaf_operation, output_expr, common_operation):
+        def _leaf_tree_traverse(ctx, data_t, sorted, args, setup,
+                                node_operation, leaf_operation,
+                                output_expr, common_operation):
             if sorted:
                 preamble = "#define PID(idx) (idx)"
             else:
@@ -556,18 +558,22 @@ class OctreeGPU(object):
                     // Check if node n1 contains node n2
                     char res = 1;
                     %for i in range(3):
-                        res = res && (n1[${i}] <= n2[${i}]) && (n1[3 + ${i}] >= n2[3 + ${i}]);
+                        res = res && (n1[${i}] <= n2[${i}]) && 
+                              (n1[3 + ${i}] >= n2[3 + ${i}]);
                     %endfor
 
                     return res;
                 }
 
-                char contains_search(private ${data_t} *n1, private ${data_t} *n2) {
-                    // Check if node n1 contains node n2 with n1 having its search radius extension
+                char contains_search(private ${data_t} *n1, 
+                                     private ${data_t} *n2) {
+                    // Check if node n1 contains node n2 with n1 having 
+                    // its search radius extension
                     ${data_t} h = n1[6];
                     char res = 1;
                     %for i in range(3):
-                        res = res & (n1[${i}] - h <= n2[${i}]) & (n1[3 + ${i}] + h >= n2[3 + ${i}]);
+                        res = res & (n1[${i}] - h <= n2[${i}]) & 
+                              (n1[3 + ${i}] + h >= n2[3 + ${i}]);
                     %endfor
 
                     return res;
@@ -581,7 +587,8 @@ class OctreeGPU(object):
                     ${data_t} h = MAX(n1[6], n2[6]);
 
                     % for i in range(3):
-                        cdist = fabs((n1[${i}] + n1[3 + ${i}]) / 2 - (n2[${i}] + n2[3 + ${i}]) / 2);
+                        cdist = fabs((n1[${i}] + n1[3 + ${i}]) / 2 - 
+                                     (n2[${i}] + n2[3 + ${i}]) / 2);
                         w1 = fabs(n1[${i}] - n1[3 + ${i}]);
                         w2 = fabs(n2[${i}] - n2[3 + ${i}]);
                         wavg = AVG(w1, w2);
@@ -641,9 +648,11 @@ class OctreeGPU(object):
                 ${data_t} xmax[3] = {-1e6, -1e6, -1e6};
                 ${data_t} hmax = 0;
                 """,
-            args="""int *pids, ${data_t} *x, ${data_t} *y, ${data_t} *z, ${data_t} *h,
-                    ${data_t} radius_scale,
-                     ${data_t}3 *node_xmin, ${data_t}3 *node_xmax, ${data_t} *node_hmax""",
+            args="""int *pids, ${data_t} *x, ${data_t} *y, ${data_t} *z, 
+            ${data_t} *h,
+            ${data_t} radius_scale,
+            ${data_t}3 *node_xmin, ${data_t}3 *node_xmax, 
+            ${data_t} *node_hmax""",
             leaf_operation="""
                 <% ch = ['x', 'y', 'z'] %>
                 for (int j=pbound.s0; j < pbound.s1; j++) {
@@ -658,8 +667,10 @@ class OctreeGPU(object):
             node_operation="""
                 % for i in range(8):
                     % for d in range(3):
-                        xmin[${d}] = fmin(xmin[${d}], node_xmin[child_offset + ${i}].s${d});
-                        xmax[${d}] = fmax(xmax[${d}], node_xmax[child_offset + ${i}].s${d});
+                        xmin[${d}] = fmin(xmin[${d}], 
+                                          node_xmin[child_offset + ${i}].s${d});
+                        xmax[${d}] = fmax(xmax[${d}], 
+                                          node_xmax[child_offset + ${i}].s${d});
                     % endfor
                     hmax = fmax(hmax, node_hmax[child_offset + ${i}]);
                 % endfor
@@ -726,8 +737,10 @@ class OctreeGPU(object):
 
         output_expr = output_expr
         args = """
-        ${data_t}3 *node_xmin_src, ${data_t}3 *node_xmax_src, ${data_t} *node_hmax_src,
-        ${data_t}3 *node_xmin_dst, ${data_t}3 *node_xmax_dst, ${data_t} *node_hmax_dst,
+        ${data_t}3 *node_xmin_src, ${data_t}3 *node_xmax_src, 
+        ${data_t} *node_hmax_src,
+        ${data_t}3 *node_xmin_dst, ${data_t}3 *node_xmax_dst, 
+        ${data_t} *node_hmax_dst,
         """ + args
 
         kernel = octree_src.leaf_tree_traverse(args, setup,
@@ -736,7 +749,8 @@ class OctreeGPU(object):
 
         def callable(*args):
             return kernel(octree_src, self,
-                          octree_src.node_xmin.array, octree_src.node_xmax.array,
+                          octree_src.node_xmin.array,
+                          octree_src.node_xmax.array,
                           octree_src.node_hmax.array,
                           self.node_xmin.array, self.node_xmax.array,
                           self.node_hmax.array,

@@ -209,8 +209,8 @@ class NNPSTestCase(unittest.TestCase):
 
         # create random points in the interval [-1, 1]^3
         x1, y1, z1 = random.random((3, num_points)) * 2.0 - 1.0
-        h1 = numpy.ones_like(x1) * numpy.random.uniform(1,
-                                                        4, size=num_points) * 1.2 * dx
+        h1 = numpy.ones_like(x1) * \
+            numpy.random.uniform(1, 4, size=num_points) * 1.2 * dx
         gid1 = numpy.arange(num_points).astype(numpy.uint32)
 
         # first particle array

@@ -35,14 +35,15 @@ def _dfs_find_leaf(octree):
     return leaf_id_count.array.get()
 
 
-def _test_nnps(neighbor_count, pa1, pa2, pids=None, sorted=False, radius_scale=1.):
+def _test_nnps(neighbor_count, pa1, pa2, pids=None, sorted=False,
+               radius_scale=1.):
     n1 = pa1.get_number_of_particles()
     n2 = pa2.get_number_of_particles()
 
     xd, yd, zd, hd = np.array(pa1.x), np.array(pa1.y), \
-                     np.array(pa1.z), np.array(pa1.h)
-    xs, ys, zs, hs = np.array(pa2.x), np.array(pa2.y), \
-                     np.array(pa2.z), np.array(pa2.h)
+        np.array(pa1.z), np.array(pa1.h)
+    xs, ysn, zs, hs = np.array(pa2.x), np.array(pa2.y), \
+        np.array(pa2.z), np.array(pa2.h)
 
     count = np.zeros(n1, dtype=int)
 
@@ -50,7 +51,8 @@ def _test_nnps(neighbor_count, pa1, pa2, pids=None, sorted=False, radius_scale=1
         for j in range(n2):
             dist2 = (xd[i] - xs[j]) ** 2 + \
                     (yd[i] - ys[j]) ** 2 + (zd[i] - zs[j]) ** 2
-            if dist2 < hd[i] ** 2 * radius_scale ** 2 or dist2 < hs[j] ** 2 * radius_scale ** 2:
+            if dist2 < hd[i] ** 2 * radius_scale ** 2 or \
+               dist2 < hs[j] ** 2 * radius_scale ** 2:
                 count[i] += 1
 
     if sorted:
@@ -106,17 +108,17 @@ def _test_tree_structure(octree):
 
         # Particle ranges of children are contiguous
         # and are contained within parent's particle arange
-        l = pbound[0]
+        start = pbound[0]
         for i in range(8):
             child_idx = offsets[n] + i
-            assert (pbounds[child_idx][0] == l)
+            assert (pbounds[child_idx][0] == start)
             assert (pbounds[child_idx][0] <= pbounds[child_idx][1])
-            l = pbounds[child_idx][1]
+            start = pbounds[child_idx][1]
 
             assert (child_idx < len(offsets))
             s.append(child_idx)
             d.append(depth + 1)
-        assert (l == pbound[1])
+        assert (start == pbound[1])
 
 
 class OctreeTestCase(unittest.TestCase):
@@ -126,7 +128,7 @@ class OctreeTestCase(unittest.TestCase):
         pa = _gen_uniform_dataset(self.N, 0.2, seed=0)
         self.octree = OctreeGPU(pa, radius_scale=1., use_double=use_double,
                                 leaf_size=64)
-        self.leaf_size=64
+        self.leaf_size = 64
         self.octree.refresh(np.array([0., 0., 0.]), np.array([1., 1., 1.]),
                             np.min(pa.h))
         self.pa = pa
@@ -175,17 +177,17 @@ class OctreeTestCase(unittest.TestCase):
 
             # Particle ranges of children are contiguous
             # and are contained within parent's particle arange
-            l = pbound[0]
+            start = pbound[0]
             for i in range(8):
                 child_idx = offsets[n] + i
-                assert (pbounds[child_idx][0] == l)
+                assert (pbounds[child_idx][0] == start)
                 assert (pbounds[child_idx][0] <= pbounds[child_idx][1])
-                l = pbounds[child_idx][1]
+                start = pbounds[child_idx][1]
 
                 assert (child_idx < len(offsets))
                 s.append(child_idx)
                 d.append(depth + 1)
-            assert (l == pbound[1])
+            assert (start == pbound[1])
 
     def test_node_bounds(self):
         # TODO: Add test to check h
@@ -231,7 +233,8 @@ class OctreeTestCase(unittest.TestCase):
         mapping = mapping.array.get()
         map_set_gpu = {mapping[i] for i in range(count)}
         map_set_here = {i for i in range(len(offsets))
-                   if offsets[i] == -1 and a < (pbounds[i][1] - pbounds[i][0]) <= b}
+                        if offsets[i] == -1 and
+                        a < (pbounds[i][1] - pbounds[i][0]) <= b}
         assert(map_set_gpu == map_set_here)
 
     def tearDown(self):
@@ -257,7 +260,7 @@ class OctreeNNPSTestCase(NNPSTestCase):
         self.octrees = [
             OctreeGPU(self.particles[i], radius_scale=2.)
             for i in range(len(self.particles))
-            ]
+        ]
 
         for i in range(len(self.particles)):
             xmin, xmax, hmin = self._find_domain(i)
@@ -279,7 +282,8 @@ class OctreeNNPSTestCase(NNPSTestCase):
             for j in range(2, self.octrees[i].max_depth):
                 octree = OctreeGPU(pa, radius_scale=2.)
                 xmin, xmax, hmin = self._find_domain(i)
-                octree.refresh(xmin - hmin / 2, xmax + hmin / 2, hmin, fixed_depth=j)
+                octree.refresh(xmin - hmin / 2, xmax +
+                               hmin / 2, hmin, fixed_depth=j)
                 _test_tree_structure(octree)
 
     def test_node_bounds(self):

@@ -71,6 +71,7 @@ def profile_kernel(kernel, name):
     else:
         return kernel
 
+
 def named_profile(name):
     def _decorator(f):
         if name is None:
