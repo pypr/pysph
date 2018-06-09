@@ -147,7 +147,7 @@ def _get_set_offset_kernel(ctx, leaf_size):
             'leaf_size': leaf_size},
         scan_expr="a + b",
         output_statement=r"""{
-            offsets[i] = ((pbounds[i].s1 - pbounds[i].s0 > %(leaf_size)s) ? 
+            offsets[i] = ((pbounds[i].s1 - pbounds[i].s0 > %(leaf_size)s) ?
                            csum_nodes_next + (8 * (i - item)) : -1);
             if (i == N - 1) { *leaf_count = item; }
         }""" % {'leaf_size': leaf_size}
@@ -391,7 +391,8 @@ class OctreeGPU(object):
                                             self.num_nodes[-1]))
 
             self._reorder_particles(depth, octants, offsets_temp[-2],
-                                    pbounds_temp[-2], seg_flag, csum_nodes_prev,
+                                    pbounds_temp[-2], seg_flag,
+                                    csum_nodes_prev,
                                     temp_vars)
             num_leaves_here = self._update_node_data(
                 offsets_temp[-2], pbounds_temp[-2],
@@ -431,7 +432,8 @@ class OctreeGPU(object):
             temp_vars[k] = getattr(self, k)
             setattr(self, k, t)
 
-    def _reorder_particles(self, depth, octants, offsets_parent, pbounds_parent,
+    def _reorder_particles(self, depth, octants, offsets_parent,
+                           pbounds_parent,
                            seg_flag, csum_nodes_prev, temp_vars):
         rshift = np.uint8(3 * (self.max_depth - depth - 1))
         mask = np.uint64(7 << rshift)
@@ -442,7 +444,8 @@ class OctreeGPU(object):
                         octants.array, mask, rshift)
 
         reorder_particles = self.helper.get_kernel('reorder_particles')
-        reorder_particles(self.pids.array, self.pid_keys.array, self.cids.array,
+        reorder_particles(self.pids.array, self.pid_keys.array,
+                          self.cids.array,
                           seg_flag.array,
                           pbounds_parent.array, offsets_parent.array,
                           octants.array,
@@ -531,7 +534,7 @@ class OctreeGPU(object):
     def leaf_tree_traverse(self, args, setup, node_operation, leaf_operation,
                            output_expr, common_operation=""):
         """
-        Traverse this (source) octree. One thread for each leaf of 
+        Traverse this (source) octree. One thread for each leaf of
         destination octree.
         """
 
@@ -558,21 +561,21 @@ class OctreeGPU(object):
                     // Check if node n1 contains node n2
                     char res = 1;
                     %for i in range(3):
-                        res = res && (n1[${i}] <= n2[${i}]) && 
+                        res = res && (n1[${i}] <= n2[${i}]) &&
                               (n1[3 + ${i}] >= n2[3 + ${i}]);
                     %endfor
 
                     return res;
                 }
 
-                char contains_search(private ${data_t} *n1, 
+                char contains_search(private ${data_t} *n1,
                                      private ${data_t} *n2) {
-                    // Check if node n1 contains node n2 with n1 having 
+                    // Check if node n1 contains node n2 with n1 having
                     // its search radius extension
                     ${data_t} h = n1[6];
                     char res = 1;
                     %for i in range(3):
-                        res = res & (n1[${i}] - h <= n2[${i}]) & 
+                        res = res & (n1[${i}] - h <= n2[${i}]) &
                               (n1[3 + ${i}] + h >= n2[3 + ${i}]);
                     %endfor
 
@@ -587,7 +590,7 @@ class OctreeGPU(object):
                     ${data_t} h = MAX(n1[6], n2[6]);
 
                     % for i in range(3):
-                        cdist = fabs((n1[${i}] + n1[3 + ${i}]) / 2 - 
+                        cdist = fabs((n1[${i}] + n1[3 + ${i}]) / 2 -
                                      (n2[${i}] + n2[3 + ${i}]) / 2);
                         w1 = fabs(n1[${i}] - n1[3 + ${i}]);
                         w2 = fabs(n2[${i}] - n2[3 + ${i}]);
@@ -648,10 +651,10 @@ class OctreeGPU(object):
                 ${data_t} xmax[3] = {-1e6, -1e6, -1e6};
                 ${data_t} hmax = 0;
                 """,
-            args="""int *pids, ${data_t} *x, ${data_t} *y, ${data_t} *z, 
+            args="""int *pids, ${data_t} *x, ${data_t} *y, ${data_t} *z,
             ${data_t} *h,
             ${data_t} radius_scale,
-            ${data_t}3 *node_xmin, ${data_t}3 *node_xmax, 
+            ${data_t}3 *node_xmin, ${data_t}3 *node_xmax,
             ${data_t} *node_hmax""",
             leaf_operation="""
                 <% ch = ['x', 'y', 'z'] %>
@@ -667,9 +670,9 @@ class OctreeGPU(object):
             node_operation="""
                 % for i in range(8):
                     % for d in range(3):
-                        xmin[${d}] = fmin(xmin[${d}], 
+                        xmin[${d}] = fmin(xmin[${d}],
                                           node_xmin[child_offset + ${i}].s${d});
-                        xmax[${d}] = fmax(xmax[${d}], 
+                        xmax[${d}] = fmax(xmax[${d}],
                                           node_xmax[child_offset + ${i}].s${d});
                     % endfor
                     hmax = fmax(hmax, node_hmax[child_offset + ${i}]);
@@ -737,9 +740,9 @@ class OctreeGPU(object):
 
         output_expr = output_expr
         args = """
-        ${data_t}3 *node_xmin_src, ${data_t}3 *node_xmax_src, 
+        ${data_t}3 *node_xmin_src, ${data_t}3 *node_xmax_src,
         ${data_t} *node_hmax_src,
-        ${data_t}3 *node_xmin_dst, ${data_t}3 *node_xmax_dst, 
+        ${data_t}3 *node_xmin_dst, ${data_t}3 *node_xmax_dst,
         ${data_t} *node_hmax_dst,
         """ + args
 
@@ -1016,7 +1019,8 @@ class OctreeGPU(object):
                 "Octree sortedness need to be the same for NNPS"
             )
 
-        if self.c_type != octree.c_type or self.use_double != octree.use_double:
+        if self.c_type != octree.c_type or \
+           self.use_double != octree.use_double:
             raise IncompatibleOctreesException(
                 "Octree floating-point data types need to be the same for NNPS"
             )
