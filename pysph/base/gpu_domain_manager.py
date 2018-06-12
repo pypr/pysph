@@ -102,10 +102,12 @@ class GPUDomainManager(object):
         _hmin, hmin = self.dtype_max, self.dtype_max
 
         for pa_wrapper in self.pa_wrappers:
-            h = pa_wrapper.pa.gpu.h
+            h = pa_wrapper.pa.gpu.get_device_array('h')
+            h.update_min_max()
 
-            _hmax = float(cl.array.max(h).get())
-            _hmin = float(cl.array.min(h).get())
+            _hmax = h.maximum
+            _hmin = h.minimum
+
             if _hmax > hmax:
                 hmax = _hmax
             if _hmin < hmin:

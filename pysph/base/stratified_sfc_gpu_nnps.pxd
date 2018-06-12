@@ -36,7 +36,7 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
     cdef bint _sorted
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices)
+    cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef _bin(self, int pa_index)
 

@@ -18,9 +18,8 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from pysph.base.ast_utils import get_symbols
-from pysph.base.cython_generator import CythonGenerator, KnownType
-from pysph.base.translator import OpenCLConverter
+from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
+                           get_symbols)
 
 
 def camel_to_underscore(name):
@@ -661,8 +660,8 @@ class CythonGroup(Group):
                 args = inspect.getargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
-                if 'KERNEL' in args:
-                    args[args.index('KERNEL')] = 'self.kernel'
+                if 'SPH_KERNEL' in args:
+                    args[args.index('SPH_KERNEL')] = 'self.kernel'
                 if kind == 'reduce':
                     args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)

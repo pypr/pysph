@@ -2,7 +2,7 @@
 
 from math import sqrt
 
-from pysph.base.cython_generator import declare
+from pysph.cpy.api import declare
 
 
 def SIGN(x=0.0, y=0.0):
@@ -152,7 +152,7 @@ def van_leer(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
 
 
 def prefun_exact(p=0.0, dk=0.0, pk=0.0, ck=0.0, g1=0.0, g2=0.0,
-                  g4=0.0, g5=0.0, g6=0.0, result=[0.0, 0.0]):
+                 g4=0.0, g5=0.0, g6=0.0, result=[0.0, 0.0]):
     """The pressure function.  Updates result with f, fd.
     """
 

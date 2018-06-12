@@ -11,7 +11,7 @@ from numpy import random
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
-from pysph.base.config import get_config
+from pysph.cpy.config import get_config
 
 # Carrays from PyZoltan
 from pyzoltan.core.carray import UIntArray, IntArray
@@ -396,6 +396,30 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
 
     def tearDown(self):
         super(ZOrderGPUDoubleNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class TestZOrderGPUNNPSWithSorting(DictBoxSortNNPSTestCase):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        ctx = cl.create_some_context(interactive=False)
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            ctx=ctx
+        )
+        self.nps.spatially_order_particles(0)
+        self.nps.spatially_order_particles(1)
+
+        for pa in self.particles:
+            pa.gpu.pull()
+
+    def tearDown(self):
+        super(TestZOrderGPUNNPSWithSorting, self).tearDown()
         get_config().use_double = self._orig_use_double
 
 

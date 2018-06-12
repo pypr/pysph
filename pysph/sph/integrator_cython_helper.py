@@ -13,7 +13,7 @@ from mako.template import Template
 
 # Local imports.
 from pysph.sph.equation import get_array_names
-from pysph.base.cython_generator import CythonGenerator, get_func_definition
+from pysph.cpy.api import CythonGenerator, get_func_definition
 
 
 class IntegratorCythonHelper(object):

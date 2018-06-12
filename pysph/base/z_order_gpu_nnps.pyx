@@ -19,9 +19,10 @@ from pyopencl.elementwise import ElementwiseKernel
 
 import numpy as np
 cimport numpy as np
+from mako.template import Template
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.base.opencl import DeviceArray, get_config
+from pysph.base.opencl import DeviceArray, get_config, profile
 
 
 IF UNAME_SYSNAME == "Windows":
@@ -81,7 +82,18 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.domain.update()
         self.update()
 
+    def get_spatially_ordered_indices(self, int pa_index):
+        def update_pids():
+            pids_new = cl.array.arange(self.queue, 0, num_particles, 1, dtype=np.uint32)
+            self.pids[pa_index].set_data(pids_new)
+
+        cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
+        num_particles = pa_wrapper.get_number_of_particles()
+        self.sorted = True
+        return self.pids[pa_index].array, update_pids
+
     cpdef _bin(self, int pa_index):
+        self.sorted = False
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
 
         fill_pids = self.helper.get_kernel("fill_pids")
@@ -139,7 +151,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         cdef NNPSParticleArrayWrapper pa_wrapper
         cdef int i, num_particles
         self.max_cid = []
-        self._sorted = False
+        self.sorted = False
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -205,7 +217,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
         z_order_nbr_lengths = self.helper.get_kernel(
-                "z_order_nbr_lengths", sorted=self._sorted,
+                "z_order_nbr_lengths", sorted=self.sorted,
                 dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu
@@ -224,7 +236,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         z_order_nbrs = self.helper.get_kernel(
-                "z_order_nbrs", sorted=self._sorted,
+                "z_order_nbrs", sorted=self.sorted,
                 dst_src=self.dst_src)
 
         dst_gpu = self.dst.pa.gpu
@@ -241,4 +253,3 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,
                 start_indices, nbrs, self.radius_scale2, self.cell_size)
-

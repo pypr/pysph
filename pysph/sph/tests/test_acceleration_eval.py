@@ -10,9 +10,9 @@ import pytest
 import numpy as np
 
 # Local imports.
-from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
-from pysph.base.cython_generator import declare
+from pysph.cpy.config import get_config
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (
     AccelerationEval, MegaGroup, CythonGroup,
@@ -191,7 +191,8 @@ class LoopAllEquation(Equation):
     def loop(self, d_idx, d_rho, s_m, s_idx, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
-    def loop_all(self, d_idx, d_x, d_rho, s_m, s_x, s_h, KERNEL, NBRS, N_NBRS):
+    def loop_all(self, d_idx, d_x, d_rho, s_m, s_x, s_h, SPH_KERNEL, NBRS,
+                 N_NBRS):
         i = declare('int')
         s_idx = declare('long')
         xij = declare('matrix((3,))')
@@ -203,7 +204,7 @@ class LoopAllEquation(Equation):
             s_idx = NBRS[i]
             xij[0] = d_x[d_idx] - s_x[s_idx]
             rij = abs(xij[0])
-            sum += s_m[s_idx]*KERNEL.kernel(xij, rij, s_h[s_idx])
+            sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, s_h[s_idx])
         d_rho[d_idx] += sum
 
 

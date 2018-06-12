@@ -9,17 +9,21 @@ tested and modified to be suitable for use with PySPH.
 
 '''
 
+from __future__ import absolute_import
+
 import ast
 import inspect
 import re
 import sys
 from textwrap import dedent, wrap
+import types
 
 import numpy as np
 from mako.template import Template
 
-from pysph.base.config import get_config
-from pysph.base.cython_generator import (
+from .config import get_config
+from .types import get_declare_info
+from .cython_generator import (
     CodeGenerationError, KnownType, Undefined, all_numeric
 )
 
@@ -131,6 +135,9 @@ class CConverter(ast.NodeVisitor):
         self._known_types = known_types if known_types is not None else {}
         self._class_name = ''
         self._src = ''
+        self._for_count = 0
+        self._added_loop_vars = set()
+        self._annotations = {}
         self._ignore_methods = []
         self._replacements = {
             'True': '1', 'False': '0', 'None': 'NULL',
@@ -139,6 +146,14 @@ class CConverter(ast.NodeVisitor):
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
+
+    def _get_return_type(self, body, node):
+        annotations = self._annotations.get(node.name)
+        if annotations:
+            kt = annotations.get('return')
+            return kt.type if kt is not None else 'void'
+        else:
+            return 'double' if self._body_has_return(body) else 'void'
 
     def _get_self_type(self):
         return KnownType('%s*' % self._class_name)
@@ -149,21 +164,27 @@ class CConverter(ast.NodeVisitor):
             args = [x.id for x in node_args]
         else:
             args = [x.arg for x in node_args]
-        defaults = [ast.literal_eval(x) for x in node.args.defaults]
-
-        # Fill up the call_args dict with the defaults.
+        annotations = self._annotations.get(node.name)
         call_args = {}
-        for i in range(1, len(defaults) + 1):
-            call_args[args[-i]] = defaults[-i]
+        if annotations:
+            for arg in args:
+                call_args[arg] = annotations.get(arg, Undefined)
+        else:
+            defaults = [ast.literal_eval(x) for x in node.args.defaults]
 
-        # Set the rest to Undefined.
-        for i in range(len(args) - len(defaults)):
-            call_args[args[i]] = Undefined
+            # Fill up the call_args dict with the defaults.
+            for i in range(1, len(defaults) + 1):
+                call_args[args[-i]] = defaults[-i]
+
+            # Set the rest to Undefined.
+            for i in range(len(args) - len(defaults)):
+                call_args[args[i]] = Undefined
+
+            call_args.update(self._known_types)
 
         if len(self._class_name) > 0:
             call_args['self'] = self._get_self_type()
 
-        call_args.update(self._known_types)
         call_sig = []
         for arg in args:
             value = call_args[arg]
@@ -173,15 +194,22 @@ class CConverter(ast.NodeVisitor):
         return ', '.join(call_sig)
 
     def _get_variable_declaration(self, type_str, names):
-        if type_str.startswith('matrix'):
-            shape = ast.literal_eval(type_str[7:-1])
+        kind, address_space, ctype, shape = get_declare_info(type_str)
+        if address_space:
+            address_space += ' '
+
+        if kind == 'matrix':
             if not isinstance(shape, tuple):
-                shape = (shape,)
+                shape = (shape, )
             sz = ''.join('[%d]' % x for x in shape)
             vars = ['%s%s' % (x, sz) for x in names]
-            return 'double %s;' % ', '.join(vars)
+            return '{address}{type} {vars};'.format(
+                address=address_space, type=ctype, vars=', '.join(vars)
+            )
         else:
-            return '%s %s;' % (type_str, ', '.join(names))
+            return '{address}{type} {vars};'.format(
+                address=address_space, type=ctype, vars=', '.join(names)
+            )
 
     def _indent_block(self, code):
         lines = code.splitlines()
@@ -226,15 +254,34 @@ class CConverter(ast.NodeVisitor):
         helper = CStructHelper(obj)
         return helper.get_code() + '\n'
 
+    def parse(self, obj):
+        obj_type = type(obj)
+        if isinstance(obj, types.FunctionType):
+            return self.parse_function(obj)
+        elif hasattr(obj, '__class__'):
+            return self.parse_instance(obj)
+        else:
+            raise TypeError('Unsupported type to wrap: %s' % obj_type)
+
     def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
         src = dedent(inspect.getsource(obj.__class__))
+        ignore_methods = [] if ignore_methods is None else ignore_methods
+        for method in dir(obj):
+            if not method.startswith('_') and method not in ignore_methods:
+                ann = getattr(getattr(obj, method), '__annotations__', None)
+                self._annotations[method] = ann
         code += self.convert(src, ignore_methods)
+        self._annotations = {}
         return code
 
     def parse_function(self, obj):
         src = dedent(inspect.getsource(obj))
-        return self.convert(src)
+        fname = obj.__name__
+        self._annotations[fname] = getattr(obj, '__annotations__', None)
+        code = self.convert(src)
+        self._annotations = {}
+        return code
 
     def visit_Add(self, node):
         return '+'
@@ -336,6 +383,14 @@ class CConverter(ast.NodeVisitor):
     def visit_Expr(self, node):
         return self.visit(node.value) + ';'
 
+    def _check_if_integer(self, s):
+        try:
+            int(ast.literal_eval(s))
+        except ValueError:
+            return False
+        else:
+            return True
+
     def visit_For(self, node):
         if node.iter.func.id != 'range':
             self.error(
@@ -344,24 +399,113 @@ class CConverter(ast.NodeVisitor):
         if node.orelse:
             self.error('For/else not supported.', node.orelse[0])
         args = node.iter.args
+
+        # If the stop or step elements are not numbers, then the semantics of a
+        # for i in range can be very different from the translated C as in C,
+        # one could change the stop or increment at each step.  This is not
+        # possible in Python.
+        simple = True
+        positive_step = True
+        int_step = True
+        int_stop = True
         if len(args) == 1:
             start, stop, incr = 0, self.visit(args[0]), 1
+            int_stop = simple = self._check_if_integer(stop)
         elif len(args) == 2:
             start, stop, incr = self.visit(args[0]), self.visit(args[1]), 1
+            int_stop = simple = self._check_if_integer(stop)
         elif len(args) == 3:
             start, stop, incr = [self.visit(x) for x in args]
+            int_step = self._check_if_integer(incr)
+            int_stop = self._check_if_integer(stop)
+            simple = (int_stop and int_step)
+            if int_step:
+                positive_step = ast.literal_eval(incr) > 0
         else:
-            self.error('range should have either [1,2,3] args', node.iter)
-        if isinstance(node.target, ast.Name) and \
-           node.target.id not in self._known:
-            self._known.add(node.target.id)
-        r = ('for (long {i}={start}; {i}<{stop}; {i}+={incr})'
-             ' {{\n{block}\n}}\n').format(
-                 i=self.visit(node.target), start=start, stop=stop, incr=incr,
-                 block='\n'.join(
-                     self._indent_block(self.visit(x)) for x in node.body
+            self.error('range should have either 1, 2, or 3 args', node.iter)
+
+        local_scope = False
+        if isinstance(node.target, ast.Name):
+            if node.target.id not in self._known:
+                target_type = 'long '
+                self._known.add(node.target.id)
+                local_scope = True
+            else:
+                target_type = ''
+
+        target = self.visit(node.target)
+        if simple:
+            comparator = '<' if positive_step else '>'
+            r = ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
+                 ' {{\n{block}\n}}\n').format(
+                     i=target, type=target_type,
+                     start=start, stop=stop, incr=incr, comp=comparator,
+                     block='\n'.join(
+                         self._indent_block(self.visit(x)) for x in node.body
+                     )
                  )
-             )
+        else:
+            count = self._for_count
+            self._for_count += 1
+            r = ''
+            if not int_stop:
+                stop_var = '__cpy_stop_{count}'.format(count=count)
+                type = 'long ' if stop_var not in self._known else ''
+                self._known.add(stop_var)
+                if count > 0:
+                    self._added_loop_vars.add(stop_var)
+                r += '{type}{stop_var} = {stop};\n'.format(
+                    type=type, stop_var=stop_var, stop=stop
+                )
+                stop = stop_var
+            if int_step:
+                comparator = '<' if positive_step else '>'
+                block = '\n'.join(
+                    self._indent_block(self.visit(x)) for x in node.body
+                )
+                r += ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
+                      ' {{\n{block}\n}}\n').format(
+                          i=target, type=target_type,
+                          start=start, stop=stop, incr=incr,
+                          comp=comparator, block=block
+                      )
+            else:
+                step_var = '__cpy_step_{count}'.format(count=count)
+                type = 'long ' if step_var not in self._known else ''
+                self._known.add(step_var)
+                if count > 0:
+                    self._added_loop_vars.add(step_var)
+                r += '{type}{step_var} = {incr};\n'.format(
+                    type=type, step_var=step_var, incr=incr
+                )
+                incr = step_var
+                block = '\n'.join(
+                    self._indent_block(self.visit(x)) for x in node.body
+                )
+                r += dedent('''\
+                if ({incr} < 0) {{
+                    for ({type}{i}={start}; {i}>{stop}; {i}+={incr}) {{
+                    {block}
+                    }}
+                }}
+                else {{
+                    for ({type}{i}={start}; {i}<{stop}; {i}+={incr}) {{
+                    {block}
+                    }}
+                }}
+                ''').format(
+                    i=target, type=target_type,
+                    start=start, stop=stop, incr=incr,
+                    block=block
+                )
+
+            self._for_count -= 1
+            if count == 0:
+                self._known -= self._added_loop_vars
+                self._added_loop_vars = set()
+
+        if local_scope:
+            self._known.remove(node.target.id)
         return r
 
     def visit_FunctionDef(self, node):
@@ -389,10 +533,10 @@ class CConverter(ast.NodeVisitor):
             func_name = self._class_name + '_' + node.name
         else:
             func_name = node.name
-        if self._body_has_return(body):
-            sig = 'double %s(%s)' % (func_name, args)
-        else:
-            sig = 'void %s(%s)' % (func_name, args)
+        return_type = self._get_return_type(body, node)
+        sig = '{ret} {name}({args})'.format(
+            ret=return_type, name=func_name, args=args
+        )
 
         declares = self._indent_block(self.get_declarations())
         if len(declares) > 0:
@@ -508,7 +652,7 @@ class CConverter(ast.NodeVisitor):
     visit_Try = visit_TryExcept
 
     def visit_UnaryOp(self, node):
-        return '(%s %s)' % (self.visit(node.op), self.visit(node.operand))
+        return '%s%s' % (self.visit(node.op), self.visit(node.operand))
 
     def visit_USub(self, node):
         return '-'
@@ -536,6 +680,12 @@ def ocl_detect_type(name, value):
 class OpenCLConverter(CConverter):
     def __init__(self, detect_type=ocl_detect_type, known_types=None):
         super(OpenCLConverter, self).__init__(detect_type, known_types)
+        self._known.update((
+            'LID_0', 'LID_1', 'LID_2',
+            'GID_0', 'GID_1', 'GID_2',
+            'LDIM_0', 'LDIM_1', 'LDIM_2',
+            'GDIM_0', 'GDIM_1', 'GDIM_2'
+        ))
 
     def _get_self_type(self):
         return KnownType('__global %s*' % self._class_name)

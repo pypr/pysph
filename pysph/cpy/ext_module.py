@@ -26,15 +26,15 @@ except ImportError:
     MPI = None
 
 # Package imports.
-import pysph
-from pysph.base.config import get_config
-from pysph.base.capture_stream import CaptureMultipleStreams
+from .config import get_config  # noqa: 402
+from .capture_stream import CaptureMultipleStreams  # noqa: 402
 
 
 def get_platform_dir():
     return 'py{version}-{platform_dir}'.format(
         version=sys.version[:3], platform_dir=get_platform()
     )
+
 
 def get_md5(data):
     """Return the MD5 sum of the given data.
@@ -46,7 +46,8 @@ class ExtModule(object):
     """Encapsulates the generated code, extension module etc.
     """
     def __init__(self, src, extension='pyx', root=None, verbose=False,
-                 depends=None):
+                 depends=None, extra_inc_dirs=None, extra_compile_args=None,
+                 extra_link_args=None):
         """Initialize ExtModule.
 
         Parameters
@@ -58,7 +59,7 @@ class ExtModule(object):
             Do not specify the '.' (defaults to 'pyx').
 
         root : str: root of directory to store code and modules in.
-            If not set it defaults to "~/.pysph/source/<platform-directory>".
+            If not set it defaults to "~/.cpy/source/<platform-directory>".
             where <platform-directory> is platform specific.
 
         verbose : Bool : Print messages for convenience.
@@ -67,6 +68,12 @@ class ExtModule(object):
             if any of these have an m_time greater than the compiled extension
             module, the extension will be recompiled.
 
+        extra_inc_dirs : list : a list of directories to look for .pxd, .h
+            and other files.
+
+        extra_compile_args: list : a list of extra compilation flags.
+
+        extra_link_args: list : a list of extra link flags.
         """
         self._setup_root(root)
         self.code = src
@@ -76,6 +83,11 @@ class ExtModule(object):
         self._setup_filenames()
         self.verbose = verbose
         self.depends = depends
+        self.extra_inc_dirs = extra_inc_dirs if extra_inc_dirs else []
+        self.extra_compile_args = (
+            extra_compile_args if extra_compile_args else []
+        )
+        self.extra_link_args = extra_link_args if extra_link_args else []
 
         if MPI is not None:
             self.comm = MPI.COMM_WORLD
@@ -97,11 +109,13 @@ class ExtModule(object):
     @contextmanager
     def _lock(self, timeout=90):
         t1 = time.time()
+
         def _is_timed_out():
             if timeout is None:
                 return False
             else:
                 return (time.time() - t1) > timeout
+
         def _try_to_lock():
             if not exists(self.lock_path):
                 try:
@@ -147,7 +161,7 @@ class ExtModule(object):
     def _setup_root(self, root):
         if root is None:
             plat_dir = get_platform_dir()
-            self.root = expanduser(join('~', '.pysph', 'source', plat_dir))
+            self.root = expanduser(join('~', '.cpy', 'source', plat_dir))
         else:
             self.root = root
 
@@ -157,7 +171,8 @@ class ExtModule(object):
             try:
                 os.makedirs(self.build_dir)
             except OSError:
-                # The directory was created at the same time by another process.
+                # The directory was created at the same time by another
+                # process.
                 pass
 
     def _dependencies_have_changed(self):
@@ -193,10 +208,10 @@ class ExtModule(object):
                 if force or self.should_recompile():
                     self._message("Compiling code at:", self.src_path)
                     inc_dirs = [numpy.get_include()]
-                    # Add pysph/base directory to inc_dirs for including spatial_hash.h
-                    # for SpatialHashNNPS
-                    inc_dirs.append(os.path.dirname(os.path.realpath(__file__)))
-                    extra_compile_args, extra_link_args = self._get_extra_args()
+                    inc_dirs.extend(self.extra_inc_dirs)
+                    extra_compile_args, extra_link_args = (
+                        self._get_extra_args()
+                    )
 
                     extension = Extension(
                         name=self.name, sources=[self.src_path],
@@ -216,8 +231,10 @@ class ExtModule(object):
                         script_args = ['--verbose']
                     try:
                         with CaptureMultipleStreams() as stream:
-                            mod = pyxbuild.pyx_to_dll(self.src_path, extension,
-                                pyxbuild_dir=self.build_dir, force_rebuild=True,
+                            mod = pyxbuild.pyx_to_dll(
+                                self.src_path, extension,
+                                pyxbuild_dir=self.build_dir,
+                                force_rebuild=True,
                                 setup_args={'script_args': script_args}
                             )
                     except (CompileError, LinkError):
@@ -226,7 +243,7 @@ class ExtModule(object):
                         print(stream.get_output()[0])
                         print(stream.get_output()[1])
                         msg = "Compilation of code failed, please check "\
-                                "error messages above."
+                              "error messages above."
                         print(hline + "\n" + msg)
                         sys.exit(1)
                     shutil.copy(mod, self.ext_path)
@@ -245,13 +262,14 @@ class ExtModule(object):
         return imp.load_module(self.name, file, path, desc)
 
     def _get_extra_args(self):
+        ec, el = self.extra_compile_args, self.extra_link_args
         if get_config().use_openmp:
             if sys.platform == 'win32':
-                return ['/openmp'], []
+                return ['/openmp'] + ec, [] + el
             else:
-                return ['-fopenmp'], ['-fopenmp']
+                return ['-fopenmp'] + ec, ['-fopenmp'] + el
         else:
-            return [], []
+            return ec, el
 
     def _message(self, *args):
         if self.verbose:

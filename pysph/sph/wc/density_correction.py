@@ -1,6 +1,5 @@
 from pysph.sph.equation import Equation
-from pysph.base.cython_generator import declare
-import numpy as np
+from pysph.cpy.api import declare
 
 
 def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
@@ -84,7 +83,7 @@ class ShepardFilter(Equation):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_m, s_rhotmp, s_x, s_y,
-                 s_z, d_h, s_h, KERNEL, NBRS, N_NBRS):
+                 s_z, d_h, s_h, SPH_KERNEL, NBRS, N_NBRS):
         i, s_idx = declare('int', 2)
         xij = declare('matrix(3)')
         tmp_w = 0.0
@@ -99,7 +98,7 @@ class ShepardFilter(Equation):
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
-            wij = KERNEL.kernel(xij, rij, hij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             tmp_w += wij * s_m[s_idx] / s_rhotmp[s_idx]
             d_rho[d_idx] += wij * s_m[s_idx]
         d_rho[d_idx] /= tmp_w
@@ -146,7 +145,7 @@ class MLSFirstOrder2D(Equation):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, s_x, s_y, d_h, s_h, s_m,
-                 s_rhotmp, KERNEL, NBRS, N_NBRS):
+                 s_rhotmp, SPH_KERNEL, NBRS, N_NBRS):
         n, i, j, k, s_idx = declare('int', 5)
         n = 3
         amls = declare('matrix(9)')
@@ -163,7 +162,7 @@ class MLSFirstOrder2D(Equation):
             xij[2] = 0.
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
             hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
-            wij = KERNEL.kernel(xij, rij, hij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             for i in range(n):
                 if i == 0:
                     fac1 = 1.0
@@ -189,7 +188,7 @@ class MLSFirstOrder2D(Equation):
             xij[2] = 0.
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1])
             hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
-            wij = KERNEL.kernel(xij, rij, hij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             wmls = (b0 + b1 * xij[0] + b2 * xij[1]) * wij
             d_rho[d_idx] += s_m[s_idx] * wmls
 
@@ -203,7 +202,7 @@ class MLSFirstOrder3D(Equation):
         d_rhotmp[d_idx] = d_rho[d_idx]
 
     def loop_all(self, d_idx, d_rho, d_x, d_y, d_z, s_x, s_y, s_z, d_h, s_h,
-                 s_m, s_rhotmp, KERNEL, NBRS, N_NBRS):
+                 s_m, s_rhotmp, SPH_KERNEL, NBRS, N_NBRS):
         n, i, j, k, s_idx = declare('int', 5)
         n = 4
         amls = declare('matrix(16)')
@@ -221,7 +220,7 @@ class MLSFirstOrder3D(Equation):
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
-            wij = KERNEL.kernel(xij, rij, hij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             for i in range(n):
                 if i == 0:
                     fac1 = 1.0
@@ -248,6 +247,6 @@ class MLSFirstOrder3D(Equation):
             xij[2] = z - s_z[s_idx]
             rij = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             hij = (d_h[d_idx] + s_h[s_idx]) * 0.5
-            wij = KERNEL.kernel(xij, rij, hij)
+            wij = SPH_KERNEL.kernel(xij, rij, hij)
             wmls = (b0 + b1 * xij[0] + b2 * xij[1] + b3 * xij[2]) * wij
             d_rho[d_idx] += s_m[s_idx] * wmls

@@ -1,12 +1,20 @@
 from textwrap import dedent
 import pytest
 import numpy as np
+import sys
 
-from pysph.base.config import get_config
-from pysph.base.translator import (
+from ..config import get_config
+from ..types import annotate, declare
+from ..translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
     OpenCLConverter, py2c
 )
+
+
+@annotate(i='int', y='floatp', return_='float')
+def annotated_f(i, y):
+    x = declare('LOCAL_MEM matrix(64)')
+    return y[i]
 
 
 def test_simple_assignment_expression():
@@ -22,7 +30,7 @@ def test_simple_assignment_expression():
     expect = dedent('''
     double a;
     double b;
-    b = ((((2 * a) + 1) * ((- a) / 1.5)) % 2);
+    b = ((((2 * a) + 1) * (-a / 1.5)) % 2);
     ''')
     assert code == expect.strip()
 
@@ -96,7 +104,7 @@ def test_conditionals():
     expect = dedent('''
     double x;
     double y;
-    if ((((x > 10) && (x < 20)) || (! ((x >= 10) && (x <= 20))))) {
+    if ((((x > 10) && (x < 20)) || !((x >= 10) && (x <= 20)))) {
         y;
     }
     ''')
@@ -373,6 +381,41 @@ def test_known_types_in_funcargs():
     assert code.strip() == expect.strip()
 
 
+def test_annotated_function():
+    # Given/When
+    t = CConverter()
+    code = t.parse_function(annotated_f)
+
+    # Then
+    expect = dedent('''
+    float annotated_f(int i, float* y)
+    {
+        LOCAL_MEM double x[64];
+        return y[i];
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+@pytest.mark.skipif(sys.version_info < (3, 4), reason='Requires Python3')
+def test_py3_annotations():
+    # Given/When
+    from .py3_code import py3_f
+    t = CConverter()
+    code = t.parse_function(py3_f)
+
+    # Then
+    expect = dedent('''
+    int py3_f(int x)
+    {
+        int y;
+        y = (x + 1);
+        return (x * y);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_calling_method_of_known_type():
     # Given
     src = dedent('''
@@ -586,6 +629,46 @@ def test_for():
     assert code.strip() == expect.strip()
 
 
+def test_for_with_decreasing_range():
+    # Given
+    src = dedent('''
+    for i in range(10, -1, -1):
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    for (long i=10; i>-1; i+=-1) {
+        ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_for_with_declare():
+    # Given
+    src = dedent('''
+    i = declare('int')
+    for i in range(5):
+        do(i)
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int i;
+    for (i=0; i<5; i+=1) {
+        do(i);
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
 def test_two_fors():
     # Given
     src = dedent('''
@@ -606,6 +689,100 @@ def test_two_fors():
 
     for (long i=0; i<5; i+=1) {
         ;
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_for_with_symbols():
+    # Given
+    src = dedent('''
+    n = declare('int')
+    n = 25
+    for i in range(n):
+        pass
+    for i in range(0, n+1, step()):
+        pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int n;
+    n = 25;
+    long __cpy_stop_0 = n;
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        ;
+    }
+
+    __cpy_stop_0 = (n + 1);
+    long __cpy_step_0 = step();
+    if (__cpy_step_0 < 0) {
+        for (long i=0; i>__cpy_stop_0; i+=__cpy_step_0) {
+            ;
+        }
+    }
+    else {
+        for (long i=0; i<__cpy_stop_0; i+=__cpy_step_0) {
+            ;
+        }
+    }
+    ''')
+    assert code.strip() == expect.strip()
+
+
+def test_nested_for_with_symbols():
+    # Given
+    src = dedent('''
+    n = declare('int')
+    n = 25
+    for i in range(n):
+        for j in range(0, n+1, step()):
+            pass
+    for i in range(n+1):
+        for j in range(0, n+2, step()):
+            pass
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int n;
+    n = 25;
+    long __cpy_stop_0 = n;
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        long __cpy_stop_1 = (n + 1);
+        long __cpy_step_1 = step();
+        if (__cpy_step_1 < 0) {
+            for (long j=0; j>__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+        else {
+            for (long j=0; j<__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+    }
+
+    __cpy_stop_0 = (n + 1);
+    for (long i=0; i<__cpy_stop_0; i+=1) {
+        long __cpy_stop_1 = (n + 2);
+        long __cpy_step_1 = step();
+        if (__cpy_step_1 < 0) {
+            for (long j=0; j>__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
+        else {
+            for (long j=0; j<__cpy_stop_1; j+=__cpy_step_1) {
+                ;
+            }
+        }
     }
     ''')
     assert code.strip() == expect.strip()
@@ -771,12 +948,29 @@ def test_declare_matrix():
     ''')
     assert code.strip() == expect.strip()
 
+    # Given
+    src = dedent('''
+    x = declare('matrix((2, 3), "int")')
+    do(x[0][1])
+    ''')
+
+    # When
+    code = py2c(src)
+
+    # Then
+    expect = dedent('''
+    int x[2][3];
+    do(x[0][1]);
+    ''')
+    assert code.strip() == expect.strip()
+
 
 def test_declare_call_declares_multiple_variables():
     # Given
     src = dedent('''
     x, y = declare('int', 2)
     u, v = declare('matrix(3)', 2)
+    A = declare('matrix((2,2), "long")')
     ''')
 
     # When
@@ -786,6 +980,7 @@ def test_declare_call_declares_multiple_variables():
     expect = dedent('''
     int x, y;
     double u[3], v[3];
+    long A[2][2];
     ''')
     assert code.strip() == expect.strip()
 
@@ -969,9 +1164,11 @@ def test_wrapping_class_with_ignore_methods():
 
 
 def test_opencl_conversion():
+    # Note that LID_0 etc. are predefined symbols when we include the CLUDA
+    # preamble, therefore should be known.
     src = dedent('''
     def f(s_idx, s_p, d_idx, d_p, J=0, t=0.0, l=[0,0], xx=(0, 0)):
-        pass
+        s_p[s_idx] = LID_0*GID_0
     ''')
 
     # When
@@ -984,7 +1181,7 @@ def test_opencl_conversion():
 void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
     J, double t, double* l, double* xx)
 {
-    ;
+    s_p[s_idx] = (LID_0 * GID_0);
 }
     ''')
     assert code.strip() == expect.strip()
