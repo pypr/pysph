@@ -294,7 +294,12 @@ class MultiPhase(Application):
             return morris_equations
 
     def post_process(self):
-        import matplotlib.pyplot as plt
+        try:
+            import matplotlibs
+            matplotlib.use('Agg')
+            import matplotlib.pyplot as plt
+        except ImportError:
+            print ("Post processing requires Matplotlib")
         from pysph.solver.utils import load
         files = self.output_files
         ke = []

@@ -54,12 +54,7 @@ def get_all_examples():
                ['tests', 'test_riemann_solver.py'],
                ['gas_dynamics', 'shocktube_setup.py'],
                ['sphysics', 'beach_geometry.py'],
-               ['sphysics', 'periodic_rigidbody.py'],
-               ['surface_tension', 'capillary_wave.py'],
-               ['surface_tension', 'equilibrium_rod.py'],
-               ['surface_tension', 'equilibrium_rod_hex.py'],
-               ['surface_tension', 'interface_instability.py'],
-               ['surface_tension', 'oscillating_rod.py']]
+               ['sphysics', 'periodic_rigidbody.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))
               for pth in _ignore]
     for dirpath, dirs, files in os.walk(basedir):
