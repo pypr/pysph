@@ -374,7 +374,7 @@ class SquareDroplet(Application):
                         dest='fluid', sources=['fluid', 'wall'], pb=p0),
                     MomentumEquationViscosity(
                         dest='fluid', sources=['fluid'], nu=nu),
-                    CSFSurfaceTensionForce(dest='fluid', sources=None, 
+                    CSFSurfaceTensionForce(dest='fluid', sources=None,
                                            sigma=sigma),
                     MomentumEquationArtificialStress(dest='fluid',
                                                      sources=['fluid']),

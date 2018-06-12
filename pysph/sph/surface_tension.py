@@ -107,7 +107,8 @@ class MomentumEquationPressureGradientAdami(Equation):
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, d_V, d_au, d_av, d_aw, s_V, d_p, s_p, DWIJ, s_idx, d_m):
+    def loop(self, d_idx, d_V, d_au, d_av, d_aw, s_V, d_p, s_p, DWIJ, s_idx,
+             d_m):
         p_i = d_p[d_idx]/(d_V[d_idx]*d_V[d_idx])
         p_j = s_p[s_idx]/(s_V[s_idx]*s_V[s_idx])
         d_au[d_idx] += -(p_i+p_j)*DWIJ[0]/d_m[d_idx]
