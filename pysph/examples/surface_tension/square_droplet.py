@@ -42,40 +42,41 @@ The surface-tension model used currently is the CSF model based on
 interface curvature and normals computed from the color function.
 
 """
+
 import numpy
-
-# Particle generator
-from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, \
-    QuinticSpline
-
-# SPH Equations and Group
-from pysph.sph.equation import Group
-
-from pysph.sph.wc.viscosity import ClearyArtificialViscosity
-
+import numpy as np
+import os
 from pysph.sph.wc.transport_velocity import SummationDensity, \
-    MomentumEquationPressureGradient,\
-    SolidWallPressureBC, SolidWallNoSlipBC, StateEquation,\
+    MomentumEquationPressureGradient, StateEquation,\
     MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
     ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
-    SmoothedColor, AdamiColorGradient, MorrisColorGradient, \
-    SY11DiracDelta, AdamiReproducingDivergence, SY11ColorGradient
+    SmoothedColor, MorrisColorGradient, SY11ColorGradient, \
+    SY11DiracDelta, MomentumEquationViscosityAdami, \
+    AdamiReproducingDivergence, CSFSurfaceTensionForceAdami,\
+    MomentumEquationPressureGradientAdami, ColorGradientAdami, \
+    ConstructStressMatrix, SurfaceForceAdami, SummationDensitySourceMass, \
+    MomentumEquationViscosityMorris, MomentumEquationPressureGradientMorris, \
+    InterfaceCurvatureFromDensity, AdamiColorGradient
 
+from pysph.sph.wc.basic import TaitEOS
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
-# PySPH solver and application
+from pysph.tools.geometry import get_2d_block
+from pysph.base.utils import get_particle_array
+from pysph.base.kernels import CubicSpline, QuinticSpline
+from pysph.sph.equation import Group, Equation
+
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
-# Integrators and Steppers
-from pysph.sph.integrator_step import TransportVelocityStep
+from pysph.sph.integrator_step import TransportVelocityStep, \
+                        VelocityVerletSymplecticWCSPHStep
 from pysph.sph.integrator import PECIntegrator
 
-# Domain manager for periodic domains
 from pysph.base.nnps import DomainManager
+from pysph.solver.utils import iter_output
 
 # problem parameters
 dim = 2
@@ -96,10 +97,10 @@ dxb2 = dyb2 = 0.5 * dx
 volume = dx*dx
 hdx = 1.3
 h0 = hdx * dx
-rho0 = 1000.0
+rho0 = 1
 c0 = 20.0
 p0 = c0*c0*rho0
-nu = 1.0/rho0
+nu = 0.2
 
 # correction factor for Morris's Method I. Set with_morris_correction
 # to True when using this correction.
@@ -116,11 +117,11 @@ dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
 
 class SquareDroplet(Application):
     def add_user_options(self, group):
-        choices = ['adami', 'morris', 'shadloo']
+        choices = ['morris', 'tvf', 'adami_stress', 'adami', 'shadloo']
         group.add_argument(
-            "--scheme", action="store", dest="scheme", default='morris',
+            "--scheme", action="store", dest='scheme', default='morris',
             choices=choices,
-            help="Specify scheme to use among %s" % choices
+            help='Specify scheme to use among %s' % choices
         )
 
     def create_particles(self):
@@ -136,7 +137,7 @@ class SquareDroplet(Application):
         # additional properties required for the fluid.
         additional_props = [
             # volume inverse or number density
-            'V',
+            'V', 'alpha',
 
             # color and gradients
             'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',
@@ -158,7 +159,7 @@ class SquareDroplet(Application):
 
             # variable to indicate reliable normals and normalizing
             # constant
-            'N', 'wij_sum',
+            'N', 'wij_sum', 'pi00', 'pi01', 'pi10', 'pi11', 'nu'
 
             ]
 
@@ -175,7 +176,8 @@ class SquareDroplet(Application):
 
         # particle volume
         fluid.V[:] = 1./volume
-
+        fluid.nu[:] = nu
+        fluid.alpha[:] = sigma
         # set additional output arrays for the fluid
         fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny',
                                  'ddelta', 'kappa', 'N', 'scolor', 'p'])
@@ -192,7 +194,10 @@ class SquareDroplet(Application):
 
     def create_solver(self):
         kernel = QuinticSpline(dim=2)
-        integrator = PECIntegrator(fluid=TransportVelocityStep())
+        stepper = TransportVelocityStep()
+        if self.options.scheme == 'shadloo':
+            stepper = VelocityVerletSymplecticWCSPHStep()
+        integrator = PECIntegrator(fluid=stepper)
         solver = Solver(
             kernel=kernel, dim=dim, integrator=integrator,
             dt=dt, tf=tf, adaptive_timestep=False)
@@ -200,223 +205,169 @@ class SquareDroplet(Application):
 
     def create_equations(self):
         sy11_equations = [
-            # We first compute the mass and number density of the fluid
-            # phase. This is used in all force computations henceforth. The
-            # number density (1/volume) is explicitly set for the solid phase
-            # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity(dest='fluid', sources=['fluid'])
-                    ]),
-
-            # Given the updated number density for the fluid, we can update
-            # the fluid pressure. Additionally, we can compute the Shepard
-            # Filtered velocity required for the no-penetration boundary
-            # condition. Also compute the gradient of the color function to
-            # compute the normal at the interface.
+                SummationDensity(dest='fluid', sources=['fluid'])
+            ], real=False),
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0,
-                                  p0=p0),
-                    SY11ColorGradient(dest='fluid', sources=['fluid'])
-                    ]),
-
-            #################################################################
-            # Begin Surface tension formulation
-            #################################################################
-            # Scale the smoothing lengths to determine the interface
-            # quantities.
+                StateEquation(dest='fluid', sources=None, rho0=rho0,
+                              p0=p0),
+                SY11ColorGradient(dest='fluid', sources=['fluid'])
+            ], real=False),
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None,
-                                         factor=factor1)
-                    ], update_nnps=False),
-
-            # Compute the discretized dirac delta with respect to the new
-            # smoothing length.
+                ScaleSmoothingLength(dest='fluid', sources=None,
+                                     factor=factor1)
+            ], real=False, update_nnps=True),
             Group(equations=[
-                    SY11DiracDelta(dest='fluid', sources=['fluid'])
-                    ],
-                  ),
-
-            # Compute the interface curvature using the modified smoothing
-            # length and interface normals computed in the previous Group.
+                SY11DiracDelta(dest='fluid', sources=['fluid'])
+            ], real=False
+            ),
             Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(
-                        dest='fluid', sources=['fluid'],
-                        with_morris_correction=True),
-                    ], ),
-
-            # Now rescale the smoothing length to the original value for the
-            # rest of the computations.
+                InterfaceCurvatureFromNumberDensity(
+                    dest='fluid', sources=['fluid'],
+                    with_morris_correction=True),
+            ], real=False),
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None,
-                                         factor=factor2)
-                    ], update_nnps=False,
-                  ),
-            #################################################################
-            # End Surface tension formulation
-            #################################################################
-
-            # The main acceleration block
+                ScaleSmoothingLength(dest='fluid', sources=None,
+                                     factor=factor2)
+            ], real=False, update_nnps=True,
+            ),
             Group(
                 equations=[
-
-                    # Gradient of pressure for the fluid phase using the
-                    # number density formulation. No penetration boundary
-                    # condition using Adami et al's generalized wall boundary
-                    # condition. The extrapolated pressure and density on the
-                    # wall particles is used in the gradient of pressure to
-                    # simulate a repulsive force.
                     MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid'], pb=p0),
-
-                    # Artificial viscosity for the fluid phase.
+                        dest='fluid', sources=['fluid'], pb=0.0),
                     MomentumEquationViscosity(
                         dest='fluid', sources=['fluid'], nu=nu),
-
-                    # Surface tension force for the SY11 formulation
                     ShadlooYildizSurfaceTensionForce(dest='fluid',
                                                      sources=None,
                                                      sigma=sigma),
-
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid',
-                                                     sources=['fluid']),
-
-                    ], )
-            ]
-
-        morris_equations = [
-
-            # We first compute the mass and number density of the fluid
-            # phase. This is used in all force computations henceforth. The
-            # number density (1/volume) is explicitly set for the solid phase
-            # and this isn't modified for the simulation.
-            Group(equations=[
-                    SummationDensity(dest='fluid', sources=['fluid'])
-                    ]),
-
-            # Given the updated number density for the fluid, we can update
-            # the fluid pressure. Additionally, we can compute the Shepard
-            # Filtered velocity required for the no-penetration boundary
-            # condition. Also compute the smoothed color based on the color
-            # index for a particle.
-            Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0,
-                                  p0=p0),
-                    SmoothedColor(dest='fluid', sources=['fluid']),
-                    ]),
-
-            #################################################################
-            # Begin Surface tension formulation
-            #################################################################
-            # Compute the gradient of the smoothed color field. At the end of
-            # this Group, we will have the interface normals and the
-            # discretized dirac delta function for the fluid-fluid interface.
-            Group(equations=[
-                    MorrisColorGradient(dest='fluid', sources=['fluid'],
-                                        epsilon=epsilon),
-                    ],
-                  ),
-
-            # Compute the interface curvature computed in the previous Group.
-            Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(
-                        dest='fluid', sources=['fluid'],
-                        with_morris_correction=True),
-                    ], ),
-            #################################################################
-            # End Surface tension formulation
-            #################################################################
-
-            # The main acceleration block
-            Group(
-                equations=[
-
-                    # Gradient of pressure for the fluid phase
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid'], pb=p0),
-
-                    # Artificial viscosity for the fluid phase.
-                    MomentumEquationViscosity(
-                        dest='fluid', sources=['fluid'], nu=nu),
-
-                    # Surface tension force for the Morris formulation
-                    CSFSurfaceTensionForce(dest='fluid', sources=None,
-                                           sigma=sigma),
-
-                    # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid',
-                                                     sources=['fluid']),
-
-                    ], )
-            ]
+                ], )
+        ]
 
         adami_equations = [
-
-            # We first compute the mass and number density of the fluid
-            # phase. This is used in all force computations henceforth. The
-            # number density (1/volume) is explicitly set for the solid phase
-            # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity(dest='fluid', sources=['fluid'])
-                    ]),
-
-            # Given the updated number density for the fluid, we can update
-            # the fluid pressure. Additionally, we can compute the Shepard
-            # Filtered velocity required for the no-penetration boundary
-            # condition.
+                SummationDensity(dest='fluid', sources=['fluid'])
+            ], real=False),
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0,
-                                  p0=p0),
-                    ]),
-
-            #################################################################
-            # Begin Surface tension formulation
-            #################################################################
-            # Compute the gradient of the color field.
+                StateEquation(dest='fluid', sources=None, rho0=rho0,
+                              p0=p0),
+            ], real=False),
             Group(equations=[
-                    AdamiColorGradient(dest='fluid', sources=['fluid']),
-                    ],
-                  ),
-
-            # Compute the interface curvature using the color gradients
-            # computed in the previous Group.
+                AdamiColorGradient(dest='fluid', sources=['fluid']),
+            ], real=False
+            ),
             Group(equations=[
-                    AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
-                                               dim=2),
-                    ], ),
-            #################################################################
-            # End Surface tension formulation
-            #################################################################
-
-            # The main acceleration block
+                AdamiReproducingDivergence(dest='fluid', sources=['fluid'],
+                                           dim=2),
+            ], real=False),
             Group(
                 equations=[
-
-                    # Gradient of pressure for the fluid phase
                     MomentumEquationPressureGradient(
                         dest='fluid', sources=['fluid'], pb=p0),
+                    MomentumEquationViscosityAdami(
+                        dest='fluid', sources=['fluid']),
+                    CSFSurfaceTensionForceAdami(dest='fluid', sources=None,)
+                ], )
+        ]
 
-                    # Artificial viscosity for the fluid phase.
+        adami_stress_equations = [
+            Group(equations=[
+                SummationDensity(
+                    dest='fluid', sources=[
+                        'fluid']),
+            ], real=False),
+            Group(equations=[
+                TaitEOS(dest='fluid', sources=None,
+                        rho0=rho0, c0=c0, gamma=7, p0=p0),
+            ], real=False),
+            Group(equations=[
+                ColorGradientAdami(dest='fluid', sources=['fluid']),
+            ], real=False),
+            Group(equations=[ConstructStressMatrix(
+                dest='fluid', sources=None, sigma=sigma, d=2)], real=False),
+            Group(
+                equations=[
+                    MomentumEquationPressureGradientAdami(
+                        dest='fluid', sources=['fluid']),
+                    MomentumEquationViscosityAdami(
+                        dest='fluid', sources=['fluid']),
+                    SurfaceForceAdami(
+                        dest='fluid', sources=['fluid']),
+                ]),
+        ]
+
+        tvf_equations = [
+            Group(equations=[
+                SummationDensity(dest='fluid', sources=['fluid'])
+            ], real=False),
+            Group(equations=[
+                StateEquation(dest='fluid', sources=None, rho0=rho0,
+                              p0=p0),
+                SmoothedColor(dest='fluid', sources=['fluid']),
+            ], real=False),
+            Group(equations=[
+                MorrisColorGradient(dest='fluid', sources=['fluid'],
+                                    epsilon=epsilon),
+            ], real=False
+            ),
+            Group(equations=[
+                InterfaceCurvatureFromNumberDensity(
+                    dest='fluid', sources=['fluid'],
+                    with_morris_correction=True),
+            ], real=False),
+            Group(
+                equations=[
+                    MomentumEquationPressureGradient(
+                        dest='fluid', sources=['fluid'], pb=p0),
                     MomentumEquationViscosity(
                         dest='fluid', sources=['fluid'], nu=nu),
-
-                    # Surface tension force for the CSF formulation
                     CSFSurfaceTensionForce(dest='fluid', sources=None,
                                            sigma=sigma),
-
-                    # Artificial stress for the fluid phase
                     MomentumEquationArtificialStress(dest='fluid',
                                                      sources=['fluid']),
+                ], )
+        ]
 
-                    ], )
-            ]
+        morris_equations = [
+            Group(equations=[
+                SummationDensitySourceMass(
+                    dest='fluid', sources=[
+                        'fluid']),
+            ], real=False, update_nnps=False),
+            Group(equations=[
+                TaitEOS(dest='fluid', sources=None,
+                        rho0=rho0, c0=c0, gamma=1.0),
+                SmoothedColor(
+                    dest='fluid', sources=['fluid', ]),
+            ], real=False, update_nnps=False),
+            Group(equations=[
+                MorrisColorGradient(dest='fluid', sources=['fluid', ],
+                                    epsilon=epsilon),
+            ], real=False, update_nnps=False),
+            Group(equations=[
+                InterfaceCurvatureFromDensity(dest='fluid', sources=['fluid'],
+                                              with_morris_correction=True),
+            ], real=False, update_nnps=False),
+            Group(
+                equations=[
+                    MomentumEquationPressureGradientMorris(
+                        dest='fluid', sources=['fluid']),
+                    MomentumEquationViscosityMorris(
+                        dest='fluid', sources=['fluid']),
+                    CSFSurfaceTensionForce(
+                        dest='fluid', sources=None, sigma=sigma),
+                ], update_nnps=False)
+        ]
 
-        if self.options.scheme == 'morris':
-            return morris_equations
+        if self.options.scheme == 'tvf':
+            return tvf_equations
+        elif self.options.scheme == 'adami_stress':
+            return adami_stress_equations
         elif self.options.scheme == 'adami':
             return adami_equations
-        else:
+        elif self.options.scheme == 'shadloo':
             return sy11_equations
+        else:
+            return morris_equations
 
 
 if __name__ == '__main__':
