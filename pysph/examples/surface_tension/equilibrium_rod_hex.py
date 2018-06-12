@@ -15,6 +15,7 @@ from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
     MomentumEquationViscosityMorris, MomentumEquationPressureGradientMorris, \
     InterfaceCurvatureFromDensity
 
+
 from pysph.sph.wc.basic import TaitEOS
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -32,42 +33,42 @@ from pysph.sph.integrator import PECIntegrator
 from pysph.base.nnps import DomainManager
 from pysph.solver.utils import iter_output
 
-
 dim = 2
-Lx = 0.5
+Lx = 1.0
 Ly = 1.0
-factor1 = 0.8
-factor2 = 1.0/factor1
-nu = 0.0
+
+nu = 0.05
 sigma = 1.0
-rho0 = 1.
+factor1 = 0.8
+factor2 = 1 / factor1
+rho0 = 1.0
 
 c0 = 20.0
 gamma = 1.4
 R = 287.1
-
-p0 = c0**2 * rho0
-
+p0 = c0*c0*rho0
 nx = 50
 dx = Lx / nx
 volume = dx * dx
 hdx = 1.5
 
-h0 = hdx * dx
+h0 = hdx*dx
 
-tf = 0.5
+tf = 10.0
 
 epsilon = 0.01 / h0
 
-KE = 10**(-6.6)*p0*p0*gamma/(c0 * c0 * rho0 * rho0 * nx * nx * (gamma - 1))
-
-Vmax = np.sqrt(2 * KE / (rho0 * dx * dx))
-
 dt1 = 0.25*np.sqrt(rho0*h0*h0*h0/(2.0*np.pi*sigma))
 
-dt2 = 0.25*h0/(c0+Vmax)
+dt2 = 0.25*h0/(c0)
 
-dt = 0.9*min(dt1, dt2)
+dt3 = 0.125*rho0*h0*h0/nu
+
+dt = 0.9*min(dt1, dt2, dt3)
+
+
+def radius(x, y):
+    return x*x + y*y
 
 
 class MultiPhase(Application):
@@ -80,10 +81,13 @@ class MultiPhase(Application):
         )
 
     def create_particles(self):
-        fluid_x, fluid_y = get_2d_block(
-            dx=dx, length=Lx-dx, height=Ly-dx, center=np.array([0., 0.5*Ly]))
+        x, y = np.mgrid[-0.5*Lx:0.5*Lx:dx, -0.5*Ly:0.5*Ly:dx]
+        xc = x.copy() + 0.5*dx
+        yc = y.copy() + 0.5*dx
+        fluid_x = np.concatenate([x.ravel(), xc.ravel()]) + 0.25*dx
+        fluid_y = np.concatenate([y.ravel(), yc.ravel()]) + 0.25*dx
         rho_fluid = np.ones_like(fluid_x) * rho0
-        m_fluid = rho_fluid * volume
+        m_fluid = rho_fluid*volume*0.5
         h_fluid = np.ones_like(fluid_x) * h0
         cs_fluid = np.ones_like(fluid_x) * c0
         additional_props = ['V', 'color', 'scolor', 'cx', 'cy', 'cz',
@@ -92,32 +96,29 @@ class MultiPhase(Application):
                             'ax', 'ay', 'az', 'wij', 'vmag2', 'N', 'wij_sum',
                             'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
                             'kappa', 'arho', 'nu', 'pi00', 'pi01', 'pi10',
-                            'pi11']
+                            'pi11', 'alpha']
         fluid = get_particle_array(
             name='fluid', x=fluid_x, y=fluid_y, h=h_fluid, m=m_fluid,
             rho=rho_fluid, cs=cs_fluid, additional_props=additional_props)
         for i in range(len(fluid.x)):
-            if fluid.y[i] > 0.25 and fluid.y[i] < 0.75:
+            if (fluid.x[i] * fluid.x[i] + fluid.y[i] * fluid.y[i]) < 0.0625:
                 fluid.color[i] = 1.0
             else:
                 fluid.color[i] = 0.0
+        fluid.alpha[:] = sigma
         fluid.V[:] = 1. / volume
         fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny',
-                                 'ddelta', 'kappa', 'N', 'scolor', 'p'])
-        angles = np.random.random_sample((len(fluid.x),))*2*np.pi
-        vel = np.sqrt(2 * KE / fluid.m)
-        fluid.u = vel
-        fluid.v = vel
-        fluid.nu[:] = 0.0
+                                'ddelta', 'kappa', 'N', 'scolor', 'p'])
+        fluid.nu[:] = nu
         return [fluid]
 
     def create_domain(self):
         return DomainManager(
-            xmin=-0.5 * Lx, xmax=0.5 * Lx, ymin=0.0, ymax=Ly,
-            periodic_in_x=True, periodic_in_y=True, n_layers=6)
+            xmin=-0.5 * Lx, xmax=0.5 * Lx, ymin=-0.5 * Ly, ymax=0.5 * Ly,
+            periodic_in_x=True, periodic_in_y=True)
 
     def create_solver(self):
-        kernel = CubicSpline(dim=2)
+        kernel = QuinticSpline(dim=2)
         integrator = PECIntegrator(fluid=TransportVelocityStep())
         solver = Solver(
             kernel=kernel, dim=dim, integrator=integrator,
@@ -131,7 +132,7 @@ class MultiPhase(Application):
             ], real=False),
             Group(equations=[
                 StateEquation(dest='fluid', sources=None, rho0=rho0,
-                              p0=p0),
+                              p0=p0, b=0.0),
                 SY11ColorGradient(dest='fluid', sources=['fluid'])
             ], real=False),
             Group(equations=[
@@ -170,7 +171,7 @@ class MultiPhase(Application):
             ], real=False),
             Group(equations=[
                 StateEquation(dest='fluid', sources=None, rho0=rho0,
-                              p0=p0),
+                              p0=p0, b=0.0),
             ], real=False),
             Group(equations=[
                 AdamiColorGradient(dest='fluid', sources=['fluid']),
@@ -183,7 +184,7 @@ class MultiPhase(Application):
             Group(
                 equations=[
                     MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid'], pb=p0),
+                        dest='fluid', sources=['fluid'], pb=0.0),
                     MomentumEquationViscosityAdami(
                         dest='fluid', sources=['fluid']),
                     CSFSurfaceTensionForceAdami(dest='fluid', sources=None,)
@@ -255,12 +256,10 @@ class MultiPhase(Application):
                         'fluid']),
             ], real=False, update_nnps=False),
             Group(equations=[
-                TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0,
-                        gamma=1.0),
+                TaitEOS(dest='fluid', sources=None,
+                        rho0=rho0, c0=c0, gamma=1.0),
                 SmoothedColor(
                     dest='fluid', sources=['fluid', ]),
-                ScaleSmoothingLength(dest='fluid', sources=None,
-                                     factor=2.0/3.0),
             ], real=False, update_nnps=False),
             Group(equations=[
                 MorrisColorGradient(dest='fluid', sources=['fluid', ],
@@ -269,7 +268,6 @@ class MultiPhase(Application):
             Group(equations=[
                 InterfaceCurvatureFromDensity(dest='fluid', sources=['fluid'],
                                               with_morris_correction=True),
-                ScaleSmoothingLength(dest='fluid', sources=None, factor=1.5),
             ], real=False, update_nnps=False),
             Group(
                 equations=[
@@ -297,21 +295,40 @@ class MultiPhase(Application):
         import matplotlib.pyplot as plt
         from pysph.solver.utils import load
         files = self.output_files
-        ke = []
+        dp = []
         t = []
         for f in files:
             data = load(f)
             pa = data['arrays']['fluid']
             t.append(data['solver_data']['t'])
             m = pa.m
-            u = pa.u
-            v = pa.v
-            length = len(m)
-            ke.append(np.log10(sum(0.5 * m * (u**2 + v**2) / length)))
+            x = pa.x
+            y = pa.y
+            N = pa.N
+            p = pa.p
+            n = len(m)
+            count_in = 0
+            count_out = 0
+            p_in = 0
+            p_out = 0
+
+            for i in range(n):
+                r = radius(x[i], y[i])
+                if N[i] < 1:
+                    if radius(x[i], y[i]) < 0.0625:
+                        p_in += p[i]
+                        count_in += 1
+                    else:
+                        p_out += p[i]
+                        count_out += 1
+                else:
+                    continue
+            dp.append((p_in/count_in) - (p_out/count_out))
+
         fname = os.path.join(self.output_dir, 'results.npz')
-        np.savez(fname, t=t, ke=ke)
-        plt.plot(t, ke, 'o')
-        fig = os.path.join(self.output_dir, "KEvst.png")
+        np.savez(fname, t=t, dp=dp)
+        plt.plot(t, dp)
+        fig = os.path.join(self.output_dir, "dpvst.png")
         plt.savefig(fig)
         plt.close()
 
