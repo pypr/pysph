@@ -358,6 +358,7 @@ class MultiPhase(Application):
             import matplotlib.pyplot as plt
         except ImportError:
             print ("Post processing requires Matplotlib")
+            return
         from pysph.solver.utils import load
         files = self.output_files
         amat = []
