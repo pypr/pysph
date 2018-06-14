@@ -54,7 +54,6 @@ def run(nv, backend):
     print(time.time() - t1)
     u = args[-3]
     u.pull()
-    print(u.data)
     return e, args
 
 

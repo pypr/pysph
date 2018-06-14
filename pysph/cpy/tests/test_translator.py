@@ -1172,14 +1172,14 @@ def test_opencl_conversion():
     ''')
 
     # When
-    known_types = {'d_p': KnownType('__global int*')}
+    known_types = {'d_p': KnownType('GLOBAL_MEM int*')}
     converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
     # Then
     expect = dedent('''
-void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
-    J, double t, double* l, double* xx)
+WITHIN_KERNEL void f(long s_idx, GLOBAL_MEM double* s_p, long d_idx,
+    GLOBAL_MEM int* d_p, long J, double t, double* l, double* xx)
 {
     s_p[s_idx] = (LID_0 * GID_0);
 }
@@ -1200,7 +1200,7 @@ def test_opencl_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(__global Foo* self, double x)
+    WITHIN_KERNEL void Foo_g(GLOBAL_MEM Foo* self, double x)
     {
         ;
     }

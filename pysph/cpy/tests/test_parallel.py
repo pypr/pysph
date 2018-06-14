@@ -48,6 +48,11 @@ class TestParallelUtils(unittest.TestCase):
 
         self._check_simple_elementwise(backend='opencl')
 
+    def test_elementwise_works_with_cuda(self):
+        importorskip('pycuda')
+
+        self._check_simple_elementwise(backend='cuda')
+
     def _check_simple_reduction(self, backend):
         x = np.linspace(0, 1, 1000)/1000
         x = wrap(x, backend=backend)
@@ -108,6 +113,18 @@ class TestParallelUtils(unittest.TestCase):
     def test_reduction_works_neutral_opencl(self):
         importorskip('pyopencl')
         self._check_reduction_min(backend='opencl')
+
+    def test_reduction_works_without_map_cuda(self):
+        importorskip('pycuda')
+        self._check_simple_reduction(backend='cuda')
+
+    def test_reduction_works_with_map_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_with_map(backend='cuda')
+
+    def test_reduction_works_neutral_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_min(backend='cuda')
 
     def test_scan_works_opencl(self):
         importorskip('pyopencl')
