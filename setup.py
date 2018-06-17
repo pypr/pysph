@@ -490,7 +490,19 @@ def get_basic_extensions():
                 language="c++",
                 define_macros=MACROS,
             ),
-
+            Extension(
+                name="pysph.base.stratified_sfc_gpu_nnps",
+                sources=["pysph/base/stratified_sfc_gpu_nnps.pyx"],
+                depends=get_deps(
+                    "pysph/base/nnps_base"
+                ),
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                cython_compile_time_env={'OPENMP': openmp_env},
+                language="c++",
+                define_macros=MACROS,
+            ),
             Extension(
                 name="pysph.base.octree_gpu_nnps",
                 sources=["pysph/base/octree_gpu_nnps.pyx"],

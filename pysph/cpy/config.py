@@ -14,6 +14,7 @@ class Config(object):
         self._use_double = None
         self._omp_schedule = None
         self._profile = None
+        self._use_local_memory = None
 
     @property
     def use_openmp(self):
@@ -37,7 +38,7 @@ class Config(object):
     @omp_schedule.setter
     def omp_schedule(self, value):
         if len(value) != 2 or \
-           value[0].lower() not in ("static", "dynamic", "guided"):
+                        value[0].lower() not in ("static", "dynamic", "guided"):
             raise ValueError("Invalid OpenMP Schedule: {}".format(value))
 
         self._omp_schedule = value
@@ -84,6 +85,19 @@ class Config(object):
         self._use_double = value
 
     def _use_double_default(self):
+        return False
+
+    @property
+    def use_local_memory(self):
+        if self._use_local_memory is None:
+            self._use_local_memory = self._use_local_memory_default()
+        return self._use_local_memory
+
+    @use_local_memory.setter
+    def use_local_memory(self, value):
+        self._use_local_memory = value
+
+    def _use_local_memory_default(self):
         return False
 
     @property

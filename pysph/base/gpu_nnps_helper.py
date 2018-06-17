@@ -1,6 +1,7 @@
 
 from pyopencl.elementwise import ElementwiseKernel
 from mako.template import Template
+from mako.lookup import TemplateLookup
 import os
 import sys
 
@@ -14,20 +15,23 @@ class GPUNNPSHelper(object):
 
         Parameters
         ----------
-        ctx
+        ctx :
+            opencl context
         tpl_filename
-        use_double
+            filename of source template
+        use_double:
+            Use double precision floating point data types
         c_type:
             c_type to use. Overrides use_double
         """
         disable_unicode = False if sys.version_info.major > 2 else True
+
         self.src_tpl = Template(
             filename=os.path.join(
                 os.path.dirname(os.path.realpath(__file__)),
                 tpl_filename),
-            disable_unicode=disable_unicode
+            disable_unicode=disable_unicode,
         )
-
         self.data_t = "double" if use_double else "float"
 
         if c_type is not None:

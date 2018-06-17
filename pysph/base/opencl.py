@@ -24,14 +24,14 @@ class DeviceWGSException(Exception):
 
 
 logger = logging.getLogger()
-
+mem_usage = 0
+max_mem_usage = 0
 
 # args: tag_array, tag, indices, head
 REMOVE_INDICES_KNL = Template(r"""//CL//
         if(tag_array[i] == tag)
             indices[atomic_inc(&head[0])] = i;
 """)
-
 
 # args: tag_array, num_real_particles
 NUM_REAL_PARTICLES_KNL = Template(r"""//CL//
@@ -63,8 +63,7 @@ def get_simple_kernel(kernel_name, args, src, wgs, preamble=""):
 
 
 class SimpleKernel(object):
-    """ElementwiseKernel substitute that supports
-    custom work group size.
+    """ElementwiseKernel substitute that supports a custom work group size.
     """
 
     def __init__(self, ctx, args, operation, wgs,
@@ -137,8 +136,23 @@ class SimpleKernel(object):
                                           wait_for=wait_for)
 
 
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
+
+
+def print_mem_usage():
+    global mem_usage, max_mem_usage
+    print("Memory usage: ", sizeof_fmt(mem_usage))
+    print("Max Memory usage: ", sizeof_fmt(max_mem_usage))
+
+
 class DeviceArray(object):
     def __init__(self, dtype, n=0):
+        global mem_usage, max_mem_usage
         self.queue = get_queue()
         self.ctx = get_context()
         self.dtype = dtype
@@ -152,15 +166,25 @@ class DeviceArray(object):
         self.length = length
         self._update_array_ref()
 
+        self.itemsize = np.dtype(dtype).itemsize
+        mem_usage += self.length * self.itemsize
+        max_mem_usage = max(max_mem_usage, mem_usage)
+
     def _update_array_ref(self):
         self.array = self._data[:self.length]
 
     def resize(self, size):
+        global mem_usage, max_mem_usage
+        mem_usage -= self.length * self.itemsize
         self.reserve(size)
         self.length = size
         self._update_array_ref()
 
+        mem_usage += self.length * self.itemsize
+        max_mem_usage = max(max_mem_usage, mem_usage)
+
     def reserve(self, size):
+
         if size > self.alloc:
             new_data = cl.array.empty(self.queue, size, self.dtype)
             new_data[:self.alloc] = self._data
@@ -227,7 +251,7 @@ class DeviceArray(object):
             arguments="__global int *if_remove,\
             __global %(dtype)s *array,\
             __global %(dtype)s *new_array" %
-            {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
+                      {"dtype": cl.tools.dtype_to_ctype(self.dtype)},
             input_expr="if_remove[i]",
             scan_expr="a+b", neutral="0",
             output_statement="""
@@ -246,6 +270,10 @@ class DeviceArray(object):
 
     def copy_values(self, indices, dest):
         dest[:len(indices)] = cl.array.take(self.array, indices)
+
+    def __del__(self):
+        global mem_usage
+        mem_usage -= self.length * self.itemsize
 
 
 class DeviceHelper(object):

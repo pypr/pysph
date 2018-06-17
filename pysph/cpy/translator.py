@@ -200,7 +200,7 @@ class CConverter(ast.NodeVisitor):
 
         if kind == 'matrix':
             if not isinstance(shape, tuple):
-                shape = (shape, )
+                shape = (shape,)
             sz = ''.join('[%d]' % x for x in shape)
             vars = ['%s%s' % (x, sz) for x in names]
             return '{address}{type} {vars};'.format(
@@ -213,12 +213,12 @@ class CConverter(ast.NodeVisitor):
 
     def _indent_block(self, code):
         lines = code.splitlines()
-        pad = ' '*4
+        pad = ' ' * 4
         return '\n'.join(pad + x for x in lines)
 
     def _remove_docstring(self, body):
         if body and isinstance(body[0], ast.Expr) and \
-           isinstance(body[0].value, ast.Str):
+                isinstance(body[0].value, ast.Str):
             return body[1:]
         else:
             return body
@@ -238,7 +238,7 @@ class CConverter(ast.NodeVisitor):
             if node.lineno > 1:  # pragma no branch
                 msg += self._src[node.lineno - 2] + '\n'
             msg += self._src[node.lineno - 1] + '\n'
-            msg += ' '*node.col_offset + '^' + '\n\n'
+            msg += ' ' * node.col_offset + '^' + '\n\n'
         msg += message
         raise NotImplementedError(msg)
 
@@ -438,12 +438,12 @@ class CConverter(ast.NodeVisitor):
             comparator = '<' if positive_step else '>'
             r = ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
                  ' {{\n{block}\n}}\n').format(
-                     i=target, type=target_type,
-                     start=start, stop=stop, incr=incr, comp=comparator,
-                     block='\n'.join(
-                         self._indent_block(self.visit(x)) for x in node.body
-                     )
-                 )
+                i=target, type=target_type,
+                start=start, stop=stop, incr=incr, comp=comparator,
+                block='\n'.join(
+                    self._indent_block(self.visit(x)) for x in node.body
+                )
+            )
         else:
             count = self._for_count
             self._for_count += 1
@@ -465,10 +465,10 @@ class CConverter(ast.NodeVisitor):
                 )
                 r += ('for ({type}{i}={start}; {i}{comp}{stop}; {i}+={incr})'
                       ' {{\n{block}\n}}\n').format(
-                          i=target, type=target_type,
-                          start=start, stop=stop, incr=incr,
-                          comp=comparator, block=block
-                      )
+                    i=target, type=target_type,
+                    start=start, stop=stop, incr=incr,
+                    comp=comparator, block=block
+                )
             else:
                 step_var = '__cpy_step_{count}'.format(count=count)
                 type = 'long ' if step_var not in self._known else ''
@@ -515,7 +515,7 @@ class CConverter(ast.NodeVisitor):
             "Functions with kwargs not supported in line %d." % node.lineno
 
         if self._class_name and (node.name.startswith('_') or
-                                 node.name in self._ignore_methods):
+                                         node.name in self._ignore_methods):
             return ''
 
         orig_declares = self._declares
@@ -543,7 +543,7 @@ class CConverter(ast.NodeVisitor):
             declares += '\n'
 
         sig = '\n'.join(wrap(
-            sig, width=78, subsequent_indent=' '*4, break_long_words=False
+            sig, width=78, subsequent_indent=' ' * 4, break_long_words=False
         ))
         self._known = orig_known
         self._declares = orig_declares
@@ -666,6 +666,23 @@ class CConverter(ast.NodeVisitor):
                 self._indent_block(self.visit(x)) for x in node.body
             )
         )
+
+
+def ocl_detect_base_type(name, value):
+    if isinstance(value, KnownType):
+        if value.base_type:
+            return value.base_type
+        else:
+            match = re.search(r"\b([a-zA-Z]+)\b\*",
+                              value.type, re.IGNORECASE)
+            if match:
+                return match.group(1)
+            else:
+                return NotImplementedError()
+    elif name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
+        return 'double'
+    else:
+        raise NotImplementedError()
 
 
 def ocl_detect_type(name, value):

@@ -26,6 +26,7 @@ cdef class OctreeGPUNNPS(GPUNNPS):
     cdef public list octrees
     cdef public bint use_elementwise
     cdef public bint use_partitions
+    cdef public object leaf_size
     # cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef _bin(self, int pa_index)
@@ -34,3 +35,5 @@ cdef class OctreeGPUNNPS(GPUNNPS):
 
     cdef void find_neighbor_lengths(self, nbr_lengths)
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices)
+
+    cpdef get_kernel_args(self, c_type)

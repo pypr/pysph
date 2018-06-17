@@ -406,6 +406,14 @@ class Application(object):
             default=False,
             help="Use OpenCL to run the simulation.")
 
+        # --use-local-memory
+        parser.add_argument(
+            "--use-local-memory",
+            action="store_true",
+            dest="with_local_memory",
+            default=False,
+            help="Use local memory with OpenCL"
+        )
         # --profile
         parser.add_argument(
             "--profile",
@@ -685,7 +693,7 @@ class Application(object):
         interfaces.add_argument(
             "--octree-leaf-size",
             dest="octree_leaf_size",
-            default=64,
+            default=32,
             help=("Specify leaf size of octree. "
                   "Must be multiples of 32")
         )
@@ -694,6 +702,7 @@ class Application(object):
             "--octree-elementwise-nnps",
             action="store_const",
             dest="octree_elementwise",
+            default=False,
             const=True,
             help=("Run NNPS for different particles "
                   "on different threads")
@@ -848,10 +857,15 @@ class Application(object):
             get_config().set_omp_schedule(options.omp_schedule)
         if options.with_opencl:
             get_config().use_opencl = True
+        if options.with_local_memory:
+            leaf_size = int(options.octree_leaf_size)
+            get_config().wgs = leaf_size
+            get_config().use_local_memory = True
         if options.use_double:
             get_config().use_double = options.use_double
         if options.profile:
             get_config().profile = options.profile
+
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 
@@ -876,12 +890,13 @@ class Application(object):
             if options.with_opencl:
                 if options.nnps == 'gpu_octree':
                     leaf_size = int(options.octree_leaf_size)
-                    if leaf_size % 32 != 0:
-                        raise ValueError("GPU Octree leaf size must "
-                                         "be a multiple of 32")
+                    # if leaf_size % 32 != 0:
+                    #     raise ValueError("GPU Octree leaf size must "
+                    #                      "be a multiple of 32")
 
                     from pysph.base.octree_gpu_nnps import OctreeGPUNNPS
                     # Sorting enabled by default
+                    print("Using elementwise: ", options.octree_elementwise)
                     nnps = OctreeGPUNNPS(
                         dim=solver.dim,
                         particles=self.particles,
@@ -1357,8 +1372,9 @@ class Application(object):
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         if self.options.with_opencl and self.options.profile:
-            from pysph.base.opencl import print_profile
+            from pysph.base.opencl import print_profile, print_mem_usage
             print_profile()
+            print_mem_usage()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
 
@@ -1450,9 +1466,9 @@ class Application(object):
         pass
 
     def configure_scheme(self):
-        """This is called after :py:meth:`consume_user_options` is called.  One can
-        configure the SPH scheme here as at this point all the command line
-        options are known.
+        """This is called after :py:meth:`consume_user_options` is called.
+        One can configure the SPH scheme here as at this point all the
+        command line options are known.
         """
         pass
 
@@ -1469,7 +1485,8 @@ class Application(object):
         pass
 
     def create_domain(self):
-        """Create a `pysph.base.nnps_base.DomainManager` and return it if needed.
+        """Create a `pysph.base.nnps_base.DomainManager` and return it if
+        needed.
 
         This is used for periodic domains etc.  Note that if the domain
         is passed to :py:meth:`__init__`, then this method is not called.

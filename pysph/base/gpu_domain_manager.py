@@ -38,6 +38,9 @@ class GPUDomainManager(object):
         self.cell_size = 1.0
         self.hmin = 1.0
 
+        # default value for radius_scale
+        self.radius_scale = 1.0
+
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
 
@@ -98,7 +101,7 @@ class GPUDomainManager(object):
         processors to decide on the appropriate binning size.
 
         """
-        _hmax, hmax = -1.0, -1.0
+        _hmax, hmax = -self.dtype_max, -self.dtype_max
         _hmin, hmin = self.dtype_max, self.dtype_max
 
         for pa_wrapper in self.pa_wrappers:
@@ -114,8 +117,7 @@ class GPUDomainManager(object):
                 hmin = _hmin
 
         cell_size = self.radius_scale * hmax
-        self.hmin = self.radius_scale * hmin
-
+        self.hmin = hmin
         if cell_size < 1e-6:
             cell_size = 1.0
 

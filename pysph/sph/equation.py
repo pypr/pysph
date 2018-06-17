@@ -20,7 +20,7 @@ from textwrap import dedent
 # Local imports.
 from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
                            get_symbols)
-
+from pysph.cpy.config import get_config
 
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
@@ -787,6 +787,15 @@ class OpenCLGroup(Group):
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
         predefined['NBRS'] = KnownType('__global unsigned int*')
+
+        if get_config().use_local_memory:
+            for k in predefined.keys():
+                if 's_' in k:
+                    # TODO: Make each argument have their own KnownType
+                    # right from the start
+                    predefined[k] = KnownType(
+                        predefined[k].type.replace('__global', '__local')
+                    )
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):
