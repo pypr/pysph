@@ -400,6 +400,66 @@ def get_particle_array_gasd(constants=None, **props):
     return pa
 
 
+def get_particle_array_swe(constants=None, **props):
+    r"""**Return a particle array for the shallow water formulation**
+
+    This sets the default properties to be::
+
+        ['x', 'y', 'z', 'u', 'v', 'w', 'h', 'rho', 'arho' 'm', 'p', 'V', 'A',
+        'cs', 'n', 'rho0', 'rho_prev_iter', 'rho_residual',
+        'positive_rho_residual', 'summation_rho', 'dw', 'alpha', 'exp_lambda',
+        'tv', 'tu', 'au', 'av', 'u_prev_step', 'v_prev_step', 'uh', 'vh',
+        'dt_cfl', 'pa_to_split', 'Sfx', 'Sfy', 'psi', 'sum_Ak', 'u_parent',
+        'v_parent', 'uh_parent', 'vh_parent', 'parent_idx', 'b', 'bx', 'by',
+        'bxx', 'bxy', byy', 'closest_idx', 'is_merged_pa', 'merge',
+        'dw_inner_reimann', 'u_inner_reimann', 'v_inner_reimann', 'shep_corr',
+        'is_boun_pa', 'dw_at_t']
+
+    Parameters
+    ----------
+    constants : dict
+        Dictionary of constants
+
+    Other Parameters
+    ----------------
+    props : dict
+        Additional keywords passed are set as the property arrays.
+
+    See Also
+    --------
+    get_particle_array
+
+    """
+    swe_props = ['A', 'cs', 'n', 'rho0', 'h0', 'rho_prev_iter', 'rho_residual',
+                 'positive_rho_residual', 'summation_rho', 'dw', 'alpha',
+                 'exp_lambda', 'tv', 'tu', 'u_prev_step', 'v_prev_step',
+                 'uh', 'vh', 'dt_cfl', 'pa_to_split', 'Sfx', 'Sfy', 'V',
+                 'psi', 'sum_Ak', 'arho', 'u_parent', 'v_parent', 'uh_parent',
+                 'vh_parent', 'b', 'bx', 'by', 'bxx', 'bxy', 'byy', 'merge',
+                 'is_merged_pa', 'dw_inner_reimann', 'u_inner_reimann',
+                 'v_inner_reimann', 'shep_corr', 'is_boun_pa', 'dw_at_t']
+
+    consts = {}
+    if constants:
+        for key, val in constants.items():
+            consts[key] = val
+
+    pa = get_particle_array(
+        constants=consts, additional_props=swe_props, **props
+    )
+    pa.add_property('parent_idx', type='int')
+    pa.add_property('closest_idx', type='int')
+
+    # default property arrays to save out.
+    props = ['x', 'y', 'h', 'rho', 'h0', 'rho0', 'p', 'A', 'uh', 'vh', 'u',
+             'v', 'm', 'tu', 'tv', 'dw', 'alpha', 'au', 'av', 'Sfx', 'Sfy',
+             'n', 'cs', 'pid', 'gid', 'tag', 'b', 'bx', 'by', 'bxx', 'bxy',
+             'byy']
+    pa.set_output_arrays(props)
+
+    return pa
+
+
 def get_particles_info(particles):
     """Return the array information for a list of particles.
 
