@@ -6,7 +6,6 @@ Basic Equations for solving shallow water problems
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.integrator import Integrator
-from pysph.base.utils import get_particle_array
 from pysph.cpy.api import declare
 from pysph.sph.wc.density_correction import gj_solve
 
@@ -189,13 +188,15 @@ class ParticleSplit(object):
             theta_edge_pa[i] = (pi/180)*theta
 
         # Angle of velocity vector with horizontal
-        angle_vel = np.where((np.abs(u_parent) > 1e-3) | (np.abs(v_parent) >
-                              1e-3), np.arctan2(v_parent, u_parent), 0)
+        angle_vel = np.where(
+            (np.abs(u_parent) > 1e-3) | (np.abs(v_parent) > 1e-3),
+            np.arctan2(v_parent, u_parent), 0
+            )
 
         # Rotates the hexagon such that its horizontal axis aligns with the
         # direction of velocity vector
-        angle_actual = np.tile(theta_edge_pa, num_of_pa_to_split)\
-                       + np.repeat(angle_vel, n)
+        angle_actual = (np.tile(theta_edge_pa, num_of_pa_to_split)
+                        + np.repeat(angle_vel, n))
 
         x = r * cos(angle_actual) * np.repeat(h_parent, n)
         y = r * sin(angle_actual) * np.repeat(h_parent, n)
@@ -415,22 +416,22 @@ class FindMergeable(Equation):
                     # The newly merged particle properties are set at index of
                     # particle 'a'
                     m_merged = d_m[d_idx] + d_m[idx]
-                    x_merged = (d_m[d_idx]*d_x[d_idx] + d_m[idx]*d_x[idx]) \
-                               / m_merged
-                    y_merged = (d_m[d_idx]*d_y[d_idx] + d_m[idx]*d_y[idx]) \
-                               / m_merged
+                    x_merged = ((d_m[d_idx]*d_x[d_idx] + d_m[idx]*d_x[idx])
+                                / m_merged)
+                    y_merged = ((d_m[d_idx]*d_y[d_idx] + d_m[idx]*d_y[idx])
+                                / m_merged)
                     xma[0] = x_merged - d_x[d_idx]
                     xma[1] = y_merged - d_y[d_idx]
                     xmb[0] = x_merged - d_x[idx]
                     xmb[1] = y_merged - d_y[idx]
                     rma = sqrt(xma[0]*xma[0] + xma[1]*xma[1])
                     rmb = sqrt(xmb[0]*xmb[0] + xmb[1]*xmb[1])
-                    d_u[d_idx] = (d_m[d_idx]*d_u[d_idx] + d_m[idx]*d_u[idx]) \
-                                 / m_merged
+                    d_u[d_idx] = ((d_m[d_idx]*d_u[d_idx] + d_m[idx]*d_u[idx])
+                                  / m_merged)
                     d_uh[d_idx] = (d_m[d_idx]*d_uh[d_idx]
                                    + d_m[idx]*d_uh[idx]) / m_merged
-                    d_v[d_idx] = (d_m[d_idx]*d_v[d_idx] + d_m[idx]*d_v[idx]) \
-                                 / m_merged
+                    d_v[d_idx] = ((d_m[d_idx]*d_v[d_idx] + d_m[idx]*d_v[idx])
+                                  / m_merged)
                     d_vh[d_idx] = (d_m[d_idx]*d_vh[d_idx]
                                    + d_m[idx]*d_vh[idx]) / m_merged
                     const1 = d_m[d_idx] * SPH_KERNEL.kernel(xma, rma,
@@ -1418,8 +1419,8 @@ class BoundaryInnerReimannStateEval(Equation):
             xij[0] = d_x[d_idx] - s_x[s_idx]
             xij[1] = d_y[d_idx] - s_y[s_idx]
             rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1])
-            corr_sum += (s_m[s_idx]/s_rho[s_idx]) * SPH_KERNEL.kernel(xij, rij,
-                                                                  d_h[d_idx])
+            corr_sum += ((s_m[s_idx]/s_rho[s_idx])
+                         * SPH_KERNEL.kernel(xij, rij, d_h[d_idx]))
         d_shep_corr[d_idx] = corr_sum
 
     def loop(self, d_u_inner_reimann, d_v_inner_reimann, d_dw_inner_reimann,
@@ -1525,9 +1526,9 @@ class SubCriticalOutFlow(Equation):
         d_cs[d_idx] = sqrt(d_dw[d_idx] * self.g)
         d_alpha[d_idx] = d_rho[d_idx] * self.dim
         const = 2. * sqrt(self.g)
-        d_u[d_idx] = d_u_inner_reimann[d_idx] \
+        d_u[d_idx] = (d_u_inner_reimann[d_idx]
                       - const*(sqrt(d_dw_inner_reimann[d_idx])
-                               - sqrt(d_dw[d_idx]))
+                               - sqrt(d_dw[d_idx])))
         d_v[d_idx] = d_v_inner_reimann[d_idx]
 
 
