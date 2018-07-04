@@ -45,14 +45,16 @@ class SodShockTube(ShockTubeSetup):
         self.nr = ratio*self.nl
         self.dxl = 0.5/self.nl
         self.dxr = 0.5/self.nr
+        self.ml = self.dxl * self.rhol
         self.h0 = self.hdx * self.dxr
         self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=-0.5, xmax=0.5, dxl=self.dxl,
-                                       dxr=self.dxr, m=self.dxl, pl=self.pl,
-                                       pr=self.pr, h0=self.h0, bx=0.03,
-                                       gamma1=gamma1, ul=self.ul, ur=self.ur)
+        return self.generate_particles(xmin=self.xmin, xmax=self.xmax,
+                                       dxl=self.dxl, dxr=self.dxr,
+                                       m=self.ml, pl=self.pl, pr=self.pr,
+                                       h0=self.h0, bx=0.03, gamma1=gamma1,
+                                       ul=self.ul, ur=self.ur)
 
     def create_scheme(self):
         self.dt = dt

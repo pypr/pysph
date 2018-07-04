@@ -84,13 +84,13 @@ import pyopencl as cl
 import pyopencl.array  # noqa: 401
 import pyopencl.tools  # noqa: 401
 
-from pysph.base.config import get_config
 from pysph.base.utils import is_overloaded_method
-from pysph.base.ext_module import get_platform_dir
 from pysph.base.opencl import (profile_kernel, get_context, get_queue,
                                DeviceHelper)
-from pysph.base.translator import (CStructHelper, OpenCLConverter,
-                                   ocl_detect_type)
+from pysph.cpy.ext_module import get_platform_dir
+from pysph.cpy.config import get_config
+from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
+                                  ocl_detect_type)
 
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
@@ -371,6 +371,10 @@ class AccelerationEvalOpenCLHelper(object):
                             'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
+        from pyopencl._cluda import CLUDA_PREAMBLE
+        double_support = get_config().use_double
+        cluda = Template(CLUDA_PREAMBLE).render(double_support=double_support)
+        main = "\n".join([cluda, main])
         return main
 
     def setup_compiled_module(self, module):
@@ -418,7 +422,7 @@ class AccelerationEvalOpenCLHelper(object):
         headers.append(transpiler.parse_instance(object.kernel))
 
         cls_name = object.kernel.__class__.__name__
-        self.known_types['KERNEL'] = KnownType(
+        self.known_types['SPH_KERNEL'] = KnownType(
             '__global %s*' % cls_name, base_type=cls_name
         )
         headers.append(object.all_group.get_equation_wrappers(
@@ -463,7 +467,7 @@ class AccelerationEvalOpenCLHelper(object):
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
             'int d_idx = get_global_id(0);'
-            '__global %s* KERNEL = kern;' % sph_k_name
+            '__global %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
             all_eqs, kind, indent=''
@@ -594,7 +598,7 @@ class AccelerationEvalOpenCLHelper(object):
         code = self._declare_precomp_vars(context)
         code.append('unsigned int d_idx = get_global_id(0);')
         code.append('unsigned int s_idx, i;')
-        code.append('__global %s* KERNEL = kern;' % sph_k_name)
+        code.append('__global %s* SPH_KERNEL = kern;' % sph_k_name)
         code.append('unsigned int start = start_idx[d_idx];')
         code.append('__global unsigned int* NBRS = &(neighbors[start]);')
         code.append('int N_NBRS = nbr_length[d_idx];')

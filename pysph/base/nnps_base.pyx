@@ -24,7 +24,7 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 # Cython for compiler directives
 cimport cython
 
-from pysph.base.config import get_config
+from pysph.cpy.config import get_config
 
 
 IF OPENMP:
@@ -1080,8 +1080,6 @@ cdef class NNPSBase:
         # Implement this in the subclass to actually do something useful.
         pass
 
-    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
-        raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
 
     cpdef get_nearest_particles(self, int src_index, int dst_index,
                                 size_t d_idx, UIntArray nbrs):
@@ -1111,18 +1109,6 @@ cdef class NNPSBase:
         self.src_index = src_index
         self.dst_index = dst_index
         self.current_cache = self.cache[idx]
-
-    cpdef spatially_order_particles(self, int pa_index):
-        """Spatially order particles such that nearby particles have indices
-        nearer each other.  This may improve pre-fetching on the CPU.
-        """
-        cdef LongArray indices = LongArray()
-        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
-        self.get_spatially_ordered_indices(pa_index, indices)
-        cdef BaseArray arr
-
-        for arr in pa.properties.values():
-            arr.c_align_array(indices)
 
 cdef class NNPS(NNPSBase):
     """Nearest neighbor query class using the box-sort algorithm.
@@ -1288,3 +1274,18 @@ cdef class NNPS(NNPSBase):
 
     cpdef _refresh(self):
         raise NotImplementedError("NNPS :: _refresh called")
+
+    cpdef get_spatially_ordered_indices(self, int pa_index, LongArray indices):
+        raise NotImplementedError("NNPSBase :: get_spatially_ordered_indices called")
+
+    cpdef spatially_order_particles(self, int pa_index):
+        """Spatially order particles such that nearby particles have indices
+        nearer each other.  This may improve pre-fetching on the CPU.
+        """
+        cdef LongArray indices = LongArray()
+        cdef ParticleArray pa = self.pa_wrappers[pa_index].pa
+        self.get_spatially_ordered_indices(pa_index, indices)
+        cdef BaseArray arr
+
+        for arr in pa.properties.values():
+            arr.c_align_array(indices)

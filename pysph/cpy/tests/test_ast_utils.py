@@ -1,10 +1,13 @@
 
 import ast
+import sys
 from textwrap import dedent
 import unittest
 
-from pysph.base.ast_utils import (get_assigned, get_aug_assign_symbols, get_symbols,
-    has_node, has_return)
+from ..ast_utils import (
+    get_assigned, get_symbols, get_unknown_names_and_calls,
+    has_node, has_return
+)
 
 
 class TestASTUtils(unittest.TestCase):
@@ -27,24 +30,6 @@ class TestASTUtils(unittest.TestCase):
         result = list(get_symbols(tree, ctx=ast.Store))
         result.sort()
         self.assertEqual(result, ['x'])
-
-    def test_get_aug_assign_symbols(self):
-        code = '''
-        x = 1
-        '''
-        result = list(get_aug_assign_symbols(dedent(code)))
-        result.sort()
-        expect = []
-        self.assertEqual(result, expect)
-
-        code = '''
-        x += 1
-        d_x[d_idx] += s_x[s_idx]
-        '''
-        result = list(get_aug_assign_symbols(dedent(code)))
-        result.sort()
-        expect = ['d_x', 'x']
-        self.assertEqual(result, expect)
 
     def test_has_return(self):
         code = dedent('''
@@ -93,6 +78,47 @@ class TestASTUtils(unittest.TestCase):
         assigned = list(sorted(get_assigned(code)))
         expect = ['u', 'v', 'x', 'y']
         self.assertEqual(assigned, expect)
+
+    def test_get_unknown_names_and_calls(self):
+        code = dedent('''
+        def f(x):
+            g(h(x))
+            y = x + SIZE
+            for i in range(y):
+                x += func(JUNK)
+            sin(x)
+        ''')
+
+        # When
+        names, calls = get_unknown_names_and_calls(code)
+
+        # Then.
+        e_names = {'SIZE', 'i', 'JUNK'}
+        e_calls = {'g', 'h', 'range', 'func', 'sin'}
+        self.assertSetEqual(names, e_names)
+        self.assertSetEqual(calls, e_calls)
+
+    @unittest.skipIf(sys.version_info < (3, 4),
+                     reason='Test requires Python 3.')
+    def test_get_unknown_names_and_calls_with_py3_annotation(self):
+        code = dedent('''
+        from pysph.cpy import types as T
+
+        def f(x: T.doublep, n: T.int_)-> T.double:
+            s = declare('double')
+            for i in range(n):
+                s += func(x)
+            return s
+        ''')
+
+        # When
+        names, calls = get_unknown_names_and_calls(code)
+
+        # Then.
+        e_names = {'i'}
+        e_calls = {'declare', 'func', 'range'}
+        self.assertSetEqual(names, e_names)
+        self.assertSetEqual(calls, e_calls)
 
 
 if __name__ == '__main__':

@@ -1,12 +1,13 @@
 from collections import defaultdict
-from os.path import dirname, join
+from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
 from pyzoltan.core import carray
 
-from pysph.base.config import get_config
-from pysph.base.cython_generator import CythonGenerator, KnownType
-from pysph.base.ext_module import ExtModule
+from pysph.cpy.config import get_config
+from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
+                                        get_parallel_range)
+from pysph.cpy.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################
@@ -141,8 +142,15 @@ class AccelerationEvalCythonHelper(object):
     def compile(self, code):
         # Note, we do not add carray or particle_array as nnps_base would
         # have been rebuilt anyway if they changed.
+        root = expanduser(join('~', '.pysph', 'source', get_platform_dir()))
         depends = ["pysph.base.nnps_base"]
-        self._ext_mod = ExtModule(code, verbose=True, depends=depends)
+        # Add pysph/base directory to inc_dirs for including spatial_hash.h
+        # for SpatialHashNNPS
+        extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
+        self._ext_mod = ExtModule(
+            code, verbose=True, root=root, depends=depends,
+            extra_inc_dirs=extra_inc_dirs
+        )
         self._module = self._ext_mod.load()
         return self._module
 
@@ -185,7 +193,7 @@ class AccelerationEvalCythonHelper(object):
         headers.append(cg.get_code())
 
         # Equation wrappers.
-        self.known_types['KERNEL'] = KnownType(
+        self.known_types['SPH_KERNEL'] = KnownType(
             object.kernel.__class__.__name__
         )
         headers.append(object.all_group.get_equation_wrappers(
@@ -247,28 +255,7 @@ class AccelerationEvalCythonHelper(object):
             return "if True: # Placeholder used for OpenMP."
 
     def get_parallel_range(self, start, stop=None, step=1):
-        if stop is None:
-            stop = start
-            start = 0
-
-        args = "{start},{stop},{step}"
-        if self.config.use_openmp:
-            schedule = self.config.omp_schedule[0]
-            chunksize = self.config.omp_schedule[1]
-
-            if schedule is not None:
-                args = args + ", schedule='{schedule}'"
-
-            if chunksize is not None:
-                args = args + ", chunksize={chunksize}"
-
-            args = args.format(start=start, stop=stop, step=step,
-                               schedule=schedule, chunksize=chunksize)
-            return "prange({})".format(args)
-
-        else:
-            args = args.format(start=start, stop=stop, step=step)
-            return "range({})".format(args)
+        return get_parallel_range(start, stop, step)
 
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]

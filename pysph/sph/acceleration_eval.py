@@ -4,7 +4,7 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from pysph.base.config import get_config
+from pysph.cpy.config import get_config
 from pysph.sph.equation import (CythonGroup, Group, OpenCLGroup,
                                 get_arrays_used_in_equation)
 

@@ -5,6 +5,8 @@ Note that this is not a general purpose code generator but one highly tailored
 for use in PySPH for general use cases, Cython itself does a terrific job.
 """
 
+from __future__ import absolute_import
+
 import ast
 try:
     from collections import OrderedDict
@@ -16,13 +18,38 @@ from textwrap import dedent
 import types
 
 from mako.template import Template
-import numpy
 
-from pysph.base.ast_utils import get_assigned, has_return
-from pysph.base.config import get_config
-
+from .types import KnownType, Undefined, get_declare_info
+from .config import get_config
+from .ast_utils import get_assigned, has_return
 
 logger = logging.getLogger(__name__)
+
+
+def get_parallel_range(start, stop=None, step=1):
+    config = get_config()
+    if stop is None:
+        stop = start
+        start = 0
+
+    args = "{start},{stop},{step}"
+    if config.use_openmp:
+        schedule = config.omp_schedule[0]
+        chunksize = config.omp_schedule[1]
+
+        if schedule is not None:
+            args = args + ", schedule='{schedule}'"
+
+        if chunksize is not None:
+            args = args + ", chunksize={chunksize}"
+
+        args = args.format(start=start, stop=stop, step=step,
+                           schedule=schedule, chunksize=chunksize)
+        return "prange({})".format(args)
+
+    else:
+        args = args.format(start=start, stop=stop, step=step)
+        return "range({})".format(args)
 
 
 class CythonClassHelper(object):
@@ -62,7 +89,7 @@ def get_func_definition(sourcelines):
     # For now return the line after the first.
     count = 1
     for line in sourcelines:
-        if line.rstrip().endswith('):'):
+        if line.rstrip().endswith(':'):
             break
         count += 1
     return sourcelines[:count], sourcelines[count:]
@@ -78,55 +105,13 @@ def all_numeric(seq):
     return all(type(x) in types for x in seq)
 
 
-def _declare(type):
-    if type.startswith('matrix'):
-        return numpy.zeros(eval(type[7:-1]))
-    elif type in ['double', 'float']:
-        return 0.0
-    else:
-        return 0
-
-
-def declare(type, num=1):
-    """Declare the variable to be of the given type.
-
-    The additional optional argument num is the number of items to return.
-
-    Normally, the declare function only defines a variable when compiled,
-    however, this function here is a pure Python implementation so that the
-    same code can be executed in Python.
-
-    Parameters
-    ----------
-
-    type: str: String representing the type.
-    num: int: the number of values to return
-
-    Examples
-    --------
-
-    >>> declare('int')
-    0
-    >>> declare('int', 3)
-    0, 0, 0
-    """
-    if num == 1:
-        return _declare(type)
-    else:
-        return tuple(_declare(type) for i in range(num))
-
-
 class CodeGenerationError(Exception):
-    pass
-
-
-class Undefined(object):
     pass
 
 
 def parse_declare(code):
     """Given a string with the source for the declare method,
-    return the type.
+    return the type information.
     """
     m = ast.parse(code)
     call = m.body[0].value
@@ -136,33 +121,8 @@ def parse_declare(code):
     if not isinstance(arg0, ast.Str):
         err = 'Type should be a string, given :%r' % arg0.s
         raise CodeGenerationError(err)
-    return arg0.s
 
-
-class KnownType(object):
-    """Simple object to specify a known type as a string.
-
-    Smells but is convenient as the type may be one available only inside
-    Cython without a corresponding Python type.
-    """
-    def __init__(self, type_str, base_type=''):
-        """Constructor
-
-        The ``base_type`` argument is optional and used to represent the base
-        type, i.e. the type_str may be 'Foo*' but the base type will be 'Foo'
-        if specified.
-
-        Parameters
-        ----------
-        type_str: str: A string representation of how the type is declared.
-        base_type: str: The base type of this entity. (optional)
-
-        """
-        self.type = type_str
-        self.base_type = base_type
-
-    def __repr__(self):
-        return 'KnownType("%s")' % self.type
+    return get_declare_info(arg0.s)
 
 
 class CythonGenerator(object):
@@ -198,13 +158,16 @@ class CythonGenerator(object):
         """Given the variable name and value, detect its type.
         """
         if isinstance(value, KnownType):
-            return value.type
+            return value.type.replace(
+                'GLOBAL_MEM ', ''
+            ).replace('LOCAL_MEM ', '')
         if name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
             return 'double*'
         if name in ['s_idx', 'd_idx']:
             return 'long'
         if value is Undefined or isinstance(value, Undefined):
-            raise CodeGenerationError('Unknown type, for %s' % name)
+            msg = 'Unknown type, for function argument named: %s' % name
+            raise CodeGenerationError(msg)
 
         if isinstance(value, bool):
             return 'int'
@@ -233,7 +196,48 @@ class CythonGenerator(object):
         elif hasattr(obj, '__class__'):
             self._parse_instance(obj)
         else:
-            raise TypeError('Unsupport type to wrap: %s' % obj_type)
+            raise TypeError('Unsupported type to wrap: %s' % obj_type)
+
+    def get_func_signature(self, func):
+        """Given a function that is wrapped, return the Python wrapper definition
+        signature and the Python call signature and the C wrapper definition
+        and C call signature.
+
+        For example if we had
+
+        def f(x=1, y=[1.0]):
+            pass
+
+        If this were passed we would get back:
+
+        (['int x', 'double[:] y'], ['x', '&y[0]']),
+        (['int x', 'double* y'], ['x', 'y'])
+
+        """
+        sourcelines = inspect.getsourcelines(func)[0]
+        defn, lines = get_func_definition(sourcelines)
+        f_name, returns, args = self._analyze_method(func, lines)
+        py_args = []
+        py_call = []
+        c_args = []
+        c_call = []
+        for arg, value in args:
+            c_type = self.detect_type(arg, value)
+            c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
+            c_call.append(arg)
+            py_type = self.ctype_to_python(c_type)
+            py_args.append('{type} {arg}'.format(type=py_type, arg=arg))
+            if c_type.endswith('*'):
+                py_call.append('&{arg}[0]'.format(arg=arg))
+            else:
+                py_call.append('{arg}'.format(arg=arg))
+
+        return (py_args, py_call), (c_args, c_call)
+
+    def set_make_python_methods(self, value):
+        """Turn on/off the generation of Python methods.
+        """
+        self.python_methods = value
 
     # #### Private protocol ###################################################
 
@@ -244,29 +248,45 @@ class CythonGenerator(object):
         and a list of [(arg_name, value),...].
         """
         name = meth.__name__
-        body = ''.join(lines)
-        returns = has_return(dedent(body))
-        argspec = inspect.getargspec(meth)
+        getfullargspec = getattr(
+            inspect, 'getfullargspec', inspect.getargspec
+        )
+        argspec = getfullargspec(meth)
         args = argspec.args
         is_method = False
         if args and args[0] == 'self':
             args = args[1:]
             is_method = True
-        defaults = argspec.defaults if argspec.defaults is not None else []
 
-        # The call_args dict is filled up with the defaults to detect
-        # the appropriate type of the arguments.
+        if hasattr(argspec, 'annotations'):
+            annotations = argspec.annotations
+        else:
+            annotations = getattr(meth, '__annotations__', {})
+
         call_args = {}
+        # Type annotations always take first precendence even over known
+        # types.
+        if len(annotations) > 0:
+            for arg in args:
+                call_args[arg] = annotations.get(arg, Undefined)
+            returns = annotations.get('return', False)
+        else:
+            body = ''.join(lines)
+            returns = has_return(dedent(body))
 
-        for i in range(1, len(defaults)+1):
-            call_args[args[-i]] = defaults[-i]
+            defaults = argspec.defaults if argspec.defaults is not None else []
 
-        # Set the rest to Undefined
-        for i in range(len(args) - len(defaults)):
-            call_args[args[i]] = Undefined
+            # The call_args dict is filled up with the defaults to detect
+            # the appropriate type of the arguments.
+            for i in range(1, len(defaults)+1):
+                call_args[args[-i]] = defaults[-i]
 
-        # Make sure any predefined quantities are suitably typed.
-        call_args.update(self.known_types)
+            # Set the rest to Undefined
+            for i in range(len(args) - len(defaults)):
+                call_args[args[i]] = Undefined
+
+            # Make sure any predefined quantities are suitably typed.
+            call_args.update(self.known_types)
 
         new_args = [('self', None)] if is_method else []
         for arg in args:
@@ -287,7 +307,10 @@ class CythonGenerator(object):
             c_type = self.detect_type(arg, value)
             c_args.append('{type} {arg}'.format(type=c_type, arg=arg))
 
-        c_ret = 'double' if returns else 'void'
+        if isinstance(returns, KnownType):
+            c_ret = returns.type
+        else:
+            c_ret = 'double' if returns else 'void'
         c_arg_def = ', '.join(c_args)
         if self._config.use_openmp:
             ignore = ['reduce', 'converged']
@@ -318,7 +341,10 @@ class CythonGenerator(object):
         return methods
 
     def _get_method_body(self, meth, lines, indent=' '*8):
-        args = set(inspect.getargspec(meth).args)
+        getfullargspec = getattr(
+            inspect, 'getfullargspec', inspect.getargspec
+        )
+        args = set(getfullargspec(meth).args)
         src = [self._process_body_line(line) for line in lines]
         declared = []
         for names, defn in src:
@@ -375,15 +401,18 @@ class CythonGenerator(object):
             else:
                 call_sig.append('{arg}'.format(arg=arg))
 
-        py_ret = ' double' if returns else ''
+        if isinstance(returns, KnownType):
+            py_ret = returns.type + ' '
+        else:
+            py_ret = 'double ' if returns else ''
         py_arg_def = ', '.join(py_args)
-        pydefn = 'cpdef{ret} py_{name}({arg_def}):'.format(
+        pydefn = 'cpdef {ret}py_{name}({arg_def}):'.format(
             ret=py_ret, name=name, arg_def=py_arg_def
         )
         call = ', '.join(call_sig)
         py_ret = 'return ' if returns else ''
         py_self = 'self.' if is_method else ''
-        body = indent + '{ret}{self}{name}({call})'.format(
+        body = indent + '{ret}{self}{name}({call})\n'.format(
             name=name, call=call, ret=py_ret, self=py_self
         )
 
@@ -396,15 +425,17 @@ class CythonGenerator(object):
             sz = ''.join(['[%d]' % n for n in size])
             return sz
 
-        # Remove the "declare('" and the trailing "')".
-        code = parse_declare(declare)
-        if code.startswith('matrix'):
-            sz = matrix(eval(code[7:-1]))
+        # Parse the declare statement.
+        kind, _address_space, ctype, shape = parse_declare(declare)
+        if kind == 'matrix':
+            sz = matrix(shape)
             vars = ['%s%s' % (x.strip(), sz) for x in name.split(',')]
-            defn = 'cdef double %s' % ', '.join(vars)
+            defn = 'cdef {type} {vars}'.format(
+                type=ctype, vars=', '.join(vars)
+            )
             return defn
         else:
-            defn = 'cdef {type} {name}'.format(type=code, name=name)
+            defn = 'cdef {type} {name}'.format(type=ctype, name=name)
             return defn
 
     def _parse_function(self, obj):

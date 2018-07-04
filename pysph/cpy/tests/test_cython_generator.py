@@ -3,11 +3,13 @@
 import unittest
 from textwrap import dedent
 from math import pi, sin
-import numpy as np
+import sys
 
-from pysph.base.config import get_config, set_config
-from pysph.base.cython_generator import (CythonGenerator, CythonClassHelper,
-                                         KnownType, all_numeric, declare)
+
+from ..config import get_config, set_config
+from ..types import declare, KnownType, annotate
+from ..cython_generator import (CythonGenerator, CythonClassHelper,
+                                all_numeric)
 
 
 class BasicEq:
@@ -37,7 +39,7 @@ class EqWithMatrix:
     def func(self, d_idx, d_x=[0.0, 0.0]):
         mat = declare('matrix((2,2))')
         mat[0][0] = d_x[d_idx]
-        vec, vec1 = declare('matrix(3)', 2)
+        vec, vec1 = declare('matrix(3, "float")', 2)
         vec[0] = d_x[d_idx]
 
 
@@ -57,6 +59,12 @@ def func_with_return(d_idx, d_x, x=0.0):
 
 def simple_func(d_idx, d_x, x=0.0):
     d_x[d_idx] += x
+
+
+@annotate(i='int', y='floatp', return_='float')
+def annotated_f(i, y=[0.0]):
+    x = declare('LOCAL_MEM matrix(64, "unsigned int")')
+    return y[i]
 
 
 class TestBase(unittest.TestCase):
@@ -115,27 +123,6 @@ class TestMiscUtils(TestBase):
         """)
         self.assert_code_equal(c.generate().strip(), expect.strip())
 
-    def test_declare(self):
-        self.assertEqual(declare('int'), 0)
-        self.assertEqual(declare('long'), 0)
-        self.assertEqual(declare('double'), 0.0)
-        self.assertEqual(declare('float'), 0.0)
-
-        self.assertEqual(declare('int', 2), (0, 0))
-        self.assertEqual(declare('long', 3), (0, 0, 0))
-        self.assertEqual(declare('double', 2), (0.0, 0.0))
-        self.assertEqual(declare('float', 3), (0.0, 0.0, 0.0))
-
-        res = declare('matrix(3)')
-        self.assertTrue(np.all(res == np.zeros(3)))
-        res = declare('matrix(3)', 3)
-        for i in range(3):
-            self.assertTrue(np.all(res[0] == np.zeros(3)))
-        res = declare('matrix((3,))')
-        self.assertTrue(np.all(res == np.zeros(3)))
-        res = declare('matrix((3, 3))')
-        self.assertTrue(np.all(res == np.zeros((3, 3))))
-
 
 class TestCythonCodeGenerator(TestBase):
     def setUp(self):
@@ -156,6 +143,51 @@ class TestCythonCodeGenerator(TestBase):
                 for key, value in kwargs.items():
                     setattr(self, key, value)
         """)
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    def test_func_signature(self):
+        # Given
+        def f(x=1, y=[1.0]):
+            pass
+
+        cg = CythonGenerator()
+        # When
+        py_data, c_data = cg.get_func_signature(f)
+
+        # Then
+        self.assertEqual(py_data[0], ['long x', 'double[:] y'])
+        self.assertEqual(py_data[1], ['x', '&y[0]'])
+        self.assertEqual(c_data[0], ['long x', 'double* y'])
+        self.assertEqual(c_data[1], ['x', 'y'])
+
+    def test_function_with_annotation(self):
+        # Given
+        cg = CythonGenerator()
+        # When
+        cg.parse(annotated_f)
+
+        # Then
+        expect = dedent('''
+        cdef inline float annotated_f(int i, float* y):
+            cdef unsigned int x[64]
+            return y[i]
+        ''')
+        self.assert_code_equal(cg.get_code().strip(), expect.strip())
+
+    @unittest.skipIf(sys.version_info < (3, 4), reason='Requires Python3.')
+    def test_python3_annotation(self):
+        # Given
+        from .py3_code import py3_f
+        cg = CythonGenerator()
+
+        # When
+        cg.parse(py3_f)
+        expect = dedent('''
+        cdef inline int py3_f(int x):
+            cdef int y
+            y = x + 1
+            return x*y
+        ''')
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
     def test_simple_method(self):
@@ -279,7 +311,7 @@ class TestCythonCodeGenerator(TestBase):
             cdef inline void func(self, long d_idx, double* d_x):
                 cdef double mat[2][2]
                 mat[0][0] = d_x[d_idx]
-                cdef double vec[3], vec1[3]
+                cdef float vec[3], vec1[3]
                 vec[0] = d_x[d_idx]
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
@@ -302,7 +334,7 @@ class TestCythonCodeGenerator(TestBase):
         """)
         self.assert_code_equal(cg.get_code().strip(), expect.strip())
 
-    def test_method_with_known_types(self):
+    def test_method_with_known_types(self):  # noqa
         cg = CythonGenerator(
             known_types={'WIJ': 0.0, 'DWIJ': [0.0, 0.0, 0.0],
                          'user': KnownType('ndarray'),
