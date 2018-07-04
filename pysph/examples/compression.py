@@ -24,20 +24,19 @@ from pysph.sph.integrator_step import WCSPHStep
 from pysph.solver.utils import iter_output
 
 rho0 = 1000.0
-mu = 1
+u0 = -0.01
+mu = 10
 co = 10
 hdx = 1.0
-dx = 0.002
+dx = 0.004
 
-t0 = -2.5
-tf = 5.5
-trest = 0.0
+tf = 3.6
 
 class Compression(Application):
     def add_user_options(self, group):
         group.add_argument(
-            "--N", action="store", type=float, dest="N", default=2000,
-            help="Number of particles."
+            "--N", action="store", type=float, dest="N", default=500,
+            help="Number of particles per layer."
         )
 
     def consume_user_options(self):
@@ -70,7 +69,7 @@ class Compression(Application):
         m0 = rho0 * dx**3
 
         # FLUID
-        n = np.arange(0,self.options.N,1)
+        n = np.arange(1,self.options.N,1)
         x = np.arange(0.5*dx,self.D-0.25*dx,dx)
         x,n = np.meshgrid(x,n)
         r = self.r*np.sqrt(n/self.options.N)
@@ -84,7 +83,7 @@ class Compression(Application):
 
         # TOP WALL
         N = (self.R/self.r)**2*self.options.N
-        n = np.arange(0,N,1)
+        n = np.arange(1,N,1)
         x = np.array([self.D+0.5*dx,self.D+1.5*dx,self.D+2.5*dx])
         x,n = np.meshgrid(x,n)
         r = self.R*np.sqrt(n/N)
@@ -98,7 +97,7 @@ class Compression(Application):
 
         # BOTTOM WALL
         N = (self.R/self.r)**2*self.options.N
-        n = np.arange(0,N,1)
+        n = np.arange(1,N,1)
         x = np.array([-2.5*dx,-1.5*dx, -0.5*dx])
         x,n = np.meshgrid(x,n)
         r = self.R*np.sqrt(n/N)
@@ -111,52 +110,25 @@ class Compression(Application):
                         z=z, m=m0, h=h0, rho=rho0)
 
         self.scheme.setup_properties([fluid, top_wall, bottom_wall])
+        top_wall.ax[:] = u0
+        top_wall.u[:] = u0
         return [fluid, top_wall, bottom_wall]
 
-    def post_stage(self, current_time, dt, stage):
-        # prescribed motion of the top mold
-        if stage == 1:
-            return
-
-        top_pa = next((p for p in self.particles if p.name=='top_wall'),None)
-        top_pa.u[:] = self.displacement_speed(current_time)
-        top_pa.x[:] += top_pa.u[:]*dt
-        self.disp.append(top_pa.x[0]-0.5*dx)
-        self.time.append(current_time-trest)
-
     def post_process(self, info_file_or_dir):
-        # Plot displacement curve of top mold
-        dd = self.D*np.exp(np.array(self.time)/t0)
-        plt.plot(self.time[::10], self.disp[::10], '.k')
-        plt.plot(self.time, dd, '--k')
-        plt.title("Displacement of top mold")
-        plt.xlabel('Time')
-        plt.ylabel('Displacement')
-        plt.tight_layout()
-        pdf_fig = os.path.join(self.output_dir, "displacement.pdf")
-        plt.savefig(pdf_fig)
-        try:
-            tex_fig = os.path.join(self.output_dir, "displacement.tex")
-            from matplotlib2tikz import save as tikz_save
-            tikz_save(tex_fig)
-        except ImportError:
-            print("Did not write tikz figure.")
-
         # plot pressure force
         time = []
         F = []
 
         for sd, array in iter_output(self.output_files, 'top_wall'):
             t = sd['t']
-            if t > trest:
-                time.append(t-trest)
-                p, x = array.get('p', 'x')
-                xmin = min(x)
-                force = 0.0
-                for press, pos in zip(p,x):
-                    if pos < xmin + dx/4:
-                        force += press*dx*dx
-                F.append(force)
+            time.append(t)
+            p, x = array.get('p', 'x')
+            xmin = min(x)
+            force = 0.0
+            for press, pos in zip(p,x):
+                if pos < xmin + dx/4:
+                    force += press*dx*dx
+            F.append(force)
 
         plt.figure()
         plt.plot(time, F, '-k')
@@ -173,14 +145,7 @@ class Compression(Application):
         except ImportError:
             print("Did not write tikz figure.")
 
-    def displacement_speed(self,t):
-        if t < 5+trest and t > trest:
-            vel = self.D/t0*np.exp((t-trest)/t0)
-        else:
-            vel = 0.0
-        return vel
-
 if __name__ == '__main__':
     app = Compression()
     app.run()
-    app.post_process(app.info_filename)
+    #app.post_process(app.info_filename)
