@@ -9,7 +9,7 @@ from pysph.sph.integrator import Integrator
 from pysph.cpy.api import declare
 from pysph.sph.wc.density_correction import gj_solve
 
-from numpy import sqrt, cos, sin, zeros, pi
+from numpy import sqrt, cos, sin, zeros, pi, exp
 import numpy as np
 import numpy
 
@@ -775,7 +775,7 @@ class InitialGuessDensity(Equation):
         d_exp_lambda[d_idx] += const * (s_m[s_idx]*(a1+a2))
 
     def post_loop(self, t, d_rho, d_exp_lambda, d_idx):
-        d_rho[d_idx] = d_rho[d_idx] * e**(d_exp_lambda[d_idx])
+        d_rho[d_idx] = d_rho[d_idx] * exp(d_exp_lambda[d_idx])
 
 
 class UpdateSmoothingLength(Equation):
