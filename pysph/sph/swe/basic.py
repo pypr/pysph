@@ -11,6 +11,7 @@ from pysph.sph.wc.density_correction import gj_solve
 
 from numpy import sqrt, cos, sin, zeros, pi
 import numpy as np
+import numpy
 
 
 class CheckForParticlesToSplit(Equation):
@@ -60,14 +61,13 @@ class CheckForParticlesToSplit(Equation):
         self.y_max = y_max
         super(CheckForParticlesToSplit, self).__init__(dest, None)
 
-    def initialize(self, d_pa_to_split, d_idx):
-        d_pa_to_split[d_idx] = 0.0
-
-    def post_loop(self, d_idx, d_rho0, d_A, d_h, d_x, d_y, d_pa_to_split):
+    def initialize(self, d_idx, d_A, d_h, d_x, d_y, d_pa_to_split):
         if (d_A[d_idx] > self.A_max and d_h[d_idx] < self.h_max
            and (self.x_min < d_x[d_idx] < self.x_max)
            and (self.y_min < d_y[d_idx] < self.y_max)):
             d_pa_to_split[d_idx] = 1
+        else:
+            d_pa_to_split[d_idx] = 0
 
 
 class ParticleSplit(object):
@@ -95,25 +95,24 @@ class ParticleSplit(object):
         # that of its parents mass
         self.center_pa_mass_frac = 0.178705766141917
 
-        # Ratio of mass of daughter particle located at edge of hexagon to that
-        # of its parents mass
-        self.edge_pa_mass_frac = 0.136882287617319
+        # Ratio of mass of daughter particle located at vertex of hexagon to
+        # that of its parents mass
+        self.vertex_pa_mass_frac = 0.136882287617319
 
         # Ratio of smoothing length of daughter particle to that of its parents
         # smoothing length
         self.pa_h_ratio = 0.9
 
-        # Ratio of distance between center daughter particle and edge daughter
-        # particle to that of its parents smoothing length
-        self.center_and_edge_pa_separation_frac = 0.4
-
-        self.props = self.pa_arr.properties.keys()
+        # Ratio of distance between center daughter particle and vertex
+        # daughter particle to that of its parents smoothing length
+        self.center_and_vertex_pa_separation_frac = 0.4
 
         # Get index of the parent particles to split
         self.idx_pa_to_split = self._get_idx_of_particles_to_split()
 
-        # Number of daughter particles located at edge of hexagonal split
-        self.num_edge_pa_after_single_split = 6
+        # Number of daughter particles located at the vertices of hexagon after
+        # splitting
+        self.num_vertex_pa_after_single_split = 6
 
     def do_particle_split(self, solver=None):
         if not self.idx_pa_to_split.size:
@@ -134,22 +133,22 @@ class ParticleSplit(object):
             rho0_parent = self.pa_arr.rho0[self.idx_pa_to_split]
             alpha_parent = self.pa_arr.alpha[self.idx_pa_to_split]
 
-            # Edge daughter particle properties update
-            n = self.num_edge_pa_after_single_split
-            h_edge_pa = self.pa_h_ratio * np.repeat(h_parent, n)
-            h0_edge_pa = self.pa_h_ratio * np.repeat(h0_parent, n)
-            u_prev_step_edge_pa = np.repeat(u_prev_step_parent, n)
-            v_prev_step_edge_pa = np.repeat(v_prev_step_parent, n)
-            m_edge_pa = self.edge_pa_mass_frac * np.repeat(m_parent, n)
-            edge_pa_pos = self._get_edge_pa_positions(h_parent, u_parent,
-                                                      v_parent)
-            x_edge_pa = edge_pa_pos[0] + np.repeat(x_parent, n)
-            y_edge_pa = edge_pa_pos[1] + np.repeat(y_parent, n)
+            # Vertex daughter particle properties update
+            n = self.num_vertex_pa_after_single_split
+            h_vertex_pa = self.pa_h_ratio * np.repeat(h_parent, n)
+            h0_vertex_pa = self.pa_h_ratio * np.repeat(h0_parent, n)
+            u_prev_step_vertex_pa = np.repeat(u_prev_step_parent, n)
+            v_prev_step_vertex_pa = np.repeat(v_prev_step_parent, n)
+            m_vertex_pa = self.vertex_pa_mass_frac * np.repeat(m_parent, n)
+            vertex_pa_pos = self._get_vertex_pa_positions(h_parent, u_parent,
+                                                          v_parent)
+            x_vertex_pa = vertex_pa_pos[0] + np.repeat(x_parent, n)
+            y_vertex_pa = vertex_pa_pos[1] + np.repeat(y_parent, n)
 
-            rho0_edge_pa = np.repeat(rho0_parent, n)
-            rho_edge_pa = np.repeat(rho_parent, n)
-            alpha_edge_pa = np.repeat(alpha_parent, n)
-            parent_idx_edge_pa = np.repeat(self.idx_pa_to_split, n)
+            rho0_vertex_pa = np.repeat(rho0_parent, n)
+            rho_vertex_pa = np.repeat(rho_parent, n)
+            alpha_vertex_pa = np.repeat(alpha_parent, n)
+            parent_idx_vertex_pa = np.repeat(self.idx_pa_to_split, n)
 
             # Note:
             # The center daughter particle properties are set at index of
@@ -163,11 +162,12 @@ class ParticleSplit(object):
                 self.pa_arr.h0[idx] *= self.pa_h_ratio
                 self.pa_arr.parent_idx[idx] = int(idx)
 
-            # Update particle array to include edge daughter particles
-            self._add_edge_pa_prop(h0_edge_pa, h_edge_pa, m_edge_pa, x_edge_pa,
-                                   y_edge_pa, rho0_edge_pa, rho_edge_pa,
-                                   u_prev_step_edge_pa, v_prev_step_edge_pa,
-                                   alpha_edge_pa, parent_idx_edge_pa)
+            # Update particle array to include vertex daughter particles
+            self._add_vertex_pa_prop(
+                h0_vertex_pa, h_vertex_pa, m_vertex_pa, x_vertex_pa,
+                y_vertex_pa, rho0_vertex_pa, rho_vertex_pa,
+                u_prev_step_vertex_pa, v_prev_step_vertex_pa, alpha_vertex_pa,
+                parent_idx_vertex_pa)
 
     def _get_idx_of_particles_to_split(self):
         idx_pa_to_split = []
@@ -176,16 +176,16 @@ class ParticleSplit(object):
                 idx_pa_to_split.append(idx)
         return np.array(idx_pa_to_split)
 
-    def _get_edge_pa_positions(self, h_parent, u_parent, v_parent):
+    def _get_vertex_pa_positions(self, h_parent, u_parent, v_parent):
         # Number of particles to split
         num_of_pa_to_split = len(self.idx_pa_to_split)
 
-        n = self.num_edge_pa_after_single_split
-        theta_edge_pa = zeros(n)
-        r = self.center_and_edge_pa_separation_frac
+        n = self.num_vertex_pa_after_single_split
+        theta_vertex_pa = zeros(n)
+        r = self.center_and_vertex_pa_separation_frac
 
         for i, theta in enumerate(range(0, 360, 60)):
-            theta_edge_pa[i] = (pi/180)*theta
+            theta_vertex_pa[i] = (pi/180)*theta
 
         # Angle of velocity vector with horizontal
         angle_vel = np.where(
@@ -195,44 +195,34 @@ class ParticleSplit(object):
 
         # Rotates the hexagon such that its horizontal axis aligns with the
         # direction of velocity vector
-        angle_actual = (np.tile(theta_edge_pa, num_of_pa_to_split)
+        angle_actual = (np.tile(theta_vertex_pa, num_of_pa_to_split)
                         + np.repeat(angle_vel, n))
 
         x = r * cos(angle_actual) * np.repeat(h_parent, n)
         y = r * sin(angle_actual) * np.repeat(h_parent, n)
         return x.copy(), y.copy()
 
-    def _add_edge_pa_prop(self, h0_edge_pa, h_edge_pa, m_edge_pa, x_edge_pa,
-                          y_edge_pa, rho0_edge_pa, rho_edge_pa,
-                          u_prev_step_edge_pa, v_prev_step_edge_pa,
-                          alpha_edge_pa, parent_idx_edge_pa):
-        add_prop = {}
-        for prop in self.props:
-            if prop == 'm':
-                add_prop[prop] = m_edge_pa
-            elif prop == 'h':
-                add_prop[prop] = h_edge_pa
-            elif prop == 'h0':
-                add_prop[prop] = h0_edge_pa
-            elif prop == 'x':
-                add_prop[prop] = x_edge_pa
-            elif prop == 'y':
-                add_prop[prop] = y_edge_pa
-            elif prop == 'u_prev_step':
-                add_prop[prop] = u_prev_step_edge_pa
-            elif prop == 'v_prev_step':
-                add_prop[prop] = v_prev_step_edge_pa
-            elif prop == 'rho0':
-                add_prop[prop] = rho0_edge_pa
-            elif prop == 'rho':
-                add_prop[prop] = rho_edge_pa
-            elif prop == 'alpha':
-                add_prop[prop] = alpha_edge_pa
-            elif prop == 'parent_idx':
-                add_prop[prop] = parent_idx_edge_pa.astype(int)
+    def _add_vertex_pa_prop(self, h0_vertex_pa, h_vertex_pa, m_vertex_pa,
+                            x_vertex_pa, y_vertex_pa, rho0_vertex_pa,
+                            rho_vertex_pa, u_prev_step_vertex_pa,
+                            v_prev_step_vertex_pa, alpha_vertex_pa,
+                            parent_idx_vertex_pa):
+        vertex_pa_props = {
+            'm': m_vertex_pa,
+            'h': h_vertex_pa,
+            'h0': h0_vertex_pa,
+            'x': x_vertex_pa,
+            'y': y_vertex_pa,
+            'u_prev_step': u_prev_step_vertex_pa,
+            'v_prev_step': v_prev_step_vertex_pa,
+            'rho0': rho0_vertex_pa,
+            'rho': rho_vertex_pa,
+            'alpha': alpha_vertex_pa,
+            'parent_idx': parent_idx_vertex_pa.astype(int)
+            }
 
-        # Add edge daughter particles to particle array
-        self.pa_arr.add_particles(**add_prop)
+        # Add vertex daughter particles to particle array
+        self.pa_arr.add_particles(**vertex_pa_props)
 
 
 class DaughterVelocityEval(Equation):
@@ -449,7 +439,7 @@ class FindMergeable(Equation):
         # The indices of particle 'b' are removed from particle array after
         # merging is done
         indices = declare('object')
-        indices = np.where(dst.merge > 0)[0]
+        indices = numpy.where(dst.merge > 0)[0]
         if len(indices) > 0:
             dst.remove_particles(indices)
 
@@ -607,7 +597,7 @@ class NonDimensionalDensityResidual(Equation):
 
     def post_loop(self, d_psi, d_rho, d_rho_prev_iter, d_idx):
         # Non-dimensional residual
-        d_psi[d_idx] = abs(d_rho[d_idx]-d_rho_prev_iter[d_idx]) \
+        d_psi[d_idx] = abs(d_rho[d_idx] - d_rho_prev_iter[d_idx]) \
                        / d_rho_prev_iter[d_idx]
 
 
@@ -632,7 +622,8 @@ class CheckConvergenceDensityResidual(Equation):
 
     Notes
     -----
-    Use this convergence criteria if particle splitting is activated.
+    If particle splitting is activated, better to use this convergence
+    criteria. It can be used even if particle splitting is not activated.
 
     """
     def __init__(self, dest, sources=None):
@@ -712,7 +703,8 @@ class InitialGuessDensityVacondio(Equation):
     ac_dw_var_hj_2D.f
 
     Note:
-    Use this method if particle splitting is activated.
+    If particle splitting is activated, better to use this method. It can be
+    used even if particle splitting is not activated.
 
     """
     def __init__(self, dest, sources, dim=2):
@@ -1124,10 +1116,10 @@ class ParticleAcceleration(Equation):
 
     def loop(self, d_x, d_y, s_x, s_y, d_rho, d_idx, s_m, s_idx, s_rho, d_m,
              DWI, DWJ, d_au, d_av, s_alpha, d_alpha, s_p, d_p, d_tu, s_dw,
-             d_dw, t, s_is_boun_pa, s_tu, d_tv, s_tv, d_h, s_h, d_u, s_u, d_v,
-             s_v, d_cs, s_cs):
+             d_dw, t, s_is_wall_boun_pa, s_tu, d_tv, s_tv, d_h, s_h, d_u, s_u,
+             d_v, s_v, d_cs, s_cs):
         # True if neighbor is wall boundary particle
-        if s_is_boun_pa[s_idx] == 1:
+        if s_is_wall_boun_pa[s_idx] == 1:
 
             # Setting artificial viscosity to zero when a particle interacts
             # with wall boundary particles
@@ -1488,7 +1480,7 @@ class SubCriticalOutFlow(Equation):
 
     ..math ::
 
-        v_{B,n} = v_{I,n} - 2\sqrt{g}(\sqrt{d_I} - \sqrt{d_B}), v_{B,t} =
+        v_{B,n} = v_{I,n} + 2\sqrt{g}(\sqrt{d_I} - \sqrt{d_B}), v_{B,t} =
         v_{I,t}
 
     References
@@ -1499,7 +1491,51 @@ class SubCriticalOutFlow(Equation):
 
     Notes:
     -----
-    The water depth is imposed at the open boundary.
+    The constant water depth is imposed at the open boundary.
+
+    """
+    def __init__(self, dest, dim=2, rhow=1000.0):
+        r"""
+        Parameters
+        ----------
+        dim : int
+            number of space dimensions (Default: 2)
+        rhow : float
+            constant 3-D density of water
+
+        """
+        self.g = 9.8
+        self.dim = dim
+        self.rhow = rhow
+        super(SubCriticalOutFlow, self).__init__(dest, None)
+
+    def post_loop(self, d_dw, d_dw_inner_reimann, d_u, d_u_inner_reimann,
+                  d_rho, d_cs, d_alpha, d_v, d_v_inner_reimann, d_idx):
+        const = 2. * sqrt(self.g)
+        # Velocities of open boundary particles
+        d_u[d_idx] = (d_u_inner_reimann[d_idx]
+                      + const*(sqrt(d_dw_inner_reimann[d_idx])
+                               - sqrt(d_dw[d_idx])))
+        d_v[d_idx] = d_v_inner_reimann[d_idx]
+
+
+class SubCriticalTimeVaryingOutFlow(Equation):
+    r"""**Subcritical outflow condition**
+
+    ..math ::
+
+        v_{B,n} = v_{I,n} + 2\sqrt{g}(\sqrt{d_I} - \sqrt{d_B}), v_{B,t} =
+        v_{I,t}
+
+    References
+    ----------
+    .. [Vacondio2012] R. Vacondio et al., "SPH modeling of shallow flow with
+    open boundaries for practical flood simulation", J. Hydraul. Eng., 2012,
+    138(6), pp. 530-541.
+
+    Notes:
+    -----
+    The time varying water depth is imposed at the open boundary.
 
     """
     def __init__(self, dest, dim=2, rhow=1000.0):
@@ -1521,13 +1557,15 @@ class SubCriticalOutFlow(Equation):
                   d_rho, d_cs, d_alpha, d_v, d_v_inner_reimann, d_idx,
                   d_dw_at_t):
         # Properties of open boundary particles
+        # Time varying water depth imposed
         d_dw[d_idx] = d_dw_at_t[d_idx]
         d_rho[d_idx] = d_dw[d_idx] * self.rhow
         d_cs[d_idx] = sqrt(d_dw[d_idx] * self.g)
         d_alpha[d_idx] = d_rho[d_idx] * self.dim
+
         const = 2. * sqrt(self.g)
         d_u[d_idx] = (d_u_inner_reimann[d_idx]
-                      - const*(sqrt(d_dw_inner_reimann[d_idx])
+                      + const*(sqrt(d_dw_inner_reimann[d_idx])
                                - sqrt(d_dw[d_idx])))
         d_v[d_idx] = d_v_inner_reimann[d_idx]
 
