@@ -78,6 +78,7 @@ class StillWaterInaParabolicSuface(Application):
 
         bed = gpa_swe(name='bed', x=xb, V=Vb, b=b, h=hb)
 
+        # For gradient correction
         len_b = len(bed.x) * 9
         bed.add_constant('m_mat', [0.0] * len_b)
 

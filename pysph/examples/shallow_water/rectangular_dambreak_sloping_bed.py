@@ -57,7 +57,7 @@ class RectangularDamBreakSlopingBed(Application):
             "--dw0", action="store", type=float, dest="dw0", default=1.0,
             help="Initial depth of the fluid column (m)")
         group.add_argument(
-            "--l", action="store", type=float, dest="l", default=2.0,
+            "--le", action="store", type=float, dest="le", default=2.0,
             help="Initial length of the fluid column (m)")
         group.add_argument(
             "--w", action="store", type=float, dest="w", default=1.0,
@@ -71,7 +71,7 @@ class RectangularDamBreakSlopingBed(Application):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.dw0 = self.options.dw0
-        self.l = self.options.l
+        self.le = self.options.le
         self.w = self.options.w
         self.theta = self.options.theta
 
@@ -83,10 +83,10 @@ class RectangularDamBreakSlopingBed(Application):
         dx = self.dx
         hdx = self.hdx
         dw0 = self.dw0
-        l = self.l
+        le = self.le
         w = self.w
 
-        x, y = mgrid[-l:l+1e-4:dx,
+        x, y = mgrid[-le:le+1e-4:dx,
                      -w/2.:w/2.+1e-4:dx]
         x = x.ravel()
         y = y.ravel()
@@ -103,8 +103,8 @@ class RectangularDamBreakSlopingBed(Application):
 
         # Bed props
         dxb = dx/2.
-        left_edge_bed = -3 * l
-        right_edge_bed = 3 * l
+        left_edge_bed = -3 * le
+        right_edge_bed = 3 * le
         top_edge_bed = w + 4*dxb
         bottom_edge_bed = -w - 4*dxb
         xb, yb = mgrid[left_edge_bed:+right_edge_bed+1e-4:dxb,
@@ -288,7 +288,7 @@ class RectangularDamBreakSlopingBed(Application):
             bed_slope_radian = self.theta * (pi/180.)
             x_actual = pos_actual(self.dw0, dw_actual, bed_slope_radian,
                                   t_to_plot[num])
-            x_actual = concatenate((array([0]), x_actual+self.l), axis=0)
+            x_actual = concatenate((array([0]), x_actual+self.le), axis=0)
 
             dw_actual = concatenate(
                     (array([self.options.dw0]), dw_actual), axis=0)
