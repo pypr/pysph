@@ -52,7 +52,7 @@ class RectangularDamBreak(Application):
             "--dw0", action="store", type=float, dest="dw0", default=1.0,
             help="Initial depth of the fluid column (m)")
         group.add_argument(
-            "--l", action="store", type=float, dest="l", default=2.0,
+            "--le", action="store", type=float, dest="le", default=2.0,
             help="Initial length of the fluid column (m)")
         group.add_argument(
             "--w", action="store", type=float, dest="w", default=1.0,
@@ -62,7 +62,7 @@ class RectangularDamBreak(Application):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.dw0 = self.options.dw0
-        self.l = self.options.l
+        self.le = self.options.le
         self.w = self.options.w
 
     def create_particles(self):
@@ -70,7 +70,7 @@ class RectangularDamBreak(Application):
         # The wall at x = 0 is simulated by applying a symmetry condition
         # in the fluid, i.e., an additional column of fluid to the left of the
         # wall
-        x, y = mgrid[-self.l:self.l+1e-4:self.dx,
+        x, y = mgrid[-self.le:self.le+1e-4:self.dx,
                      -(self.w)/2.:(self.w)/2.+1e-4:self.dx]
         x = x.ravel()
         y = y.ravel()
@@ -240,7 +240,7 @@ class RectangularDamBreak(Application):
             dw_actual = concatenate((dw, dw_rem), axis=0)
 
             x_actual = pos_actual(self.dw0, dw_actual, t_to_plot[num])
-            x_actual = concatenate((array([0]), x_actual+self.l), axis=0)
+            x_actual = concatenate((array([0]), x_actual+self.le), axis=0)
 
             dw_actual = concatenate(
                     (array([self.options.dw0]), dw_actual), axis=0)

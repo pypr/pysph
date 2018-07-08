@@ -54,7 +54,7 @@ class StillWaterOveraStep(Application):
             dest="fluid_surf_hei", default=1.0, help="Surface height of fluid\
             column (m)")
         group.add_argument(
-            "--l", action="store", type=float, dest="l", default=1.0,
+            "--le", action="store", type=float, dest="le", default=1.0,
             help="Initial length of the fluid column (m)")
         group.add_argument(
             "--step_loc", action="store", type=float, dest="step_loc",
@@ -67,7 +67,7 @@ class StillWaterOveraStep(Application):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.fluid_surf_hei = self.options.fluid_surf_hei
-        self.l = self.options.l
+        self.le = self.options.le
         self.step_loc = self.options.step_loc
         self.step_hei = self.options.step_hei
 
@@ -76,11 +76,11 @@ class StillWaterOveraStep(Application):
         hdx = self.hdx
         dx = self.dx
         fluid_surf_hei = self.fluid_surf_hei
-        l = self.l
+        le = self.le
 
         # Bed
         dxb = 0.25 * dx
-        xb = arange(-dx, l+dx+1e-4, dxb)
+        xb = arange(-dx, le+dx+1e-4, dxb)
         b = zeros_like(xb)
         b[where(xb > self.step_loc)] = self.step_hei
 
@@ -89,11 +89,12 @@ class StillWaterOveraStep(Application):
 
         bed = gpa_swe(name='bed', x=xb, V=Vb, b=b, h=hb)
 
+        # For gradient correction
         len_b = len(bed.x) * 9
         bed.add_constant('m_mat', [0.0] * len_b)
 
         # Fluid
-        x = arange(0, l+1e-4, dx)
+        x = arange(0, le+1e-4, dx)
         h = ones_like(x) * hdx * dx
         h0 = ones_like(x) * hdx * dx
 

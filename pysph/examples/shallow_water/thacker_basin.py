@@ -95,6 +95,8 @@ class ThackerBasin(Application):
         hb = ones_like(xb) * hdx * dxb
 
         bed = gpa_swe(name='bed', x=xb, y=yb, V=Vb, b=b, h=hb)
+
+        # For gradient correction
         len_b = len(bed.x) * 9
         bed.add_constant('m_mat', [0.0] * len_b)
 
