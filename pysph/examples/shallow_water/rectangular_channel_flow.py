@@ -56,7 +56,7 @@ class RectangularOpenChannelFlow(Application):
             "--dw0", action="store", type=float, dest="dw0", default=5.0,
             help="Initial depth of the fluid column (m)")
         group.add_argument(
-            "--l", action="store", type=float, dest="l", default=800.0,
+            "--le", action="store", type=float, dest="le", default=800.0,
             help="Length of the channel (m)")
         group.add_argument(
             "--w", action="store", type=float, dest="w", default=400.0,
@@ -69,7 +69,7 @@ class RectangularOpenChannelFlow(Application):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.dw0 = self.options.dw0
-        self.l = self.options.l
+        self.le = self.options.le
         self.w = self.options.w
         self.n = self.options.n
 
@@ -78,8 +78,8 @@ class RectangularOpenChannelFlow(Application):
         self.num_outlet_pa = 2
         self.x_max_inlet = 0.
         self.x_min_inlet = -self.dx * self.num_inlet_pa
-        self.x_min_outlet = self.l
-        self.x_max_outlet = self.l + self.num_outlet_pa*self.dx
+        self.x_min_outlet = self.le
+        self.x_max_outlet = self.le + self.num_outlet_pa*self.dx
 
         # Initial Condition
         q = 14.645  # Specific Discharge
@@ -90,7 +90,7 @@ class RectangularOpenChannelFlow(Application):
         dx = self.dx
         d = self.dw0
         w = self.w
-        l = self.l
+        le = self.le
         # Inlet Properties
         y = arange(dx/2, w-(dx/4.), dx)
         x = zeros_like(y) - 0.5*dx
@@ -122,7 +122,7 @@ class RectangularOpenChannelFlow(Application):
         inlet.add_output_arrays(boundary_props)
 
         # Fluid Properties
-        xf, yf = np.mgrid[0.5*dx:self.x_max_inlet+l:dx, dx/2:w-(dx/4.):dx]
+        xf, yf = np.mgrid[0.5*dx:self.x_max_inlet+le:dx, dx/2:w-(dx/4.):dx]
         xf, yf = (np.ravel(t) for t in (xf, yf))
         m = ones_like(xf) * dx * dx * rho_w * d
         h = ones_like(xf) * hdx * dx
@@ -138,7 +138,7 @@ class RectangularOpenChannelFlow(Application):
         # Outlet Properties
         xo, yo = np.mgrid[dx/2.:self.num_outlet_pa*dx:dx, dx/2:w-(dx/4.):dx]
         xo, yo = (np.ravel(t) for t in (xo, yo))
-        xo += l
+        xo += le
         dw = ones_like(xo) * d
         m = ones_like(xo) * dx * dx * rho_w * d
         h = ones_like(xo) * hdx * dx
@@ -152,7 +152,7 @@ class RectangularOpenChannelFlow(Application):
         outlet.add_output_arrays(boundary_props)
 
         # Bed Properties
-        xb, yb = np.mgrid[-5*dx:l+5*dx:dx, 0:w+dx/2.:dx]
+        xb, yb = np.mgrid[-5*dx:le+5*dx:dx, 0:w+dx/2.:dx]
         xb = np.ravel(xb)
         yb = np.ravel(yb)
 

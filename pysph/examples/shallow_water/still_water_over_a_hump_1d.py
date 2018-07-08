@@ -55,25 +55,25 @@ class StillWaterOverHump(Application):
             dest="fluid_surf_hei", default=0.4, help="Surface height of fluid\
             column (m)")
         group.add_argument(
-            "--l", action="store", type=float, dest="l", default=1.0,
+            "--le", action="store", type=float, dest="le", default=1.0,
             help="Initial length of the fluid column (m)")
 
     def consume_user_options(self):
         self.hdx = self.options.hdx
         self.dx = self.options.dx
         self.fluid_surf_hei = self.options.fluid_surf_hei
-        self.l = self.options.l
+        self.le = self.options.le
 
     def create_particles(self):
         # 1D
         hdx = self.hdx
         dx = self.dx
         fluid_surf_hei = self.fluid_surf_hei
-        l = self.l
+        le = self.le
 
         # Bed
         dxb = dx
-        xb = arange(0, l+1e-4, dxb)
+        xb = arange(0, le+1e-4, dxb)
         cond = (0.25 < xb) & (xb < 0.75)
         b = where(cond, 0.05*(1+sin(pi*(4*xb+0.5))), 0)
 
@@ -82,11 +82,12 @@ class StillWaterOverHump(Application):
 
         bed = gpa_swe(name='bed', x=xb, V=Vb, b=b, h=hb)
 
+        # For gradient correction
         len_b = len(bed.x) * 9
         bed.add_constant('m_mat', [0.0] * len_b)
 
         # Fluid
-        x = arange(0, l+1e-4, dx)
+        x = arange(0, le+1e-4, dx)
         h = ones_like(x) * hdx * dx
         h0 = ones_like(x) * hdx * dx
 
