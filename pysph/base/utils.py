@@ -411,7 +411,7 @@ def get_particle_array_swe(constants=None, **props):
         'v_parent', 'uh_parent', 'vh_parent', 'parent_idx', 'b', 'bx', 'by',
         'bxx', 'bxy', byy', 'closest_idx', 'is_merged_pa', 'merge',
         'dw_inner_reimann', 'u_inner_reimann', 'v_inner_reimann', 'shep_corr',
-        'is_boun_pa', 'dw_at_t']
+        'is_wall_boun_pa', 'dw_at_t']
 
     Parameters
     ----------
@@ -435,7 +435,7 @@ def get_particle_array_swe(constants=None, **props):
                  'psi', 'sum_Ak', 'arho', 'u_parent', 'v_parent', 'uh_parent',
                  'vh_parent', 'b', 'bx', 'by', 'bxx', 'bxy', 'byy', 'merge',
                  'is_merged_pa', 'dw_inner_reimann', 'u_inner_reimann',
-                 'v_inner_reimann', 'shep_corr', 'is_boun_pa', 'dw_at_t']
+                 'v_inner_reimann', 'shep_corr', 'is_wall_boun_pa', 'dw_at_t']
 
     consts = {}
     if constants:
