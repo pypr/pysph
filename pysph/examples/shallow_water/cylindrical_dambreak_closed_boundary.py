@@ -223,11 +223,15 @@ class CylindricalDamBreakClosedBoundary(Application):
         num = 0
         # Solution files of this problem (Vacondio et al.) for
         # depth of dam 10 m and radius 10.0 m at times 0.1s, 0.4s & 2.0s
-        files_dir = (os.path.dirname(os.path.realpath(__file__))
-                     + '/files_for_output_comparison/')
-        vacondio_soln_files = [files_dir+'cyl_dam_closed_boun_t01.csv',
-                               files_dir+'cyl_dam_closed_boun_t02.csv',
-                               files_dir+'cyl_dam_closed_boun_t03.csv']
+        files_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                'files_for_output_comparison'
+                )
+        vacondio_soln_files = [
+                os.path.join(files_dir, 'cyl_dam_closed_boun_t01.csv'),
+                os.path.join(files_dir, 'cyl_dam_closed_boun_t02.csv'),
+                os.path.join(files_dir, 'cyl_dam_closed_boun_t03.csv')
+                ]
         for fname in fname_for_plot:
             data = load(fname)
             fluid = data['arrays']['fluid']
