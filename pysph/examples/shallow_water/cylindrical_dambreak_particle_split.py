@@ -220,11 +220,15 @@ class CylindricalDamBreakSplit(Application):
         num = 0
         # Finite volume solution files of this problem for depth of dam 10 m
         # and radius 1000 m at times 10s, 30s and 50s
-        files_dir = (os.path.dirname(os.path.realpath(__file__))
-                     + '/files_for_output_comparison/')
-        finite_vol_soln_files = [files_dir+'cyl_dam_split_t01.csv',
-                                 files_dir+'cyl_dam_split_t02.csv',
-                                 files_dir+'cyl_dam_split_t03.csv']
+        files_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                'files_for_output_comparison'
+                )
+        finite_vol_soln_files = [
+                os.path.join(files_dir, 'cyl_dam_split_t01.csv'),
+                os.path.join(files_dir, 'cyl_dam_split_t02.csv'),
+                os.path.join(files_dir, 'cyl_dam_split_t03.csv')
+                ]
         for fname in fname_for_plot:
             data = load(fname)
             fluid = data['arrays']['fluid']
