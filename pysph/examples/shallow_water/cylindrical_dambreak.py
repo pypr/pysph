@@ -211,11 +211,15 @@ class CylindricalDamBreak(Application):
         num = 0
         # Solution files of this problem (Rodriguez et al.) for
         # depth of dam 1 m and radius 0.5 m at times 0.1s, 0.2s & 0.3s
-        files_dir = (os.path.dirname(os.path.realpath(__file__))
-                     + '/files_for_output_comparison/')
-        rodri_soln_files = [files_dir+'cyl_dam_t01.csv',
-                            files_dir+'cyl_dam_t02.csv',
-                            files_dir+'cyl_dam_t03.csv']
+        files_dir = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                'files_for_output_comparison'
+                )
+        rodri_soln_files = [
+                os.path.join(files_dir, 'cyl_dam_t01.csv'),
+                os.path.join(files_dir, 'cyl_dam_t02.csv'),
+                os.path.join(files_dir, 'cyl_dam_t03.csv')
+                ]
         for fname in fname_for_plot:
             data = load(fname)
             fluid = data['arrays']['fluid']
