@@ -1551,7 +1551,7 @@ class SubCriticalTimeVaryingOutFlow(Equation):
         self.g = 9.8
         self.dim = dim
         self.rhow = rhow
-        super(SubCriticalOutFlow, self).__init__(dest, None)
+        super(SubCriticalTimeVaryingOutFlow, self).__init__(dest, None)
 
     def post_loop(self, d_dw, d_dw_inner_reimann, d_u, d_u_inner_reimann,
                   d_rho, d_cs, d_alpha, d_v, d_v_inner_reimann, d_idx,
