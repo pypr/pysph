@@ -694,7 +694,7 @@ class Scan(object):
         self.input_func = input
         self.output_func = output
         self.is_segment_func = is_segment
-        self.complex_map=complex_map
+        self.complex_map = complex_map
         if input is not None:
             self.name = 'scan_' + input.__name__
         else:
