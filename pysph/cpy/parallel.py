@@ -163,10 +163,15 @@ cdef void c_${name}(${c_arg_sig}):
     cdef ${type} a, b, temp
     # This chunksize would divide input data equally
     # between threads
-    # cdef int chunksize = (SIZE + n_thread - 1) // n_thread
-
+    % if not calc_last_item:
     # A chunk of 1 MB per thread
     cdef int chunksize = 1048576 / sz
+    % else:
+    # Process all data together. Only then can we get
+    # the last item immediately
+    cdef int chunksize = (SIZE + n_thread - 1) // n_thread
+    % endif
+
     cdef int offset = 0
     cdef ${type} global_carry = ${neutral}
     cdef ${type} last_item

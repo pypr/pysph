@@ -290,3 +290,29 @@ class TestParallelUtils(unittest.TestCase):
     def test_segmented_scan_cython_parallel(self):
         with use_config(use_openmp=True):
             self._test_segmented_scan(backend='cython')
+
+    def _test_scan_last_item(self, backend):
+        # Given
+        a = np.random.randint(0, 100, 50000, dtype=np.int32)
+        a_copy = a.copy()
+
+        a = wrap(a, backend=backend)
+
+        @annotate(int='i, last_item, item', ary='intp')
+        def output_f(i, last_item, item, ary):
+            ary[i] = item + last_item
+
+        expect = np.cumsum(a_copy) + np.cumsum(a_copy)[-1]
+
+        # When
+        scan = Scan(output=output_f, scan_expr='a+b',
+                    dtype=np.int32, backend=backend)
+        scan(a, a)
+        a.pull()
+
+        # Then
+        np.testing.assert_equal(expect, a.data)
+
+    def test_scan_last_item_cython_parallel(self):
+        with use_config(use_openmp=True):
+            self._test_scan_last_item(backend='cython')
