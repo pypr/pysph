@@ -116,7 +116,7 @@ class BasicCodeBlock(object):
             context.update(kwargs)
         bytecode = compile(self.code, '<string>', 'exec')
         glb = globals()
-        exec (bytecode, glb, context)
+        exec(bytecode, glb, context)
         return Context(**context)
 
     ##########################################################################
@@ -632,7 +632,7 @@ class CythonGroup(Group):
                     decl.append(
                         'cdef DoubleArray _{var} = '
                         'DoubleArray(aligned({size}, 8)*self.n_threads)'
-                            .format(
+                        .format(
                             var=var, size=len(value)
                         )
                     )
@@ -713,7 +713,7 @@ class CythonGroup(Group):
             if isinstance(value, (list, tuple)):
                 code.append(
                     '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'
-                        .format(size=len(value), var=var)
+                    .format(size=len(value), var=var)
                 )
         return '\n'.join(code)
 
