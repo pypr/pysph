@@ -33,7 +33,6 @@ def _get_neighbor_count_prefix_sum_kernel(ctx):
 
 @memoize
 def _get_macros_preamble(c_type, sorted, dim):
-    # TODO: 2D variants of contains, contains_search and intersects
     return Template("""
     #define IN_BOUNDS(X, MIN, MAX) ((X >= MIN) && (X < MAX))
     #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
@@ -429,7 +428,7 @@ class PointTree(Tree):
                            neighbor_cid_count.array, neighbor_cids.array)
         return neighbor_cid_count, neighbor_cids
 
-    # TODO: 1D and 2D NNPS not properly supported here.
+    # TODO?: 1D and 2D NNPS not properly supported here.
     # Just assuming the other spatial coordinates (y and z in case of 1D,
     # and z in case of 2D) are set to 0.
     def find_neighbor_lengths_elementwise(self, neighbor_cid_count,

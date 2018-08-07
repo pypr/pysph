@@ -514,8 +514,9 @@ class CConverter(ast.NodeVisitor):
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
 
-        if self._class_name and (node.name.startswith('_') or
-                                         node.name in self._ignore_methods):
+        if self._class_name and \
+                (node.name.startswith('_') or
+                    node.name in self._ignore_methods):
             return ''
 
         orig_declares = self._declares

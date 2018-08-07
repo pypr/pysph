@@ -66,8 +66,8 @@ def get_vector_dtype(ctype, dim):
     try:
         return _vector_dtypes[ctype][dim]
     except KeyError:
-        # TODO: What to throw?
-        raise Exception()
+        raise ValueError("Vector datatype of type %(ctype)s with %(dim)s items"
+                         " is not supported" % dict(ctype=ctype, dim=dim))
 
 
 c2d = {

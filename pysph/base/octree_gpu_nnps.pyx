@@ -94,15 +94,12 @@ cdef class OctreeGPUNNPS(GPUNNPS):
     cdef void find_neighbor_lengths(self, nbr_lengths):
         octree_src = self.octrees[self.src_index]
         octree_dst = self.octrees[self.dst_index]
-        # TODO: use elementwise for CPU
 
         args = []
         if self.use_elementwise:
             find_neighbor_lengths = octree_dst.find_neighbor_lengths_elementwise
         else:
             find_neighbor_lengths = octree_dst.find_neighbor_lengths
-            # TODO: Check effect of partitioning on this function
-            # args.append(self.use_partitions)
 
         find_neighbor_lengths(
             self.neighbor_cid_counts, self.neighbor_cids, octree_src,

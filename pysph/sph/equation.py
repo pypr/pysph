@@ -5,6 +5,7 @@ the Group class.
 import ast
 
 from collections import defaultdict
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -21,6 +22,7 @@ from textwrap import dedent
 from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
                            get_symbols)
 from pysph.cpy.config import get_config
+
 
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
@@ -54,6 +56,7 @@ class Context(dict):
         >>> c.keys()
         ['a', 'x', 'b']
     """
+
     def __getattr__(self, key):
         try:
             return self.__getitem__(key)
@@ -113,7 +116,7 @@ class BasicCodeBlock(object):
             context.update(kwargs)
         bytecode = compile(self.code, '<string>', 'exec')
         glb = globals()
-        exec(bytecode, glb, context)
+        exec (bytecode, glb, context)
         return Context(**context)
 
     ##########################################################################
@@ -352,7 +355,6 @@ def get_init_args(obj, method, ignore=None):
 # `Equation` class.
 ##############################################################################
 class Equation(object):
-
     ##########################################################################
     # `object` interface.
     ##########################################################################
@@ -630,7 +632,7 @@ class CythonGroup(Group):
                     decl.append(
                         'cdef DoubleArray _{var} = '
                         'DoubleArray(aligned({size}, 8)*self.n_threads)'
-                        .format(
+                            .format(
                             var=var, size=len(value)
                         )
                     )
@@ -665,7 +667,7 @@ class CythonGroup(Group):
                 if kind == 'reduce':
                     args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)
-                c = 'self.{eq_name}.{method}({args})'\
+                c = 'self.{eq_name}.{method}({args})' \
                     .format(eq_name=eq.var_name, method=kind, args=call_args)
                 code.append(c)
         if len(code) > 0:
@@ -711,7 +713,7 @@ class CythonGroup(Group):
             if isinstance(value, (list, tuple)):
                 code.append(
                     '{var} = &_{var}.data[thread_id*aligned({size}, 8)]'
-                    .format(size=len(value), var=var)
+                        .format(size=len(value), var=var)
                 )
         return '\n'.join(code)
 
@@ -761,9 +763,9 @@ class CythonGroup(Group):
     def get_equation_init(self):
         lines = []
         for i, equation in enumerate(self.equations):
-            code = 'self.{name} = {cls}(**equations[{idx}].__dict__)'\
-                        .format(name=equation.var_name, cls=equation.name,
-                                idx=i)
+            code = 'self.{name} = {cls}(**equations[{idx}].__dict__)' \
+                .format(name=equation.var_name, cls=equation.name,
+                        idx=i)
             lines.append(code)
         return '\n'.join(lines)
 

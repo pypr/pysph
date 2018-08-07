@@ -27,7 +27,6 @@ cdef class OctreeGPUNNPS(GPUNNPS):
     cdef public bint use_elementwise
     cdef public bint use_partitions
     cdef public object leaf_size
-    # cpdef get_spatially_ordered_indices(self, int pa_index)
 
     cpdef _bin(self, int pa_index)
 
