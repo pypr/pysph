@@ -4,13 +4,26 @@
     #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
     #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
     #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
-    #define INF 1e6
     #define SQR(X) ((X) * (X))
+
+    typedef struct {
+        union {
+            float s0;
+            float x;
+        };
+    } float1;
+
+    typedef struct {
+        union {
+            double s0;
+            double x;
+        };
+    } double1;
 </%def>
 
 <%def name="fill_particle_data_args(data_t, xvars, dim)" cached="False">
     % for v in xvars:
-        ${data_t}* ${v},
+    ${data_t}* ${v},
     % endfor
     ${data_t} cell_size, ${data_t}${dim} min,
     unsigned long* keys, unsigned int* pids
@@ -19,7 +32,7 @@
 
 <%def name="fill_particle_data_src(data_t, xvars, dim)" cached="False">
     % for v in xvars:
-        unsigned long c_${v} = floor((${v}[i] - min.${v}) / cell_size);
+    unsigned long c_${v} = floor((${v}[i] - min.${v}) / cell_size);
     % endfor
     unsigned long key;
     ## For 3D: key = interleave3(c_x, c_y, c_z);

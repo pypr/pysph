@@ -412,7 +412,7 @@ class Application(object):
             action="store_true",
             dest="with_local_memory",
             default=False,
-            help="Use local memory with OpenCL"
+            help="Use local memory with OpenCL (Experimental)"
         )
         # --profile
         parser.add_argument(
@@ -695,7 +695,7 @@ class Application(object):
             dest="octree_leaf_size",
             default=32,
             help=("Specify leaf size of octree. "
-                  "Must be multiples of 32")
+                  "Must be multiples of 32 (Experimental)")
         )
 
         interfaces.add_argument(
@@ -705,7 +705,7 @@ class Application(object):
             default=False,
             const=True,
             help=("Run NNPS for different particles "
-                  "on different threads")
+                  "on different threads (Experimental)")
         )
 
         # Scheme options.

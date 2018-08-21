@@ -32,10 +32,10 @@ NNPS_TEMPLATE = r"""
         d_idx = _pids_dst[_pbound_here.s0 + lid];
         % endif
 
-        _xd = d_x[d_idx];
-        _yd = d_y[d_idx];
-        _zd = d_z[d_idx];
-        _hd = d_h[d_idx];
+        _xd = xd[d_idx];
+        _yd = yd[d_idx];
+        _zd = zd[d_idx];
+        _hd = hd[d_idx];
     }
 
     // Set loop parameters
@@ -44,68 +44,78 @@ NNPS_TEMPLATE = r"""
     int _offset_lim = _neighbor_cid_offset[_idx + 1];
     uint2 _pbound_here2;
 
+    local ${data_t} _xs[${wgs}];
+    local ${data_t} _ys[${wgs}];
+    local ${data_t} _zs[${wgs}];
+    local ${data_t} _hs[${wgs}];
+
     % for var, type in zip(vars, types):
-    local ${type} ${var}[${lmem_size}];
+    local ${type} ${var}[${wgs}];
     % endfor
 
-    char _nbrs[${lmem_size}];
-    int _nbr_cnt, _m, _nbr_saved;
+    char _nbrs[${wgs}];
+    int _nbr_cnt, _m;
+
     ${setup}
+
     while (_offset_src < _offset_lim) {
-        _nbr_saved = 0;
-        while (_offset_src < _offset_lim) {
-            _cid_src = _neighbor_cids[_offset_src];
-            _pbound_here2 = _pbounds_src[_cid_src];
+        _cid_src = _neighbor_cids[_offset_src];
+        _pbound_here2 = _pbounds_src[_cid_src];
+
+        while (_pbound_here2.s0 < _pbound_here2.s1) {
             _m = min(_pbound_here2.s1,
-                    _pbound_here2.s0 + ${wgs}) - _pbound_here2.s0;
-            if (_m + _nbr_saved > ${lmem_size})
-                break;
+                _pbound_here2.s0 + ${wgs}) - _pbound_here2.s0;
 
             // Copy src data
             if (lid < _m) {
 
-                %if sorted:
+                % if sorted:
                 _pid_src = _pbound_here2.s0 + lid;
                 % else:
                 _pid_src = _pids_src[_pbound_here2.s0 + lid];
-                %endif
+                % endif
 
+                _xs[lid] = xs[_pid_src];
+                _ys[lid] = ys[_pid_src];
+                _zs[lid] = zs[_pid_src];
+                _hs[lid] = hs[_pid_src];
 
                 % for var in vars:
-                ${var}[_nbr_saved + lid] = ${var}_global[_pid_src];
+                ${var}[lid] = ${var}_global[_pid_src];
                 % endfor
             }
-            _nbr_saved += _m;
-            _offset_src++;
-        }
+            barrier(CLK_LOCAL_MEM_FENCE);
 
-        barrier(CLK_LOCAL_MEM_FENCE);
+            // Everything this point forward is done independently
+            // by each thread.
+            if (_svalid) {
+                _nbr_cnt = 0;
+                for (int _j=0; _j < _m; _j++) {
+                    ${data_t} _dist2 = NORM2(_xs[_j] - _xd,
+                                _ys[_j] - _yd,
+                                _zs[_j] - _zd);
 
-        // Everything this point forward is done independently
-        // by each thread.
-        if (_svalid) {
-            _nbr_cnt = 0;
-            for (int _j=0; _j < _nbr_saved; _j++) {
-                ${data_t} _dist2 = NORM2(s_x[_j] - _xd,
-                            s_y[_j] - _yd,
-                            s_z[_j] - _zd);
+                    ${data_t} _r2 = MAX(_hs[_j], _hd) * _radius_scale;
+                    _r2 *= _r2;
 
-                ${data_t} _r2 = MAX(s_h[_j], _hd) * _radius_scale;
-                _r2 *= _r2;
+                    if (_dist2 < _r2) {
+                        _nbrs[_nbr_cnt++] = _j;
+                    }
+                }
 
-                if (_dist2 < _r2) {
-                    _nbrs[_nbr_cnt++] = _j;
+                int _j = 0;
+                while (_j < _nbr_cnt) {
+                    int s_idx = _nbrs[_j];
+                    ${loop_code}
+                    _j++;
                 }
             }
-
-            int _j = 0;
-            while (_j < _nbr_cnt) {
-                int s_idx = _nbrs[_j];
-                ${loop_code}
-                _j++;
-            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+            _pbound_here2.s0 += ${wgs};
         }
-        barrier(CLK_LOCAL_MEM_FENCE);
+
+        // Process next neighboring cell
+        _offset_src++;
     }
 
 """
@@ -116,7 +126,11 @@ NNPS_ARGS_TEMPLATE = """
     __global int *_cids,
     __global uint2 *_pbounds_src, __global uint2 *_pbounds_dst,
     %(data_t)s _radius_scale,
-    __global int *_neighbor_cid_offset, __global int *_neighbor_cids
+    __global int *_neighbor_cid_offset, __global int *_neighbor_cids,
+    __global %(data_t)s *xd, __global %(data_t)s *yd,
+    __global %(data_t)s *zd, __global %(data_t)s *hd,
+    __global %(data_t)s *xs, __global %(data_t)s *ys,
+    __global %(data_t)s *zs, __global %(data_t)s *hs
     """
 
 
@@ -126,14 +140,13 @@ def _generate_nnps_code(sorted, wgs, setup, loop, vars, types,
     # need to be fixed throughout the simulation since
     # currently this function is only called at the start of
     # the simulation.
-    chunksize = 3
     return Template(NNPS_TEMPLATE, disable_unicode=disable_unicode).render(
         data_t=data_t, sorted=sorted, wgs=wgs, setup=setup, loop_code=loop,
-        vars=vars, types=types, chunksize=chunksize, lmem_size=wgs*chunksize
+        vars=vars, types=types
     )
 
 
-def generate_body(setup, loop, vars, types, wgs, c_type):
+def generate_body(setup, loop, vars, types, wgs, c_type='float'):
     return _generate_nnps_code(True, wgs, setup, loop, vars, types,
                                c_type)
 

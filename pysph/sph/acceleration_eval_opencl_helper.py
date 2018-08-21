@@ -129,16 +129,6 @@ def get_helper_code(helpers, transpiler=None):
     return result
 
 
-def print_pa_stats(pa):
-    print('hmin', cl.array.min(pa.gpu.h))
-    print('x[0..2]', pa.gpu.x[0:3].get())
-    print('xmin', (cl.array.min(pa.gpu.x), cl.array.min(pa.gpu.y),
-                   cl.array.min(pa.gpu.z)))
-
-    print('xmax', (cl.array.max(pa.gpu.x), cl.array.max(pa.gpu.y),
-                   cl.array.max(pa.gpu.z)))
-
-
 class OpenCLAccelerationEval(object):
     """Does the actual work of performing the evaluation.
     """
@@ -162,8 +152,8 @@ class OpenCLAccelerationEval(object):
         if info.get('loop'):
             if get_config().use_local_memory:
                 nnps.set_context(info['src_idx'], info['dst_idx'])
-                c_type = 'double' if self._use_double else 'float'
-                nnps_args, gs_ls = self.nnps.get_kernel_args(c_type)
+
+                nnps_args, gs_ls = self.nnps.get_kernel_args('float')
                 self._queue.finish()
                 args[1] = gs_ls[0]
                 args[2] = gs_ls[1]
@@ -228,8 +218,8 @@ class OpenCLAccelerationEval(object):
                 group = info['group']
                 iter_count += 1
                 if ((iter_count >= group.min_iterations) and
-                    (iter_count == group.max_iterations or
-                        self._converged(eqs))):
+                        (iter_count == group.max_iterations or
+                         self._converged(eqs))):
                     pass
                 else:
                     i = iter_start
@@ -705,7 +695,6 @@ class AccelerationEvalOpenCLHelper(object):
             g_idx=g_idx, sg=sub_grp, source=source, dest=dest
         )
         sph_k_name = self.object.kernel.__class__.__name__
-        c_type = 'double' if get_config().use_double else 'float'
         context = eq_group.context
         all_args, py_args = [], []
         setup_code = self._declare_precomp_vars(context)
@@ -762,7 +751,7 @@ class AccelerationEvalOpenCLHelper(object):
             ['__global {kernel}* kern'.format(kernel=sph_k_name),
              'double t', 'double dt']
         )
-        all_args.extend(get_kernel_args_list(c_type))
+        all_args.extend(get_kernel_args_list())
 
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
@@ -771,8 +760,7 @@ class AccelerationEvalOpenCLHelper(object):
 
         body = generate_body(setup=setup_body, loop=loop_body,
                              vars=source_vars, types=source_var_types,
-                             wgs=get_config().wgs,
-                             c_type=c_type)
+                             wgs=get_config().wgs)
 
         sig = get_kernel_definition(kernel, all_args)
         return (

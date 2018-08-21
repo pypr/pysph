@@ -15,6 +15,7 @@ class Config(object):
         self._omp_schedule = None
         self._profile = None
         self._use_local_memory = None
+        self._wgs = None
 
     @property
     def use_openmp(self):
@@ -88,6 +89,19 @@ class Config(object):
         return False
 
     @property
+    def profile(self):
+        if self._profile is None:
+            self._profile = self._profile_default()
+        return self._profile
+
+    @profile.setter
+    def profile(self, value):
+        self._profile = value
+
+    def _profile_default(self):
+        return False
+
+    @property
     def use_local_memory(self):
         if self._use_local_memory is None:
             self._use_local_memory = self._use_local_memory_default()
@@ -101,17 +115,17 @@ class Config(object):
         return False
 
     @property
-    def profile(self):
-        if self._profile is None:
-            self._profile = self._profile_default()
-        return self._profile
+    def wgs(self):
+        if self._wgs is None:
+            self._wgs = self._wgs_default()
+        return self._wgs
 
-    @profile.setter
-    def profile(self, value):
-        self._profile = value
+    @wgs.setter
+    def wgs(self, value):
+        self._wgs = value
 
-    def _profile_default(self):
-        return False
+    def _wgs_default(self):
+        return 32
 
 
 _config = None

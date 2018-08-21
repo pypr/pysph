@@ -12,6 +12,11 @@
     inline int neighbor_boxes(int c_x, int c_y, int c_z, \
             ulong* nbr_boxes);
 
+    inline ulong interleave1(ulong p)
+    {
+        return p;
+    }
+
     inline ulong interleave2(ulong p, ulong q)
     {
         p = p & 0xffffffff;

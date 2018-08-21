@@ -9,7 +9,9 @@ from pytools import memoize
 import sys
 import numpy as np
 
+import pyopencl as cl
 from pyopencl.scan import GenericScanKernel
+import pyopencl.tools
 
 from mako.template import Template
 
@@ -33,7 +35,7 @@ def _get_neighbor_count_prefix_sum_kernel(ctx):
 
 @memoize
 def _get_macros_preamble(c_type, sorted, dim):
-    return Template("""
+    result = Template("""
     #define IN_BOUNDS(X, MIN, MAX) ((X >= MIN) && (X < MAX))
     #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
     #define NORM2_2D(X, Y) ((X)*(X) + (Y)*(Y))
@@ -42,6 +44,20 @@ def _get_macros_preamble(c_type, sorted, dim):
     #define AVG(X, Y) (((X) + (Y)) / 2)
     #define ABS(X) ((X) > 0 ? (X) : -(X))
     #define SQR(X) ((X) * (X))
+
+    typedef struct {
+        union {
+            float s0;
+            float x;
+        };
+    } float1;
+
+    typedef struct {
+        union {
+            double s0;
+            double x;
+        };
+    } double1;
 
     % if sorted:
     #define PID(idx) (idx)
@@ -102,6 +118,7 @@ def _get_macros_preamble(c_type, sorted, dim):
     }
     """, disable_unicode=disable_unicode).render(data_t=c_type, sorted=sorted,
                                                  dim=dim)
+    return result
 
 
 @memoize
@@ -215,8 +232,18 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
             ${data_t}${dim} *node_xmin_dst, ${data_t}${dim} *node_xmax_dst,
             ${data_t} *node_hmax_dst,
             """ + args).render(data_t=data_t, dim=dim)
+
     }
     return result
+
+
+# Support for 1D
+def register_custom_pyopencl_ctypes():
+    cl.tools.get_or_register_dtype('float1', np.dtype([('s0', np.float32)]))
+    cl.tools.get_or_register_dtype('double1', np.dtype([('s0', np.float64)]))
+
+
+register_custom_pyopencl_ctypes()
 
 
 class PointTree(Tree):
@@ -263,6 +290,10 @@ class PointTree(Tree):
 
     def _calc_cell_size_and_depth(self):
         self.cell_size = self.hmin * self.radius_scale * (1. + 1e-3)
+
+        # Logic from gpu_domain_manager.py
+        if self.cell_size < 1e-6:
+            self.cell_size = 1
 
         # This lets the tree grow up to log2(128) = 7 layers beyond what it
         # could have previously. Pretty arbitrary.
