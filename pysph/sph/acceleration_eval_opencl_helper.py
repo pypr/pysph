@@ -92,7 +92,7 @@ from pysph.sph.acceleration_nnps_helper import generate_body, \
 from pysph.cpy.ext_module import get_platform_dir
 from pysph.cpy.config import get_config
 from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
-                                  ocl_detect_type, ocl_detect_base_type)
+                                  ocl_detect_type, ocl_detect_pointer_base_type)
 
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
@@ -456,7 +456,7 @@ class AccelerationEvalOpenCLHelper(object):
         base_types = []
         for arg in args:
             base_types.append(
-                ocl_detect_base_type(arg, self.known_types.get(arg))
+                ocl_detect_pointer_base_type(arg, self.known_types.get(arg))
             )
         return base_types
 

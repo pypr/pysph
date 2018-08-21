@@ -438,7 +438,6 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
     def _make_accel_eval(self, equations, cache_nnps=True):
         pytest.importorskip('pysph.base.gpu_nnps')
-        # from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
         from pysph.base.gpu_nnps import OctreeGPUNNPS as GPUNNPS
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
