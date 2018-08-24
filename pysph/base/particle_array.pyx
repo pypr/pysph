@@ -12,6 +12,9 @@ logger = logging.getLogger()
 cimport numpy
 import numpy
 
+import pyopencl as cl
+import pyopencl.array
+
 # PyZoltan imports
 from pyzoltan.core.carray cimport *
 
@@ -19,6 +22,9 @@ from pyzoltan.core.carray cimport *
 from cpython cimport PyObject
 from cpython cimport *
 from cython cimport *
+
+from pysph.cpy.opencl import get_config, get_queue
+import pysph.base.opencl as opencl
 
 # Parallel imports
 try:
@@ -149,6 +155,10 @@ cdef class ParticleArray:
         # list of output property arrays
         self.output_property_arrays = []
 
+        if get_config().use_opencl:
+            h = opencl.DeviceHelper(self)
+            self.set_device_helper(h)
+
     def __getattr__(self, name):
         """Convenience, to access particle property arrays as an attribute
 
@@ -167,6 +177,9 @@ cdef class ParticleArray:
 
     def __setattr__(self, name, value):
         """Convenience, to set particle property arrays as an attribute """
+        #if name == 'num_real_particles':
+        #    self.num_real_particles = value
+        #else:
         self.set(**{name:value})
 
     def __reduce__(self):
@@ -378,6 +391,9 @@ cdef class ParticleArray:
         """Set the is_dirty variable to given value """
         self.is_dirty = value
 
+    cpdef set_num_real_particles(self, long value):
+        self.num_real_particles = value
+
     cpdef set_indices_invalid(self, bint value):
         """Set the indices_invalid to the given value """
         self.indices_invalid = value
@@ -419,6 +435,8 @@ cdef class ParticleArray:
 
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
+        if self.gpu is not None:
+            return self.gpu.get_number_of_particles()
         if real:
             return self.num_real_particles
         else:
@@ -456,6 +474,15 @@ cdef class ParticleArray:
                 array.remove(sorted_indices)
 
         """
+        if self.gpu is not None:
+            if type(indices) != cl.array.Array:
+                if isinstance(indices, BaseArray):
+                    indices = indices.get_npy_array()
+                else:
+                    indices = numpy.asarray(indices)
+                indices = cl.array.to_device(get_queue(), indices.astype(numpy.uint32))
+            return self.gpu.remove_particles(indices)
+
         cdef BaseArray index_list
         if isinstance(indices, BaseArray):
             index_list = indices
@@ -499,6 +526,8 @@ cdef class ParticleArray:
             the type of particles that need to be removed.
 
         """
+        if self.gpu is not None:
+            return self.gpu.remove_tagged_particles(tag)
         cdef LongArray indices = LongArray()
         cdef IntArray tag_array = self.properties['tag']
         cdef int *tagarrptr = tag_array.get_data_ptr()
@@ -532,13 +561,25 @@ cdef class ParticleArray:
            properties.
 
         """
-        cdef int num_extra_particles, old_num_particles, new_num_particles
         cdef str prop
         cdef BaseArray arr
-        cdef numpy.ndarray s_arr, nparr
 
         if len(particle_props) == 0:
             return 0
+
+        if self.gpu is not None:
+            gpu_particle_props = {}
+            for prop, ary in particle_props.items():
+                if prop in self.gpu.properties:
+                    dtype = self.gpu.get_device_array(prop).dtype
+                else:
+                    dtype = self.default_values[prop]
+                gpu_particle_props[prop] = cl.array.to_device(
+                        get_queue(), numpy.array(ary, dtype=dtype))
+            return self.gpu.add_particles(**gpu_particle_props)
+
+        cdef int num_extra_particles, old_num_particles, new_num_particles
+        cdef numpy.ndarray s_arr, nparr
 
         # check if the input properties are valid.
         for prop in particle_props:
@@ -574,6 +615,10 @@ cdef class ParticleArray:
         properties that are not there in self will be added
         """
         if parray.get_number_of_particles() == 0:
+            return 0
+
+        if self.gpu is not None:
+            self.gpu.append_parray(parray)
             return 0
 
         cdef int num_extra_particles = parray.get_number_of_particles()
@@ -627,6 +672,10 @@ cdef class ParticleArray:
         """
         if num_particles <= 0:
             return
+
+        if self.gpu is not None:
+            self.gpu.extend(num_particles)
+            return 0
 
         cdef int old_size = self.get_number_of_particles()
         cdef int new_size = old_size + num_particles
@@ -762,10 +811,6 @@ cdef class ParticleArray:
 
             # if the tag property is being set, the alignment will have to be
             # changed.
-            if prop == 'tag':
-                self.align_particles()
-            if prop == 'x' or prop == 'y' or prop == 'z':
-                self.set_dirty(True)
 
     cpdef BaseArray get_carray(self, str prop):
         """Return the c-array for the property or constant.
@@ -803,7 +848,7 @@ cdef class ParticleArray:
         array_data = numpy.ravel(data)
         self.constants[name] = self._create_c_array_from_npy_array(array_data)
         if self.gpu is not None:
-            self.gpu.add_prop(name, self.constants[name])
+            self.gpu.add_const(name, self.constants[name])
 
     cpdef add_property(self, str name, str type='double', default=None, data=None):
         """Add a new property to the particle array.
@@ -955,8 +1000,11 @@ cdef class ParticleArray:
                         np_arr = arr.get_npy_array()
                         arr.get_npy_array()[:] = numpy.asarray(data)
                         self.properties[prop_name] = arr
+
         if self.gpu is not None:
             self.gpu.add_prop(prop_name, self.properties[prop_name])
+            if self.gpu.get_number_of_particles() == 0:
+                self.gpu.push()
 
     ######################################################################
     # Non-public interface
@@ -1070,6 +1118,10 @@ cdef class ParticleArray:
                          prop[i] = prop[index_arr[i]]
                          prop[index_arr[i]] = tmp
         """
+        if self.gpu is not None:
+            self.gpu.align_particles()
+            return 0
+
         cdef size_t i, num_particles
         cdef size_t next_insert
         cdef size_t num_arrays
@@ -1142,6 +1194,13 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
+        print self.tag
+        if self.gpu is not None:
+            if type(indices) != cl.array.Array:
+                indices = cl.array.to_device(get_queue(),
+                        numpy.array(indices, dtype=numpy.int32))
+            return self.gpu.extract_particles(indices, props=props)
+
         cdef BaseArray index_array
         if isinstance(indices, BaseArray):
             index_array = indices
@@ -1306,20 +1365,28 @@ cdef class ParticleArray:
         if prop_name in self.output_property_arrays:
             self.output_property_arrays.remove(prop_name)
         if self.gpu is not None:
-            self.gpu.remove_prop(prop_name)
+            return self.gpu.remove_prop(prop_name)
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
+        if self.gpu is not None:
+            backend = self.gpu
+        else:
+            backend = self
+
         if props:
             for prop in props:
-                array = self.properties[prop]
+                array = backend.properties[prop]
                 array.update_min_max()
         else:
-            for array in self.properties.values():
+            for array in backend.properties.values():
                 array.update_min_max()
 
     cpdef resize(self, long size):
         """Resize all arrays to the new size"""
+        if self.gpu is not None:
+            return self.gpu.resize(size)
+
         for prop, array in self.properties.items():
             array.resize(size)
 
