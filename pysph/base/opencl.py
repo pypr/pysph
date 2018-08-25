@@ -287,7 +287,7 @@ class DeviceHelper(object):
             if arg_cpu.size != pa_arr.length:
                 pa_arr.resize(arg_cpu.size)
             pa_arr.set_data(arg_cpu)
-        self._particle_array.set_num_real_particles(self.num_real_particles)
+        p.set_num_real_particles(self.num_real_particles)
 
     def push(self, *args):
         if len(args) == 0:

@@ -12,9 +12,6 @@ logger = logging.getLogger()
 cimport numpy
 import numpy
 
-import pyopencl as cl
-import pyopencl.array
-
 # PyZoltan imports
 from pyzoltan.core.carray cimport *
 
@@ -23,8 +20,15 @@ from cpython cimport PyObject
 from cpython cimport *
 from cython cimport *
 
-from pysph.cpy.opencl import get_config, get_queue
-import pysph.base.opencl as opencl
+from pysph.cpy.config import get_config
+
+try:
+    import pyopencl as cl
+    import pyopencl.array
+    from pysph.cpy.opencl import get_queue
+    import pysph.base.opencl as ocl
+except ImportError:
+    ocl = None
 
 # Parallel imports
 try:
@@ -155,7 +159,7 @@ cdef class ParticleArray:
         self.output_property_arrays = []
 
         if get_config().use_opencl:
-            h = opencl.DeviceHelper(self)
+            h = ocl.DeviceHelper(self)
             self.set_device_helper(h)
 
     def __getattr__(self, name):
