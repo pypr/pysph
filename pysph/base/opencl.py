@@ -198,13 +198,6 @@ class DeviceHelper(object):
         self._data[name] = g_ary
         setattr(self, name, g_ary.array)
 
-    def _check_property(self, prop):
-        """Check if a property is present or not """
-        if prop in self.properties:
-            return
-        else:
-            raise AttributeError('property %s not present' % (prop))
-
     def get_number_of_particles(self, real=False):
         if real:
             return self.num_real_particles
@@ -303,7 +296,7 @@ class DeviceHelper(object):
         if prop in self.properties or prop in self.constants:
             return
         else:
-            raise AttributeError, 'property %s not present'%(prop)
+            raise AttributeError('property %s not present'%(prop))
 
     def remove_prop(self, name):
         if name in self.properties:
