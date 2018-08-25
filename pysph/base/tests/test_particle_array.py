@@ -491,10 +491,22 @@ class ParticleArrayTest(object):
         self.pull(p)
         x_new = p.get('x', only_real_particles=False)
         y_new = p.get('y', only_real_particles=False)
+
+        # check the local particles
         self.assertEqual(check_array(x_new[:4], [1, 2, 6, 8]),
                          True)
         self.assertEqual(check_array(y_new[:4], [10, 9, 5, 3]),
                          True)
+
+        # check the remaining particles
+        self.assertEqual(
+                check_array(numpy.sort(x_new[4:]),
+                    [3, 4, 5, 7, 9, 10]), True
+                )
+        self.assertEqual(
+                check_array(numpy.sort(y_new[4:]),
+                    [1, 2, 4, 6, 7, 8]), True
+                )
 
         p.set(**{'tag': [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
         self.push(p)
@@ -502,10 +514,23 @@ class ParticleArrayTest(object):
         self.pull(p)
         x_new = p.get('x', only_real_particles=False)
         y_new = p.get('y', only_real_particles=False)
+
+        # check the remaining particles
         self.assertEqual(check_array(x_new[:4], [1, 2, 6, 8]),
                          True)
         self.assertEqual(check_array(y_new[:4], [10, 9, 5, 3]),
                          True)
+
+        # check the remaining particles
+        self.assertEqual(
+                check_array(numpy.sort(x_new[4:]),
+                    [3, 4, 5, 7, 9, 10]), True
+                )
+        self.assertEqual(
+                check_array(numpy.sort(y_new[4:]),
+                    [1, 2, 4, 6, 7, 8]), True
+                )
+
 
     def test_append_parray(self):
         """
