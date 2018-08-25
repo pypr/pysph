@@ -657,7 +657,6 @@ class ParticleArrayTest(object):
         # When.
         n = p.extract_particles(indices=[1])
         self.pull(n)
-        #print n.gpu.tag
 
         # Then.
         self.assertEqual(len(p.x), 3)

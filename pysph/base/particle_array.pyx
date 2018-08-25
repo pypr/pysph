@@ -177,9 +177,6 @@ cdef class ParticleArray:
 
     def __setattr__(self, name, value):
         """Convenience, to set particle property arrays as an attribute """
-        #if name == 'num_real_particles':
-        #    self.num_real_particles = value
-        #else:
         self.set(**{name:value})
 
     def __reduce__(self):
@@ -1194,7 +1191,6 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
-        print self.tag
         if self.gpu is not None:
             if type(indices) != cl.array.Array:
                 indices = cl.array.to_device(get_queue(),

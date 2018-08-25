@@ -319,7 +319,6 @@ class DeviceHelper(object):
 
     def align_particles(self):
         tag_arr = self._data['tag'].array
-        #print tag_arr
 
         if len(tag_arr) == 0:
             self.num_real_particles = 0
@@ -520,7 +519,6 @@ class DeviceHelper(object):
 
         old_size = self.get_number_of_particles()
         new_size = old_size + num_particles
-        print self.properties
 
         for prop in self.properties:
             arr = self._data[prop]
@@ -550,7 +548,6 @@ class DeviceHelper(object):
             if prop_name in self.properties:
                 arr = self._data[prop_name]
                 source = parray.gpu.get_device_array(prop_name)
-                #print source
                 arr.array[old_num_particles:] = source.array
             else:
                 # meaning this property is not there in self.
@@ -618,7 +615,6 @@ class DeviceHelper(object):
         for const in self.constants:
             result_array.gpu.update_const(const, self._data[const].copy())
 
-        #print "tag array in extract", result_array.gpu.x
         result_array.gpu.align_particles()
         result_array.set_name(self._particle_array.name)
 
