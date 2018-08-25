@@ -17,9 +17,6 @@ import pytest
 
 from pysph.cpy.opencl import get_config
 
-get_config().use_opencl = True
-get_config().use_double = True
-
 
 def check_array(x, y):
     """Check if two arrays are equal with an absolute tolerance of
@@ -30,19 +27,10 @@ def check_array(x, y):
 ###############################################################################
 # `ParticleArrayTest` class.
 ###############################################################################
-class ParticleArrayTest(unittest.TestCase):
+class ParticleArrayTest(object):
     """
     Tests for the particle array class.
     """
-
-    def setUp(self):
-        get_config().use_opencl = False
-
-    def pull(self, p):
-        pass
-
-    def push(self, p):
-        pass
 
     def test_constructor(self):
         """
@@ -195,40 +183,6 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(z, p.get('z')), True)
         self.assertEqual(check_array(m, p.get('m')), True)
         self.assertEqual(check_array(h, p.get('h')), True)
-
-    def test_set(self):
-        """
-        Tests the set function.
-        """
-        x = [1, 2, 3, 4.]
-        y = [0., 1., 2., 3.]
-        z = [0., 0., 0., 0.]
-        m = [1., 1., 1., 1.]
-        h = [.1, .1, .1, .1]
-
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
-
-        # set the x array with new values
-        p.set(**{'x': [4., 3, 2, 1], 'h': [0.2, 0.2, 0.2, 0.2]})
-        self.assertEqual(check_array(p.get('x'), [4., 3, 2, 1]), True)
-        self.assertEqual(check_array(p.get('h'), [0.2, 0.2, 0.2, 0.2]), True)
-
-        # trying to set the tags
-        p.set(**{'tag': [0, 1, 1, 1]})
-        self.assertEqual(
-            check_array(p.get('tag', only_real_particles=False), [0, 1, 1, 1]),
-            True
-        )
-        self.assertEqual(check_array(p.get('tag'), [0]), True)
-
-        # try setting array with smaller length array.
-        p.set(**{'x': [5, 6, 7]})
-        self.assertEqual(check_array(p.get('x', only_real_particles=False),
-                                     [5, 6, 7, 1]), True)
-        # try setting array with longer array.
-        self.assertRaises(ValueError, p.set, **{'x': [1., 2, 3, 5, 6]})
 
     def test_clear(self):
         """
@@ -562,7 +516,6 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(check_array(y_new[:4], [10, 9, 5, 3]),
                          True)
 
-    @pytest.mark.skip(reason="add property to be called in pull method")
     def test_append_parray(self):
         """
         Tests the append_parray function.
@@ -577,11 +530,6 @@ class ParticleArrayTest(unittest.TestCase):
 
         p1.append_parray(p2)
         self.pull(p1)
-        print p1.x
-
-        # print(p1.get('x', only_real_particles=False))
-        # print(p1.get('y', only_real_particles=False))
-        # print(p1.get('tag', only_real_particles=False))
 
         self.assertEqual(p1.get_number_of_particles(), 6)
         self.assertEqual(check_array(p1.x, [1, 2, 3, 5]), True)
@@ -615,27 +563,6 @@ class ParticleArrayTest(unittest.TestCase):
         self.assertEqual(
             check_array(p1.s, [0, 0, 0, 0, 0, 2, 3, 4, 5, 0]), True
         )
-
-    def test_pickle(self):
-        """
-        Tests the pickle and unpickle functions
-        """
-        p1 = particle_array.ParticleArray()
-        p1.add_property('x', data=numpy.arange(10))
-        p1.add_property('y', data=numpy.arange(10))
-        p1.add_constant('c', [0.0, 1.0])
-        p1.align_particles()
-        self.pull(p1)
-
-        s = pickle.dumps(p1)
-        p2 = pickle.loads(s)
-
-        self.assertEqual(len(p1.x), len(p2.x))
-        check_array(p1.x, p2.x)
-        self.assertEqual(len(p1.y), len(p2.y))
-        check_array(p1.y, p2.y)
-        self.assertEqual(len(p1.c), len(p2.c))
-        check_array(p1.c, p2.c)
 
     def test_that_constants_can_be_added(self):
         # Given
@@ -689,6 +616,7 @@ class ParticleArrayTest(unittest.TestCase):
         # When
         p.add_constant('v', [0.0, 1.0])
         p.add_particles(x=[2.0, 3.0])
+        self.pull(p)
 
         # Then
         self.assertTrue(check_array(p.v, [0.0, 1.0]))
@@ -768,6 +696,9 @@ class ParticleArrayTest(unittest.TestCase):
 
 
 class ParticleArrayUtils(unittest.TestCase):
+    def setUp(self):
+        get_config().use_opencl = False
+
     def test_that_get_particles_info_works(self):
         # Given.
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
@@ -797,9 +728,81 @@ class ParticleArrayUtils(unittest.TestCase):
         self.assertTrue(numpy.allclose(numpy.ravel(data), pa.data))
 
 
-class ParticleArrayTestGPU(ParticleArrayTest):
+class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
+    """
+    Tests for the particle array class.
+    """
+
+    def setUp(self):
+        get_config().use_opencl = False
+
+    def pull(self, p):
+        pass
+
+    def push(self, p):
+        pass
+
+    def test_pickle(self):
+        """
+        Tests the pickle and unpickle functions
+        """
+        p1 = particle_array.ParticleArray()
+        p1.add_property('x', data=numpy.arange(10))
+        p1.add_property('y', data=numpy.arange(10))
+        p1.add_constant('c', [0.0, 1.0])
+        p1.align_particles()
+
+        s = pickle.dumps(p1)
+        p2 = pickle.loads(s)
+
+        self.assertEqual(len(p1.x), len(p2.x))
+        check_array(p1.x, p2.x)
+        self.assertEqual(len(p1.y), len(p2.y))
+        check_array(p1.y, p2.y)
+        self.assertEqual(len(p1.c), len(p2.c))
+        check_array(p1.c, p2.c)
+
+    def test_set(self):
+        """
+        Tests the set function.
+        """
+        x = [1, 2, 3, 4.]
+        y = [0., 1., 2., 3.]
+        z = [0., 0., 0., 0.]
+        m = [1., 1., 1., 1.]
+        h = [.1, .1, .1, .1]
+
+        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
+                                         z={'data': z}, m={'data': m},
+                                         h={'data': h})
+
+        # set the x array with new values
+        p.set(**{'x': [4., 3, 2, 1], 'h': [0.2, 0.2, 0.2, 0.2]})
+        self.assertEqual(check_array(p.get('x'), [4., 3, 2, 1]), True)
+        self.assertEqual(check_array(p.get('h'), [0.2, 0.2, 0.2, 0.2]), True)
+
+        # trying to set the tags
+        p.set(**{'tag': [0, 1, 1, 1]})
+        p.align_particles()
+        self.pull(p)
+        self.assertEqual(
+            check_array(p.get('tag', only_real_particles=False), [0, 1, 1, 1]),
+            True
+        )
+        self.assertEqual(check_array(p.get('tag'), [0]), True)
+
+        # try setting array with smaller length array.
+        p.set(**{'x': [5, 6, 7]})
+        self.assertEqual(check_array(p.get('x', only_real_particles=False),
+                                     [5, 6, 7, 1]), True)
+        # try setting array with longer array.
+        self.assertRaises(ValueError, p.set, **{'x': [1., 2, 3, 5, 6]})
+
+
+class ParticleArrayTestGPU(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
         get_config().use_opencl = True
+        get_config().use_double = True
 
     def pull(self, p):
         p.gpu.pull()

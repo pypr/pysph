@@ -924,12 +924,12 @@ cdef class ParticleArray:
 
         # setup the default values
         if default is None:
-            if PyDict_Contains(self.properties, prop_name) != 1:
+            if prop_name not in self.properties:
                 default = 0
             else:
-                default = <object>PyDict_GetItem(self.default_values, prop_name)
+                default = self.default_values[prop_name]
 
-        PyDict_SetItem(self.default_values, prop_name, default)
+        self.default_values[prop_name] = default
 
         # array sizes are compatible, now resize the required arrays
         # appropriately and add.
@@ -937,7 +937,7 @@ cdef class ParticleArray:
             if data is None or len(data) == 0:
                 # if a property with that name already exists, do not do
                 # anything.
-                if PyDict_Contains(self.properties, prop_name) != 1:
+                if prop_name not in self.properties:
                     # just add the property with a zero array.
                     self.properties[prop_name] = self._create_carray(
                         data_type, 0, default)

@@ -271,12 +271,18 @@ class DeviceHelper(object):
             array.update_min_max()
 
     def pull(self, *args):
+        p = self._particle_array
         if len(args) == 0:
             args = self._data.keys()
         for arg in args:
             arg_cpu = getattr(self, arg).get()
-            if arg in self._particle_array.properties or \
-                    arg in self._particle_array.constants:
+            if arg in p.properties or arg in p.constants:
+                pa_arr = self._get_prop_or_const(arg)
+            else:
+                if arg in self.properties:
+                    p.add_property(arg)
+                if arg in self.constants:
+                    p.add_constant(arg)
                 pa_arr = self._get_prop_or_const(arg)
             if arg_cpu.size != pa_arr.length:
                 pa_arr.resize(arg_cpu.size)
