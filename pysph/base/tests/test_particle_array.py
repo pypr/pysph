@@ -15,7 +15,7 @@ from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
 import pickle
 import pytest
 
-from pysph.cpy.opencl import get_config
+from pysph.cpy.config import get_config
 
 
 def check_array(x, y):
@@ -791,6 +791,7 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 
 class ParticleArrayTestGPU(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
+        ocl = pytest.importorskip("pysph.base.opencl")
         get_config().use_opencl = True
         get_config().use_double = True
 
