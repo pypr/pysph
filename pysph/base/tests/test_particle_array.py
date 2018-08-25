@@ -531,7 +531,6 @@ class ParticleArrayTest(object):
                     [1, 2, 4, 6, 7, 8]), True
                 )
 
-
     def test_append_parray(self):
         """
         Tests the append_parray function.
