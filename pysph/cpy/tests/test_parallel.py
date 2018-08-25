@@ -7,7 +7,7 @@ from pytest import importorskip
 from ..config import get_config
 from ..array import wrap
 from ..types import annotate
-from ..parallel import Elementwise, Reduction
+from ..parallel import Elementwise, Reduction, Scan
 
 
 class TestParallelUtils(unittest.TestCase):
@@ -47,6 +47,11 @@ class TestParallelUtils(unittest.TestCase):
         importorskip('pyopencl')
 
         self._check_simple_elementwise(backend='opencl')
+
+    def test_elementwise_works_with_cuda(self):
+        importorskip('pycuda')
+
+        self._check_simple_elementwise(backend='cuda')
 
     def _check_simple_reduction(self, backend):
         x = np.linspace(0, 1, 1000)/1000
@@ -108,3 +113,41 @@ class TestParallelUtils(unittest.TestCase):
     def test_reduction_works_neutral_opencl(self):
         importorskip('pyopencl')
         self._check_reduction_min(backend='opencl')
+
+    def test_reduction_works_without_map_cuda(self):
+        importorskip('pycuda')
+        self._check_simple_reduction(backend='cuda')
+
+    def test_reduction_works_with_map_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_with_map(backend='cuda')
+
+    def test_reduction_works_neutral_cuda(self):
+        importorskip('pycuda')
+        self._check_reduction_min(backend='cuda')
+
+    def test_scan_works_opencl(self):
+        importorskip('pyopencl')
+        # Given
+        a = np.arange(10000, dtype=np.int32)
+        data = a.copy()
+        a = wrap(a, backend='opencl')
+
+        @annotate(i='int', ary='intp', return_='int')
+        def input_f(i, ary):
+            return ary[i]
+
+        @annotate(int='i, item', ary='intp')
+        def output_f(i, ary, item):
+            ary[i+1] = item
+
+        # When
+        s = Scan(input_f, output_f, 'a+b', dtype=np.int32, backend='opencl')
+        s(a)
+        a.pull()
+        result = a.data
+
+        # Then
+        expect = np.cumsum(data)
+        # print(result, y)
+        self.assertTrue(np.all(expect[:-1] == result[1:]))

@@ -146,6 +146,7 @@ class Elementwise(object):
 
             from .opencl import get_context, get_queue
             from pyopencl.elementwise import ElementwiseKernel
+            from pyopencl._cluda import CLUDA_PREAMBLE
             ctx = get_context()
             self.queue = get_queue()
             name = self.func.__name__
@@ -155,13 +156,41 @@ class Elementwise(object):
             )
             arguments = convert_to_float_if_needed(', '.join(c_data[0][1:]))
             preamble = convert_to_float_if_needed(self.tp.get_code())
+            cluda_preamble = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
             knl = ElementwiseKernel(
                 ctx,
                 arguments=arguments,
                 operation=expr,
-                preamble=preamble
+                preamble="\n".join([cluda_preamble, preamble])
             )
             self.c_func = knl
+        elif self.backend == 'cuda':
+            py_data, c_data = self.cython_gen.get_func_signature(self.func)
+            self._correct_opencl_address_space(c_data)
+
+            from .cuda import set_context
+            set_context()
+            from pycuda.elementwise import ElementwiseKernel
+            from pycuda._cluda import CLUDA_PREAMBLE
+            name = self.func.__name__
+            expr = '{func}({args})'.format(
+                func=name,
+                args=', '.join(c_data[1])
+            )
+            arguments = convert_to_float_if_needed(', '.join(c_data[0][1:]))
+            preamble = convert_to_float_if_needed(self.tp.get_code())
+            cluda_preamble = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
+            knl = ElementwiseKernel(
+                arguments=arguments,
+                operation=expr,
+                preamble="\n".join([cluda_preamble, preamble])
+            )
+            self.c_func = knl
+
 
     def _correct_opencl_address_space(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
@@ -172,13 +201,13 @@ class Elementwise(object):
             header_idx += 1
 
         def _add_address_space(arg):
-            if '*' in arg and '__global' not in arg:
-                return '__global ' + arg
+            if '*' in arg and 'GLOBAL_MEM' not in arg:
+                return 'GLOBAL_MEM ' + arg
             else:
                 return arg
         args = [_add_address_space(arg) for arg in c_data[0]]
         code[:header_idx] = wrap(
-            'void {func}({args})'.format(
+            'WITHIN_KERNEL void {func}({args})'.format(
                 func=self.func.__name__,
                 args=', '.join(args)
             ),
@@ -201,6 +230,12 @@ class Elementwise(object):
         elif self.backend == 'opencl':
             self.c_func(*c_args, **kw)
             self.queue.finish()
+        elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
+            self.c_func(*c_args, **kw)
+            event.record()
+            event.synchronize()
 
 
 def elementwise(func=None, backend=None):
@@ -292,6 +327,11 @@ class Reduction(object):
 
             from .opencl import get_context, get_queue
             from pyopencl.reduction import ReductionKernel
+            from pyopencl._cluda import CLUDA_PREAMBLE
+            cluda_preamble = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
+
             ctx = get_context()
             self.queue = get_queue()
             knl = ReductionKernel(
@@ -301,9 +341,46 @@ class Reduction(object):
                 reduce_expr=self.reduce_expr,
                 map_expr=expr,
                 arguments=arguments,
-                preamble=preamble
+                preamble="\n".join([cluda_preamble, preamble])
             )
             self.c_func = knl
+        elif self.backend == 'cuda':
+            if self.func is not None:
+                self.tp.add(self.func)
+                py_data, c_data = self.cython_gen.get_func_signature(self.func)
+                self._correct_opencl_address_space(c_data)
+                name = self.func.__name__
+                expr = '{func}({args})'.format(
+                    func=name,
+                    args=', '.join(c_data[1])
+                )
+                arguments = convert_to_float_if_needed(
+                    ', '.join(c_data[0][1:])
+                )
+                preamble = convert_to_float_if_needed(self.tp.get_code())
+            else:
+                arguments = '{type} *in'.format(type=self.type)
+                expr = None
+                preamble = ''
+
+            from .cuda import set_context
+            set_context()
+            from pycuda.reduction import ReductionKernel
+            from pycuda._cluda import CLUDA_PREAMBLE
+            cluda_preamble = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
+
+            knl = ReductionKernel(
+                dtype_out=self.dtype_out,
+                neutral=self.neutral,
+                reduce_expr=self.reduce_expr,
+                map_expr=expr,
+                arguments=arguments,
+                preamble="\n".join([cluda_preamble, preamble])
+            )
+            self.c_func = knl
+
 
     def _correct_return_type(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
@@ -313,8 +390,8 @@ class Reduction(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _add_address_space(self, arg):
-        if '*' in arg and '__global' not in arg:
-            return '__global ' + arg
+        if '*' in arg and 'GLOBAL_MEM' not in arg:
+            return 'GLOBAL_MEM ' + arg
         else:
             return arg
 
@@ -328,7 +405,7 @@ class Reduction(object):
 
         args = [self._add_address_space(arg) for arg in c_data[0]]
         code[:header_idx] = wrap(
-            '{type} {func}({args})'.format(
+            'WITHIN_KERNEL {type} {func}({args})'.format(
                 type=self.type,
                 func=self.func.__name__,
                 args=', '.join(args)
@@ -353,3 +430,129 @@ class Reduction(object):
             result = self.c_func(*c_args)
             self.queue.finish()
             return result.get()
+        elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
+            result = self.c_func(*c_args)
+            event.record()
+            event.synchronize()
+            return result.get()
+
+
+class Scan(object):
+    def __init__(self, input, output, scan_expr, is_segment=None,
+                 dtype=np.float64, neutral='0', backend='opencl'):
+        backend = get_backend(backend)
+        self.tp = Transpiler(backend=backend)
+        self.backend = backend
+        self.input_func = input
+        self.output_func = output
+        self.is_segment_func = is_segment
+        if input is not None:
+            self.name = 'scan_' + input.__name__
+        else:
+            self.name = 'scan'
+        self.scan_expr = scan_expr
+        self.dtype = dtype
+        self.type = dtype_to_ctype(dtype)
+        if backend == 'cython':
+            # On Windows, INFINITY is not defined so we use INFTY which we
+            # internally define.
+            self.neutral = neutral.replace('INFINITY', 'INFTY')
+            raise NotImplementedError(
+                'Scan not supported for Cython backend.'
+            )
+        else:
+            self.neutral = neutral
+        self._config = get_config()
+        self.cython_gen = CythonGenerator()
+        self.queue = None
+        self._generate()
+
+    def _wrap_ocl_function(self, func):
+        if func is not None:
+            self.tp.add(func)
+            py_data, c_data = self.cython_gen.get_func_signature(func)
+            self._correct_opencl_address_space(c_data, func)
+            name = func.__name__
+            expr = '{func}({args})'.format(
+                func=name,
+                args=', '.join(c_data[1])
+            )
+            arguments = convert_to_float_if_needed(
+                ', '.join(c_data[0][1:])
+            )
+        else:
+            arguments = ''
+            expr = None
+        return expr, arguments
+
+    def _generate(self):
+        if self.backend == 'opencl':
+            input_expr, input_args = self._wrap_ocl_function(self.input_func)
+            output_expr, output_args = self._wrap_ocl_function(
+                self.output_func
+            )
+            segment_expr, segment_args = self._wrap_ocl_function(
+                self.is_segment_func
+            )
+
+            preamble = convert_to_float_if_needed(self.tp.get_code())
+
+            from .opencl import get_context, get_queue
+            from pyopencl.scan import GenericScanKernel
+            ctx = get_context()
+            self.queue = get_queue()
+            knl = GenericScanKernel(
+                ctx,
+                dtype=self.dtype,
+                arguments=input_args,
+                input_expr=input_expr,
+                scan_expr=self.scan_expr,
+                neutral=self.neutral,
+                output_statement=output_expr,
+                is_segment_start_expr=segment_expr,
+                preamble=preamble
+            )
+            self.c_func = knl
+
+    def _add_address_space(self, arg):
+        if '*' in arg and '__global' not in arg:
+            return '__global ' + arg
+        else:
+            return arg
+
+    def _correct_opencl_address_space(self, c_data, func):
+        code = self.tp.blocks[-1].code.splitlines()
+        header_idx = 1
+        for line in code:
+            if line.rstrip().endswith(')'):
+                break
+            header_idx += 1
+
+        args = [self._add_address_space(arg) for arg in c_data[0]]
+        code[:header_idx] = wrap(
+            '{type} {func}({args})'.format(
+                type=self.type,
+                func=func.__name__,
+                args=', '.join(args)
+            ),
+            width=78, subsequent_indent=' '*4, break_long_words=False
+        )
+        self.tp.blocks[-1].code = '\n'.join(code)
+
+    def _massage_arg(self, x):
+        if isinstance(x, Array):
+            return x.dev
+        else:
+            return x
+
+    def __call__(self, *args):
+        c_args = [self._massage_arg(x) for x in args]
+        if self.backend == 'cython':
+            size = len(c_args[0])
+            c_args.insert(0, size)
+            self.c_func(*c_args)
+        elif self.backend == 'opencl':
+            self.c_func(*c_args)
+            self.queue.finish()

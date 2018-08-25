@@ -130,7 +130,7 @@ class Transpiler(object):
         ----------
 
         backend: str: Backend to use.
-            Can be one of 'cython', 'opencl', or 'python'
+            Can be one of 'cython', 'opencl', 'cuda' or 'python'
         """
         self.backend = backend
         self.blocks = []
@@ -158,6 +158,18 @@ class Transpiler(object):
 
             __constant double pi=M_PI;
             ''')
+        elif backend == 'cuda':
+            from pycuda._cluda import CLUDA_PREAMBLE
+            self._cgen = OpenCLConverter()
+            cluda = Template(text=CLUDA_PREAMBLE).render(
+                double_support=True
+            )
+            self.header = cluda + dedent('''
+            #define max(x, y) fmax((double)(x), (double)(y))
+
+            __constant__ double pi= 3.141592654f;
+            ''')
+
 
     def _handle_symbol(self, name, value):
         backend = self.backend
@@ -171,7 +183,7 @@ class Transpiler(object):
             ctype = 'double'
         elif isinstance(value, bool):
             ctype = 'bint' if backend == 'cython' else 'int'
-            if backend == 'opencl':
+            if backend == 'opencl' or backend == 'cuda':
                 value = str(value).lower()
         else:
             msg = 'Unsupported type (%s) of variable "%s"' % (
@@ -183,7 +195,7 @@ class Transpiler(object):
             return 'cdef {type} {name} = {value}'.format(
                 type=ctype, name=name, value=value
             )
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             return '#define {name} {value}'.format(
                 name=name, value=value
             )
@@ -240,7 +252,7 @@ class Transpiler(object):
         if self.backend == 'cython':
             self._cgen.parse(obj)
             code = self._cgen.get_code()
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             code = self._cgen.parse(obj)
 
         cb = CodeBlock(obj, code)
@@ -267,3 +279,8 @@ class Transpiler(object):
             self.mod = cl.Program(ctx, self.source).build(
                 options=['-w']
             )
+        elif self.backend == 'cuda':
+            import pycuda as cu
+            from pycuda.compiler import SourceModule
+            self.source = convert_to_float_if_needed(self.get_code())
+            self.mod = SourceModule(self.source)

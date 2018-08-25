@@ -193,7 +193,7 @@ class AccelerationEvalCythonHelper(object):
         headers.append(cg.get_code())
 
         # Equation wrappers.
-        self.known_types['KERNEL'] = KnownType(
+        self.known_types['SPH_KERNEL'] = KnownType(
             object.kernel.__class__.__name__
         )
         headers.append(object.all_group.get_equation_wrappers(
