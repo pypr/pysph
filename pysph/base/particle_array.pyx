@@ -136,7 +136,6 @@ cdef class ParticleArray:
         """
         self.time = 0.0
         self.name = name
-        self.is_dirty = True
         self.indices_invalid = True
 
         self.properties = {}
@@ -211,7 +210,6 @@ cdef class ParticleArray:
         self.constants = {}
         self.property_arrays = []
         self.default_values = {}
-        self.is_dirty = True
         self.indices_invalid = True
         self.num_real_particles = 0
 
@@ -384,10 +382,6 @@ cdef class ParticleArray:
 
         return arrays
 
-    cpdef set_dirty(self, bint value):
-        """Set the is_dirty variable to given value """
-        self.is_dirty = value
-
     cpdef set_num_real_particles(self, long value):
         self.num_real_particles = value
 
@@ -406,7 +400,6 @@ cdef class ParticleArray:
         self.default_values.clear()
         self.default_values = {'tag':tag_def_values, 'pid':0, 'gid':_UINT_MAX}
 
-        self.is_dirty = True
         self.indices_invalid = True
 
     cpdef set_time(self, double time):
@@ -510,7 +503,6 @@ cdef class ParticleArray:
 
         if index_list.length > 0:
             self.align_particles()
-            self.is_dirty = True
             self.indices_invalid = True
 
     cpdef remove_tagged_particles(self, int tag):
@@ -602,7 +594,6 @@ cdef class ParticleArray:
         if num_extra_particles > 0:
             # make sure particles are aligned properly.
             self.align_particles()
-            self.is_dirty = True
 
         return 0
 
@@ -657,7 +648,6 @@ cdef class ParticleArray:
 
         if num_extra_particles > 0:
             self.align_particles()
-            self.is_dirty = True
 
         return 0
 
@@ -1164,7 +1154,6 @@ cdef class ParticleArray:
             arr.c_align_array(index_array)
 
         if num_moves > 0:
-            self.is_dirty = True
             self.indices_invalid = True
 
     cpdef ParticleArray extract_particles(self, indices, list props=None):

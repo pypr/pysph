@@ -40,7 +40,6 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(name='test_particle_array')
 
         self.assertEqual(p.name, 'test_particle_array')
-        #self.assertEqual(p.is_dirty, True)
         self.assertEqual('tag' in p.properties, True)
         self.assertEqual(p.properties['tag'].length, 0)
 
@@ -210,8 +209,6 @@ class ParticleArrayTest(object):
         self.assertEqual('gid' in p.properties, True)
         self.assertEqual(p.properties['gid'].length, 0)
 
-        #self.assertEqual(p.is_dirty, True)
-
     def test_getattr(self):
         """
         Tests the __getattr__ function.
@@ -313,7 +310,6 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z}, m={'data': m},
                                          h={'data': h})
-        p.set_dirty(False)
 
         new_particles = {}
         new_particles['x'] = numpy.array([5., 6, 7], dtype=numpy.float32)
@@ -327,13 +323,10 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.x, [1., 2, 3, 4, 5, 6, 7]), True)
         self.assertEqual(check_array(p.y, [0., 1, 2, 3, 4, 5, 6]), True)
         self.assertEqual(check_array(p.z, [0., 0, 0, 0, 0, 0, 0]), True)
-        #self.assertEqual(p.is_dirty, True)
 
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
         self.assertEqual(len(p.m), 7)
-
-        p.set_dirty(False)
 
         # try adding an empty particle list
         p.add_particles(**{})
@@ -342,7 +335,6 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.x, [1., 2, 3, 4, 5, 6, 7]), True)
         self.assertEqual(check_array(p.y, [0., 1, 2, 3, 4, 5, 6]), True)
         self.assertEqual(check_array(p.z, [0., 0, 0, 0, 0, 0, 0]), True)
-        #self.assertEqual(p.is_dirty, False)
 
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
@@ -493,7 +485,6 @@ class ParticleArrayTest(object):
                           'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
         p.add_property(**{'name': 'y',
                           'data': [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]})
-        p.set_dirty(False)
         p.set(**{'tag': [0, 0, 1, 1, 1, 0, 4, 0, 1, 5]})
         self.push(p)
         p.align_particles()
