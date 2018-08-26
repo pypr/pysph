@@ -4,43 +4,54 @@
 import numpy as np
 import os
 
-# PySPH imports
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import QuinticSpline
 from pysph.solver.application import Application
 
-from pysph.sph.equation import Equation
+from pysph.sph.equation import Group, Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
 
+from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
+                                            GradientCorrection,
+                                            MixedKernelCorrectionPreStep)
+from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
+
+
 # domain and constants
-L = 1.0; U = 1.0
-rho0 = 1.0; c0 = 10 * U
+L = 1.0
+U = 1.0
+rho0 = 1.0
+c0 = 10 * U
 p0 = c0**2 * rho0
 
 
 def exact_solution(U, b, t, x, y):
-    pi = np.pi; sin = np.sin; cos = np.cos
-    factor = U * np.exp(b*t)
+    pi = np.pi
+    sin = np.sin
+    cos = np.cos
+    factor = U * np.exp(b * t)
 
-    u = -cos( 2 * pi * x ) * sin( 2 * pi * y)
-    v = sin( 2 * pi * x ) * cos( 2 * pi * y)
-    p = -0.25*(cos(4*pi*x) + cos(4*pi*y))
+    u = -cos(2 * pi * x) * sin(2 * pi * y)
+    v = sin(2 * pi * x) * cos(2 * pi * y)
+    p = -0.25 * (cos(4 * pi * x) + cos(4 * pi * y))
 
-    return factor * u, factor * v, factor*factor*p
+    return factor * u, factor * v, factor * factor * p
 
 
 class TaylorGreen(Application):
+
     def add_user_options(self, group):
+        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
         )
         group.add_argument(
             "--perturb", action="store", type=float, dest="perturb", default=0,
-            help="Random perturbation of initial particles as a fraction "\
-                "of dx (setting it to zero disables it, the default)."
+            help="Random perturbation of initial particles as a fraction "
+            "of dx (setting it to zero disables it, the default)."
         )
         group.add_argument(
             "--nx", action="store", type=int, dest="nx", default=50,
@@ -59,34 +70,39 @@ class TaylorGreen(Application):
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
+        group.add_argument(
+            "--kernel-corr", action="store", type=str, dest='kernel_corr',
+            default='', help="Type of Kernel Correction", choices=corrections
+        )
 
     def consume_user_options(self):
         nx = self.options.nx
         re = self.options.re
 
-        self.nu = nu = U*L/re
+        self.nu = nu = U * L / re
 
-        self.dx = dx = L/nx
-        self.volume = dx*dx
+        self.dx = dx = L / nx
+        self.volume = dx * dx
         self.hdx = self.options.hdx
 
         h0 = self.hdx * self.dx
-        dt_cfl = 0.25 * h0/( c0 + U )
-        dt_viscous = 0.125 * h0**2/nu
+        dt_cfl = 0.25 * h0 / (c0 + U)
+        dt_viscous = 0.125 * h0**2 / nu
         dt_force = 0.25 * 1.0
 
         self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+        self.kernel_corr = self.options.kernel_corr
 
     def configure_scheme(self):
         scheme = self.scheme
         h0 = self.hdx * self.dx
         if self.options.scheme == 'tvf':
-            scheme.configure(pb=self.options.pb_factor*p0, nu=self.nu, h0=h0)
+            scheme.configure(pb=self.options.pb_factor * p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         elif self.options.scheme == 'edac':
-            scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor*p0)
+            scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor * p0)
         kernel = QuinticSpline(dim=2)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
 
@@ -108,6 +124,36 @@ class TaylorGreen(Application):
         s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf, edac=edac)
         return s
 
+    def create_equations(self):
+        eqns = self.scheme.get_equations()
+        n = len(eqns)
+        tol = 1.0
+        if self.kernel_corr == 'grad-corr':
+            eqn1 = Group(equations=[
+                GradientCorrectionPreStep('fluid', ['fluid'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        elif self.kernel_corr == 'mixed-corr':
+            eqn1 = Group(equations=[
+                MixedKernelCorrectionPreStep('fluid', ['fluid'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        elif self.kernel_corr == 'crksph':
+            eqn1 = Group(equations=[
+                CRKSPHPreStep('fluid', ['fluid'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = CRKSPH('fluid', ['fluid'], 2, tol)
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        return eqns
+
     def create_domain(self):
         return DomainManager(
             xmin=0, xmax=L, ymin=0, ymax=L, periodic_in_x=True,
@@ -117,8 +163,10 @@ class TaylorGreen(Application):
     def create_particles(self):
         # create the particles
         dx = self.dx
-        _x = np.arange( dx/2, L, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        _x = np.arange(dx / 2, L, dx)
+        x, y = np.meshgrid(_x, _x)
+        x = x.ravel()
+        y = y.ravel()
         if self.options.init is not None:
             fname = self.options.init
             from pysph.solver.utils import load
@@ -128,9 +176,9 @@ class TaylorGreen(Application):
 
         if self.options.perturb > 0:
             np.random.seed(1)
-            factor = dx*self.options.perturb
-            x += np.random.random(x.shape)*factor
-            y += np.random.random(x.shape)*factor
+            factor = dx * self.options.perturb
+            x += np.random.random(x.shape) * factor
+            y += np.random.random(x.shape) * factor
         h = np.ones_like(x) * dx
 
         # create the arrays
@@ -143,19 +191,22 @@ class TaylorGreen(Application):
         fluid.add_property('color')
         fluid.add_output_arrays(['color'])
 
-        print("Taylor green vortex problem :: nfluid = %d, dt = %g"%(
+        print("Taylor green vortex problem :: nfluid = %d, dt = %g" % (
             fluid.get_number_of_particles(), self.dt))
 
         # setup the particle properties
-        pi = np.pi; cos = np.cos; sin=np.sin
+        pi = np.pi
+        cos = np.cos
+        sin = np.sin
 
         # color
-        fluid.color[:] = cos(2*pi*x) * cos(4*pi*y)
+        fluid.color[:] = cos(2 * pi * x) * cos(4 * pi * y)
 
         # velocities
-        fluid.u[:] = -U * cos(2*pi*x) * sin(2*pi*y)
-        fluid.v[:] = +U * sin(2*pi*x) * cos(2*pi*y)
-        fluid.p[:] = -U*U*(np.cos(4*np.pi*x) + np.cos(4*np.pi*y))*0.25
+        fluid.u[:] = -U * cos(2 * pi * x) * sin(2 * pi * y)
+        fluid.v[:] = +U * sin(2 * pi * x) * cos(2 * pi * y)
+        fluid.p[:] = -U * U * (np.cos(4 * np.pi * x) +
+                               np.cos(4 * np.pi * y)) * 0.25
 
         # mass is set to get the reference density of each phase
         fluid.rho[:] = rho0
@@ -163,16 +214,29 @@ class TaylorGreen(Application):
 
         # volume is set as dx^2
         if self.options.scheme == 'tvf':
-            fluid.V[:] = 1./self.volume
+            fluid.V[:] = 1. / self.volume
 
         # smoothing lengths
         fluid.h[:] = self.hdx * dx
 
+        corr = self.kernel_corr
+        if corr == 'kernel-corr' or corr == 'mixed-corr':
+            fluid.add_property('cwij')
+        if corr == 'mixed-corr' or corr == 'grad-corr':
+            len_f = len(fluid.x) * 13
+            fluid.add_constant('m_mat', [0.0] * len_f)
+        elif corr == 'crksph':
+            fluid.add_property('ai')
+            len_f = len(fluid.x) * 13
+            fluid.add_constant('gradbi', [0.0] * len_f)
+            len_f = len(fluid.x) * 5
+            for const in ['gradai', 'bi']:
+                fluid.add_constant(const, [0.0] * len_f)
+
         # return the particle list
         return [fluid]
 
-
-    #####  The following are all related to post-processing.  #####
+    # The following are all related to post-processing.
     def _get_post_process_props(self, array):
         """Return x, y, m, u, v, p.
         """
@@ -215,7 +279,7 @@ class TaylorGreen(Application):
             return
 
         from pysph.solver.utils import iter_output
-        decay_rate = -8.0 * np.pi**2/self.options.re
+        decay_rate = -8.0 * np.pi**2 / self.options.re
 
         files = self.output_files
         t, ke, ke_ex, decay, linf, l1, p_l1 = [], [], [], [], [], [], []
@@ -226,29 +290,29 @@ class TaylorGreen(Application):
             u_e, v_e, p_e = exact_solution(U, decay_rate, _t, x, y)
             vmag2 = u**2 + v**2
             vmag = np.sqrt(vmag2)
-            ke.append(0.5*np.sum(m*vmag2))
+            ke.append(0.5 * np.sum(m * vmag2))
             vmag2_e = u_e**2 + v_e**2
             vmag_e = np.sqrt(vmag2_e)
-            ke_ex.append(0.5*np.sum(m*vmag2_e))
+            ke_ex.append(0.5 * np.sum(m * vmag2_e))
 
             vmag_max = vmag.max()
             decay.append(vmag_max)
             theoretical_max = U * np.exp(decay_rate * _t)
-            linf.append(abs( (vmag_max - theoretical_max)/theoretical_max ))
+            linf.append(abs((vmag_max - theoretical_max) / theoretical_max))
 
             l1_err = np.average(np.abs(vmag - vmag_e))
             avg_vmag_e = np.average(np.abs(vmag_e))
             # scale the error by the maximum velocity.
-            l1.append(l1_err/avg_vmag_e)
+            l1.append(l1_err / avg_vmag_e)
 
             p_e_max = np.abs(p_e).max()
-            p_error = np.average(np.abs(p - p_e))/p_e_max
+            p_error = np.average(np.abs(p - p_e)) / p_e_max
             p_l1.append(p_error)
 
         t, ke, ke_ex, decay, l1, linf, p_l1 = list(map(
             np.asarray, (t, ke, ke_ex, decay, l1, linf, p_l1))
         )
-        decay_ex = U*np.exp(decay_rate*t)
+        decay_ex = U * np.exp(decay_rate * t)
         fname = os.path.join(self.output_dir, 'results.npz')
         np.savez(
             fname, t=t, ke=ke, ke_ex=ke_ex, decay=decay, linf=linf, l1=l1,
@@ -262,26 +326,30 @@ class TaylorGreen(Application):
         plt.clf()
         plt.semilogy(t, decay_ex, label="exact")
         plt.semilogy(t, decay, label="computed")
-        plt.xlabel('t'); plt.ylabel('max velocity')
+        plt.xlabel('t')
+        plt.ylabel('max velocity')
         plt.legend()
         fig = os.path.join(self.output_dir, "decay.png")
         plt.savefig(fig, dpi=300)
 
         plt.clf()
         plt.plot(t, linf)
-        plt.xlabel('t'); plt.ylabel(r'$L_\infty$ error')
+        plt.xlabel('t')
+        plt.ylabel(r'$L_\infty$ error')
         fig = os.path.join(self.output_dir, "linf_error.png")
         plt.savefig(fig, dpi=300)
 
         plt.clf()
         plt.plot(t, l1, label="error")
-        plt.xlabel('t'); plt.ylabel(r'$L_1$ error')
+        plt.xlabel('t')
+        plt.ylabel(r'$L_1$ error')
         fig = os.path.join(self.output_dir, "l1_error.png")
         plt.savefig(fig, dpi=300)
 
         plt.clf()
         plt.plot(t, p_l1, label="error")
-        plt.xlabel('t'); plt.ylabel(r'$L_1$ error for $p$')
+        plt.xlabel('t')
+        plt.ylabel(r'$L_1$ error for $p$')
         fig = os.path.join(self.output_dir, "p_l1_error.png")
         plt.savefig(fig, dpi=300)
 
