@@ -161,6 +161,8 @@ cdef class ParticleArray:
         if get_config().use_opencl:
             h = ocl.DeviceHelper(self)
             self.set_device_helper(h)
+        else:
+            self.gpu = None
 
     def __getattr__(self, name):
         """Convenience, to access particle property arrays as an attribute

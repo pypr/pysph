@@ -819,6 +819,9 @@ class ParticleArrayTestGPU(unittest.TestCase, ParticleArrayTest):
         get_config().use_opencl = True
         get_config().use_double = True
 
+    def tearDown(self):
+        get_config().use_opencl = False
+
     def pull(self, p):
         p.gpu.pull()
 
