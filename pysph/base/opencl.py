@@ -346,8 +346,8 @@ class DeviceHelper(object):
         new_indices = DeviceArray(np.uint32, n=num_particles)
 
         remove_knl = GenericScanKernel(
-            self._ctx, np.uint32,
-            arguments="__global uint *if_remove, __global uint *new_indices",
+            self._ctx, np.int32,
+            arguments="__global int *if_remove, __global uint *new_indices",
             input_expr="if_remove[i]",
             scan_expr="a+b", neutral="0",
             output_statement="""
@@ -406,12 +406,12 @@ class DeviceHelper(object):
             raise ValueError(msg)
 
         num_particles = self.get_number_of_particles()
-        if_remove = DeviceArray(np.uint32, n=num_particles)
+        if_remove = DeviceArray(np.int32, n=num_particles)
         if_remove.fill(0)
 
         fill_if_remove_knl = get_elwise_kernel(
             "fill_if_remove_knl",
-            "uint* indices, uint* if_remove, int size",
+            "uint* indices, int* if_remove, int size",
             "if(indices[i] < size) if_remove[indices[i]] = 1;"
         )
 
@@ -433,7 +433,7 @@ class DeviceHelper(object):
 
         """
         tag_array = self.tag
-        if_remove = tag_array == tag
+        if_remove = (tag_array == tag).astype(np.int32)
         self.remove_particles_bool(if_remove)
 
     def add_particles(self, **particle_props):
@@ -590,7 +590,7 @@ class DeviceHelper(object):
         for prop in prop_names:
             src_arr = self._data[prop].array
             dst_arr = result_array.gpu.get_device_array(prop)
-            dst_arr.set_data(src_arr[indices])
+            dst_arr.set_data(cl.array.take(src_arr, indices))
 
         for const in self.constants:
             result_array.gpu.update_const(const, self._data[const].copy())
