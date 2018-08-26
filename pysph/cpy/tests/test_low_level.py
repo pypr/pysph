@@ -54,7 +54,7 @@ class TestKernel(unittest.TestCase):
         # When
         k = Kernel(knl, backend='cuda')
         a = 21.0
-        k(x, y, a, size)
+        k(x, y, a, 1000)
 
         # Then
         y.pull()
