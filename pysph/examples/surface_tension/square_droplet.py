@@ -46,21 +46,23 @@ import numpy
 
 # Particle generator
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, QuinticSpline
+from pysph.base.kernels import CubicSpline, WendlandQuintic, Gaussian, \
+    QuinticSpline
 
 # SPH Equations and Group
 from pysph.sph.equation import Group
 
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 
-from pysph.sph.wc.transport_velocity import SummationDensity, MomentumEquationPressureGradient,\
+from pysph.sph.wc.transport_velocity import SummationDensity, \
+    MomentumEquationPressureGradient,\
     SolidWallPressureBC, SolidWallNoSlipBC, StateEquation,\
     MomentumEquationArtificialStress, MomentumEquationViscosity
 
 from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
     ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
-    SmoothedColor, AdamiColorGradient, MorrisColorGradient, SY11ColorGradient, \
-    SY11DiracDelta, AdamiReproducingDivergence
+    SmoothedColor, AdamiColorGradient, MorrisColorGradient, \
+    SY11DiracDelta, AdamiReproducingDivergence, SY11ColorGradient
 
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
 
@@ -105,11 +107,12 @@ epsilon = 0.01/h0
 
 # time steps
 tf = 1.0
-dt_cfl = 0.25 * h0/( 1.1*c0 )
+dt_cfl = 0.25 * h0/(1.1*c0)
 dt_viscous = 0.125 * h0**2/nu
 dt_force = 1.0
 
 dt = 0.9 * min(dt_cfl, dt_viscous, dt_force)
+
 
 class SquareDroplet(Application):
     def add_user_options(self, group):
@@ -117,12 +120,13 @@ class SquareDroplet(Application):
         group.add_argument(
             "--scheme", action="store", dest="scheme", default='morris',
             choices=choices,
-            help="Specify scheme to use among %s"%choices
+            help="Specify scheme to use among %s" % choices
         )
 
     def create_particles(self):
-        x, y = numpy.mgrid[ dxb2:domain_width:dx, dyb2:domain_height:dy ]
-        x = x.ravel(); y = y.ravel()
+        x, y = numpy.mgrid[dxb2:domain_width:dx, dyb2:domain_height:dy]
+        x = x.ravel()
+        y = y.ravel()
 
         m = numpy.ones_like(x) * volume * rho0
         rho = numpy.ones_like(x) * rho0
@@ -165,21 +169,21 @@ class SquareDroplet(Application):
 
         # set the color of the inner square
         for i in range(x.size):
-            if ( (fluid.x[i] > 0.35) and (fluid.x[i] < 0.65) ):
-                if ( (fluid.y[i] > 0.35) and (fluid.y[i] < 0.65) ):
+            if ((fluid.x[i] > 0.35) and (fluid.x[i] < 0.65)):
+                if ((fluid.y[i] > 0.35) and (fluid.y[i] < 0.65)):
                     fluid.color[i] = 1.0
 
         # particle volume
         fluid.V[:] = 1./volume
 
         # set additional output arrays for the fluid
-        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
-                                 'kappa', 'N', 'scolor', 'p'])
+        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny',
+                                 'ddelta', 'kappa', 'N', 'scolor', 'p'])
 
-        print("2D Square droplet deformation with %d fluid particles"%(
+        print("2D Square droplet deformation with %d fluid particles" % (
                 fluid.get_number_of_particles()))
 
-        return [fluid,]
+        return [fluid, ]
 
     def create_domain(self):
         return DomainManager(
@@ -188,7 +192,7 @@ class SquareDroplet(Application):
 
     def create_solver(self):
         kernel = QuinticSpline(dim=2)
-        integrator = PECIntegrator( fluid=TransportVelocityStep() )
+        integrator = PECIntegrator(fluid=TransportVelocityStep())
         solver = Solver(
             kernel=kernel, dim=dim, integrator=integrator,
             dt=dt, tf=tf, adaptive_timestep=False)
@@ -201,8 +205,8 @@ class SquareDroplet(Application):
             # number density (1/volume) is explicitly set for the solid phase
             # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity( dest='fluid', sources=['fluid'] )
-                    ] ),
+                    SummationDensity(dest='fluid', sources=['fluid'])
+                    ]),
 
             # Given the updated number density for the fluid, we can update
             # the fluid pressure. Additionally, we can compute the Shepard
@@ -210,9 +214,10 @@ class SquareDroplet(Application):
             # condition. Also compute the gradient of the color function to
             # compute the normal at the interface.
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
+                    StateEquation(dest='fluid', sources=None, rho0=rho0,
+                                  p0=p0),
                     SY11ColorGradient(dest='fluid', sources=['fluid'])
-                    ] ),
+                    ]),
 
             #################################################################
             # Begin Surface tension formulation
@@ -220,8 +225,9 @@ class SquareDroplet(Application):
             # Scale the smoothing lengths to determine the interface
             # quantities.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=factor1)
-                    ], update_nnps=False ),
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=factor1)
+                    ], update_nnps=False),
 
             # Compute the discretized dirac delta with respect to the new
             # smoothing length.
@@ -233,14 +239,16 @@ class SquareDroplet(Application):
             # Compute the interface curvature using the modified smoothing
             # length and interface normals computed in the previous Group.
             Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
-                                                        with_morris_correction=True),
+                    InterfaceCurvatureFromNumberDensity(
+                        dest='fluid', sources=['fluid'],
+                        with_morris_correction=True),
                     ], ),
 
             # Now rescale the smoothing length to the original value for the
             # rest of the computations.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=factor2)
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=factor2)
                     ], update_nnps=False,
                   ),
             #################################################################
@@ -265,10 +273,13 @@ class SquareDroplet(Application):
                         dest='fluid', sources=['fluid'], nu=nu),
 
                     # Surface tension force for the SY11 formulation
-                    ShadlooYildizSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+                    ShadlooYildizSurfaceTensionForce(dest='fluid',
+                                                     sources=None,
+                                                     sigma=sigma),
 
                     # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                    MomentumEquationArtificialStress(dest='fluid',
+                                                     sources=['fluid']),
 
                     ], )
             ]
@@ -280,8 +291,8 @@ class SquareDroplet(Application):
             # number density (1/volume) is explicitly set for the solid phase
             # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity( dest='fluid', sources=['fluid'] )
-                    ] ),
+                    SummationDensity(dest='fluid', sources=['fluid'])
+                    ]),
 
             # Given the updated number density for the fluid, we can update
             # the fluid pressure. Additionally, we can compute the Shepard
@@ -289,9 +300,10 @@ class SquareDroplet(Application):
             # condition. Also compute the smoothed color based on the color
             # index for a particle.
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
-                    SmoothedColor( dest='fluid', sources=['fluid'], smooth=True ),
-                    ] ),
+                    StateEquation(dest='fluid', sources=None, rho0=rho0,
+                                  p0=p0),
+                    SmoothedColor(dest='fluid', sources=['fluid']),
+                    ]),
 
             #################################################################
             # Begin Surface tension formulation
@@ -307,8 +319,9 @@ class SquareDroplet(Application):
 
             # Compute the interface curvature computed in the previous Group.
             Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid'],
-                                                        with_morris_correction=True),
+                    InterfaceCurvatureFromNumberDensity(
+                        dest='fluid', sources=['fluid'],
+                        with_morris_correction=True),
                     ], ),
             #################################################################
             # End Surface tension formulation
@@ -327,10 +340,12 @@ class SquareDroplet(Application):
                         dest='fluid', sources=['fluid'], nu=nu),
 
                     # Surface tension force for the Morris formulation
-                    CSFSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+                    CSFSurfaceTensionForce(dest='fluid', sources=None,
+                                           sigma=sigma),
 
                     # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                    MomentumEquationArtificialStress(dest='fluid',
+                                                     sources=['fluid']),
 
                     ], )
             ]
@@ -342,16 +357,17 @@ class SquareDroplet(Application):
             # number density (1/volume) is explicitly set for the solid phase
             # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity( dest='fluid', sources=['fluid'] )
-                    ] ),
+                    SummationDensity(dest='fluid', sources=['fluid'])
+                    ]),
 
             # Given the updated number density for the fluid, we can update
             # the fluid pressure. Additionally, we can compute the Shepard
             # Filtered velocity required for the no-penetration boundary
             # condition.
             Group(equations=[
-                    StateEquation(dest='fluid', sources=None, rho0=rho0, p0=p0),
-                    ] ),
+                    StateEquation(dest='fluid', sources=None, rho0=rho0,
+                                  p0=p0),
+                    ]),
 
             #################################################################
             # Begin Surface tension formulation
@@ -385,10 +401,12 @@ class SquareDroplet(Application):
                         dest='fluid', sources=['fluid'], nu=nu),
 
                     # Surface tension force for the CSF formulation
-                    CSFSurfaceTensionForce(dest='fluid', sources=None, sigma=sigma),
+                    CSFSurfaceTensionForce(dest='fluid', sources=None,
+                                           sigma=sigma),
 
                     # Artificial stress for the fluid phase
-                    MomentumEquationArtificialStress(dest='fluid', sources=['fluid']),
+                    MomentumEquationArtificialStress(dest='fluid',
+                                                     sources=['fluid']),
 
                     ], )
             ]

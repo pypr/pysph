@@ -15,42 +15,55 @@ from pysph.examples._db_geometry import DamBreak2DGeometry
 from pysph.solver.application import Application
 from pysph.sph.scheme import WCSPHScheme, SchemeChooser, AdamiHuAdamsScheme
 from pysph.sph.wc.edac import EDACScheme
+from pysph.sph.iisph import IISPHScheme
+from pysph.sph.equation import Group
+from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
+                                            GradientCorrection,
+                                            MixedKernelCorrectionPreStep)
+from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
+
 
 fluid_column_height = 2.0
 fluid_column_width = 1.0
 container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
-#h = 0.0156
 nu = 0.0
 h = 0.039
 g = 9.81
 ro = 1000.0
-co = 10.0 * np.sqrt(2*9.81*fluid_column_height)
+co = 10.0 * np.sqrt(2 * 9.81 * fluid_column_height)
 gamma = 7.0
 alpha = 0.1
 beta = 0.0
-B = co*co*ro/gamma
+B = co * co * ro / gamma
 p0 = 1000.0
 
 
 class DamBreak2D(Application):
+
     def add_user_options(self, group):
         self.hdx = 1.3
+        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
             "--h-factor", action="store", type=float, dest="h_factor",
             default=1.0,
             help="Divide default h by this factor to change resolution"
         )
+        group.add_argument(
+            "--kernel-corr", action="store", type=str, dest='kernel_corr',
+            default='', help="Type of Kernel Correction", choices=corrections
+        )
 
     def consume_user_options(self):
-        self.h = h/self.options.h_factor
-        print("Using h = %f"%self.h)
+        self.h = h / self.options.h_factor
+        self.kernel_corr = self.options.kernel_corr
+        print("Using h = %f" % self.h)
         if self.options.scheme == 'wcsph':
             self.hdx = self.hdx
         else:
             self.hdx = 1.0
-        self.dx = self.h/self.hdx
+        self.dx = self.h / self.hdx
 
     def configure_scheme(self):
         tf = 2.5
@@ -71,23 +84,32 @@ class DamBreak2D(Application):
         elif self.options.scheme == 'aha':
             self.scheme.configure(h0=self.h)
             kernel = QuinticSpline(dim=2)
-            dt = 0.125*self.h/co
+            dt = 0.125 * self.h / co
             kw.update(
                 dict(
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
         elif self.options.scheme == 'edac':
             self.scheme.configure(h=self.h)
             kernel = QuinticSpline(dim=2)
-            dt = 0.125*self.h/co
+            dt = 0.125 * self.h / co
             kw.update(
                 dict(
                     kernel=kernel, dt=dt
                 )
             )
-            print("dt = %f"%dt)
+            print("dt = %f" % dt)
+        elif self.options.scheme == 'iisph':
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125 * 10 * self.h / co
+            kw.update(
+                dict(
+                    kernel=kernel, dt=dt, adaptive_timestep=True
+                )
+            )
+            print("dt = %f" % dt)
 
         self.scheme.configure_solver(**kw)
 
@@ -105,8 +127,47 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, c0=co, nu=nu,
             rho0=ro, h=h, pb=0.0, gy=-g, eps=0.0, clamp_p=True
         )
-        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac)
+        iisph = IISPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            rho0=ro, gy=-g
+        )
+        s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
+                          iisph=iisph)
         return s
+
+    def create_equations(self):
+        eqns = self.scheme.get_equations()
+        if self.options.scheme == 'iisph':
+            return eqns
+        n = len(eqns)
+        if self.kernel_corr == 'grad-corr':
+            eqn1 = Group(equations=[
+                GradientCorrectionPreStep('fluid', ['fluid', 'boundary'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = GradientCorrection('fluid', ['fluid', 'boundary'])
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        elif self.kernel_corr == 'mixed-corr':
+            eqn1 = Group(equations=[
+                MixedKernelCorrectionPreStep('fluid', ['fluid', 'boundary'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = GradientCorrection('fluid', ['fluid', 'boundary'])
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        elif self.kernel_corr == 'crksph':
+            eqn1 = Group(equations=[
+                CRKSPHPreStep('fluid', ['fluid', 'boundary']),
+                CRKSPHPreStep('boundary', ['fluid', 'boundary'])
+            ], real=False)
+            for i in range(n):
+                eqn2 = CRKSPH('fluid', ['fluid', 'boundary'])
+                eqn3 = CRKSPH('boundary', ['fluid', 'boundary'])
+                eqns[i].equations.insert(0, eqn3)
+                eqns[i].equations.insert(0, eqn2)
+            eqns.insert(0, eqn1)
+        return eqns
 
     def create_particles(self):
         if self.options.scheme == 'wcsph':
@@ -129,20 +190,47 @@ class DamBreak2D(Application):
             nfluid_offset=nfluid_offset,
         )
         self.scheme.setup_properties([fluid, boundary])
+        if self.options.scheme == 'iisph':
+            # the default position tends to cause the particles to be pushed
+            # away from the wall, so displacing it by a tiny amount helps.
+            fluid.x += self.dx / 4
+
+        # Adding extra properties for kernel correction
+        corr = self.kernel_corr
+        if corr == 'kernel-corr' or corr == 'mixed-corr':
+            fluid.add_property('cwij')
+            boundary.add_property('cwij')
+        if corr == 'mixed-corr' or corr == 'grad-corr':
+            len_f = len(fluid.x) * 9
+            len_b = len(boundary.x) * 9
+            fluid.add_constant('m_mat', [0.0] * len_f)
+            boundary.add_constant('m_mat', [0.0] * len_b)
+        elif corr == 'crksph':
+            fluid.add_property('ai')
+            boundary.add_property('ai')
+            len_f = len(fluid.x) * 9
+            len_b = len(boundary.x) * 9
+            fluid.add_constant('gradbi', [0.0] * len_f)
+            boundary.add_constant('gradbi', [0.0] * len_b)
+            len_f = len(fluid.x) * 3
+            len_b = len(boundary.x) * 3
+            for const in ['gradai', 'bi']:
+                fluid.add_constant(const, [0.0] * len_f)
+                boundary.add_constant(const, [0.0] * len_b)
 
         return [fluid, boundary]
 
     def post_process(self, info_fname):
-        info = self.read_info(info_fname)
+        self.read_info(info_fname)
         if len(self.output_files) == 0:
             return
 
         from pysph.solver.utils import iter_output
         t, x_max = [], []
-        factor = np.sqrt(2.0*9.81/fluid_column_width)
+        factor = np.sqrt(2.0 * 9.81 / fluid_column_width)
         files = self.output_files
         for sd, array in iter_output(files, 'fluid'):
-            t.append(sd['t']*factor)
+            t.append(sd['t'] * factor)
             x = array.get('x')
             x_max.append(x.max())
 
@@ -157,11 +245,14 @@ class DamBreak2D(Application):
         plt.plot(t, x_max, label='Computed')
         te, xe = dbd.get_koshizuka_oka_data()
         plt.plot(te, xe, 'o', label='Koshizuka & Oka (1996)')
-        plt.xlim(0, 0.7*factor); plt.ylim(0, 4.5)
-        plt.xlabel('$T$'); plt.ylabel('$Z/L$')
+        plt.xlim(0, 0.7 * factor)
+        plt.ylim(0, 4.5)
+        plt.xlabel('$T$')
+        plt.ylabel('$Z/L$')
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(self.output_dir, 'x_vs_t.png'), dpi=300)
         plt.close()
+
 
 if __name__ == '__main__':
     app = DamBreak2D()

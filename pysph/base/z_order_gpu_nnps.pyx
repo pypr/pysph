@@ -116,7 +116,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         (sorted_indices, sorted_keys), evnt = self.radix_sort(
             self.pids[pa_index].array, self.pid_keys[pa_index].array, key_bits=64
         )
-        profile("radix_sort", evnt)
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
 
@@ -254,4 +253,3 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.cid_to_idx[self.src_index].array,
                 self.overflow_cid_to_idx.array, self.dst_to_src.array,
                 start_indices, nbrs, self.radius_scale2, self.cell_size)
-

@@ -1,10 +1,11 @@
 import json
 import glob
 from pysph.solver.utils import load, get_files
-from IPython.display import display, clear_output, Image
+from IPython.display import display, Image
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+import numpy as np
 
 
 class Viewer(object):
@@ -170,7 +171,7 @@ class ParticleArrayWidgets(object):
             value=False,
             description="legend",
             disabled=False,
-            layout=widgets.Layout(width='100px', display='flex')
+            layout=widgets.Layout(width='200px', display='flex')
         )
         self.legend.owner = self.array_name
         self.vector = widgets.Text(
@@ -178,7 +179,8 @@ class ParticleArrayWidgets(object):
             placeholder='variable1,variable2',
             description='vector',
             disabled=False,
-            layout=widgets.Layout(width='240px', display='flex')
+            layout=widgets.Layout(width='240px', display='flex'),
+            continuous_update=False
         )
         self.vector.owner = self.array_name
         self.vector_width = widgets.FloatSlider(
@@ -188,6 +190,7 @@ class ParticleArrayWidgets(object):
             value=25,
             description='vector width',
             layout=widgets.Layout(width='300px'),
+            continuous_update=False,
         )
         self.vector_width.owner = self.array_name
         self.vector_scale = widgets.FloatSlider(
@@ -197,6 +200,7 @@ class ParticleArrayWidgets(object):
             value=55,
             description='vector scale',
             layout=widgets.Layout(width='300px'),
+            continuous_update=False,
         )
         self.vector_scale.owner = self.array_name
         self.scalar_size = widgets.FloatSlider(
@@ -206,6 +210,7 @@ class ParticleArrayWidgets(object):
             value=10,
             description='scalar size',
             layout=widgets.Layout(width='300px'),
+            continuous_update=False,
         )
         self.scalar_size.owner = self.array_name
 
@@ -239,6 +244,7 @@ class Viewer2DWidgets(object):
             value=0,
             description='frame',
             layout=widgets.Layout(width='600px'),
+            continuous_update=False,
         )
         self.save_figure = widgets.Text(
                 value='',
@@ -319,6 +325,12 @@ class Viewer2D(Viewer):
 
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
+        self._vector_ax = self.figure.add_axes(
+            self._scatter_ax.get_position(),
+            frameon=False
+            )
+        self._vector_ax.get_xaxis().set_visible(False)
+        self._vector_ax.get_yaxis().set_visible(False)
         self._scatters = {}
         self._cbar_ax = {}
         self._cbars = {}
@@ -329,25 +341,14 @@ class Viewer2D(Viewer):
         Set plotting attributes, create widgets and display them
         along with the interactive plot.
 
-        Use %matplotlib notebook for more interactivity.
+        Use %matplotlib ipympl (mandatory).
         '''
 
         self._configure_plot()
         self._create_widgets()
-        self._frame_handler(None)
         display(self._widgets._create_vbox())
-
-    def _frame_handler(self, change):
-
         temp_data = self.get_frame(self._widgets.frame.value)
-
-        # scalars #
-
-        self.figure.set_label(
-            "Time : " + str(temp_data['solver_data']['t'])
-        )
         temp_data = temp_data['arrays']
-
         for sct in self._scatters.values():
             if sct in self._scatter_ax.collections:
                 self._scatter_ax.collections.remove(sct)
@@ -356,35 +357,61 @@ class Viewer2D(Viewer):
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.scalar.value != 'None':
-                self._scatters[array_name] = self._scatter_ax.scatter(
+                sct = self._scatters[array_name] = self._scatter_ax.scatter(
                     temp_data[array_name].x,
                     temp_data[array_name].y,
-                    c=getattr(
-                            temp_data[array_name],
-                            pa_widgets.scalar.value
-                    ),
                     s=pa_widgets.scalar_size.value,
-                    cmap=pa_widgets.scalar_cmap.value,
                 )
-        self._legend_handler(None, manual=True)
+                c = getattr(
+                        temp_data[array_name],
+                        pa_widgets.scalar.value
+                )
+                c = c + abs(np.min(c))
+                cmap = pa_widgets.scalar_cmap.value
+                colormap = getattr(mpl.cm, cmap)
+                sct = self._scatters[array_name]
+                cmax = np.max(c)
+                if cmax != 0:
+                    sct.set_facecolors(colormap(c*1.0/cmax))
+                else:
+                    sct.set_facecolors(colormap(c*0))
+        self._scatter_ax.axis('equal')
+        self._legend_handler(None)
 
-        # _vectors #
+    def _plot_vectors(self):
 
-        for vct in self._vectors.values():
-            if vct in self._scatter_ax.collections:
-                self._scatter_ax.collections.remove(vct)
-
+        temp_data = self.get_frame(self._widgets.frame.value)
+        temp_data = temp_data['arrays']
+        self.figure.delaxes(self._vector_ax)
+        self._vector_ax = self.figure.add_axes(
+            self._scatter_ax.get_position(),
+            frameon=False
+            )
+        self._vector_ax.get_xaxis().set_visible(False)
+        self._vector_ax.get_yaxis().set_visible(False)
         self._vectors = {}
+
         for array_name in self._widgets.particles.keys():
             if self._widgets.particles[array_name].vector.value != '':
                 pa_widgets = self._widgets.particles[array_name]
-                temp_data = temp_data[array_name]
-                x = temp_data.x
-                y = temp_data.y
-                v1 = getattr(temp_data, pa_widgets.vector.value.split(",")[0])
-                v2 = getattr(temp_data, pa_widgets.vector.value.split(",")[1])
+                temp_data_arr = temp_data[array_name]
+                x = temp_data_arr.x
+                y = temp_data_arr.y
+
+                try:
+                    v1 = getattr(
+                        temp_data_arr,
+                        pa_widgets.vector.value.split(",")[0]
+                        )
+                    v2 = getattr(
+                        temp_data_arr,
+                        pa_widgets.vector.value.split(",")[1]
+                        )
+                except AttributeError:
+                    continue
+
                 vmag = (v1**2 + v2**2)**0.5
-                self._vectors[array_name] = self._scatter_ax.quiver(
+                self._vectors[array_name] = self._vector_ax.quiver(
                     x,
                     y,
                     v1,
@@ -393,113 +420,164 @@ class Viewer2D(Viewer):
                     scale=pa_widgets.vector_scale.value,
                     width=(pa_widgets.vector_width.value)/10000,
                 )
+        self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
+        self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
 
-        # show the changes #
-        clear_output(wait=True)
-        display(self.figure)
+    def _frame_handler(self, change):
+
+        temp_data = self.get_frame(self._widgets.frame.value)
+        temp_data = temp_data['arrays']
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            if pa_widgets.scalar.value != 'None':
+                sct = self._scatters[array_name]
+                sct.set_offsets(
+                    np.vstack(
+                        (temp_data[array_name].x, temp_data[array_name].y)
+                        ).T
+                    )
+
+                c = getattr(
+                        temp_data[array_name],
+                        pa_widgets.scalar.value
+                )
+                c = c + abs(np.min(c))
+                # making it non-zero so that it scales properly from 0 to 1
+                cmap = pa_widgets.scalar_cmap.value
+                colormap = getattr(mpl.cm, cmap)
+                cmax = np.max(c)
+                if cmax != 0:
+                    sct.set_facecolors(colormap(c*1.0/cmax))
+                else:
+                    sct.set_facecolors(colormap(c*0))
+
+        self._legend_handler(None)
+        self._vector_handler(None)
+        self._adjust_axes()
 
     def _scalar_handler(self, change):
         array_name = change['owner'].owner
         temp_data = self.get_frame(
             self._widgets.frame.value
-        )['arrays'][array_name]
-        scatter = self._scatters[array_name]
+        )['arrays']
+        sct = self._scatters[array_name]
         pa_widgets = self._widgets.particles[array_name]
-        if array_name in self._scatters.keys():
-            if scatter in self._scatter_ax.collections:
-                self._scatter_ax.collections.remove(
-                    scatter
+
+        new = change['new']
+        old = change['old']
+
+        if (new == 'None' and old == 'None'):
+            pass
+
+        elif (new == 'None' and old != 'None'):
+            sct.set_offsets(None)
+
+        elif (new != 'None' and old == 'None'):
+            sct.set_offsets(
+                np.vstack(
+                    (temp_data[array_name].x, temp_data[array_name].y)
+                    ).T
                 )
-
-        if change['new'] != 'None':
-            self._scatters[array_name] = self._scatter_ax.scatter(
-                temp_data.x,
-                temp_data.y,
-                c=getattr(temp_data, change['new']),
-                s=pa_widgets.scalar_size.value,
-                cmap=pa_widgets.scalar_cmap.value,
+            c = getattr(
+                    temp_data[array_name],
+                    pa_widgets.scalar.value
             )
+            c = c + abs(np.min(c))
+            cmap = pa_widgets.scalar_cmap.value
+            colormap = getattr(mpl.cm, cmap)
+            cmax = np.max(c)
+            if cmax != 0:
+                sct.set_facecolors(colormap(c*1.0/cmax))
+            else:
+                sct.set_facecolors(colormap(c*0))
 
-        self._legend_handler(None, manual=True)
+        else:
+            c = getattr(
+                    temp_data[array_name],
+                    pa_widgets.scalar.value
+            )
+            c = c + abs(np.min(c))
+            cmap = pa_widgets.scalar_cmap.value
+            colormap = getattr(mpl.cm, cmap)
+            cmax = np.max(c)
+            if cmax != 0:
+                sct.set_facecolors(colormap(c*1.0/cmax))
+            else:
+                sct.set_facecolors(colormap(c*0))
 
-        clear_output(wait=True)
-        display(self.figure)
+        self._legend_handler(None)
 
     def _vector_handler(self, change):
         '''
         Bug : Arrows go out of the figure
         '''
 
-        array_name = change['owner'].owner
-        temp_data = self.get_frame(
-            self._widgets.frame.value
-        )['arrays'][array_name]
-        pa_widgets = self._widgets.particles[array_name]
-        if array_name in self._vectors.keys():
-            if self._vectors[array_name] in self._scatter_ax.collections:
-                self._scatter_ax.collections.remove(
-                    self._vectors[array_name]
-                )
-
-        if change['new'] != '':
-            x = temp_data.x
-            y = temp_data.y
-            v1 = getattr(temp_data, change['new'].split(",")[0])
-            v2 = getattr(temp_data, change['new'].split(",")[0])
-            vmag = (v1**2 + v2**2)**0.5
-            self._vectors[array_name] = self._scatter_ax.quiver(
-                x,
-                y,
-                v1,
-                v2,
-                vmag,
-                scale=pa_widgets.vector_scale.value,
-                width=(pa_widgets.vector_width.value)/10000,
-            )
-
-        clear_output(wait=True)
-        display(self.figure)
+        self._plot_vectors()
 
     def _vector_scale_handler(self, change):
-        # the widget value must already have updated.
-        array_name = change['owner'].owner
-        if array_name in self._vectors.keys():
-            self._vectors[array_name].scale = change['new']
-        clear_output(wait=True)
-        display(self.figure)
+
+        self._plot_vectors()
+
+    def _adjust_axes(self):
+
+        if hasattr(self, '_vector_ax'):
+
+            self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
+            self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
+        else:
+            pass
 
     def _scalar_size_handler(self, change):
+
         array_name = change['owner'].owner
-        if array_name in self._scatters.keys():
-            self._scatters[array_name].set_sizes([change['new']])
-        clear_output(wait=True)
-        display(self.figure)
+        self._scatters[array_name].set_sizes([change['new']])
 
     def _vector_width_handler(self, change):
-        # the widget value must already have updated.
-        array_name = change['owner'].owner
-        if array_name in self._vectors.keys():
-            self._vectors[array_name].width = change['new']/10000
-        clear_output(wait=True)
-        display(self.figure)
+
+        self._plot_vectors()
 
     def _scalar_cmap_handler(self, change):
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        change['new'] = pa_widgets.scalar.value
-        self._scalar_handler(change)
+        c = getattr(
+                temp_data[array_name],
+                pa_widgets.scalar.value
+        )
+        c = c + abs(np.min(c))
+        cmap = pa_widgets.scalar_cmap.value
+        colormap = getattr(mpl.cm, cmap)
+        sct = self._scatters[array_name]
+        cmax = np.max(c)
+        if cmax != 0:
+            sct.set_facecolors(colormap(c*1.0/cmax))
+        else:
+            sct.set_facecolors(colormap(c*0))
+        self._legend_handler(None)
 
-    def _legend_handler(self, change, manual=False):
-
+    def _legend_handler(self, change):
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
         for _cbar_ax in self._cbar_ax.values():
             self.figure.delaxes(_cbar_ax)
         self._cbar_ax = {}
         self._cbars = {}
-        self._scatter_ax.set_position([0, 0, 1, 1])
+
         for array_name in self._widgets.particles.keys():
+
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.legend.value:
                 if pa_widgets.scalar.value != 'None':
+                    c = getattr(
+                            temp_data[array_name],
+                            pa_widgets.scalar.value
+                    )
+                    cmap = pa_widgets.scalar_cmap.value
+                    colormap = getattr(mpl.cm, cmap)
                     self._scatter_ax.set_position(
                         [0, 0, 0.84 - 0.15*len(self._cbars.keys()), 1]
                     )
@@ -511,17 +589,26 @@ class Viewer2D(Viewer):
                                 0.82
                             ]
                     )
-                    self._cbars[array_name] = self.figure.colorbar(
-                            self._scatters[array_name],
-                            cax=self._cbar_ax[array_name]
+                    maxm = np.max(c)
+                    minm = np.min(c)
+                    if (minm == maxm == 0):
+                        boundaries = np.linspace(0, 1, 100)
+                    else:
+                        boundaries = np.linspace(
+                            minm*(1 - np.sign(minm)*0.0001),
+                            maxm*(1 + np.sign(maxm)*0.0001),
+                            100
+                        )
+
+                    self._cbars[array_name] = mpl.colorbar.ColorbarBase(
+                            ax=self._cbar_ax[array_name],
+                            cmap=colormap,
+                            boundaries=boundaries,
                     )
                     self._cbars[array_name].set_label(
                             array_name + " : " +
                             pa_widgets.scalar.value
                     )
-        if not manual:
-            clear_output(wait=True)
-            display(self.figure)
 
     def _save_figure_handler(self, change):
 

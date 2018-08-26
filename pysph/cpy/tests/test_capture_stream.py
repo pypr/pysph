@@ -2,7 +2,7 @@ import subprocess
 import sys
 import unittest
 
-from pysph.base.capture_stream import CaptureMultipleStreams, CaptureStream
+from ..capture_stream import CaptureMultipleStreams, CaptureStream
 
 
 def write_stderr():
@@ -11,11 +11,13 @@ def write_stderr():
          "import sys;sys.stderr.write('stderr')"]
     )
 
+
 def write_stdout():
     subprocess.call(
         [sys.executable, "-S", "-s", "-c",
          "import sys;sys.stdout.write('stdout')"]
     )
+
 
 class TestCaptureStream(unittest.TestCase):
     def test_that_stderr_is_captured_by_default(self):
@@ -44,6 +46,7 @@ class TestCaptureStream(unittest.TestCase):
 
         # Then
         self.assertEqual(stream.get_output(), "stderr")
+
 
 class TestCaptureMultipleStreams(unittest.TestCase):
     def test_that_stdout_stderr_are_captured_by_default(self):

@@ -50,9 +50,6 @@ cdef class ParticleArray:
     # name associated with this particle array
     cdef public str name
 
-    # indicates if coordinates of particles has changed.
-    cdef public bint is_dirty
-
     # indicate if the particle configuration has changed.
     cdef public bint indices_invalid
 
@@ -84,7 +81,7 @@ cdef class ParticleArray:
 
     cpdef get_lb_props(self)
 
-    cpdef set_dirty(self, bint val)
+    cpdef set_num_real_particles(self, long value)
     cpdef set_indices_invalid(self, bint val)
 
     cpdef BaseArray get_carray(self, str prop)

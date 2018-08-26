@@ -40,13 +40,19 @@ methods of a typical :py:class:`Equation` subclass::
       def initialize(self, d_idx, ...):
           # Called once per destination before loop.
 
+      def loop_all(self, d_idx, ..., NBRS, N_NBRS, ...):
+          # Called once before the loop and can be used
+          # for non-pairwise interactions as one can pass the neighbors
+          # for particle d_idx.
+
       def loop(self, d_idx, s_idx, ...):
-          # loop over neighbors for all sources.
+          # loop over neighbors for all sources,
+          # called once for each pair of particles!
 
       def post_loop(self, d_idx ...):
           # called after all looping is done.
 
-      def reduce(self, dst):
+      def reduce(self, dst, t, dt):
           # Called once for the destination array.
           # Any Python code can go here.
 
@@ -63,6 +69,13 @@ equation is used.  What happens is as follows:
 - for each fluid particle, the ``initialize`` method is called with the
   required arrays.
 
+- the *fluid* neighbors for each fluid particle are found for each particle
+  and can be passed en-masse to the ``loop_all`` method. One can pass ``NBRS``
+  which is an array of unsigned ints with indices to the neighbors in the
+  source particles. ``N_NBRS`` is the number of neighbors (an integer). This
+  method is ideal for any non-pairwise computations or more complex
+  computations.
+
 - the *fluid* neighbors for each fluid particle are found and for each pair,
   the ``loop`` method is called with the required properties/values.
 
@@ -75,8 +88,9 @@ equation is used.  What happens is as follows:
 - If a reduce method exists, it is called for the destination (only once, not
   once per particle). It is passed the destination particle array.
 
-The ``initialize, loop, post_loop`` methods all may be called in separate
-threads (both on CPU/GPU) depending on the implementation of the backend.
+The ``initialize, loop_all, loop, post_loop`` methods all may be called in
+separate threads (both on CPU/GPU) depending on the implementation of the
+backend.
 
 It is possible to set a scalar value in the equation as an instance attribute,
 i.e. by setting ``self.something = value`` but remember that this is just one
@@ -101,7 +115,8 @@ The reduce function is called only once every time the accelerations are
 evaluated. As such you may write any Python code there. The only caveat is
 that when using the CPU, one will have to declare any variables used a little
 carefully -- ideally declare any variables used in this as
-``declare('object')``.
+``declare('object')``. On the GPU, this function is not called via OpenCL and
+is a pure Python function.
 
 
 
@@ -157,6 +172,11 @@ equation:
 
     - ``EPS = 0.01 * HIJ * HIJ``
 
+    - ``SPH_KERNEL``: the kernel being used and one can call the kernel as
+      ``SPH_KERNEL.kernel(xij, rij, h)`` the gradient as
+      ``SPH_KERNEL.gradient(...)``, ``SPH_KERNEL.gradient_h(...)`` etc. The
+      kernel is any one of the instances of the kernel classes defined in
+      :py:mod:`pysph.base.kernels`
 
 In addition if one requires the current time or the timestep in an equation,
 the following may be passed into any of the methods of an equation:
@@ -164,6 +184,14 @@ the following may be passed into any of the methods of an equation:
     - ``t``: is the current time.
 
     - ``dt``: the current time step.
+
+For the ``loop_all`` method and the ``loop`` method, one may also pass the
+following:
+
+ - ``NBRS``: an array of unsigned ints with neighbor indices.
+ - ``N_NBRS``: an integer denoting the number of neighbors for the current
+   destination particle with index, ``d_idx``.
+
 
 
 .. note::
@@ -183,18 +211,44 @@ writing:
 
 .. code-block:: python
 
+    vec, vec1 = declare("matrix(3)", 2)
     mat = declare("matrix((3,3))")
-    ii = declare('int')
+    i, j = declare('int')
 
 When the Cython code is generated, this gets translated to:
 
 .. code-block:: cython
 
-    cdef double[3][3] mat
-    cdef int ii
+    cdef double vec[3], vec1[3]
+    cdef double mat[3][3]
+    cdef int i, j
 
 One can also declare any valid c-type using the same approach, for example if
-one desires a ``long`` data type, one may use ``ii = declare("long")``.
+one desires a ``long`` data type, one may use ``i = declare("long")``.
+
+Note that the additional (optional) argument in the declare specifies the
+number of variables. While this is ignored during transpilation, this is
+useful when writing functions in pure Python, the
+:py:func:`pysph.base.cython_generator.declare` function provides a pure Python
+implementation of this so that the code works both when compiled as well as
+when run from pure Python. For example::
+
+.. code-block:: python
+
+   i, j = declare("int", 2)
+
+In this case, the declare function call returns two integers so that the code
+runs correctly in pure Python also. The second argument is optional and
+defaults to 1. If we defined a matrix, then this returns two NumPy arrays of
+the appropriate shape.
+
+.. code-block:: python
+
+   >>> declare("matrix(2)", 2)
+   (array([ 0.,  0.]), array([ 0.,  0.]))
+
+Thus the code one writes can be used in pure Python and can also be safely
+transpiled into other languages.
 
 Writing the reduce method
 -------------------------
@@ -206,7 +260,7 @@ equation:
 .. code-block:: python
 
     class FindMaxU(Equation):
-        def reduce(self, dst):
+        def reduce(self, dst, t, dt):
             m = serial_reduce_array(dst.m, 'sum')
             max_u = serial_reduce_array(dst.u, 'max')
             dst.total_mass[0] = parallel_reduce_array(m, 'sum')
@@ -215,6 +269,8 @@ equation:
 where:
 
     - ``dst``: refers to a destination ``ParticleArray``.
+
+    - ``t, dt``: are the current time and timestep respectively.
 
     - ``serial_reduce_array``: is a special function provided that performs
       reductions correctly in serial. It currently supports ``sum, prod, max``
@@ -242,6 +298,115 @@ If you wish to use adaptive time stepping, see the code
 :py:class:`pysph.sph.integrator.Integrator`. The integrator uses information
 from the arrays ``dt_cfl``, ``dt_force``, and ``dt_visc`` in each of the
 particle arrays to determine the most suitable time step.
+
+Illustration of the ``loop_all`` method
+----------------------------------------
+
+The ``loop_all`` is a powerful method we show how we can use the above to
+perform what the ``loop`` method usually does ourselves.
+
+.. code-block:: python
+
+   class LoopAllEquation(Equation):
+       def initialize(self, d_idx, d_rho):
+           d_rho[d_idx] = 0.0
+
+       def loop_all(self, d_idx, d_x, d_y, d_z, d_rho, d_h,
+                    s_m, s_x, s_y, s_z, s_h,
+                    SPH_KERNEL, NBRS, N_NBRS):
+           i = declare('int')
+           s_idx = declare('long')
+           xij = declare('matrix(3)')
+           rij = 0.0
+           sum = 0.0
+           for i in range(N_NBRS):
+               s_idx = NBRS[i]
+               xij[0] = d_x[d_idx] - s_x[s_idx]
+               xij[1] = d_y[d_idx] - s_y[s_idx]
+               xij[2] = d_z[d_idx] - s_z[s_idx]
+               rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
+               sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
+           d_rho[d_idx] += sum
+
+This seems a bit complex but let us look at what is being done. ``initialize``
+is called once per particle and each of their densities is set to zero. Then
+when ``loop_all`` is called it is called once per destination particle (unlike
+``loop`` which is called pairwise for each destination and source particle).
+The ``loop_all`` is passed arrays as is typical of most equations but is also
+passed the ``SPH_KERNEL`` itself, the list of neighbors, and the number of
+neighbors.
+
+The code first declares the variables, ``i, s_idx`` as an integer and long,
+and then ``x_ij`` as a 3-element array. These are important for performance in
+the generated code. The code then loops over all neighbors and computes the
+summation density. Notice how the kernel is computed using
+``SPH_KERNEL.kernel(...)``. Notice also how the source index, ``s_idx`` is found
+from the neighbors.
+
+This above ``loop_all`` code does exactly what the following single line of
+code does.
+
+.. code-block:: python
+
+       def loop(self, d_idx, d_rho, s_m, s_idx, WIJ):
+           d_rho[d_idx] += s_m[s_idx]*WIJ
+
+However, ``loop`` is only called pairwise and there are times when we want to
+do more with the neighbors. For example if we wish to setup a matrix and solve
+it per particle, we could do it in ``loop_all`` efficiently. This is also very
+useful for non-pairwise interactions which are common in other particle
+methods like molecular dynamics.
+
+Calling user-defined functions from equations
+----------------------------------------------
+
+Sometimes we may want to call a user-defined function from the equations. Any
+pure Python function defined using the same conventions as listed above (with
+suitable type hints) can be called from the equations. Here is a simple
+example from one of the tests in PySPH.
+
+.. code-block:: python
+
+    def helper(x=1.0):
+        return x*1.5
+
+    class SillyEquation(Equation):
+        def initialize(self, d_idx, d_au, d_m):
+            d_au[d_idx] += helper(d_m[d_idx])
+
+        def _get_helpers_(self):
+            return [helper]
+
+Notice that ``initialize`` is calling the ``helper`` function defined above.
+The helper function has a default argument to indicate to our code generation
+that x is a floating point number. We could have also set the default argument
+to a list and this would then be passed an array of values. The
+``_get_helpers_`` method returns a list of functions and these functions are
+automatically transpiled into high-performance C or OpenCL/CUDA code and can
+be called from your equations.
+
+Here is a more complex helper function.
+
+.. code-block:: python
+
+    def trace(x=[1.0, 1.0], nx=1):
+        i = declare('int')
+        result = 0.0
+        for i in range(nx):
+            result += x[i]
+        return result
+
+    class SillyEquation(Equation):
+        def loop(self, d_idx, d_au, d_m, XIJ):
+            d_au[d_idx] += trace(XIJ, 3)
+
+        def _get_helpers_(self):
+            return [trace]
+
+The trace function effectively is converted into a function with signature
+``double trace(double* x, int nx)`` and thus can be called with any
+one-dimensional array.
+
 
 Examples to study
 ------------------

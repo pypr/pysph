@@ -12,7 +12,6 @@ import sys
 import time
 
 # PySPH imports.
-from pysph.base.config import get_config
 from pysph.base import utils
 from pysph.base.utils import is_overloaded_method
 
@@ -21,6 +20,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
     StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
+from pysph.cpy.config import get_config
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
 
@@ -394,7 +394,7 @@ class Application(object):
             action="store",
             dest="omp_schedule",
             default="dynamic,64",
-            help="""Schedule how loop iterations 
+            help="""Schedule how loop iterations
             are divided amongst multiple threads""")
 
         # --opencl
@@ -711,7 +711,8 @@ class Application(object):
         if self.scheme is not None:
             self.scheme.consume_user_options(self.options)
         self.consume_user_options()
-        self.configure_scheme()
+        if self.scheme is not None:
+            self.configure_scheme()
 
     def _setup_logging(self):
         """Setup logging for the application.

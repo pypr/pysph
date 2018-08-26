@@ -9,7 +9,7 @@ class GPUDomainManager(object):
     def __init__(self, xmin=-1000., xmax=1000., ymin=0.,
                  ymax=0., zmin=0., zmax=0.,
                  periodic_in_x=False, periodic_in_y=False,
-                 periodic_in_z=False):
+                 periodic_in_z=False, n_layers=2.0):
         """Constructor"""
         self.xmin = xmin
         self.xmax = xmax
@@ -23,6 +23,7 @@ class GPUDomainManager(object):
         self.periodic_in_y = periodic_in_y
         self.periodic_in_z = periodic_in_z
         self.is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
+        self.n_layers = n_layers
 
         # get the translates in each coordinate direction
         self.xtranslate = xmax - xmin

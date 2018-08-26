@@ -1,7 +1,7 @@
 """Simulate the classical Sod Shocktube problem in 1D (5 seconds).
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
 import numpy
 
 # Numerical constants
@@ -64,9 +64,16 @@ class SodShockTube(ShockTubeSetup):
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
+            beta=1.0, update_alpha1=True, update_alpha2=True
         )
-        s = SchemeChooser(default='adke', adke=adke, mpm=mpm)
+        gsph = GSPHScheme(
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
+            kernel_factor=1.2,
+            g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
+            interface_zero=True, hybrid=False, blend_alpha=2.0,
+            niter=20, tol=1e-6
+        )
+        s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
         return s
 
 

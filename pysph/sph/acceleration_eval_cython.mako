@@ -53,7 +53,7 @@ src = self.${source}
 ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
-% if eq_group.has_loop():
+% if eq_group.has_loop() or eq_group.has_loop_all():
 #######################################################################
 ## Iterate over destination particles.
 #######################################################################
@@ -66,16 +66,21 @@ ${helper.get_parallel_block()}
         ###############################################################
         ## Find and iterate over neighbors.
         ###############################################################
-        nbrs = NULL
         nnps.get_nearest_neighbors(d_idx, <UIntArray>self.nbrs[thread_id])
-        for nbr_idx in range((<UIntArray>self.nbrs[thread_id]).length):
-            s_idx = <int>((<UIntArray>self.nbrs[thread_id]).data[nbr_idx])
+        NBRS = (<UIntArray>self.nbrs[thread_id]).data
+        N_NBRS = (<UIntArray>self.nbrs[thread_id]).length
+% if eq_group.has_loop_all():
+        ${indent(eq_group.get_loop_all_code(helper.object.kernel), 2)}
+% endif
+% if eq_group.has_loop():
+        for nbr_idx in range(N_NBRS):
+            s_idx = <long>(NBRS[nbr_idx])
             ###########################################################
             ## Iterate over the equations for the same set of neighbors.
             ###########################################################
             ${indent(eq_group.get_loop_code(helper.object.kernel), 3)}
-
-% endif ## if eq_group.has_loop():
+% endif ## if has_loop
+% endif ## if eq_group.has_loop() or has_loop_all():
 # Source ${source} done.
 # --------------------------------------
 % endfor
@@ -210,7 +215,9 @@ cdef class AccelerationEval:
 
     cpdef compute(self, double t, double dt):
         cdef long nbr_idx, NP_SRC, NP_DEST
-        cdef int s_idx, d_idx, thread_id
+        cdef long s_idx, d_idx
+        cdef int thread_id, N_NBRS
+        cdef unsigned int* NBRS
         cdef NNPS nnps = self.nnps
         cdef ParticleArrayWrapper src, dst
 

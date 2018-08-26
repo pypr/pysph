@@ -16,7 +16,8 @@ from pysph.sph.equation import Group
 from pysph.sph.basic_equations import XSPHCorrection, IsothermalEOS, BodyForce
 from pysph.sph.wc.viscosity import ClearyArtificialViscosity
 from pysph.sph.wc.basic import PressureGradientUsingNumberDensity
-from pysph.sph.wc.transport_velocity import SummationDensity, SolidWallPressureBC
+from pysph.sph.wc.transport_velocity import SummationDensity, \
+                    SolidWallPressureBC
 
 # Surface tension equations
 from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
@@ -68,12 +69,15 @@ nu = 0.125 * alpha * h0 * c0
 tf = 3.0
 dt = 1e-4
 
+
 class KHISY11(Application):
     def create_particles(self):
         ghost_extent = (nghost_layers + 0.5)*dx
 
-        x, y = numpy.mgrid[ dxb2:domain_width:dx, -ghost_extent:domain_height+ghost_extent:dy ]
-        x = x.ravel(); y = y.ravel()
+        x, y = numpy.mgrid[dxb2:domain_width:dx,
+                           -ghost_extent:domain_height+ghost_extent:dy]
+        x = x.ravel()
+        y = y.ravel()
 
         m = numpy.ones_like(x) * volume * rho0
         rho = numpy.ones_like(x) * rho0
@@ -123,49 +127,50 @@ class KHISY11(Application):
         fluid.u[:] = -U
         mode = 1
         for i in range(len(fluid.x)):
-            if fluid.y[i] > domain_height/2 + psi0*domain_height*numpy.sin(2*numpy.pi*fluid.x[i]/(mode*domain_width)):
+            ang = 2*numpy.pi*fluid.x[i]/(mode*domain_width)
+            if fluid.y[i] > domain_height/2+psi0*domain_height*numpy.sin(ang):
                 fluid.u[i] = U
-                fluid.color[i] = 1
+                fluid.color[i] = 1.0
 
         # extract the top and bottom boundary particles
-        indices = numpy.where( fluid.y > domain_height )[0]
-        wall = fluid.extract_particles( indices )
-        fluid.remove_particles( indices )
+        indices = numpy.where(fluid.y > domain_height)[0]
+        wall = fluid.extract_particles(indices)
+        fluid.remove_particles(indices)
 
-        indices = numpy.where( fluid.y < 0 )[0]
-        bottom = fluid.extract_particles( indices )
-        fluid.remove_particles( indices )
+        indices = numpy.where(fluid.y < 0)[0]
+        bottom = fluid.extract_particles(indices)
+        fluid.remove_particles(indices)
 
         # concatenate the two boundaries
-        wall.append_parray( bottom )
-        wall.set_name( 'wall' )
+        wall.append_parray(bottom)
+        wall.set_name('wall')
 
         # set the number density initially for all particles
         fluid.V[:] = 1./volume
         wall.V[:] = 1./volume
 
         # set additional output arrays for the fluid
-        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny', 'ddelta',
-                                 'p', 'rho', 'au', 'av'])
+        fluid.add_output_arrays(['V', 'color', 'cx', 'cy', 'nx', 'ny',
+                                 'ddelta', 'p', 'rho', 'au', 'av'])
 
-        print("2D KHI with %d fluid particles and %d wall particles"%(
-                fluid.get_number_of_particles(), wall.get_number_of_particles()))
+        print("2D KHI with %d fluid particles and %d wall particles" % (
+                fluid.get_number_of_particles(),
+                wall.get_number_of_particles()))
 
         return [fluid, wall]
 
     def create_domain(self):
-        return DomainManager(xmin=0, xmax=domain_width, ymin=0, ymax=domain_height,
-                               periodic_in_x=True, periodic_in_y=False)
-
+        return DomainManager(xmin=0, xmax=domain_width, ymin=0,
+                             ymax=domain_height,
+                             periodic_in_x=True, periodic_in_y=False)
 
     def create_solver(self):
         kernel = WendlandQuintic(dim=2)
-        integrator = PECIntegrator( fluid=VerletSymplecticWCSPHStep() )
+        integrator = PECIntegrator(fluid=VerletSymplecticWCSPHStep())
         solver = Solver(
             kernel=kernel, dim=dim, integrator=integrator,
             dt=dt, tf=tf, adaptive_timestep=False)
         return solver
-
 
     def create_equations(self):
         equations = [
@@ -175,8 +180,8 @@ class KHISY11(Application):
             # number density (1/volume) is explicitly set for the solid phase
             # and this isn't modified for the simulation.
             Group(equations=[
-                    SummationDensity( dest='fluid', sources=['fluid', 'wall'] )
-                    ] ),
+                    SummationDensity(dest='fluid', sources=['fluid', 'wall'])
+                    ]),
 
             # Given the updated number density for the fluid, we can update
             # the fluid pressure. Additionally, we compute the gradient of the
@@ -184,9 +189,10 @@ class KHISY11(Application):
             # length. This will compute the interface normals. Also compute
             # the smoothed color based on the color index for a particle.
             Group(equations=[
-                    IsothermalEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, p0=p0),
-                    SmoothedColor( dest='fluid', sources=['fluid'] ),
-                    ] ),
+                    IsothermalEOS(dest='fluid', sources=None, rho0=rho0, c0=c0,
+                                  p0=p0),
+                    SmoothedColor(dest='fluid', sources=['fluid']),
+                    ]),
 
             #################################################################
             # Begin Surface tension formulation
@@ -195,28 +201,32 @@ class KHISY11(Application):
             # quantities. The NNPS need not be updated since the smoothing
             # length is decreased.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=0.8)
-                    ], update_nnps=False ),
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=0.8)
+                    ], update_nnps=False),
 
             # Compute the gradient of the color function with respect to the
             # new smoothing length. At the end of this Group, we will have the
             # interface normals and the discretized dirac delta function for
             # the fluid-fluid interface.
             Group(equations=[
-                    ColorGradientUsingNumberDensity(dest='fluid', sources=['fluid', 'wall']),
+                    ColorGradientUsingNumberDensity(dest='fluid',
+                                                    sources=['fluid', 'wall']),
                     ],
                   ),
 
             # Compute the interface curvature using the modified smoothing
             # length and interface normals computed in the previous Group.
             Group(equations=[
-                    InterfaceCurvatureFromNumberDensity(dest='fluid', sources=['fluid']),
+                    InterfaceCurvatureFromNumberDensity(dest='fluid',
+                                                        sources=['fluid']),
                     ], ),
 
             # Now rescale the smoothing length to the original value for the
             # rest of the computations.
             Group(equations=[
-                    ScaleSmoothingLength(dest='fluid', sources=None, factor=1.25)
+                    ScaleSmoothingLength(dest='fluid', sources=None,
+                                         factor=1.25)
                     ], update_nnps=False,
                   ),
             #################################################################
@@ -264,6 +274,7 @@ class KHISY11(Application):
                     ], )
         ]
         return equations
+
 
 if __name__ == '__main__':
     app = KHISY11()

@@ -7,10 +7,11 @@
 
 """
 
-from numpy import sqrt
+from numpy import sqrt, fabs
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
+from pysph.sph.scheme import Scheme, add_bool_argument
 
 
 class IISPHStep(IntegratorStep):
@@ -138,9 +139,9 @@ class ComputeDII(Equation):
         d_dii2[d_idx] = 0.0
 
     def loop(self, d_idx, d_rho, d_dii0, d_dii1, d_dii2,
-             s_idx, s_m, DWIJ, dt=0.0):
+             s_idx, s_m, DWIJ):
         rho_1 = 1.0/d_rho[d_idx]
-        fac = -dt*dt*s_m[s_idx]*rho_1*rho_1
+        fac = -s_m[s_idx]*rho_1*rho_1
         d_dii0[d_idx] += fac*DWIJ[0]
         d_dii1[d_idx] += fac*DWIJ[1]
         d_dii2[d_idx] += fac*DWIJ[2]
@@ -152,9 +153,9 @@ class ComputeDIIBoundary(Equation):
         super(ComputeDIIBoundary, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_dii0, d_dii1, d_dii2, d_rho,
-             s_idx, s_m, s_V, DWIJ, dt=0.0):
+             s_idx, s_m, s_V, DWIJ):
         rhoi1 = 1.0/d_rho[d_idx]
-        fac = -dt*dt*rhoi1*rhoi1*self.rho0/s_V[s_idx]
+        fac = -rhoi1*rhoi1*self.rho0/s_V[s_idx]
         d_dii0[d_idx] += fac*DWIJ[0]
         d_dii1[d_idx] += fac*DWIJ[1]
         d_dii2[d_idx] += fac*DWIJ[2]
@@ -196,9 +197,9 @@ class ComputeAII(Equation):
         d_aii[d_idx] = 0.0
 
     def loop(self, d_idx, d_aii, d_dii0, d_dii1, d_dii2, d_m, d_rho,
-             s_idx, s_m, s_rho, DWIJ, dt=0.0):
+             s_idx, s_m, s_rho, DWIJ):
         rho1 = 1.0/d_rho[d_idx]
-        fac = dt*dt*d_m[d_idx]*rho1*rho1
+        fac = d_m[d_idx]*rho1*rho1
         # The following is m_j (d_ii - d_ji) . DWIJ
         # DWIJ = -DWJI
         dijdotdwij = (d_dii0[d_idx] - fac*DWIJ[0])*DWIJ[0] + \
@@ -214,11 +215,14 @@ class ComputeAIIBoundary(Equation):
         self.rho0 = rho0
         super(ComputeAIIBoundary, self).__init__(dest, sources)
 
-    def loop(self, d_idx, d_aii, d_dii0, d_dii1, d_dii2, d_rho,
-             s_idx, s_m, s_V, DWIJ, dt=0.0):
+    def loop(self, d_idx, d_m, d_aii, d_dii0, d_dii1, d_dii2, d_rho,
+             s_idx, s_m, s_V, DWIJ):
         phi_b = self.rho0/s_V[s_idx]
-        dijdotdwij = (d_dii0[d_idx]*DWIJ[0] + d_dii1[d_idx]*DWIJ[1] +
-                      d_dii2[d_idx]*DWIJ[2])
+        rho1 = 1.0/d_rho[d_idx]
+        fac = d_m[d_idx]*rho1*rho1
+        dijdotdwij = ((d_dii0[d_idx] - fac*DWIJ[0])*DWIJ[0] +
+                      (d_dii1[d_idx] - fac*DWIJ[1])*DWIJ[1] +
+                      (d_dii2[d_idx] - fac*DWIJ[2])*DWIJ[2])
         d_aii[d_idx] += phi_b*dijdotdwij
 
 
@@ -229,9 +233,9 @@ class ComputeDIJPJ(Equation):
         d_dijpj2[d_idx] = 0.0
 
     def loop(self, d_idx, d_dijpj0, d_dijpj1, d_dijpj2,
-             s_idx, s_m, s_rho, s_piter, DWIJ, dt=0.0):
+             s_idx, s_m, s_rho, s_piter, DWIJ):
         rho1 = 1.0/s_rho[s_idx]
-        fac = -dt*dt*s_m[s_idx]*rho1*rho1*s_piter[s_idx]
+        fac = -s_m[s_idx]*rho1*rho1*s_piter[s_idx]
         d_dijpj0[d_idx] += fac*DWIJ[0]
         d_dijpj1[d_idx] += fac*DWIJ[1]
         d_dijpj2[d_idx] += fac*DWIJ[2]
@@ -253,12 +257,12 @@ class PressureSolve(Equation):
 
     def loop(self, d_idx, d_p, d_piter, d_rho, d_m, d_dijpj0, d_dijpj1,
              d_dijpj2, s_idx, s_m, s_dii0, s_dii1, s_dii2,
-             s_piter, s_dijpj0, s_dijpj1, s_dijpj2, DWIJ, dt=0.0):
+             s_piter, s_dijpj0, s_dijpj1, s_dijpj2, DWIJ):
 
         # Note that a good way to check this is to see that when
         # d_idx == s_idx the contribution is zero, as is expected.
         rho1 = 1.0/d_rho[d_idx]
-        fac = dt*dt*d_m[d_idx]*rho1*rho1*d_piter[d_idx]
+        fac = d_m[d_idx]*rho1*rho1*d_piter[d_idx]
         djkpk0 = s_dijpj0[s_idx] - fac*DWIJ[0]
         djkpk1 = s_dijpj1[s_idx] - fac*DWIJ[1]
         djkpk2 = s_dijpj2[s_idx] - fac*DWIJ[2]
@@ -273,31 +277,35 @@ class PressureSolve(Equation):
 
     def post_loop(self, d_idx, d_piter, d_p0, d_p, d_aii, d_rho_adv, d_rho,
                   d_compression, dt=0.0):
-        tmp = self.rho0 - d_rho_adv[d_idx] - d_p[d_idx]
-        p = (1.0 - self.omega)*d_piter[d_idx] + self.omega/d_aii[d_idx]*tmp
+        dt2 = dt*dt
+        # Recall that d_p now has \sum_{j\neq i} a_ij p_j
+        tmp = self.rho0 - d_rho_adv[d_idx] - d_p[d_idx]*dt2
+        dnr = d_aii[d_idx]*dt2
 
-        aii_min = dt*dt*0.01
-
-        # Clamp pressure to positive values.
-        if p < 0.0:
-            p = 0.0
-        elif abs(d_aii[d_idx]) < aii_min:
-            p = 0.0
+        if fabs(dnr) > 1e-9:
+            # Clamp pressure to positive values.
+            p = max((1.0 - self.omega)*d_piter[d_idx] +
+                    self.omega/dnr*tmp, 0.0)
         else:
-            d_compression[d_idx] = abs(p*d_aii[d_idx] - tmp)
+            p = 0.0
+
+        if p != 0.0:
+            d_compression[d_idx] = fabs(p*dnr - tmp) + self.rho0
+        else:
+            d_compression[d_idx] = self.rho0
 
         d_piter[d_idx] = p
         d_p[d_idx] = p
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         dst.tmp_comp[0] = serial_reduce_array(dst.compression > 0.0, 'sum')
         dst.tmp_comp[1] = serial_reduce_array(dst.compression, 'sum')
-        dst.tmp_comp.set_data(parallel_reduce_array(dst.tmp_comp, 'sum'))
+        dst.tmp_comp[:] = parallel_reduce_array(dst.tmp_comp, 'sum')
         if dst.tmp_comp[0] > 0:
-            comp = dst.tmp_comp[1]/dst.tmp_comp[0]/self.rho0
+            avg_rho = dst.tmp_comp[1]/dst.tmp_comp[0]
         else:
-            comp = 0.0
-        self.compression = comp
+            avg_rho = self.rho0
+        self.compression = fabs(avg_rho - self.rho0)/self.rho0
 
     def converged(self):
         debug = self.debug
@@ -363,3 +371,248 @@ class PressureForceBoundary(Equation):
         d_au[d_idx] += fac*DWIJ[0]
         d_av[d_idx] += fac*DWIJ[1]
         d_aw[d_idx] += fac*DWIJ[2]
+
+
+class IISPHScheme(Scheme):
+    def __init__(self, fluids, solids, dim, rho0, nu=0.0,
+                 gx=0.0, gy=0.0, gz=0.0, omega=0.5, tolerance=1e-2,
+                 debug=False):
+        '''The IISPH scheme
+
+        Parameters
+        ----------
+
+        fluids : list(str)
+            List of names of fluid particle arrays.
+        solids : list(str)
+            List of names of solid particle arrays.
+        dim: int
+            Dimensionality of the problem.
+        rho0 : float
+            Density of fluid.
+        nu : float
+            Kinematic viscosity.
+        gx, gy, gz : float
+            Componenents of body acceleration (gravity, external forcing etc.)
+        omega : float
+            Relaxation parameter for relaxed-Jacobi iterations.
+        tolerance: float
+            Tolerance for the convergence of pressure iterations as a fraction.
+        debug: bool
+            Produce some debugging output on iterations.
+        '''
+        self.fluids = fluids
+        self.solids = solids
+        self.dim = dim
+        self.rho0 = rho0
+        self.nu = nu
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.omega = omega
+        self.tolerance = tolerance
+        self.debug = debug
+
+    def add_user_options(self, group):
+        group.add_argument(
+            '--omega', action="store", type=float, dest="omega",
+            default=None, help="Relaxation parameter for Jacobi iterations."
+        )
+        group.add_argument(
+            '--tolerance', action='store', type=float, dest='tolerance',
+            default=None,
+            help='Tolerance for convergence of iterations as a fraction'
+        )
+        add_bool_argument(
+            group, 'iisph-debug', dest='debug', default=None,
+            help="Produce some debugging output on convergence of iterations."
+        )
+
+    def consume_user_options(self, options):
+        vars = ['omega', 'tolerance', 'debug']
+        data = dict((var, self._smart_getattr(options, var))
+                    for var in vars)
+        self.configure(**data)
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        """Configure the solver to be generated.
+
+        This is to be called before `get_solver` is called.
+
+        Parameters
+        ----------
+
+        dim : int
+            Number of dimensions.
+        kernel : Kernel instance.
+            Kernel to use, if none is passed a default one is used.
+        integrator_cls : pysph.sph.integrator.Integrator
+            Integrator class to use, use sensible default if none is
+            passed.
+        extra_steppers : dict
+            Additional integration stepper instances as a dict.
+        **kw : extra arguments
+            Any additional keyword args are passed to the solver instance.
+        """
+        from pysph.base.kernels import CubicSpline
+        from pysph.sph.integrator import EulerIntegrator
+        from pysph.solver.solver import Solver
+        if kernel is None:
+            kernel = CubicSpline(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        for fluid in self.fluids:
+            if fluid not in steppers:
+                steppers[fluid] = IISPHStep()
+
+        cls = integrator_cls if integrator_cls is not None else EulerIntegrator
+        integrator = cls(**steppers)
+
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        equations = []
+        if self.solids:
+            g1 = Group(
+                equations=[NumberDensity(dest=x, sources=[x])
+                           for x in self.solids]
+            )
+            equations.append(g1)
+
+        g2 = Group(
+            equations=[SummationDensity(dest=x, sources=self.fluids)
+                       for x in self.fluids],
+            real=False
+        )
+        equations.append(g2)
+
+        if self.solids:
+            g3 = Group(
+                equations=[
+                    SummationDensityBoundary(
+                        dest=x, sources=self.solids, rho0=self.rho0
+                    )
+                    for x in self.fluids],
+                real=False
+            )
+            equations.append(g3)
+
+        eq = []
+        for fluid in self.fluids:
+            eq.extend([
+                AdvectionAcceleration(
+                    dest=fluid, sources=None,
+                    gx=self.gx, gy=self.gy, gz=self.gz
+                ),
+                ComputeDII(dest=fluid, sources=self.fluids)
+            ])
+            if self.nu > 0.0:
+                eq.append(
+                    ViscosityAcceleration(
+                        dest=fluid, sources=self.fluids, nu=self.nu
+                    )
+                )
+
+            if self.solids:
+                if self.nu > 0.0:
+                    eq.append(
+                        ViscosityAccelerationBoundary(
+                            dest=fluid, sources=self.solids, nu=self.nu,
+                            rho0=self.rho0,
+                        )
+                    )
+                eq.append(
+                    ComputeDIIBoundary(dest=fluid, sources=self.solids,
+                                       rho0=self.rho0)
+                )
+
+        g4 = Group(equations=eq)
+        equations.append(g4)
+
+        eq = []
+        for fluid in self.fluids:
+            eq.extend([
+                ComputeRhoAdvection(dest=fluid, sources=self.fluids),
+                ComputeAII(dest=fluid, sources=self.fluids),
+            ])
+            if self.solids:
+                eq.extend([
+                    ComputeRhoBoundary(dest=fluid, sources=self.solids,
+                                       rho0=self.rho0),
+                    ComputeAIIBoundary(dest=fluid, sources=self.solids,
+                                       rho0=self.rho0),
+                ])
+        g5 = Group(equations=eq)
+        equations.append(g5)
+
+        sg1 = Group(
+            equations=[
+                ComputeDIJPJ(dest=x, sources=self.fluids)
+                for x in self.fluids
+            ]
+        )
+        eq = []
+        for fluid in self.fluids:
+            eq.append(
+                PressureSolve(dest=fluid, sources=self.fluids,
+                              rho0=self.rho0, tolerance=self.tolerance,
+                              debug=self.debug)
+            )
+            if self.solids:
+                eq.append(
+                    PressureSolveBoundary(
+                        dest=fluid, sources=self.solids, rho0=self.rho0,
+                    )
+                )
+        sg2 = Group(equations=eq)
+        g6 = Group(
+            equations=[sg1, sg2],
+            iterate=True, max_iterations=30, min_iterations=2
+        )
+        equations.append(g6)
+
+        eq = []
+        for fluid in self.fluids:
+            eq.append(
+                PressureForce(dest=fluid, sources=self.fluids)
+            )
+            if self.solids:
+                eq.append(
+                    PressureForceBoundary(
+                        dest=fluid, sources=self.solids, rho0=self.rho0
+                    )
+                )
+        g7 = Group(equations=eq)
+        equations.append(g7)
+
+        return equations
+
+    def setup_properties(self, particles, clean=True):
+        """Setup the particle arrays so they have the right set of properties
+        for this scheme.
+
+        Parameters
+        ----------
+
+        particles : list
+            List of particle arrays.
+
+        clean : bool
+            If True, removes any unnecessary properties.
+        """
+        from pysph.base.utils import get_particle_array_iisph
+        dummy = get_particle_array_iisph()
+        props = set(dummy.properties.keys())
+        for pa in particles:
+            self._ensure_properties(pa, props, clean)
+            for c, v in dummy.constants.items():
+                if c not in pa.constants:
+                    pa.add_constant(c, v)
+            pa.set_output_arrays(dummy.output_property_arrays)

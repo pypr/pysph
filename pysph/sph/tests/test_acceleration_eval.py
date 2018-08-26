@@ -10,11 +10,14 @@ import pytest
 import numpy as np
 
 # Local imports.
-from pysph.base.config import get_config
 from pysph.base.utils import get_particle_array
+from pysph.cpy.config import get_config
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation, Group
-from pysph.sph.acceleration_eval import (AccelerationEval,
-                                         check_equation_array_properties)
+from pysph.sph.acceleration_eval import (
+    AccelerationEval, MegaGroup, CythonGroup,
+    check_equation_array_properties
+)
 from pysph.sph.basic_equations import SummationDensity
 from pysph.base.kernels import CubicSpline
 from pysph.base.nnps import LinkedListNNPS as NNPS
@@ -30,8 +33,8 @@ class DummyEquation(Equation):
     def loop(self, d_idx, d_rho, s_idx, s_m, s_u, WIJ):
         d_rho[d_idx] += s_m[s_idx]*WIJ
 
-    def post_loop(self, d_idx, d_rho, s_idx, s_m, s_V, WIJ):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+    def post_loop(self, d_idx, d_rho, s_idx, s_m, s_V):
+        d_rho[d_idx] += s_m[d_idx]
 
 
 class FindTotalMass(Equation):
@@ -175,10 +178,66 @@ class SimpleReduction(Equation):
     def initialize(self, d_idx, d_au):
         d_au[d_idx] = 0.0
 
-    def reduce(self, dst):
+    def reduce(self, dst, t, dt):
         dst.total_mass[0] = serial_reduce_array(dst.m, op='sum')
         if dst.gpu is not None:
             dst.gpu.push('total_mass')
+
+
+class LoopAllEquation(Equation):
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
+    def loop(self, d_idx, d_rho, s_m, s_idx, WIJ):
+        d_rho[d_idx] += s_m[s_idx]*WIJ
+
+    def loop_all(self, d_idx, d_x, d_rho, s_m, s_x, s_h, SPH_KERNEL, NBRS,
+                 N_NBRS):
+        i = declare('int')
+        s_idx = declare('long')
+        xij = declare('matrix((3,))')
+        rij = 0.0
+        sum = 0.0
+        xij[1] = 0.0
+        xij[2] = 0.0
+        for i in range(N_NBRS):
+            s_idx = NBRS[i]
+            xij[0] = d_x[d_idx] - s_x[s_idx]
+            rij = abs(xij[0])
+            sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, s_h[s_idx])
+        d_rho[d_idx] += sum
+
+
+class TestMegaGroup(unittest.TestCase):
+    def test_ensure_group_retains_user_order_of_equations(self):
+        # Given
+        group = Group(equations=[
+            SimpleEquation(dest='f', sources=['s', 'f']),
+            DummyEquation(dest='f', sources=['s', 'f']),
+            MixedTypeEquation(dest='f', sources=['f']),
+        ])
+
+        # When
+        mg = MegaGroup(group, CythonGroup)
+
+        # Then
+        data = mg.data
+        self.assertEqual(list(data.keys()), ['f'])
+        eqs_with_no_source, sources, all_eqs = data['f']
+        self.assertEqual(len(eqs_with_no_source.equations), 0)
+
+        all_eqs_order = [x.__class__.__name__ for x in all_eqs.equations]
+        expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
+        self.assertEqual(all_eqs_order, expect)
+
+        self.assertEqual(sorted(sources.keys()), ['f', 's'])
+        s_eqs = [x.__class__.__name__ for x in sources['s'].equations]
+        expect = ['SimpleEquation', 'DummyEquation']
+        self.assertEqual(s_eqs, expect)
+
+        f_eqs = [x.__class__.__name__ for x in sources['f'].equations]
+        expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
+        self.assertEqual(f_eqs, expect)
 
 
 class TestAccelerationEval1D(unittest.TestCase):
@@ -311,6 +370,50 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
         self.assertListEqual(list(pa.u), list(expect))
+
+    def test_should_support_loop_all_and_loop(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+        ref_rho = pa.rho.copy()
+
+        # When
+        pa.rho[:] = 0.0
+        equations = [LoopAllEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        # 2*ref_rho as we are doing both the loop and loop_all to test if
+        # both are called.
+        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
+
+    def test_should_handle_repeated_helper_functions(self):
+        pa = self.pa
+
+        def helper(x=1.0):
+            return x*1.5
+
+        class SillyEquation2(Equation):
+            def initialize(self, d_idx, d_au, d_m):
+                d_au[d_idx] += helper(d_m[d_idx])
+
+            def _get_helpers_(self):
+                return [helper]
+
+        equations = [SillyEquation2(dest='fluid', sources=['fluid']),
+                     SillyEquation2(dest='fluid', sources=['fluid'])]
+
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.ones(10)*3.0
+        self.assertListEqual(list(pa.au), list(expect))
 
 
 class EqWithTime(Equation):
@@ -545,7 +648,8 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
             def _get_helpers_(self):
                 return [helper]
 
-        equations = [SillyEquation2(dest='fluid', sources=['fluid'])]
+        equations = [SillyEquation2(dest='fluid', sources=['fluid']),
+                     SillyEquation2(dest='fluid', sources=['fluid'])]
 
         a_eval = self._make_accel_eval(equations)
 
@@ -553,7 +657,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.ones(10)*1.5
+        expect = np.ones(10)*3.0
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
 
@@ -595,3 +699,25 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
         # Then
         assert eqs == [se, se1]
+
+    def test_should_support_loop_all_and_loop_on_gpu(self):
+        # Given
+        pa = self.pa
+        equations = [SummationDensity(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+        pa.gpu.pull('rho')
+        ref_rho = pa.rho.copy()
+
+        # When
+        pa.rho[:] = 0.0
+        pa.gpu.push('rho')
+        equations = [LoopAllEquation(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        # 2*ref_rho as we are doing both the loop and loop_all to test if
+        # both are called.
+        pa.gpu.pull('rho')
+        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))

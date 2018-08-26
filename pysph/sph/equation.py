@@ -18,9 +18,8 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from pysph.base.ast_utils import get_symbols
-from pysph.base.cython_generator import CythonGenerator, KnownType
-from pysph.base.translator import OpenCLConverter
+from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
+                           get_symbols)
 
 
 def camel_to_underscore(name):
@@ -31,10 +30,6 @@ def camel_to_underscore(name):
     # http://stackoverflow.com/questions/1175208/elegant-python-function-to-convert-camelcase-to-camel-case
     s1 = re.sub(r'(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
-
-
-def declare(*args):
-    pass
 
 
 ##############################################################################
@@ -320,6 +315,8 @@ def get_predefined_types(precomp):
     result = {'dt': 0.0,
               't': 0.0,
               'dst': KnownType('object'),
+              'NBRS': KnownType('unsigned int*'),
+              'N_NBRS': KnownType('int'),
               'src': KnownType('ParticleArrayWrapper')}
     for sym, value in precomp.items():
         result[sym] = value.context[sym]
@@ -331,7 +328,7 @@ def get_arrays_used_in_equation(equation):
     """
     src_arrays = set()
     dest_arrays = set()
-    for meth_name in ('initialize', 'loop', 'post_loop'):
+    for meth_name in ('initialize', 'loop', 'loop_all', 'post_loop'):
         meth = getattr(equation, meth_name, None)
         if meth is not None:
             args = inspect.getargspec(meth).args
@@ -481,7 +478,8 @@ class Group(object):
         )
 
     def _has_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
+        assert kind in ('initialize', 'loop', 'loop_all',
+                        'post_loop', 'reduce')
         for equation in self.equations:
             if hasattr(equation, kind):
                 return True
@@ -597,6 +595,9 @@ class Group(object):
     def has_loop(self):
         return self._has_code('loop')
 
+    def has_loop_all(self):
+        return self._has_code('loop_all')
+
     def has_post_loop(self):
         return self._has_code('post_loop')
 
@@ -639,8 +640,9 @@ class CythonGroup(Group):
                     pass
         return '\n'.join(decl)
 
-    def _get_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'post_loop', 'reduce')
+    def _get_code(self, kernel=None, kind='loop'):
+        assert kind in ('initialize', 'loop', 'loop_all',
+                        'post_loop', 'reduce')
         # We assume here that precomputed quantities are only relevant
         # for loops and not post_loops and initialization.
         pre = []
@@ -648,7 +650,9 @@ class CythonGroup(Group):
             for p, cb in self.precomputed.items():
                 pre.append(cb.code.strip())
             if len(pre) > 0:
-                pre.append('')
+                pre.extend(['', ''])
+        preamble = self._set_kernel('\n'.join(pre), kernel)
+
         code = []
         for eq in self.equations:
             meth = getattr(eq, kind, None)
@@ -656,15 +660,17 @@ class CythonGroup(Group):
                 args = inspect.getargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
+                if 'SPH_KERNEL' in args:
+                    args[args.index('SPH_KERNEL')] = 'self.kernel'
                 if kind == 'reduce':
-                    args = ['dst.array']
+                    args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)
                 c = 'self.{eq_name}.{method}({args})'\
                     .format(eq_name=eq.var_name, method=kind, args=call_args)
                 code.append(c)
         if len(code) > 0:
             code.append('')
-        return '\n'.join(pre + code)
+        return preamble + '\n'.join(code)
 
     def _set_kernel(self, code, kernel):
         if kernel is not None:
@@ -710,19 +716,19 @@ class CythonGroup(Group):
         return '\n'.join(code)
 
     def get_initialize_code(self, kernel=None):
-        code = self._get_code(kind='initialize')
-        return self._set_kernel(code, kernel)
+        return self._get_code(kernel, kind='initialize')
 
     def get_loop_code(self, kernel=None):
-        code = self._get_code(kind='loop')
-        return self._set_kernel(code, kernel)
+        return self._get_code(kernel, kind='loop')
+
+    def get_loop_all_code(self, kernel=None):
+        return self._get_code(kernel, kind='loop_all')
 
     def get_post_loop_code(self, kernel=None):
-        code = self._get_code(kind='post_loop')
-        return self._set_kernel(code, kernel)
+        return self._get_code(kernel, kind='post_loop')
 
     def get_reduce_code(self):
-        return self._get_code(kind='reduce')
+        return self._get_code(kernel=None, kind='reduce')
 
     def get_equation_wrappers(self, known_types={}):
         classes = defaultdict(lambda: 0)
@@ -780,6 +786,7 @@ class OpenCLGroup(Group):
         wrappers = []
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
+        predefined['NBRS'] = KnownType('__global unsigned int*')
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):
