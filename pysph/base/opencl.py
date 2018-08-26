@@ -23,13 +23,6 @@ import pysph.base.particle_array
 logger = logging.getLogger()
 
 
-# args: tag_array, tag, indices, head
-REMOVE_INDICES_KNL = Template(r"""//CL//
-        if(tag_array[i] == tag)
-            indices[atomic_inc(&head[0])] = i;
-""")
-
-
 def get_elwise_kernel(kernel_name, args, src, preamble=""):
     ctx = get_context()
     knl = ElementwiseKernel(
@@ -341,6 +334,44 @@ class DeviceHelper(object):
 
         self.num_real_particles = int(num_particles_knl(tag_arr).get())
 
+    def remove_particles_bool(self, if_remove):
+        """ Remove particle i if if_remove[i] is True
+        """
+        num_indices = int(cl.array.sum(if_remove).get())
+
+        if num_indices == 0:
+            return
+
+        num_particles = self.get_number_of_particles()
+        new_indices = DeviceArray(np.uint32, n=num_particles)
+
+        remove_knl = GenericScanKernel(
+            self._ctx, np.uint32,
+            arguments="__global uint *if_remove, __global uint *new_indices",
+            input_expr="if_remove[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            if(!if_remove[i]) new_indices[i - item] = i;
+            """
+        )
+
+        remove_knl(if_remove, new_indices.array)
+
+        num_removed_particles_knl = ReductionKernel(
+            self._ctx, np.uint32, neutral="0",
+            reduce_expr="a+b",
+            map_expr="if_remove[i]",
+            arguments="__global uint *if_remove"
+        )
+
+        num_removed_particles = \
+                int(num_removed_particles_knl(if_remove).get())
+        new_num_particles = num_particles - num_removed_particles
+
+        for prop in self.properties:
+            self._data[prop].align(new_indices.array[:new_num_particles])
+            setattr(self, prop, self._data[prop].array)
+
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
 
@@ -375,9 +406,8 @@ class DeviceHelper(object):
             raise ValueError(msg)
 
         num_particles = self.get_number_of_particles()
-        if_remove = DeviceArray(np.int32, n=num_particles)
+        if_remove = DeviceArray(np.uint32, n=num_particles)
         if_remove.fill(0)
-        new_indices = DeviceArray(np.uint32, n=num_particles)
 
         fill_if_remove_knl = get_elwise_kernel(
             "fill_if_remove_knl",
@@ -387,32 +417,7 @@ class DeviceHelper(object):
 
         fill_if_remove_knl(indices, if_remove.array, num_particles)
 
-        remove_knl = GenericScanKernel(
-            self._ctx, np.int32,
-            arguments="__global int *if_remove, __global uint *new_indices",
-            input_expr="if_remove[i]",
-            scan_expr="a+b", neutral="0",
-            output_statement="""
-            if(!if_remove[i]) new_indices[i - item] = i;
-            """
-        )
-
-        remove_knl(if_remove.array, new_indices.array)
-
-        num_removed_particles_knl = ReductionKernel(
-            self._ctx, np.uint32, neutral="0",
-            reduce_expr="a+b",
-            map_expr="if_remove[i]",
-            arguments="__global unsigned int *if_remove"
-        )
-
-        num_removed_particles = \
-                int(num_removed_particles_knl(if_remove.array).get())
-        new_num_particles = num_particles - num_removed_particles
-
-        for prop in self.properties:
-            self._data[prop].align(new_indices.array[:new_num_particles])
-            setattr(self, prop, self._data[prop].array)
+        self.remove_particles_bool(if_remove.array)
 
         if len(indices) > 0:
             self.align_particles()
@@ -428,26 +433,8 @@ class DeviceHelper(object):
 
         """
         tag_array = self.tag
-
-        remove_places = tag_array == tag
-        num_indices = int(cl.array.sum(remove_places).get())
-
-        if num_indices == 0:
-            return
-
-        indices = cl.array.empty(self._queue, num_indices, np.uint32)
-        head = cl.array.zeros(self._queue, 1, np.uint32)
-
-        args = "uint* tag_array, uint tag, uint* indices, uint* head"
-        src = REMOVE_INDICES_KNL.render()
-
-        # find the indices of the particles to be removed.
-        remove_indices = get_elwise_kernel("remove_indices", args, src)
-
-        remove_indices(tag_array, tag, indices, head)
-
-        # remove the particles.
-        self.remove_particles(indices)
+        if_remove = tag_array == tag
+        self.remove_particles_bool(if_remove)
 
     def add_particles(self, **particle_props):
         """
