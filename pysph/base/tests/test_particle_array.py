@@ -145,7 +145,7 @@ class ParticleArrayTest(object):
         # get the properties are check if they are the same
         self.assertEqual(check_array(p.x, x), True)
         self.assertEqual(check_array(p.y, y), True)
-        self.assertEqual(check_array(p.rho, numpy.ones(4)*rho), True)
+        self.assertEqual(check_array(p.rho, numpy.ones(4) * rho), True)
         self.assertEqual(check_array(p.data, numpy.ravel(data)), True)
 
     def test_get_number_of_particles(self):
@@ -246,10 +246,10 @@ class ParticleArrayTest(object):
                                          z={'data': z}, m={'data': m},
                                          h={'data': h})
 
-        p.x = p.x*2.0
+        p.x = p.x * 2.0
 
         self.assertEqual(check_array(p.get('x'), [2., 4, 6, 8]), True)
-        p.x = p.x + 3.0*p.x
+        p.x = p.x + 3.0 * p.x
         self.assertEqual(check_array(p.get('x'), [8., 16., 24., 32.]), True)
 
     def test_remove_particles(self):
@@ -470,7 +470,7 @@ class ParticleArrayTest(object):
 
         self.assertEqual(p.get_number_of_particles(), 5)
         self.assertEqual(check_array(p.get(
-                    'x', only_real_particles=False), [0, 0, 0, 0, 0]), True)
+            'x', only_real_particles=False), [0, 0, 0, 0, 0]), True)
         self.assertEqual(check_array(p.get('y', only_real_particles=False),
                                      [-1., -1., -1., -1., -1.]), True)
         self.assertEqual(check_array(p.get('tag', only_real_particles=False),
@@ -500,13 +500,13 @@ class ParticleArrayTest(object):
 
         # check the remaining particles
         self.assertEqual(
-                check_array(numpy.sort(x_new[4:]),
-                    [3, 4, 5, 7, 9, 10]), True
-                )
+            check_array(numpy.sort(x_new[4:]),
+                        [3, 4, 5, 7, 9, 10]), True
+        )
         self.assertEqual(
-                check_array(numpy.sort(y_new[4:]),
-                    [1, 2, 4, 6, 7, 8]), True
-                )
+            check_array(numpy.sort(y_new[4:]),
+                        [1, 2, 4, 6, 7, 8]), True
+        )
 
         p.set(**{'tag': [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
         self.push(p)
@@ -523,13 +523,13 @@ class ParticleArrayTest(object):
 
         # check the remaining particles
         self.assertEqual(
-                check_array(numpy.sort(x_new[4:]),
-                    [3, 4, 5, 7, 9, 10]), True
-                )
+            check_array(numpy.sort(x_new[4:]),
+                        [3, 4, 5, 7, 9, 10]), True
+        )
         self.assertEqual(
-                check_array(numpy.sort(y_new[4:]),
-                    [1, 2, 4, 6, 7, 8]), True
-                )
+            check_array(numpy.sort(y_new[4:]),
+                        [1, 2, 4, 6, 7, 8]), True
+        )
 
     def test_append_parray(self):
         """
@@ -682,7 +682,7 @@ class ParticleArrayTest(object):
     def test_extract_particles_works_with_specific_props(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
-        p.set_output_arrays(['x',  'y'])
+        p.set_output_arrays(['x', 'y'])
 
         # When.
         n = p.extract_particles(indices=[1], props=['x'])

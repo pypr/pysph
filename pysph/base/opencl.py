@@ -279,8 +279,9 @@ class DeviceHelper(object):
         if len(args) == 0:
             args = self._data.keys()
         for arg in args:
-            cl_arr = cl.array.to_device(get_queue(),
-                    self._get_array(self._get_prop_or_const(arg)))
+            cl_arr = cl.array.to_device(
+                get_queue(), self._get_array(
+                    self._get_prop_or_const(arg)))
             self._data[arg].set_data(cl_arr)
             setattr(self, arg, self._data[arg].array)
 
@@ -289,7 +290,7 @@ class DeviceHelper(object):
         if prop in self.properties or prop in self.constants:
             return
         else:
-            raise AttributeError('property %s not present'%(prop))
+            raise AttributeError('property %s not present' % (prop))
 
     def remove_prop(self, name):
         if name in self.properties:
@@ -365,7 +366,7 @@ class DeviceHelper(object):
         )
 
         num_removed_particles = \
-                int(num_removed_particles_knl(if_remove).get())
+            int(num_removed_particles_knl(if_remove).get())
         new_num_particles = num_particles - num_removed_particles
 
         for prop in self.properties:
