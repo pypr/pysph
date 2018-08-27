@@ -314,6 +314,7 @@ class DeviceHelper(object):
         num_particles = len(tag_arr)
         indices = cl.array.arange(self._queue, 0, num_particles, 1,
                                   dtype=np.uint32)
+
         radix_sort = cl.algorithm.RadixSort(
             self._ctx,
             "unsigned int* indices, unsigned int* tags",
@@ -323,8 +324,6 @@ class DeviceHelper(object):
 
         (sorted_indices,), event = radix_sort(indices, tag_arr, key_bits=1)
         self.align(sorted_indices)
-
-        tag_arr = self._data['tag'].array
 
         num_particles_knl = ReductionKernel(
             self._ctx, np.uint32, neutral="0",
