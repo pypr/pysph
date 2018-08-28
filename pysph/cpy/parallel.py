@@ -755,7 +755,7 @@ class Scan(object):
         else:
             return False
 
-    def _wrap_ocl_function(self, func):
+    def _wrap_ocl_function(self, func, func_type=None):
         if func is not None:
             self.tp.add(func)
             py_data, c_data = self.cython_gen.get_func_signature(func)
@@ -765,17 +765,19 @@ class Scan(object):
                 func=name,
                 args=', '.join(c_data[1])
             )
-            arguments = convert_to_float_if_needed(
-                ', '.join(c_data[0][1:])
-            )
 
             n_ignore = self._num_ignore_args(c_data)
             arguments = c_data[0][n_ignore:]
             c_args = c_data[1][n_ignore:]
         else:
-            arguments = []
-            expr = None
-            c_args = []
+            if func_type is 'input':
+                arguments = ['__global %(type)s *input' % {'type': self.type}]
+                expr = 'input[i]'
+                c_args = ['input']
+            else:
+                arguments = []
+                expr = None
+                c_args = []
         return expr, arguments, c_args
 
     def _ignore_arg(self, arg_name):
@@ -795,7 +797,7 @@ class Scan(object):
     def _generate(self):
         if self.backend == 'opencl':
             input_expr, input_args, input_c_args = \
-                self._wrap_ocl_function(self.input_func)
+                self._wrap_ocl_function(self.input_func, func_type='input')
 
             output_expr, output_args, output_c_args = \
                 self._wrap_ocl_function(self.output_func)

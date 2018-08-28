@@ -215,6 +215,7 @@ class TestParallelUtils(unittest.TestCase):
             self._test_unique_scan(backend='cython')
 
     def test_unique_scan_opencl(self):
+        importorskip('pyopencl')
         self._test_unique_scan(backend='opencl')
 
     def _get_segmented_scan_actual(self, a, segment_flags):
@@ -269,6 +270,7 @@ class TestParallelUtils(unittest.TestCase):
             self._test_segmented_scan(backend='cython')
 
     def test_segmented_scan_opencl(self):
+        importorskip('pyopencl')
         self._test_segmented_scan(backend='opencl')
 
     def _test_scan_last_item(self, backend):
@@ -296,3 +298,7 @@ class TestParallelUtils(unittest.TestCase):
     def test_scan_last_item_cython_parallel(self):
         with use_config(use_openmp=True):
             self._test_scan_last_item(backend='cython')
+
+    def test_scan_last_item_opencl(self):
+        importorskip('pyopencl')
+        self._test_scan_last_item(backend='opencl')
