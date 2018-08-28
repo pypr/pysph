@@ -75,7 +75,7 @@ cdef ${type} c_${name}(${c_arg_sig}):
     cdef ${type}* buffer
     buffer = <${type}*>malloc(n_thread*stride*sz)
     if buffer == NULL:
-        abort()
+        raise MemoryError("Unable to allocate memory for reduction")
 
 %if openmp:
     with nogil, parallel():
@@ -144,20 +144,28 @@ cdef void c_${name}(${c_arg_sig}):
     cdef ${type}* buffer
     buffer = <${type}*> malloc(n_thread * stride * sz)
 
+    if buffer == NULL:
+        raise MemoryError("Unable to allocate memory for scan.")
+
     % if use_segment:
     cdef int* scan_seg_flags
     cdef int* chunk_new_segment
     scan_seg_flags = <int*> malloc(SIZE * sizeof(int))
     chunk_new_segment = <int*> malloc(n_thread * stride * sizeof(int))
+
+    if scan_seg_flags == NULL or chunk_new_segment == NULL:
+        raise MemoryError("Unable to allocate memory for segmented scan")
     % endif
 
     % if complex_map:
     cdef ${type}* map_output
     map_output = <${type}*> malloc(SIZE * sz)
+
+    if map_output == NULL:
+        raise MemoryError("Unable to allocate memory for scan. (Recommended:
+        Set complex_map=False.)")
     % endif
 
-    if buffer == NULL:
-        abort()
 
     cdef int buffer_idx, start, end, has_segment
     cdef ${type} a, b, temp
@@ -324,7 +332,7 @@ cimport openmp
 cimport numpy as np
 
 cdef void c_${name}(${c_arg_sig}):
-    cdef int i, N, seg_flag_here
+    cdef int i, N, across_seg_boundary
     cdef ${type} a, b, item
     N = SIZE
 
@@ -333,8 +341,8 @@ cdef void c_${name}(${c_arg_sig}):
     for i in range(N):
         # Segment operation
         % if use_segment:
-        seg_flag_here = ${is_segment_start_expr}
-        if seg_flag_here:
+        across_seg_boundary = ${is_segment_start_expr}
+        if across_seg_boundary:
             a = ${neutral}
         % endif
 
@@ -355,6 +363,14 @@ cdef void c_${name}(${c_arg_sig}):
 cpdef py_${name}(${py_arg_sig}):
     return c_${name}(${py_args})
 '''
+
+
+def drop_duplicates(arr):
+    result = []
+    for x in arr:
+        if x not in result:
+            result.extend([x])
+    return result
 
 
 class Elementwise(object):
@@ -707,6 +723,7 @@ class Scan(object):
         self.scan_expr = scan_expr
         self.dtype = dtype
         self.type = dtype_to_ctype(dtype)
+        self.arg_keys = None
         if backend == 'cython':
             # On Windows, INFINITY is not defined so we use INFTY which we
             # internally define.
@@ -751,10 +768,15 @@ class Scan(object):
             arguments = convert_to_float_if_needed(
                 ', '.join(c_data[0][1:])
             )
+
+            n_ignore = self._num_ignore_args(c_data)
+            arguments = c_data[0][n_ignore:]
+            c_args = c_data[1][n_ignore:]
         else:
-            arguments = ''
+            arguments = []
             expr = None
-        return expr, arguments
+            c_args = []
+        return expr, arguments, c_args
 
     def _ignore_arg(self, arg_name):
         if arg_name in ['item', 'prev_item', 'last_item', 'i', 'N']:
@@ -772,15 +794,29 @@ class Scan(object):
 
     def _generate(self):
         if self.backend == 'opencl':
-            input_expr, input_args = self._wrap_ocl_function(self.input_func)
-            output_expr, output_args = self._wrap_ocl_function(
-                self.output_func
-            )
-            segment_expr, segment_args = self._wrap_ocl_function(
-                self.is_segment_func
-            )
+            input_expr, input_args, input_c_args = \
+                self._wrap_ocl_function(self.input_func)
+
+            output_expr, output_args, output_c_args = \
+                self._wrap_ocl_function(self.output_func)
+
+            segment_expr, segment_args, segment_c_args = \
+                self._wrap_ocl_function(self.is_segment_func)
+
+            if self.is_segment_func is not None:
+                scan_expr = '(across_seg_boundary ? b : (%s))' % self.scan_expr
+            else:
+                scan_expr = self.scan_expr
 
             preamble = convert_to_float_if_needed(self.tp.get_code())
+
+            args = input_args + segment_args + output_args
+            args = drop_duplicates(args)
+            arg_defn = convert_to_float_if_needed(','.join(args))
+
+            c_args = input_c_args + segment_c_args + output_c_args
+            c_args = drop_duplicates(c_args)
+            self.arg_keys = c_args
 
             from .opencl import get_context, get_queue
             from pyopencl.scan import GenericScanKernel
@@ -789,9 +825,9 @@ class Scan(object):
             knl = GenericScanKernel(
                 ctx,
                 dtype=self.dtype,
-                arguments=input_args,
+                arguments=arg_defn,
                 input_expr=input_expr,
-                scan_expr=self.scan_expr,
+                scan_expr=scan_expr,
                 neutral=self.neutral,
                 output_statement=output_expr,
                 is_segment_start_expr=segment_expr,
@@ -811,11 +847,11 @@ class Scan(object):
             else:
                 # The first value of the arrays (int i) are all ignored
                 # later while building a list of arguments
-                py_data = (['int i', '{type}[:] inp'.format(type=self.type)],
-                           ['i', '&inp[0]'])
-                c_data = (['int i', '{type}* inp'.format(type=self.type)],
-                          ['i', 'inp'])
-                input_expr = 'inp[i]'
+                py_data = (['int i', '{type}[:] input'.format(type=self.type)],
+                           ['i', '&input[0]'])
+                c_data = (['int i', '{type}* input'.format(type=self.type)],
+                          ['i', 'input'])
+                input_expr = 'input[i]'
 
             use_segment = False
             segment_expr = ''
@@ -865,6 +901,15 @@ class Scan(object):
             py_defn = ['long SIZE'] + py_data[0][1:]
             c_defn = ['long SIZE'] + c_data[0][1:]
             py_args = ['SIZE'] + py_data[1][1:]
+            c_args = ['SIZE'] + c_data[1][1:]
+
+            # Only use unique arguments
+            py_defn = drop_duplicates(py_defn)
+            c_defn = drop_duplicates(c_defn)
+            py_args = drop_duplicates(py_args)
+            c_args = drop_duplicates(c_args)
+
+            self.arg_keys = c_args
 
             if self._config.use_openmp:
                 template = Template(text=scan_cy_template)
@@ -922,12 +967,13 @@ class Scan(object):
         else:
             return x
 
-    def __call__(self, *args):
-        c_args = [self._massage_arg(x) for x in args]
+    def __call__(self, **kwargs):
+        c_args_dict = {k: self._massage_arg(x) for k, x in kwargs.items()}
+
         if self.backend == 'cython':
-            size = len(c_args[0])
-            c_args.insert(0, size)
-            self.c_func(*c_args)
+            size = len(c_args_dict[self.arg_keys[1]])
+            c_args_dict['SIZE'] = size
+            self.c_func(*[c_args_dict[k] for k in self.arg_keys])
         elif self.backend == 'opencl':
-            self.c_func(*c_args)
+            self.c_func(*[c_args_dict[k] for k in self.arg_keys])
             self.queue.finish()

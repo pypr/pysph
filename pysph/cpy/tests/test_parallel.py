@@ -125,32 +125,6 @@ class TestParallelUtils(unittest.TestCase):
         importorskip('pycuda')
         self._check_reduction_min(backend='cuda')
 
-    def test_scan_works_opencl(self):
-        importorskip('pyopencl')
-        # Given
-        a = np.arange(10000, dtype=np.int32)
-        data = a.copy()
-        a = wrap(a, backend='opencl')
-
-        @annotate(i='int', ary='intp', return_='int')
-        def input_f(i, ary):
-            return ary[i]
-
-        @annotate(int='i, item', ary='intp')
-        def output_f(i, ary, item):
-            ary[i + 1] = item
-
-        # When
-        s = Scan(input_f, output_f, 'a+b', dtype=np.int32, backend='opencl')
-        s(a)
-        a.pull()
-        result = a.data
-
-        # Then
-        expect = np.cumsum(data)
-        # print(result, y)
-        self.assertTrue(np.all(expect[:-1] == result[1:]))
-
     def _test_scan(self, backend):
         # Given
         a = np.arange(10000, dtype=np.int32)
@@ -159,18 +133,18 @@ class TestParallelUtils(unittest.TestCase):
 
         a = wrap(a, backend=backend)
 
-        @annotate(i='int', input_ary='intp', return_='int')
-        def input_f(i, input_ary):
-            return input_ary[i]
+        @annotate(i='int', ary='intp', return_='int')
+        def input_f(i, ary):
+            return ary[i]
 
-        @annotate(int='i, item', output_ary='intp')
-        def output_f(i, item, output_ary):
-            output_ary[i] = item
+        @annotate(int='i, item', ary='intp')
+        def output_f(i, item, ary):
+            ary[i] = item
 
         # When
         scan = Scan(input_f, output_f, 'a+b', dtype=np.int32,
                     backend=backend)
-        scan(a, a)
+        scan(ary=a)
 
         a.pull()
         result = a.data
@@ -184,6 +158,10 @@ class TestParallelUtils(unittest.TestCase):
     def test_scan_works_cython_parallel(self):
         with use_config(use_openmp=True):
             self._test_scan(backend='cython')
+
+    def test_scan_works_opencl(self):
+        importorskip('pyopencl')
+        self._test_scan(backend='opencl')
 
     def _test_unique_scan(self, backend):
         # Given
@@ -202,28 +180,24 @@ class TestParallelUtils(unittest.TestCase):
         unique_count = np.zeros(1, dtype=np.int32)
         unique_count = wrap(unique_count, backend=backend)
 
-        @annotate(i='int', input_ary='intp', return_='int')
-        def input_f(i, input_ary):
-            if i == 0 or input_ary[i] != input_ary[i - 1]:
+        @annotate(i='int', ary='intp', return_='int')
+        def input_f(i, ary):
+            if i == 0 or ary[i] != ary[i - 1]:
                 return 1
             else:
                 return 0
 
-        @annotate(int='i, item', ary2='intp')
-        def output_f(i, item, ary2):
-            ary2[i] = item
-
-        @annotate(int='i, prev_item, item, N', ary2='intp',
+        @annotate(int='i, prev_item, item, N', ary='intp',
                   unique='intp', unique_count='intp')
-        def output_f(i, prev_item, item, N, ary2, unique, unique_count):
+        def output_f(i, prev_item, item, N, ary, unique, unique_count):
             if item != prev_item:
-                unique[item - 1] = ary2[i]
+                unique[item - 1] = ary[i]
             if i == N - 1:
                 unique_count[0] = item
 
         # When
         scan = Scan(input_f, output_f, 'a+b', dtype=np.int32, backend=backend)
-        scan(a, a, unique_ary, unique_count)
+        scan(ary=a, unique=unique_ary, unique_count=unique_count)
         unique_ary.pull()
         unique_count.pull()
         unique_count = unique_count.data[0]
@@ -239,6 +213,9 @@ class TestParallelUtils(unittest.TestCase):
     def test_unique_scan_cython_parallel(self):
         with use_config(use_openmp=True):
             self._test_unique_scan(backend='cython')
+
+    def test_unique_scan_opencl(self):
+        self._test_unique_scan(backend='opencl')
 
     def _get_segmented_scan_actual(self, a, segment_flags):
         output_actual = np.zeros_like(a)
@@ -261,24 +238,24 @@ class TestParallelUtils(unittest.TestCase):
         a = wrap(a, backend=backend)
         seg = wrap(seg, backend=backend)
 
-        @annotate(i='int', input_ary='intp', return_='int')
-        def input_f(i, input_ary):
-            return input_ary[i]
+        @annotate(i='int', ary='intp', return_='int')
+        def input_f(i, ary):
+            return ary[i]
 
         @annotate(i='int', seg_flag='intp', return_='int')
         def segment_f(i, seg_flag):
             return seg_flag[i]
 
-        @annotate(int='i, item', output_ary='intp')
-        def output_f(i, item, output_ary):
-            output_ary[i] = item
+        @annotate(int='i, item', ary='intp')
+        def output_f(i, item, ary):
+            ary[i] = item
 
         output_actual = self._get_segmented_scan_actual(a_copy, seg_copy)
 
         # When
         scan = Scan(input_f, output_f, 'a+b', dtype=np.int32, backend=backend,
                     is_segment=segment_f)
-        scan(a, seg, a)
+        scan(ary=a, seg_flag=seg)
         a.pull()
 
         # Then
@@ -290,6 +267,9 @@ class TestParallelUtils(unittest.TestCase):
     def test_segmented_scan_cython_parallel(self):
         with use_config(use_openmp=True):
             self._test_segmented_scan(backend='cython')
+
+    def test_segmented_scan_opencl(self):
+        self._test_segmented_scan(backend='opencl')
 
     def _test_scan_last_item(self, backend):
         # Given
@@ -307,7 +287,7 @@ class TestParallelUtils(unittest.TestCase):
         # When
         scan = Scan(output=output_f, scan_expr='a+b',
                     dtype=np.int32, backend=backend)
-        scan(a, a)
+        scan(input=a, ary=a)
         a.pull()
 
         # Then
