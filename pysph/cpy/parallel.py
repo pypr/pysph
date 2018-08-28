@@ -710,6 +710,10 @@ class Scan(object):
                  complex_map=False,
                  backend='opencl'):
         backend = get_backend(backend)
+        if backend not in ['opencl', 'cython']:
+            raise NotImplementedError("Unsupported backend: %s. Supported "
+                                      "backends: cython, opencl" %
+                                      backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.input_func = input
@@ -755,6 +759,128 @@ class Scan(object):
         else:
             return False
 
+    def _ignore_arg(self, arg_name):
+        if arg_name in ['item', 'prev_item', 'last_item', 'i', 'N']:
+            return True
+        return False
+
+    def _num_ignore_args(self, c_data):
+        result = 0
+        for arg_name in c_data[1][:]:
+            if self._ignore_arg(arg_name):
+                result += 1
+            else:
+                break
+        return result
+
+    def _generate(self):
+        if self.backend == 'opencl':
+            self._generate_opencl_code()
+        elif self.backend == 'cython':
+            self._generate_cython_code()
+
+    def _default_cython_input_function(self):
+        py_data = (['int i', '{type}[:] input'.format(type=self.type)],
+                   ['i', '&input[0]'])
+        c_data = (['int i', '{type}* input'.format(type=self.type)],
+                  ['i', 'input'])
+        input_expr = 'input[i]'
+        return py_data, c_data, input_expr
+
+    def _wrap_cython_code(self, func, func_type=None):
+        name = self.name
+        if func is not None:
+            self.tp.add(func)
+            py_data, c_data = self.cython_gen.get_func_signature(func)
+            self._correct_return_type(c_data, func_type)
+
+            cargs = ', '.join(c_data[1])
+            expr = '{name}_{modifier}({cargs})'.format(name=name, cargs=cargs,
+                                                       modifier=func_type)
+        else:
+            if func_type is 'input':
+                py_data, c_data, expr = self._default_cython_input_function()
+            else:
+                py_data, c_data, expr = [], [], None
+
+        return py_data, c_data, expr
+
+    def _append_cython_arg_data(self, all_py_data, all_c_data, py_data,
+                                c_data):
+        if len(c_data) > 0:
+            n_ignore = self._num_ignore_args(c_data)
+            all_py_data[0].extend(py_data[0][n_ignore:])
+            all_py_data[1].extend(py_data[1][n_ignore:])
+            all_c_data[0].extend(c_data[0][n_ignore:])
+            all_c_data[1].extend(c_data[1][n_ignore:])
+
+    def _generate_cython_code(self):
+        name = self.name
+        all_py_data = [[], []]
+        all_c_data = [[], []]
+
+        # Process input function
+        py_data, c_data, input_expr = self._wrap_cython_code(self.input_func,
+                                                             func_type='input')
+        self._append_cython_arg_data(all_py_data, all_c_data,
+                                     py_data, c_data)
+
+        # Process segment function
+        use_segment = True if self.is_segment_func is not None else False
+        py_data, c_data, segment_expr = self._wrap_cython_code(
+            self.is_segment_func, func_type='segment')
+        self._append_cython_arg_data(all_py_data, all_c_data, py_data, c_data)
+
+        # Process output expression
+        calc_last_item = False
+        calc_prev_item = False
+
+        py_data, c_data, output_expr = self._wrap_cython_code(
+            self.output_func, func_type='output')
+        if self.output_func is not None:
+            calc_last_item = self._include_last_item()
+            calc_prev_item = self._include_prev_item()
+        self._append_cython_arg_data(all_py_data, all_c_data, py_data, c_data)
+
+        # Add size argument
+        py_defn = ['long SIZE'] + all_py_data[0]
+        c_defn = ['long SIZE'] + all_c_data[0]
+        py_args = ['SIZE'] + all_py_data[1]
+        c_args = ['SIZE'] + all_c_data[1]
+
+        # Only use unique arguments
+        py_defn = drop_duplicates(py_defn)
+        c_defn = drop_duplicates(c_defn)
+        py_args = drop_duplicates(py_args)
+        c_args = drop_duplicates(c_args)
+
+        self.arg_keys = c_args
+
+        if self._config.use_openmp:
+            template = Template(text=scan_cy_template)
+        else:
+            template = Template(text=scan_cy_single_thread_template)
+        src = template.render(
+            name=self.name,
+            type=self.type,
+            input_expr=input_expr,
+            scan_expr=self.scan_expr,
+            output_expr=output_expr,
+            neutral=self.neutral,
+            c_arg_sig=', '.join(c_defn),
+            py_arg_sig=', '.join(py_defn),
+            py_args=', '.join(py_args),
+            openmp=self._config.use_openmp,
+            calc_last_item=calc_last_item,
+            calc_prev_item=calc_prev_item,
+            use_segment=use_segment,
+            is_segment_start_expr=segment_expr,
+            complex_map=self.complex_map
+        )
+        self.tp.add_code(src)
+        self.tp.compile()
+        self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+
     def _wrap_ocl_function(self, func, func_type=None):
         if func is not None:
             self.tp.add(func)
@@ -780,163 +906,50 @@ class Scan(object):
                 c_args = []
         return expr, arguments, c_args
 
-    def _ignore_arg(self, arg_name):
-        if arg_name in ['item', 'prev_item', 'last_item', 'i', 'N']:
-            return True
-        return False
+    def _get_scan_expr_opencl(self):
+        if self.is_segment_func is not None:
+            return '(across_seg_boundary ? b : (%s))' % self.scan_expr
+        else:
+            return self.scan_expr
 
-    def _num_ignore_args(self, c_data):
-        result = 0
-        for arg_name in c_data[1][:]:
-            if self._ignore_arg(arg_name):
-                result += 1
-            else:
-                break
-        return result
+    def _generate_opencl_code(self):
+        input_expr, input_args, input_c_args = \
+            self._wrap_ocl_function(self.input_func, func_type='input')
 
-    def _generate(self):
-        if self.backend == 'opencl':
-            input_expr, input_args, input_c_args = \
-                self._wrap_ocl_function(self.input_func, func_type='input')
+        output_expr, output_args, output_c_args = \
+            self._wrap_ocl_function(self.output_func)
 
-            output_expr, output_args, output_c_args = \
-                self._wrap_ocl_function(self.output_func)
+        segment_expr, segment_args, segment_c_args = \
+            self._wrap_ocl_function(self.is_segment_func)
 
-            segment_expr, segment_args, segment_c_args = \
-                self._wrap_ocl_function(self.is_segment_func)
+        scan_expr = self._get_scan_expr_opencl()
 
-            if self.is_segment_func is not None:
-                scan_expr = '(across_seg_boundary ? b : (%s))' % self.scan_expr
-            else:
-                scan_expr = self.scan_expr
+        preamble = convert_to_float_if_needed(self.tp.get_code())
 
-            preamble = convert_to_float_if_needed(self.tp.get_code())
+        args = input_args + segment_args + output_args
+        args = drop_duplicates(args)
+        arg_defn = convert_to_float_if_needed(','.join(args))
 
-            args = input_args + segment_args + output_args
-            args = drop_duplicates(args)
-            arg_defn = convert_to_float_if_needed(','.join(args))
+        c_args = input_c_args + segment_c_args + output_c_args
+        c_args = drop_duplicates(c_args)
+        self.arg_keys = c_args
 
-            c_args = input_c_args + segment_c_args + output_c_args
-            c_args = drop_duplicates(c_args)
-            self.arg_keys = c_args
-
-            from .opencl import get_context, get_queue
-            from pyopencl.scan import GenericScanKernel
-            ctx = get_context()
-            self.queue = get_queue()
-            knl = GenericScanKernel(
-                ctx,
-                dtype=self.dtype,
-                arguments=arg_defn,
-                input_expr=input_expr,
-                scan_expr=scan_expr,
-                neutral=self.neutral,
-                output_statement=output_expr,
-                is_segment_start_expr=segment_expr,
-                preamble=preamble
-            )
-            self.c_func = knl
-        elif self.backend == 'cython':
-            if self.input_func is not None:
-                self.tp.add(self.input_func)
-                py_data, c_data = \
-                    self.cython_gen.get_func_signature(self.input_func)
-                self._correct_return_type(c_data, 'input')
-                name = self.name
-                cargs = ', '.join(c_data[1])
-                input_expr = '{name}_input({cargs})'.format(name=name,
-                                                            cargs=cargs)
-            else:
-                # The first value of the arrays (int i) are all ignored
-                # later while building a list of arguments
-                py_data = (['int i', '{type}[:] input'.format(type=self.type)],
-                           ['i', '&input[0]'])
-                c_data = (['int i', '{type}* input'.format(type=self.type)],
-                          ['i', 'input'])
-                input_expr = 'input[i]'
-
-            use_segment = False
-            segment_expr = ''
-            if self.is_segment_func is not None:
-                self.tp.add(self.is_segment_func)
-                segment_py_data, segment_c_data = \
-                    self.cython_gen.get_func_signature(self.is_segment_func)
-                self._correct_return_type(segment_c_data, 'segment')
-
-                use_segment = True
-
-                cargs = ', '.join(segment_c_data[1])
-                segment_expr = '{name}_segment({cargs})'.format(name=self.name,
-                                                                cargs=cargs)
-                n_ignore = self._num_ignore_args(segment_c_data)
-                py_data = (py_data[0] + segment_py_data[0][n_ignore:],
-                           py_data[1] + segment_py_data[1][n_ignore:])
-                c_data = (c_data[0] + segment_c_data[0][n_ignore:],
-                          c_data[1] + segment_c_data[1][n_ignore:])
-
-            calc_last_item = False
-            calc_prev_item = False
-
-            if self.output_func is not None:
-                self.tp.add(self.output_func)
-                output_py_data, output_c_data = \
-                    self.cython_gen.get_func_signature(self.output_func)
-                self._correct_return_type(output_c_data, 'output')
-
-                calc_last_item = self._include_last_item()
-                calc_prev_item = self._include_prev_item()
-
-                name = self.name
-                cargs = ', '.join(output_c_data[1])
-                output_expr = '{name}_output({cargs})'.format(name=name,
-                                                              cargs=cargs)
-
-                n_ignore = self._num_ignore_args(output_c_data)
-
-                py_data = (py_data[0] + output_py_data[0][n_ignore:],
-                           py_data[1] + output_py_data[1][n_ignore:])
-                c_data = (c_data[0] + output_c_data[0][n_ignore:],
-                          c_data[1] + output_c_data[1][n_ignore:])
-            else:
-                output_expr = ''
-
-            py_defn = ['long SIZE'] + py_data[0][1:]
-            c_defn = ['long SIZE'] + c_data[0][1:]
-            py_args = ['SIZE'] + py_data[1][1:]
-            c_args = ['SIZE'] + c_data[1][1:]
-
-            # Only use unique arguments
-            py_defn = drop_duplicates(py_defn)
-            c_defn = drop_duplicates(c_defn)
-            py_args = drop_duplicates(py_args)
-            c_args = drop_duplicates(c_args)
-
-            self.arg_keys = c_args
-
-            if self._config.use_openmp:
-                template = Template(text=scan_cy_template)
-            else:
-                template = Template(text=scan_cy_single_thread_template)
-            src = template.render(
-                name=self.name,
-                type=self.type,
-                input_expr=input_expr,
-                scan_expr=self.scan_expr,
-                output_expr=output_expr,
-                neutral=self.neutral,
-                c_arg_sig=', '.join(c_defn),
-                py_arg_sig=', '.join(py_defn),
-                py_args=', '.join(py_args),
-                openmp=self._config.use_openmp,
-                calc_last_item=calc_last_item,
-                calc_prev_item=calc_prev_item,
-                use_segment=use_segment,
-                is_segment_start_expr=segment_expr,
-                complex_map=self.complex_map
-            )
-            self.tp.add_code(src)
-            self.tp.compile()
-            self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+        from .opencl import get_context, get_queue
+        from pyopencl.scan import GenericScanKernel
+        ctx = get_context()
+        self.queue = get_queue()
+        knl = GenericScanKernel(
+            ctx,
+            dtype=self.dtype,
+            arguments=arg_defn,
+            input_expr=input_expr,
+            scan_expr=scan_expr,
+            neutral=self.neutral,
+            output_statement=output_expr,
+            is_segment_start_expr=segment_expr,
+            preamble=preamble
+        )
+        self.c_func = knl
 
     def _add_address_space(self, arg):
         if '*' in arg and '__global' not in arg:
