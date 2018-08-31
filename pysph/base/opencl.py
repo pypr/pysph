@@ -344,29 +344,24 @@ class DeviceHelper(object):
 
         num_particles = self.get_number_of_particles()
         new_indices = DeviceArray(np.uint32, n=num_particles)
+        num_removed_particles = cl.array.empty(self._queue, 1, dtype=np.int32)
 
         remove_knl = GenericScanKernel(
             self._ctx, np.int32,
-            arguments="__global int *if_remove, __global uint *new_indices",
+            arguments="__global int *if_remove, __global uint *new_indices, \
+                    __global int *num_removed_particles, int num_particles",
             input_expr="if_remove[i]",
             scan_expr="a+b", neutral="0",
             output_statement="""
             if(!if_remove[i]) new_indices[i - item] = i;
+            if(i == num_particles - 1) num_removed_particles[0] = last_item;
             """
         )
 
-        remove_knl(if_remove, new_indices.array)
+        remove_knl(if_remove, new_indices.array, num_removed_particles,
+                   num_particles)
 
-        num_removed_particles_knl = ReductionKernel(
-            self._ctx, np.uint32, neutral="0",
-            reduce_expr="a+b",
-            map_expr="if_remove[i]",
-            arguments="__global uint *if_remove"
-        )
-
-        num_removed_particles = \
-            int(num_removed_particles_knl(if_remove).get())
-        new_num_particles = num_particles - num_removed_particles
+        new_num_particles = num_particles - int(num_removed_particles.get())
 
         for prop in self.properties:
             self._data[prop].align(new_indices.array[:new_num_particles])
