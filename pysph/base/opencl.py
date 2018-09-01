@@ -313,7 +313,6 @@ class DeviceHelper(object):
 
         num_particles = len(tag_arr)
 
-        inv_tag_arr = (tag_arr == 0).astype(dtype=np.int32)
         new_indices = cl.array.empty(self._queue, num_particles,
                                      dtype=np.int32)
         num_real_particles = cl.array.empty(self._queue, 1,
@@ -321,23 +320,20 @@ class DeviceHelper(object):
 
         align_particles_knl = GenericScanKernel(
             self._ctx, np.int32,
-            arguments="__global int *inv_tag_arr, __global int *new_indices, \
+            arguments="__global int *tag_arr, __global int *new_indices, \
                     __global int *num_real_particles, int num_particles",
-            input_expr="inv_tag_arr[i]",
+            input_expr="tag_arr[i] == 0",
             scan_expr="a+b", neutral="0",
             output_statement="""
             int t = last_item + i - prev_item;
-            int idx = (inv_tag_arr[i] == 0) ? t : prev_item;
+            int idx = tag_arr[i] ? t : prev_item;
             new_indices[idx] = i;
             if(i == num_particles - 1)
                 num_real_particles[0] = last_item;
             """
         )
 
-        idx_buff = cl.array.empty(self._queue, num_particles,
-                                  dtype=np.int32)
-
-        align_particles_knl(inv_tag_arr, new_indices, num_real_particles,
+        align_particles_knl(tag_arr, new_indices, num_real_particles,
                             num_particles)
 
         self.align(new_indices)
