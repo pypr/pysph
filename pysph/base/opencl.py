@@ -312,27 +312,37 @@ class DeviceHelper(object):
             return
 
         num_particles = len(tag_arr)
-        indices = cl.array.arange(self._queue, 0, num_particles, 1,
-                                  dtype=np.uint32)
 
-        radix_sort = cl.algorithm.RadixSort(
-            self._ctx,
-            "unsigned int* indices, unsigned int* tags",
-            scan_kernel=GenericScanKernel, key_expr="tags[i] > 0",
-            sort_arg_names=["indices"]
+        inv_tag_arr = (tag_arr == 0).astype(dtype=np.int32)
+        new_indices = cl.array.empty(self._queue, num_particles,
+                                     dtype=np.int32)
+        num_real_particles = cl.array.empty(self._queue, 1,
+                                            dtype=np.int32)
+
+        align_particles_knl = GenericScanKernel(
+            self._ctx, np.int32,
+            arguments="__global int *inv_tag_arr, __global int *new_indices, \
+                    __global int *num_real_particles, int num_particles",
+            input_expr="inv_tag_arr[i]",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            int t = last_item + i - prev_item;
+            int idx = (inv_tag_arr[i] == 0) ? t : prev_item;
+            new_indices[idx] = i;
+            if(i == num_particles - 1)
+                num_real_particles[0] = last_item;
+            """
         )
 
-        (sorted_indices,), event = radix_sort(indices, tag_arr, key_bits=1)
-        self.align(sorted_indices)
+        idx_buff = cl.array.empty(self._queue, num_particles,
+                                  dtype=np.int32)
 
-        num_particles_knl = ReductionKernel(
-            self._ctx, np.uint32, neutral="0",
-            reduce_expr="a+b",
-            map_expr="tag_arr[i] == 0 ? 1 : 0",
-            arguments="__global unsigned int *tag_arr"
-        )
+        align_particles_knl(inv_tag_arr, new_indices, num_real_particles,
+                            num_particles)
 
-        self.num_real_particles = int(num_particles_knl(tag_arr).get())
+        self.align(new_indices)
+
+        self.num_real_particles = int(num_real_particles.get())
 
     def remove_particles_bool(self, if_remove):
         """ Remove particle i if if_remove[i] is True
