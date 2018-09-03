@@ -384,8 +384,8 @@ class TestDeviceHelper(TestCase):
 
         # When
         pa.set_device_helper(h)
-        h.resize(5)
-        h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+        h.resize(4)
+        h.x.set(np.array([2.0, 3.0, 4.0, 5.0], h.x.dtype))
 
         indices = np.array([1, 2], dtype=np.uint32)
         indices = cl.array.to_device(get_queue(), indices)
@@ -393,7 +393,7 @@ class TestDeviceHelper(TestCase):
         h.remove_particles(indices)
 
         # Then
-        assert np.all(np.sort(h.x.get()) == np.array([2., 5., 6.]))
+        assert np.all(np.sort(h.x.get()) == np.array([2., 5.]))
 
     def test_remove_tagged_particles(self):
         # Given
