@@ -89,11 +89,11 @@ class CubicSpline(object):
 
         return val * fac
 
-    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
+    def sigmadwdq(self, rij=1.0, h=1.0):
         h1 = 1. / h
         q = rij * h1
 
-        # get the kernel normalizing factor
+        # get the kernel normalizing factor ( sigma )
         if self.dim == 1:
             fac = self.fac * h1
         elif self.dim == 2:
@@ -101,19 +101,29 @@ class CubicSpline(object):
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
 
-        # compute the gradient.
+        # compute sigma * dw_dq
         tmp2 = 2. - q
         if (rij > 1e-12):
             if (q > 2.0):
                 val = 0.0
             elif (q > 1.0):
-                val = -0.75 * tmp2 * tmp2 * h1 / rij
+                val = -0.75 * tmp2 * tmp2
             else:
-                val = -3.0 * q * (1 - 0.75 * q) * h1 / rij
+                val = -3.0 * q * (1 - 0.75 * q)
         else:
             val = 0.0
 
-        tmp = val * fac
+        return val * fac
+
+    def gradient(self, wdash=1., xij=[0., 0, 0], rij=1.0, h=1.0,
+                 grad=[0, 0, 0]):
+        h1 = 1. / h
+        # compute the gradient.
+        if (rij > 1e-12):
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]

@@ -232,18 +232,33 @@ def precomputed_symbols():
         WJ=0.0
     )
 
+    c.WDASHI = BasicCodeBlock(
+        code="WDASHI = SIGMADWDQ(RIJ, d_h[d_idx])",
+        WDASHI=0.0
+    )
+
+    c.WDASHJ = BasicCodeBlock(
+        code="WDASHJ = SIGMADWDQ(RIJ, s_h[s_idx])",
+        WDASHJ=0.0
+    )
+
+    c.WDASHIJ = BasicCodeBlock(
+        code="WDASHIJ = SIGMADWDQ(RIJ, HIJ)",
+        WDASHIJ=0.0
+    )
+
     c.DWIJ = BasicCodeBlock(
-        code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
+        code="GRADIENT(WDASHIJ, XIJ, RIJ, HIJ, DWIJ)",
         DWIJ=[0.0, 0.0, 0.0]
     )
 
     c.DWI = BasicCodeBlock(
-        code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
+        code="GRADIENT(WDASHI, XIJ, RIJ, d_h[d_idx], DWI)",
         DWI=[0.0, 0.0, 0.0]
     )
 
     c.DWJ = BasicCodeBlock(
-        code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
+        code="GRADIENT(WDASHJ, XIJ, RIJ, s_h[s_idx], DWJ)",
         DWJ=[0.0, 0.0, 0.0]
     )
 
@@ -675,13 +690,14 @@ class CythonGroup(Group):
     def _set_kernel(self, code, kernel):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
+            w_func = 'self.kernel.sigmadwdq'
             g_func = 'self.kernel.gradient'
             h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
             return code.replace('GRADIENT', g_func).replace(
                 'KERNEL', k_func
-            ).replace('GRADH', h_func)
+            ).replace('GRADH', h_func).replace('SIGMADWDQ', w_func)
         else:
             return code
 
