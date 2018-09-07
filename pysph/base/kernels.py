@@ -115,11 +115,11 @@ class CubicSpline(object):
 
         return val * fac
 
-    def gradient(self, wdash=1., xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -227,12 +227,12 @@ class WendlandQuinticC2_1D(object):
 
         return val * fac
 
-    def gradient(self, wdash=1., xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -335,12 +335,13 @@ class WendlandQuintic(object):
 
         return val * fac
 
-    def gradient(self, wdash=1., xij=[0., 0, 0], rij=1.0, h=1.0,
+    def gradient(self, xij=[0., 0, 0], rij=1.0, h=1.0,
                  grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -445,12 +446,12 @@ class WendlandQuinticC4_1D(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -556,12 +557,12 @@ class WendlandQuinticC4(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -670,11 +671,11 @@ class WendlandQuinticC6_1D(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -781,11 +782,11 @@ class WendlandQuinticC6(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -897,12 +898,12 @@ class Gaussian(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -1003,11 +1004,11 @@ class SuperGaussian(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0
@@ -1145,12 +1146,12 @@ class QuinticSpline(object):
 
         return val * fac
 
-    def gradient(self, wdash=1.0, xij=[0., 0, 0], rij=1.0, h=1.0,
-                 grad=[0, 0, 0]):
+    def gradient(self, xij=[0., 0., 0.], rij=1.0, h=1.0, grad=[0, 0, 0]):
         h1 = 1. / h
 
         # compute the gradient.
         if (rij > 1e-12):
+            wdash = self.sigmadwdq(rij, h)
             tmp = wdash * h1 / rij
         else:
             tmp = 0.0

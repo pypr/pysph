@@ -248,17 +248,17 @@ def precomputed_symbols():
     )
 
     c.DWIJ = BasicCodeBlock(
-        code="GRADIENT(WDASHIJ, XIJ, RIJ, HIJ, DWIJ)",
+        code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
         DWIJ=[0.0, 0.0, 0.0]
     )
 
     c.DWI = BasicCodeBlock(
-        code="GRADIENT(WDASHI, XIJ, RIJ, d_h[d_idx], DWI)",
+        code="GRADIENT(XIJ, RIJ, d_h[d_idx], DWI)",
         DWI=[0.0, 0.0, 0.0]
     )
 
     c.DWJ = BasicCodeBlock(
-        code="GRADIENT(WDASHJ, XIJ, RIJ, s_h[s_idx], DWJ)",
+        code="GRADIENT(XIJ, RIJ, s_h[s_idx], DWJ)",
         DWJ=[0.0, 0.0, 0.0]
     )
 
