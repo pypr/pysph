@@ -233,17 +233,17 @@ def precomputed_symbols():
     )
 
     c.WDASHI = BasicCodeBlock(
-        code="WDASHI = SIGMADWDQ(RIJ, d_h[d_idx])",
+        code="WDASHI = DWDQ(RIJ, d_h[d_idx])",
         WDASHI=0.0
     )
 
     c.WDASHJ = BasicCodeBlock(
-        code="WDASHJ = SIGMADWDQ(RIJ, s_h[s_idx])",
+        code="WDASHJ = DWDQ(RIJ, s_h[s_idx])",
         WDASHJ=0.0
     )
 
     c.WDASHIJ = BasicCodeBlock(
-        code="WDASHIJ = SIGMADWDQ(RIJ, HIJ)",
+        code="WDASHIJ = DWDQ(RIJ, HIJ)",
         WDASHIJ=0.0
     )
 
@@ -690,14 +690,14 @@ class CythonGroup(Group):
     def _set_kernel(self, code, kernel):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
-            w_func = 'self.kernel.sigmadwdq'
+            w_func = 'self.kernel.dwdq'
             g_func = 'self.kernel.gradient'
             h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
             return code.replace('GRADIENT', g_func).replace(
                 'KERNEL', k_func
-            ).replace('GRADH', h_func).replace('SIGMADWDQ', w_func)
+            ).replace('GRADH', h_func).replace('DWDQ', w_func)
         else:
             return code
 
