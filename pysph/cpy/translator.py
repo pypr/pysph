@@ -294,7 +294,8 @@ class CConverter(ast.NodeVisitor):
         if len(node.targets) != 1:
             self.error("Assignments can have only one target.", node)
         left, right = node.targets[0], node.value
-        if isinstance(right, ast.Call) and right.func.id == 'declare':
+        if isinstance(right, ast.Call) and \
+           isinstance(right.func, ast.Name) and right.func.id == 'declare':
             if not isinstance(right.args[0], ast.Str):
                 self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
