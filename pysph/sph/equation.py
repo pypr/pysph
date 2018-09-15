@@ -417,7 +417,7 @@ class Group(object):
     pre_comp = precomputed_symbols()
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
-                 max_iterations=1, min_iterations=0):
+                 max_iterations=1, min_iterations=0, pre=None, post=None):
         """Constructor.
 
         Parameters
@@ -446,6 +446,14 @@ class Group(object):
             specifies the minimum number of times this group should be
             iterated.
 
+        pre: callable
+            A callable which is passed no arguments that is called before
+            anything in the group is executed.
+
+        pre: callable
+            A callable which is passed no arguments that is called after
+            the group is completed.
+
         Notes
         -----
 
@@ -465,6 +473,8 @@ class Group(object):
         self.iterate = iterate
         self.max_iterations = max_iterations
         self.min_iterations = min_iterations
+        self.pre = pre
+        self.post = post
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
