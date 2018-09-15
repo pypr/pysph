@@ -462,7 +462,6 @@ class TestAccelerationEval1D(unittest.TestCase):
         self.assertListEqual(list(pa.u), list(expect))
 
 
-
 class EqWithTime(Equation):
     def initialize(self, d_idx, d_au, t, dt):
         d_au[d_idx] = t + dt
@@ -768,3 +767,33 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         # both are called.
         pa.gpu.pull('rho')
         self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
+
+    def test_should_call_pre_post_functions_in_group_on_gpu(self):
+        # Given
+        pa = self.pa
+
+        def pre():
+            pa.m += 1.0
+            pa.gpu.push('m')
+
+        def post():
+            pa.gpu.pull('u')
+            pa.u += 1.0
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                pre=pre, post=post
+
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11.,  9.,  7.])
+        self.assertListEqual(list(pa.u), list(expect))
