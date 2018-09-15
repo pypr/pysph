@@ -180,6 +180,7 @@ cdef class GPUNNPS(NNPSBase):
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
+        self._last_domain_size = 0.0
 
         # Set the device helper if needed.
         for pa in particles:
@@ -253,6 +254,7 @@ cdef class GPUNNPS(NNPSBase):
         """Compute coordinate bounds for the particles"""
         cdef list pa_wrappers = self.pa_wrappers
         cdef NNPSParticleArrayWrapper pa_wrapper
+        cdef double domain_size
         xmax = -self.dtype_max
         ymax = -self.dtype_max
         zmax = -self.dtype_max
@@ -283,6 +285,19 @@ cdef class GPUNNPS(NNPSBase):
         lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
         xmin -= lx*0.01; ymin -= ly*0.01; zmin -= lz*0.01
         xmax += lx*0.01; ymax += ly*0.01; zmax += lz*0.01
+
+        domain_size = fmax(lx, ly)
+        domain_size = fmax(domain_size, lz)
+        if self._last_domain_size > 1e-16 and \
+           domain_size > 2.0*self._last_domain_size:
+            msg = (
+                '*'*70 +
+                '\nWARNING: Domain size has increased by a large amount.\n' +
+                'Particles are probably diverging, please check your code!\n' +
+                '*'*70
+            )
+            print(msg)
+            self._last_domain_size = domain_size
 
         # If all of the dimensions have very small extent give it a unit size.
         _eps = 1e-12
