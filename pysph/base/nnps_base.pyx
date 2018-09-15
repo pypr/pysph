@@ -1127,6 +1127,7 @@ cdef class NNPS(NNPSBase):
         # min and max coordinate values
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
+        self._last_domain_size = 0.0
 
         # The cache.
         self.use_cache = cache
@@ -1200,7 +1201,7 @@ cdef class NNPS(NNPSBase):
         cdef DoubleArray x, y, z
         cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
         cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
-        cdef double lx, ly, lz
+        cdef double lx, ly, lz, domain_size
 
         for pa_wrapper in pa_wrappers:
             x = pa_wrapper.x
@@ -1224,6 +1225,19 @@ cdef class NNPS(NNPSBase):
         lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
         xmin -= lx*0.01; ymin -= ly*0.01; zmin -= lz*0.01
         xmax += lx*0.01; ymax += ly*0.01; zmax += lz*0.01
+
+        domain_size = fmax(lx, ly)
+        domain_size = fmax(domain_size, lz)
+        if self._last_domain_size > 1e-16 and \
+           domain_size > 2.0*self._last_domain_size:
+            msg = (
+                '*'*70 +
+                '\nWARNING: Domain size has increased by a large amount.\n' +
+                'Particles are probably diverging, please check your code!\n' +
+                '*'*70
+            )
+            print(msg)
+        self._last_domain_size = domain_size
 
         # If all of the dimensions have very small extent give it a unit size.
         cdef double _eps = 1e-12
