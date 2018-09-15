@@ -8,6 +8,12 @@ ${' '*4*level}${l}
 
 <%def name="do_group(helper, group, level=0)" buffered="True">
 #######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+${indent(helper.get_pre_call(group), 0)}
+% endif
+#######################################################################
 ## Iterate over destinations in this group.
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
@@ -113,6 +119,12 @@ nnps.update()
 % endif
 
 % endfor
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+${indent(helper.get_post_call(group), 0)}
+% endif
 </%def>
 
 from libc.stdio cimport printf
@@ -179,11 +191,13 @@ cdef class AccelerationEval:
     cdef void **nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
+    cdef object groups
     ${indent(helper.get_kernel_defs(), 1)}
     ${indent(helper.get_equation_defs(), 1)}
 
-    def __init__(self, kernel, equations, particle_arrays):
+    def __init__(self, kernel, equations, particle_arrays, groups):
         self.particle_arrays = tuple(particle_arrays)
+        self.groups = groups
         self.n_threads = get_number_of_threads()
         cdef int i
         for i, pa in enumerate(particle_arrays):

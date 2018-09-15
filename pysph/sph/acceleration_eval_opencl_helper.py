@@ -191,6 +191,9 @@ class OpenCLAccelerationEval(object):
                     method(_args[0], _args[1], t, dt)
                 else:
                     method(*info.get('args'))
+            elif type == 'call':
+                func = info.get('callable')
+                func(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -353,7 +356,8 @@ class AccelerationEvalOpenCLHelper(object):
                     args[0] = [x for x in grp.equations
                                if hasattr(x, 'reduce')]
                     args[1] = self._array_map[args[1]]
-
+            elif type == 'call':
+                info = dict(item)
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -562,6 +566,12 @@ class AccelerationEvalOpenCLHelper(object):
             return code.replace('KERNEL(', kern).replace('GRADH(', grad_h)
         else:
             return code
+
+    def call_post(self, group):
+        self.data.append(dict(callable=group.post, type='call', args=()))
+
+    def call_pre(self, group):
+        self.data.append(dict(callable=group.pre, type='call', args=()))
 
     def call_reduce(self, all_eq_group, dest):
         self.data.append(dict(method='do_reduce', type='method',

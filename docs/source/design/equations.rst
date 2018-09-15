@@ -407,6 +407,29 @@ The trace function effectively is converted into a function with signature
 ``double trace(double* x, int nx)`` and thus can be called with any
 one-dimensional array.
 
+Calling arbitrary Python functions from a Group
+------------------------------------------------
+
+Sometimes, you may need to implement something that is hard to write (at least
+initially) with the constraints that PySPH places. For example if you need to
+implement an algorithm that requires more complex data structures and you want
+to do it easily in Python. There are ways to call arbitrary Python code from
+the application already but sometimes you need to do this during every
+acceleration evaluation. To support this the :py:class:`Group` class supports
+two additional keyword arguments called ``pre`` and ``post``. These can be any
+Python callable that take no arguments. Any callable passed as ``pre`` will be
+called *before* any equation related code is executed and ``post`` will be
+executed after the entire group is finished. If the group is iterated, it
+should call those functions repeatedly.
+
+Now these functions are pure Python functions so you may choose to do anything
+in them. These are not called within an OpenMP context and if you are using
+the OpenCL or CUDA backends again this will simply be a Python function call
+that has nothing to do with the particular backend. However, since it is
+arbitrary Python, you can choose to implement the code using any approach you
+choose to do. This should be flexible enough to customize PySPH greatly.
+
+
 
 Examples to study
 ------------------

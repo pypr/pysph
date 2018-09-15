@@ -101,7 +101,7 @@ class MegaGroup(object):
         return self._orig_group.get_converged_condition()
 
     def _copy_props(self, group):
-        for key in ('real', 'update_nnps', 'iterate',
+        for key in ('real', 'update_nnps', 'iterate', 'pre', 'post',
                     'max_iterations', 'min_iterations', 'has_subgroups'):
             setattr(self, key, getattr(group, key))
 
