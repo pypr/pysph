@@ -37,7 +37,7 @@ cdef class BaseArray:
     cdef public long length, alloc
     cdef np.ndarray _npy_array
 
-    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_align_array(self, LongArray new_indices, int stride=*) nogil
     cdef void c_reserve(self, long size) nogil
     cdef void c_reset(self) nogil
     cdef void c_resize(self, long size) nogil
@@ -48,14 +48,14 @@ cdef class BaseArray:
     cpdef np.ndarray get_npy_array(self)
     cpdef set_data(self, np.ndarray)
     cpdef squeeze(self)
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=*, int stride=*)
     cpdef extend(self, np.ndarray in_array)
     cpdef reset(self)
 
-    cpdef align_array(self, LongArray new_indices)
+    cpdef align_array(self, LongArray new_indices, int stride=*)
     cpdef str get_c_type(self)
-    cpdef copy_values(self, LongArray indices, BaseArray dest)
-    cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*)
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=*)
+    cpdef copy_subset(self, BaseArray source, long start_index=*, long end_index=*, int stride=*)
     cpdef update_min_max(self)
 
 % for ARRAY_TYPE, CLASSNAME, NUMPY_TYPENAME in type_info:
@@ -70,7 +70,7 @@ cdef class ${CLASSNAME}(BaseArray):
     cdef ${CLASSNAME} _parent
 
     cdef _setup_npy_array(self)
-    cdef void c_align_array(self, LongArray new_indices) nogil
+    cdef void c_align_array(self, LongArray new_indices, int stride=*) nogil
     cdef void c_append(self, ${ARRAY_TYPE} value) nogil
     cdef void c_set_view(self, ${ARRAY_TYPE} *array, long length) nogil
     cdef ${ARRAY_TYPE}* get_data_ptr(self)
@@ -84,7 +84,7 @@ cdef class ${CLASSNAME}(BaseArray):
     cpdef set_data(self, np.ndarray)
     cpdef set_view(self, ${CLASSNAME}, long start, long end)
     cpdef squeeze(self)
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=*)
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=*, int stride=*)
     cpdef extend(self, np.ndarray in_array)
     cpdef reset(self)
     cpdef long index(self, ${ARRAY_TYPE} value)

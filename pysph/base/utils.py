@@ -416,6 +416,7 @@ def get_particles_info(particles):
             prop_info[prop_name] = {
                 'name': prop_name, 'type': prop.get_c_type(),
                 'default': parray.default_values[prop_name],
+                'stride': parray.stride.get(prop_name, 1),
                 'data': None}
         const_info = {}
         if parray.gpu is not None:
