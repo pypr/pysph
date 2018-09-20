@@ -1,13 +1,45 @@
 """Tests for the PySPH parallel module"""
 
-import os
 import shutil
 import tempfile
 import unittest
+
+import numpy as np
 from pytest import mark, importorskip
 from pysph.tools import run_parallel_script
 
 path = run_parallel_script.get_directory(__file__)
+
+
+class ParticleArrayTestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        importorskip("pysph.parallel.parallel_manager")
+
+    def test_get_strided_indices(self):
+        # Given
+        from pysph.parallel.parallel_manager import get_strided_indices
+
+        indices = np.array([1, 5, 3])
+
+        # When
+        idx = get_strided_indices(indices, 1)
+        # Then
+        np.testing.assert_array_equal(idx, indices)
+
+        # When
+        idx = get_strided_indices(indices, 2)
+        # Then
+        np.testing.assert_array_equal(
+            idx, [2, 3, 10, 11, 6, 7]
+        )
+
+        # When
+        idx = get_strided_indices(indices, 3)
+        # Then
+        np.testing.assert_array_equal(
+            idx, [3, 4, 5, 15, 16, 17, 9, 10, 11]
+        )
 
 
 class ParticleArrayExchangeTestCase(unittest.TestCase):

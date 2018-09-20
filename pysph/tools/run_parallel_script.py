@@ -46,8 +46,8 @@ def run(filename, args=None, nprocs=2, timeout=30.0, path=None):
     retcode = process.returncode
     if retcode:
         msg = 'test ' + filename + ' failed with returncode ' + str(retcode)
-        print(out)
-        print(err)
+        print(out.decode('utf-8'))
+        print(err.decode('utf-8'))
         print('#'*80)
         print(msg)
         print('#'*80)
