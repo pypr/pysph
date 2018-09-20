@@ -22,6 +22,11 @@ from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
                            get_symbols)
 
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
+
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
     i.e. camel_case.
@@ -346,7 +351,7 @@ def get_arrays_used_in_equation(equation):
     for meth_name in ('initialize', 'loop', 'loop_all', 'post_loop'):
         meth = getattr(equation, meth_name, None)
         if meth is not None:
-            args = inspect.getargspec(meth).args
+            args = getfullargspec(meth).args
             s, d = get_array_names(args)
             src_arrays.update(s)
             dest_arrays.update(d)
@@ -357,7 +362,7 @@ def get_init_args(obj, method, ignore=None):
     """Return the arguments for the method given, typically an __init__.
     """
     ignore = ignore if ignore is not None else []
-    spec = inspect.getargspec(method)
+    spec = getfullargspec(method)
     keys = [k for k in spec.args[1:] if k not in ignore and k in obj.__dict__]
     args = ['%s=%r' % (k, getattr(obj, k)) for k in keys]
     return args
@@ -516,7 +521,7 @@ class Group(object):
         all_args = set()
         for equation in self.equations:
             if hasattr(equation, 'loop'):
-                args = inspect.getargspec(equation.loop).args
+                args = getfullargspec(equation.loop).args
                 all_args.update(args)
         all_args.discard('self')
 
@@ -682,7 +687,7 @@ class CythonGroup(Group):
         for eq in self.equations:
             meth = getattr(eq, kind, None)
             if meth is not None:
-                args = inspect.getargspec(meth).args
+                args = getfullargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
                 if 'SPH_KERNEL' in args:
