@@ -30,12 +30,6 @@ try:
 except ImportError:
     ocl = None
 
-# Parallel imports
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
-
 # Maximum value of an unsigned int
 cdef extern from "limits.h":
     cdef unsigned int UINT_MAX
@@ -1383,101 +1377,6 @@ cdef class ParticleArray:
             stride = self.stride.get(prop, 1)
             array.resize(size*stride)
 
-    ######################################################################
-    # Parallel interface
-    ######################################################################
-    def Send(self, int recv_proc, props=None) :
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nprocs = comm.Get_size()
-        if rank < 10 :
-            rank_str = '0' + str(rank)
-        else :
-            rank_str = str(rank)
-        if recv_proc < 10 :
-            recv_proc_str = '0' + str(recv_proc)
-        else :
-            recv_proc_str = str(recv_proc)
-        pre_tag = str(1) + rank_str + recv_proc_str
-        tag_count = 0
-        if recv_proc < nprocs :
-            datasize = numpy.zeros(1)
-            for prop in props :
-                if self.properties.has_key(prop) :
-                    datasize[0] = len(self.properties[prop])
-                else :
-                    props.remove(prop)
-            if datasize[0] != 0 and len(props) != 0 :
-                prop_count = numpy.zeros(1)
-                prop_count[0] = len(props)
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(prop_count, recv_proc, tag=tag)
-                tag_count+=1
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(datasize, recv_proc, tag=tag)
-                tag_count+=1
-                prop_len = numpy.zeros(len(props))
-                i = 0
-                for prop in props :
-                    prop_len[i] = len(prop)
-                    i+=1
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(prop_len, recv_proc, tag=tag)
-                tag_count+=1
-                for prop in props :
-                    prop_char = numpy.zeros(len(prop), dtype=numpy.character)
-                    prop_char[0:] = list(prop)
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Send([prop_char, MPI.CHARACTER], recv_proc, tag=tag)
-                    tag_count+=1
-                for prop in props :
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Send(self.get(prop), recv_proc, tag=tag)
-                    tag_count+=1
-
-    def Receive(self, int send_proc) :
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nprocs = comm.Get_size()
-        if rank < 10 :
-            rank_str = '0' + str(rank)
-        else :
-            rank_str = str(rank)
-        if send_proc < 10 :
-            send_proc_str = '0' + str(send_proc)
-        else :
-            send_proc_str = str(send_proc)
-        pre_tag = str(1) + send_proc_str + rank_str
-        tag_count = 0
-        recv_props = {}
-        props = []
-        if send_proc < nprocs :
-            prop_count = numpy.zeros(1)
-            tag = int(pre_tag + str(tag_count))
-            comm.Recv(prop_count, send_proc, tag=tag)
-            tag_count+=1
-            datasize = numpy.zeros(1)
-            tag = int(pre_tag + str(tag_count))
-            comm.Recv(datasize, send_proc, tag=tag)
-            tag_count+=1
-            if datasize[0] != 0 and prop_count[0] != 0 :
-                prop_len = numpy.zeros(int(prop_count[0]))
-                tag = int(pre_tag + str(tag_count))
-                comm.Recv(prop_len, send_proc, tag=tag)
-                tag_count+=1
-                for i in range(int(prop_count[0])) :
-                    prop_char = numpy.zeros(int(prop_len[i]), dtype=numpy.character)
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Recv([prop_char, MPI.CHARACTER], send_proc, tag=tag)
-                    tag_count+=1
-                    prop = "".join(prop_char)
-                    props.append(prop)
-                    recv_props[prop] = numpy.zeros(int(datasize[0]))
-                for prop in props :
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Recv(recv_props[prop], send_proc, tag=tag)
-                    tag_count+=1
-                self.add_particles(**recv_props)
 
 # End of ParticleArray class
 ##############################################################################

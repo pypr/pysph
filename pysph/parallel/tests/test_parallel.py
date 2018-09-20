@@ -1,6 +1,5 @@
 """Tests for the PySPH parallel module"""
 
-
 import os
 import shutil
 import tempfile
@@ -8,12 +7,10 @@ import unittest
 from pytest import mark, importorskip
 from pysph.tools import run_parallel_script
 
-
 path = run_parallel_script.get_directory(__file__)
 
 
 class ParticleArrayExchangeTestCase(unittest.TestCase):
-
     @classmethod
     def setup_class(cls):
         importorskip("mpi4py.MPI")
@@ -25,11 +22,12 @@ class ParticleArrayExchangeTestCase(unittest.TestCase):
 
     @mark.parallel
     def test_remote_exchange(self):
-        run_parallel_script.run(filename='remote_exchange.py', nprocs=4, path=path)
+        run_parallel_script.run(
+            filename='remote_exchange.py', nprocs=4, path=path
+        )
 
 
 class SummationDensityTestCase(unittest.TestCase):
-
     @classmethod
     def setup_class(cls):
         importorskip("mpi4py.MPI")
@@ -38,12 +36,12 @@ class SummationDensityTestCase(unittest.TestCase):
     @mark.slow
     @mark.parallel
     def test_summation_density(self):
-        run_parallel_script.run(filename='summation_density.py', nprocs=4,
-                                path=path)
+        run_parallel_script.run(
+            filename='summation_density.py', nprocs=4, path=path
+        )
 
 
 class MPIReduceArrayTestCase(unittest.TestCase):
-
     @classmethod
     def setup_class(cls):
         importorskip("mpi4py.MPI")
@@ -63,14 +61,13 @@ class MPIReduceArrayTestCase(unittest.TestCase):
 
     @mark.parallel
     def test_parallel_reduce(self):
-        args = ['--directory=%s'%self.root]
+        args = ['--directory=%s' % self.root]
         run_parallel_script.run(
             filename='simple_reduction.py', args=args, nprocs=4, path=path
         )
 
 
 class DumpLoadTestCase(unittest.TestCase):
-
     @classmethod
     def setup_class(cls):
         importorskip("mpi4py.MPI")
