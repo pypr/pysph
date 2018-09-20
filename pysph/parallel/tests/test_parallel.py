@@ -12,7 +12,7 @@ path = run_parallel_script.get_directory(__file__)
 
 class ParticleArrayExchangeTestCase(unittest.TestCase):
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 
@@ -29,7 +29,7 @@ class ParticleArrayExchangeTestCase(unittest.TestCase):
 
 class SummationDensityTestCase(unittest.TestCase):
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 
@@ -43,7 +43,7 @@ class SummationDensityTestCase(unittest.TestCase):
 
 class MPIReduceArrayTestCase(unittest.TestCase):
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 
@@ -69,7 +69,7 @@ class MPIReduceArrayTestCase(unittest.TestCase):
 
 class DumpLoadTestCase(unittest.TestCase):
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 

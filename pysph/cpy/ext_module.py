@@ -89,7 +89,7 @@ class ExtModule(object):
         )
         self.extra_link_args = extra_link_args if extra_link_args else []
 
-        if MPI is not None:
+        if MPI is not None and MPI.Is_initialized():
             self.comm = MPI.COMM_WORLD
             self.rank = self.comm.Get_rank()
             self.num_procs = self.comm.Get_size()
@@ -249,7 +249,7 @@ class ExtModule(object):
                     shutil.copy(mod, self.ext_path)
                 else:
                     self._message("Precompiled code from:", self.src_path)
-        if MPI is not None:
+        if MPI is not None and MPI.Is_initialized():
             self.comm.barrier()
 
     def load(self):
