@@ -18,7 +18,6 @@ from .transpiler import Transpiler, convert_to_float_if_needed
 from .array import Array, get_backend
 from .types import dtype_to_ctype
 
-
 elementwise_cy_template = '''
 from cython.parallel import parallel, prange
 
@@ -76,7 +75,7 @@ cdef ${type} c_${name}(${c_arg_sig}):
     cdef ${type}* buffer
     buffer = <${type}*>malloc(n_thread*stride*sz)
     if buffer == NULL:
-        abort()
+        raise MemoryError("Unable to allocate memory for reduction")
 
 %if openmp:
     with nogil, parallel():
@@ -106,6 +105,272 @@ cdef ${type} c_${name}(${c_arg_sig}):
 cpdef py_${name}(${py_arg_sig}):
     return c_${name}(${py_args})
 '''
+
+scan_cy_template = '''
+from cython.parallel import parallel, prange, threadid
+from libc.stdlib cimport abort, malloc, free
+cimport openmp
+cimport numpy as np
+cpdef int get_number_of_threads():
+    % if openmp:
+        cdef int i, n
+        with nogil, parallel():
+            for i in prange(1):
+                n = openmp.omp_get_num_threads()
+        return n
+    % else:
+        return 1
+    % endif
+
+cdef int gcd(int a, int b):
+    while b != 0:
+        a, b = b, a % b
+    return a
+
+cdef int get_stride(int sz, int itemsize):
+    return sz / gcd(sz, itemsize)
+
+
+cdef void c_${name}(${c_arg_sig}):
+    cdef int i, n_thread, tid, stride, sz, N
+
+    N = SIZE
+    n_thread = get_number_of_threads()
+    sz = sizeof(${type})
+
+    # This striding is to do 64 bit alignment to prevent false sharing.
+    stride = get_stride(64, sz)
+
+    cdef ${type}* buffer
+    buffer = <${type}*> malloc(n_thread * stride * sz)
+
+    if buffer == NULL:
+        raise MemoryError("Unable to allocate memory for scan.")
+
+    % if use_segment:
+    cdef int* scan_seg_flags
+    cdef int* chunk_new_segment
+    scan_seg_flags = <int*> malloc(SIZE * sizeof(int))
+    chunk_new_segment = <int*> malloc(n_thread * stride * sizeof(int))
+
+    if scan_seg_flags == NULL or chunk_new_segment == NULL:
+        raise MemoryError("Unable to allocate memory for segmented scan")
+    % endif
+
+    % if complex_map:
+    cdef ${type}* map_output
+    map_output = <${type}*> malloc(SIZE * sz)
+
+    if map_output == NULL:
+        raise MemoryError("Unable to allocate memory for scan. (Recommended:
+        Set complex_map=False.)")
+    % endif
+
+
+    cdef int buffer_idx, start, end, has_segment
+    cdef ${type} a, b, temp
+    # This chunksize would divide input data equally
+    # between threads
+    % if not calc_last_item:
+    # A chunk of 1 MB per thread
+    cdef int chunksize = 1048576 / sz
+    % else:
+    # Process all data together. Only then can we get
+    # the last item immediately
+    cdef int chunksize = (SIZE + n_thread - 1) // n_thread
+    % endif
+
+    cdef int offset = 0
+    cdef ${type} global_carry = ${neutral}
+    cdef ${type} last_item
+    cdef ${type} carry, item, prev_item
+
+    while offset < SIZE:
+        # Pass 1
+        with nogil, parallel():
+            tid = threadid()
+            buffer_idx = tid * stride
+
+            start = offset + tid * chunksize
+            end = offset + min((tid + 1) * chunksize, SIZE)
+            has_segment = 0
+
+            temp = ${neutral}
+            for i in range(start, end):
+
+                % if use_segment:
+                # Generate segment flags
+                scan_seg_flags[i] = ${is_segment_start_expr}
+                if (scan_seg_flags[i]):
+                    has_segment = 1
+                % endif
+
+                # Carry
+                % if use_segment:
+                if (scan_seg_flags[i]):
+                    a = ${neutral}
+                else:
+                    a = temp
+                % else:
+                a = temp
+                % endif
+
+                # Map
+                b = ${input_expr}
+                % if complex_map:
+                map_output[i] = b
+                % endif
+
+                # Scan
+                temp = ${scan_expr}
+
+            buffer[buffer_idx] = temp
+            % if use_segment:
+            chunk_new_segment[buffer_idx] = has_segment
+            % endif
+
+        # Pass 2: Aggregate chunks
+        # Add previous carry to buffer[0]
+        % if use_segment:
+        if chunk_new_segment[0]:
+            a = ${neutral}
+        else:
+            a = global_carry
+        b = buffer[0]
+        % else:
+        a = global_carry
+        b = buffer[0]
+        % endif
+        buffer[0] = ${scan_expr}
+
+        for i in range(n_thread - 1):
+            % if use_segment:
+
+            # With segmented scan
+            if chunk_new_segment[(i + 1) * stride]:
+                a = ${neutral}
+            else:
+                a = buffer[i * stride]
+            b = buffer[(i + 1) * stride]
+            buffer[(i + 1) * stride] = ${scan_expr}
+
+            % else:
+
+            # Without segmented scan
+            a = buffer[i * stride]
+            b = buffer[(i + 1) * stride]
+            buffer[(i + 1) * stride] = ${scan_expr}
+
+            % endif
+
+        last_item = buffer[(n_thread - 1) * stride]
+
+        # Shift buffer to right by 1 unit
+        for i in range(n_thread - 1, 0, -1):
+            buffer[i * stride] = buffer[(i - 1) * stride]
+
+        buffer[0] = global_carry
+        global_carry = last_item
+
+        # Pass 3: Output
+        with nogil, parallel():
+            tid = threadid()
+            buffer_idx = tid * stride
+            carry = buffer[buffer_idx]
+
+            start = offset + tid * chunksize
+            end = offset + min((tid + 1) * chunksize, SIZE)
+
+            for i in range(start, end):
+                # Output
+                % if use_segment:
+                if scan_seg_flags[i]:
+                    a = ${neutral}
+                else:
+                    a = carry
+                % else:
+                a = carry
+                % endif
+
+                % if complex_map:
+                b = map_output[i]
+                % else:
+                b = ${input_expr}
+                % endif
+
+                % if calc_prev_item:
+                prev_item = carry
+                % endif
+
+                carry = ${scan_expr}
+                item = carry
+
+                ${output_expr}
+        offset += chunksize * n_thread
+
+    # Clean up
+    free(buffer)
+
+    % if use_segment:
+    free(scan_seg_flags)
+    free(chunk_new_segment)
+    % endif
+
+    % if complex_map:
+    free(map_output)
+    % endif
+
+cpdef py_${name}(${py_arg_sig}):
+    return c_${name}(${py_args})
+'''
+
+# No support for last_item in single thread
+scan_cy_single_thread_template = '''
+from cython.parallel import parallel, prange, threadid
+from libc.stdlib cimport abort, malloc, free
+cimport openmp
+cimport numpy as np
+
+cdef void c_${name}(${c_arg_sig}):
+    cdef int i, N, across_seg_boundary
+    cdef ${type} a, b, item
+    N = SIZE
+
+    a = ${neutral}
+
+    for i in range(N):
+        # Segment operation
+        % if use_segment:
+        across_seg_boundary = ${is_segment_start_expr}
+        if across_seg_boundary:
+            a = ${neutral}
+        % endif
+
+        # Map
+        b = ${input_expr}
+
+        % if calc_prev_item:
+        prev_item = a
+        % endif
+
+        # Scan
+        a = ${scan_expr}
+        item = a
+
+        # Output
+        ${output_expr}
+
+cpdef py_${name}(${py_arg_sig}):
+    return c_${name}(${py_args})
+'''
+
+
+def drop_duplicates(arr):
+    result = []
+    for x in arr:
+        if x not in result:
+            result.extend([x])
+    return result
 
 
 class Elementwise(object):
@@ -191,7 +456,6 @@ class Elementwise(object):
             )
             self.c_func = knl
 
-
     def _correct_opencl_address_space(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
         header_idx = 1
@@ -205,13 +469,14 @@ class Elementwise(object):
                 return 'GLOBAL_MEM ' + arg
             else:
                 return arg
+
         args = [_add_address_space(arg) for arg in c_data[0]]
         code[:header_idx] = wrap(
             'WITHIN_KERNEL void {func}({args})'.format(
                 func=self.func.__name__,
                 args=', '.join(args)
             ),
-            width=78, subsequent_indent=' '*4, break_long_words=False
+            width=78, subsequent_indent=' ' * 4, break_long_words=False
         )
         self.tp.blocks[-1].code = '\n'.join(code)
 
@@ -241,6 +506,7 @@ class Elementwise(object):
 def elementwise(func=None, backend=None):
     def _wrapper(function):
         return wraps(function)(Elementwise(function, backend=backend))
+
     if func is None:
         return _wrapper
     else:
@@ -381,7 +647,6 @@ class Reduction(object):
             )
             self.c_func = knl
 
-
     def _correct_return_type(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
         code[0] = "cdef inline {type} {name}({args}) nogil:".format(
@@ -410,7 +675,7 @@ class Reduction(object):
                 func=self.func.__name__,
                 args=', '.join(args)
             ),
-            width=78, subsequent_indent=' '*4, break_long_words=False
+            width=78, subsequent_indent=' ' * 4, break_long_words=False
         )
         self.tp.blocks[-1].code = '\n'.join(code)
 
@@ -440,14 +705,21 @@ class Reduction(object):
 
 
 class Scan(object):
-    def __init__(self, input, output, scan_expr, is_segment=None,
-                 dtype=np.float64, neutral='0', backend='opencl'):
+    def __init__(self, input=None, output=None, scan_expr="a+b",
+                 is_segment=None, dtype=np.float64, neutral='0',
+                 complex_map=False,
+                 backend='opencl'):
         backend = get_backend(backend)
+        if backend not in ['opencl', 'cython']:
+            raise NotImplementedError("Unsupported backend: %s. Supported "
+                                      "backends: cython, opencl" %
+                                      backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.input_func = input
         self.output_func = output
         self.is_segment_func = is_segment
+        self.complex_map = complex_map
         if input is not None:
             self.name = 'scan_' + input.__name__
         else:
@@ -455,13 +727,11 @@ class Scan(object):
         self.scan_expr = scan_expr
         self.dtype = dtype
         self.type = dtype_to_ctype(dtype)
+        self.arg_keys = None
         if backend == 'cython':
             # On Windows, INFINITY is not defined so we use INFTY which we
             # internally define.
             self.neutral = neutral.replace('INFINITY', 'INFTY')
-            raise NotImplementedError(
-                'Scan not supported for Cython backend.'
-            )
         else:
             self.neutral = neutral
         self._config = get_config()
@@ -469,7 +739,149 @@ class Scan(object):
         self.queue = None
         self._generate()
 
-    def _wrap_ocl_function(self, func):
+    def _correct_return_type(self, c_data, modifier):
+        code = self.tp.blocks[-1].code.splitlines()
+        code[0] = "cdef inline {type} {name}_{modifier}({args}) nogil:".format(
+            type=self.type, name=self.name, modifier=modifier,
+            args=', '.join(c_data[0])
+        )
+        self.tp.blocks[-1].code = '\n'.join(code)
+
+    def _include_prev_item(self):
+        if 'prev_item' in self.tp.blocks[-1].code:
+            return True
+        else:
+            return False
+
+    def _include_last_item(self):
+        if 'last_item' in self.tp.blocks[-1].code:
+            return True
+        else:
+            return False
+
+    def _ignore_arg(self, arg_name):
+        if arg_name in ['item', 'prev_item', 'last_item', 'i', 'N']:
+            return True
+        return False
+
+    def _num_ignore_args(self, c_data):
+        result = 0
+        for arg_name in c_data[1][:]:
+            if self._ignore_arg(arg_name):
+                result += 1
+            else:
+                break
+        return result
+
+    def _generate(self):
+        if self.backend == 'opencl':
+            self._generate_opencl_code()
+        elif self.backend == 'cython':
+            self._generate_cython_code()
+
+    def _default_cython_input_function(self):
+        py_data = (['int i', '{type}[:] input'.format(type=self.type)],
+                   ['i', '&input[0]'])
+        c_data = (['int i', '{type}* input'.format(type=self.type)],
+                  ['i', 'input'])
+        input_expr = 'input[i]'
+        return py_data, c_data, input_expr
+
+    def _wrap_cython_code(self, func, func_type=None):
+        name = self.name
+        if func is not None:
+            self.tp.add(func)
+            py_data, c_data = self.cython_gen.get_func_signature(func)
+            self._correct_return_type(c_data, func_type)
+
+            cargs = ', '.join(c_data[1])
+            expr = '{name}_{modifier}({cargs})'.format(name=name, cargs=cargs,
+                                                       modifier=func_type)
+        else:
+            if func_type is 'input':
+                py_data, c_data, expr = self._default_cython_input_function()
+            else:
+                py_data, c_data, expr = [], [], None
+
+        return py_data, c_data, expr
+
+    def _append_cython_arg_data(self, all_py_data, all_c_data, py_data,
+                                c_data):
+        if len(c_data) > 0:
+            n_ignore = self._num_ignore_args(c_data)
+            all_py_data[0].extend(py_data[0][n_ignore:])
+            all_py_data[1].extend(py_data[1][n_ignore:])
+            all_c_data[0].extend(c_data[0][n_ignore:])
+            all_c_data[1].extend(c_data[1][n_ignore:])
+
+    def _generate_cython_code(self):
+        name = self.name
+        all_py_data = [[], []]
+        all_c_data = [[], []]
+
+        # Process input function
+        py_data, c_data, input_expr = self._wrap_cython_code(self.input_func,
+                                                             func_type='input')
+        self._append_cython_arg_data(all_py_data, all_c_data,
+                                     py_data, c_data)
+
+        # Process segment function
+        use_segment = True if self.is_segment_func is not None else False
+        py_data, c_data, segment_expr = self._wrap_cython_code(
+            self.is_segment_func, func_type='segment')
+        self._append_cython_arg_data(all_py_data, all_c_data, py_data, c_data)
+
+        # Process output expression
+        calc_last_item = False
+        calc_prev_item = False
+
+        py_data, c_data, output_expr = self._wrap_cython_code(
+            self.output_func, func_type='output')
+        if self.output_func is not None:
+            calc_last_item = self._include_last_item()
+            calc_prev_item = self._include_prev_item()
+        self._append_cython_arg_data(all_py_data, all_c_data, py_data, c_data)
+
+        # Add size argument
+        py_defn = ['long SIZE'] + all_py_data[0]
+        c_defn = ['long SIZE'] + all_c_data[0]
+        py_args = ['SIZE'] + all_py_data[1]
+        c_args = ['SIZE'] + all_c_data[1]
+
+        # Only use unique arguments
+        py_defn = drop_duplicates(py_defn)
+        c_defn = drop_duplicates(c_defn)
+        py_args = drop_duplicates(py_args)
+        c_args = drop_duplicates(c_args)
+
+        self.arg_keys = c_args
+
+        if self._config.use_openmp:
+            template = Template(text=scan_cy_template)
+        else:
+            template = Template(text=scan_cy_single_thread_template)
+        src = template.render(
+            name=self.name,
+            type=self.type,
+            input_expr=input_expr,
+            scan_expr=self.scan_expr,
+            output_expr=output_expr,
+            neutral=self.neutral,
+            c_arg_sig=', '.join(c_defn),
+            py_arg_sig=', '.join(py_defn),
+            py_args=', '.join(py_args),
+            openmp=self._config.use_openmp,
+            calc_last_item=calc_last_item,
+            calc_prev_item=calc_prev_item,
+            use_segment=use_segment,
+            is_segment_start_expr=segment_expr,
+            complex_map=self.complex_map
+        )
+        self.tp.add_code(src)
+        self.tp.compile()
+        self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+
+    def _wrap_ocl_function(self, func, func_type=None):
         if func is not None:
             self.tp.add(func)
             py_data, c_data = self.cython_gen.get_func_signature(func)
@@ -479,42 +891,65 @@ class Scan(object):
                 func=name,
                 args=', '.join(c_data[1])
             )
-            arguments = convert_to_float_if_needed(
-                ', '.join(c_data[0][1:])
-            )
+
+            n_ignore = self._num_ignore_args(c_data)
+            arguments = c_data[0][n_ignore:]
+            c_args = c_data[1][n_ignore:]
         else:
-            arguments = ''
-            expr = None
-        return expr, arguments
+            if func_type is 'input':
+                arguments = ['__global %(type)s *input' % {'type': self.type}]
+                expr = 'input[i]'
+                c_args = ['input']
+            else:
+                arguments = []
+                expr = None
+                c_args = []
+        return expr, arguments, c_args
 
-    def _generate(self):
-        if self.backend == 'opencl':
-            input_expr, input_args = self._wrap_ocl_function(self.input_func)
-            output_expr, output_args = self._wrap_ocl_function(
-                self.output_func
-            )
-            segment_expr, segment_args = self._wrap_ocl_function(
-                self.is_segment_func
-            )
+    def _get_scan_expr_opencl(self):
+        if self.is_segment_func is not None:
+            return '(across_seg_boundary ? b : (%s))' % self.scan_expr
+        else:
+            return self.scan_expr
 
-            preamble = convert_to_float_if_needed(self.tp.get_code())
+    def _generate_opencl_code(self):
+        input_expr, input_args, input_c_args = \
+            self._wrap_ocl_function(self.input_func, func_type='input')
 
-            from .opencl import get_context, get_queue
-            from pyopencl.scan import GenericScanKernel
-            ctx = get_context()
-            self.queue = get_queue()
-            knl = GenericScanKernel(
-                ctx,
-                dtype=self.dtype,
-                arguments=input_args,
-                input_expr=input_expr,
-                scan_expr=self.scan_expr,
-                neutral=self.neutral,
-                output_statement=output_expr,
-                is_segment_start_expr=segment_expr,
-                preamble=preamble
-            )
-            self.c_func = knl
+        output_expr, output_args, output_c_args = \
+            self._wrap_ocl_function(self.output_func)
+
+        segment_expr, segment_args, segment_c_args = \
+            self._wrap_ocl_function(self.is_segment_func)
+
+        scan_expr = self._get_scan_expr_opencl()
+
+        preamble = convert_to_float_if_needed(self.tp.get_code())
+
+        args = input_args + segment_args + output_args
+        args = drop_duplicates(args)
+        arg_defn = convert_to_float_if_needed(','.join(args))
+
+        c_args = input_c_args + segment_c_args + output_c_args
+        c_args = drop_duplicates(c_args)
+        self.arg_keys = c_args
+
+        from .opencl import get_context, get_queue
+        from pyopencl.scan import GenericScanKernel
+        ctx = get_context()
+        self.queue = get_queue()
+        knl = GenericScanKernel(
+            ctx,
+            dtype=self.dtype,
+            arguments=arg_defn,
+            input_expr=input_expr,
+            scan_expr=scan_expr,
+            neutral=self.neutral,
+            output_statement=output_expr,
+            is_segment_start_expr=segment_expr,
+            preamble=preamble
+        )
+        self.c_func = knl
 
     def _add_address_space(self, arg):
         if '*' in arg and '__global' not in arg:
@@ -537,7 +972,7 @@ class Scan(object):
                 func=func.__name__,
                 args=', '.join(args)
             ),
-            width=78, subsequent_indent=' '*4, break_long_words=False
+            width=78, subsequent_indent=' ' * 4, break_long_words=False
         )
         self.tp.blocks[-1].code = '\n'.join(code)
 
@@ -547,12 +982,13 @@ class Scan(object):
         else:
             return x
 
-    def __call__(self, *args):
-        c_args = [self._massage_arg(x) for x in args]
+    def __call__(self, **kwargs):
+        c_args_dict = {k: self._massage_arg(x) for k, x in kwargs.items()}
+
         if self.backend == 'cython':
-            size = len(c_args[0])
-            c_args.insert(0, size)
-            self.c_func(*c_args)
+            size = len(c_args_dict[self.arg_keys[1]])
+            c_args_dict['SIZE'] = size
+            self.c_func(*[c_args_dict[k] for k in self.arg_keys])
         elif self.backend == 'opencl':
-            self.c_func(*c_args)
+            self.c_func(*[c_args_dict[k] for k in self.arg_keys])
             self.queue.finish()
