@@ -1193,7 +1193,7 @@ cdef class ParticleArray:
         if self.gpu is not None:
             if type(indices) != cl.array.Array:
                 indices = cl.array.to_device(get_queue(),
-                        numpy.array(indices, dtype=numpy.int32))
+                        numpy.array(indices, dtype=numpy.uint32))
             return self.gpu.extract_particles(indices, props=props)
 
         cdef BaseArray index_array

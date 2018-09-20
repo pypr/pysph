@@ -353,7 +353,7 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0., 0, 0, 0, 0, 0, 0]), True)
         expect = numpy.zeros(21, dtype=A.dtype)
         expect[:12] = A
-        self.assertEqual(check_array(p.A, expect), True)
+        numpy.testing.assert_array_equal(p.A, expect)
 
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
@@ -398,6 +398,11 @@ class ParticleArrayTest(object):
             z={'data': z}, m={'data': m},
             h={'data': h}, tag={'data': tag}, A={'data': A, 'stride': 3}
         )
+
+        numpy.testing.assert_array_equal(
+            p.get('A'), numpy.arange(9, 12)
+        )
+
         p.remove_tagged_particles(0)
         self.pull(p)
 
@@ -430,12 +435,16 @@ class ParticleArrayTest(object):
             check_array(p.get('m', only_real_particles=False), [1., 1., 1.]),
             True
         )
-        self.assertEqual(
-            check_array(p.get('A', only_real_particles=False),
-                        numpy.arange(9)),
-            True
-        )
-
+        if p.gpu is None:
+            numpy.testing.assert_array_equal(
+                p.get('A', only_real_particles=False),
+                numpy.arange(9)
+            )
+        else:
+            numpy.testing.assert_array_equal(
+                p.get('A', only_real_particles=False),
+                list(range(3, 9)) + [0., 1, 2]
+            )
         self.assertEqual(check_array(p.x, []), True)
         self.assertEqual(check_array(p.y, []), True)
         self.assertEqual(check_array(p.z, []), True)
@@ -554,6 +563,7 @@ class ParticleArrayTest(object):
         # When
         p.resize(4)
         p.align_particles()
+        self.pull(p)
 
         # Then
         self.assertEqual(p.get_carray('x').length, 4)
@@ -665,7 +675,7 @@ class ParticleArrayTest(object):
         self.assertEqual(p1.get_number_of_particles(), 6)
         self.assertEqual(check_array(p1.x, [1, 2, 3, 5]), True)
         self.assertEqual(check_array(p1.y, [0, 0, 0, 2]), True)
-        self.assertEqual(check_array(p1.A, [2.0]*6 + [0.0]*2), True)
+        numpy.testing.assert_array_equal(p1.A, [2.0]*6 + [0.0]*2)
         self.assertEqual(check_array(p1.tag, [0, 0, 0, 0]), True)
 
         # Given

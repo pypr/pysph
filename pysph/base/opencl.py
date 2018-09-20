@@ -158,6 +158,7 @@ class DeviceHelper(object):
         self._ctx = get_context()
         use_double = get_config().use_double
         self._dtype = np.float64 if use_double else np.float32
+        self.num_real_particles = pa.num_real_particles
         self._data = {}
         self.properties = []
         self.constants = []
@@ -166,8 +167,6 @@ class DeviceHelper(object):
             self.add_prop(prop, ary)
         for prop, ary in pa.constants.items():
             self.add_const(prop, ary)
-
-        self.align_particles()
 
     def _get_array(self, ary):
         ctype = ary.get_c_type()
@@ -196,14 +195,21 @@ class DeviceHelper(object):
             return self.num_real_particles
         else:
             if len(self.properties) > 0:
-                prop0 = self._data[self.properties[0]]
-                return len(prop0.array)
+                pname = self.properties[0]
+                stride = self._particle_array.stride.get(pname, 1)
+                prop0 = self._data[pname]
+                return len(prop0.array)//stride
             else:
                 return 0
 
     def align(self, indices):
+        '''Note that the indices passed here is a dictionary keyed on the stride.
+        '''
+        if not isinstance(indices, dict):
+            indices = {1: indices}
         for prop in self.properties:
-            self._data[prop].align(indices)
+            stride = self._particle_array.stride.get(prop, 1)
+            self._data[prop].align(indices.get(stride))
             setattr(self, prop, self._data[prop].array)
 
     def add_prop(self, name, carray):
@@ -301,7 +307,8 @@ class DeviceHelper(object):
 
     def resize(self, new_size):
         for prop in self.properties:
-            self._data[prop].resize(new_size)
+            stride = self._particle_array.stride.get(prop, 1)
+            self._data[prop].resize(new_size*stride)
             setattr(self, prop, self._data[prop].array)
 
     def align_particles(self):
@@ -336,11 +343,42 @@ class DeviceHelper(object):
         align_particles_knl(tag_arr, new_indices, num_real_particles,
                             num_particles)
 
-        self.align(new_indices)
+        indices = {1: new_indices}
+        for stride in set(self._particle_array.stride.values()):
+            if stride > 1:
+                indices[stride] = self._build_indices_with_strides(
+                    tag_arr, stride
+                )
+
+        self.align(indices)
 
         self.num_real_particles = int(num_real_particles.get())
 
-    def remove_particles_bool(self, if_remove):
+    def _build_indices_with_strides(self, tag_arr, stride):
+        num_particles = len(tag_arr)
+
+        new_indices = cl.array.empty(self._queue, num_particles*stride,
+                                     dtype=np.int32)
+
+        align_particles_knl = GenericScanKernel(
+            self._ctx, np.int32,
+            arguments="__global int *tag_arr, __global int *new_indices, \
+                    int num_particles, int stride",
+            input_expr="tag_arr[i] == 0",
+            scan_expr="a+b", neutral="0",
+            output_statement="""
+            int t = last_item + i - prev_item;
+            int idx = tag_arr[i] ? t : prev_item;
+            for (int j_s=0; j_s<stride; j_s++) {
+                new_indices[stride*idx + j_s] = stride*i + j_s;
+            }
+            """
+        )
+
+        align_particles_knl(tag_arr, new_indices, num_particles, stride)
+        return new_indices
+
+    def _remove_particles_bool(self, if_remove):
         """ Remove particle i if if_remove[i] is True
         """
         num_indices = int(cl.array.sum(if_remove).get())
@@ -349,7 +387,7 @@ class DeviceHelper(object):
             return
 
         num_particles = self.get_number_of_particles()
-        new_indices = DeviceArray(np.uint32, n=num_particles)
+        new_indices = DeviceArray(np.uint32, n=(num_particles - num_indices))
         num_removed_particles = cl.array.empty(self._queue, 1, dtype=np.int32)
 
         remove_knl = GenericScanKernel(
@@ -369,9 +407,36 @@ class DeviceHelper(object):
 
         new_num_particles = num_particles - int(num_removed_particles.get())
 
+        stride_knl = get_elwise_kernel(
+            'stride_knl',
+            'uint* indices, uint* new_indices, int size, int stride',
+            '''
+            uint tmp_idx;
+            for (int j_s=0; j_s<stride; j_s++) {
+                tmp_idx = i*stride + j_s;
+                if (tmp_idx < size)
+                    new_indices[tmp_idx] = indices[i]*stride + j_s;
+                }
+            '''
+        )
+
+        strides = set(self._particle_array.stride.values())
+        s_indices = {1: new_indices}
+        for stride in strides:
+            if stride == 1:
+                continue
+            size = new_num_particles*stride
+            s_index = DeviceArray(np.uint32, n=size)
+            stride_knl(new_indices.array, s_index.array, size, stride)
+            s_indices[stride] = s_index
+
         for prop in self.properties:
-            self._data[prop].align(new_indices.array[:new_num_particles])
+            stride = self._particle_array.stride.get(prop, 1)
+            s_index = s_indices[stride]
+            self._data[prop].align(s_index.array)
             setattr(self, prop, self._data[prop].array)
+
+        self.align_particles()
 
     def remove_particles(self, indices):
         """ Remove particles whose indices are given in index_list.
@@ -418,10 +483,7 @@ class DeviceHelper(object):
 
         fill_if_remove_knl(indices, if_remove.array, num_particles)
 
-        self.remove_particles_bool(if_remove.array)
-
-        if len(indices) > 0:
-            self.align_particles()
+        self._remove_particles_bool(if_remove.array)
 
     def remove_tagged_particles(self, tag):
         """ Remove particles that have the given tag.
@@ -435,7 +497,7 @@ class DeviceHelper(object):
         """
         tag_array = self.tag
         if_remove = (tag_array == tag).astype(np.int32)
-        self.remove_particles_bool(if_remove)
+        self._remove_particles_bool(if_remove)
 
     def add_particles(self, **particle_props):
         """
@@ -472,14 +534,14 @@ class DeviceHelper(object):
 
         for prop in self.properties:
             arr = self._data[prop]
-
+            stride = self._particle_array.stride.get(prop, 1)
             if prop in particle_props.keys():
                 s_arr = particle_props[prop]
                 arr.extend(s_arr)
             else:
-                arr.resize(new_num_particles)
+                arr.resize(new_num_particles*stride)
                 # set the properties of the new particles to the default ones.
-                arr.array[old_num_particles:] = pa.default_values[prop]
+                arr.array[old_num_particles*stride:] = pa.default_values[prop]
 
             self.update_prop(prop, arr)
 
@@ -503,8 +565,10 @@ class DeviceHelper(object):
 
         for prop in self.properties:
             arr = self._data[prop]
-            arr.resize(new_size)
-            arr.array[old_size:] = self._particle_array.default_values[prop]
+            stride = self._particle_array.stride.get(prop, 1)
+            arr.resize(new_size*stride)
+            arr.array[old_size*stride:] = \
+                self._particle_array.default_values[prop]
             self.update_prop(prop, arr)
 
     def append_parray(self, parray):
@@ -525,22 +589,26 @@ class DeviceHelper(object):
         # extend current arrays by the required number of particles
         self.extend(num_extra_particles)
 
+        my_stride = self._particle_array.stride
         for prop_name in parray.gpu.properties:
+            stride = parray.stride.get(prop_name, 1)
+            if stride > 1 and prop_name not in my_stride:
+                my_stride[prop_name] = stride
             if prop_name in self.properties:
                 arr = self._data[prop_name]
                 source = parray.gpu.get_device_array(prop_name)
-                arr.array[old_num_particles:] = source.array
+                arr.array[old_num_particles*stride:] = source.array
             else:
                 # meaning this property is not there in self.
                 dtype = parray.gpu.get_device_array(prop_name).dtype
-                arr = DeviceArray(dtype, n=new_num_particles)
+                arr = DeviceArray(dtype, n=new_num_particles*stride)
                 arr.fill(parray.default_values[prop_name])
                 self.update_prop(prop_name, arr)
 
                 # now add the values to the end of the created array
                 dest = self._data[prop_name]
                 source = parray.gpu.get_device_array(prop_name)
-                dest.array[old_num_particles:] = source.array
+                dest.array[old_num_particles*stride:] = source.array
 
         for const in parray.gpu.constants:
             if const not in self.constants:
@@ -565,6 +633,7 @@ class DeviceHelper(object):
 
         """
         result_array = pysph.base.particle_array.ParticleArray()
+        result_array.set_name(self._particle_array.name)
         result_array.set_device_helper(DeviceHelper(result_array))
 
         if props is None:
@@ -577,21 +646,24 @@ class DeviceHelper(object):
 
         for prop_name in prop_names:
             src_arr = self._data[prop_name]
-            dst_arr = DeviceArray(src_arr.dtype, n=len(indices))
-            src_arr.copy_values(indices, dst_arr.array)
+            stride = self._particle_array.stride.get(prop_name, 1)
 
             prop_type = cl.tools.dtype_to_ctype(src_arr.dtype)
             prop_default = self._particle_array.default_values[prop_name]
             result_array.add_property(name=prop_name,
                                       type=prop_type,
-                                      default=prop_default)
+                                      default=prop_default, stride=stride)
+
+        s_indices = self._build_copy_indices_with_strides(indices)
 
         result_array.gpu.extend(len(indices))
 
         for prop in prop_names:
+            stride = self._particle_array.stride.get(prop, 1)
+            s_index = s_indices[stride]
             src_arr = self._data[prop].array
             dst_arr = result_array.gpu.get_device_array(prop)
-            dst_arr.set_data(cl.array.take(src_arr, indices))
+            dst_arr.set_data(cl.array.take(src_arr, s_index))
 
         for const in self.constants:
             result_array.gpu.update_const(const, self._data[const].copy())
@@ -610,3 +682,29 @@ class DeviceHelper(object):
 
         result_array.set_output_arrays(output_arrays)
         return result_array
+
+    def _build_copy_indices_with_strides(self, indices):
+        result = {1: indices}
+        n_indices = len(indices)
+        strides = set(self._particle_array.stride.values())
+
+        for stride in strides:
+            sz = n_indices*stride
+            new_indices = cl.array.empty(self._queue, sz,
+                                         dtype=np.uint32)
+            fill_indices_knl = get_elwise_kernel(
+                "fill_indices_%d" % stride,
+                "uint* indices, uint* new_indices, int size, int stride",
+                '''
+                uint tmp_idx;
+                for (int j_s=0; j_s<stride; j_s++) {
+                    tmp_idx = i*stride + j_s;
+                    if (tmp_idx < size)
+                        new_indices[tmp_idx] = indices[i]*stride + j_s;
+                }
+                '''
+            )
+            fill_indices_knl(indices, new_indices, sz, stride)
+            result[stride] = new_indices
+
+        return result
