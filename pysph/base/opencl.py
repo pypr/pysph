@@ -17,6 +17,10 @@ from pysph.cpy.opencl import (  # noqa: 401
     get_context, get_queue, profile, profile_kernel,
     print_profile, set_context, set_queue
 )
+from pysph.cpy.array import get_backend, Array
+import pysph.cpy.array as array
+from pysph.cpy.parallel import Elementwise
+from pysph.cpy.api import declare, annotate
 import pysph.base.particle_array
 
 
@@ -34,21 +38,22 @@ def get_elwise_kernel(kernel_name, args, src, preamble=""):
 
 class DeviceArray(object):
     def __init__(self, dtype, n=0):
-        self.queue = get_queue()
-        self.ctx = get_context()
+        self.backend = get_backend()
         self.dtype = dtype
         length = n
         if n == 0:
             n = 16
-        data = cl.array.empty(self.queue, n, dtype)
+        data = array.empty(n, dtype)
         self.minimum = 0
         self.maximum = 0
+        self.array = Array()
         self.set_data(data)
         self.length = length
         self._update_array_ref()
 
     def _update_array_ref(self):
-        self.array = self._data[:self.length]
+        self.dev = self._data[:self.length]
+        self.array.set_dev_array(self.dev)
 
     def resize(self, size):
         self.reserve(size)
@@ -57,13 +62,17 @@ class DeviceArray(object):
 
     def reserve(self, size):
         if size > self.alloc:
-            new_data = cl.array.empty(self.queue, size, self.dtype)
-            new_data[:self.alloc] = self._data
-            self._data = new_data
+            new_data = array.empty(size, self.dtype)
+            new_data.dev[:self.alloc] = self._data
+            self._data = new_data.dev
             self.alloc = size
             self._update_array_ref()
 
     def set_data(self, data):
+        # data can be an Array instance or
+        # a numpy/cl array/cuda array
+        if isinstance(data, Array):
+            data = data.dev
         self._data = data
         self.length = data.size
         self.alloc = data.size
@@ -75,15 +84,17 @@ class DeviceArray(object):
 
     def copy(self):
         arr_copy = DeviceArray(self.dtype)
-        arr_copy.set_data(self.array.copy())
+        arr_copy.set_data(self.dev.copy())
         return arr_copy
 
     def update_min_max(self):
-        self.minimum = float(cl.array.min(self.array).get())
-        self.maximum = float(cl.array.max(self.array).get())
+        self.minimum = array.minimum(self.array, backend=self.backend)
+        self.maximum = array.maximum(self.array, backend=self.backend)
+        self.minimum = self.minimum.astype(self.dtype)
+        self.maximum = self.maximum.astype(self.dtype)
 
     def fill(self, value):
-        self.array.fill(value)
+        self.dev.fill(value)
 
     def append(self, value):
         if self.length >= self.alloc:
@@ -92,15 +103,15 @@ class DeviceArray(object):
         self.length += 1
         self._update_array_ref()
 
-    def extend(self, cl_arr):
-        if self.length + len(cl_arr) > self.alloc:
-            self.reserve(self.length + len(cl_arr))
-        self._data[-len(cl_arr):] = cl_arr
-        self.length += len(cl_arr)
+    def extend(self, ary):
+        if self.length + len(ary.dev) > self.alloc:
+            self.reserve(self.length + len(ary.dev))
+        self._data[-len(ary.dev):] = ary.dev
+        self.length += len(ary.dev)
         self._update_array_ref()
 
     def remove(self, indices, input_sorted=False):
-        if len(indices) > self.length:
+        if len(indices.dev) > self.length:
             msg = 'Number of indices to be removed is greater than'
             msg += 'number of indices in array'
             raise ValueError(msg)
@@ -109,16 +120,17 @@ class DeviceArray(object):
         if_remove.fill(0)
         new_array = self.copy()
 
-        fill_if_remove_knl = get_elwise_kernel(
-            "fill_if_remove_knl",
-            "int* indices, int* if_remove",
-            "if_remove[indices[i]] = 1;"
-        )
+        @annotate(i='int', gintp='indices, if_remove')
+        def fill_if_remove(i, indices, if_remove):
+            if_remove[indices[i]] = 1
+
+        fill_if_remove_knl = Elementwise(fill_if_remove,
+                                         backend=self.backend)
 
         fill_if_remove_knl(indices, if_remove.array)
 
         remove_knl = GenericScanKernel(
-            self.ctx, np.int32,
+            get_context(), np.int32,
             arguments="__global int *if_remove,\
             __global %(dtype)s *array,\
             __global %(dtype)s *new_array" %
@@ -129,18 +141,23 @@ class DeviceArray(object):
             if(!if_remove[i]) new_array[i - item] = array[i];
             """)
 
-        remove_knl(if_remove.array, self.array, new_array.array)
+        remove_knl(if_remove.dev, self.dev, new_array.dev)
 
-        self.set_data(new_array.array[:-len(indices)])
+        self.set_data(new_array.dev[:-len(indices.dev)])
 
     def align(self, indices):
-        self.set_data(cl.array.take(self.array, indices))
+        self.set_data(array.take(self.array, indices, backend=self.backend))
 
     def squeeze(self):
         self.set_data(self._data[:self.length])
 
     def copy_values(self, indices, dest):
-        dest[:len(indices)] = cl.array.take(self.array, indices)
+        # indices and dest need to be Array instances
+        if not isinstance(indices, Array) or not isinstance(dest, Array):
+            raise TypeError('indices and dest need to be Array instances')
+        dest.dev[:len(indices.dev)] = array.take(
+                self.array, indices, backend=self.backend
+                ).dev
 
 
 class DeviceHelper(object):

@@ -29,9 +29,9 @@ def wrap(*args, **kw):
     '''
     backend = get_backend(kw.get('backend'))
     if len(args) == 1:
-        return Array(args[0], backend=backend)
+        return Array(ary=args[0], backend=backend)
     else:
-        return [Array(x, backend=backend) for x in args]
+        return [Array(ary=x, backend=backend) for x in args]
 
 
 def ones_like(array, backend='cython'):
@@ -65,44 +65,70 @@ def ones(n, dtype, backend='cython'):
 def empty(n, dtype, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
-        dev_array = gpuarray.empty(get_queue(), n, dtype)
+        return Array(dev_ary=gpuarray.empty(get_queue(), n, dtype))
     elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
-        dev_array = gpuarray.empty(n, dtype)
+        return Array(dev_ary=gpuarray.empty(n, dtype))
     else:
-        return Array(np.empty(n, dtype=dtype))
-    wrapped_array = Array()
-    wrapped_array.set_dev_array(dev_array)
-    return wrapped_array
+        return Array(ary=np.empty(n, dtype=dtype))
 
 
 def zeros(n, dtype, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
-        dev_array = gpuarray.zeros(get_queue(), n, dtype)
+        return Array(dev_ary=gpuarray.zeros(get_queue(), n, dtype))
     elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
-        dev_array = gpuarray.zeros(n, dtype)
+        return Array(dev_ary=gpuarray.zeros(n, dtype))
     else:
-        return Array(np.zeros(n, dtype=dtype))
-    wrapped_array = Array()
-    wrapped_array.set_dev_array(dev_array)
-    return wrapped_array
+        return Array(ary=np.zeros(n, dtype=dtype))
 
 
 def arange(start, stop, step, dtype=None, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
-        dev_array = gpuarray.arange(get_queue(), start, stop,
-                                    step, dtype=dtype)
+        return Array(dev_ary=gpuarray.arange(get_queue(),
+                     start, stop,step, dtype=dtype))
     elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
-        dev_array = gpuarray.arange(start, stop, step, dtype=dtype)
+        return Array(dev_ary=gpuarray.arange(start,
+                     stop, step, dtype=dtype))
     else:
         return Array(np.arange(start, stop, step, dtype=dtype))
-    wrapped_array = Array()
-    wrapped_array.set_dev_array(dev_array)
-    return wrapped_array
+
+
+def minimum(ary, backend='cython'):
+    if backend == 'cython':
+        return ary.dev.min()
+    elif backend == 'opencl':
+        import pyopencl.array as gpuarray
+        return gpuarray.min(ary.dev).get()
+    elif backend == 'cuda':
+        import pycuda.array as gpuarray
+        return gpuarray.min(ary.dev).get()
+
+
+def maximum(ary, backend='cython'):
+    if backend == 'cython':
+        return ary.dev.max()
+    elif backend == 'opencl':
+        import pyopencl.array as gpuarray
+        return gpuarray.max(ary.dev).get()
+    elif backend == 'cuda':
+        import pycuda.array as gpuarray
+        return gpuarray.max(ary.dev).get()
+
+
+def take(ary, indices, backend='cython'):
+    if backend == 'opencl':
+        import pyopencl.array as gpuarray
+        out = gpuarray.take(ary.dev, indices.dev)
+    elif backend == 'cuda':
+        import pycuda.gpuarray as gpuarray
+        out = gpuarray.take(ary.dev, indices.dev)
+    elif backend == 'cython':
+        return Array(ary=np.take(ary.dev, indices.dev))
+    return Array(dev_ary=out)
 
 
 class Array(object):
@@ -118,10 +144,19 @@ class Array(object):
     Use `push()` to push the data to the device.
 
     """
-    def __init__(self, ary=None, backend=None):
+    def __init__(self, ary=None, dev_ary=None, backend=None):
         self.backend = get_backend(backend)
         self.data = ary
         self._convert = False
+        if self.data is not None:
+            self._initialize()
+        else:
+            if dev_ary is not None:
+                self.dev = dev_ary
+            else:
+                self.dev = None
+
+    def _initialize(self):
         if self.backend == 'opencl' or self.backend == 'cuda':
             use_double = get_config().use_double
             self._dtype = np.float64 if use_double else np.float32
@@ -163,3 +198,5 @@ class Array(object):
     def push(self):
         if self.backend == 'opencl' or self.backend == 'cuda':
             self.dev.set(self._get_data())
+
+
