@@ -33,9 +33,6 @@ class ParticleArrayTest(object):
     """
 
     def test_constructor(self):
-        """
-        Test the constructor.
-        """
         # Default constructor test.
         p = particle_array.ParticleArray(name='test_particle_array')
 
@@ -119,6 +116,32 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0, 0]), True)
         self.assertEqual(check_array(p.h, [0.1, 0.1]), True)
 
+    def test_constructor_works_with_strides(self):
+        # Given
+        x = [1, 2, 3, 4.]
+        rho = 10.0
+        data = numpy.arange(8)
+
+        # When
+        p = particle_array.ParticleArray(
+            x=x, rho=rho, data={'data': data, 'stride': 2}, name='fluid'
+        )
+
+        # Then
+        self.assertEqual(p.name, 'fluid')
+
+        self.assertEqual('x' in p.properties, True)
+        self.assertEqual('rho' in p.properties, True)
+        self.assertEqual('data' in p.properties, True)
+        self.assertEqual('tag' in p.properties, True)
+        self.assertEqual('pid' in p.properties, True)
+        self.assertEqual('gid' in p.properties, True)
+
+        # get the properties are check if they are the same
+        self.assertEqual(check_array(p.x, x), True)
+        self.assertEqual(check_array(p.rho, numpy.ones(4) * rho), True)
+        self.assertEqual(check_array(p.data, numpy.ravel(data)), True)
+
     def test_constructor_works_with_simple_props(self):
         # Given
         x = [1, 2, 3, 4.]
@@ -149,44 +172,43 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.data, numpy.ravel(data)), True)
 
     def test_get_number_of_particles(self):
-        """
-        Tests the get_number_of_particles of particles.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        A = numpy.arange(12)
+
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A={'data': A, 'stride': 3}
+        )
 
         self.assertEqual(p.get_number_of_particles(), 4)
 
     def test_get(self):
-        """
-        Tests the get function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A={'data': A, 'stride': 3}
+        )
 
         self.assertEqual(check_array(x, p.get('x')), True)
         self.assertEqual(check_array(y, p.get('y')), True)
         self.assertEqual(check_array(z, p.get('z')), True)
         self.assertEqual(check_array(m, p.get('m')), True)
         self.assertEqual(check_array(h, p.get('h')), True)
+        self.assertEqual(check_array(A.ravel(), p.get('A')), True)
 
     def test_clear(self):
-        """
-        Tests the clear function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -210,61 +232,65 @@ class ParticleArrayTest(object):
         self.assertEqual(p.properties['gid'].length, 0)
 
     def test_getattr(self):
-        """
-        Tests the __getattr__ function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A={'data': A, 'stride': 3}
+        )
 
         self.assertEqual(check_array(x, p.x), True)
         self.assertEqual(check_array(y, p.y), True)
         self.assertEqual(check_array(z, p.z), True)
         self.assertEqual(check_array(m, p.m), True)
         self.assertEqual(check_array(h, p.h), True)
+        self.assertEqual(check_array(A.ravel(), p.get('A')), True)
 
         # try getting an non-existant attribute
         self.assertRaises(AttributeError, p.__getattr__, 'a')
 
     def test_setattr(self):
-        """
-        Tests the __setattr__ function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A={'data': A, 'stride': 3}
+        )
 
         p.x = p.x * 2.0
 
         self.assertEqual(check_array(p.get('x'), [2., 4, 6, 8]), True)
         p.x = p.x + 3.0 * p.x
         self.assertEqual(check_array(p.get('x'), [8., 16., 24., 32.]), True)
+        p.A = p.A*2
+        self.assertEqual(check_array(p.get('A').ravel(), A*2), True)
 
     def test_remove_particles(self):
-        """
-        Tests the remove_particles function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A={'data': A, 'stride': 3}
+        )
+
         remove_arr = LongArray(0)
         remove_arr.append(0)
         remove_arr.append(1)
@@ -278,6 +304,7 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0., 0.]), True)
         self.assertEqual(check_array(p.m, [1., 1.]), True)
         self.assertEqual(check_array(p.h, [.1, .1]), True)
+        self.assertEqual(check_array(p.A, numpy.arange(6, 12)), True)
 
         # now try invalid operations to make sure errors are raised.
         remove_arr.resize(10)
@@ -296,20 +323,21 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0., 0.]), True)
         self.assertEqual(check_array(p.m, [1., 1.]), True)
         self.assertEqual(check_array(p.h, [.1, .1]), True)
+        self.assertEqual(check_array(p.A, numpy.arange(6, 12)), True)
 
     def test_add_particles(self):
-        """
-        Tests the add_particles function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, A=dict(data=A, stride=3)
+        )
 
         new_particles = {}
         new_particles['x'] = numpy.array([5., 6, 7], dtype=numpy.float32)
@@ -323,6 +351,9 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.x, [1., 2, 3, 4, 5, 6, 7]), True)
         self.assertEqual(check_array(p.y, [0., 1, 2, 3, 4, 5, 6]), True)
         self.assertEqual(check_array(p.z, [0., 0, 0, 0, 0, 0, 0]), True)
+        expect = numpy.zeros(21, dtype=A.dtype)
+        expect[:12] = A
+        numpy.testing.assert_array_equal(p.A, expect)
 
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
@@ -335,6 +366,7 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.x, [1., 2, 3, 4, 5, 6, 7]), True)
         self.assertEqual(check_array(p.y, [0., 1, 2, 3, 4, 5, 6]), True)
         self.assertEqual(check_array(p.z, [0., 0, 0, 0, 0, 0, 0]), True)
+        self.assertEqual(check_array(p.A, expect), True)
 
         # make sure the other arrays were resized
         self.assertEqual(len(p.h), 7)
@@ -353,19 +385,24 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0, 0, 0, 0, 0, 0]), True)
 
     def test_remove_tagged_particles(self):
-        """
-        Tests the remove_tagged_particles function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
         m = [1., 1., 1., 1.]
         h = [.1, .1, .1, .1]
+        A = numpy.arange(12)
         tag = [1, 1, 1, 0]
 
-        p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
-                                         z={'data': z}, m={'data': m},
-                                         h={'data': h}, tag={'data': tag})
+        p = particle_array.ParticleArray(
+            x={'data': x}, y={'data': y},
+            z={'data': z}, m={'data': m},
+            h={'data': h}, tag={'data': tag}, A={'data': A, 'stride': 3}
+        )
+
+        numpy.testing.assert_array_equal(
+            p.get('A'), numpy.arange(9, 12)
+        )
+
         p.remove_tagged_particles(0)
         self.pull(p)
 
@@ -398,17 +435,24 @@ class ParticleArrayTest(object):
             check_array(p.get('m', only_real_particles=False), [1., 1., 1.]),
             True
         )
-
+        if p.gpu is None:
+            numpy.testing.assert_array_equal(
+                p.get('A', only_real_particles=False),
+                numpy.arange(9)
+            )
+        else:
+            numpy.testing.assert_array_equal(
+                p.get('A', only_real_particles=False),
+                list(range(3, 9)) + [0., 1, 2]
+            )
         self.assertEqual(check_array(p.x, []), True)
         self.assertEqual(check_array(p.y, []), True)
         self.assertEqual(check_array(p.z, []), True)
         self.assertEqual(check_array(p.h, []), True)
         self.assertEqual(check_array(p.m, []), True)
+        self.assertEqual(check_array(p.A, []), True)
 
     def test_add_property(self):
-        """
-        Tests the add_property function.
-        """
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -432,6 +476,15 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.f1, [1, 1, 2, 3]), True)
         self.assertEqual(type(p.properties['f1']), IntArray)
         self.assertEqual(p.default_values['f1'], 4)
+
+        # add a property with stride.
+        data = [1, 1, 2, 2, 3, 3, 4, 4]
+        p.add_property(**{'name': 'm1',
+                          'data': data,
+                          'type': 'int',
+                          'stride': 2})
+        self.assertEqual(check_array(p.m1, data), True)
+        self.assertEqual(type(p.properties['m1']), IntArray)
 
         # add a property without specifying the type
         p.add_property(**{'name': 'f2',
@@ -458,16 +511,24 @@ class ParticleArrayTest(object):
                          p.get_number_of_particles())
         self.assertEqual(check_array(p.f5, [10.0, 10.0, 10.0, 10.0]), True)
 
+        p.add_property('m2', data=10.0, stride=2)
+        self.assertEqual(type(p.properties['m2']), DoubleArray)
+        self.assertEqual(p.properties['m2'].length,
+                         p.get_number_of_particles()*2)
+        self.assertEqual(check_array(p.m2, [10.0]*8), True)
+
     def test_extend(self):
-        """
-        Tests the extend function.
-        """
+        # Given
         p = particle_array.ParticleArray(default_particle_tag=10, x={},
                                          y={'default': -1.})
+        p.add_property('A', default=5.0, stride=2)
+
+        # When
         p.extend(5)
         p.align_particles()
         self.pull(p)
 
+        # Then
         self.assertEqual(p.get_number_of_particles(), 5)
         self.assertEqual(check_array(p.get(
             'x', only_real_particles=False), [0, 0, 0, 0, 0]), True)
@@ -475,27 +536,73 @@ class ParticleArrayTest(object):
                                      [-1., -1., -1., -1., -1.]), True)
         self.assertEqual(check_array(p.get('tag', only_real_particles=False),
                                      [10, 10, 10, 10, 10]), True)
+        self.assertEqual(check_array(p.get('A', only_real_particles=False),
+                                     [5.0]*10), True)
+
+        # Given
+        p = particle_array.ParticleArray(
+            A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.}
+        )
+
+        # When
+        p.extend(5)
+        p.align_particles()
+        self.pull(p)
+
+        # Then
+        self.assertEqual(check_array(p.get('A', only_real_particles=False),
+                                     [10.0, 10.0] + [-1.0]*10), True)
+
+    def test_resize(self):
+        # Given
+        p = particle_array.ParticleArray(
+            A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.},
+            x=[1.0]
+        )
+
+        # When
+        p.resize(4)
+        p.align_particles()
+        self.pull(p)
+
+        # Then
+        self.assertEqual(p.get_carray('x').length, 4)
+        self.assertEqual(p.get_carray('A').length, 8)
 
     def test_align_particles(self):
-        """
-        Tests the align particles function.
-        """
+        # Given
         p = particle_array.ParticleArray()
         p.add_property(**{'name': 'x',
                           'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
         p.add_property(**{'name': 'y',
                           'data': [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]})
+        a = numpy.arange(10) + 1
+        A = numpy.zeros(20)
+        A[::2] = a
+        A[1::2] = a
+        p.add_property('A', data=A, stride=2)
+        print(A)
         p.set(**{'tag': [0, 0, 1, 1, 1, 0, 4, 0, 1, 5]})
+
+        # When
         self.push(p)
         p.align_particles()
         self.pull(p)
+
+        # Then
         x_new = p.get('x', only_real_particles=False)
         y_new = p.get('y', only_real_particles=False)
+        A_new = p.get('A', only_real_particles=False)
+        print(A_new)
 
         # check the local particles
         self.assertEqual(check_array(x_new[:4], [1, 2, 6, 8]),
                          True)
         self.assertEqual(check_array(y_new[:4], [10, 9, 5, 3]),
+                         True)
+        self.assertEqual(check_array(A_new[:8:2], [1, 2, 6, 8]),
+                         True)
+        self.assertEqual(check_array(A_new[1:8:2], [1, 2, 6, 8]),
                          True)
 
         # check the remaining particles
@@ -506,6 +613,14 @@ class ParticleArrayTest(object):
         self.assertEqual(
             check_array(numpy.sort(y_new[4:]),
                         [1, 2, 4, 6, 7, 8]), True
+        )
+        self.assertEqual(
+            check_array(numpy.sort(A_new[8::2]),
+                        [3, 4, 5, 7, 9, 10]), True
+        )
+        self.assertEqual(
+            check_array(numpy.sort(A_new[9::2]),
+                        [3, 4, 5, 7, 9, 10]), True
         )
 
         p.set(**{'tag': [0, 0, 0, 0, 1, 1, 1, 1, 1, 1]})
@@ -520,6 +635,10 @@ class ParticleArrayTest(object):
                          True)
         self.assertEqual(check_array(y_new[:4], [10, 9, 5, 3]),
                          True)
+        self.assertEqual(check_array(A_new[:8:2], [1, 2, 6, 8]),
+                         True)
+        self.assertEqual(check_array(A_new[1:8:2], [1, 2, 6, 8]),
+                         True)
 
         # check the remaining particles
         self.assertEqual(
@@ -530,53 +649,91 @@ class ParticleArrayTest(object):
             check_array(numpy.sort(y_new[4:]),
                         [1, 2, 4, 6, 7, 8]), True
         )
+        self.assertEqual(
+            check_array(numpy.sort(A_new[8::2]),
+                        [3, 4, 5, 7, 9, 10]), True
+        )
+        self.assertEqual(
+            check_array(numpy.sort(A_new[9::2]),
+                        [3, 4, 5, 7, 9, 10]), True
+        )
 
     def test_append_parray(self):
-        """
-        Tests the append_parray function.
-        """
+        # Given
         p1 = particle_array.ParticleArray()
         p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
-        p1.align_particles()
-
+        p1.add_property('A', data=2.0, stride=2)
         p2 = particle_array.ParticleArray(x={'data': [4, 5, 6]},
                                           y={'data': [1, 2, 3]},
                                           tag={'data': [1, 0, 1]})
 
+        # When
         p1.append_parray(p2)
         self.pull(p1)
 
+        # Then
         self.assertEqual(p1.get_number_of_particles(), 6)
         self.assertEqual(check_array(p1.x, [1, 2, 3, 5]), True)
         self.assertEqual(check_array(p1.y, [0, 0, 0, 2]), True)
+        numpy.testing.assert_array_equal(p1.A, [2.0]*6 + [0.0]*2)
+        self.assertEqual(check_array(p1.tag, [0, 0, 0, 0]), True)
+
+        # Given
+        p1 = particle_array.ParticleArray()
+        p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
+        # In this case the new strided prop is in the second parray.
+        p2 = particle_array.ParticleArray(x={'data': [4, 5, 6]},
+                                          y={'data': [1, 2, 3]},
+                                          tag={'data': [1, 0, 1]})
+        p2.add_property('A', data=2.0, stride=2)
+
+        # When
+        p1.append_parray(p2)
+        self.pull(p1)
+
+        # Then
+        self.assertEqual(p1.get_number_of_particles(), 6)
+        self.assertEqual(check_array(p1.x, [1, 2, 3, 5]), True)
+        self.assertEqual(check_array(p1.y, [0, 0, 0, 2]), True)
+        self.assertEqual(check_array(p1.A, [0.0]*6 + [2.0]*2), True)
         self.assertEqual(check_array(p1.tag, [0, 0, 0, 0]), True)
 
     def test_copy_properties(self):
-        """
-        Tests the copy properties function.
-        """
+        # Given
         p1 = particle_array.ParticleArray()
         p1.add_property(**{'name': 'x',
                            'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
-        p1.add_property(**{'name': 'y'})
-        p1.add_property(**{'name': 't'})
-        p1.align_particles()
+        p1.add_property(name='y')
+        p1.add_property(name='t')
+        p1.add_property('A', data=2.0, stride=2)
 
         p2 = particle_array.ParticleArray()
-        p2.add_property(**{'name': 't', 'data': [-1, -1, -1, -1]})
-        p2.add_property(**{'name': 's', 'data': [2, 3, 4, 5]})
-        p2.align_particles()
+        p2.add_property(name='t', data=[-1, -1, -1, -1])
+        p2.add_property(name='s', data=[2, 3, 4, 5])
+        p2.add_property('A', data=3.0, stride=2)
 
+        # When
         p1.copy_properties(p2, start_index=5, end_index=9)
+
+        # Then
         self.assertEqual(check_array(p1.t, [0, 0, 0, 0, 0, -1, -1, -1, -1, 0]),
                          True)
+        numpy.testing.assert_array_equal(
+            p1.A, [2.0]*10 + [3.0]*8 + [2.0]*2
+        )
 
-        p1.add_property(**{'name': 's'})
+        # When
+        p1.add_property('s')
         p1.copy_properties(p2, start_index=5, end_index=9)
+
+        # Then
         self.assertEqual(check_array(p1.t, [0, 0, 0, 0, 0, -1, -1, -1, -1, 0]),
                          True)
         self.assertEqual(
             check_array(p1.s, [0, 0, 0, 0, 0, 2, 3, 4, 5, 0]), True
+        )
+        numpy.testing.assert_array_equal(
+            p1.A, [2.0]*10 + [3.0]*8 + [2.0]*2
         )
 
     def test_that_constants_can_be_added(self):
@@ -667,7 +824,8 @@ class ParticleArrayTest(object):
     def test_extract_particles_extracts_particles_and_output_arrays(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
-        p.set_output_arrays(['x'])
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        p.set_output_arrays(['x', 'A'])
 
         # When.
         n = p.extract_particles(indices=[1])
@@ -675,26 +833,32 @@ class ParticleArrayTest(object):
 
         # Then.
         self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(p.A), 6)
         self.assertEqual(len(n.x), 1)
+        self.assertEqual(len(n.A), 2)
         self.assertEqual(n.x[0], 2.0)
+        numpy.testing.assert_array_equal(n.A, [2, 3])
         self.assertEqual(n.output_property_arrays, p.output_property_arrays)
 
     def test_extract_particles_works_with_specific_props(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
-        p.set_output_arrays(['x', 'y'])
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        p.set_output_arrays(['x', 'y', 'A'])
 
         # When.
-        n = p.extract_particles(indices=[1], props=['x'])
+        n = p.extract_particles(indices=[1], props=['x', 'A'])
         self.pull(n)
 
         # Then.
         self.assertEqual(len(p.x), 3)
         self.assertEqual(len(n.x), 1)
         self.assertEqual(n.x[0], 2.0)
+        self.assertEqual(n.x[0], 2.0)
+        numpy.testing.assert_array_equal(n.A, [2, 3])
         self.assertFalse('y' in n.properties)
-        self.assertEqual(sorted(p.output_property_arrays), sorted(['x', 'y']))
-        self.assertEqual(n.output_property_arrays, ['x'])
+        self.assertEqual(sorted(p.output_property_arrays), sorted(['A', 'x', 'y']))
+        self.assertEqual(sorted(n.output_property_arrays), ['A', 'x'])
 
     def test_that_remove_property_also_removes_output_arrays(self):
         # Given
@@ -716,6 +880,7 @@ class ParticleArrayUtils(unittest.TestCase):
     def test_that_get_particles_info_works(self):
         # Given.
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
+        p.add_property('A', data=numpy.arange(6), stride=2)
         c = [1.0, 2.0]
         p.add_constant('c', c)
 
@@ -728,6 +893,9 @@ class ParticleArrayUtils(unittest.TestCase):
         self.assertTrue(check_array(dummy.c, c))
         self.assertEqual(dummy.name, 'f')
         self.assertTrue('x' in dummy.properties)
+        self.assertTrue('A' in dummy.properties)
+        self.assertTrue('A' in dummy.stride)
+        self.assertEqual(dummy.stride['A'], 2)
 
     def test_get_particle_array_takes_scalars(self):
         # Given/when

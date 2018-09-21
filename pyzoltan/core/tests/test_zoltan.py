@@ -7,10 +7,11 @@ from pysph.tools import run_parallel_script
 
 path = run_parallel_script.get_directory(__file__)
 
+
 class PyZoltanTests(unittest.TestCase):
 
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 
@@ -32,6 +33,7 @@ class PyZoltanTests(unittest.TestCase):
         run_parallel_script.run(
             filename='zcomm.py', nprocs=4, path=path
         )
+
 
 if __name__ == '__main__':
     unittest.main()

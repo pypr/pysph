@@ -200,6 +200,17 @@ where, a list of indices is provided.  One could also provide the indices in
 the form of a :py:class:`LongArray` which, as the name suggests, is an array
 of 64 bit integers.
 
+The particle array also supports what we call strided properties where you may
+associate multiple values per particle. Normally the stride length is 1. This
+feature is convenient if you wish to associate a matrix or vector of values
+per particle. You must still access the individual values as a "flattened"
+array but one can resize, remove, and add particles and the strided properties
+will be honored. For example::
+
+    >>> pa.add_property(name='A', data=2.0, default=-1.0, stride=2)
+
+Will create a new property called ``'A'`` with a stride length of 2.
+
 .. note::
 
    Any one-dimensional (NumPy) array is valid input for PySPH. You can

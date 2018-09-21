@@ -1,6 +1,6 @@
 # Standard library imports
 from contextlib import contextmanager
-from distutils.sysconfig import get_config_var
+from distutils.sysconfig import get_config_vars
 from distutils.util import get_platform
 from distutils.errors import CompileError, LinkError
 import hashlib
@@ -34,6 +34,12 @@ def get_platform_dir():
     return 'py{version}-{platform_dir}'.format(
         version=sys.version[:3], platform_dir=get_platform()
     )
+
+
+def get_ext_extension():
+    """Return the system's file extension for Extension modules."""
+    vars = get_config_vars()
+    return vars.get('EXT_SUFFIX', vars.get('SO'))
 
 
 def get_md5(data):
@@ -89,7 +95,7 @@ class ExtModule(object):
         )
         self.extra_link_args = extra_link_args if extra_link_args else []
 
-        if MPI is not None:
+        if MPI is not None and MPI.Is_initialized():
             self.comm = MPI.COMM_WORLD
             self.rank = self.comm.Get_rank()
             self.num_procs = self.comm.Get_size()
@@ -103,7 +109,7 @@ class ExtModule(object):
     def _setup_filenames(self):
         base = self.name
         self.src_path = join(self.root, base + '.' + self.extension)
-        self.ext_path = join(self.root, base + get_config_var('SO'))
+        self.ext_path = join(self.root, base + get_ext_extension())
         self.lock_path = join(self.root, base + '.lock')
 
     @contextmanager
@@ -249,7 +255,7 @@ class ExtModule(object):
                     shutil.copy(mod, self.ext_path)
                 else:
                     self._message("Precompiled code from:", self.src_path)
-        if MPI is not None:
+        if MPI is not None and MPI.Is_initialized():
             self.comm.barrier()
 
     def load(self):

@@ -1,4 +1,4 @@
-#Author: Anshuman Kumar
+# Author: Anshuman Kumar
 
 try:
     # This is for Python-2.6.x
@@ -14,13 +14,25 @@ except ImportError:
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
 
+
 class MockApp(Application):
-    def add_user_options(self,group):
-        group.add_argument( "--testarg", action="store", type=float,
-                dest="testarg", default=int(10.0), help="Test Argument")
-        
+
+    @mock.patch('pysph.solver.application.in_parallel', return_value=False)
+    def __init__(self, mock_in_parallel, *args, **kw):
+        super(MockApp, self).__init__(*args, **kw)
+
+    def add_user_options(self, group):
+        group.add_argument(
+            "--testarg",
+            action="store",
+            type=float,
+            dest="testarg",
+            default=int(10.0),
+            help="Test Argument"
+        )
+
     def consume_user_options(self):
-        self.testarg  = self.options.testarg
+        self.testarg = self.options.testarg
 
     def create_particles(self):
         return []
@@ -30,7 +42,7 @@ class MockApp(Application):
 
     def create_solver(self):
         solver = Solver()
-        solver.particles =[]
+        solver.particles = []
         solver.solve = mock.Mock()
         solver.setup = mock.Mock()
         return solver
@@ -38,35 +50,35 @@ class MockApp(Application):
     def create_nnps(self):
         nnps = mock.Mock()
         return nnps
- 
+
+
 class TestApplication(TestCase):
 
     # Test When testarg is  notpassed
     def test_user_options_false(self):
-        #Given
+        # Given
         app = MockApp()
 
-        #When
+        # When
         args = []
         app.run(args)
-        record = app.testarg
 
-        #Then
+        # Then
+        self.assertEqual(app.comm, None)
         expected = 10.0
-        error_message = "Expected %f, got %f"%(expected, app.testarg)
-        self.assertEqual(expected,app.testarg,error_message)
+        error_message = "Expected %f, got %f" % (expected, app.testarg)
+        self.assertEqual(expected, app.testarg, error_message)
 
     # Test When testarg is passed
     def test_user_options_true(self):
-        #Given
+        # Given
         app = MockApp()
 
-        #When
+        # When
         args = ['--testarg', '20']
         app.run(args)
 
-        #Then
+        # Then
         expected = 20.0
-        error_message = "Expected %f, got %f"%(expected, app.testarg)
-        self.assertEqual(expected,app.testarg,error_message)
-
+        error_message = "Expected %f, got %f" % (expected, app.testarg)
+        self.assertEqual(expected, app.testarg, error_message)

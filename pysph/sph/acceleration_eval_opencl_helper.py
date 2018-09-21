@@ -97,6 +97,10 @@ from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
 
 def get_kernel_definition(kernel, arg_list):
     sig = '__kernel void\n{kernel}\n({args})'.format(
@@ -515,7 +519,7 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
+                call_args = list(getfullargspec(method).args)
                 if 'self' in call_args:
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
