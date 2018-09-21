@@ -74,6 +74,7 @@ cdef class GPUNNPS(NNPSBase):
     cdef public bint use_double
     cdef public dtype
     cdef public dtype_max
+    cdef public double _last_domain_size # last size of domain.
 
     cdef public np.ndarray xmin
     cdef public np.ndarray xmax

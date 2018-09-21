@@ -16,6 +16,11 @@ from pysph.sph.equation import get_array_names
 from pysph.cpy.api import CythonGenerator, get_func_definition
 
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
+
 class IntegratorCythonHelper(object):
     """A helper that generates Cython code for the Integrator class.
     """
@@ -88,7 +93,7 @@ class IntegratorCythonHelper(object):
     def get_args(self, dest, method):
         stepper = self.object.steppers[dest]
         meth = getattr(stepper, method)
-        return inspect.getargspec(meth).args
+        return getfullargspec(meth).args
 
     def get_array_declarations(self, method):
         arrays = set()

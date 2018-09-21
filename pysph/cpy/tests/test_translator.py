@@ -990,11 +990,11 @@ def test_class():
     src = dedent('''
     class Foo(object):
         def g(self, x=0.0):
-            pass
+            return x*2.0
         def f(self, x=0.0):
             y = x + 1
             do(self.a, x)
-            self.g(y)
+            z = self.g(y)
     ''')
 
     # When
@@ -1002,17 +1002,18 @@ def test_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(Foo* self, double x)
+    double Foo_g(Foo* self, double x)
     {
-        ;
+        return (x * 2.0);
     }
 
     void Foo_f(Foo* self, double x)
     {
         double y;
+        double z;
         y = (x + 1);
         do(self->a, x);
-        Foo_g(self, y);
+        z = Foo_g(self, y);
     }
     ''')
     assert code.strip() == expect.strip()

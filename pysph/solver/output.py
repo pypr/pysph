@@ -122,15 +122,14 @@ class NumpyOutput(Output):
             particles = _get_dict_from_arrays(data["particles"])
 
             for array_name, array_info in particles.items():
+                for prop, data in array_info['arrays'].items():
+                    array_info['properties'][prop]['data'] = data
                 array = ParticleArray(name=array_name,
                                       constants=array_info["constants"],
-                                      **array_info["arrays"])
+                                      **array_info["properties"])
                 array.set_output_arrays(
                     array_info.get('output_property_arrays', [])
                 )
-                for prop, prop_info in array_info["properties"].items():
-                    if prop not in array_info["arrays"]:
-                        array.add_property(**prop_info)
                 ret["arrays"][array_name] = array
 
         else:
@@ -182,12 +181,16 @@ class HDFOutput(Output):
                 prop_name = _to_str(h5obj.attrs['name'])
                 type_ = _to_str(h5obj.attrs['type'])
                 default = h5obj.attrs['default']
+                stride = h5obj.attrs.get('stride', 1)
                 if h5obj.attrs['stored']:
                     output_array.append(_to_str(pname))
                     array.add_property(
-                            prop_name, type_, default, numpy.array(h5obj))
+                        prop_name, type=type_, default=default,
+                        data=numpy.array(h5obj),
+                        stride=stride
+                    )
                 else:
-                    array.add_property(prop_name, type_)
+                    array.add_property(prop_name, type=type_, stride=stride)
             array.set_output_arrays(output_array)
             particles[str(name)] = array
         return particles

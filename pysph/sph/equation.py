@@ -22,6 +22,11 @@ from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
                            get_symbols)
 
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
+
 def camel_to_underscore(name):
     """Given a CamelCase name convert it to a name with underscores,
     i.e. camel_case.
@@ -232,6 +237,21 @@ def precomputed_symbols():
         WJ=0.0
     )
 
+    c.WDASHI = BasicCodeBlock(
+        code="WDASHI = DWDQ(RIJ, d_h[d_idx])",
+        WDASHI=0.0
+    )
+
+    c.WDASHJ = BasicCodeBlock(
+        code="WDASHJ = DWDQ(RIJ, s_h[s_idx])",
+        WDASHJ=0.0
+    )
+
+    c.WDASHIJ = BasicCodeBlock(
+        code="WDASHIJ = DWDQ(RIJ, HIJ)",
+        WDASHIJ=0.0
+    )
+
     c.DWIJ = BasicCodeBlock(
         code="GRADIENT(XIJ, RIJ, HIJ, DWIJ)",
         DWIJ=[0.0, 0.0, 0.0]
@@ -331,7 +351,7 @@ def get_arrays_used_in_equation(equation):
     for meth_name in ('initialize', 'loop', 'loop_all', 'post_loop'):
         meth = getattr(equation, meth_name, None)
         if meth is not None:
-            args = inspect.getargspec(meth).args
+            args = getfullargspec(meth).args
             s, d = get_array_names(args)
             src_arrays.update(s)
             dest_arrays.update(d)
@@ -342,7 +362,7 @@ def get_init_args(obj, method, ignore=None):
     """Return the arguments for the method given, typically an __init__.
     """
     ignore = ignore if ignore is not None else []
-    spec = inspect.getargspec(method)
+    spec = getfullargspec(method)
     keys = [k for k in spec.args[1:] if k not in ignore and k in obj.__dict__]
     args = ['%s=%r' % (k, getattr(obj, k)) for k in keys]
     return args
@@ -402,7 +422,7 @@ class Group(object):
     pre_comp = precomputed_symbols()
 
     def __init__(self, equations, real=True, update_nnps=False, iterate=False,
-                 max_iterations=1, min_iterations=0):
+                 max_iterations=1, min_iterations=0, pre=None, post=None):
         """Constructor.
 
         Parameters
@@ -431,6 +451,14 @@ class Group(object):
             specifies the minimum number of times this group should be
             iterated.
 
+        pre: callable
+            A callable which is passed no arguments that is called before
+            anything in the group is executed.
+
+        pre: callable
+            A callable which is passed no arguments that is called after
+            the group is completed.
+
         Notes
         -----
 
@@ -450,6 +478,8 @@ class Group(object):
         self.iterate = iterate
         self.max_iterations = max_iterations
         self.min_iterations = min_iterations
+        self.pre = pre
+        self.post = post
 
         only_groups = [x for x in equations if isinstance(x, Group)]
         if (len(only_groups) > 0) and (len(only_groups) != len(equations)):
@@ -491,7 +521,7 @@ class Group(object):
         all_args = set()
         for equation in self.equations:
             if hasattr(equation, 'loop'):
-                args = inspect.getargspec(equation.loop).args
+                args = getfullargspec(equation.loop).args
                 all_args.update(args)
         all_args.discard('self')
 
@@ -657,7 +687,7 @@ class CythonGroup(Group):
         for eq in self.equations:
             meth = getattr(eq, kind, None)
             if meth is not None:
-                args = inspect.getargspec(meth).args
+                args = getfullargspec(meth).args
                 if 'self' in args:
                     args.remove('self')
                 if 'SPH_KERNEL' in args:
@@ -675,13 +705,14 @@ class CythonGroup(Group):
     def _set_kernel(self, code, kernel):
         if kernel is not None:
             k_func = 'self.kernel.kernel'
+            w_func = 'self.kernel.dwdq'
             g_func = 'self.kernel.gradient'
             h_func = 'self.kernel.gradient_h'
             deltap = 'self.kernel.get_deltap()'
             code = code.replace('DELTAP', deltap)
             return code.replace('GRADIENT', g_func).replace(
                 'KERNEL', k_func
-            ).replace('GRADH', h_func)
+            ).replace('GRADH', h_func).replace('DWDQ', w_func)
         else:
             return code
 

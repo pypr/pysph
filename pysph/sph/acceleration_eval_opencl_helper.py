@@ -97,6 +97,10 @@ from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
 )
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
 
 def get_kernel_definition(kernel, arg_list):
     sig = '__kernel void\n{kernel}\n({args})'.format(
@@ -191,6 +195,9 @@ class OpenCLAccelerationEval(object):
                     method(_args[0], _args[1], t, dt)
                 else:
                     method(*info.get('args'))
+            elif type == 'call':
+                func = info.get('callable')
+                func(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -353,7 +360,8 @@ class AccelerationEvalOpenCLHelper(object):
                     args[0] = [x for x in grp.equations
                                if hasattr(x, 'reduce')]
                     args[1] = self._array_map[args[1]]
-
+            elif type == 'call':
+                info = dict(item)
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -511,7 +519,7 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
+                call_args = list(getfullargspec(method).args)
                 if 'self' in call_args:
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
@@ -562,6 +570,12 @@ class AccelerationEvalOpenCLHelper(object):
             return code.replace('KERNEL(', kern).replace('GRADH(', grad_h)
         else:
             return code
+
+    def call_post(self, group):
+        self.data.append(dict(callable=group.post, type='call', args=()))
+
+    def call_pre(self, group):
+        self.data.append(dict(callable=group.pre, type='call', args=()))
 
     def call_reduce(self, all_eq_group, dest):
         self.data.append(dict(method='do_reduce', type='method',

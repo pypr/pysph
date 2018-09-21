@@ -15,7 +15,7 @@ from pysph.parallel.tests.example_test_case import ExampleTestCase, get_example_
 class ParallelTests(ExampleTestCase):
 
     @classmethod
-    def setup_class(cls):
+    def setUpClass(cls):
         importorskip("mpi4py.MPI")
         importorskip("pyzoltan.core.zoltan")
 

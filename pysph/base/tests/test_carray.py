@@ -209,9 +209,6 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(numpy.allclose(l1.get_npy_array(), numpy.arange(10)), True)
 
     def test_remove(self):
-        """
-        Tests the remove function.
-        """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
         rem = [0, 4, 3]
@@ -233,10 +230,35 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(l1.length, 0)
         self.assertEqual(len(l1.get_npy_array()), 0)
 
+    def test_remove_with_strides(self):
+        # Given
+        l1 = LongArray(12)
+        l1.set_data(numpy.arange(12))
+
+        # When
+        rem = [3, 1]
+        l1.remove(numpy.array(rem, dtype=numpy.int), stride=3)
+
+        # Then
+        self.assertEqual(l1.length, 6)
+        self.assertEqual(numpy.allclose([0, 1, 2, 6, 7, 8],
+                                        l1.get_npy_array()), True)
+
+        # Given
+        l1 = LongArray(12)
+        l1.set_data(numpy.arange(12))
+
+        # When
+        rem = [0, 2]
+        l1.remove(numpy.array(rem, dtype=numpy.int), stride=3)
+
+        # Then
+        self.assertEqual(l1.length, 6)
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        self.assertEqual(numpy.allclose([9, 10, 11, 3, 4, 5],
+                                        l1.get_npy_array()), True)
+
     def test_align_array(self):
-        """
-        Test the align_array function.
-        """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
 
@@ -247,10 +269,17 @@ class TestLongArray(unittest.TestCase):
         self.assertEqual(numpy.allclose([1, 5, 3, 2, 4, 7, 8, 6, 9, 0],
                                         l1.get_npy_array()), True)
 
+        # Test case with strides.
+        l1 = LongArray(6)
+        l1.set_data(numpy.arange(6))
+
+        new_indices = LongArray(3)
+        new_indices.set_data(numpy.asarray([2, 1, 0]))
+        l1.align_array(new_indices, 2)
+        self.assertEqual(numpy.allclose([4, 5, 2, 3, 0, 1],
+                                        l1.get_npy_array()), True)
+
     def test_copy_subset(self):
-        """
-        Tests the copy_subset function.
-        """
         l1 = LongArray(10)
         l1.set_data(numpy.arange(10))
 
@@ -284,6 +313,62 @@ class TestLongArray(unittest.TestCase):
         self.assertRaises(ValueError, l1.copy_subset, l2, 0, 11)
         self.assertRaises(ValueError, l1.copy_subset, l2, 10, 20)
         self.assertRaises(ValueError, l1.copy_subset, l2, -1, -1)
+
+    def test_copy_subset_works_with_strides(self):
+        # Given
+        l1 = LongArray(8)
+        l1.set_data(numpy.arange(8))
+
+        l2 = LongArray(4)
+        l2.set_data(numpy.arange(10, 14))
+
+        # When
+        l1.copy_subset(l2, 2, 3, stride=2)
+
+        # Then
+        numpy.testing.assert_array_equal(
+            l1.get_npy_array(),
+            [0, 1, 2, 3, 10, 11, 6, 7]
+        )
+
+        # When
+        l1.copy_subset(l2, 2, 4, stride=2)
+
+        # Then
+        numpy.testing.assert_array_equal(
+            l1.get_npy_array(),
+            [0, 1, 2, 3, 10, 11, 12, 13]
+        )
+
+    def test_copy_values(self):
+        # Given
+        l1 = LongArray(8)
+        l1.set_data(numpy.arange(8))
+        l2 = LongArray(8)
+        l2.set_data(numpy.zeros(8, dtype=int))
+
+        # When
+        indices = LongArray(3)
+        indices.set_data(numpy.array([2, 4, 6]))
+        l1.copy_values(indices, l2)
+
+        # Then
+        numpy.testing.assert_array_equal(
+            l2.get_npy_array(),
+            [2, 4, 6] + [0]*5
+        )
+
+        # When
+        l2.set_data(numpy.zeros(8, dtype=int))
+        indices.set_data(numpy.array([1, 2, 3]))
+
+        l1.copy_values(indices, l2, stride=2)
+
+        # Then
+        numpy.testing.assert_array_equal(
+            l2.get_npy_array(),
+            [2, 3, 4, 5, 6, 7, 0, 0]
+        )
 
     def test_update_min_max(self):
         """

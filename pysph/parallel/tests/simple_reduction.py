@@ -17,7 +17,7 @@ def create_particles():
     m = np.ones_like(x)
     y = np.zeros_like(x)
     z = np.zeros_like(x)
-    h = np.ones_like(x)*0.2
+    h = np.ones_like(x) * 0.2
 
     fluid = ParticleArray(name='fluid', x=x, y=y, z=z, m=m, h=h)
     fluid.add_constant('total_mass', 0.0)
@@ -37,28 +37,34 @@ class DummyStepper(IntegratorStep):
     def stage1(self):
         pass
 
-# Create the application.
-app = Application()
 
-dim = 1
-# Create the kernel
-kernel = CubicSpline(dim=dim)
+def main():
+    # Create the application.
+    app = Application()
 
-# Create the integrator.
-integrator = EulerIntegrator(fluid=DummyStepper())
+    dim = 1
+    # Create the kernel
+    kernel = CubicSpline(dim=dim)
 
-solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
-solver.set_time_step(0.1)
-solver.set_final_time(0.1)
+    # Create the integrator.
+    integrator = EulerIntegrator(fluid=DummyStepper())
 
-equations = [TotalMass(dest='fluid', sources=['fluid'])]
-app.setup(solver=solver, equations=equations,
-          particle_factory=create_particles)
-# There is no need to write any output as the test below
-# computes the total mass.
-solver.set_disable_output(True)
-app.run()
+    solver = Solver(kernel=kernel, dim=dim, integrator=integrator)
+    solver.set_time_step(0.1)
+    solver.set_final_time(0.1)
 
-fluid = solver.particles[0]
-err = fluid.total_mass[0] - 10.0
-assert abs(err) < 1e-16, "Error: %s"%err
+    equations = [TotalMass(dest='fluid', sources=['fluid'])]
+    app.setup(
+        solver=solver, equations=equations, particle_factory=create_particles)
+    # There is no need to write any output as the test below
+    # computes the total mass.
+    solver.set_disable_output(True)
+    app.run()
+
+    fluid = solver.particles[0]
+    err = fluid.total_mass[0] - 10.0
+    assert abs(err) < 1e-16, "Error: %s" % err
+
+
+if __name__ == '__main__':
+    main()
