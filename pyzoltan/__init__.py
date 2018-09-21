@@ -18,7 +18,8 @@ def has_mpi():
         except ImportError:
             _has_mpi = False
         else:
-            mpi4py.rc(initialize=False, finalize=True)
+            mpi4py.rc.initialize = False
+            mpi4py.rc.finalize = True
     return _has_mpi
 
 

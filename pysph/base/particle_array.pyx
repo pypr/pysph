@@ -426,9 +426,12 @@ cdef class ParticleArray:
         if real:
             return self.num_real_particles
         else:
-            if len(self.properties) > 0:
-                prop0 = list(self.properties.values())[0]
-                return prop0.length
+            if 'tag' in self.properties:
+                return self.properties['tag'].length
+            elif len(self.properties) > 0:
+                prop = list(self.properties.keys())[0]
+                stride = self.stride.get(prop, 1)
+                return self.properties[prop].length//stride
             else:
                 return 0
 
