@@ -20,30 +20,30 @@ def get_backend(backend=None):
 def wrap_array(arr, backend):
     wrapped_array = Array(arr.dtype, allocate=False, backend=backend)
     if isinstance(arr, np.ndarray):
-        wrapped_array.npdata = arr
+        wrapped_array.data = arr
         if backend == 'opencl' or backend == 'cuda':
             use_double = get_config().use_double
             _dtype = np.float64 if use_double else np.float32
             if np.issubdtype(arr.dtype, np.float):
                 wrapped_array.dtype = _dtype
-                wrapped_array.npdata = arr.astype(_dtype)
+                wrapped_array.data = arr.astype(_dtype)
             q = None
             if backend == 'opencl':
                 from .opencl import get_queue
                 from pyopencl.array import to_device
                 q = get_queue()
                 if arr is not None:
-                    dev_ary = to_device(q, wrapped_array.npdata)
+                    dev_ary = to_device(q, wrapped_array.data)
                     wrapped_array.set_data(dev_ary)
             elif backend == 'cuda':
                 from .cuda import set_context
                 set_context()
                 from pycuda.gpuarray import to_gpu
                 if arr is not None:
-                    dev_ary = to_gpu(wrapped_array.npdata)
+                    dev_ary = to_gpu(wrapped_array.data)
                     wrapped_array.set_data(dev_ary)
         else:
-            wrapped_array.set_data(wrapped_array.npdata)
+            wrapped_array.set_data(wrapped_array.data)
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         if isinstance(arr, gpuarray.Array):
@@ -205,7 +205,7 @@ class Array(object):
         self.gptr_type = dtype_to_knowntype(dtype, address='global')
         self.minimum = 0
         self.maximum = 0
-        self.npdata = None
+        self.data = None
         self._data = None
         self.dev = None
         if allocate:
@@ -259,7 +259,7 @@ class Array(object):
         self.dev = self._data[:self.length]
 
     def _get_np_data(self):
-        return self.npdata
+        return self.data
 
     def get(self):
         if self.backend == 'cython':
@@ -269,9 +269,9 @@ class Array(object):
 
     def pull(self):
         if self.backend == 'opencl' or self.backend == 'cuda':
-            if self.npdata is None:
-                self.npdata = np.empty(len(self.dev), dtype=self.dtype)
-            self.npdata[:] = self.dev.get()
+            if self.data is None:
+                self.data = np.empty(len(self.dev), dtype=self.dtype)
+            self.data[:] = self.dev.get()
 
     def push(self):
         if self.backend == 'opencl' or self.backend == 'cuda':
