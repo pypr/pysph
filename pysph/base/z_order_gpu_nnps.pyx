@@ -22,7 +22,8 @@ cimport numpy as np
 from mako.template import Template
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.base.opencl import DeviceArray, get_config, profile
+from pysph.cpy.array import Array
+from pysph.base.opencl import get_config, profile
 
 
 IF UNAME_SYSNAME == "Windows":
@@ -68,16 +69,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.pids.append(DeviceArray(np.uint32, n=num_particles))
-            self.pid_keys.append(DeviceArray(np.uint64, n=num_particles))
-            self.cids.append(DeviceArray(np.uint32, n=num_particles))
-            self.cid_to_idx.append(DeviceArray(np.int32))
+            self.pids.append(Array(np.uint32, n=num_particles))
+            self.pid_keys.append(Array(np.uint64, n=num_particles))
+            self.cids.append(Array(np.uint32, n=num_particles))
+            self.cid_to_idx.append(Array(np.int32))
 
         self.curr_cid = 1 + cl.array.zeros(self.queue, 1, dtype=np.uint32)
         self.max_cid_src = cl.array.zeros(self.queue, 1, dtype=np.int32)
 
-        self.dst_to_src = DeviceArray(np.uint32)
-        self.overflow_cid_to_idx = DeviceArray(np.int32)
+        self.dst_to_src = Array(np.uint32)
+        self.overflow_cid_to_idx = Array(np.int32)
 
         self.domain.update()
         self.update()

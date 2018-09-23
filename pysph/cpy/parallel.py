@@ -15,8 +15,11 @@ import numpy as np
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import Transpiler, convert_to_float_if_needed
-from .array import Array, get_backend
+#from .array import Array, get_backend
 from .types import dtype_to_ctype
+
+import pysph.cpy.array as array
+
 
 elementwise_cy_template = '''
 from cython.parallel import parallel, prange
@@ -375,7 +378,7 @@ def drop_duplicates(arr):
 
 class Elementwise(object):
     def __init__(self, func, backend='cython'):
-        backend = get_backend(backend)
+        backend = array.get_backend(backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.name = func.__name__
@@ -481,7 +484,7 @@ class Elementwise(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x
@@ -516,7 +519,7 @@ def elementwise(func=None, backend=None):
 class Reduction(object):
     def __init__(self, reduce_expr, map_func=None, dtype_out=np.float64,
                  neutral='0', backend='cython'):
-        backend = get_backend(backend)
+        backend = array.get_backend(backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.func = map_func
@@ -680,7 +683,7 @@ class Reduction(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x
@@ -707,9 +710,8 @@ class Reduction(object):
 class Scan(object):
     def __init__(self, input=None, output=None, scan_expr="a+b",
                  is_segment=None, dtype=np.float64, neutral='0',
-                 complex_map=False,
-                 backend='opencl'):
-        backend = get_backend(backend)
+                 preamble=[], complex_map=False, backend='opencl'):
+        backend = array.get_backend(backend)
         if backend not in ['opencl', 'cython']:
             raise NotImplementedError("Unsupported backend: %s. Supported "
                                       "backends: cython, opencl" %
@@ -718,6 +720,7 @@ class Scan(object):
         self.backend = backend
         self.input_func = input
         self.output_func = output
+        self.preamble = preamble
         self.is_segment_func = is_segment
         self.complex_map = complex_map
         if input is not None:
@@ -818,6 +821,9 @@ class Scan(object):
         name = self.name
         all_py_data = [[], []]
         all_c_data = [[], []]
+        # Process preamble
+        for func in self.preamble:
+            self.tp.add(func)
 
         # Process input function
         py_data, c_data, input_expr = self._wrap_cython_code(self.input_func,
@@ -882,6 +888,8 @@ class Scan(object):
         self.c_func = getattr(self.tp.mod, 'py_' + self.name)
 
     def _wrap_ocl_function(self, func, func_type=None):
+        for preamble_f in self.preamble:
+            self.tp.add(preamble_f)
         if func is not None:
             self.tp.add(func)
             py_data, c_data = self.cython_gen.get_func_signature(func)
@@ -977,7 +985,7 @@ class Scan(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x
