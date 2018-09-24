@@ -154,7 +154,7 @@ cdef class ParticleArray:
         # list of output property arrays
         self.output_property_arrays = []
 
-        if get_config().use_opencl:
+        if self.backend:
             h = ocl.DeviceHelper(self, backend=self.backend)
             self.set_device_helper(h)
         else:
