@@ -11,16 +11,17 @@ from pysph.base.opencl import DeviceHelper, Array, \
         get_queue  # noqa: E402
 from pysph.cpy.config import get_config
 from pysph.cpy.array import Array
+import pysph.cpy.array as array
 
 
-class TestDeviceHelper(TestCase):
-    def setUp(self):
+class DeviceHelperTest(object):
+    def setup(self):
         self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
 
     def test_simple(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -35,7 +36,7 @@ class TestDeviceHelper(TestCase):
     def test_push_correctly_sets_values_with_args(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
         self.assertEqual(pa.tag[0], 0)
 
         # When
@@ -55,7 +56,7 @@ class TestDeviceHelper(TestCase):
     def test_push_correctly_sets_values_with_no_args(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -75,7 +76,7 @@ class TestDeviceHelper(TestCase):
     def test_pull_correctly_sets_values_with_args(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
         self.assertEqual(pa.tag[0], 0)
 
         # When
@@ -95,7 +96,7 @@ class TestDeviceHelper(TestCase):
     def test_pull_correctly_sets_values_with_no_args(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -115,7 +116,7 @@ class TestDeviceHelper(TestCase):
     def test_max_provides_maximum(self):
         # Given/When
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # Then
         self.assertEqual(h.max('x'), 1.0)
@@ -123,7 +124,7 @@ class TestDeviceHelper(TestCase):
     def test_that_adding_removing_prop_to_array_updates_gpu(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -143,7 +144,7 @@ class TestDeviceHelper(TestCase):
     def test_resize_works(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -174,7 +175,7 @@ class TestDeviceHelper(TestCase):
     def test_get_number_of_particles(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -191,14 +192,15 @@ class TestDeviceHelper(TestCase):
     def test_align(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
         h.resize(5)
         h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
 
-        indices = cl.array.arange(get_queue(), 4, -1, -1, dtype=np.int32)
+        indices = array.arange(4, -1, -1, dtype=np.int32,
+                               backend=self.backend)
 
         h.align(indices)
 
@@ -208,7 +210,7 @@ class TestDeviceHelper(TestCase):
     def test_align_particles(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -225,7 +227,7 @@ class TestDeviceHelper(TestCase):
     def test_remove_particles(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -233,7 +235,7 @@ class TestDeviceHelper(TestCase):
         h.x.set(np.array([2.0, 3.0, 4.0, 5.0], h.x.dtype))
 
         indices = np.array([1, 2], dtype=np.uint32)
-        indices = cl.array.to_device(get_queue(), indices)
+        indices = array.to_device(indices, backend=self.backend)
 
         h.remove_particles(indices)
 
@@ -243,7 +245,7 @@ class TestDeviceHelper(TestCase):
     def test_remove_tagged_particles(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -259,11 +261,11 @@ class TestDeviceHelper(TestCase):
     def test_add_particles(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
-        x = cl.array.zeros(get_queue(), 4, np.float32)
+        x = array.zeros(4, np.float32, backend=self.backend)
 
         h.add_particles(x=x)
 
@@ -273,7 +275,7 @@ class TestDeviceHelper(TestCase):
     def test_extend(self):
         # Given
         pa = self.pa
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
 
         # When
         pa.set_device_helper(h)
@@ -287,7 +289,7 @@ class TestDeviceHelper(TestCase):
         # Given
         pa1 = self.pa
         pa2 = get_particle_array(name='s', x=[0.0, 1.0], m=1.0, rho=2.0)
-        h = DeviceHelper(pa1)
+        h = DeviceHelper(pa1, backend=self.backend)
         pa1.set_device_helper(h)
 
         # When
@@ -300,14 +302,33 @@ class TestDeviceHelper(TestCase):
         # Given
         pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
                                 m=1.0, rho=2.0)
-        h = DeviceHelper(pa)
+        h = DeviceHelper(pa, backend=self.backend)
         pa.set_device_helper(h)
 
         # When
         indices = np.array([1, 2], dtype=np.uint32)
-        indices = cl.array.to_device(get_queue(), indices)
+        indices = array.to_device(indices, backend=self.backend)
 
         result_pa = h.extract_particles(indices)
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
+
+class DeviceHelperTestCython(DeviceHelperTest, TestCase):
+    def setUp(self):
+        self.setup()
+        self.backend = 'cython'
+        get_config().use_openmp = True
+
+class DeviceHelperTestOpenCL(DeviceHelperTest, TestCase):
+    def setUp(self):
+        self.setup()
+        self.backend = 'opencl'
+        pytest.importorskip('pyopencl')
+
+class DeviceHelperTestCUDA(DeviceHelperTest, TestCase):
+    def setUp(self):
+        self.setup()
+        self.backend = 'cuda'
+        pytest.importorskip('pycuda')
+

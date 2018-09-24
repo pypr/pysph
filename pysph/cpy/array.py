@@ -44,11 +44,11 @@ def wrap_array(arr, backend):
                     wrapped_array.set_data(dev_ary)
         else:
             wrapped_array.set_data(wrapped_array.data)
-    if backend == 'opencl':
+    elif backend == 'opencl':
         import pyopencl.array as gpuarray
         if isinstance(arr, gpuarray.Array):
             wrapped_array.set_data(arr)
-    if backend == 'cuda':
+    elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
         if isinstance(arr, gpuarray.GPUArray):
             wrapped_array.set_data(arr)
@@ -193,9 +193,7 @@ def take(ary, indices, backend='cython'):
         out = gpuarray.take(ary.dev, indices.dev)
     elif backend == 'cython':
         out = np.take(ary.dev, indices.dev)
-    wrapped_array = Array(out.dtype, allocate=False)
-    wrapped_array.set_data(out)
-    return wrapped_array
+    return wrap_array(out, backend)
 
 
 class Array(object):
@@ -267,6 +265,12 @@ class Array(object):
         elif self.backend == 'opencl' or self.backend == 'cuda':
             return self.dev.get()
 
+    def set(self, nparr):
+        if self.backend == 'cython':
+            self.set_data(nparr)
+        else:
+            self.set_data(to_device(nparr, backend=self.backend))
+
     def pull(self):
         if self.backend == 'opencl' or self.backend == 'cuda':
             if self.data is None:
@@ -296,11 +300,17 @@ class Array(object):
         # a numpy/cl array/cuda array
         if isinstance(data, Array):
             data = data.dev
+        #FIXME: Find a way around this copy
+        if self.backend == 'cython':
+            data = data.copy()
         self._data = data
         self.length = data.size
         self.alloc = data.size
         self.dtype = data.dtype
         self._update_array_ref()
+
+    def get_array(self):
+        return self[:self.length]
 
     def get_data(self):
         return self._data
@@ -377,7 +387,8 @@ class Array(object):
         self.set_data(new_array.dev[:-len(indices.dev)])
 
     def align(self, indices):
-        self.set_data(take(self, indices, backend=self.backend))
+        self.set_data(take(self.get_array(), indices,
+                      backend=self.backend))
 
     def squeeze(self):
         self.set_data(self._data[:self.length])

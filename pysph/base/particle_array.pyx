@@ -21,6 +21,8 @@ from cpython cimport *
 from cython cimport *
 
 from pysph.cpy.config import get_config
+from pysph.cpy.array import Array
+#import pysph.cpy.array as array
 
 try:
     import pyopencl as cl
@@ -373,7 +375,7 @@ cdef class ParticleArray:
 
         # number of particles
         num_particles = self.get_number_of_particles(only_real)
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             self.gpu.pull(*props)
 
         # add the property arrays
@@ -421,7 +423,7 @@ cdef class ParticleArray:
 
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             return self.gpu.get_number_of_particles()
         if real:
             return self.num_real_particles
@@ -463,7 +465,7 @@ cdef class ParticleArray:
                 array.remove(sorted_indices)
 
         """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             if type(indices) != cl.array.Array:
                 if isinstance(indices, BaseArray):
                     indices = indices.get_npy_array()
@@ -511,7 +513,7 @@ cdef class ParticleArray:
             the type of particles that need to be removed.
 
         """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             return self.gpu.remove_tagged_particles(tag)
         cdef LongArray indices = LongArray()
         cdef IntArray tag_array = self.properties['tag']
@@ -551,7 +553,7 @@ cdef class ParticleArray:
         if len(particle_props) == 0:
             return 0
 
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             gpu_particle_props = {}
             for prop, ary in particle_props.items():
                 if prop in self.gpu.properties:
@@ -606,7 +608,7 @@ cdef class ParticleArray:
         if parray.get_number_of_particles() == 0:
             return 0
 
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             self.gpu.append_parray(parray)
             return 0
 
@@ -664,7 +666,7 @@ cdef class ParticleArray:
         if num_particles <= 0:
             return
 
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             self.gpu.extend(num_particles)
             return 0
 
@@ -837,7 +839,7 @@ cdef class ParticleArray:
 
         array_data = numpy.ravel(data)
         self.constants[name] = self._create_c_array_from_npy_array(array_data)
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             self.gpu.add_const(name, self.constants[name])
 
     cpdef add_property(self, str name, str type='double', default=None, data=None,
@@ -1118,7 +1120,7 @@ cdef class ParticleArray:
                          prop[i] = prop[index_arr[i]]
                          prop[index_arr[i]] = tmp
         """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             self.gpu.align_particles()
             return 0
 
@@ -1187,7 +1189,7 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             if type(indices) != cl.array.Array:
                 indices = cl.array.to_device(get_queue(),
                         numpy.array(indices, dtype=numpy.uint32))
@@ -1354,7 +1356,7 @@ cdef class ParticleArray:
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             backend = self.gpu
         else:
             backend = self
@@ -1373,7 +1375,7 @@ cdef class ParticleArray:
         To do that, you need to call `align_particles`.
 
         """
-        if self.gpu is not None:
+        if self.gpu is not None and get_config().use_opencl:
             return self.gpu.resize(size)
 
         for prop, array in self.properties.items():

@@ -17,7 +17,7 @@ from pysph.cpy.opencl import (  # noqa: 401
     get_context, get_queue, profile, profile_kernel,
     print_profile, set_context, set_queue
 )
-from pysph.cpy.array import get_backend, Array
+from pysph.cpy.array import get_backend, wrap_array, Array
 import pysph.cpy.array as array
 from pysph.cpy.parallel import Elementwise, Scan
 from pysph.cpy.api import declare, annotate
@@ -26,15 +26,6 @@ import pysph.base.particle_array
 
 
 logger = logging.getLogger()
-
-
-def get_elwise_kernel(kernel_name, args, src, preamble=""):
-    ctx = get_context()
-    knl = ElementwiseKernel(
-        ctx, args, src,
-        kernel_name, preamble=preamble
-    )
-    return profile_kernel(knl, kernel_name)
 
 
 class DeviceHelper(object):
@@ -46,11 +37,11 @@ class DeviceHelper(object):
 
     """
 
-    def __init__(self, particle_array):
+    def __init__(self, particle_array, backend=None):
+        self.backend = get_backend(backend)
         self._particle_array = pa = particle_array
         use_double = get_config().use_double
         self._dtype = np.float64 if use_double else np.float32
-        self.backend = get_backend()
         self.num_real_particles = pa.num_real_particles
         self._data = {}
         self.properties = []
@@ -78,10 +69,11 @@ class DeviceHelper(object):
         particle array.
         """
         np_array = self._get_array(carray)
-        g_ary = Array(np_array.dtype, n=carray.length)
-        g_ary.dev.set(np_array)
+        g_ary = Array(np_array.dtype, n=carray.length,
+                      backend=self.backend)
+        g_ary.set(np_array)
         self._data[name] = g_ary
-        setattr(self, name, g_ary.dev)
+        setattr(self, name, g_ary)
 
     def get_number_of_particles(self, real=False):
         if real:
@@ -103,7 +95,7 @@ class DeviceHelper(object):
         for prop in self.properties:
             stride = self._particle_array.stride.get(prop, 1)
             self._data[prop].align(indices.get(stride))
-            setattr(self, prop, self._data[prop].dev)
+            setattr(self, prop, self._data[prop])
 
     def add_prop(self, name, carray):
         """Add a new property given the name and carray, note
@@ -129,7 +121,7 @@ class DeviceHelper(object):
         """Add a new property to DeviceHelper. Note that this property
         is not added to the particle array itself"""
         self._data[name] = dev_array
-        setattr(self, name, dev_array.dev)
+        setattr(self, name, dev_array)
         if name not in self.properties:
             self.properties.append(name)
 
@@ -137,7 +129,7 @@ class DeviceHelper(object):
         """Add a new constant to DeviceHelper. Note that this property
         is not added to the particle array itself"""
         self._data[name] = dev_array
-        setattr(self, name, dev_array.dev)
+        setattr(self, name, dev_array)
         if name not in self.constants:
             self.constants.append(name)
 
@@ -146,7 +138,8 @@ class DeviceHelper(object):
             return self._data[prop]
 
     def max(self, arg):
-        return float(array.maximum(getattr(self, arg)))
+        return float(array.maximum(getattr(self, arg),
+                     backend=self.backend))
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
@@ -182,7 +175,7 @@ class DeviceHelper(object):
                 self._get_array(self._get_prop_or_const(arg)),
                 backend=self.backend)
             self._data[arg].set_data(dev_arr)
-            setattr(self, arg, self._data[arg].dev)
+            setattr(self, arg, self._data[arg])
 
     def _check_property(self, prop):
         """Check if a property is present or not """
@@ -202,16 +195,16 @@ class DeviceHelper(object):
         for prop in self.properties:
             stride = self._particle_array.stride.get(prop, 1)
             self._data[prop].resize(new_size*stride)
-            setattr(self, prop, self._data[prop].dev)
+            setattr(self, prop, self._data[prop])
 
     def align_particles(self):
         tag_arr = self._data['tag']
 
-        if len(tag_arr.dev) == 0:
+        if len(tag_arr) == 0:
             self.num_real_particles = 0
             return
 
-        num_particles = len(tag_arr.dev)
+        num_particles = len(tag_arr)
 
         new_indices = array.empty(num_particles, dtype=np.int32,
                                   backend=self.backend)
@@ -223,13 +216,12 @@ class DeviceHelper(object):
             return tag_arr[i] == 0
 
         @annotate(int='i, item, prev_item, last_item, num_particles',
-                gintp='tag_arr, new_indices, num_real_particles',
-                return_='int')
+                gintp='tag_arr, new_indices, num_real_particles')
         def align_output_expr(i, item, prev_item, last_item, tag_arr,
                 new_indices, num_particles, num_real_particles):
             t, idx = declare('int', 2)
             t = last_item + i - prev_item
-            idx = prev_item if item else t
+            idx = t if tag_arr[i] else prev_item
             new_indices[idx] = i
             if i == num_particles - 1:
                 num_real_particles[0] = last_item
@@ -270,7 +262,7 @@ class DeviceHelper(object):
                 new_indices, num_particles, stride):
             t, idx, j_s = declare('int', 3)
             t = last_item + i - prev_item
-            idx = prev_item if item else t
+            idx = t if tag_arr[i] else prev_item
             for j_s in range(stride):
                 new_indices[stride*idx + j_s] = stride*i + j_s
 
@@ -286,13 +278,14 @@ class DeviceHelper(object):
     def _remove_particles_bool(self, if_remove):
         """ Remove particle i if if_remove[i] is True
         """
-        num_indices = int(array.sum(if_remove))
+        num_indices = int(array.sum(if_remove, backend=self.backend))
 
         if num_indices == 0:
             return
 
         num_particles = self.get_number_of_particles()
-        new_indices = Array(np.uint32, n=(num_particles - num_indices))
+        new_indices = Array(np.uint32, n=(num_particles - num_indices),
+                            backend=self.backend)
         num_removed_particles = array.empty(1, dtype=np.int32,
                                             backend=self.backend)
 
@@ -321,7 +314,7 @@ class DeviceHelper(object):
 
         @annotate(int='i, size, stride', guintp='indices, new_indices')
         def stride_knl_elwise(i, indices, new_indices, size, stride):
-            tmp_idx, j_s = declare('uint', 2)
+            tmp_idx, j_s = declare('unsigned int', 2)
             for j_s in range(stride):
                 tmp_idx = i*stride + j_s
                 if tmp_idx < size:
@@ -335,7 +328,7 @@ class DeviceHelper(object):
             if stride == 1:
                 continue
             size = new_num_particles*stride
-            s_index = Array(np.uint32, n=size)
+            s_index = Array(np.uint32, n=size, backend=self.backend)
             stride_knl(new_indices, s_index, size, stride)
             s_indices[stride] = s_index
 
@@ -343,7 +336,7 @@ class DeviceHelper(object):
             stride = self._particle_array.stride.get(prop, 1)
             s_index = s_indices[stride]
             self._data[prop].align(s_index)
-            setattr(self, prop, self._data[prop].dev)
+            setattr(self, prop, self._data[prop])
 
         self.align_particles()
 
@@ -381,10 +374,10 @@ class DeviceHelper(object):
             raise ValueError(msg)
 
         num_particles = self.get_number_of_particles()
-        if_remove = Array(np.int32, n=num_particles)
+        if_remove = Array(np.int32, n=num_particles, backend=self.backend)
         if_remove.fill(0)
 
-        @annotate(int='i, size', guintp='indices', gintp='if_remove')
+        @annotate(int='i, size', indices='guintp', if_remove='gintp')
         def fill_if_remove_elwise(i, indices, if_remove, size):
             if indices[i] < size:
                 if_remove[indices[i]] = 1
@@ -407,7 +400,8 @@ class DeviceHelper(object):
 
         """
         tag_array = self.tag
-        if_remove = (tag_array == tag).astype(np.int32)
+        if_remove = wrap_array((tag_array.dev == tag).astype(np.int32),
+                               self.backend)
         self._remove_particles_bool(if_remove)
 
     def add_particles(self, **particle_props):
@@ -512,7 +506,8 @@ class DeviceHelper(object):
             else:
                 # meaning this property is not there in self.
                 dtype = parray.gpu.get_device_array(prop_name).dtype
-                arr = Array(dtype, n=new_num_particles*stride)
+                arr = Array(dtype, n=new_num_particles*stride,
+                            backend=self.backend)
                 arr.fill(parray.default_values[prop_name])
                 self.update_prop(prop_name, arr)
 
@@ -545,7 +540,8 @@ class DeviceHelper(object):
         """
         result_array = pysph.base.particle_array.ParticleArray()
         result_array.set_name(self._particle_array.name)
-        result_array.set_device_helper(DeviceHelper(result_array))
+        result_array.set_device_helper(DeviceHelper(result_array,
+                                       backend=self.backend))
 
         if props is None:
             prop_names = self.properties
@@ -574,7 +570,8 @@ class DeviceHelper(object):
             s_index = s_indices[stride]
             src_arr = self._data[prop]
             dst_arr = result_array.gpu.get_device_array(prop)
-            dst_arr.set_data(array.take(src_arr, s_index))
+            dst_arr.set_data(array.take(src_arr, s_index,
+                             backend=self.backend))
 
         for const in self.constants:
             result_array.gpu.update_const(const, self._data[const].copy())
@@ -600,8 +597,8 @@ class DeviceHelper(object):
         strides = set(self._particle_array.stride.values())
 
         @annotate(int='i, size, stride', guintp='indices, new_indices')
-        def fill_indices_elwise(i, indices, new_indices, size, stride)
-            tmp_idx, j_s = declare('uint', 2)
+        def fill_indices_elwise(i, indices, new_indices, size, stride):
+            tmp_idx, j_s = declare('unsigned int', 2)
             for j_s in range(stride):
                 tmp_idx = i*stride + j_s
                 if tmp_idx < size:
