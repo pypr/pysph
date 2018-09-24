@@ -710,7 +710,7 @@ class Reduction(object):
 class Scan(object):
     def __init__(self, input=None, output=None, scan_expr="a+b",
                  is_segment=None, dtype=np.float64, neutral='0',
-                 preamble=[], complex_map=False, backend='opencl'):
+                 complex_map=False, backend='opencl'):
         backend = array.get_backend(backend)
         if backend not in ['opencl', 'cython']:
             raise NotImplementedError("Unsupported backend: %s. Supported "
@@ -720,7 +720,6 @@ class Scan(object):
         self.backend = backend
         self.input_func = input
         self.output_func = output
-        self.preamble = preamble
         self.is_segment_func = is_segment
         self.complex_map = complex_map
         if input is not None:
@@ -821,9 +820,6 @@ class Scan(object):
         name = self.name
         all_py_data = [[], []]
         all_c_data = [[], []]
-        # Process preamble
-        for func in self.preamble:
-            self.tp.add(func)
 
         # Process input function
         py_data, c_data, input_expr = self._wrap_cython_code(self.input_func,
@@ -888,8 +884,6 @@ class Scan(object):
         self.c_func = getattr(self.tp.mod, 'py_' + self.name)
 
     def _wrap_ocl_function(self, func, func_type=None):
-        for preamble_f in self.preamble:
-            self.tp.add(preamble_f)
         if func is not None:
             self.tp.add(func)
             py_data, c_data = self.cython_gen.get_func_signature(func)

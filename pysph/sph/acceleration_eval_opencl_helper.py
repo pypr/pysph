@@ -156,9 +156,9 @@ class OpenCLAccelerationEval(object):
             cache.get_neighbors_gpu()
             self._queue.finish()
             args = args + [
-                cache._nbr_lengths_gpu.array.data,
-                cache._start_idx_gpu.array.data,
-                cache._neighbors_gpu.array.data
+                cache._nbr_lengths_gpu.dev.data,
+                cache._start_idx_gpu.dev.data,
+                cache._neighbors_gpu.dev.data
             ] + extra_args
             call(*args)
         else:
@@ -289,7 +289,7 @@ class AccelerationEvalOpenCLHelper(object):
         array_index = {}
         for idx, pa in enumerate(pas):
             if pa.gpu is None:
-                pa.set_device_helper(DeviceHelper(pa))
+                pa.set_device_helper(DeviceHelper(pa, backend='opencl'))
             array_map[pa.name] = pa
             array_index[pa.name] = idx
 
@@ -317,7 +317,7 @@ class AccelerationEvalOpenCLHelper(object):
         # This is needed for late binding on the device helper's attributes
         # which may change at each iteration when particles are added/removed.
         def _get_array(gpu_helper, attr):
-            return getattr(gpu_helper, attr).data
+            return getattr(gpu_helper, attr).dev.data
 
         def _get_struct(obj):
             return obj

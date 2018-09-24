@@ -240,7 +240,7 @@ cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0):
+                 double n_layers=2.0, backend=None):
         """Constructor
 
         Parameters
@@ -252,8 +252,9 @@ cdef class DomainManager:
         n_layers: double: number of ghost layers as a multiple of
             h_max*radius_scale
         """
+        self.backend = backend
         is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
-        if get_config().use_opencl and not is_periodic:
+        if self.backend and not is_periodic:
             from pysph.base.gpu_domain_manager import GPUDomainManager
             domain_manager = GPUDomainManager
         else:
@@ -262,7 +263,7 @@ cdef class DomainManager:
             xmin=xmin, xmax=xmax, ymin=ymin,
             ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
             periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z,
-            n_layers=n_layers
+            n_layers=n_layers, backend=self.backend
         )
 
     def set_pa_wrappers(self, wrappers):
@@ -308,7 +309,7 @@ cdef class CPUDomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0):
+                 double n_layers=2.0, backend=None):
         """Constructor
 
         The n_layers argument specifies the number of ghost layers as multiples

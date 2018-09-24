@@ -31,6 +31,7 @@ cdef extern from 'limits.h':
 
 
 cdef class GPUNeighborCache:
+    cdef object backend
     cdef int _dst_index
     cdef int _src_index
     cdef int _narrays
@@ -65,7 +66,7 @@ cdef class GPUNeighborCache:
 
 cdef class GPUNNPS(NNPSBase):
 
-    cdef object ctx
+    cdef public object backend
     cdef public object queue
 
     cdef public double radius_scale2

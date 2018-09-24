@@ -86,15 +86,17 @@ def to_device(array, backend='cython'):
     return wrap_array(out, backend)
 
 
-def ones_like(array, backend='cython'):
+def ones_like(array, backend=None):
+    if backend is None:
+        backend = array.backend
     if backend == 'opencl':
         import pyopencl.array as gpuarray
-        out = 1 + gpuarray.zeros_like(array)
+        out = 1 + gpuarray.zeros_like(array.dev)
     elif backend == 'cuda':
         import pycuda.gpuarray as gpuarray
-        out = gpuarray.ones_like(array)
+        out = gpuarray.ones_like(array.dev)
     else:
-        out = np.ones_like(array)
+        out = np.ones_like(array.dev)
     return wrap_array(out, backend)
 
 
@@ -137,6 +139,20 @@ def zeros(n, dtype, backend='cython'):
     return wrap_array(out, backend)
 
 
+def zeros_like(array, backend=None):
+    if backend is None:
+        backend = array.backend
+    if backend == 'opencl':
+        import pyopencl.array as gpuarray
+        out = gpuarray.zeros_like(array.dev)
+    elif backend == 'cuda':
+        import pycuda.gpuarray as gpuarray
+        out = gpuarray.zeros_like(array.dev)
+    else:
+        out = np.zeros_like(array.dev)
+    return wrap_array(out, backend)
+
+
 def arange(start, stop, step, dtype=None, backend='cython'):
     if backend == 'opencl':
         import pyopencl.array as gpuarray
@@ -151,7 +167,9 @@ def arange(start, stop, step, dtype=None, backend='cython'):
     return wrap_array(out, backend)
 
 
-def minimum(ary, backend='cython'):
+def minimum(ary, backend=None):
+    if backend is None:
+        backend = ary.backend
     if backend == 'cython':
         return ary.dev.min()
     elif backend == 'opencl':
@@ -162,7 +180,9 @@ def minimum(ary, backend='cython'):
         return gpuarray.min(ary.dev).get()
 
 
-def maximum(ary, backend='cython'):
+def maximum(ary, backend=None):
+    if backend is None:
+        backend = ary.backend
     if backend == 'cython':
         return ary.dev.max()
     elif backend == 'opencl':
@@ -173,7 +193,9 @@ def maximum(ary, backend='cython'):
         return gpuarray.max(ary.dev).get()
 
 
-def sum(ary, backend='cython'):
+def sum(ary, backend=None):
+    if backend is None:
+        backend = ary.backend
     if backend == 'cython':
         return np.sum(ary.dev)
     if backend == 'opencl':
@@ -184,7 +206,9 @@ def sum(ary, backend='cython'):
         return gpuarray.sum(ary.dev).get()
 
 
-def take(ary, indices, backend='cython'):
+def take(ary, indices, backend=None):
+    if backend is None:
+        backend = ary.backend
     if backend == 'opencl':
         import pyopencl.array as gpuarray
         out = gpuarray.take(ary.dev, indices.dev)
@@ -272,10 +296,9 @@ class Array(object):
             self.set_data(to_device(nparr, backend=self.backend))
 
     def pull(self):
-        if self.backend == 'opencl' or self.backend == 'cuda':
-            if self.data is None:
-                self.data = np.empty(len(self.dev), dtype=self.dtype)
-            self.data[:] = self.dev.get()
+        if self.data is None:
+            self.data = np.empty(len(self.dev), dtype=self.dtype)
+        self.data[:] = self.get()
 
     def push(self):
         if self.backend == 'opencl' or self.backend == 'cuda':

@@ -190,7 +190,8 @@ def ctype_to_dtype(ctype):
 
 def dtype_to_knowntype(dtype, address=None):
     ctype = dtype_to_ctype(dtype)
-    if ctype == 'unsigned int': ctype = 'uint'
+    if 'unsigned' in ctype:
+        ctype = 'u%s' % ctype.replace('unsigned ', '')
     knowntype = ctype
     if address == 'ptr':
         knowntype = '%sp' % knowntype

@@ -28,6 +28,16 @@ import pysph.base.particle_array
 logger = logging.getLogger()
 
 
+def get_elwise_kernel(kernel_name, args, src, preamble=""):
+    ctx = get_context()
+    from pyopencl.elementwise import ElementwiseKernel
+    knl = ElementwiseKernel(
+        ctx, args, src,
+        kernel_name, preamble=preamble
+    )
+    return profile_kernel(knl, kernel_name)
+
+
 class DeviceHelper(object):
     """Manages the arrays contained in a particle array on the device.
 

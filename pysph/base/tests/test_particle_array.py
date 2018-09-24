@@ -1010,12 +1010,9 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 
 class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
-        ocl = pytest.importorskip("pysph.base.opencl")
+        ocl = pytest.importorskip("pyopencl")
         get_config().use_double = True
         self.backend = 'opencl'
-
-    def tearDown(self):
-        get_config().use_opencl = False
 
     def pull(self, p):
         p.gpu.pull()
@@ -1032,6 +1029,19 @@ class ParticleArrayTestCython(unittest.TestCase, ParticleArrayTest):
 
     def tearDown(self):
         get_config().use_openmp = False
+
+    def pull(self, p):
+        p.gpu.pull()
+
+    def push(self, p):
+        p.gpu.push()
+
+
+class ParticleArrayTestCUDA(unittest.TestCase, ParticleArrayTest):
+    def setUp(self):
+        cu = pytest.importorskip("pycuda")
+        get_config().use_double = True
+        self.backend = 'cuda'
 
     def pull(self, p):
         p.gpu.pull()

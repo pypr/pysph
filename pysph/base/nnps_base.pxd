@@ -148,6 +148,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef int get_number_of_particles(self)
 
 cdef class DomainManager:
+    cdef public str backend
     cdef public object manager
 
 # Domain limits for the simulation

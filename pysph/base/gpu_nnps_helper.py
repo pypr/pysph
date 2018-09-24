@@ -8,7 +8,7 @@ from pysph.base.opencl import profile_kernel, get_elwise_kernel
 
 
 class GPUNNPSHelper(object):
-    def __init__(self, ctx, tpl_filename, use_double=False):
+    def __init__(self, tpl_filename, backend=None, use_double=False):
         disable_unicode = False if sys.version_info.major > 2 else True
         self.src_tpl = Template(
             filename=os.path.join(
@@ -33,8 +33,8 @@ class GPUNNPSHelper(object):
             data_t=self.data_t
         )
         self.preamble = "\n".join([helper_preamble, preamble])
-        self.ctx = ctx
         self.cache = {}
+        self.backend = backend
 
     def _get_code(self, kernel_name, **kwargs):
         arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
