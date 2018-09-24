@@ -4,13 +4,9 @@ import numpy as np
 
 pytest.importorskip("pysph.base.opencl")
 
-import pyopencl as cl
-
 from pysph.base.utils import get_particle_array  # noqa: E402
-from pysph.base.opencl import DeviceHelper, Array, \
-        get_queue  # noqa: E402
+from pysph.base.opencl import DeviceHelper
 from pysph.cpy.config import get_config
-from pysph.cpy.array import Array
 import pysph.cpy.array as array
 
 

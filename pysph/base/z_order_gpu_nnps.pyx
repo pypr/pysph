@@ -14,7 +14,6 @@ import pyopencl as cl
 import pyopencl.array
 import pyopencl.algorithm
 from pyopencl.scan import GenericScanKernel
-from pyopencl.scan import GenericDebugScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 import numpy as np
@@ -24,8 +23,7 @@ from mako.template import Template
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
 from pysph.cpy.array import Array
 import pysph.cpy.array as array
-from pysph.cpy.opencl import get_context
-from pysph.base.opencl import get_config, profile
+from pysph.cpy.opencl import get_context, get_config, profile_kernel
 
 
 IF UNAME_SYSNAME == "Windows":

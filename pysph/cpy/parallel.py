@@ -15,7 +15,6 @@ import numpy as np
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import Transpiler, convert_to_float_if_needed
-#from .array import Array, get_backend
 from .types import dtype_to_ctype
 
 import pysph.cpy.array as array

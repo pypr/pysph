@@ -1,10 +1,19 @@
-
-from pyopencl.elementwise import ElementwiseKernel
 from mako.template import Template
 import os
 import sys
 
-from pysph.base.opencl import profile_kernel, get_elwise_kernel
+from pysph.cpy.opencl import get_context, profile_kernel
+
+
+def get_elwise_kernel(kernel_name, args, src, preamble=""):
+    ctx = get_context()
+    from pyopencl.elementwise import ElementwiseKernel
+    knl = ElementwiseKernel(
+        ctx, args, src,
+        kernel_name, preamble=preamble
+    )
+    return profile_kernel(knl, kernel_name)
+
 
 
 class GPUNNPSHelper(object):

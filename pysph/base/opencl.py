@@ -3,39 +3,17 @@
 
 import logging
 import numpy as np
-import pyopencl as cl
-import pyopencl.array  # noqa: 401
-import pyopencl.algorithm
-import pyopencl.tools  # noqa: 401
-from pyopencl.scan import GenericScanKernel
-from pyopencl.reduction import ReductionKernel
-from pyopencl.elementwise import ElementwiseKernel
-from mako.template import Template
 
 from pysph.cpy.config import get_config
-from pysph.cpy.opencl import (  # noqa: 401
-    get_context, get_queue, profile, profile_kernel,
-    print_profile, set_context, set_queue
-)
 from pysph.cpy.array import get_backend, wrap_array, Array
 import pysph.cpy.array as array
 from pysph.cpy.parallel import Elementwise, Scan
 from pysph.cpy.api import declare, annotate
-from pysph.cpy.types import dtype_to_knowntype
+from pysph.cpy.types import dtype_to_ctype
 import pysph.base.particle_array
 
 
 logger = logging.getLogger()
-
-
-def get_elwise_kernel(kernel_name, args, src, preamble=""):
-    ctx = get_context()
-    from pyopencl.elementwise import ElementwiseKernel
-    knl = ElementwiseKernel(
-        ctx, args, src,
-        kernel_name, preamble=preamble
-    )
-    return profile_kernel(knl, kernel_name)
 
 
 class DeviceHelper(object):
@@ -565,7 +543,7 @@ class DeviceHelper(object):
             src_arr = self._data[prop_name]
             stride = self._particle_array.stride.get(prop_name, 1)
 
-            prop_type = cl.tools.dtype_to_ctype(src_arr.dtype)
+            prop_type = dtype_to_ctype(src_arr.dtype)
             prop_default = self._particle_array.default_values[prop_name]
             result_array.add_property(name=prop_name,
                                       type=prop_type,

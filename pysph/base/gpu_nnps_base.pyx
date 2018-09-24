@@ -30,13 +30,13 @@ from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
-from pysph.base.opencl import (DeviceHelper, get_context,
-                                get_queue, set_context, set_queue)
+from pysph.base.opencl import DeviceHelper
 from pysph.cpy.config import get_config
 from pysph.cpy.array import Array
 from pysph.cpy.parallel import Elementwise, Scan
 from pysph.cpy.types import annotate
-from pysph.cpy.opencl import get_context
+from pysph.cpy.opencl import (get_context, get_queue,
+                              set_context, set_queue)
 import pysph.cpy.array as array
 
 # Particle Tag information
