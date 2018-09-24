@@ -182,14 +182,10 @@ cdef class GPUNNPS(NNPSBase):
         self.dtype_max = np.finfo(self.dtype).max
         self._last_domain_size = 0.0
 
-        print particles[0].gpu
-
         # Set the device helper if needed.
         for pa in particles:
             if pa.gpu is None:
                 pa.set_device_helper(DeviceHelper(pa, backend=self.backend))
-
-        print particles[0].gpu
 
         # The cache.
         self.use_cache = cache
