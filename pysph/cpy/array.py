@@ -1,4 +1,5 @@
 import numpy as np
+from pytools import memoize_method
 
 from .config import get_config
 from .types import annotate, dtype_to_knowntype
@@ -366,17 +367,9 @@ class Array(object):
         self.length += len(ary.dev)
         self._update_array_ref()
 
-    def remove(self, indices, input_sorted=False):
-        if len(indices) > self.length:
-            msg = 'Number of indices to be removed is greater than'
-            msg += 'number of indices in array'
-            raise ValueError(msg)
-
+    @memoize_method
+    def _get_remove_kernels(self):
         import pysph.cpy.parallel as parallel
-
-        if_remove = Array(np.int32, n=self.length, backend=self.backend)
-        if_remove.fill(0)
-        new_array = self.copy()
 
         @annotate(i='int', gintp='indices, if_remove')
         def fill_if_remove(i, indices, if_remove):
@@ -384,8 +377,6 @@ class Array(object):
 
         fill_if_remove_knl = parallel.Elementwise(
             fill_if_remove, backend=self.backend)
-
-        fill_if_remove_knl(indices, if_remove)
 
         @annotate(i='int', if_remove='gintp', return_='int')
         def remove_input_expr(i, if_remove):
@@ -404,6 +395,22 @@ class Array(object):
         remove_knl = parallel.Scan(remove_input_expr, remove_output_expr,
                                    'a+b', dtype=np.int32,
                                    backend=self.backend)
+
+        return fill_if_remove_knl, remove_knl
+
+    def remove(self, indices, input_sorted=False):
+        if len(indices) > self.length:
+            msg = 'Number of indices to be removed is greater than'
+            msg += 'number of indices in array'
+            raise ValueError(msg)
+
+        if_remove = Array(np.int32, n=self.length, backend=self.backend)
+        if_remove.fill(0)
+        new_array = self.copy()
+
+        fill_if_remove_knl, remove_knl = self._get_remove_kernels()
+
+        fill_if_remove_knl(indices, if_remove)
 
         remove_knl(if_remove=if_remove, old_array=self, new_array=new_array)
 

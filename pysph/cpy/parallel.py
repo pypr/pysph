@@ -385,7 +385,7 @@ class Elementwise(object):
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None
-        self._generate()
+        self.c_func = self._generate()
 
     def _generate(self):
         self.tp.add(self.func)
@@ -406,7 +406,7 @@ class Elementwise(object):
             )
             self.tp.add_code(src)
             self.tp.compile()
-            self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+            return getattr(self.tp.mod, 'py_' + self.name)
         elif self.backend == 'opencl':
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
@@ -432,7 +432,7 @@ class Elementwise(object):
                 operation=expr,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
         elif self.backend == 'cuda':
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
@@ -456,7 +456,7 @@ class Elementwise(object):
                 operation=expr,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
 
     def _correct_opencl_address_space(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
