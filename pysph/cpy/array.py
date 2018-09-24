@@ -323,7 +323,7 @@ class Array(object):
         # a numpy/cl array/cuda array
         if isinstance(data, Array):
             data = data.dev
-        #FIXME: Find a way around this copy
+        # FIXME: Find a way around this copy
         if self.backend == 'cython':
             data = data.copy()
         self._data = data
@@ -383,7 +383,7 @@ class Array(object):
             if_remove[indices[i]] = 1
 
         fill_if_remove_knl = parallel.Elementwise(
-                fill_if_remove, backend=self.backend)
+            fill_if_remove, backend=self.backend)
 
         fill_if_remove_knl(indices, if_remove)
 
@@ -411,7 +411,7 @@ class Array(object):
 
     def align(self, indices):
         self.set_data(take(self.get_array(), indices,
-                      backend=self.backend))
+                           backend=self.backend))
 
     def squeeze(self):
         self.set_data(self._data[:self.length])
@@ -423,5 +423,5 @@ class Array(object):
             raise TypeError('indices and dest need to be \
                     Array instances')
         dest.dev[:len(indices.dev)] = take(
-                self, indices, backend=self.backend
-                ).dev
+            self, indices, backend=self.backend
+        ).dev

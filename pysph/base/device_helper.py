@@ -73,7 +73,8 @@ class DeviceHelper(object):
                 return 0
 
     def align(self, indices):
-        '''Note that the indices passed here is a dictionary keyed on the stride.
+        '''Note that the indices passed here is a dictionary
+        keyed on the stride.
         '''
         if not isinstance(indices, dict):
             indices = {1: indices}

@@ -882,7 +882,8 @@ class ParticleArrayTest(object):
         self.assertEqual(n.x[0], 2.0)
         numpy.testing.assert_array_equal(n.A, [2, 3])
         self.assertFalse('y' in n.properties)
-        self.assertEqual(sorted(p.output_property_arrays), sorted(['A', 'x', 'y']))
+        self.assertEqual(sorted(p.output_property_arrays),
+                         sorted(['A', 'x', 'y']))
         self.assertEqual(sorted(n.output_property_arrays), ['A', 'x'])
 
     def test_that_remove_property_also_removes_output_arrays(self):
