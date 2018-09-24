@@ -7,7 +7,7 @@ import types
 from mako.template import Template
 import numpy as np
 
-from pysph.base.opencl import profile_kernel
+from pysph.cpy.opencl import profile_kernel
 from pysph.cpy.config import get_config
 from pysph.cpy.translator import OpenCLConverter
 from .equation import get_array_names

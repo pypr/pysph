@@ -1,15 +1,12 @@
-"""Common OpenCL related functionality.
-"""
-
 import logging
 import numpy as np
 
 from pysph.cpy.config import get_config
 from pysph.cpy.array import get_backend, wrap_array, Array
-import pysph.cpy.array as array
 from pysph.cpy.parallel import Elementwise, Scan
 from pysph.cpy.api import declare, annotate
 from pysph.cpy.types import dtype_to_ctype
+import pysph.cpy.array as array
 import pysph.base.particle_array
 
 

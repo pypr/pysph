@@ -22,14 +22,7 @@ from cython cimport *
 
 from pysph.cpy.config import get_config
 from pysph.cpy.array import Array, get_backend, to_device
-
-try:
-    import pyopencl as cl
-    import pyopencl.array
-    from pysph.cpy.opencl import get_queue
-    import pysph.base.opencl as ocl
-except ImportError:
-    ocl = None
+from pysph.base.device_helper import DeviceHelper
 
 # Maximum value of an unsigned int
 cdef extern from "limits.h":
@@ -155,7 +148,7 @@ cdef class ParticleArray:
         self.output_property_arrays = []
 
         if self.backend:
-            h = ocl.DeviceHelper(self, backend=self.backend)
+            h = DeviceHelper(self, backend=self.backend)
             self.set_device_helper(h)
         else:
             self.gpu = None

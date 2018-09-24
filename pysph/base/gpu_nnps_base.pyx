@@ -30,7 +30,7 @@ from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
-from pysph.base.opencl import DeviceHelper
+from pysph.base.device_helper import DeviceHelper
 from pysph.cpy.config import get_config
 from pysph.cpy.array import Array
 from pysph.cpy.parallel import Elementwise, Scan
