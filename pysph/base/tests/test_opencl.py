@@ -16,7 +16,8 @@ import pysph.cpy.array as array
 
 class DeviceHelperTest(object):
     def setup(self):
-        self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
+        self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0,
+                                     backend=self.backend)
 
     def test_simple(self):
         # Given
@@ -316,19 +317,20 @@ class DeviceHelperTest(object):
 
 class DeviceHelperTestCython(DeviceHelperTest, TestCase):
     def setUp(self):
-        self.setup()
         self.backend = 'cython'
+        #FIXME: last_item not supported on single thread
         get_config().use_openmp = True
+        self.setup()
 
 class DeviceHelperTestOpenCL(DeviceHelperTest, TestCase):
     def setUp(self):
-        self.setup()
         self.backend = 'opencl'
         pytest.importorskip('pyopencl')
+        self.setup()
 
 class DeviceHelperTestCUDA(DeviceHelperTest, TestCase):
     def setUp(self):
-        self.setup()
         self.backend = 'cuda'
         pytest.importorskip('pycuda')
+        self.setup()
 
