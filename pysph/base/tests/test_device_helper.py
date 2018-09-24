@@ -309,12 +309,14 @@ class DeviceHelperTest(object):
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
 
+
 class DeviceHelperTestCython(DeviceHelperTest, TestCase):
     def setUp(self):
         self.backend = 'cython'
-        #FIXME: last_item not supported on single thread
+        # FIXME: last_item not supported on single thread
         get_config().use_openmp = True
         self.setup()
+
 
 class DeviceHelperTestOpenCL(DeviceHelperTest, TestCase):
     def setUp(self):
@@ -322,9 +324,9 @@ class DeviceHelperTestOpenCL(DeviceHelperTest, TestCase):
         pytest.importorskip('pyopencl')
         self.setup()
 
+
 class DeviceHelperTestCUDA(DeviceHelperTest, TestCase):
     def setUp(self):
         self.backend = 'cuda'
         pytest.importorskip('pycuda')
         self.setup()
-

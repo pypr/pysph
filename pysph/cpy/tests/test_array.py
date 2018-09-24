@@ -42,6 +42,7 @@ def test_reserve(backend):
     assert dev_array.length == 16
     assert dev_array[0] == 1
 
+
 @test_all_backends
 def test_resize_with_reallocation(backend):
     check_import(backend)
@@ -57,6 +58,7 @@ def test_resize_with_reallocation(backend):
     assert dev_array.length == 64
     assert dev_array[0] == 1
 
+
 @test_all_backends
 def test_resize_without_reallocation(backend):
     check_import(backend)
@@ -71,6 +73,7 @@ def test_resize_without_reallocation(backend):
     assert len(dev_array.get_data()) == 128
     assert dev_array.length == 64
     assert dev_array[0] == 1
+
 
 @test_all_backends
 def test_copy(backend):
@@ -89,6 +92,7 @@ def test_copy(backend):
     dev_array_copy[0] = 2
     assert dev_array[0] != dev_array_copy[0]
 
+
 @test_all_backends
 def test_append_with_reallocation(backend):
     check_import(backend)
@@ -102,6 +106,7 @@ def test_append_with_reallocation(backend):
     # Then
     assert dev_array[-1] == 2
     assert len(dev_array.get_data()) == 32
+
 
 @test_all_backends
 def test_append_without_reallocation(backend):
@@ -118,6 +123,7 @@ def test_append_without_reallocation(backend):
     assert dev_array[-1] == 2
     assert len(dev_array.get_data()) == 20
 
+
 @test_all_backends
 def test_extend(backend):
     check_import(backend)
@@ -133,6 +139,7 @@ def test_extend(backend):
     old_nparr = dev_array.get()
     new_nparr = new_array.get()
     assert np.all(old_nparr[-len(new_array)] == new_nparr)
+
 
 @test_all_backends
 def test_remove(backend):
@@ -151,6 +158,7 @@ def test_remove(backend):
     # Then
     assert np.all(dev_array.get() == (8 + indices).get())
 
+
 @test_all_backends
 def test_align(backend):
     check_import(backend)
@@ -166,6 +174,7 @@ def test_align(backend):
 
     # Then
     assert np.all(dev_array.get() == indices.get())
+
 
 @test_all_backends
 def test_squeeze(backend):
@@ -183,6 +192,7 @@ def test_squeeze(backend):
     # Then
     assert dev_array.alloc == 16
 
+
 @test_all_backends
 def test_copy_values(backend):
     check_import(backend)
@@ -199,6 +209,7 @@ def test_copy_values(backend):
 
     # Then
     assert np.all(dev_array[:len(indices)].get() == dest.get())
+
 
 @test_all_backends
 def test_min_max(backend):

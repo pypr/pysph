@@ -15,7 +15,6 @@ def get_elwise_kernel(kernel_name, args, src, preamble=""):
     return profile_kernel(knl, kernel_name)
 
 
-
 class GPUNNPSHelper(object):
     def __init__(self, tpl_filename, backend=None, use_double=False):
         disable_unicode = False if sys.version_info.major > 2 else True
@@ -47,10 +46,10 @@ class GPUNNPSHelper(object):
 
     def _get_code(self, kernel_name, **kwargs):
         arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         src = self.src_tpl.get_def("%s_src" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         return arguments, src
 
