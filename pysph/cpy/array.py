@@ -190,7 +190,7 @@ def maximum(ary, backend=None):
         import pyopencl.array as gpuarray
         return gpuarray.max(ary.dev).get()
     elif backend == 'cuda':
-        import pycuda.array as gpuarray
+        import pycuda.gpuarray as gpuarray
         return gpuarray.max(ary.dev).get()
 
 
@@ -224,6 +224,9 @@ def take(ary, indices, backend=None):
 class Array(object):
     def __init__(self, dtype, n=0, allocate=True, backend=None):
         self.backend = get_backend(backend)
+        if backend == 'cuda':
+            from .cuda import set_context
+            set_context()
         self.dtype = dtype
         self.gptr_type = dtype_to_knowntype(dtype, address='global')
         self.minimum = 0
@@ -250,7 +253,13 @@ class Array(object):
 
     def __setitem__(self, key, value):
         if self.backend == 'cuda':
-            self.dev[key] = np.asarray(value, dtype=self.dtype)
+            if isinstance(key, slice):
+                if isinstance(value, np.ndarray):
+                    self.dev[key] = np.asarray(value, dtype=self.dtype)
+                else:
+                    self.dev[key].fill(value)
+            else:
+                self.dev[key] = np.asarray(value, dtype=self.dtype)
         else:
             self.dev[key] = value
 
@@ -279,7 +288,11 @@ class Array(object):
         return wrap_array(ans, self.backend)
 
     def _update_array_ref(self):
-        self.dev = self._data[:self.length]
+        # For PyCUDA compatibility
+        if self.length == 0 and len(self._data) == 0:
+            self.dev = self._data
+        else:
+            self.dev = self._data[:self.length]
 
     def _get_np_data(self):
         return self.data
@@ -314,7 +327,9 @@ class Array(object):
     def reserve(self, size):
         if size > self.alloc:
             new_data = empty(size, self.dtype, backend=self.backend)
-            new_data.dev[:self.alloc] = self._data
+            # For PyCUDA compatibility
+            if self.alloc > 0:
+                new_data.dev[:self.alloc] = self._data
             self._data = new_data.dev
             self.alloc = size
             self._update_array_ref()

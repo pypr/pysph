@@ -8,31 +8,53 @@ from pysph.cpy.config import get_config
 import pysph.cpy.array as array
 
 
-class DeviceHelperTest(object):
+def setup_module():
+    get_config().use_openmp=True
+
+
+def teardown_module():
+    get_config().use_openmp=False
+
+
+test_all_backends = pytest.mark.parametrize('backend',
+        ['cython', 'opencl', 'cuda'])
+
+
+test_fail_on_cuda = pytest.mark.parametrize('backend',
+        ['cython', 'opencl', pytest.param('cuda',
+            marks=pytest.mark.xfail(raises=NotImplementedError,
+                reason='Scan not supported by CUDA'))])
+
+
+class TestDeviceHelper(object):
     def setup(self):
         self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0,
-                                     backend=self.backend)
+                                     backend='cpu')
 
-    def test_simple(self):
+    @test_all_backends
+    def test_simple(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
 
         # Then
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_push_correctly_sets_values_with_args(self):
+    @test_all_backends
+    def test_push_correctly_sets_values_with_args(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
-        self.assertEqual(pa.tag[0], 0)
+        h = DeviceHelper(pa, backend=backend)
+        assert pa.tag[0] == 0
 
         # When
         pa.set_device_helper(h)
@@ -42,16 +64,18 @@ class DeviceHelperTest(object):
         h.push('x', 'rho', 'tag')
 
         # Then
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_push_correctly_sets_values_with_no_args(self):
+    @test_all_backends
+    def test_push_correctly_sets_values_with_no_args(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -62,17 +86,19 @@ class DeviceHelperTest(object):
         h.push()
 
         # Then
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_pull_correctly_sets_values_with_args(self):
+    @test_all_backends
+    def test_pull_correctly_sets_values_with_args(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
-        self.assertEqual(pa.tag[0], 0)
+        h = DeviceHelper(pa, backend=backend)
+        assert pa.tag[0] == 0
 
         # When
         pa.set_device_helper(h)
@@ -82,16 +108,18 @@ class DeviceHelperTest(object):
         h.pull('x', 'rho', 'tag')
 
         # Then
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_pull_correctly_sets_values_with_no_args(self):
+    @test_all_backends
+    def test_pull_correctly_sets_values_with_no_args(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -102,44 +130,50 @@ class DeviceHelperTest(object):
         h.pull()
 
         # Then
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_max_provides_maximum(self):
+    @test_all_backends
+    def test_max_provides_maximum(self, backend):
+        self.setup()
         # Given/When
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # Then
-        self.assertEqual(h.max('x'), 1.0)
+        assert h.max('x') == 1.0
 
-    def test_that_adding_removing_prop_to_array_updates_gpu(self):
+    @test_all_backends
+    def test_that_adding_removing_prop_to_array_updates_gpu(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
         pa.add_property('test', data=[3.0, 4.0])
 
         # Then
-        self.assertTrue(np.allclose(pa.test, h.test.get()))
+        assert np.allclose(pa.test, h.test.get())
 
         # When
         pa.remove_property('test')
 
         # Then
-        self.assertFalse(hasattr(h, 'test'))
-        self.assertFalse('test' in h._data)
-        self.assertFalse('test' in h.properties)
+        assert not hasattr(h, 'test')
+        assert not 'test' in h._data
+        assert not 'test' in h.properties
 
-    def test_resize_works(self):
+    @test_all_backends
+    def test_resize_works(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -148,10 +182,10 @@ class DeviceHelperTest(object):
         h.resize(4)
 
         # Then
-        self.assertTrue(np.allclose(pa.x[:2], h.x[:2].get()))
-        self.assertTrue(np.allclose(pa.m[:2], h.m[:2].get()))
-        self.assertTrue(np.allclose(pa.rho[:2], h.rho[:2].get()))
-        self.assertTrue(np.allclose(pa.tag[:2], h.tag[:2].get()))
+        assert np.allclose(pa.x[:2], h.x[:2].get())
+        assert np.allclose(pa.m[:2], h.m[:2].get())
+        assert np.allclose(pa.rho[:2], h.rho[:2].get())
+        assert np.allclose(pa.tag[:2], h.tag[:2].get())
 
         # When
         pa.remove_particles([2, 3])
@@ -160,17 +194,19 @@ class DeviceHelperTest(object):
         h.resize(2)
 
         # Then
-        self.assertEqual(old_x, h.x.data)
-        self.assertTrue(np.allclose(pa.x, h.x.get()))
-        self.assertTrue(np.allclose(pa.y, h.y.get()))
-        self.assertTrue(np.allclose(pa.m, h.m.get()))
-        self.assertTrue(np.allclose(pa.rho, h.rho.get()))
-        self.assertTrue(np.allclose(pa.tag, h.tag.get()))
+        assert old_x == h.x.data
+        assert np.allclose(pa.x, h.x.get())
+        assert np.allclose(pa.y, h.y.get())
+        assert np.allclose(pa.m, h.m.get())
+        assert np.allclose(pa.rho, h.rho.get())
+        assert np.allclose(pa.tag, h.tag.get())
 
-    def test_get_number_of_particles(self):
+    @test_fail_on_cuda
+    def test_get_number_of_particles(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -184,10 +220,12 @@ class DeviceHelperTest(object):
         assert h.get_number_of_particles() == 5
         assert h.get_number_of_particles(real=True) == 3
 
-    def test_align(self):
+    @test_all_backends
+    def test_align(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -195,17 +233,19 @@ class DeviceHelperTest(object):
         h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
 
         indices = array.arange(4, -1, -1, dtype=np.int32,
-                               backend=self.backend)
+                               backend=backend)
 
         h.align(indices)
 
         # Then
         assert np.all(h.x.get() == np.array([6., 5., 4., 3., 2.]))
 
-    def test_align_particles(self):
+    @test_fail_on_cuda
+    def test_align_particles(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -219,10 +259,12 @@ class DeviceHelperTest(object):
         x = h.x.get()
         assert np.all(np.sort(x[:-2]) == np.array([2., 3., 5.]))
 
-    def test_remove_particles(self):
+    @test_fail_on_cuda
+    def test_remove_particles(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -230,17 +272,19 @@ class DeviceHelperTest(object):
         h.x.set(np.array([2.0, 3.0, 4.0, 5.0], h.x.dtype))
 
         indices = np.array([1, 2], dtype=np.uint32)
-        indices = array.to_device(indices, backend=self.backend)
+        indices = array.to_device(indices, backend=backend)
 
         h.remove_particles(indices)
 
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 5.]))
 
-    def test_remove_tagged_particles(self):
+    @test_fail_on_cuda
+    def test_remove_tagged_particles(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -253,24 +297,28 @@ class DeviceHelperTest(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 3., 5.]))
 
-    def test_add_particles(self):
+    @test_fail_on_cuda
+    def test_add_particles(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
-        x = array.zeros(4, np.float32, backend=self.backend)
+        x = array.zeros(4, np.float32, backend=backend)
 
         h.add_particles(x=x)
 
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([0., 0., 0., 0., 0., 1.]))
 
-    def test_extend(self):
+    @test_all_backends
+    def test_extend(self, backend):
+        self.setup()
         # Given
         pa = self.pa
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
@@ -280,11 +328,13 @@ class DeviceHelperTest(object):
         # Then
         assert h.get_number_of_particles() == 6
 
-    def test_append_parray(self):
+    @test_fail_on_cuda
+    def test_append_parray(self, backend):
+        self.setup()
         # Given
         pa1 = self.pa
         pa2 = get_particle_array(name='s', x=[0.0, 1.0], m=1.0, rho=2.0)
-        h = DeviceHelper(pa1, backend=self.backend)
+        h = DeviceHelper(pa1, backend=backend)
         pa1.set_device_helper(h)
 
         # When
@@ -293,40 +343,21 @@ class DeviceHelperTest(object):
         # Then
         assert h.get_number_of_particles() == 4
 
-    def test_extract_particles(self):
+    @test_fail_on_cuda
+    def test_extract_particles(self, backend):
+        self.setup()
         # Given
         pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
                                 m=1.0, rho=2.0)
-        h = DeviceHelper(pa, backend=self.backend)
+        h = DeviceHelper(pa, backend=backend)
         pa.set_device_helper(h)
 
         # When
         indices = np.array([1, 2], dtype=np.uint32)
-        indices = array.to_device(indices, backend=self.backend)
+        indices = array.to_device(indices, backend=backend)
 
         result_pa = h.extract_particles(indices)
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
 
-
-class DeviceHelperTestCython(DeviceHelperTest, TestCase):
-    def setUp(self):
-        self.backend = 'cython'
-        # FIXME: last_item not supported on single thread
-        get_config().use_openmp = True
-        self.setup()
-
-
-class DeviceHelperTestOpenCL(DeviceHelperTest, TestCase):
-    def setUp(self):
-        self.backend = 'opencl'
-        pytest.importorskip('pyopencl')
-        self.setup()
-
-
-class DeviceHelperTestCUDA(DeviceHelperTest, TestCase):
-    def setUp(self):
-        self.backend = 'cuda'
-        pytest.importorskip('pycuda')
-        self.setup()

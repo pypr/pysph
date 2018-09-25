@@ -456,7 +456,7 @@ class DeviceHelper(object):
             else:
                 arr.resize(new_num_particles * stride)
                 # set the properties of the new particles to the default ones.
-                arr.dev[old_num_particles * stride:] = pa.default_values[prop]
+                arr[old_num_particles * stride:] = pa.default_values[prop]
 
             self.update_prop(prop, arr)
 
@@ -482,7 +482,7 @@ class DeviceHelper(object):
             arr = self._data[prop]
             stride = self._particle_array.stride.get(prop, 1)
             arr.resize(new_size * stride)
-            arr.dev[old_size * stride:] = \
+            arr[old_size * stride:] = \
                 self._particle_array.default_values[prop]
             self.update_prop(prop, arr)
 
