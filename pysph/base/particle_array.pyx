@@ -104,7 +104,7 @@ cdef class ParticleArray:
     # `object` interface
     ######################################################################
     def __init__(self, str name='', default_particle_tag=Local,
-                 constants=None, backend=None, **props):
+                 constants=None, backend='cpu', **props):
         """Constructor
 
         Parameters

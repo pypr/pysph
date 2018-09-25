@@ -177,7 +177,7 @@ def minimum(ary, backend=None):
         import pyopencl.array as gpuarray
         return gpuarray.min(ary.dev).get()
     elif backend == 'cuda':
-        import pycuda.array as gpuarray
+        import pycuda.gpuarray as gpuarray
         return gpuarray.min(ary.dev).get()
 
 
@@ -249,7 +249,11 @@ class Array(object):
     def __getitem__(self, key):
         if isinstance(key, slice):
             return wrap_array(self.dev[key], self.backend)
-        return self.dev[key]
+        # NOTE: Not sure about this, done for PyCUDA compatibility
+        elif self.backend is not 'cython':
+            return self.dev[key].get()
+        else:
+            return self.dev[key]
 
     def __setitem__(self, key, value):
         if self.backend == 'cuda':
@@ -371,7 +375,7 @@ class Array(object):
     def append(self, value):
         if self.length >= self.alloc:
             self.reserve(2 * self.length)
-        self._data[self.length] = value
+        self._data[self.length] = np.asarray(value, dtype=self.dtype)
         self.length += 1
         self._update_array_ref()
 

@@ -20,7 +20,7 @@ test_all_backends = pytest.mark.parametrize('backend',
         ['cython', 'opencl', 'cuda'])
 
 
-test_fail_on_cuda = pytest.mark.parametrize('backend',
+test_fails_on_cuda = pytest.mark.parametrize('backend',
         ['cython', 'opencl', pytest.param('cuda',
             marks=pytest.mark.xfail(raises=NotImplementedError,
                 reason='Scan not supported by CUDA'))])
@@ -201,7 +201,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_get_number_of_particles(self, backend):
         self.setup()
         # Given
@@ -240,7 +240,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(h.x.get() == np.array([6., 5., 4., 3., 2.]))
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_align_particles(self, backend):
         self.setup()
         # Given
@@ -259,7 +259,7 @@ class TestDeviceHelper(object):
         x = h.x.get()
         assert np.all(np.sort(x[:-2]) == np.array([2., 3., 5.]))
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_remove_particles(self, backend):
         self.setup()
         # Given
@@ -279,7 +279,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 5.]))
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_remove_tagged_particles(self, backend):
         self.setup()
         # Given
@@ -297,7 +297,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 3., 5.]))
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_add_particles(self, backend):
         self.setup()
         # Given
@@ -328,7 +328,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 6
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_append_parray(self, backend):
         self.setup()
         # Given
@@ -343,7 +343,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 4
 
-    @test_fail_on_cuda
+    @test_fails_on_cuda
     def test_extract_particles(self, backend):
         self.setup()
         # Given
