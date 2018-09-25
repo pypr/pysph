@@ -120,9 +120,11 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
                 scan_kernel=GenericScanKernel, key_expr="keys[i]",
                 sort_arg_names=["pids", "keys"])
 
-        #FIXME: change key_bits
+        cdef int max_num_bits = <int> (self.max_num_bits - 1 + \
+                ceil(log2(self.num_levels)))
+
         (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index].dev,
-                self.pid_keys[pa_index].dev, key_bits=64)
+                self.pid_keys[pa_index].dev, key_bits=max_num_bits)
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
 

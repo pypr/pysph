@@ -121,10 +121,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 sort_arg_names=["pids", "keys"]
             )
 
+        cdef double max_length = fmax(fmax((self.xmax[0] - self.xmin[0]),
+            (self.xmax[1] - self.xmin[1])), (self.xmax[2] - self.xmin[2]))
 
-        #FIXME: change key_bits
+        cdef int max_num_cells = (<int> ceil(max_length/self.hmin))
+
+        cdef int max_num_bits = 3*(<int> ceil(log2(max_num_cells)))
+
         (sorted_indices, sorted_keys), evnt = self.radix_sort(
-            self.pids[pa_index].dev, self.pid_keys[pa_index].dev, key_bits=64
+            self.pids[pa_index].dev, self.pid_keys[pa_index].dev,
+            key_bits=max_num_bits
         )
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
