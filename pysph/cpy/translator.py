@@ -269,7 +269,8 @@ class CConverter(ast.NodeVisitor):
         src = dedent(inspect.getsource(obj.__class__))
         ignore_methods = [] if ignore_methods is None else ignore_methods
         for method in dir(obj):
-            if not method.startswith('_') and method not in ignore_methods:
+            if not method.startswith(('_', 'py_')) \
+               and method not in ignore_methods:
                 ann = getattr(getattr(obj, method), '__annotations__', None)
                 self._annotations[method] = ann
         code += self.convert(src, ignore_methods)
@@ -516,7 +517,7 @@ class CConverter(ast.NodeVisitor):
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
 
-        if self._class_name and (node.name.startswith('_') or
+        if self._class_name and (node.name.startswith(('_', 'py_')) or
                                  node.name in self._ignore_methods):
             return ''
 

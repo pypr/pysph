@@ -28,6 +28,10 @@ ${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.re
 dst_array_index = dst.index
 
 #######################################################################
+## Call py_initialize for all equations for this destination.
+#######################################################################
+${indent(all_eqs.get_py_initialize_code(), 0)}
+#######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
 % if all_eqs.has_initialize():
@@ -192,6 +196,7 @@ cdef class AccelerationEval:
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
     cdef object groups
+    cdef object all_equations
     ${indent(helper.get_kernel_defs(), 1)}
     ${indent(helper.get_equation_defs(), 1)}
 
@@ -215,6 +220,10 @@ cdef class AccelerationEval:
 
         ${indent(helper.get_kernel_init(), 2)}
         ${indent(helper.get_equation_init(), 2)}
+        all_equations = {}
+        for equation in equations:
+            all_equations[equation.var_name] = equation
+        self.all_equations = all_equations
 
     def __dealloc__(self):
         aligned_free(self.nbrs)

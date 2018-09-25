@@ -15,8 +15,9 @@ from pysph.base.nnps import LinkedListNNPS
 from pysph.sph.sph_compiler import SPHCompiler
 from pysph.sph.integrator import (LeapFrogIntegrator, PECIntegrator,
                                   PEFRLIntegrator)
-from pysph.sph.integrator_step import (LeapFrogStep, PEFRLStep,
-                                       TwoStageRigidBodyStep)
+from pysph.sph.integrator_step import (
+    IntegratorStep, LeapFrogStep, PEFRLStep, TwoStageRigidBodyStep
+)
 
 
 class SHM(Equation):
@@ -104,6 +105,57 @@ class TestIntegratorBase(unittest.TestCase):
             t += dt
 
 
+class S1Step(IntegratorStep):
+
+    def py_stage1(self, dest, t, dt):
+        self.called_with1 = t, dt
+        dest.u[:] = 1.0
+
+    def stage1(self, d_idx, d_u, d_au, dt):
+        d_u[d_idx] += d_au[d_idx] * dt * 0.5
+
+    def stage2(self, d_idx, d_x, d_u, d_au, dt):
+        d_u[d_idx] += 0.5*dt * d_au[d_idx]
+        d_x[d_idx] += dt * d_u[d_idx]
+
+
+class S12Step(IntegratorStep):
+
+    def py_stage1(self, dest, t, dt):
+        self.called_with1 = t, dt
+        dest.u[:] = 1.0
+        if dest.gpu:
+            dest.gpu.push('u')
+
+    def stage1(self, d_idx, d_u, d_au, dt):
+        d_u[d_idx] += d_au[d_idx] * dt * 0.5
+
+    def py_stage2(self, dest, t, dt):
+        self.called_with2 = t, dt
+        if dest.gpu:
+            dest.gpu.pull('u')
+        dest.u += 0.5
+        if dest.gpu:
+            dest.gpu.push('u')
+
+    def stage2(self, d_idx, d_x, d_u, d_au, dt):
+        d_u[d_idx] += 0.5*dt * d_au[d_idx]
+        d_x[d_idx] += dt * d_u[d_idx]
+
+
+class OnlyPyStep(IntegratorStep):
+
+    def py_stage1(self, dest, t, dt):
+        self.called_with1 = t, dt
+        dest.x[:] = 0.0
+        dest.u[:] = 1.0
+
+    def py_stage2(self, dest, t, dt):
+        self.called_with2 = t, dt
+        dest.u += 0.5
+        dest.x += 0.5
+
+
 class TestLeapFrogIntegrator(TestIntegratorBase):
     def test_leapfrog(self):
         # Given.
@@ -126,6 +178,80 @@ class TestLeapFrogIntegrator(TestIntegratorBase):
         # Then
         energy = np.asarray(energy)
         self.assertAlmostEqual(np.max(np.abs(energy - 0.5)), 0.0, places=3)
+
+    def test_integrator_calls_py_stage1(self):
+        # Given.
+        stepper = S1Step()
+        integrator = LeapFrogIntegrator(fluid=stepper)
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+        tf = 1.0
+        dt = tf
+
+        # When
+        call_data = []
+
+        def callback(t):
+            call_data.append(t)
+
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        self.assertEqual(len(call_data), 1)
+        self.assertTrue(hasattr(stepper, 'called_with1'))
+        self.assertEqual(stepper.called_with1, (0.0, dt))
+        # These are not physically significant as the main purpose is to see
+        # if the py_stage* methods are called.
+        np.testing.assert_array_almost_equal(self.pa.x, [1.5])
+        np.testing.assert_array_almost_equal(self.pa.u, [0.5])
+
+    def test_integrator_calls_py_stage1_stage2(self):
+        # Given.
+        stepper = S12Step()
+        integrator = LeapFrogIntegrator(fluid=stepper)
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+        tf = 1.0
+        dt = tf
+
+        # When
+        def callback(t):
+            pass
+
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        self.assertTrue(hasattr(stepper, 'called_with1'))
+        self.assertEqual(stepper.called_with1, (0.0, dt))
+        self.assertTrue(hasattr(stepper, 'called_with2'))
+        self.assertEqual(stepper.called_with2, (0.5*dt, dt))
+        # These are not physically significant as the main purpose is to see
+        # if the py_stage* methods are called.
+        np.testing.assert_array_almost_equal(self.pa.x, [2.0])
+        np.testing.assert_array_almost_equal(self.pa.u, [1.0])
+
+    def test_integrator_calls_only_py_when_no_stage(self):
+        # Given.
+        stepper = OnlyPyStep()
+        integrator = LeapFrogIntegrator(fluid=stepper)
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+        tf = 1.0
+        dt = tf
+
+        # When
+        def callback(t):
+            pass
+
+        self._integrate(integrator, dt, tf, callback)
+
+        # Then
+        self.assertTrue(hasattr(stepper, 'called_with1'))
+        self.assertEqual(stepper.called_with1, (0.0, dt))
+        self.assertTrue(hasattr(stepper, 'called_with2'))
+        self.assertEqual(stepper.called_with2, (0.5*dt, dt))
+        np.testing.assert_array_almost_equal(self.pa.x, [0.5])
+        np.testing.assert_array_almost_equal(self.pa.u, [1.5])
 
     def test_leapfrog_is_second_order(self):
         # Given.
@@ -265,6 +391,32 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         # Then
         energy = np.asarray(energy)
         self.assertAlmostEqual(np.max(np.abs(energy - 0.5)), 0.0, places=3)
+
+    def test_py_stage_is_called_on_gpu(self):
+        # Given.
+        stepper = S12Step()
+        integrator = LeapFrogIntegrator(fluid=stepper)
+        equations = [SHM(dest="fluid", sources=None)]
+        self._setup_integrator(equations=equations, integrator=integrator)
+        dt = 1.0
+        tf = dt
+
+        # When
+        def callback(t):
+            pass
+
+        self._integrate(integrator, dt, tf, callback)
+        self.pa.gpu.pull('x', 'u')
+
+        # Then
+        self.assertTrue(hasattr(stepper, 'called_with1'))
+        self.assertEqual(stepper.called_with1, (0.0, dt))
+        self.assertTrue(hasattr(stepper, 'called_with2'))
+        self.assertEqual(stepper.called_with2, (0.5*dt, dt))
+        # These are not physically significant as the main purpose is to see
+        # if the py_stage* methods are called.
+        np.testing.assert_array_almost_equal(self.pa.x, [2.0])
+        np.testing.assert_array_almost_equal(self.pa.u, [1.0])
 
     def test_leapfrog_with_double(self):
         orig = get_config().use_double
