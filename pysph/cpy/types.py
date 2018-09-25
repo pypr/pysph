@@ -156,12 +156,12 @@ _inject_types_in_module()
 
 
 NP_C_TYPE_MAP = {
-    np.bool: 'char',
-    np.float32: 'float', np.float64: 'double',
-    np.int8: 'char', np.uint8: 'unsigned char',
-    np.int16: 'short', np.uint16: 'unsigned short',
-    np.int32: 'int', np.uint32: 'unsigned int',
-    np.int64: 'long', np.uint64: 'unsigned long'
+    np.dtype(np.bool): 'char',
+    np.dtype(np.float32): 'float', np.dtype(np.float64): 'double',
+    np.dtype(np.int8): 'char', np.dtype(np.uint8): 'unsigned char',
+    np.dtype(np.int16): 'short', np.dtype(np.uint16): 'unsigned short',
+    np.dtype(np.int32): 'int', np.dtype(np.uint32): 'unsigned int',
+    np.dtype(np.int64): 'long', np.dtype(np.uint64): 'unsigned long'
 }
 
 C_NP_TYPE_MAP = {
@@ -180,11 +180,32 @@ C_NP_TYPE_MAP = {
 
 
 def dtype_to_ctype(dtype):
+    dtype = np.dtype(dtype)
     return NP_C_TYPE_MAP[dtype]
 
 
 def ctype_to_dtype(ctype):
     return C_NP_TYPE_MAP[ctype]
+
+
+def dtype_to_knowntype(dtype, address=None):
+    ctype = dtype_to_ctype(dtype)
+    if 'unsigned' in ctype:
+        ctype = 'u%s' % ctype.replace('unsigned ', '')
+    knowntype = ctype
+    if address == 'ptr':
+        knowntype = '%sp' % knowntype
+    elif address == 'global':
+        knowntype = 'g%sp' % knowntype
+    elif address == 'local':
+        knowntype = 'l%sp' % knowntype
+    else:
+        raise ValueError("address can only be ptr, global or local")
+
+    if knowntype in TYPES:
+        return knowntype
+    else:
+        raise TypeError("Not a vaild KnownType")
 
 
 def annotate(func=None, **kw):

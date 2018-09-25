@@ -7,7 +7,7 @@ import types
 from mako.template import Template
 import numpy as np
 
-from pysph.base.opencl import profile_kernel
+from pysph.cpy.opencl import profile_kernel
 from pysph.cpy.config import get_config
 from pysph.cpy.translator import OpenCLConverter
 from .equation import get_array_names
@@ -128,7 +128,7 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
                 # directly storing the dest.gpu.x, we compute it on the fly
                 # as the number of particles and the actual buffer may change.
                 def _getter(dest_gpu, x):
-                    return getattr(dest_gpu, x).data
+                    return getattr(dest_gpu, x).dev.data
 
                 _args = [
                     functools.partial(_getter, dest.gpu, x[2:]) for x in args

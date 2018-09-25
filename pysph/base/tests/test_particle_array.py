@@ -34,7 +34,8 @@ class ParticleArrayTest(object):
 
     def test_constructor(self):
         # Default constructor test.
-        p = particle_array.ParticleArray(name='test_particle_array')
+        p = particle_array.ParticleArray(name='test_particle_array',
+                                         backend=self.backend)
 
         self.assertEqual(p.name, 'test_particle_array')
         self.assertEqual('tag' in p.properties, True)
@@ -50,7 +51,8 @@ class ParticleArrayTest(object):
                                          y={'data': y},
                                          z={'data': z},
                                          m={'data': m},
-                                         h={'data': h})
+                                         h={'data': h},
+                                         backend=self.backend)
 
         self.assertEqual(p.name, '')
 
@@ -84,7 +86,8 @@ class ParticleArrayTest(object):
         tags = [0, 1, 0, 1]
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z},
-                                         tag={'data': tags, 'type': 'int'})
+                                         tag={'data': tags, 'type': 'int'},
+                                         backend=self.backend)
         self.assertEqual(check_array(p.get('tag', only_real_particles=False),
                                      [0, 0, 1, 1]), True)
         self.assertEqual(check_array(p.get('x', only_real_particles=False),
@@ -96,7 +99,8 @@ class ParticleArrayTest(object):
 
         # trying to create particle array without any values but some
         # properties.
-        p = particle_array.ParticleArray(x={}, y={}, z={}, h={})
+        p = particle_array.ParticleArray(x={}, y={}, z={}, h={},
+                                         backend=self.backend)
 
         self.assertEqual(p.get_number_of_particles(), 0)
         self.assertEqual('x' in p.properties, True)
@@ -107,7 +111,7 @@ class ParticleArrayTest(object):
         # now trying to supply some properties with values and others without
         p = particle_array.ParticleArray(
             x={'default': 10.0}, y={'data': [1.0, 2.0]},
-            z={}, h={'data': [0.1, 0.1]}
+            z={}, h={'data': [0.1, 0.1]}, backend=self.backend
         )
 
         self.assertEqual(p.get_number_of_particles(), 2)
@@ -124,7 +128,8 @@ class ParticleArrayTest(object):
 
         # When
         p = particle_array.ParticleArray(
-            x=x, rho=rho, data={'data': data, 'stride': 2}, name='fluid'
+            x=x, rho=rho, data={'data': data, 'stride': 2}, name='fluid',
+            backend=self.backend
         )
 
         # Then
@@ -151,7 +156,8 @@ class ParticleArrayTest(object):
 
         # When
         p = particle_array.ParticleArray(
-            x=x, y=y, rho=rho, data=data, name='fluid'
+            x=x, y=y, rho=rho, data=data, name='fluid',
+            backend=self.backend
         )
 
         # Then
@@ -182,7 +188,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A={'data': A, 'stride': 3}
+            h={'data': h}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         self.assertEqual(p.get_number_of_particles(), 4)
@@ -198,7 +205,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A={'data': A, 'stride': 3}
+            h={'data': h}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         self.assertEqual(check_array(x, p.get('x')), True)
@@ -217,7 +225,7 @@ class ParticleArrayTest(object):
 
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z}, m={'data': m},
-                                         h={'data': h})
+                                         h={'data': h}, backend=self.backend)
 
         p.clear()
 
@@ -242,7 +250,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A={'data': A, 'stride': 3}
+            h={'data': h}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         self.assertEqual(check_array(x, p.x), True)
@@ -266,7 +275,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A={'data': A, 'stride': 3}
+            h={'data': h}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         p.x = p.x * 2.0
@@ -278,6 +288,9 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.get('A').ravel(), A*2), True)
 
     def test_remove_particles(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -288,7 +301,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A={'data': A, 'stride': 3}
+            h={'data': h}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         remove_arr = LongArray(0)
@@ -326,6 +340,9 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.A, numpy.arange(6, 12)), True)
 
     def test_add_particles(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -336,7 +353,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, A=dict(data=A, stride=3)
+            h={'data': h}, A=dict(data=A, stride=3),
+            backend=self.backend
         )
 
         new_particles = {}
@@ -375,7 +393,8 @@ class ParticleArrayTest(object):
         # adding particles with tags
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z}, m={'data': m},
-                                         h={'data': h})
+                                         h={'data': h},
+                                         backend=self.backend)
         p.add_particles(x=[5, 6, 7, 8], tag=[1, 1, 0, 0])
         self.pull(p)
 
@@ -385,6 +404,9 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0, 0, 0, 0, 0, 0]), True)
 
     def test_remove_tagged_particles(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -396,7 +418,8 @@ class ParticleArrayTest(object):
         p = particle_array.ParticleArray(
             x={'data': x}, y={'data': y},
             z={'data': z}, m={'data': m},
-            h={'data': h}, tag={'data': tag}, A={'data': A, 'stride': 3}
+            h={'data': h}, tag={'data': tag}, A={'data': A, 'stride': 3},
+            backend=self.backend
         )
 
         numpy.testing.assert_array_equal(
@@ -462,7 +485,8 @@ class ParticleArrayTest(object):
 
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z}, m={'data': m},
-                                         h={'data': h}, tag={'data': tag})
+                                         h={'data': h}, tag={'data': tag},
+                                         backend=self.backend)
 
         p.add_property(**{'name': 'x'})
         # make sure the current 'x' property is intact.
@@ -518,9 +542,13 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.m2, [10.0]*8), True)
 
     def test_extend(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
         p = particle_array.ParticleArray(default_particle_tag=10, x={},
-                                         y={'default': -1.})
+                                         y={'default': -1.},
+                                         backend=self.backend)
         p.add_property('A', default=5.0, stride=2)
 
         # When
@@ -541,7 +569,8 @@ class ParticleArrayTest(object):
 
         # Given
         p = particle_array.ParticleArray(
-            A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.}
+            A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.},
+            backend=self.backend
         )
 
         # When
@@ -554,10 +583,13 @@ class ParticleArrayTest(object):
                                      [10.0, 10.0] + [-1.0]*10), True)
 
     def test_resize(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
         p = particle_array.ParticleArray(
             A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.},
-            x=[1.0]
+            x=[1.0], backend=self.backend
         )
 
         # When
@@ -570,8 +602,11 @@ class ParticleArrayTest(object):
         self.assertEqual(p.get_carray('A').length, 8)
 
     def test_align_particles(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
-        p = particle_array.ParticleArray()
+        p = particle_array.ParticleArray(backend=self.backend)
         p.add_property(**{'name': 'x',
                           'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
         p.add_property(**{'name': 'y',
@@ -659,13 +694,17 @@ class ParticleArrayTest(object):
         )
 
     def test_append_parray(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
-        p1 = particle_array.ParticleArray()
+        p1 = particle_array.ParticleArray(backend=self.backend)
         p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
         p1.add_property('A', data=2.0, stride=2)
         p2 = particle_array.ParticleArray(x={'data': [4, 5, 6]},
                                           y={'data': [1, 2, 3]},
-                                          tag={'data': [1, 0, 1]})
+                                          tag={'data': [1, 0, 1]},
+                                          backend=self.backend)
 
         # When
         p1.append_parray(p2)
@@ -679,12 +718,13 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p1.tag, [0, 0, 0, 0]), True)
 
         # Given
-        p1 = particle_array.ParticleArray()
+        p1 = particle_array.ParticleArray(backend=self.backend)
         p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
         # In this case the new strided prop is in the second parray.
         p2 = particle_array.ParticleArray(x={'data': [4, 5, 6]},
                                           y={'data': [1, 2, 3]},
-                                          tag={'data': [1, 0, 1]})
+                                          tag={'data': [1, 0, 1]},
+                                          backend=self.backend)
         p2.add_property('A', data=2.0, stride=2)
 
         # When
@@ -700,14 +740,14 @@ class ParticleArrayTest(object):
 
     def test_copy_properties(self):
         # Given
-        p1 = particle_array.ParticleArray()
+        p1 = particle_array.ParticleArray(backend=self.backend)
         p1.add_property(**{'name': 'x',
                            'data': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]})
         p1.add_property(name='y')
         p1.add_property(name='t')
         p1.add_property('A', data=2.0, stride=2)
 
-        p2 = particle_array.ParticleArray()
+        p2 = particle_array.ParticleArray(backend=self.backend)
         p2.add_property(name='t', data=[-1, -1, -1, -1])
         p2.add_property(name='s', data=[2, 3, 4, 5])
         p2.add_property('A', data=3.0, stride=2)
@@ -738,7 +778,7 @@ class ParticleArrayTest(object):
 
     def test_that_constants_can_be_added(self):
         # Given
-        p = particle_array.ParticleArray()
+        p = particle_array.ParticleArray(backend=self.backend)
         nprop = len(p.properties)
         self.assertEqual(len(p.constants), 0)
 
@@ -759,7 +799,8 @@ class ParticleArrayTest(object):
         # Given
         # When
         p = particle_array.ParticleArray(
-            constants=dict(s=0.0, v=[0.0, 1.0, 2.0])
+            constants=dict(s=0.0, v=[0.0, 1.0, 2.0]),
+            backend=self.backend
         )
         nprop = len(p.properties)
 
@@ -771,7 +812,8 @@ class ParticleArrayTest(object):
 
     def test_that_get_works_on_constants(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
 
         # When
         p.add_constant('s', 0.0)
@@ -782,8 +824,12 @@ class ParticleArrayTest(object):
         self.assertTrue(check_array(p.get('v'), [0.0, 1.0, 2.0]))
 
     def test_that_constants_are_not_resized_when_particles_are_added(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1.0])
+        p = particle_array.ParticleArray(name='f', x=[1.0],
+                                         backend=self.backend)
 
         # When
         p.add_constant('v', [0.0, 1.0])
@@ -797,7 +843,8 @@ class ParticleArrayTest(object):
     def test_that_set_works_on_constants(self):
         # Given
         constants = dict(v=[0.0, 0.0, 0.0], c=[0.0, 0.0, 0.0])
-        p = particle_array.ParticleArray(name='f', constants=constants)
+        p = particle_array.ParticleArray(name='f', constants=constants,
+                                         backend=self.backend)
 
         # When
         p.set(v=[0.0, 1.0, 2.0])
@@ -810,7 +857,7 @@ class ParticleArrayTest(object):
 
     def test_that_get_carray_works_with_constants(self):
         # Given
-        p = particle_array.ParticleArray()
+        p = particle_array.ParticleArray(backend=self.backend)
         v = [0.0, 1.0, 2.0]
 
         # When
@@ -822,8 +869,12 @@ class ParticleArrayTest(object):
         self.assertTrue(check_array(a.get_npy_array(), v))
 
     def test_extract_particles_extracts_particles_and_output_arrays(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1, 2, 3])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
         p.add_property('A', data=numpy.arange(6), stride=2)
         p.set_output_arrays(['x', 'A'])
 
@@ -841,8 +892,12 @@ class ParticleArrayTest(object):
         self.assertEqual(n.output_property_arrays, p.output_property_arrays)
 
     def test_extract_particles_works_with_specific_props(self):
+        if self.backend == 'cuda':
+            pytest.xfail("Scan not supported on CUDA")
+
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
+                                         backend=self.backend)
         p.add_property('A', data=numpy.arange(6), stride=2)
         p.set_output_arrays(['x', 'y', 'A'])
 
@@ -857,12 +912,14 @@ class ParticleArrayTest(object):
         self.assertEqual(n.x[0], 2.0)
         numpy.testing.assert_array_equal(n.A, [2, 3])
         self.assertFalse('y' in n.properties)
-        self.assertEqual(sorted(p.output_property_arrays), sorted(['A', 'x', 'y']))
+        self.assertEqual(sorted(p.output_property_arrays),
+                         sorted(['A', 'x', 'y']))
         self.assertEqual(sorted(n.output_property_arrays), ['A', 'x'])
 
     def test_that_remove_property_also_removes_output_arrays(self):
         # Given
-        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0])
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
+                                         backend=self.backend)
         p.add_property('test')
         p.set_output_arrays(['x', 'y', 'test'])
 
@@ -917,6 +974,7 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 
     def setUp(self):
         get_config().use_opencl = False
+        self.backend = None
 
     def pull(self, p):
         pass
@@ -956,7 +1014,8 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 
         p = particle_array.ParticleArray(x={'data': x}, y={'data': y},
                                          z={'data': z}, m={'data': m},
-                                         h={'data': h})
+                                         h={'data': h},
+                                         backend=self.backend)
 
         # set the x array with new values
         p.set(**{'x': [4., 3, 2, 1], 'h': [0.2, 0.2, 0.2, 0.2]})
@@ -981,14 +1040,24 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
         self.assertRaises(ValueError, p.set, **{'x': [1., 2, 3, 5, 6]})
 
 
-class ParticleArrayTestGPU(unittest.TestCase, ParticleArrayTest):
+class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
-        ocl = pytest.importorskip("pysph.base.opencl")
-        get_config().use_opencl = True
+        ocl = pytest.importorskip("pyopencl")
         get_config().use_double = True
+        self.backend = 'opencl'
 
-    def tearDown(self):
-        get_config().use_opencl = False
+    def pull(self, p):
+        p.gpu.pull()
+
+    def push(self, p):
+        p.gpu.push()
+
+
+class ParticleArrayTestCUDA(unittest.TestCase, ParticleArrayTest):
+    def setUp(self):
+        cu = pytest.importorskip("pycuda")
+        get_config().use_double = True
+        self.backend = 'cuda'
 
     def pull(self, p):
         p.gpu.pull()

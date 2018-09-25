@@ -15,8 +15,10 @@ import numpy as np
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import Transpiler, convert_to_float_if_needed
-from .array import Array, get_backend
 from .types import dtype_to_ctype
+
+import pysph.cpy.array as array
+
 
 elementwise_cy_template = '''
 from cython.parallel import parallel, prange
@@ -65,15 +67,15 @@ cdef int get_stride(sz, itemsize):
 
 
 cdef ${type} c_${name}(${c_arg_sig}):
-    cdef int i, n_thread, tid, stride, sz
+    cdef int i, n_thread, tid, scan_stride, sz
     cdef ${type} a, b
     n_thread = get_number_of_threads()
     sz = sizeof(${type})
 
     # This striding is to do 64 bit alignment to prevent false sharing.
-    stride = get_stride(64, sz)
+    scan_stride = get_stride(64, sz)
     cdef ${type}* buffer
-    buffer = <${type}*>malloc(n_thread*stride*sz)
+    buffer = <${type}*>malloc(n_thread*scan_stride*sz)
     if buffer == NULL:
         raise MemoryError("Unable to allocate memory for reduction")
 
@@ -83,19 +85,19 @@ cdef ${type} c_${name}(${c_arg_sig}):
     if 1:
 % endif
         tid = threadid()
-        buffer[tid*stride] = ${neutral}
+        buffer[tid*scan_stride] = ${neutral}
 %if openmp:
         for i in ${get_parallel_range("SIZE")}:
 %else:
         for i in range(SIZE):
 %endif
-            a = buffer[tid*stride]
+            a = buffer[tid*scan_stride]
             b = ${map_expr}
-            buffer[tid*stride] = ${reduce_expr}
+            buffer[tid*scan_stride] = ${reduce_expr}
 
     a = ${neutral}
     for i in range(n_thread):
-        b = buffer[i*stride]
+        b = buffer[i*scan_stride]
         a = ${reduce_expr}
 
     free(buffer)
@@ -132,17 +134,17 @@ cdef int get_stride(int sz, int itemsize):
 
 
 cdef void c_${name}(${c_arg_sig}):
-    cdef int i, n_thread, tid, stride, sz, N
+    cdef int i, n_thread, tid, scan_stride, sz, N
 
     N = SIZE
     n_thread = get_number_of_threads()
     sz = sizeof(${type})
 
     # This striding is to do 64 bit alignment to prevent false sharing.
-    stride = get_stride(64, sz)
+    scan_stride = get_stride(64, sz)
 
     cdef ${type}* buffer
-    buffer = <${type}*> malloc(n_thread * stride * sz)
+    buffer = <${type}*> malloc(n_thread * scan_stride * sz)
 
     if buffer == NULL:
         raise MemoryError("Unable to allocate memory for scan.")
@@ -151,7 +153,7 @@ cdef void c_${name}(${c_arg_sig}):
     cdef int* scan_seg_flags
     cdef int* chunk_new_segment
     scan_seg_flags = <int*> malloc(SIZE * sizeof(int))
-    chunk_new_segment = <int*> malloc(n_thread * stride * sizeof(int))
+    chunk_new_segment = <int*> malloc(n_thread * scan_stride * sizeof(int))
 
     if scan_seg_flags == NULL or chunk_new_segment == NULL:
         raise MemoryError("Unable to allocate memory for segmented scan")
@@ -189,7 +191,7 @@ cdef void c_${name}(${c_arg_sig}):
         # Pass 1
         with nogil, parallel():
             tid = threadid()
-            buffer_idx = tid * stride
+            buffer_idx = tid * scan_stride
 
             start = offset + tid * chunksize
             end = offset + min((tid + 1) * chunksize, SIZE)
@@ -247,27 +249,27 @@ cdef void c_${name}(${c_arg_sig}):
             % if use_segment:
 
             # With segmented scan
-            if chunk_new_segment[(i + 1) * stride]:
+            if chunk_new_segment[(i + 1) * scan_stride]:
                 a = ${neutral}
             else:
-                a = buffer[i * stride]
-            b = buffer[(i + 1) * stride]
-            buffer[(i + 1) * stride] = ${scan_expr}
+                a = buffer[i * scan_stride]
+            b = buffer[(i + 1) * scan_stride]
+            buffer[(i + 1) * scan_stride] = ${scan_expr}
 
             % else:
 
             # Without segmented scan
-            a = buffer[i * stride]
-            b = buffer[(i + 1) * stride]
-            buffer[(i + 1) * stride] = ${scan_expr}
+            a = buffer[i * scan_stride]
+            b = buffer[(i + 1) * scan_stride]
+            buffer[(i + 1) * scan_stride] = ${scan_expr}
 
             % endif
 
-        last_item = buffer[(n_thread - 1) * stride]
+        last_item = buffer[(n_thread - 1) * scan_stride]
 
         # Shift buffer to right by 1 unit
         for i in range(n_thread - 1, 0, -1):
-            buffer[i * stride] = buffer[(i - 1) * stride]
+            buffer[i * scan_stride] = buffer[(i - 1) * scan_stride]
 
         buffer[0] = global_carry
         global_carry = last_item
@@ -275,7 +277,7 @@ cdef void c_${name}(${c_arg_sig}):
         # Pass 3: Output
         with nogil, parallel():
             tid = threadid()
-            buffer_idx = tid * stride
+            buffer_idx = tid * scan_stride
             carry = buffer[buffer_idx]
 
             start = offset + tid * chunksize
@@ -375,7 +377,7 @@ def drop_duplicates(arr):
 
 class Elementwise(object):
     def __init__(self, func, backend='cython'):
-        backend = get_backend(backend)
+        backend = array.get_backend(backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.name = func.__name__
@@ -383,7 +385,7 @@ class Elementwise(object):
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None
-        self._generate()
+        self.c_func = self._generate()
 
     def _generate(self):
         self.tp.add(self.func)
@@ -404,7 +406,7 @@ class Elementwise(object):
             )
             self.tp.add_code(src)
             self.tp.compile()
-            self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+            return getattr(self.tp.mod, 'py_' + self.name)
         elif self.backend == 'opencl':
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
@@ -430,7 +432,7 @@ class Elementwise(object):
                 operation=expr,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
         elif self.backend == 'cuda':
             py_data, c_data = self.cython_gen.get_func_signature(self.func)
             self._correct_opencl_address_space(c_data)
@@ -454,7 +456,7 @@ class Elementwise(object):
                 operation=expr,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
 
     def _correct_opencl_address_space(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
@@ -481,7 +483,7 @@ class Elementwise(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x
@@ -516,7 +518,7 @@ def elementwise(func=None, backend=None):
 class Reduction(object):
     def __init__(self, reduce_expr, map_func=None, dtype_out=np.float64,
                  neutral='0', backend='cython'):
-        backend = get_backend(backend)
+        backend = array.get_backend(backend)
         self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.func = map_func
@@ -680,7 +682,7 @@ class Reduction(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x
@@ -707,9 +709,8 @@ class Reduction(object):
 class Scan(object):
     def __init__(self, input=None, output=None, scan_expr="a+b",
                  is_segment=None, dtype=np.float64, neutral='0',
-                 complex_map=False,
-                 backend='opencl'):
-        backend = get_backend(backend)
+                 complex_map=False, backend='opencl'):
+        backend = array.get_backend(backend)
         if backend not in ['opencl', 'cython']:
             raise NotImplementedError("Unsupported backend: %s. Supported "
                                       "backends: cython, opencl" %
@@ -977,7 +978,7 @@ class Scan(object):
         self.tp.blocks[-1].code = '\n'.join(code)
 
     def _massage_arg(self, x):
-        if isinstance(x, Array):
+        if isinstance(x, array.Array):
             return x.dev
         else:
             return x

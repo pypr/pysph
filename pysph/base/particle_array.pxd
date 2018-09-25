@@ -34,6 +34,7 @@ cdef class ParticleArray:
     """
     Maintains various properties for particles.
     """
+    cdef public str backend
     # dictionary to hold the properties held per particle
     cdef public dict properties
     cdef public list property_arrays
