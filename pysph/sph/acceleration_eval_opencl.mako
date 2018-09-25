@@ -10,6 +10,8 @@
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
 // Destination ${dest}
+## Call py_initialize if it is defined for the equations.
+<% helper.call_py_initialize(all_eqs, dest) %>
 #######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
