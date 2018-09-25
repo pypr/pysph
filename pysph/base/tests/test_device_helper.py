@@ -31,7 +31,8 @@ test_fails_on_cuda = pytest.mark.parametrize(
     'backend', [
         'cython', 'opencl', pytest.param(
             'cuda', marks=pytest.mark.xfail(
-                raises=NotImplementedError, reason='Scan not supported by CUDA'))])
+                raises=NotImplementedError,
+                reason='Scan not supported by CUDA'))])
 
 
 class TestDeviceHelper(object):
