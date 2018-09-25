@@ -758,6 +758,15 @@ class CythonGroup(Group):
     def get_post_loop_code(self, kernel=None):
         return self._get_code(kernel, kind='post_loop')
 
+    def get_py_initialize_code(self):
+        lines = []
+        for i, equation in enumerate(self.equations):
+            if hasattr(equation, 'py_initialize'):
+                code = ('self.all_equations["{name}"].py_initialize'
+                        '(dst.array, t, dt)').format(name=equation.var_name)
+                lines.append(code)
+        return '\n'.join(lines)
+
     def get_reduce_code(self):
         return self._get_code(kernel=None, kind='reduce')
 

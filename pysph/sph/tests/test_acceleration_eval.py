@@ -184,6 +184,19 @@ class SimpleReduction(Equation):
             dst.gpu.push('total_mass')
 
 
+class PyInit(Equation):
+    def py_initialize(self, dst, t, dt):
+        self.called_with = t, dt
+        if dst.gpu:
+            dst.pull('au')
+        dst.au[:] = 1.0
+        if dst.gpu:
+            dst.push('au')
+
+    def initialize(self, d_idx, d_au):
+        d_au[d_idx] += 1.0
+
+
 class LoopAllEquation(Equation):
     def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
@@ -375,6 +388,22 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.sum(pa.m)
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_should_call_py_initialize(self):
+        # Given.
+        pa = self.pa
+        equations = [PyInit(dest='fluid', sources=None)]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('au')
+        np.testing.assert_array_almost_equal(
+            pa.au, np.ones_like(pa.x)*2.0
+        )
 
     def test_should_work_with_non_double_arrays(self):
         # Given
