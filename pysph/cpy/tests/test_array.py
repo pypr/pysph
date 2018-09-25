@@ -8,13 +8,14 @@ import pysph.cpy.array as array
 
 
 test_all_backends = pytest.mark.parametrize('backend',
-        ['cython', 'opencl', 'cuda'])
+                                            ['cython', 'opencl', 'cuda'])
 
 
-test_fails_on_cuda = pytest.mark.parametrize('backend',
-        ['cython', 'opencl', pytest.param('cuda',
-            marks=pytest.mark.xfail(raises=NotImplementedError,
-                reason='Scan not supported by CUDA'))])
+test_fails_on_cuda = pytest.mark.parametrize(
+    'backend', [
+        'cython', 'opencl', pytest.param(
+            'cuda', marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason='Scan not supported by CUDA'))])
 
 
 def make_dev_array(backend, n=16):

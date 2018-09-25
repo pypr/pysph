@@ -9,11 +9,11 @@ import pysph.cpy.array as array
 
 
 def setup_module():
-    get_config().use_openmp=True
+    get_config().use_openmp = True
 
 
 def teardown_module():
-    get_config().use_openmp=False
+    get_config().use_openmp = False
 
 
 def check_import(backend):
@@ -24,13 +24,14 @@ def check_import(backend):
 
 
 test_all_backends = pytest.mark.parametrize('backend',
-        ['cython', 'opencl', 'cuda'])
+                                            ['cython', 'opencl', 'cuda'])
 
 
-test_fails_on_cuda = pytest.mark.parametrize('backend',
-        ['cython', 'opencl', pytest.param('cuda',
-            marks=pytest.mark.xfail(raises=NotImplementedError,
-                reason='Scan not supported by CUDA'))])
+test_fails_on_cuda = pytest.mark.parametrize(
+    'backend', [
+        'cython', 'opencl', pytest.param(
+            'cuda', marks=pytest.mark.xfail(
+                raises=NotImplementedError, reason='Scan not supported by CUDA'))])
 
 
 class TestDeviceHelper(object):
@@ -178,8 +179,8 @@ class TestDeviceHelper(object):
 
         # Then
         assert not hasattr(h, 'test')
-        assert not 'test' in h._data
-        assert not 'test' in h.properties
+        assert 'test' not in h._data
+        assert 'test' not in h.properties
 
     @test_all_backends
     def test_resize_works(self, backend):
@@ -383,4 +384,3 @@ class TestDeviceHelper(object):
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
-
