@@ -16,6 +16,13 @@ def teardown_module():
     get_config().use_openmp=False
 
 
+def check_import(backend):
+    if backend == 'opencl':
+        pytest.importorskip('pyopencl')
+    if backend == 'cuda':
+        pytest.importorskip('pycuda')
+
+
 test_all_backends = pytest.mark.parametrize('backend',
         ['cython', 'opencl', 'cuda'])
 
@@ -28,11 +35,11 @@ test_fails_on_cuda = pytest.mark.parametrize('backend',
 
 class TestDeviceHelper(object):
     def setup(self):
-        self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0,
-                                     backend='cpu')
+        self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
 
     @test_all_backends
     def test_simple(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -50,6 +57,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_push_correctly_sets_values_with_args(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -72,6 +80,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_push_correctly_sets_values_with_no_args(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -94,6 +103,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_pull_correctly_sets_values_with_args(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -116,6 +126,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_pull_correctly_sets_values_with_no_args(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -138,6 +149,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_max_provides_maximum(self, backend):
+        check_import(backend)
         self.setup()
         # Given/When
         pa = self.pa
@@ -148,6 +160,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_that_adding_removing_prop_to_array_updates_gpu(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -170,6 +183,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_resize_works(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -203,6 +217,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_get_number_of_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -222,6 +237,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_align(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -242,6 +258,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_align_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -261,6 +278,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_remove_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -281,6 +299,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_remove_tagged_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -299,6 +318,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_add_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -315,6 +335,7 @@ class TestDeviceHelper(object):
 
     @test_all_backends
     def test_extend(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = self.pa
@@ -330,6 +351,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_append_parray(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa1 = self.pa
@@ -345,6 +367,7 @@ class TestDeviceHelper(object):
 
     @test_fails_on_cuda
     def test_extract_particles(self, backend):
+        check_import(backend)
         self.setup()
         # Given
         pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],

@@ -44,7 +44,7 @@ DEFAULT_PROPS = set(
 )
 
 
-def get_particle_array(additional_props=None, constants=None, backend=None,
+def get_particle_array(additional_props=None, constants=None, backend='cpu',
                        **props):
     """Create and return a particle array with default properties.
 
