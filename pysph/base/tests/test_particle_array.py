@@ -974,7 +974,7 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 
     def setUp(self):
         get_config().use_opencl = False
-        self.backend = 'cpu'
+        self.backend = None
 
     def pull(self, p):
         pass
@@ -1045,22 +1045,6 @@ class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
         ocl = pytest.importorskip("pyopencl")
         get_config().use_double = True
         self.backend = 'opencl'
-
-    def pull(self, p):
-        p.gpu.pull()
-
-    def push(self, p):
-        p.gpu.push()
-
-
-class ParticleArrayTestCython(unittest.TestCase, ParticleArrayTest):
-    def setUp(self):
-        get_config().use_double = True
-        get_config().use_openmp = True
-        self.backend = 'cython'
-
-    def tearDown(self):
-        get_config().use_openmp = False
 
     def pull(self, p):
         p.gpu.pull()
