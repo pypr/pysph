@@ -288,9 +288,6 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.get('A').ravel(), A*2), True)
 
     def test_remove_particles(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -340,9 +337,6 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.A, numpy.arange(6, 12)), True)
 
     def test_add_particles(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -404,9 +398,6 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.z, [0, 0, 0, 0, 0, 0]), True)
 
     def test_remove_tagged_particles(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         x = [1, 2, 3, 4.]
         y = [0., 1., 2., 3.]
         z = [0., 0., 0., 0.]
@@ -542,9 +533,6 @@ class ParticleArrayTest(object):
         self.assertEqual(check_array(p.m2, [10.0]*8), True)
 
     def test_extend(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(default_particle_tag=10, x={},
                                          y={'default': -1.},
@@ -583,9 +571,6 @@ class ParticleArrayTest(object):
                                      [10.0, 10.0] + [-1.0]*10), True)
 
     def test_resize(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(
             A={'data': [10.0, 10.0], 'stride': 2, 'default': -1.},
@@ -602,9 +587,6 @@ class ParticleArrayTest(object):
         self.assertEqual(p.get_carray('A').length, 8)
 
     def test_align_particles(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(backend=self.backend)
         p.add_property(**{'name': 'x',
@@ -694,9 +676,6 @@ class ParticleArrayTest(object):
         )
 
     def test_append_parray(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p1 = particle_array.ParticleArray(backend=self.backend)
         p1.add_property(**{'name': 'x', 'data': [1, 2, 3]})
@@ -824,9 +803,6 @@ class ParticleArrayTest(object):
         self.assertTrue(check_array(p.get('v'), [0.0, 1.0, 2.0]))
 
     def test_that_constants_are_not_resized_when_particles_are_added(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(name='f', x=[1.0],
                                          backend=self.backend)
@@ -869,9 +845,6 @@ class ParticleArrayTest(object):
         self.assertTrue(check_array(a.get_npy_array(), v))
 
     def test_extract_particles_extracts_particles_and_output_arrays(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
                                          backend=self.backend)
@@ -892,9 +865,6 @@ class ParticleArrayTest(object):
         self.assertEqual(n.output_property_arrays, p.output_property_arrays)
 
     def test_extract_particles_works_with_specific_props(self):
-        if self.backend == 'cuda':
-            pytest.xfail("Scan not supported on CUDA")
-
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
                                          backend=self.backend)

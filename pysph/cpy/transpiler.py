@@ -123,7 +123,7 @@ class CodeBlock(object):
 
 
 class Transpiler(object):
-    def __init__(self, backend='cython'):
+    def __init__(self, backend='cython', incl_cluda=True):
         """Constructor.
 
         Parameters
@@ -150,9 +150,11 @@ class Transpiler(object):
         elif backend == 'opencl':
             from pyopencl._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            cluda = Template(text=CLUDA_PREAMBLE).render(
-                double_support=True
-            )
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
@@ -161,9 +163,11 @@ class Transpiler(object):
         elif backend == 'cuda':
             from pycuda._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            cluda = Template(text=CLUDA_PREAMBLE).render(
-                double_support=True
-            )
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 

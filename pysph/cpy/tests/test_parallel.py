@@ -163,6 +163,10 @@ class TestParallelUtils(unittest.TestCase):
         importorskip('pyopencl')
         self._test_scan(backend='opencl')
 
+    def test_scan_works_cuda(self):
+        importorskip('pycuda')
+        self._test_scan(backend='cuda')
+
     def _test_unique_scan(self, backend):
         # Given
         a = np.random.randint(0, 100, 100, dtype=np.int32)

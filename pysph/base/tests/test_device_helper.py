@@ -27,14 +27,6 @@ test_all_backends = pytest.mark.parametrize('backend',
                                             ['cython', 'opencl', 'cuda'])
 
 
-test_fails_on_cuda = pytest.mark.parametrize(
-    'backend', [
-        'cython', 'opencl', pytest.param(
-            'cuda', marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason='Scan not supported by CUDA'))])
-
-
 class TestDeviceHelper(object):
     def setup(self):
         self.pa = get_particle_array(name='f', x=[0.0, 1.0], m=1.0, rho=2.0)
@@ -217,7 +209,7 @@ class TestDeviceHelper(object):
         assert np.allclose(pa.rho, h.rho.get())
         assert np.allclose(pa.tag, h.tag.get())
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_get_number_of_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -258,7 +250,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(h.x.get() == np.array([6., 5., 4., 3., 2.]))
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_align_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -278,7 +270,7 @@ class TestDeviceHelper(object):
         x = h.x.get()
         assert np.all(np.sort(x[:-2]) == np.array([2., 3., 5.]))
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_remove_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -299,7 +291,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 5.]))
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_remove_tagged_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -318,7 +310,7 @@ class TestDeviceHelper(object):
         # Then
         assert np.all(np.sort(h.x.get()) == np.array([2., 3., 5.]))
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_add_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -351,7 +343,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 6
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_append_parray(self, backend):
         check_import(backend)
         self.setup()
@@ -367,7 +359,7 @@ class TestDeviceHelper(object):
         # Then
         assert h.get_number_of_particles() == 4
 
-    @test_fails_on_cuda
+    @test_all_backends
     def test_extract_particles(self, backend):
         check_import(backend)
         self.setup()
