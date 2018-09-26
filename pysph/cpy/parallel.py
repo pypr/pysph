@@ -897,7 +897,8 @@ class Scan(object):
         else:
             if func_type is 'input':
                 if self.backend == 'opencl':
-                    arguments = ['__global %(type)s *input' % {'type': self.type}]
+                    arguments = ['__global %(type)s *input' %
+                                 {'type': self.type}]
                 elif self.backend == 'cuda':
                     arguments = ['%(type)s *input' % {'type': self.type}]
                 expr = 'input[i]'
@@ -937,11 +938,11 @@ class Scan(object):
         self.arg_keys = c_args
 
         return scan_expr, arg_defn, input_expr, output_expr, \
-                segment_expr, preamble
+            segment_expr, preamble
 
     def _generate_opencl_kernel(self):
         scan_expr, arg_defn, input_expr, output_expr, \
-                segment_expr, preamble = self._get_opencl_cuda_code()
+            segment_expr, preamble = self._get_opencl_cuda_code()
 
         from .opencl import get_context, get_queue
         from pyopencl.scan import GenericScanKernel
@@ -962,7 +963,7 @@ class Scan(object):
 
     def _generate_cuda_kernel(self):
         scan_expr, arg_defn, input_expr, output_expr, \
-                segment_expr, preamble = self._get_opencl_cuda_code()
+            segment_expr, preamble = self._get_opencl_cuda_code()
 
         from .cuda import set_context, GenericScanKernel
         set_context()

@@ -174,7 +174,6 @@ class Transpiler(object):
             __constant__ double pi= 3.141592654f;
             ''')
 
-
     def _handle_symbol(self, name, value):
         backend = self.backend
         value_type = type(value)
@@ -211,7 +210,7 @@ class Transpiler(object):
         lines = []
         comment = self._get_comment()
         if len(syms):
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             code = '{com} Global constants from user namespace'.format(
                 com=comment
             )
@@ -226,7 +225,7 @@ class Transpiler(object):
         # Link is ignored for now until we have a concrete example.
         if code:
             comment = self._get_comment()
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             info = '{com} External definitions.'.format(com=comment)
             lines = [hline, info, ''] + code + [hline]
             self.header += '\n'.join(lines)
