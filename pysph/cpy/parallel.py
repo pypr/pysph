@@ -1021,4 +1021,8 @@ class Scan(object):
             self.c_func(*[c_args_dict[k] for k in self.arg_keys])
             self.queue.finish()
         elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
             self.c_func(*[c_args_dict[k] for k in self.arg_keys])
+            event.record()
+            event.synchronize()
