@@ -711,10 +711,6 @@ class Scan(object):
                  is_segment=None, dtype=np.float64, neutral='0',
                  complex_map=False, backend='opencl'):
         backend = array.get_backend(backend)
-        #if backend not in ['opencl', 'cython']:
-        #    raise NotImplementedError("Unsupported backend: %s. Supported "
-        #                              "backends: cython, opencl" %
-        #                              backend)
         self.tp = Transpiler(backend=backend, incl_cluda=False)
         self.backend = backend
         self.input_func = input
