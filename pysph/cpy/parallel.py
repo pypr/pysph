@@ -896,7 +896,10 @@ class Scan(object):
             c_args = c_data[1][n_ignore:]
         else:
             if func_type is 'input':
-                arguments = ['GLOBAL_MEM %(type)s *input' % {'type': self.type}]
+                if self.backend == 'opencl':
+                    arguments = ['__global %(type)s *input' % {'type': self.type}]
+                elif self.backend == 'cuda':
+                    arguments = ['%(type)s *input' % {'type': self.type}]
                 expr = 'input[i]'
                 c_args = ['input']
             else:

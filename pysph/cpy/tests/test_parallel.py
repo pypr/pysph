@@ -222,6 +222,10 @@ class TestParallelUtils(unittest.TestCase):
         importorskip('pyopencl')
         self._test_unique_scan(backend='opencl')
 
+    def test_unique_scan_cuda(self):
+        importorskip('pycuda')
+        self._test_unique_scan(backend='cuda')
+
     def _get_segmented_scan_actual(self, a, segment_flags):
         output_actual = np.zeros_like(a)
         for i in range(len(a)):
@@ -277,6 +281,10 @@ class TestParallelUtils(unittest.TestCase):
         importorskip('pyopencl')
         self._test_segmented_scan(backend='opencl')
 
+    def test_segmented_scan_cuda(self):
+        importorskip('pycuda')
+        self._test_segmented_scan(backend='cuda')
+
     def _test_scan_last_item(self, backend):
         # Given
         a = np.random.randint(0, 100, 50000, dtype=np.int32)
@@ -306,3 +314,7 @@ class TestParallelUtils(unittest.TestCase):
     def test_scan_last_item_opencl(self):
         importorskip('pyopencl')
         self._test_scan_last_item(backend='opencl')
+
+    def test_scan_last_item_cuda(self):
+        importorskip('pycuda')
+        self._test_scan_last_item(backend='cuda')
