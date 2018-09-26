@@ -27,7 +27,7 @@ import pycuda.driver as drv
 import pycuda.gpuarray as gpuarray
 from pycuda.compiler import SourceModule
 from pycuda.tools import (dtype_to_ctype, bitlog2,
-        context_dependent_memoize, ScalarArg, VectorArg)
+                          context_dependent_memoize, ScalarArg, VectorArg)
 
 import pycuda._mymako as mako
 from pycuda._cluda import CLUDA_PREAMBLE
@@ -75,7 +75,7 @@ def get_arg_list_scalar_arg_dtypes(arg_types):
 def _process_code_for_macro(code):
     if "//" in code:
         raise RuntimeError("end-of-line comments ('//') may not be used in "
-                "code snippets")
+                           "code snippets")
 
     return code.replace("\n", " \\\n")
 
@@ -87,7 +87,7 @@ class _NumpyTypesKeyBuilder(KeyBuilderBase):
             return
 
         raise TypeError("unsupported type for persistent hash keying: %s"
-                % type(key))
+                        % type(key))
 
 
 # {{{ preamble
@@ -765,6 +765,7 @@ void ${name_prefix}_final_update(
 
 # {{{ helpers
 
+
 def _round_down_to_power_of_2(val):
     result = 2**bitlog2(val)
     if result > val:
@@ -867,7 +868,7 @@ def _make_template(s):
         if word in _IGNORED_WORDS:
             return word
         elif word in _PREFIX_WORDS:
-            return "psc_"+word
+            return "psc_" + word
         else:
             leftovers.add(word)
             return word
@@ -888,29 +889,29 @@ from pytools import Record, RecordWithoutPickling
 class _GeneratedScanKernelInfo(Record):
 
     __slots__ = [
-            "scan_src",
-            "kernel_name",
-            "scalar_arg_dtypes",
-            "wg_size",
-            "k_group_size"]
+        "scan_src",
+        "kernel_name",
+        "scalar_arg_dtypes",
+        "wg_size",
+        "k_group_size"]
 
     def __init__(self, scan_src, kernel_name, scalar_arg_dtypes, wg_size,
-            k_group_size):
+                 k_group_size):
         Record.__init__(self,
-                scan_src=scan_src,
-                kernel_name=kernel_name,
-                scalar_arg_dtypes=scalar_arg_dtypes,
-                wg_size=wg_size,
-                k_group_size=k_group_size)
+                        scan_src=scan_src,
+                        kernel_name=kernel_name,
+                        scalar_arg_dtypes=scalar_arg_dtypes,
+                        wg_size=wg_size,
+                        k_group_size=k_group_size)
 
     def build(self, options):
         program = SourceModule(self.scan_src, options=options)
         kernel = program.get_function(self.kernel_name)
         kernel.prepare(self.scalar_arg_dtypes)
         return _BuiltScanKernelInfo(
-                kernel=kernel,
-                wg_size=self.wg_size,
-                k_group_size=self.k_group_size)
+            kernel=kernel,
+            wg_size=self.wg_size,
+            k_group_size=self.k_group_size)
 
 
 class _BuiltScanKernelInfo(RecordWithoutPickling):
@@ -919,28 +920,28 @@ class _BuiltScanKernelInfo(RecordWithoutPickling):
 
     def __init__(self, kernel, wg_size, k_group_size):
         RecordWithoutPickling.__init__(self,
-                kernel=kernel,
-                wg_size=wg_size,
-                k_group_size=k_group_size)
+                                       kernel=kernel,
+                                       wg_size=wg_size,
+                                       k_group_size=k_group_size)
 
 
 class _GeneratedFinalUpdateKernelInfo(Record):
 
     def __init__(self, source, kernel_name, scalar_arg_dtypes, update_wg_size):
         Record.__init__(self,
-                source=source,
-                kernel_name=kernel_name,
-                scalar_arg_dtypes=scalar_arg_dtypes,
-                update_wg_size=update_wg_size)
+                        source=source,
+                        kernel_name=kernel_name,
+                        scalar_arg_dtypes=scalar_arg_dtypes,
+                        update_wg_size=update_wg_size)
 
     def build(self, options):
         program = SourceModule(self.source, options=options)
         kernel = program.get_function(self.kernel_name)
         kernel.prepare(self.scalar_arg_dtypes)
         return _BuiltFinalUpdateKernelInfo(
-                kernel=kernel,
-                update_wg_size=self.update_wg_size
-                )
+            kernel=kernel,
+            update_wg_size=self.update_wg_size
+        )
 
 
 class _BuiltFinalUpdateKernelInfo(RecordWithoutPickling):
@@ -948,8 +949,8 @@ class _BuiltFinalUpdateKernelInfo(RecordWithoutPickling):
 
     def __init__(self, kernel, update_wg_size):
         RecordWithoutPickling.__init__(self,
-                kernel=kernel,
-                update_wg_size=update_wg_size)
+                                       kernel=kernel,
+                                       update_wg_size=update_wg_size)
 
 # }}}
 
@@ -962,10 +963,10 @@ class _GenericScanKernelBase(object):
     # {{{ constructor, argument processing
 
     def __init__(self, dtype,
-            arguments, input_expr, scan_expr, neutral, output_statement,
-            is_segment_start_expr=None, input_fetch_exprs=[],
-            index_dtype=np.int32,
-            name_prefix="scan", options=None, preamble=""):
+                 arguments, input_expr, scan_expr, neutral, output_statement,
+                 is_segment_start_expr=None, input_fetch_exprs=[],
+                 index_dtype=np.int32,
+                 name_prefix="scan", options=None, preamble=""):
         """
         :arg dtype: the :class:`numpy.dtype` with which the scan will
             be performed. May be a structured type if that type was registered
@@ -1051,12 +1052,13 @@ class _GenericScanKernelBase(object):
         if neutral is None:
             from warnings import warn
             warn("not specifying 'neutral' is deprecated and will lead to "
-                    "wrong results if your scan is not in-place or your "
-                    "'output_statement' does something otherwise non-trivial",
-                    stacklevel=2)
+                 "wrong results if your scan is not in-place or your "
+                 "'output_statement' does something otherwise non-trivial",
+                 stacklevel=2)
 
         if dtype.itemsize % 4 != 0:
-            raise TypeError("scan value type must have size divisible by 4 bytes")
+            raise TypeError(
+                "scan value type must have size divisible by 4 bytes")
 
         self.index_dtype = np.dtype(index_dtype)
         if np.iinfo(self.index_dtype).min >= 0:
@@ -1066,8 +1068,8 @@ class _GenericScanKernelBase(object):
 
         self.parsed_args = parse_arg_list(arguments)
         from pycuda.tools import VectorArg
-        vector_args_indices = [i for i, arg in enumerate(self.parsed_args) \
-                if isinstance(arg, VectorArg)]
+        vector_args_indices = [i for i, arg in enumerate(self.parsed_args)
+                               if isinstance(arg, VectorArg)]
         self.first_array_idx = vector_args_indices[0]
 
         self.input_expr = input_expr
@@ -1075,13 +1077,15 @@ class _GenericScanKernelBase(object):
         self.is_segment_start_expr = is_segment_start_expr
         self.is_segmented = is_segment_start_expr is not None
         if self.is_segmented:
-            is_segment_start_expr = _process_code_for_macro(is_segment_start_expr)
+            is_segment_start_expr = _process_code_for_macro(
+                is_segment_start_expr)
 
         self.output_statement = output_statement
 
         for name, arg_name, ife_offset in input_fetch_exprs:
             if ife_offset not in [0, -1]:
-                raise RuntimeError("input_fetch_expr offsets must either be 0 or -1")
+                raise RuntimeError(
+                    "input_fetch_expr offsets must either be 0 or -1")
         self.input_fetch_exprs = input_fetch_exprs
 
         arg_dtypes = {}
@@ -1111,7 +1115,7 @@ class _GenericScanKernelBase(object):
             scan_expr=_process_code_for_macro(scan_expr),
             neutral=_process_code_for_macro(neutral),
             double_support=has_double_support(),
-            )
+        )
 
         index_typename = dtype_to_ctype(self.index_dtype)
         scan_typename = dtype_to_ctype(dtype)
@@ -1134,13 +1138,13 @@ class _GenericScanKernelBase(object):
             # the other variables.
             index_typename,
             scan_typename,
-            )
+        )
 
         # }}}
 
         self.use_lookbehind_update = "prev_item" in self.output_statement
         self.store_segment_start_flags = (
-                self.is_segmented and self.use_lookbehind_update)
+            self.is_segmented and self.use_lookbehind_update)
 
         self.finish_setup()
 
@@ -1148,8 +1152,8 @@ class _GenericScanKernelBase(object):
 
 
 generic_scan_kernel_cache = WriteOncePersistentDict(
-        "pycuda-generated-scan-kernel-cache-v1",
-        key_builder=_NumpyTypesKeyBuilder())
+    "pycuda-generated-scan-kernel-cache-v1",
+    key_builder=_NumpyTypesKeyBuilder())
 
 
 class GenericScanKernel(_GenericScanKernelBase):
@@ -1184,7 +1188,7 @@ class GenericScanKernel(_GenericScanKernelBase):
             result = generic_scan_kernel_cache[cache_key]
             from_cache = True
             logger.debug(
-                    "cache hit for generated scan kernel '%s'" % self.name_prefix)
+                "cache hit for generated scan kernel '%s'" % self.name_prefix)
             (
                 self.first_level_scan_gen_info,
                 self.second_level_scan_gen_info,
@@ -1194,7 +1198,7 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         if not from_cache:
             logger.debug(
-                    "cache miss for generated scan kernel '%s'" % self.name_prefix)
+                "cache miss for generated scan kernel '%s'" % self.name_prefix)
             self._finish_setup_impl()
 
             result = (self.first_level_scan_gen_info,
@@ -1205,15 +1209,15 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         # Build the kernels.
         self.first_level_scan_info = self.first_level_scan_gen_info.build(
-                self.options)
+            self.options)
         del self.first_level_scan_gen_info
 
         self.second_level_scan_info = self.second_level_scan_gen_info.build(
-                self.options)
+            self.options)
         del self.second_level_scan_gen_info
 
         self.final_update_info = self.final_update_gen_info.build(
-                self.options)
+            self.options)
         del self.final_update_gen_info
 
     def _finish_setup_impl(self):
@@ -1223,65 +1227,66 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         dev = drv.Context.get_device()
         avail_local_mem = dev.get_attribute(
-                 drv.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK)
+            drv.device_attribute.MAX_SHARED_MEMORY_PER_BLOCK)
 
         # not sure where these go, but roughly this much seems unavailable.
         avail_local_mem -= 0x400
 
         max_scan_wg_size = dev.get_attribute(
-                drv.device_attribute.MAX_THREADS_PER_BLOCK)
+            drv.device_attribute.MAX_THREADS_PER_BLOCK)
         wg_size_multiples = 64
 
         use_bank_conflict_avoidance = (
-                self.dtype.itemsize > 4 and self.dtype.itemsize % 8 == 0)
+            self.dtype.itemsize > 4 and self.dtype.itemsize % 8 == 0)
 
         # k_group_size should be a power of two because of in-kernel
         # division by that number.
 
         solutions = []
         for k_exp in range(0, 9):
-            for wg_size in range(wg_size_multiples, max_scan_wg_size+1,
-                    wg_size_multiples):
+            for wg_size in range(wg_size_multiples, max_scan_wg_size + 1,
+                                 wg_size_multiples):
 
                 k_group_size = 2**k_exp
                 lmem_use = self.get_local_mem_use(wg_size, k_group_size,
-                        use_bank_conflict_avoidance)
+                                                  use_bank_conflict_avoidance)
                 if lmem_use <= avail_local_mem:
-                    solutions.append((wg_size*k_group_size, k_group_size, wg_size))
+                    solutions.append(
+                        (wg_size * k_group_size, k_group_size, wg_size))
 
         from pytools import any
         for wg_size_floor in [256, 192, 128]:
             have_sol_above_floor = any(wg_size >= wg_size_floor
-                    for _, _, wg_size in solutions)
+                                       for _, _, wg_size in solutions)
 
             if have_sol_above_floor:
                 # delete all solutions not meeting the wg size floor
                 solutions = [(total, try_k_group_size, try_wg_size)
-                        for total, try_k_group_size, try_wg_size in solutions
-                        if try_wg_size >= wg_size_floor]
+                             for total, try_k_group_size, try_wg_size in solutions
+                             if try_wg_size >= wg_size_floor]
                 break
 
         _, k_group_size, max_scan_wg_size = max(solutions)
 
         while True:
             candidate_scan_gen_info = self.generate_scan_kernel(
-                    max_scan_wg_size, self.parsed_args,
-                    _process_code_for_macro(self.input_expr),
-                    self.is_segment_start_expr,
-                    input_fetch_exprs=self.input_fetch_exprs,
-                    is_first_level=True,
-                    store_segment_start_flags=self.store_segment_start_flags,
-                    k_group_size=k_group_size,
-                    use_bank_conflict_avoidance=use_bank_conflict_avoidance)
+                max_scan_wg_size, self.parsed_args,
+                _process_code_for_macro(self.input_expr),
+                self.is_segment_start_expr,
+                input_fetch_exprs=self.input_fetch_exprs,
+                is_first_level=True,
+                store_segment_start_flags=self.store_segment_start_flags,
+                k_group_size=k_group_size,
+                use_bank_conflict_avoidance=use_bank_conflict_avoidance)
 
             candidate_scan_info = candidate_scan_gen_info.build(
-                    self.options)
+                self.options)
 
             # Will this device actually let us execute this kernel
             # at the desired work group size? Building it is the
             # only way to find out.
             kernel_max_wg_size = candidate_scan_info.kernel.get_attribute(
-                    drv.function_attribute.MAX_THREADS_PER_BLOCK)
+                drv.function_attribute.MAX_THREADS_PER_BLOCK)
 
             if candidate_scan_info.wg_size <= kernel_max_wg_size:
                 break
@@ -1301,13 +1306,13 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         from pycuda.tools import VectorArg
         second_level_arguments = self.parsed_args + [
-                VectorArg(self.dtype, "interval_sums")]
+            VectorArg(self.dtype, "interval_sums")]
 
         second_level_build_kwargs = {}
         if self.is_segmented:
             second_level_arguments.append(
-                    VectorArg(self.index_dtype,
-                        "g_first_segment_start_in_interval_input"))
+                VectorArg(self.index_dtype,
+                          "g_first_segment_start_in_interval_input"))
 
             # is_segment_start_expr answers the question "should previous sums
             # spill over into this item". And since
@@ -1315,20 +1320,20 @@ class GenericScanKernel(_GenericScanKernelBase):
             # segment boundary was found in an interval of data, then if not,
             # it's ok to spill over.
             second_level_build_kwargs["is_segment_start_expr"] = \
-                    "g_first_segment_start_in_interval_input[i] != NO_SEG_BOUNDARY"
+                "g_first_segment_start_in_interval_input[i] != NO_SEG_BOUNDARY"
         else:
             second_level_build_kwargs["is_segment_start_expr"] = None
 
         self.second_level_scan_gen_info = self.generate_scan_kernel(
-                max_scan_wg_size,
-                arguments=second_level_arguments,
-                input_expr="interval_sums[i]",
-                input_fetch_exprs=[],
-                is_first_level=False,
-                store_segment_start_flags=False,
-                k_group_size=k_group_size,
-                use_bank_conflict_avoidance=use_bank_conflict_avoidance,
-                **second_level_build_kwargs)
+            max_scan_wg_size,
+            arguments=second_level_arguments,
+            input_expr="interval_sums[i]",
+            input_fetch_exprs=[],
+            is_first_level=False,
+            store_segment_start_flags=False,
+            k_group_size=k_group_size,
+            use_bank_conflict_avoidance=use_bank_conflict_avoidance,
+            **second_level_build_kwargs)
 
         # }}}
 
@@ -1348,8 +1353,8 @@ class GenericScanKernel(_GenericScanKernelBase):
             **self.code_variables))
 
         update_scalar_arg_dtypes = (
-                get_arg_list_scalar_arg_dtypes(self.parsed_args)
-                + [self.index_dtype, self.index_dtype, None, None])
+            get_arg_list_scalar_arg_dtypes(self.parsed_args)
+            + [self.index_dtype, self.index_dtype, None, None])
         if self.is_segmented:
             # g_first_segment_start_in_interval
             update_scalar_arg_dtypes.append(None)
@@ -1357,17 +1362,17 @@ class GenericScanKernel(_GenericScanKernelBase):
             update_scalar_arg_dtypes.append(None)  # g_segment_start_flags
 
         self.final_update_gen_info = _GeneratedFinalUpdateKernelInfo(
-                final_update_src,
-                self.name_prefix + "_final_update",
-                update_scalar_arg_dtypes,
-                update_wg_size)
+            final_update_src,
+            self.name_prefix + "_final_update",
+            update_scalar_arg_dtypes,
+            update_wg_size)
 
         # }}}
 
     # {{{ scan kernel build/properties
 
     def get_local_mem_use(self, k_group_size, wg_size,
-            use_bank_conflict_avoidance):
+                          use_bank_conflict_avoidance):
         arg_dtypes = {}
         for arg in self.parsed_args:
             arg_dtypes[arg.name] = arg.dtype
@@ -1381,29 +1386,36 @@ class GenericScanKernel(_GenericScanKernelBase):
             itemsize += 4
 
         return (
-                # ldata
-                itemsize*(k_group_size+1)*(wg_size+1)
+            # ldata
+            itemsize * (k_group_size + 1) * (wg_size + 1)
 
-                # l_segment_start_flags
-                + k_group_size*wg_size
+            # l_segment_start_flags
+            + k_group_size * wg_size
 
-                # l_first_segment_start_in_subtree
-                + self.index_dtype.itemsize*wg_size
+            # l_first_segment_start_in_subtree
+            + self.index_dtype.itemsize * wg_size
 
-                + k_group_size*wg_size*sum(
-                    arg_dtypes[arg_name].itemsize
-                    for arg_name, ife_offsets in list(fetch_expr_offsets.items())
-                    if -1 in ife_offsets or len(ife_offsets) > 1))
+            + k_group_size * wg_size * sum(
+                arg_dtypes[arg_name].itemsize
+                for arg_name, ife_offsets in list(fetch_expr_offsets.items())
+                if -1 in ife_offsets or len(ife_offsets) > 1))
 
-    def generate_scan_kernel(self, max_wg_size, arguments, input_expr,
-            is_segment_start_expr, input_fetch_exprs, is_first_level,
-            store_segment_start_flags, k_group_size,
+    def generate_scan_kernel(
+            self,
+            max_wg_size,
+            arguments,
+            input_expr,
+            is_segment_start_expr,
+            input_fetch_exprs,
+            is_first_level,
+            store_segment_start_flags,
+            k_group_size,
             use_bank_conflict_avoidance):
         scalar_arg_dtypes = get_arg_list_scalar_arg_dtypes(arguments)
 
         # Empirically found on Nv hardware: no need to be bigger than this size
         wg_size = _round_down_to_power_of_2(
-                min(max_wg_size, 256))
+            min(max_wg_size, 256))
 
         kernel_name = self.code_variables["name_prefix"]
         if is_first_level:
@@ -1412,21 +1424,23 @@ class GenericScanKernel(_GenericScanKernelBase):
             kernel_name += "_lev2"
 
         scan_tpl = _make_template(SCAN_INTERVALS_SOURCE)
-        scan_src = str(scan_tpl.render(
-            wg_size=wg_size,
-            input_expr=input_expr,
-            k_group_size=k_group_size,
-            argument_signature=", ".join(arg.declarator() for arg in arguments),
-            is_segment_start_expr=is_segment_start_expr,
-            input_fetch_exprs=input_fetch_exprs,
-            is_first_level=is_first_level,
-            store_segment_start_flags=store_segment_start_flags,
-            use_bank_conflict_avoidance=use_bank_conflict_avoidance,
-            kernel_name=kernel_name,
-            **self.code_variables))
+        scan_src = str(
+            scan_tpl.render(
+                wg_size=wg_size,
+                input_expr=input_expr,
+                k_group_size=k_group_size,
+                argument_signature=", ".join(
+                    arg.declarator() for arg in arguments),
+                is_segment_start_expr=is_segment_start_expr,
+                input_fetch_exprs=input_fetch_exprs,
+                is_first_level=is_first_level,
+                store_segment_start_flags=store_segment_start_flags,
+                use_bank_conflict_avoidance=use_bank_conflict_avoidance,
+                kernel_name=kernel_name,
+                **self.code_variables))
 
         scalar_arg_dtypes.extend(
-                (None, self.index_dtype, self.index_dtype))
+            (None, self.index_dtype, self.index_dtype))
         if is_first_level:
             scalar_arg_dtypes.append(None)  # interval_results
         if self.is_segmented and is_first_level:
@@ -1435,11 +1449,11 @@ class GenericScanKernel(_GenericScanKernelBase):
             scalar_arg_dtypes.append(None)  # g_segment_start_flags
 
         return _GeneratedScanKernelInfo(
-                scan_src=scan_src,
-                kernel_name=kernel_name,
-                scalar_arg_dtypes=scalar_arg_dtypes,
-                wg_size=wg_size,
-                k_group_size=k_group_size)
+            scan_src=scan_src,
+            kernel_name=kernel_name,
+            scalar_arg_dtypes=scalar_arg_dtypes,
+            wg_size=wg_size,
+            k_group_size=k_group_size)
 
     # }}}
 
@@ -1452,7 +1466,7 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         if len(args) != len(self.parsed_args):
             raise TypeError("expected %d arguments, got %d" %
-                    (len(self.parsed_args), len(args)))
+                            (len(self.parsed_args), len(args)))
 
         first_array = args[self.first_array_idx]
         allocator = allocator or first_array.allocator
@@ -1478,49 +1492,49 @@ class GenericScanKernel(_GenericScanKernelBase):
 
         unit_size = l1_info.wg_size * l1_info.k_group_size
         dev = drv.Context.get_device()
-        max_intervals = 3*dev.get_attribute(
-                 drv.device_attribute.MULTIPROCESSOR_COUNT)
+        max_intervals = 3 * dev.get_attribute(
+            drv.device_attribute.MULTIPROCESSOR_COUNT)
 
         from pytools import uniform_interval_splitting
         interval_size, num_intervals = uniform_interval_splitting(
-                n, unit_size, max_intervals)
+            n, unit_size, max_intervals)
 
         # {{{ allocate some buffers
 
         interval_results = gpuarray.empty(
-                num_intervals, dtype=self.dtype,
-                allocator=allocator)
+            num_intervals, dtype=self.dtype,
+            allocator=allocator)
 
         partial_scan_buffer = gpuarray.empty(
-                n, dtype=self.dtype,
-                allocator=allocator)
+            n, dtype=self.dtype,
+            allocator=allocator)
 
         if self.store_segment_start_flags:
             segment_start_flags = gpuarray.empty(
-                    n, dtype=np.bool,
-                    allocator=allocator)
+                n, dtype=np.bool,
+                allocator=allocator)
 
         # }}}
 
         # {{{ first level scan of interval (one interval per block)
 
         scan1_args = data_args + [
-                partial_scan_buffer.gpudata, n, interval_size,
-                interval_results.gpudata,
-                ]
+            partial_scan_buffer.gpudata, n, interval_size,
+            interval_results.gpudata,
+        ]
 
         if self.is_segmented:
             first_segment_start_in_interval = gpuarray.empty(
-                    num_intervals, dtype=self.index_dtype,
-                    allocator=allocator)
+                num_intervals, dtype=self.index_dtype,
+                allocator=allocator)
             scan1_args.append(first_segment_start_in_interval.gpudata)
 
         if self.store_segment_start_flags:
             scan1_args.append(segment_start_flags.gpudata)
 
         l1_evt = l1_info.kernel.prepared_async_call(
-                (num_intervals, 1), (l1_info.wg_size, 1, 1), stream,
-                *scan1_args)
+            (num_intervals, 1), (l1_info.wg_size, 1, 1), stream,
+            *scan1_args)
 
         # }}}
 
@@ -1530,36 +1544,36 @@ class GenericScanKernel(_GenericScanKernelBase):
         assert interval_size >= num_intervals
 
         scan2_args = data_args + [
-                interval_results.gpudata,  # interval_sums
-                ]
+            interval_results.gpudata,  # interval_sums
+        ]
         if self.is_segmented:
             scan2_args.append(first_segment_start_in_interval.gpudata)
         scan2_args = scan2_args + [
-                interval_results.gpudata,  # partial_scan_buffer
-                num_intervals, interval_size]
+            interval_results.gpudata,  # partial_scan_buffer
+            num_intervals, interval_size]
 
         l2_evt = l2_info.kernel.prepared_async_call(
-                (1, 1), (l1_info.wg_size, 1, 1), stream,
-                *scan2_args)
+            (1, 1), (l1_info.wg_size, 1, 1), stream,
+            *scan2_args)
 
         # }}}
 
         # {{{ update intervals with result of interval scan
 
-        upd_args = data_args + [
-                n, interval_size, interval_results.gpudata, partial_scan_buffer.gpudata]
+        upd_args = data_args + [n,
+                                interval_size,
+                                interval_results.gpudata,
+                                partial_scan_buffer.gpudata]
         if self.is_segmented:
             upd_args.append(first_segment_start_in_interval.gpudata)
         if self.store_segment_start_flags:
             upd_args.append(segment_start_flags.gpudata)
 
         return self.final_update_info.kernel.prepared_async_call(
-                (num_intervals, 1),
-                (self.final_update_info.update_wg_size, 1, 1), stream,
-                *upd_args)
+            (num_intervals, 1),
+            (self.final_update_info.update_wg_size, 1, 1), stream,
+            *upd_args)
 
         # }}}
 
 # }}}
-
-
