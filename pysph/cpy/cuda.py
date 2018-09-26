@@ -1159,7 +1159,7 @@ class GenericScanKernel(_GenericScanKernelBase):
     Usage example::
 
         import pycuda.gpuarray as gpuarray
-        from pycuda.scan import GenericScanKernel
+        from pysph.cuda.scan import GenericScanKernel
 
         knl = GenericScanKernel(
                 np.int32,
