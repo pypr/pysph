@@ -86,6 +86,32 @@ class Output(object):
         raise NotImplementedError()
 
 
+def _dict_bytes_to_str(d):
+    # This craziness is needed as if the npz file is saved in Python2
+    # then all the strings are bytes and if this is loaded in Python 3,
+    # the keys will be bytes and not strings leading to strange errors.
+    res = {}
+    for key, value in d.items():
+        if isinstance(value, dict):
+            value = _dict_bytes_to_str(value)
+        if isinstance(value, bytes):
+            value = _to_str(value)
+        if isinstance(value, list):
+            if value and isinstance(value[0], bytes):
+                value = [_to_str(x) for x in value]
+        res[_to_str(key)] = value
+    return res
+
+
+def _get_dict_from_arrays(arrays):
+    arrays.shape = (1,)
+    res = arrays[0]
+    if res and isinstance(list(res.keys())[0], bytes):
+        return _dict_bytes_to_str(res)
+    else:
+        return res
+
+
 class NumpyOutput(Output):
 
     def _dump(self, filename):
@@ -97,10 +123,7 @@ class NumpyOutput(Output):
         save_method(filename, version=2, **output_data)
 
     def _load(self, fname):
-        def _get_dict_from_arrays(arrays):
-            arrays.shape = (1,)
-            return arrays[0]
-        data = numpy.load(fname)
+        data = numpy.load(fname, encoding='bytes')
 
         if 'version' not in data.files:
             msg = "Wrong file type! No version number recorded."
