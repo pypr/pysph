@@ -3,14 +3,13 @@ Module contains some common functions.
 """
 
 # standard imports
-import pickle
 import numpy
 import sys
 import os
 
-from pysph.base.particle_array import ParticleArray
-from pysph.base.utils import get_particle_array, get_particles_info
-from pysph.solver.output import load, dump, output_formats
+import pysph
+from pysph.solver.output import load, dump, output_formats  # noqa: 401
+from pysph.solver.output import gather_array_data as _gather_array_data
 
 HAS_PBAR = True
 try:
@@ -18,12 +17,12 @@ try:
 except ImportError:
     HAS_PBAR = False
 
-import pysph
 
 def check_array(x, y):
     """Check if two arrays are equal with an absolute tolerance of
     1e-16."""
     return numpy.allclose(x, y, atol=1e-16, rtol=0)
+
 
 def get_distributed_particles(pa, comm, cell_size):
     # FIXME: this can be removed once the examples all use Application.
@@ -41,6 +40,7 @@ def get_distributed_particles(pa, comm, cell_size):
 
     return particles
 
+
 def get_array_by_name(arrays, name):
     """Given a list of arrays and the name of the desired array, return the
     desired array.
@@ -49,9 +49,7 @@ def get_array_by_name(arrays, name):
         if array.name == name:
             return array
 
-################################################################################
-# `PBar` class.
-###############################################################################
+
 class PBar(object):
     """A simple wrapper around the progressbar so it works if a user has
     it installed or not.
@@ -77,7 +75,7 @@ class PBar(object):
         if self.bar is not None:
             self.bar.update(self.count)
         elif self.show:
-            sys.stdout.write('\r%d%%'%int(self.count*100/self.maxval))
+            sys.stdout.write('\r%d%%' % int(self.count*100/self.maxval))
         if self.show:
             sys.stdout.flush()
 
@@ -108,6 +106,7 @@ class FloatPBar(object):
     def finish(self):
         self.bar.finish()
 
+
 ##############################################################################
 # friendly mkdir  from http://code.activestate.com/recipes/82465/.
 ##############################################################################
@@ -121,7 +120,7 @@ def mkdir(newdir):
         pass
 
     elif os.path.isfile(newdir):
-        raise OSError("a file with the same name as the desired " \
+        raise OSError("a file with the same name as the desired "
                       "dir, '%s', already exists." % newdir)
 
     else:
@@ -145,19 +144,21 @@ def mkdir(newdir):
 def get_pysph_root():
     return os.path.split(pysph.__file__)[0]
 
+
 def dump_v1(filename, particles, solver_data, detailed_output=False,
-         only_real=True, mpi_comm=None):
+            only_real=True, mpi_comm=None):
     """Dump the given particles and solver data to the given filename using
     version 1.  This is mainly used only for testing that we can continue
     to load older versions of the data files.
     """
 
     all_array_data = {}
-    output_data = {"arrays":all_array_data, "solver_data":solver_data}
+    output_data = {"arrays": all_array_data, "solver_data": solver_data}
 
     for array in particles:
         all_array_data[array.name] = array.get_property_arrays(
-            all=detailed_output, only_real=only_real)
+            all=detailed_output, only_real=only_real
+        )
 
     # Gather particle data on root
     if mpi_comm is not None:
@@ -169,7 +170,7 @@ def dump_v1(filename, particles, solver_data, detailed_output=False,
         numpy.savez(filename, version=1, **output_data)
 
 
-def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
+def load_and_concatenate(prefix, nprocs=1, directory=".", count=None):
     """Load the results from multiple files.
 
     Given a filename prefix and the number of processors, return a
@@ -194,14 +195,17 @@ def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
     """
 
     if count is None:
-        counts = [i.rsplit('_',1)[1][:-4] for i in os.listdir(directory) if i.startswith(prefix) and i.endswith('.npz')]
-        counts = sorted( [int(i) for i in counts] )
+        counts = [i.rsplit('_', 1)[1][:-4] for i in os.listdir(directory)
+                  if i.startswith(prefix) and i.endswith('.npz')]
+        counts = sorted([int(i) for i in counts])
         count = counts[-1]
 
     arrays_by_rank = {}
 
     for rank in range(nprocs):
-        fname = os.path.join(directory, prefix+'_'+str(rank)+'_'+str(count)+'.npz')
+        fname = os.path.join(
+            directory, prefix + '_' + str(rank) + '_' + str(count) + '.npz'
+        )
 
         data = load(fname)
         arrays_by_rank[rank] = data["arrays"]
@@ -211,6 +215,7 @@ def load_and_concatenate(prefix,nprocs=1,directory=".",count=None):
     data["arrays"] = arrays
 
     return data
+
 
 def _concatenate_arrays(arrays_by_rank, nprocs):
     """Concatenate arrays into one single particle array. """
@@ -225,7 +230,7 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
         ret = {}
         for array_name in array_names:
             first_array = first_processors_arrays[array_name]
-            for rank in range(1,nprocs):
+            for rank in range(1, nprocs):
                 other_processors_arrays = arrays_by_rank[rank]
                 other_array = other_processors_arrays[array_name]
 
@@ -242,120 +247,6 @@ def _concatenate_arrays(arrays_by_rank, nprocs):
 
     return ret
 
-# SPH interpolation of data
-from pyzoltan.core.carray import UIntArray
-from pysph.base.kernels import Gaussian, get_compiled_kernel
-from pysph.base.nnps import LinkedListNNPS as NNPS
-class SPHInterpolate(object):
-    """Class to perform SPH interpolation
-
-    Given solution data on possibly a scattered set, SPHInterpolate
-    can be used to interpolate solution data on a regular grid.
-
-    """
-    def __init__(self, dim, dst, src, kernel=None):
-        self.dst = dst; self.src = src
-        if kernel is None:
-            self.kernel = get_compiled_kernel(Gaussian(dim))
-
-        # create the neighbor locator object
-        self.nnps = nnps = NNPS(dim=dim, particles=[dst, src],
-                                radius_scale=self.kernel.radius_scale)
-        nnps.update()
-
-    def interpolate(self, arr):
-        """Interpolate data given in arr onto coordinate positions"""
-        # the result array
-        np = self.dst.get_number_of_particles()
-        result = numpy.zeros(np)
-
-        nbrs = UIntArray()
-
-        # source arrays
-        src = self.src
-        sx, sy, sz, sh = src.get('x', 'y', 'z', 'h', only_real_particles=False)
-
-        # dest arrays
-        dst = self.dst
-        dx, dy, dz, dh = dst.x, dst.y, dst.z, dst.h
-
-        # kernel
-        kernel = self.kernel
-
-        for i in range(np):
-            self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-            nnbrs = nbrs.length
-
-            _wij = 0.0; _sum = 0.0
-            for indexj in range(nnbrs):
-                j  = nbrs[indexj]
-
-                hij = 0.5 * (sh[j] + dh[i])
-
-                wij = kernel.kernel(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
-                _wij += wij
-                _sum += arr[j] * wij
-
-            # save the result
-            result[i] = _sum/_wij
-
-        return result
-
-    def gradient(self, arr):
-        """Compute the gradient on the interpolated data"""
-        # the result array
-        np = self.dst.get_number_of_particles()
-
-        # result arrays
-        resultx = numpy.zeros(np)
-        resulty = numpy.zeros(np)
-        resultz = numpy.zeros(np)
-
-        nbrs = UIntArray()
-
-        # data arrays
-        # source arrays
-        src = self.src
-        sx, sy, sz, sh, srho, sm = src.get('x', 'y', 'z', 'h', 'rho', 'm', only_real_particles=False)
-
-        # dest arrays
-        dst = self.dst
-        dx, dy, dz, dh = dst.x, dst.y, dst.z, dst.h
-
-        # kernel
-        kernel = self.kernel
-
-        for i in range(np):
-            self.nnps.get_nearest_particles(src_index=1, dst_index=0, d_idx=i, nbrs=nbrs)
-            nnbrs = nbrs.length
-
-            _wij = 0.0; _sumx = 0.0; _sumy = 0.0; _sumz = 0.0
-            for indexj in range(nnbrs):
-                j  = nbrs[indexj]
-
-                hij = 0.5 * (sh[j] + dh[i])
-
-                wij = kernel.kernel(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
-
-                rhoj = srho[j]; mj = sm[j]
-                fji = arr[j] - arr[i]
-
-                # kernel gradient
-                dwij = kernel.gradient(dx[i], dy[i], dz[i], sx[j], sy[j], sz[j], hij)
-
-                _wij += wij
-                tmp = 1./rhoj * fji * mj
-
-                _sumx += tmp * dwij.x
-                _sumy += tmp * dwij.y
-                _sumz += tmp * dwij.z
-
-            # save the result
-            resultx[i] = _sumx
-            resulty[i] = _sumy
-            resultz[i] = _sumz
-
-        return resultx, resulty, resultz
 
 def get_files(dirname=None, fname=None, endswith=output_formats):
     """Get all solution files in a given directory, `dirname`.
@@ -375,8 +266,8 @@ def get_files(dirname=None, fname=None, endswith=output_formats):
     if dirname is None:
         return []
 
-    path = os.path.abspath( dirname )
-    files = os.listdir( path )
+    path = os.path.abspath(dirname)
+    files = os.listdir(path)
 
     if fname is None:
         fname = os.path.split(path)[1].split('_output')[0]
@@ -388,7 +279,7 @@ def get_files(dirname=None, fname=None, endswith=output_formats):
     # sort the files
     def _key_func(arg):
         a = os.path.splitext(arg)[0]
-        return int(a[a.rfind('_')+1:])
+        return int(a[a.rfind('_') + 1:])
 
     files.sort(key=_key_func)
 
@@ -431,15 +322,17 @@ def iter_output(files, *arrays):
             _arrays = [data['arrays'][x] for x in arrays]
             yield [solver_data] + _arrays
 
+
 def _sort_key(arg):
     a = os.path.splitext(arg)[0]
-    return int(a[a.rfind('_')+1:])
+    return int(a[a.rfind('_') + 1:])
+
 
 def remove_irrelevant_files(files):
     """Remove any npz files that are not output files.
 
-    That is, the file should not end with a '_number.npz'.  This allows users
-    to dump other .npz of .hdf5 files in the output while post-processing without
+    That is, the file should not end with a '_number.npz'. This allows users to
+    dump other .npz of .hdf5 files in the output while post-processing without
     breaking.
     """
     result = []

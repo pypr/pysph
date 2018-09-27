@@ -20,6 +20,35 @@ def _to_str(s):
         return str(s)
 
 
+def gather_array_data(all_array_data, comm):
+    """Given array_data from the current processor and an MPI
+    communicator,return a joined array_data from all processors
+    on rank 0 and the same array_data on the other machines.
+    """
+
+    array_names = all_array_data.keys()
+
+    # gather the data from all processors
+    collected_data = comm.gather(all_array_data, root=0)
+
+    if comm.Get_rank() == 0:
+        all_array_data = {}
+        size = comm.Get_size()
+
+        # concatenate the arrays
+        for array_name in array_names:
+            array_data = {}
+            all_array_data[array_name] = array_data
+
+            _props = collected_data[0][array_name].keys()
+            for prop in _props:
+                data = [collected_data[pid][array_name][prop]
+                        for pid in range(size)]
+                prop_arr = numpy.concatenate(data)
+                array_data[prop] = prop_arr
+    return all_array_data
+
+
 class Output(object):
     """ Class that handles output for simulation """
     def __init__(self, detailed_output=False, only_real=True, mpi_comm=None,
@@ -39,43 +68,15 @@ class Output(object):
                 )
         mpi_comm = self.mpi_comm
         if mpi_comm is not None:
-            self.all_array_data = self._gather_array_data(
-                    self.all_array_data, mpi_comm
-                    )
+            self.all_array_data = gather_array_data(
+                self.all_array_data, mpi_comm
+            )
         self.solver_data = solver_data
         if mpi_comm is None or mpi_comm.Get_rank() == 0:
             self._dump(fname)
 
     def load(self, fname):
         return self._load(fname)
-
-    def _gather_array_data(self, all_array_data, comm):
-        """Given array_data from the current processor and an MPI
-        communicator,return a joined array_data from all processors
-        on rank 0 and the same array_data on the other machines.
-        """
-
-        array_names = all_array_data.keys()
-
-        # gather the data from all processors
-        collected_data = comm.gather(all_array_data, root=0)
-
-        if comm.Get_rank() == 0:
-            all_array_data = {}
-            size = comm.Get_size()
-
-            # concatenate the arrays
-            for array_name in array_names:
-                array_data = {}
-                all_array_data[array_name] = array_data
-
-                _props = collected_data[0][array_name].keys()
-                for prop in _props:
-                    data = [collected_data[pid][array_name][prop]
-                            for pid in range(size)]
-                    prop_arr = numpy.concatenate(data)
-                    array_data[prop] = prop_arr
-        return all_array_data
 
     def _dump(self, fname):
         """ Implement the method for writing the output to a file here """
