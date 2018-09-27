@@ -711,11 +711,7 @@ class Scan(object):
                  is_segment=None, dtype=np.float64, neutral='0',
                  complex_map=False, backend='opencl'):
         backend = array.get_backend(backend)
-        if backend not in ['opencl', 'cython']:
-            raise NotImplementedError("Unsupported backend: %s. Supported "
-                                      "backends: cython, opencl" %
-                                      backend)
-        self.tp = Transpiler(backend=backend)
+        self.tp = Transpiler(backend=backend, incl_cluda=False)
         self.backend = backend
         self.input_func = input
         self.output_func = output
@@ -776,7 +772,9 @@ class Scan(object):
 
     def _generate(self):
         if self.backend == 'opencl':
-            self._generate_opencl_code()
+            self._generate_opencl_kernel()
+        elif self.backend == 'cuda':
+            self._generate_cuda_kernel()
         elif self.backend == 'cython':
             self._generate_cython_code()
 
@@ -886,7 +884,7 @@ class Scan(object):
         if func is not None:
             self.tp.add(func)
             py_data, c_data = self.cython_gen.get_func_signature(func)
-            self._correct_opencl_address_space(c_data, func)
+            self._correct_opencl_address_space(c_data, func, func_type)
             name = func.__name__
             expr = '{func}({args})'.format(
                 func=name,
@@ -898,7 +896,11 @@ class Scan(object):
             c_args = c_data[1][n_ignore:]
         else:
             if func_type is 'input':
-                arguments = ['__global %(type)s *input' % {'type': self.type}]
+                if self.backend == 'opencl':
+                    arguments = ['__global %(type)s *input' %
+                                 {'type': self.type}]
+                elif self.backend == 'cuda':
+                    arguments = ['%(type)s *input' % {'type': self.type}]
                 expr = 'input[i]'
                 c_args = ['input']
             else:
@@ -907,23 +909,23 @@ class Scan(object):
                 c_args = []
         return expr, arguments, c_args
 
-    def _get_scan_expr_opencl(self):
+    def _get_scan_expr_opencl_cuda(self):
         if self.is_segment_func is not None:
             return '(across_seg_boundary ? b : (%s))' % self.scan_expr
         else:
             return self.scan_expr
 
-    def _generate_opencl_code(self):
+    def _get_opencl_cuda_code(self):
         input_expr, input_args, input_c_args = \
             self._wrap_ocl_function(self.input_func, func_type='input')
 
         output_expr, output_args, output_c_args = \
-            self._wrap_ocl_function(self.output_func)
+            self._wrap_ocl_function(self.output_func, func_type='output')
 
         segment_expr, segment_args, segment_c_args = \
             self._wrap_ocl_function(self.is_segment_func)
 
-        scan_expr = self._get_scan_expr_opencl()
+        scan_expr = self._get_scan_expr_opencl_cuda()
 
         preamble = convert_to_float_if_needed(self.tp.get_code())
 
@@ -934,6 +936,13 @@ class Scan(object):
         c_args = input_c_args + segment_c_args + output_c_args
         c_args = drop_duplicates(c_args)
         self.arg_keys = c_args
+
+        return scan_expr, arg_defn, input_expr, output_expr, \
+            segment_expr, preamble
+
+    def _generate_opencl_kernel(self):
+        scan_expr, arg_defn, input_expr, output_expr, \
+            segment_expr, preamble = self._get_opencl_cuda_code()
 
         from .opencl import get_context, get_queue
         from pyopencl.scan import GenericScanKernel
@@ -952,13 +961,32 @@ class Scan(object):
         )
         self.c_func = knl
 
+    def _generate_cuda_kernel(self):
+        scan_expr, arg_defn, input_expr, output_expr, \
+            segment_expr, preamble = self._get_opencl_cuda_code()
+
+        from .cuda import set_context, GenericScanKernel
+        set_context()
+        knl = GenericScanKernel(
+            dtype=self.dtype,
+            arguments=arg_defn,
+            input_expr=input_expr,
+            scan_expr=scan_expr,
+            neutral=self.neutral,
+            output_statement=output_expr,
+            is_segment_start_expr=segment_expr,
+            preamble=preamble
+        )
+        self.c_func = knl
+
     def _add_address_space(self, arg):
-        if '*' in arg and '__global' not in arg:
-            return '__global ' + arg
+        if '*' in arg and 'GLOBAL_MEM' not in arg:
+            return 'GLOBAL_MEM ' + arg
         else:
             return arg
 
-    def _correct_opencl_address_space(self, c_data, func):
+    def _correct_opencl_address_space(self, c_data, func, func_type):
+        return_type = 'void' if func_type is 'output' else self.type
         code = self.tp.blocks[-1].code.splitlines()
         header_idx = 1
         for line in code:
@@ -968,8 +996,8 @@ class Scan(object):
 
         args = [self._add_address_space(arg) for arg in c_data[0]]
         code[:header_idx] = wrap(
-            '{type} {func}({args})'.format(
-                type=self.type,
+            'WITHIN_KERNEL {type} {func}({args})'.format(
+                type=return_type,
                 func=func.__name__,
                 args=', '.join(args)
             ),
@@ -993,3 +1021,9 @@ class Scan(object):
         elif self.backend == 'opencl':
             self.c_func(*[c_args_dict[k] for k in self.arg_keys])
             self.queue.finish()
+        elif self.backend == 'cuda':
+            import pycuda.driver as drv
+            event = drv.Event()
+            self.c_func(*[c_args_dict[k] for k in self.arg_keys])
+            event.record()
+            event.synchronize()

@@ -11,14 +11,6 @@ test_all_backends = pytest.mark.parametrize('backend',
                                             ['cython', 'opencl', 'cuda'])
 
 
-test_fails_on_cuda = pytest.mark.parametrize(
-    'backend', [
-        'cython', 'opencl', pytest.param(
-            'cuda', marks=pytest.mark.xfail(
-                raises=NotImplementedError,
-                reason='Scan not supported by CUDA'))])
-
-
 def make_dev_array(backend, n=16):
     dev_array = Array(np.int32, n=n, backend=backend)
     dev_array.fill(0)
@@ -147,7 +139,7 @@ def test_extend(backend):
     assert np.all(old_nparr[-len(new_array)] == new_nparr)
 
 
-@test_fails_on_cuda
+@test_all_backends
 def test_remove(backend):
     check_import(backend)
 

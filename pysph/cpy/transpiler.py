@@ -123,7 +123,7 @@ class CodeBlock(object):
 
 
 class Transpiler(object):
-    def __init__(self, backend='cython'):
+    def __init__(self, backend='cython', incl_cluda=True):
         """Constructor.
 
         Parameters
@@ -150,9 +150,11 @@ class Transpiler(object):
         elif backend == 'opencl':
             from pyopencl._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            cluda = Template(text=CLUDA_PREAMBLE).render(
-                double_support=True
-            )
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
@@ -161,15 +163,16 @@ class Transpiler(object):
         elif backend == 'cuda':
             from pycuda._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            cluda = Template(text=CLUDA_PREAMBLE).render(
-                double_support=True
-            )
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
             __constant__ double pi= 3.141592654f;
             ''')
-
 
     def _handle_symbol(self, name, value):
         backend = self.backend
@@ -207,7 +210,7 @@ class Transpiler(object):
         lines = []
         comment = self._get_comment()
         if len(syms):
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             code = '{com} Global constants from user namespace'.format(
                 com=comment
             )
@@ -222,7 +225,7 @@ class Transpiler(object):
         # Link is ignored for now until we have a concrete example.
         if code:
             comment = self._get_comment()
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             info = '{com} External definitions.'.format(com=comment)
             lines = [hline, info, ''] + code + [hline]
             self.header += '\n'.join(lines)
