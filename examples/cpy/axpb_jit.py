@@ -3,7 +3,9 @@ from pysph.cpy.jit import ElementwiseJIT
 import numpy as np
 
 def axpb(i, x, y, a, b):
-    y[i] = a*sin(x[i]) + b
+    xi = declare('double')
+    xi = x[i]
+    y[i] = a*sin(xi) + b
 
 x = np.linspace(0, 1, 10000)
 y = np.zeros_like(x)
