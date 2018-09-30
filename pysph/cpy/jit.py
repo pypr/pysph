@@ -28,6 +28,18 @@ def get_ctype_from_arg(arg):
         return False
 
 
+def memoize(f):
+    @wraps(f)
+    def wrapper(obj, *args, **kwargs):
+        if not hasattr(obj, 'cache'):
+            obj.cache = dict()
+        key = tuple([get_ctype_from_arg(arg) for arg in args])
+        if key not in obj.cache:
+            obj.cache[key] = f(obj, *args, **kwargs)
+        return obj.cache[key]
+    return wrapper
+
+
 class JITHelper(ast.NodeVisitor):
     def __init__(self, func):
         self.func = func
@@ -142,12 +154,11 @@ class ElementwiseJIT(Elementwise):
         self.cython_gen = CythonGenerator()
         self.queue = None
 
-    @memoize_method
+    @memoize
     def _generate_kernel(self, *args):
         # FIXME: Memoization doesn't work with np.ndarray as argument
         self.helper = JITHelper(self.func)
         self.func = self.helper.annotate(*args)
-
         return self._generate()
 
     def _massage_arg(self, x):
