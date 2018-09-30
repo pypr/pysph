@@ -188,7 +188,7 @@ def ctype_to_dtype(ctype):
     return C_NP_TYPE_MAP[ctype]
 
 
-def dtype_to_knowntype(dtype, address=None):
+def dtype_to_knowntype(dtype, address='scalar'):
     ctype = dtype_to_ctype(dtype)
     if 'unsigned' in ctype:
         ctype = 'u%s' % ctype.replace('unsigned ', '')
@@ -199,8 +199,9 @@ def dtype_to_knowntype(dtype, address=None):
         knowntype = 'g%sp' % knowntype
     elif address == 'local':
         knowntype = 'l%sp' % knowntype
-    else:
-        raise ValueError("address can only be ptr, global or local")
+    elif address != 'scalar':
+        raise ValueError("address can only be scalar,"\
+                " ptr, global or local")
 
     if knowntype in TYPES:
         return knowntype

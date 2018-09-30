@@ -734,7 +734,7 @@ class Scan(object):
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None
-        self._generate()
+        self.c_func = self._generate()
 
     def _correct_return_type(self, c_data, modifier):
         code = self.tp.blocks[-1].code.splitlines()
@@ -772,11 +772,11 @@ class Scan(object):
 
     def _generate(self):
         if self.backend == 'opencl':
-            self._generate_opencl_kernel()
+            return self._generate_opencl_kernel()
         elif self.backend == 'cuda':
-            self._generate_cuda_kernel()
+            return self._generate_cuda_kernel()
         elif self.backend == 'cython':
-            self._generate_cython_code()
+            return self._generate_cython_code()
 
     def _default_cython_input_function(self):
         py_data = (['int i', '{type}[:] input'.format(type=self.type)],
@@ -878,7 +878,7 @@ class Scan(object):
         )
         self.tp.add_code(src)
         self.tp.compile()
-        self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+        return getattr(self.tp.mod, 'py_' + self.name)
 
     def _wrap_ocl_function(self, func, func_type=None):
         if func is not None:
@@ -959,7 +959,7 @@ class Scan(object):
             is_segment_start_expr=segment_expr,
             preamble=preamble
         )
-        self.c_func = knl
+        return knl
 
     def _generate_cuda_kernel(self):
         scan_expr, arg_defn, input_expr, output_expr, \
@@ -977,7 +977,7 @@ class Scan(object):
             is_segment_start_expr=segment_expr,
             preamble=preamble
         )
-        self.c_func = knl
+        return knl
 
     def _add_address_space(self, arg):
         if '*' in arg and 'GLOBAL_MEM' not in arg:
