@@ -538,7 +538,7 @@ class Reduction(object):
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None
-        self._generate()
+        self.c_func = self._generate()
 
     def _generate(self):
         if self.backend == 'cython':
@@ -573,7 +573,7 @@ class Reduction(object):
             )
             self.tp.add_code(src)
             self.tp.compile()
-            self.c_func = getattr(self.tp.mod, 'py_' + self.name)
+            return getattr(self.tp.mod, 'py_' + self.name)
         elif self.backend == 'opencl':
             if self.func is not None:
                 self.tp.add(self.func)
@@ -611,7 +611,7 @@ class Reduction(object):
                 arguments=arguments,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
         elif self.backend == 'cuda':
             if self.func is not None:
                 self.tp.add(self.func)
@@ -647,7 +647,7 @@ class Reduction(object):
                 arguments=arguments,
                 preamble="\n".join([cluda_preamble, preamble])
             )
-            self.c_func = knl
+            return knl
 
     def _correct_return_type(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
