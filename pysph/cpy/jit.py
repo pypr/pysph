@@ -55,7 +55,7 @@ class AnnotationHelper(ast.NodeVisitor):
         return ctype
 
     def get_type_info_for_external_funcs(self):
-        self.type_info = getattr(self.func, '__annotations__')
+        self.type_info = getattr(self.func, 'type_info')
         src = dedent('\n'.join(inspect.getsourcelines(self.func)[0]))
         self._src = src.splitlines()
         code = ast.parse(src)
@@ -122,8 +122,6 @@ class AnnotationHelper(ast.NodeVisitor):
                 self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
             if isinstance(left, ast.Name):
-                if left.id in self.type_info:
-                    self.error("Redeclaring variable not allowed")
                 self.type_info[left.id] = self.get_type(type)
             elif isinstance(left, ast.Tuple):
                 names = [x.id for x in left.elts]
