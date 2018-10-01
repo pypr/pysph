@@ -215,7 +215,7 @@ def gather_external_funcs(f_helper, external_f):
     node_name = f_helper.func.__name__
     if node_name not in external_f:
         external_f[node_name] = []
-    for name, child in f_helper.children.iteritems():
+    for name, child in f_helper.children.items():
         external_f[node_name].append(child.func)
         gather_external_funcs(child, external_f)
 
