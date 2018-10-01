@@ -10,12 +10,13 @@ import warnings
 
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
-from .transpiler import Transpiler, convert_to_float_if_needed, \
-        filter_calls, BUILTINS
+from .transpiler import (Transpiler, convert_to_float_if_needed,
+        filter_calls, CY_BUILTIN_SYMBOLS, OCL_BUILTIN_SYMBOLS, BUILTINS)
 from .types import dtype_to_ctype, annotate, get_declare_info, \
         dtype_to_knowntype
 from .parallel import Elementwise, Reduction, Scan
 from .extern import Extern
+from .ast_utils import get_unknown_names_and_calls
 
 import pysph.cpy.array as array
 
@@ -41,19 +42,11 @@ def memoize(f):
     return wrapper
 
 
-class JITHelper(ast.NodeVisitor):
+class AnnotationHelper(ast.NodeVisitor):
     def __init__(self, func):
         self.func = func
         self.calls = set()
         self.arg_types = {}
-
-    def annotate(self, type_info):
-        self.type_info = type_info
-        self.annotate_external_funcs()
-        mod = importlib.import_module(self.func.__module__)
-        print self.type_info
-        self.func = annotate(self.func, **self.type_info)
-        setattr(mod, self.func.__name__, self.func)
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)
@@ -61,29 +54,23 @@ class JITHelper(ast.NodeVisitor):
             ctype = '%sp' % ctype
         return ctype
 
-    def annotate_external_funcs(self):
+    def get_type_info_for_external_funcs(self):
+        self.type_info = getattr(self.func, '__annotations__')
         src = dedent('\n'.join(inspect.getsourcelines(self.func)[0]))
         self._src = src.splitlines()
         code = ast.parse(src)
         self.visit(code)
+        return self.arg_types
 
-        mod = importlib.import_module(self.func.__module__)
-        calls = filter_calls(self.calls)
-        undefined = []
-        for call in calls:
-            f = getattr(mod, call, None)
-            if f is None:
-                undefined.append(call)
-            elif not isinstance(f, Extern):
-                f_arg_names = inspect.getargspec(f)[0]
-                annotations = dict(zip(f_arg_names, self.arg_types[call]))
-                helper = JITHelper(f)
-                helper.annotate(annotations)
-        if undefined:
-            msg = 'The following functions are not defined:\n %s ' % (
-                ', '.join(undefined)
-            )
-            raise NameError(msg)
+    def get_return_type(self, type_info):
+        self.type_info = type_info
+        src = dedent('\n'.join(inspect.getsourcelines(self.func)[0]))
+        self._src = src.splitlines()
+        code = ast.parse(src)
+        self.visit(code)
+        return_type = self.type_info.get('return_', None)
+        self.type_info = {}
+        return return_type
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -147,17 +134,122 @@ class JITHelper(ast.NodeVisitor):
         if isinstance(node.value, ast.Name) or \
                 isinstance(node.value, ast.Subscript):
             self.type_info['return_'] = self.visit(node.value)
+        elif isinstance(node.value, ast.Num):
+            if isinstance(node.value.n, float):
+                return_type = 'double'
+            else:
+                if node.value.n > 2147483648:
+                    return_type = 'long'
+                else:
+                    return_type = 'int'
+            self.type_info['return_'] = return_type
         else:
-            self.warn("Return value should be a variable or a "\
-                    "subscript. Return value will default to 'double' "\
+            self.warn("Return value should be a variable, subscript "\
+                    "or a number. Return value will default to 'double' "\
                     "otherwise", node)
             self.type_info['return_'] = 'double'
+
+
+def get_and_annotate_external_symbols_and_calls(func, backend):
+    '''Given a function, return a dictionary of all external names (with their
+    values), a set of implicitly defined names, a list of functions that it
+    calls ignoring standard math functions and a few other standard ones, and a
+    list of Extern instances.
+
+    If a function is not defined it will raise a ``NameError``.
+
+    Parameters
+    ----------
+
+    func: Function to look at.
+    backend: str: The backend being used.
+
+    Returns
+    -------
+
+    names, implicits, functions, externs
+
+    '''
+    if backend == 'cython':
+        ignore = CY_BUILTIN_SYMBOLS
+    else:
+        ignore = OCL_BUILTIN_SYMBOLS
+
+    src = dedent('\n'.join(inspect.getsourcelines(func)[0]))
+    names, calls = get_unknown_names_and_calls(src)
+    names -= ignore
+    calls = filter_calls(calls)
+    mod = importlib.import_module(func.__module__)
+    symbols = {}
+    implicit = set()
+    externs = []
+    for name in names:
+        if hasattr(mod, name):
+            value = getattr(mod, name)
+            if isinstance(value, Extern):
+                externs.append(value)
+            else:
+                symbols[name] = value
+        else:
+            implicit.add(name)
+
+    funcs = []
+    undefined = []
+    helper = AnnotationHelper(func)
+    arg_types = helper.get_type_info_for_external_funcs()
+    for call in calls:
+        f = getattr(mod, call, None)
+        if f is None:
+            undefined.append(call)
+        elif isinstance(f, Extern):
+            externs.append(f)
+        else:
+            f_arg_names = inspect.getargspec(f)[0]
+            annotations = dict(zip(f_arg_names, arg_types[call]))
+            new_f = annotate(f, **annotations)
+            funcs.append(new_f)
+    if undefined:
+        msg = 'The following functions are not defined:\n %s ' % (
+            ', '.join(undefined)
+        )
+        raise NameError(msg)
+
+    return symbols, implicit, funcs, externs
+
+
+class TranspilerJIT(Transpiler):
+    def __init__(self, backend='cython', incl_cluda=True):
+        """Constructor.
+
+        Parameters
+        ----------
+
+        backend: str: Backend to use.
+            Can be one of 'cython', 'opencl', 'cuda' or 'python'
+        """
+        Transpiler.__init__(self, backend=backend, incl_cluda=incl_cluda)
+
+    def _handle_external(self, func):
+        syms, implicit, calls, externs = \
+                get_and_annotate_external_symbols_and_calls(func,
+                                                            self.backend)
+        if implicit:
+            msg = ('Warning: the following symbols are implicitly defined.\n'
+                   '  %s\n'
+                   'You may want to explicitly declare/define them.')
+            print(msg)
+
+        self._handle_externs(externs)
+        self._handle_symbols(syms)
+
+        for f in calls:
+            self.add(f)
 
 
 class ElementwiseJIT(Elementwise):
     def __init__(self, func, backend='cython'):
         backend = array.get_backend(backend)
-        self.tp = Transpiler(backend=backend)
+        self.tp = TranspilerJIT(backend=backend)
         self.backend = backend
         self.name = func.__name__
         self.func = func
@@ -182,8 +274,11 @@ class ElementwiseJIT(Elementwise):
     def _generate_kernel(self, *args):
         if self.func is not None:
             annotations = self.get_type_info_from_args(*args)
-            helper = JITHelper(self.func)
-            helper.annotate(annotations)
+            helper = AnnotationHelper(self.func)
+            return_type = helper.get_return_type(annotations)
+            if return_type:
+                annotations['return_'] = return_type
+            self.func = annotate(self.func, **annotations)
         return self._generate()
 
     def _massage_arg(self, x):
@@ -255,8 +350,11 @@ class ReductionJIT(Reduction):
     def _generate_kernel(self, *args):
         if self.func is not None:
             annotations = self.get_type_info_from_args(*args)
-            helper = JITHelper(self.func)
-            helper.annotate(annotations)
+            helper = AnnotationHelper(self.func)
+            return_type = helper.get_return_type(annotations)
+            if return_type:
+                annotations['return_'] = return_type
+            self.func = annotate(self.func, **annotations)
         return self._generate()
 
     def _massage_arg(self, x):
@@ -339,12 +437,32 @@ class ScanJIT(Scan):
 
     @memoize
     def _generate_kernel(self, **kwargs):
-        funcs = [self.input_func, self.output_func, self.is_segment_func]
-        for func in funcs:
-            if func is not None:
-                annotations = self.get_type_info_from_kwargs(func, **kwargs)
-                helper = JITHelper(func)
-                helper.annotate(annotations)
+        if self.input_func is not None:
+            annotations = self.get_type_info_from_kwargs(self.input_func,
+                                                         **kwargs)
+            helper = AnnotationHelper(self.input_func)
+            return_type = helper.get_return_type(annotations)
+            if return_type:
+                annotations['return_'] = return_type
+            self.input_func = annotate(self.input_func, **annotations)
+
+        if self.output_func is not None:
+            annotations = self.get_type_info_from_kwargs(self.output_func,
+                                                         **kwargs)
+            helper = AnnotationHelper(self.output_func)
+            return_type = helper.get_return_type(annotations)
+            if return_type:
+                annotations['return_'] = return_type
+            self.output_func = annotate(self.output_func, **annotations)
+
+        if self.is_segment_func is not None:
+            annotations = self.get_type_info_from_kwargs(self.is_segment_func,
+                                                         **kwargs)
+            helper = AnnotationHelper(self.is_segment_func)
+            return_type = helper.get_return_type(annotations)
+            if return_type:
+                annotations['return_'] = return_type
+            self.is_segment_func = annotate(self.is_segment_func, **annotations)
         return self._generate()
 
     def _massage_arg(self, x):
