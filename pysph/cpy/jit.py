@@ -38,7 +38,10 @@ def get_ctype_from_arg(arg):
     elif isinstance(arg, np.ndarray):
         return dtype_to_ctype(arg.dtype)
     else:
-        return False
+        if isinstance(arg, float):
+            return 'double'
+        else:
+            return  'long'
 
 
 def memoize(f):
@@ -289,7 +292,7 @@ class ElementwiseJIT(Elementwise):
         elif isinstance(x, np.ndarray):
             return x
         else:
-            return np.asarray(x, dtype=np.float64)
+            return np.asarray(x)
 
     def __call__(self, *args, **kw):
         c_func = self._generate_kernel(*args)
@@ -365,7 +368,7 @@ class ReductionJIT(Reduction):
         elif isinstance(x, np.ndarray):
             return x
         else:
-            return np.asarray(x, dtype=np.float64)
+            return np.asarray(x)
 
     def __call__(self, *args, **kw):
         c_func = self._generate_kernel(*args)
@@ -473,7 +476,7 @@ class ScanJIT(Scan):
         elif isinstance(x, np.ndarray):
             return x
         else:
-            return np.asarray(x, dtype=np.float64)
+            return np.asarray(x)
 
     def __call__(self, **kwargs):
         c_func = self._generate_kernel(**kwargs)
