@@ -42,6 +42,24 @@ def memoize(f):
     return wrapper
 
 
+def get_binop_return_type(a, b):
+    preference_order = ['short', 'long', 'int', 'float', 'double']
+    unsigned_a = unsigned_b = False
+    if a.startswith('u'):
+        unsigned_a = True
+        a = a[1:]
+    if b.startswith('u'):
+        unsigned_b = True
+        b = b[1:]
+    idx_a = preference_order.index(a)
+    idx_b = preference_order.index(b)
+    return_type = preference_order[idx_a] if idx_a > idx_b else \
+            preference_order[idx_b]
+    if unsigned_a and unsigned_b:
+        return_type = 'u%s' % return_type
+    return return_type
+
+
 class AnnotationHelper(ast.NodeVisitor):
     def __init__(self, func):
         self.func = func
@@ -50,6 +68,8 @@ class AnnotationHelper(ast.NodeVisitor):
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)
+        if 'unsigned' in ctype:
+            ctype = ctype.replace('unsigned ', 'u')
         if kind == 'matrix':
             ctype = '%sp' % ctype
         return ctype
@@ -128,19 +148,41 @@ class AnnotationHelper(ast.NodeVisitor):
                 for name in names:
                     self.type_info[name] = self.get_type(type)
 
+    def visit_BinOp(self, node):
+        if isinstance(node.op, ast.Pow):
+            return self.visit(node.left)
+        else:
+            if isinstance(node.left, ast.Call) or \
+                    isinstance(node.right, ast.Call):
+                return False
+            else:
+                return get_binop_return_type(self.visit(node.left),
+                                             self.visit(node.right))
+
+    def visit_Num(self, node):
+        if isinstance(node.n, float):
+            return_type = 'double'
+        else:
+            if node.n > 2147483648:
+                return_type = 'long'
+            else:
+                return_type = 'int'
+        return return_type
+
     def visit_Return(self, node):
         if isinstance(node.value, ast.Name) or \
-                isinstance(node.value, ast.Subscript):
+                isinstance(node.value, ast.Subscript) or \
+                isinstance(node.value, ast.Num):
             self.type_info['return_'] = self.visit(node.value)
-        elif isinstance(node.value, ast.Num):
-            if isinstance(node.value.n, float):
-                return_type = 'double'
+        elif isinstance(node.value, ast.BinOp):
+            result_type = self.visit(node.value)
+            if result_type:
+                self.type_info['return_'] = self.visit(node.value)
             else:
-                if node.value.n > 2147483648:
-                    return_type = 'long'
-                else:
-                    return_type = 'int'
-            self.type_info['return_'] = return_type
+                self.warn("Return value should be a variable, subscript "\
+                        "or a number. Return value will default to 'double' "\
+                        "otherwise", node)
+                self.type_info['return_'] = 'double'
         else:
             self.warn("Return value should be a variable, subscript "\
                     "or a number. Return value will default to 'double' "\
@@ -329,7 +371,6 @@ class ReductionJIT(Reduction):
         self._config = get_config()
         self.cython_gen = CythonGenerator()
         self.queue = None
-        #self._generate()
 
     def get_type_info_from_args(self, *args):
         type_info = {}
