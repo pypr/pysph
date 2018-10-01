@@ -11,7 +11,7 @@ import warnings
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import (Transpiler, convert_to_float_if_needed,
-        filter_calls, CY_BUILTIN_SYMBOLS, OCL_BUILTIN_SYMBOLS, BUILTINS)
+        filter_calls, get_external_symbols_and_calls, BUILTINS)
 from .types import dtype_to_ctype, annotate, get_declare_info, \
         dtype_to_knowntype
 from .parallel import Elementwise, Reduction, Scan
@@ -19,6 +19,17 @@ from .extern import Extern
 from .ast_utils import get_unknown_names_and_calls
 
 import pysph.cpy.array as array
+
+
+def jit(func):
+    def wrapper(func):
+        func.is_jit = True
+        return func
+
+    if func is None:
+        return wrapper
+    else:
+        return wrapper(func)
 
 
 def get_ctype_from_arg(arg):
@@ -43,7 +54,9 @@ def memoize(f):
 
 
 def get_binop_return_type(a, b):
-    preference_order = ['short', 'long', 'int', 'float', 'double']
+    if a is None or b is None:
+        return None
+    preference_order = ['short', 'int', 'long', 'float', 'double']
     unsigned_a = unsigned_b = False
     if a.startswith('u'):
         unsigned_a = True
@@ -61,10 +74,11 @@ def get_binop_return_type(a, b):
 
 
 class AnnotationHelper(ast.NodeVisitor):
-    def __init__(self, func):
+    def __init__(self, func, arg_types):
         self.func = func
-        self.calls = set()
-        self.arg_types = {}
+        self.arg_types = arg_types
+        self.var_types = arg_types.copy()
+        self.children = {}
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)
@@ -74,23 +88,12 @@ class AnnotationHelper(ast.NodeVisitor):
             ctype = '%sp' % ctype
         return ctype
 
-    def get_type_info_for_external_funcs(self):
-        self.type_info = getattr(self.func, 'type_info')
+    def annotate(self):
         src = dedent('\n'.join(inspect.getsourcelines(self.func)[0]))
         self._src = src.splitlines()
         code = ast.parse(src)
         self.visit(code)
-        return self.arg_types
-
-    def get_return_type(self, type_info):
-        self.type_info = type_info
-        src = dedent('\n'.join(inspect.getsourcelines(self.func)[0]))
-        self._src = src.splitlines()
-        code = ast.parse(src)
-        self.visit(code)
-        return_type = self.type_info.get('return_', None)
-        self.type_info = {}
-        return return_type
+        self.func = annotate(self.func, **self.arg_types)
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -113,14 +116,28 @@ class AnnotationHelper(ast.NodeVisitor):
         warnings.warn(msg)
 
     def visit_Call(self, node):
+        mod = importlib.import_module(self.func.__module__)
+        f = getattr(mod, node.func.id, None)
+        if not hasattr(f, 'is_jit'):
+            return None
+        if node.func.id in self.children:
+            return self.children[node.func.id].arg_types['return_']
         if isinstance(node.func, ast.Name) and \
                 node.func.id not in BUILTINS:
-            self.calls.add(node.func.id)
-            arg_types = []
-            for arg in node.args:
-                arg_type = self.visit(arg)
-                arg_types.append(arg_type)
-            self.arg_types[node.func.id] = arg_types
+            if f is None or isinstance(f, Extern):
+                return None
+            else:
+                arg_types = []
+                for arg in node.args:
+                    arg_type = self.visit(arg)
+                    arg_types.append(arg_type)
+                # make a new helper and call visit
+                f_arg_names = inspect.getargspec(f)[0]
+                f_arg_types = dict(zip(f_arg_names, arg_types))
+                f_helper = AnnotationHelper(f, f_arg_types)
+                f_helper.annotate()
+                self.children[node.func.id] = f_helper
+                return f_helper.arg_types['return_']
 
     def visit_Subscript(self, node):
         base_type = self.visit(node.value)
@@ -129,10 +146,11 @@ class AnnotationHelper(ast.NodeVisitor):
         return base_type[:-1]
 
     def visit_Name(self, node):
-        node_type = self.type_info.get(node.id, 'double')
+        node_type = self.var_types.get(node.id, 'double')
         return node_type
 
     def visit_Assign(self, node):
+        # Only for declare calls
         if len(node.targets) != 1:
             self.error("Assignments can have only one target.", node)
         left, right = node.targets[0], node.value
@@ -142,22 +160,18 @@ class AnnotationHelper(ast.NodeVisitor):
                 self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
             if isinstance(left, ast.Name):
-                self.type_info[left.id] = self.get_type(type)
+                self.var_types[left.id] = self.get_type(type)
             elif isinstance(left, ast.Tuple):
                 names = [x.id for x in left.elts]
                 for name in names:
-                    self.type_info[name] = self.get_type(type)
+                    self.var_types[name] = self.get_type(type)
 
     def visit_BinOp(self, node):
         if isinstance(node.op, ast.Pow):
             return self.visit(node.left)
         else:
-            if isinstance(node.left, ast.Call) or \
-                    isinstance(node.right, ast.Call):
-                return False
-            else:
-                return get_binop_return_type(self.visit(node.left),
-                                             self.visit(node.right))
+            return get_binop_return_type(self.visit(node.left),
+                                         self.visit(node.right))
 
     def visit_Num(self, node):
         if isinstance(node.n, float):
@@ -173,88 +187,30 @@ class AnnotationHelper(ast.NodeVisitor):
         if isinstance(node.value, ast.Name) or \
                 isinstance(node.value, ast.Subscript) or \
                 isinstance(node.value, ast.Num):
-            self.type_info['return_'] = self.visit(node.value)
-        elif isinstance(node.value, ast.BinOp):
+            self.arg_types['return_'] = self.visit(node.value)
+        elif isinstance(node.value, ast.BinOp) or \
+                isinstance(node.value, ast.Call):
             result_type = self.visit(node.value)
             if result_type:
-                self.type_info['return_'] = self.visit(node.value)
+                self.arg_types['return_'] = self.visit(node.value)
             else:
-                self.warn("Return value should be a variable, subscript "\
-                        "or a number. Return value will default to 'double' "\
-                        "otherwise", node)
-                self.type_info['return_'] = 'double'
+                msg = "Function called is not marked by the jit "\
+                        "decorator. Return value defaulting to 'double'."\
+                        "If the return type is not 'double', store the value "\
+                        "in a variable of appropriate type and return the "\
+                        "variable"
+                self.warn(msg, node)
+                self.arg_types['return_'] = 'double'
         else:
-            self.warn("Return value should be a variable, subscript "\
-                    "or a number. Return value will default to 'double' "\
-                    "otherwise", node)
-            self.type_info['return_'] = 'double'
+            self.warn("Unknown type for return value. "\
+                      "Return value defaulting to 'double'", node)
+            self.arg_types['return_'] = 'double'
 
 
-def get_and_annotate_external_symbols_and_calls(func, backend):
-    '''Given a function, return a dictionary of all external names (with their
-    values), a set of implicitly defined names, a list of functions that it
-    calls ignoring standard math functions and a few other standard ones, and a
-    list of Extern instances.
-
-    If a function is not defined it will raise a ``NameError``.
-
-    Parameters
-    ----------
-
-    func: Function to look at.
-    backend: str: The backend being used.
-
-    Returns
-    -------
-
-    names, implicits, functions, externs
-
-    '''
-    if backend == 'cython':
-        ignore = CY_BUILTIN_SYMBOLS
-    else:
-        ignore = OCL_BUILTIN_SYMBOLS
-
-    src = dedent('\n'.join(inspect.getsourcelines(func)[0]))
-    names, calls = get_unknown_names_and_calls(src)
-    names -= ignore
-    calls = filter_calls(calls)
-    mod = importlib.import_module(func.__module__)
-    symbols = {}
-    implicit = set()
-    externs = []
-    for name in names:
-        if hasattr(mod, name):
-            value = getattr(mod, name)
-            if isinstance(value, Extern):
-                externs.append(value)
-            else:
-                symbols[name] = value
-        else:
-            implicit.add(name)
-
-    funcs = []
-    undefined = []
-    helper = AnnotationHelper(func)
-    arg_types = helper.get_type_info_for_external_funcs()
-    for call in calls:
-        f = getattr(mod, call, None)
-        if f is None:
-            undefined.append(call)
-        elif isinstance(f, Extern):
-            externs.append(f)
-        else:
-            f_arg_names = inspect.getargspec(f)[0]
-            annotations = dict(zip(f_arg_names, arg_types[call]))
-            new_f = annotate(f, **annotations)
-            funcs.append(new_f)
-    if undefined:
-        msg = 'The following functions are not defined:\n %s ' % (
-            ', '.join(undefined)
-        )
-        raise NameError(msg)
-
-    return symbols, implicit, funcs, externs
+def gather_external_funcs(f_helper, external_f):
+    for child in f_helper.children:
+        external_f.add(child.func)
+        gather_external_funcs(child, external_f)
 
 
 class TranspilerJIT(Transpiler):
@@ -270,9 +226,9 @@ class TranspilerJIT(Transpiler):
         Transpiler.__init__(self, backend=backend, incl_cluda=incl_cluda)
 
     def _handle_external(self, func):
-        syms, implicit, calls, externs = \
-                get_and_annotate_external_symbols_and_calls(func,
-                                                            self.backend)
+        syms, implicit, calls, externs = get_external_symbols_and_calls(
+                func, self.backend)
+        calls = self.external_funcs
         if implicit:
             msg = ('Warning: the following symbols are implicitly defined.\n'
                    '  %s\n'
@@ -313,12 +269,13 @@ class ElementwiseJIT(Elementwise):
     @memoize
     def _generate_kernel(self, *args):
         if self.func is not None:
-            annotations = self.get_type_info_from_args(*args)
-            helper = AnnotationHelper(self.func)
-            return_type = helper.get_return_type(annotations)
-            if return_type:
-                annotations['return_'] = return_type
-            self.func = annotate(self.func, **annotations)
+            arg_types = self.get_type_info_from_args(*args)
+            helper = AnnotationHelper(self.func, arg_types)
+            helper.annotate()
+            self.func = helper.func
+            external_funcs = set()
+            gather_external_funcs(helper, external_funcs)
+            self.tp.external_funcs = list(external_funcs)
         return self._generate()
 
     def _massage_arg(self, x):
@@ -388,12 +345,13 @@ class ReductionJIT(Reduction):
     @memoize
     def _generate_kernel(self, *args):
         if self.func is not None:
-            annotations = self.get_type_info_from_args(*args)
-            helper = AnnotationHelper(self.func)
-            return_type = helper.get_return_type(annotations)
-            if return_type:
-                annotations['return_'] = return_type
-            self.func = annotate(self.func, **annotations)
+            arg_types = self.get_type_info_from_args(*args)
+            helper = AnnotationHelper(self.func, arg_types)
+            helper.annotate()
+            self.func = helper.func
+            external_funcs = set()
+            gather_external_funcs(helper, external_funcs)
+            self.tp.external_funcs = list(external_funcs)
         return self._generate()
 
     def _massage_arg(self, x):
@@ -476,32 +434,32 @@ class ScanJIT(Scan):
 
     @memoize
     def _generate_kernel(self, **kwargs):
+        external_funcs = set()
         if self.input_func is not None:
-            annotations = self.get_type_info_from_kwargs(self.input_func,
-                                                         **kwargs)
-            helper = AnnotationHelper(self.input_func)
-            return_type = helper.get_return_type(annotations)
-            if return_type:
-                annotations['return_'] = return_type
-            self.input_func = annotate(self.input_func, **annotations)
+            arg_types = self.get_type_info_from_kwargs(
+                    self.input_func, **kwargs)
+            helper = AnnotationHelper(self.input_func, arg_types)
+            helper.annotate()
+            self.input_func = helper.func
+            gather_external_funcs(helper, external_funcs)
 
         if self.output_func is not None:
-            annotations = self.get_type_info_from_kwargs(self.output_func,
-                                                         **kwargs)
-            helper = AnnotationHelper(self.output_func)
-            return_type = helper.get_return_type(annotations)
-            if return_type:
-                annotations['return_'] = return_type
-            self.output_func = annotate(self.output_func, **annotations)
+            arg_types = self.get_type_info_from_kwargs(
+                    self.output_func, **kwargs)
+            helper = AnnotationHelper(self.output_func, arg_types)
+            helper.annotate()
+            self.output_func = helper.func
+            gather_external_funcs(helper, external_funcs)
 
         if self.is_segment_func is not None:
-            annotations = self.get_type_info_from_kwargs(self.is_segment_func,
-                                                         **kwargs)
-            helper = AnnotationHelper(self.is_segment_func)
-            return_type = helper.get_return_type(annotations)
-            if return_type:
-                annotations['return_'] = return_type
-            self.is_segment_func = annotate(self.is_segment_func, **annotations)
+            arg_types = self.get_type_info_from_kwargs(
+                    self.is_segment_func, **kwargs)
+            helper = AnnotationHelper(self.is_segment_func, arg_types)
+            helper.annotate()
+            self.is_segment_func = helper.func
+            gather_external_funcs(helper, external_funcs)
+
+        self.tp.external_funcs = list(external_funcs)
         return self._generate()
 
     def _massage_arg(self, x):

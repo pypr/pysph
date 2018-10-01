@@ -7,7 +7,7 @@ from pytest import importorskip
 from ..config import get_config, use_config
 from ..array import wrap
 from ..types import annotate
-from ..jit import ElementwiseJIT, ReductionJIT, ScanJIT
+from ..jit import jit, ElementwiseJIT, ReductionJIT, ScanJIT
 
 
 class TestJIT(unittest.TestCase):
@@ -21,6 +21,7 @@ class TestJIT(unittest.TestCase):
 
     def _check_simple_elementwise_jit(self, backend):
         # Given
+        @jit
         def axpb(i, x, y, a, b):
             y[i] = a * sin(x[i]) + b
 
@@ -80,6 +81,7 @@ class TestJIT(unittest.TestCase):
         y = x.copy()
         x, y = wrap(x, y, backend=backend)
 
+        @jit
         def map(i=0, x=[0.0], y=[0.0]):
             return cos(x[i]) * sin(y[i])
 
@@ -131,9 +133,11 @@ class TestJIT(unittest.TestCase):
 
         a = wrap(a, backend=backend)
 
+        @jit
         def input_f(i, ary):
             return ary[i]
 
+        @jit
         def output_f(i, item, ary):
             ary[i] = item
 
@@ -180,12 +184,14 @@ class TestJIT(unittest.TestCase):
         unique_count = np.zeros(1, dtype=np.int32)
         unique_count = wrap(unique_count, backend=backend)
 
+        @jit
         def input_f(i, ary):
             if i == 0 or ary[i] != ary[i - 1]:
                 return 1
             else:
                 return 0
 
+        @jit
         def output_f(i, prev_item, item, N, ary, unique, unique_count):
             if item != prev_item:
                 unique[item - 1] = ary[i]
@@ -240,12 +246,15 @@ class TestJIT(unittest.TestCase):
         a = wrap(a, backend=backend)
         seg = wrap(seg, backend=backend)
 
+        @jit
         def input_f(i, ary):
             return ary[i]
 
+        @jit
         def segment_f(i, seg_flag):
             return seg_flag[i]
 
+        @jit
         def output_f(i, item, ary):
             ary[i] = item
 
@@ -282,6 +291,7 @@ class TestJIT(unittest.TestCase):
 
         a = wrap(a, backend=backend)
 
+        @jit
         def output_f(i, last_item, item, ary):
             ary[i] = item + last_item
 
