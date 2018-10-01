@@ -121,7 +121,8 @@ class AnnotationHelper(ast.NodeVisitor):
         if not hasattr(f, 'is_jit'):
             return None
         if node.func.id in self.children:
-            return self.children[node.func.id].arg_types['return_']
+            return self.children[node.func.id].arg_types.get(
+                    'return_', None)
         if isinstance(node.func, ast.Name) and \
                 node.func.id not in BUILTINS:
             if f is None or isinstance(f, Extern):
@@ -137,7 +138,7 @@ class AnnotationHelper(ast.NodeVisitor):
                 f_helper = AnnotationHelper(f, f_arg_types)
                 f_helper.annotate()
                 self.children[node.func.id] = f_helper
-                return f_helper.arg_types['return_']
+                return f_helper.arg_types.get('return_', None)
 
     def visit_Subscript(self, node):
         base_type = self.visit(node.value)
@@ -208,8 +209,11 @@ class AnnotationHelper(ast.NodeVisitor):
 
 
 def gather_external_funcs(f_helper, external_f):
-    for child in f_helper.children:
-        external_f.add(child.func)
+    node_name = f_helper.func.__name__
+    if node_name not in external_f:
+        external_f[node_name] = []
+    for name, child in f_helper.children.iteritems():
+        external_f[node_name].append(child.func)
         gather_external_funcs(child, external_f)
 
 
@@ -227,8 +231,9 @@ class TranspilerJIT(Transpiler):
 
     def _handle_external(self, func):
         syms, implicit, calls, externs = get_external_symbols_and_calls(
-                func, self.backend)
-        calls = self.external_funcs
+            func, self.backend
+        )
+
         if implicit:
             msg = ('Warning: the following symbols are implicitly defined.\n'
                    '  %s\n'
@@ -238,7 +243,7 @@ class TranspilerJIT(Transpiler):
         self._handle_externs(externs)
         self._handle_symbols(syms)
 
-        for f in calls:
+        for f in self.external_funcs[func.__name__]:
             self.add(f)
 
 
@@ -273,9 +278,9 @@ class ElementwiseJIT(Elementwise):
             helper = AnnotationHelper(self.func, arg_types)
             helper.annotate()
             self.func = helper.func
-            external_funcs = set()
+            external_funcs = {}
             gather_external_funcs(helper, external_funcs)
-            self.tp.external_funcs = list(external_funcs)
+            self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
@@ -349,9 +354,9 @@ class ReductionJIT(Reduction):
             helper = AnnotationHelper(self.func, arg_types)
             helper.annotate()
             self.func = helper.func
-            external_funcs = set()
+            external_funcs = {}
             gather_external_funcs(helper, external_funcs)
-            self.tp.external_funcs = list(external_funcs)
+            self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
@@ -434,7 +439,7 @@ class ScanJIT(Scan):
 
     @memoize
     def _generate_kernel(self, **kwargs):
-        external_funcs = set()
+        external_funcs = {}
         if self.input_func is not None:
             arg_types = self.get_type_info_from_kwargs(
                     self.input_func, **kwargs)
@@ -459,7 +464,7 @@ class ScanJIT(Scan):
             self.is_segment_func = helper.func
             gather_external_funcs(helper, external_funcs)
 
-        self.tp.external_funcs = list(external_funcs)
+        self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
