@@ -12,8 +12,8 @@ from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import (Transpiler, convert_to_float_if_needed,
         filter_calls, get_external_symbols_and_calls, BUILTINS)
-from .types import dtype_to_ctype, annotate, get_declare_info, \
-        dtype_to_knowntype
+from .types import (dtype_to_ctype, annotate, get_declare_info,
+        dtype_to_knowntype)
 from .parallel import Elementwise, Reduction, Scan
 from .extern import Extern
 from .ast_utils import get_unknown_names_and_calls
@@ -32,18 +32,6 @@ def jit(func):
         return wrapper(func)
 
 
-def get_ctype_from_arg(arg):
-    if isinstance(arg, array.Array):
-        return arg.gptr_type
-    elif isinstance(arg, np.ndarray):
-        return dtype_to_ctype(arg.dtype)
-    else:
-        if isinstance(arg, float):
-            return 'double'
-        else:
-            return  'long'
-
-
 def memoize(f):
     @wraps(f)
     def wrapper(obj, *args, **kwargs):
@@ -54,6 +42,18 @@ def memoize(f):
             obj.cache[key] = f(obj, *args, **kwargs)
         return obj.cache[key]
     return wrapper
+
+
+def get_ctype_from_arg(arg):
+    if isinstance(arg, array.Array):
+        return arg.gptr_type
+    elif isinstance(arg, np.ndarray):
+        return dtype_to_ctype(arg.dtype)
+    else:
+        if isinstance(arg, float):
+            return 'double'
+        else:
+            return  'long'
 
 
 def get_binop_return_type(a, b):
