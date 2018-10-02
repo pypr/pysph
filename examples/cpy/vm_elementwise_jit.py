@@ -6,10 +6,10 @@ from pysph.cpy.config import get_config
 from pysph.cpy.api import declare, annotate
 from pysph.cpy.parallel import Elementwise
 from pysph.cpy.array import wrap
-from pysph.cpy.jit import jit, ElementwiseJIT
+from pysph.cpy.jit import annotate
 
 
-@jit
+@annotate
 def point_vortex(xi, yi, xj, yj, gamma, result):
     xij = xi - xj
     yij = yi - yj
@@ -23,7 +23,7 @@ def point_vortex(xi, yi, xj, yj, gamma, result):
         result[1] = tmp*xij
 
 
-@jit
+@annotate
 def velocity(i, x, y, gamma, u, v, nv):
     j = declare('int')
     tmp = declare('matrix(2)')
@@ -48,7 +48,7 @@ def make_vortices(nv, backend):
 
 
 def run(nv, backend):
-    e = ElementwiseJIT(velocity, backend=backend)
+    e = Elementwise(velocity, backend=backend)
     args = make_vortices(nv, backend)
     t1 = time.time()
     e(*args)

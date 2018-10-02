@@ -17,16 +17,17 @@ from .transpiler import (
     filter_calls,
     get_external_symbols_and_calls,
     BUILTINS)
-from .types import (dtype_to_ctype, annotate, get_declare_info,
+from .types import (dtype_to_ctype, get_declare_info,
                     dtype_to_knowntype)
-from .parallel import Elementwise, Reduction, Scan
 from .extern import Extern
 from .ast_utils import get_unknown_names_and_calls
 
 import pysph.cpy.array as array
+import pysph.cpy.parallel as parallel
+import pysph.cpy.types as types
 
 
-def jit(func):
+def annotate(func):
     def wrapper(func):
         func.is_jit = True
         return func
@@ -108,7 +109,7 @@ class AnnotationHelper(ast.NodeVisitor):
         self._src = src.splitlines()
         code = ast.parse(src)
         self.visit(code)
-        self.func = annotate(self.func, **self.arg_types)
+        self.func = types.annotate(self.func, **self.arg_types)
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -273,7 +274,7 @@ class TranspilerJIT(Transpiler):
             self.add(f)
 
 
-class ElementwiseJIT(Elementwise):
+class ElementwiseJIT(parallel.ElementwiseBase):
     def __init__(self, func, backend='cython'):
         backend = array.get_backend(backend)
         self.tp = TranspilerJIT(backend=backend)
@@ -336,7 +337,7 @@ class ElementwiseJIT(Elementwise):
             event.synchronize()
 
 
-class ReductionJIT(Reduction):
+class ReductionJIT(parallel.ReductionBase):
     def __init__(self, reduce_expr, map_func=None, dtype_out=np.float64,
                  neutral='0', backend='cython'):
         backend = array.get_backend(backend)
@@ -414,7 +415,7 @@ class ReductionJIT(Reduction):
             return result.get()
 
 
-class ScanJIT(Scan):
+class ScanJIT(parallel.ScanBase):
     def __init__(self, input=None, output=None, scan_expr="a+b",
                  is_segment=None, dtype=np.float64, neutral='0',
                  complex_map=False, backend='opencl'):

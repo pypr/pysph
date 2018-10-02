@@ -375,7 +375,7 @@ def drop_duplicates(arr):
     return result
 
 
-class Elementwise(object):
+class ElementwiseBase(object):
     def __init__(self, func, backend='cython'):
         backend = array.get_backend(backend)
         self.tp = Transpiler(backend=backend)
@@ -505,6 +505,21 @@ class Elementwise(object):
             event.synchronize()
 
 
+class Elementwise(object):
+    def __init__(self, func, backend='cython'):
+        if hasattr(func, '__annotations__'):
+            self.elementwise = ElementwiseBase(func, backend=backend)
+        else:
+            from pysph.cpy.jit import ElementwiseJIT
+            self.elementwise = ElementwiseJIT(func, backend=backend)
+
+    def __getattr__(self, name):
+        return getattr(self.elementwise, name)
+
+    def __call__(self, *args, **kwargs):
+        self.elementwise(*args, **kwargs)
+
+
 def elementwise(func=None, backend=None):
     def _wrapper(function):
         return wraps(function)(Elementwise(function, backend=backend))
@@ -515,7 +530,7 @@ def elementwise(func=None, backend=None):
         return _wrapper(func)
 
 
-class Reduction(object):
+class ReductionBase(object):
     def __init__(self, reduce_expr, map_func=None, dtype_out=np.float64,
                  neutral='0', backend='cython'):
         backend = array.get_backend(backend)
@@ -706,7 +721,29 @@ class Reduction(object):
             return result.get()
 
 
-class Scan(object):
+class Reduction(object):
+    def __init__(self, reduce_expr, map_func=None, dtype_out=np.float64,
+                 neutral='0', backend='cython'):
+        if map_func is not None and hasattr(map_func, '__annotations__'):
+            self.reduction = ReductionBase(reduce_expr, map_func=map_func,
+                                           dtype_out=dtype_out,
+                                           neutral=neutral,
+                                           backend=backend)
+        else:
+            from pysph.cpy.jit import ReductionJIT
+            self.reduction = ReductionJIT(reduce_expr, map_func=map_func,
+                                          dtype_out=dtype_out,
+                                          neutral=neutral,
+                                          backend=backend)
+
+    def __getattr__(self, name):
+        return getattr(self.reduction, name)
+
+    def __call__(self, *args, **kwargs):
+        return self.reduction(*args, **kwargs)
+
+
+class ScanBase(object):
     def __init__(self, input=None, output=None, scan_expr="a+b",
                  is_segment=None, dtype=np.float64, neutral='0',
                  complex_map=False, backend='opencl'):
@@ -1027,3 +1064,37 @@ class Scan(object):
             self.c_func(*[c_args_dict[k] for k in self.arg_keys])
             event.record()
             event.synchronize()
+
+
+class Scan(object):
+    def __init__(self, input=None, output=None, scan_expr="a+b",
+                 is_segment=None, dtype=np.float64, neutral='0',
+                 complex_map=False, backend='opencl'):
+        input_base = input is not None and \
+                hasattr(input, '__annotations__')
+        output_base = output is not None and \
+                hasattr(output, '__annotations__')
+        is_segment_base = is_segment is not None and \
+                hasattr(is_segment, '__annotations__')
+
+        if input_base and output_base and is_segment_base:
+            self.scan = ScanBase(input=input, output=output,
+                                 scan_expr=scan_expr,
+                                 is_segment=is_segment,
+                                 dtype=dtype, neutral=neutral,
+                                 complex_map=complex_map,
+                                 backend=backend)
+        else:
+            from pysph.cpy.jit import ScanJIT
+            self.scan = ScanJIT(input=input, output=output,
+                                scan_expr=scan_expr,
+                                is_segment=is_segment,
+                                dtype=dtype, neutral=neutral,
+                                complex_map=complex_map,
+                                backend=backend)
+
+    def __getattr__(self, name):
+        return getattr(self.scan, name)
+
+    def __call__(self, **kwargs):
+        self.scan(**kwargs)

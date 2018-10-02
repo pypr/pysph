@@ -6,17 +6,16 @@ from pytest import importorskip
 
 from ..config import get_config, use_config
 from ..array import wrap
-from ..types import annotate
-from ..jit import (jit, get_binop_return_type, AnnotationHelper,
-                   ElementwiseJIT, ReductionJIT, ScanJIT)
+from ..jit import annotate, get_binop_return_type, AnnotationHelper
+from ..parallel import Elementwise, Reduction, Scan
 
 
-@jit
+@annotate
 def g(x):
     return x
 
 
-@jit
+@annotate
 def h(a, b):
     return g(a) * g(b)
 
@@ -24,7 +23,7 @@ def h(a, b):
 class TestAnnotationHelper(unittest.TestCase):
     def test_const_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def int_f(a):
             return g(1)
 
@@ -37,7 +36,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.children['g'].arg_types['x'] == 'int'
 
         # Given
-        @jit
+        @annotate
         def long_f(a):
             return g(10000000000)
 
@@ -50,7 +49,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.children['g'].arg_types['x'] == 'long'
 
         # Given
-        @jit
+        @annotate
         def double_f(a):
             return g(1.)
 
@@ -64,7 +63,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_variable_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             x = declare('int')
             x = a + b
@@ -80,7 +79,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_subscript_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(i, a):
             return g(a[i])
 
@@ -94,7 +93,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_binop_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(a + b)
 
@@ -108,7 +107,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_call_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(h(a, b))
 
@@ -122,7 +121,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_binop_with_call_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(h(a, b) + h(b, a))
 
@@ -136,7 +135,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_non_jit_call_as_call_arg(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(sin(a))
 
@@ -150,7 +149,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_variable_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a):
             return a
 
@@ -164,7 +163,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_subscript_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(i, a):
             return a[i]
 
@@ -178,7 +177,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_const_in_return(self):
         # Given
-        @jit
+        @annotate
         def int_f(a, b):
             return 1
 
@@ -191,7 +190,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.arg_types['return_'] == 'int'
 
         # Given
-        @jit
+        @annotate
         def long_f(a, b):
             return 10000000000
 
@@ -204,7 +203,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.arg_types['return_'] == 'long'
 
         # Given
-        @jit
+        @annotate
         def double_f(a, b):
             return 1.
 
@@ -218,7 +217,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_binop_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return a + b
 
@@ -232,7 +231,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_call_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(a)
 
@@ -247,7 +246,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_binop_with_call_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return g(a) + g(b)
 
@@ -261,7 +260,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_multi_level_call_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return h(a, b)
 
@@ -277,7 +276,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_non_jit_call_in_return(self):
         # Given
-        @jit
+        @annotate
         def f(a):
             return sin(a)
 
@@ -291,7 +290,7 @@ class TestAnnotationHelper(unittest.TestCase):
 
     def test_binop_return_type(self):
         # Given
-        @jit
+        @annotate
         def f(a, b):
             return a + b
 
@@ -339,7 +338,7 @@ class TestParallelJIT(unittest.TestCase):
 
     def _check_simple_elementwise_jit(self, backend):
         # Given
-        @jit
+        @annotate
         def axpb(i, x, y, a, b):
             y[i] = a * sin(x[i]) + b
 
@@ -350,7 +349,7 @@ class TestParallelJIT(unittest.TestCase):
         x, y = wrap(x, y, backend=backend)
 
         # When
-        e = ElementwiseJIT(axpb, backend=backend)
+        e = Elementwise(axpb, backend=backend)
         e(x, y, a, b)
 
         # Then
@@ -375,7 +374,7 @@ class TestParallelJIT(unittest.TestCase):
         x = wrap(x, backend=backend)
 
         # When
-        r = ReductionJIT('a+b', backend=backend)
+        r = Reduction('a+b', backend=backend)
         result = r(x)
 
         # Then
@@ -386,7 +385,7 @@ class TestParallelJIT(unittest.TestCase):
         x = wrap(x, backend=backend)
 
         # When
-        r = ReductionJIT('min(a, b)', neutral='INFINITY', backend=backend)
+        r = Reduction('min(a, b)', neutral='INFINITY', backend=backend)
         result = r(x)
 
         # Then
@@ -399,12 +398,12 @@ class TestParallelJIT(unittest.TestCase):
         y = x.copy()
         x, y = wrap(x, y, backend=backend)
 
-        @jit
+        @annotate
         def map(i=0, x=[0.0], y=[0.0]):
             return cos(x[i]) * sin(y[i])
 
         # When
-        r = ReductionJIT('a+b', map_func=map, backend=backend)
+        r = Reduction('a+b', map_func=map, backend=backend)
         result = r(x, y)
 
         # Then
@@ -451,17 +450,17 @@ class TestParallelJIT(unittest.TestCase):
 
         a = wrap(a, backend=backend)
 
-        @jit
+        @annotate
         def input_f(i, ary):
             return ary[i]
 
-        @jit
+        @annotate
         def output_f(i, item, ary):
             ary[i] = item
 
         # When
-        scan = ScanJIT(input_f, output_f, 'a+b', dtype=np.int32,
-                       backend=backend)
+        scan = Scan(input_f, output_f, 'a+b', dtype=np.int32,
+                    backend=backend)
         scan(ary=a)
 
         a.pull()
@@ -502,14 +501,14 @@ class TestParallelJIT(unittest.TestCase):
         unique_count = np.zeros(1, dtype=np.int32)
         unique_count = wrap(unique_count, backend=backend)
 
-        @jit
+        @annotate
         def input_f(i, ary):
             if i == 0 or ary[i] != ary[i - 1]:
                 return 1
             else:
                 return 0
 
-        @jit
+        @annotate
         def output_f(i, prev_item, item, N, ary, unique, unique_count):
             if item != prev_item:
                 unique[item - 1] = ary[i]
@@ -517,12 +516,7 @@ class TestParallelJIT(unittest.TestCase):
                 unique_count[0] = item
 
         # When
-        scan = ScanJIT(
-            input_f,
-            output_f,
-            'a+b',
-            dtype=np.int32,
-            backend=backend)
+        scan = Scan(input_f, output_f, 'a+b', dtype=np.int32, backend=backend)
         scan(ary=a, unique=unique_ary, unique_count=unique_count)
         unique_ary.pull()
         unique_count.pull()
@@ -569,28 +563,23 @@ class TestParallelJIT(unittest.TestCase):
         a = wrap(a, backend=backend)
         seg = wrap(seg, backend=backend)
 
-        @jit
+        @annotate
         def input_f(i, ary):
             return ary[i]
 
-        @jit
+        @annotate
         def segment_f(i, seg_flag):
             return seg_flag[i]
 
-        @jit
+        @annotate
         def output_f(i, item, ary):
             ary[i] = item
 
         output_actual = self._get_segmented_scan_actual(a_copy, seg_copy)
 
         # When
-        scan = ScanJIT(
-            input_f,
-            output_f,
-            'a+b',
-            dtype=np.int32,
-            backend=backend,
-            is_segment=segment_f)
+        scan = Scan(input_f, output_f, 'a+b', dtype=np.int32,
+                    backend=backend, is_segment=segment_f)
         scan(ary=a, seg_flag=seg)
         a.pull()
 
@@ -619,14 +608,14 @@ class TestParallelJIT(unittest.TestCase):
 
         a = wrap(a, backend=backend)
 
-        @jit
+        @annotate
         def output_f(i, last_item, item, ary):
             ary[i] = item + last_item
 
         expect = np.cumsum(a_copy) + np.cumsum(a_copy)[-1]
 
         # When
-        scan = ScanJIT(output=output_f, scan_expr='a+b',
+        scan = Scan(output=output_f, scan_expr='a+b',
                        dtype=np.int32, backend=backend)
         scan(input=a, ary=a)
         a.pull()
