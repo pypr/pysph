@@ -7,8 +7,8 @@ from pytest import importorskip
 from ..config import get_config, use_config
 from ..array import wrap
 from ..types import annotate
-from ..jit import (jit, AnnotationHelper, ElementwiseJIT,
-        ReductionJIT, ScanJIT)
+from ..jit import (jit, get_binop_return_type, AnnotationHelper,
+        ElementwiseJIT, ReductionJIT, ScanJIT)
 
 
 @jit
@@ -289,6 +289,43 @@ class TestAnnotationHelper(unittest.TestCase):
         # Then
         assert helper.arg_types['return_'] == 'double'
 
+    def test_binop_return_type(self):
+        # Given
+        @jit
+        def f(a, b):
+            return a + b
+
+        # When
+        types = {'a' : 'long', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'long'
+
+        # When
+        types = {'a' : 'int', 'b' : 'double'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'double'
+
+        # When
+        types = {'a' : 'uint', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+        # When
+        types = {'a' : 'uint', 'b' : 'ulong'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'ulong'
 
 class TestParallelJIT(unittest.TestCase):
     def setUp(self):
