@@ -275,6 +275,20 @@ class TestAnnotationHelper(unittest.TestCase):
         assert 'g' in helper.children['h'].children
         assert helper.arg_types['return_'] == 'int'
 
+    def test_non_jit_call_in_return(self):
+        # Given
+        @jit
+        def f(a):
+            return sin(a)
+
+        # When
+        types = {'a' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'double'
+
 
 class TestParallelJIT(unittest.TestCase):
     def setUp(self):
