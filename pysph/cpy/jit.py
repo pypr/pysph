@@ -7,6 +7,7 @@ import inspect
 import ast
 import importlib
 import warnings
+import sys
 
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
@@ -42,6 +43,13 @@ def memoize(f):
             obj.cache[key] = f(obj, *args, **kwargs)
         return obj.cache[key]
     return wrapper
+
+
+def getargspec(f):
+    if sys.version_info[0] < 3:
+        return inspect.getargspec(f)[0]
+    else:
+        return inspect.getfullargspec(f)[0]
 
 
 def get_ctype_from_arg(arg):
@@ -138,7 +146,7 @@ class AnnotationHelper(ast.NodeVisitor):
                     arg_type = self.visit(arg)
                     arg_types.append(arg_type)
                 # make a new helper and call visit
-                f_arg_names = inspect.getargspec(f)[0]
+                f_arg_names = getargspec(f)
                 f_arg_types = dict(zip(f_arg_names, arg_types))
                 f_helper = AnnotationHelper(f, f_arg_types)
                 f_helper.annotate()
@@ -265,7 +273,7 @@ class ElementwiseJIT(Elementwise):
 
     def get_type_info_from_args(self, *args):
         type_info = {}
-        arg_names = inspect.getargspec(self.func)[0]
+        arg_names = getargspec(self.func)
         if 'i' in arg_names:
             arg_names.remove('i')
             type_info['i'] = 'int'
@@ -341,7 +349,7 @@ class ReductionJIT(Reduction):
 
     def get_type_info_from_args(self, *args):
         type_info = {}
-        arg_names = inspect.getargspec(self.func)[0]
+        arg_names = getargspec(self.func)
         if 'i' in arg_names:
             arg_names.remove('i')
             type_info['i'] = 'int'
@@ -428,7 +436,7 @@ class ScanJIT(Scan):
 
     def get_type_info_from_kwargs(self, func, **kwargs):
         type_info = {}
-        arg_names = inspect.getargspec(func)[0]
+        arg_names = getargspec(func)
         for name in arg_names:
             arg = kwargs.get(name, None)
             if arg is None and name not in self.builtin_types:
