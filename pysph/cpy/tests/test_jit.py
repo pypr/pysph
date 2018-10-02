@@ -8,7 +8,7 @@ from ..config import get_config, use_config
 from ..array import wrap
 from ..types import annotate
 from ..jit import (jit, get_binop_return_type, AnnotationHelper,
-        ElementwiseJIT, ReductionJIT, ScanJIT)
+                   ElementwiseJIT, ReductionJIT, ScanJIT)
 
 
 @jit
@@ -29,7 +29,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(1)
 
         # When
-        types = {'a' : 'int'}
+        types = {'a': 'int'}
         helper = AnnotationHelper(int_f, types)
         helper.annotate()
 
@@ -42,7 +42,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(10000000000)
 
         # When
-        types = {'a' : 'int'}
+        types = {'a': 'int'}
         helper = AnnotationHelper(long_f, types)
         helper.annotate()
 
@@ -55,7 +55,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(1.)
 
         # When
-        types = {'a' : 'int'}
+        types = {'a': 'int'}
         helper = AnnotationHelper(double_f, types)
         helper.annotate()
 
@@ -71,7 +71,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(x)
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -85,7 +85,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(a[i])
 
         # When
-        types = {'i' : 'int', 'a' : 'intp'}
+        types = {'i': 'int', 'a': 'intp'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -99,7 +99,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(a + b)
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -113,7 +113,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(h(a, b))
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -127,7 +127,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(h(a, b) + h(b, a))
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -141,7 +141,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(sin(a))
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -155,7 +155,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return a
 
         # When
-        types = {'a' : 'int'}
+        types = {'a': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -169,7 +169,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return a[i]
 
         # When
-        types = {'i' : 'int', 'a' : 'intp'}
+        types = {'i': 'int', 'a': 'intp'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -183,7 +183,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return 1
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(int_f, types)
         helper.annotate()
 
@@ -196,7 +196,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return 10000000000
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(long_f, types)
         helper.annotate()
 
@@ -209,7 +209,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return 1.
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(double_f, types)
         helper.annotate()
 
@@ -223,7 +223,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return a + b
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -237,7 +237,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(a)
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -252,7 +252,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return g(a) + g(b)
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -266,7 +266,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return h(a, b)
 
         # When
-        types = {'a' : 'int', 'b' : 'int'}
+        types = {'a': 'int', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -282,7 +282,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return sin(a)
 
         # When
-        types = {'a' : 'int'}
+        types = {'a': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -296,7 +296,7 @@ class TestAnnotationHelper(unittest.TestCase):
             return a + b
 
         # When
-        types = {'a' : 'long', 'b' : 'int'}
+        types = {'a': 'long', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -304,7 +304,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.arg_types['return_'] == 'long'
 
         # When
-        types = {'a' : 'int', 'b' : 'double'}
+        types = {'a': 'int', 'b': 'double'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -312,7 +312,7 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.arg_types['return_'] == 'double'
 
         # When
-        types = {'a' : 'uint', 'b' : 'int'}
+        types = {'a': 'uint', 'b': 'int'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
@@ -320,12 +320,13 @@ class TestAnnotationHelper(unittest.TestCase):
         assert helper.arg_types['return_'] == 'int'
 
         # When
-        types = {'a' : 'uint', 'b' : 'ulong'}
+        types = {'a': 'uint', 'b': 'ulong'}
         helper = AnnotationHelper(f, types)
         helper.annotate()
 
         # Then
         assert helper.arg_types['return_'] == 'ulong'
+
 
 class TestParallelJIT(unittest.TestCase):
     def setUp(self):
@@ -460,7 +461,7 @@ class TestParallelJIT(unittest.TestCase):
 
         # When
         scan = ScanJIT(input_f, output_f, 'a+b', dtype=np.int32,
-                    backend=backend)
+                       backend=backend)
         scan(ary=a)
 
         a.pull()
@@ -516,7 +517,12 @@ class TestParallelJIT(unittest.TestCase):
                 unique_count[0] = item
 
         # When
-        scan = ScanJIT(input_f, output_f, 'a+b', dtype=np.int32, backend=backend)
+        scan = ScanJIT(
+            input_f,
+            output_f,
+            'a+b',
+            dtype=np.int32,
+            backend=backend)
         scan(ary=a, unique=unique_ary, unique_count=unique_count)
         unique_ary.pull()
         unique_count.pull()
@@ -578,8 +584,13 @@ class TestParallelJIT(unittest.TestCase):
         output_actual = self._get_segmented_scan_actual(a_copy, seg_copy)
 
         # When
-        scan = ScanJIT(input_f, output_f, 'a+b', dtype=np.int32, backend=backend,
-                    is_segment=segment_f)
+        scan = ScanJIT(
+            input_f,
+            output_f,
+            'a+b',
+            dtype=np.int32,
+            backend=backend,
+            is_segment=segment_f)
         scan(ary=a, seg_flag=seg)
         a.pull()
 
@@ -616,7 +627,7 @@ class TestParallelJIT(unittest.TestCase):
 
         # When
         scan = ScanJIT(output=output_f, scan_expr='a+b',
-                    dtype=np.int32, backend=backend)
+                       dtype=np.int32, backend=backend)
         scan(input=a, ary=a)
         a.pull()
 

@@ -11,10 +11,14 @@ import sys
 
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
-from .transpiler import (Transpiler, convert_to_float_if_needed,
-        filter_calls, get_external_symbols_and_calls, BUILTINS)
+from .transpiler import (
+    Transpiler,
+    convert_to_float_if_needed,
+    filter_calls,
+    get_external_symbols_and_calls,
+    BUILTINS)
 from .types import (dtype_to_ctype, annotate, get_declare_info,
-        dtype_to_knowntype)
+                    dtype_to_knowntype)
 from .parallel import Elementwise, Reduction, Scan
 from .extern import Extern
 from .ast_utils import get_unknown_names_and_calls
@@ -61,7 +65,7 @@ def get_ctype_from_arg(arg):
         if isinstance(arg, float):
             return 'double'
         else:
-            return  'long'
+            return 'long'
 
 
 def get_binop_return_type(a, b):
@@ -78,7 +82,7 @@ def get_binop_return_type(a, b):
     idx_a = preference_order.index(a)
     idx_b = preference_order.index(b)
     return_type = preference_order[idx_a] if idx_a > idx_b else \
-            preference_order[idx_b]
+        preference_order[idx_b]
     if unsigned_a and unsigned_b:
         return_type = 'u%s' % return_type
     return return_type
@@ -112,7 +116,7 @@ class AnnotationHelper(ast.NodeVisitor):
             if node.lineno > 1:  # pragma no branch
                 msg += self._src[node.lineno - 2] + '\n'
             msg += self._src[node.lineno - 1] + '\n'
-            msg += ' '*node.col_offset + '^' + '\n\n'
+            msg += ' ' * node.col_offset + '^' + '\n\n'
         msg += message
         raise NotImplementedError(msg)
 
@@ -122,7 +126,7 @@ class AnnotationHelper(ast.NodeVisitor):
             if node.lineno > 1:  # pragma no branch
                 msg += self._src[node.lineno - 2] + '\n'
             msg += self._src[node.lineno - 1] + '\n'
-            msg += ' '*node.col_offset + '^' + '\n\n'
+            msg += ' ' * node.col_offset + '^' + '\n\n'
         msg += message
         warnings.warn(msg)
 
@@ -136,7 +140,7 @@ class AnnotationHelper(ast.NodeVisitor):
             return None
         if node.func.id in self.children:
             return self.children[node.func.id].arg_types.get(
-                    'return_', None)
+                'return_', None)
         if isinstance(node.func, ast.Name) and \
                 node.func.id not in BUILTINS:
             if f is None or isinstance(f, Extern):
@@ -147,10 +151,10 @@ class AnnotationHelper(ast.NodeVisitor):
                     arg_type = self.visit(arg)
                     if not arg_type:
                         msg = "Function called is not marked by the jit "\
-                                "decorator. Argument type defaulting to "\
-                                "'double'. If the type is not 'double', "\
-                                "store the value in a variable of "\
-                                "appropriate type and pass the variable"
+                            "decorator. Argument type defaulting to "\
+                            "'double'. If the type is not 'double', "\
+                            "store the value in a variable of "\
+                            "appropriate type and pass the variable"
                         self.warn(msg, arg)
                         arg_type = 'double'
                     arg_types.append(arg_type)
@@ -218,14 +222,14 @@ class AnnotationHelper(ast.NodeVisitor):
                 self.arg_types['return_'] = self.visit(node.value)
             else:
                 msg = "Function called is not marked by the jit "\
-                        "decorator. Return value defaulting to 'double'."\
-                        "If the return type is not 'double', store the value "\
-                        "in a variable of appropriate type and return the "\
-                        "variable"
+                    "decorator. Return value defaulting to 'double'."\
+                    "If the return type is not 'double', store the value "\
+                    "in a variable of appropriate type and return the "\
+                    "variable"
                 self.warn(msg, node.value)
                 self.arg_types['return_'] = 'double'
         else:
-            self.warn("Unknown type for return value. "\
+            self.warn("Unknown type for return value. "
                       "Return value defaulting to 'double'", node)
             self.arg_types['return_'] = 'double'
 
@@ -439,7 +443,7 @@ class ScanJIT(Scan):
         self.cython_gen = CythonGenerator()
         self.queue = None
         builtin_symbols = ['item', 'prev_item', 'last_item']
-        self.builtin_types = {'i' : 'int', 'N' : 'int'}
+        self.builtin_types = {'i': 'int', 'N': 'int'}
         for sym in builtin_symbols:
             self.builtin_types[sym] = dtype_to_knowntype(self.dtype)
 
@@ -464,7 +468,7 @@ class ScanJIT(Scan):
         external_funcs = {}
         if self.input_func is not None:
             arg_types = self.get_type_info_from_kwargs(
-                    self.input_func, **kwargs)
+                self.input_func, **kwargs)
             helper = AnnotationHelper(self.input_func, arg_types)
             helper.annotate()
             self.input_func = helper.func
@@ -472,7 +476,7 @@ class ScanJIT(Scan):
 
         if self.output_func is not None:
             arg_types = self.get_type_info_from_kwargs(
-                    self.output_func, **kwargs)
+                self.output_func, **kwargs)
             helper = AnnotationHelper(self.output_func, arg_types)
             helper.annotate()
             self.output_func = helper.func
@@ -480,7 +484,7 @@ class ScanJIT(Scan):
 
         if self.is_segment_func is not None:
             arg_types = self.get_type_info_from_kwargs(
-                    self.is_segment_func, **kwargs)
+                self.is_segment_func, **kwargs)
             helper = AnnotationHelper(self.is_segment_func, arg_types)
             helper.annotate()
             self.is_segment_func = helper.func

@@ -86,6 +86,7 @@ class KnownType(object):
     Smells but is convenient as the type may be one available only inside
     Cython without a corresponding Python type.
     """
+
     def __init__(self, type_str, base_type=''):
         """Constructor
 
@@ -200,8 +201,8 @@ def dtype_to_knowntype(dtype, address='scalar'):
     elif address == 'local':
         knowntype = 'l%sp' % knowntype
     elif address != 'scalar':
-        raise ValueError("address can only be scalar,"\
-                " ptr, global or local")
+        raise ValueError("address can only be scalar,"
+                         " ptr, global or local")
 
     if knowntype in TYPES:
         return knowntype
