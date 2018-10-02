@@ -134,6 +134,20 @@ class TestAnnotationHelper(unittest.TestCase):
         # Then
         assert helper.children['g'].arg_types['x'] == 'int'
 
+    def test_non_jit_call_as_call_arg(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(sin(a))
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'double'
+
     def test_variable_in_return(self):
         # Given
         @jit

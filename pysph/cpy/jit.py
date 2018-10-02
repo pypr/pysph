@@ -128,7 +128,8 @@ class AnnotationHelper(ast.NodeVisitor):
 
     def visit_Call(self, node):
         # FIXME: External functions have to be at the module level
-        # for this to work
+        # for this to work. Pass list of external functions to
+        # make this work
         mod = importlib.import_module(self.func.__module__)
         f = getattr(mod, node.func.id, None)
         if not hasattr(f, 'is_jit'):
@@ -144,6 +145,14 @@ class AnnotationHelper(ast.NodeVisitor):
                 arg_types = []
                 for arg in node.args:
                     arg_type = self.visit(arg)
+                    if not arg_type:
+                        msg = "Function called is not marked by the jit "\
+                                "decorator. Argument type defaulting to "\
+                                "'double'. If the type is not 'double', "\
+                                "store the value in a variable of "\
+                                "appropriate type and pass the variable"
+                        self.warn(msg, arg)
+                        arg_type = 'double'
                     arg_types.append(arg_type)
                 # make a new helper and call visit
                 f_arg_names = getargspec(f)
@@ -213,7 +222,7 @@ class AnnotationHelper(ast.NodeVisitor):
                         "If the return type is not 'double', store the value "\
                         "in a variable of appropriate type and return the "\
                         "variable"
-                self.warn(msg, node)
+                self.warn(msg, node.value)
                 self.arg_types['return_'] = 'double'
         else:
             self.warn("Unknown type for return value. "\
