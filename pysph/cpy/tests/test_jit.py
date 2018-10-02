@@ -616,7 +616,7 @@ class TestParallelJIT(unittest.TestCase):
 
         # When
         scan = Scan(output=output_f, scan_expr='a+b',
-                       dtype=np.int32, backend=backend)
+                    dtype=np.int32, backend=backend)
         scan(input=a, ary=a)
         a.pull()
 

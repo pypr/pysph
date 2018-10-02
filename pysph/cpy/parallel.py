@@ -1071,11 +1071,11 @@ class Scan(object):
                  is_segment=None, dtype=np.float64, neutral='0',
                  complex_map=False, backend='opencl'):
         input_base = input is not None and \
-                hasattr(input, '__annotations__')
+            hasattr(input, '__annotations__')
         output_base = output is not None and \
-                hasattr(output, '__annotations__')
+            hasattr(output, '__annotations__')
         is_segment_base = is_segment is not None and \
-                hasattr(is_segment, '__annotations__')
+            hasattr(is_segment, '__annotations__')
 
         if input_base and output_base and is_segment_base:
             self.scan = ScanBase(input=input, output=output,
