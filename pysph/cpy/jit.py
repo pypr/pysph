@@ -119,6 +119,8 @@ class AnnotationHelper(ast.NodeVisitor):
         warnings.warn(msg)
 
     def visit_Call(self, node):
+        # FIXME: External functions have to be at the module level
+        # for this to work
         mod = importlib.import_module(self.func.__module__)
         f = getattr(mod, node.func.id, None)
         if not hasattr(f, 'is_jit'):
@@ -181,6 +183,7 @@ class AnnotationHelper(ast.NodeVisitor):
         if isinstance(node.n, float):
             return_type = 'double'
         else:
+            print node.n
             if node.n > 2147483648:
                 return_type = 'long'
             else:

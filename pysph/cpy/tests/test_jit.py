@@ -7,10 +7,262 @@ from pytest import importorskip
 from ..config import get_config, use_config
 from ..array import wrap
 from ..types import annotate
-from ..jit import jit, ElementwiseJIT, ReductionJIT, ScanJIT
+from ..jit import (jit, AnnotationHelper, ElementwiseJIT,
+        ReductionJIT, ScanJIT)
 
 
-class TestJIT(unittest.TestCase):
+@jit
+def g(x):
+    return x
+
+
+@jit
+def h(a, b):
+    return g(a) * g(b)
+
+
+class TestAnnotationHelper(unittest.TestCase):
+    def test_const_as_call_arg(self):
+        # Given
+        @jit
+        def int_f(a):
+            return g(1)
+
+        # When
+        types = {'a' : 'int'}
+        helper = AnnotationHelper(int_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+        # Given
+        @jit
+        def long_f(a):
+            return g(10000000000)
+
+        # When
+        types = {'a' : 'int'}
+        helper = AnnotationHelper(long_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'long'
+
+        # Given
+        @jit
+        def double_f(a):
+            return g(1.)
+
+        # When
+        types = {'a' : 'int'}
+        helper = AnnotationHelper(double_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'double'
+
+    def test_variable_as_call_arg(self):
+        # Given
+        @jit
+        def f(a, b):
+            x = declare('int')
+            x = a + b
+            return g(x)
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+    def test_subscript_as_call_arg(self):
+        # Given
+        @jit
+        def f(i, a):
+            return g(a[i])
+
+        # When
+        types = {'i' : 'int', 'a' : 'intp'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+    def test_binop_as_call_arg(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(a + b)
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+    def test_call_as_call_arg(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(h(a, b))
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+    def test_binop_with_call_as_call_arg(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(h(a, b) + h(b, a))
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.children['g'].arg_types['x'] == 'int'
+
+    def test_variable_in_return(self):
+        # Given
+        @jit
+        def f(a):
+            return a
+
+        # When
+        types = {'a' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+    def test_subscript_in_return(self):
+        # Given
+        @jit
+        def f(i, a):
+            return a[i]
+
+        # When
+        types = {'i' : 'int', 'a' : 'intp'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+    def test_const_in_return(self):
+        # Given
+        @jit
+        def int_f(a, b):
+            return 1
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(int_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+        # Given
+        @jit
+        def long_f(a, b):
+            return 10000000000
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(long_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'long'
+
+        # Given
+        @jit
+        def double_f(a, b):
+            return 1.
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(double_f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'double'
+
+    def test_binop_in_return(self):
+        # Given
+        @jit
+        def f(a, b):
+            return a + b
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+    def test_call_in_return(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(a)
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert 'g' in helper.children
+        assert helper.arg_types['return_'] == 'int'
+
+    def test_binop_with_call_in_return(self):
+        # Given
+        @jit
+        def f(a, b):
+            return g(a) + g(b)
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.arg_types['return_'] == 'int'
+
+    def test_multi_level_call_in_return(self):
+        # Given
+        @jit
+        def f(a, b):
+            return h(a, b)
+
+        # When
+        types = {'a' : 'int', 'b' : 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert 'h' in helper.children
+        assert 'g' in helper.children['h'].children
+        assert helper.arg_types['return_'] == 'int'
+
+
+class TestParallelJIT(unittest.TestCase):
     def setUp(self):
         cfg = get_config()
         self._use_double = cfg.use_double
