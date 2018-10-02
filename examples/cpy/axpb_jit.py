@@ -1,7 +1,8 @@
 from pysph.cpy.api import Elementwise, annotate, wrap, get_config
-from pysph.cpy.jit import ElementwiseJIT
+from pysph.cpy.jit import jit, ElementwiseJIT
 import numpy as np
 
+@jit
 def axpb(i, x, y, a, b):
     xi = declare('double')
     xi = x[i]
