@@ -183,7 +183,6 @@ class AnnotationHelper(ast.NodeVisitor):
         if isinstance(node.n, float):
             return_type = 'double'
         else:
-            print node.n
             if node.n > 2147483648:
                 return_type = 'long'
             else:
