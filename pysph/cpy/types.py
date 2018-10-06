@@ -238,6 +238,7 @@ def annotate(func=None, **kw):
 
     def wrapper(func):
         func.__annotations__ = data
+        func.has_annotations = True
         return func
 
     if func is None:

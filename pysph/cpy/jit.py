@@ -470,6 +470,7 @@ class ScanJIT(parallel.ScanBase):
         if self.input_func is not None:
             arg_types = self.get_type_info_from_kwargs(
                 self.input_func, **kwargs)
+            arg_types['return_'] = dtype_to_knowntype(self.dtype)
             helper = AnnotationHelper(self.input_func, arg_types)
             helper.annotate()
             self.input_func = helper.func
@@ -486,6 +487,7 @@ class ScanJIT(parallel.ScanBase):
         if self.is_segment_func is not None:
             arg_types = self.get_type_info_from_kwargs(
                 self.is_segment_func, **kwargs)
+            arg_types['return_'] = 'int'
             helper = AnnotationHelper(self.is_segment_func, arg_types)
             helper.annotate()
             self.is_segment_func = helper.func
