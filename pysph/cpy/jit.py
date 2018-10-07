@@ -85,7 +85,7 @@ class AnnotationHelper(ast.NodeVisitor):
         self.warning_msg = ('''
             Function called is not marked by the annotate decorator. Argument
             type defaulting to 'double'. If the type is not 'double', store
-            the value in a variable of appropriate type and pass the variable
+            the value in a variable of appropriate type and use the variable
             '''
         )
 
@@ -144,12 +144,6 @@ class AnnotationHelper(ast.NodeVisitor):
                 for arg in node.args:
                     arg_type = self.visit(arg)
                     if not arg_type:
-                        msg = ('''
-                        Function called is not marked by the jit decorator.
-                        Argument type defaulting to 'double'. If the type
-                        is not 'double',store the value in a variable of
-                        appropriate type and pass the variable'''
-                               )
                         self.warn(dedent(self.warning_msg), arg)
                         arg_type = 'double'
                     arg_types.append(arg_type)
@@ -231,9 +225,9 @@ def gather_external_funcs(f_helper, external_f):
     node_name = f_helper.func.__name__
     if node_name not in external_f:
         external_f[node_name] = []
-    for name, child in f_helper.external_funcs.items():
-        external_f[node_name].append(child.func)
-        gather_external_funcs(child, external_f)
+    for name, external in f_helper.external_funcs.items():
+        external_f[node_name].append(external.func)
+        gather_external_funcs(external, external_f)
 
 
 class TranspilerJIT(Transpiler):
