@@ -664,6 +664,25 @@ class CorrectionFactorVariableSmoothingLength(Equation):
         d_alpha[d_idx] += -s_m[s_idx] * (DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1])
 
 
+class RemoveParticlesWithZeroAlpha(Equation):
+    r"""Removes particles if correction factor (alpha) in internal force due to
+    variable smoothing length is zero
+
+    """
+    def __init__(self, dest):
+        super(RemoveParticlesWithZeroAlpha, self).__init__(dest, None)
+
+    def post_loop(self, d_alpha, d_pa_alpha_zero, d_idx):
+        if d_alpha[d_idx] == 0:
+            d_pa_alpha_zero[d_idx] = 1
+
+    def reduce(self, dst, t, dt):
+        indices = declare('object')
+        indices = numpy.where(dst.pa_alpha_zero > 0)[0]
+        if len(indices) > 0:
+            dst.remove_particles(indices)
+
+
 class SummationDensity(Equation):
     r"""**Summation Density**
 
@@ -1713,3 +1732,302 @@ class GradientCorrection(Equation):
         if change <= self.tol:
             for i in range(n):
                 DWJ[i] = res[i]
+
+
+class RemoveOutofDomainParticles(Equation):
+    r"""Removes particles if the following condition is satisfied:
+
+    .. math::
+
+        (x_i < x_min) or (x_i > x_max) or (y_i < y_min) or (y_i > y_max)
+
+    """
+    def __init__(self, dest, x_min=-1e9, x_max=1e9,
+                 y_min=-1e9, y_max=1e9):
+        r"""
+        Parameters
+        ----------
+        x_min : float
+            minimum distance along x-direction below which particles are
+            removed
+        x_max : float
+            maximum distance along x-direction above which particles are
+            removed
+        y_min : float
+            minimum distance along y-direction below which particles are
+            removed
+        y_max : float
+            maximum distance along x-direction above which particles are
+            removed
+
+        """
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+        super(RemoveOutofDomainParticles, self).__init__(dest, None)
+
+    def initialize(self, d_pa_out_of_domain, d_x, d_y, d_idx):
+        if ((d_x[d_idx] < self.x_min or d_x[d_idx] > self.x_max)
+            or (d_y[d_idx] < self.y_min or d_y[d_idx] > self.y_max)):
+            d_pa_out_of_domain[d_idx] = 1
+        else:
+            d_pa_out_of_domain[d_idx] = 0
+
+    def reduce(self, dst, t, dt):
+        indices = declare('object')
+        indices = numpy.where(dst.pa_out_of_domain > 0)[0]
+        # Removes the out of domain particles
+        if len(indices) > 0:
+            dst.remove_particles(indices)
+
+
+class RemoveCloseParticlesAtOpenBoundary(Equation):
+    r"""Removes the newly created open boundary particle if the distance
+    between this particle and any of its neighbor is less than min_dist_ob
+
+    The following cases creates new open boundary particles
+
+    * Particles which are moved back to the inlet after exiting the inlet.
+    * Particles which have moved from another domain into the open boundary and 
+    have been converted to open boundary particles.
+
+    References
+    ----------
+    .. [VacondioSWE-SPHysics, 2013] R. Vacondio et al., SWE-SPHysics source
+    code, File: SWE_SPHYsics/SWE-SPHysics_2D_v1.0.00/source/SPHYSICS_SWE_2D/
+    check_limits_2D.f
+
+    """
+    def __init__(self, dest, sources, min_dist_ob=0.0):
+        """
+        Parameters
+        ----------
+        min_dist_ob : float
+            minimum distance of a newly created open boundary particle and its
+            neighbor below which the particle is removed
+        """
+        self.min_dist_ob = min_dist_ob
+        super(RemoveCloseParticlesAtOpenBoundary, self).__init__(dest, sources)
+
+    def loop_all(self, d_idx, d_ob_pa_to_tag, d_ob_pa_to_remove, d_x, d_y, s_x,
+                 s_y, NBRS, N_NBRS):
+        i = declare('int')
+        s_idx = declare('unsigned int')
+        # ob_pa_to_tag is 1 for newly created open boundary particles
+        if d_ob_pa_to_tag[d_idx]:
+            xi = d_x[d_idx]
+            yi = d_y[d_idx]
+            for i in range(N_NBRS):
+                s_idx = NBRS[i]
+                if s_idx == d_idx:
+                    continue
+                xij = xi - s_x[s_idx]
+                yij = yi - s_y[s_idx]
+                rij = sqrt(xij*xij + yij*yij)
+                if rij < self.min_dist_ob:
+                    d_ob_pa_to_remove[d_idx] = 1
+
+    def reduce(self, dst, t, dt):
+        indices = declare('object')
+        indices = numpy.where(dst.ob_pa_to_remove > 0)[0]
+        if len(indices) > 0:
+            dst.remove_particles(indices)
+        dst.ob_pa_to_tag = numpy.zeros_like(dst.ob_pa_to_tag)
+
+
+class RemoveFluidParticlesWithNoNeighbors(Equation):
+    r"""Removes fluid particles if there exists no neighboring particles within 
+    its kernel radius (2*smoothing length)
+
+    """
+    def loop_all(self, d_idx, d_ob_pa_to_tag, d_fluid_pa_to_remove, d_x, d_y,
+                 s_x, s_y, d_h, NBRS, N_NBRS):
+        i, n_nbrs_outside_ker = declare('int', 2)
+        s_idx = declare('unsigned int')
+        xi = d_x[d_idx]
+        yi = d_y[d_idx]
+        # Number of neighbors outside the particles kernel radius
+        n_nbrs_outside_ker = 0
+        for i in range(N_NBRS):
+            s_idx = NBRS[i]
+            if s_idx == d_idx:
+                continue
+            xij = xi - s_x[s_idx]
+            yij = yi - s_y[s_idx]
+            rij = sqrt(xij*xij + yij*yij)
+            if rij > 2*d_h[d_idx]:
+                n_nbrs_outside_ker += 1
+        # If all neighbors outside its kernel then tag particle for removal
+        if n_nbrs_outside_ker == N_NBRS-1:
+            d_fluid_pa_to_remove[d_idx] = 1
+        else:
+            d_fluid_pa_to_remove[d_idx] = 0
+
+    def reduce(self, dst, t, dt):
+        indices = declare('object')
+        indices = numpy.where(dst.fluid_pa_to_remove > 0)[0]
+        if len(indices) > 0:
+            dst.remove_particles(indices)
+
+
+class SWEInletOutletStep(IntegratorStep):
+    r"""Stepper for both inlet and outlet particles for the cases dealing with
+    shallow water flows
+
+    """
+    def initialize(self):
+        pass
+
+    def stage1(self, d_idx, d_x, d_y, d_uh, d_vh, d_u, d_v, dt):
+        dtb2 = 0.5*dt
+        d_uh[d_idx] = d_u[d_idx]
+        d_vh[d_idx] = d_v[d_idx]
+        d_x[d_idx] += dtb2 * d_u[d_idx]
+        d_y[d_idx] += dtb2 * d_v[d_idx]
+
+    def stage2(self, d_idx, d_x, d_y, d_u, d_v, dt):
+        dtb2 = 0.5*dt
+        d_x[d_idx] += dtb2 * d_u[d_idx]
+        d_y[d_idx] += dtb2 * d_v[d_idx]
+
+
+class SWEInlet(object):
+    """This inlet is used for shallow water flows. It has particles
+    stacked along a particular axis (defaults to 'x'). These particles can
+    move along any direction and as they flow out of the domain they are copied
+    into the destination particle array at each timestep.
+
+    Inlet particles are stacked by subtracting the spacing amount from the
+    existing inlet array. These are copied when the inlet is created. The
+    particles that cross the inlet domain are copied over to the destination
+    particle array and moved back to the other side of the inlet.
+
+    The particles from the source particle array which have moved to the inlet
+    domain are removed from the source and added to the inlet particle array.
+
+    The motion of the particles can be along any direction required.  One
+    can set the 'u' velocity to have a parabolic profile in the 'y' direction
+    if so desired.
+
+    """
+    def __init__(self, inlet_pa, dest_pa, source_pa, spacing, n=5, axis='x',
+                 xmin=-1.0, xmax=1.0, ymin=-1.0, ymax=1.0, callback=None):
+        """Constructor.
+
+        Note that the inlet must be defined such that the spacing times the
+        number of stacks of particles is equal to the length of the domain in
+        the stacked direction.  For example, if particles are stacked along
+        the 'x' axis and n=5 with spacing 0.1, then xmax - xmin should be 0.5.
+
+        Parameters
+        ----------
+
+        inlet_pa: ParticleArray
+           Particle array for the inlet particles.
+
+        dest_pa: ParticleArray
+           Particle array for the destination into which inlet flows.
+
+        source_pa : ParticleArray
+            Particle array from which the particles flow in.
+
+        spacing: float
+           Spacing of particles in the inlet domain.
+
+        n: int
+           Total number of copies of the initial particles.
+
+        axis: str
+           Axis along which to stack particles, one of 'x', 'y'.
+
+        xmin, xmax, ymin, ymax : float
+           Domain of the outlet.
+
+        """
+        self.inlet_pa = inlet_pa
+        self.dest_pa = dest_pa
+        self.spacing = spacing
+        self.source_pa = source_pa
+        self.callback = callback
+        assert axis in ('x', 'y')
+        self.axis = axis
+        self.n = n
+        self.xmin, self.xmax = xmin, xmax
+        self.ymin, self.ymax = ymin, ymax
+        self._create_inlet_particles()
+
+    def _create_inlet_particles(self):
+        props = self.inlet_pa.get_property_arrays()
+        inlet_props = {}
+        for prop, array in props.items():
+            new_array = np.array([], dtype=array.dtype)
+            for i in range(1, self.n):
+                if prop == self.axis:
+                    new_array = np.append(new_array, array - i*self.spacing)
+                else:
+                    new_array = np.append(new_array, array)
+            inlet_props[prop] = new_array
+        self.inlet_pa.add_particles(**inlet_props)
+
+    def update(self, solver=None):
+        """This is called by the solver after each timestep and is passed
+        the solver instance.
+        """
+        pa_add = {}
+        inlet_pa = self.inlet_pa
+        xmin, xmax, ymin, ymax = self.xmin, self.xmax, self.ymin, self.ymax
+        lx, ly = xmax - xmin, ymax - ymin
+        x, y = inlet_pa.x, inlet_pa.y
+
+        xcond = (x > xmax)
+        ycond = (y > ymax)
+        # All the indices of particles which have left.
+        all_idx = np.where(xcond | ycond)[0]
+        # The indices which need to be wrapped around.
+        x_idx = np.where(xcond)[0]
+        y_idx = np.where(ycond)[0]
+
+        # Adding particles to the destination array.
+        props = inlet_pa.get_property_arrays()
+        for prop, array in props.items():
+            pa_add[prop] = np.array(array[all_idx])
+        self.dest_pa.add_particles(**pa_add)
+
+        # Moving the moved particles back to the array beginning.
+        inlet_pa.x[x_idx] -= np.sign(inlet_pa.x[x_idx] - xmax)*lx
+        inlet_pa.y[y_idx] -= np.sign(inlet_pa.y[y_idx] - ymax)*ly
+
+        # Tags the particles which have been moved back to inlet. These tagged
+        # particles are then used for checking minimum spacing condition
+        # with other open boundary particles.
+        inlet_pa.ob_pa_to_tag[all_idx] = 1
+
+        source_pa = self.source_pa
+        x, y = source_pa.x, source_pa.y
+        idx = np.where((x <= xmax) & (x >= xmin) & (y <= ymax) & (y >=
+                       ymin))[0]
+
+        # Adding particles to the destination array.
+        pa_add = {}
+        props = source_pa.get_property_arrays()
+        for prop, array in props.items():
+            pa_add[prop] = np.array(array[idx])
+
+        # Tags the particles which have been added to the destination array
+        # from the source array. These tagged particles are then used for
+        # checking minimum spacing condition with other open boundary
+        # particles.
+        pa_add['ob_pa_to_tag'] = np.ones_like(pa_add['ob_pa_to_tag'])
+
+        if self.callback is not None:
+            self.callback(inlet_pa, pa_add)
+
+        inlet_pa.add_particles(**pa_add)
+
+        source_pa.remove_particles(idx)
+
+        # Removing the particles that moved out of inlet
+        x, y = inlet_pa.x, inlet_pa.y
+        idx = np.where((x > xmax) | (x < xmin) | (y > ymax) | (y < ymin))[0]
+        inlet_pa.remove_particles(idx)
