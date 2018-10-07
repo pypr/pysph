@@ -1,3 +1,8 @@
+"""Shows the use of annotate without any type information.
+The type information is extracted from the arguments passed
+and the function is annotated and compiled at runtime.
+"""
+
 from pysph.cpy.api import annotate, Elementwise, wrap, get_config
 import numpy as np
 
