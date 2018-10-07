@@ -1768,8 +1768,10 @@ class RemoveOutofDomainParticles(Equation):
         super(RemoveOutofDomainParticles, self).__init__(dest, None)
 
     def initialize(self, d_pa_out_of_domain, d_x, d_y, d_idx):
-        if ((d_x[d_idx] < self.x_min or d_x[d_idx] > self.x_max)
-            or (d_y[d_idx] < self.y_min or d_y[d_idx] > self.y_max)):
+        if (
+            (d_x[d_idx] < self.x_min or d_x[d_idx] > self.x_max)
+            or (d_y[d_idx] < self.y_min or d_y[d_idx] > self.y_max)
+        ):
             d_pa_out_of_domain[d_idx] = 1
         else:
             d_pa_out_of_domain[d_idx] = 0
@@ -1789,7 +1791,7 @@ class RemoveCloseParticlesAtOpenBoundary(Equation):
     The following cases creates new open boundary particles
 
     * Particles which are moved back to the inlet after exiting the inlet.
-    * Particles which have moved from another domain into the open boundary and 
+    * Particles which have moved from another domain into the open boundary and
     have been converted to open boundary particles.
 
     References
@@ -1837,7 +1839,7 @@ class RemoveCloseParticlesAtOpenBoundary(Equation):
 
 
 class RemoveFluidParticlesWithNoNeighbors(Equation):
-    r"""Removes fluid particles if there exists no neighboring particles within 
+    r"""Removes fluid particles if there exists no neighboring particles within
     its kernel radius (2*smoothing length)
 
     """
