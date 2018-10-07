@@ -1,9 +1,17 @@
 <%def name="do_group(helper, g_idx, sg_idx, group)" buffered="True">
 #######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+<% helper.call_pre(group) %>
+% endif
+#######################################################################
 ## Iterate over destinations in this group.
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
 // Destination ${dest}
+## Call py_initialize if it is defined for the equations.
+<% helper.call_py_initialize(all_eqs, dest) %>
 #######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
@@ -53,6 +61,12 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 <% helper.call_update_nnps(group) %>
 % endif
 % endfor
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+<% helper.call_post(group) %>
+% endif
 </%def>
 
 #define abs fabs

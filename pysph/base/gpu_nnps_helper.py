@@ -1,14 +1,22 @@
-
-from pyopencl.elementwise import ElementwiseKernel
 from mako.template import Template
 import os
 import sys
 
-from pysph.base.opencl import profile_kernel, get_elwise_kernel
+from pysph.cpy.opencl import get_context, profile_kernel
+
+
+def get_elwise_kernel(kernel_name, args, src, preamble=""):
+    ctx = get_context()
+    from pyopencl.elementwise import ElementwiseKernel
+    knl = ElementwiseKernel(
+        ctx, args, src,
+        kernel_name, preamble=preamble
+    )
+    return profile_kernel(knl, kernel_name)
 
 
 class GPUNNPSHelper(object):
-    def __init__(self, ctx, tpl_filename, use_double=False):
+    def __init__(self, tpl_filename, backend=None, use_double=False):
         disable_unicode = False if sys.version_info.major > 2 else True
         self.src_tpl = Template(
             filename=os.path.join(
@@ -33,15 +41,15 @@ class GPUNNPSHelper(object):
             data_t=self.data_t
         )
         self.preamble = "\n".join([helper_preamble, preamble])
-        self.ctx = ctx
         self.cache = {}
+        self.backend = backend
 
     def _get_code(self, kernel_name, **kwargs):
         arguments = self.src_tpl.get_def("%s_args" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         src = self.src_tpl.get_def("%s_src" % kernel_name).render(
-                data_t=self.data_t, **kwargs)
+            data_t=self.data_t, **kwargs)
 
         return arguments, src
 

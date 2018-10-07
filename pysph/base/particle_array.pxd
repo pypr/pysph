@@ -34,9 +34,12 @@ cdef class ParticleArray:
     """
     Maintains various properties for particles.
     """
+    cdef public str backend
     # dictionary to hold the properties held per particle
     cdef public dict properties
     cdef public list property_arrays
+
+    cdef public dict stride
 
     # list of output property arrays
     cdef public list output_property_arrays
@@ -49,12 +52,6 @@ cdef class ParticleArray:
 
     # name associated with this particle array
     cdef public str name
-
-    # indicates if coordinates of particles has changed.
-    cdef public bint is_dirty
-
-    # indicate if the particle configuration has changed.
-    cdef public bint indices_invalid
 
     # the number of real particles.
     cdef public long num_real_particles
@@ -84,8 +81,7 @@ cdef class ParticleArray:
 
     cpdef get_lb_props(self)
 
-    cpdef set_dirty(self, bint val)
-    cpdef set_indices_invalid(self, bint val)
+    cpdef set_num_real_particles(self, long value)
 
     cpdef BaseArray get_carray(self, str prop)
 
@@ -95,7 +91,7 @@ cdef class ParticleArray:
 
     # function to add any property
     cpdef add_constant(self, str name, data)
-    cpdef add_property(self, str name, str type=*, default=*, data=*)
+    cpdef add_property(self, str name, str type=*, default=*, data=*, stride=*)
     cpdef remove_property(self, str prop_name)
 
     # increase the number of particles by num_particles
@@ -127,10 +123,6 @@ cdef class ParticleArray:
 
     # set the specified properties to zero
     cpdef set_to_zero(self, list props)
-
-    # perform an update on a particle
-    cpdef update_property(self, BaseArray a, BaseArray a0,
-                          BaseArray acc, double dt)
 
     # resize all arrays to a new size
     cpdef resize(self, long size)

@@ -14,7 +14,7 @@ try:
 except ImportError:
     import mock
 
-from ..ext_module import get_md5, ExtModule
+from ..ext_module import get_md5, ExtModule, get_ext_extension
 
 
 def _check_write_source(root):
@@ -83,7 +83,7 @@ class TestExtModule(TestCase):
         self.assertEqual(s.name, expect_name)
         self.assertEqual(s.src_path, join(self.root, expect_name + '.pyx'))
         self.assertEqual(s.ext_path,
-                         join(self.root, expect_name + get_config_var('SO')))
+                         join(self.root, expect_name + get_ext_extension()))
 
         self.assertTrue(exists(s.src_path))
         self.assertEqual(data, open(s.src_path).read())

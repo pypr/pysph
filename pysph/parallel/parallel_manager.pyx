@@ -30,6 +30,19 @@ cdef extern from 'limits.h':
     cdef int INT_MAX
     cdef unsigned int UINT_MAX
 
+
+cpdef get_strided_indices(np.ndarray indices, int stride):
+    cdef int j
+    cdef list args = []
+    if stride == 1:
+        return indices
+    else:
+        tmp = indices*stride
+        for j in range(stride):
+            args.append(tmp + j)
+        return np.ravel(np.column_stack(args))
+
+
 ################################################################
 # ParticleArrayExchange
 ################################################################w
@@ -190,7 +203,7 @@ cdef class ParticleArrayExchange:
     cdef exchange_data(self, ZComm zcomm, dict sendbufs, int count):
         cdef ParticleArray pa = self.pa
         cdef str prop
-        cdef int prop_tag, nbytes, i, nprops = self.nprops
+        cdef int prop_tag, stride, nbytes, i, nprops = self.nprops
 
         cdef np.ndarray prop_arr, sendbuf, recvbuf
 
@@ -201,16 +214,17 @@ cdef class ParticleArrayExchange:
 
             prop_arr = pa.properties[prop].get_npy_array()
             nbytes = prop_arr.dtype.itemsize
+            stride = pa.stride.get(prop, 1)
 
             # the send and receive buffers
             sendbuf = sendbufs[prop]
-            recvbuf = prop_arr[count:]
+            recvbuf = prop_arr[count*stride:]
 
             # tag for this property
             prop_tag = i
 
             # set the nbytes and tag for the zoltan communicator
-            zcomm.set_nbytes( nbytes )
+            zcomm.set_nbytes( nbytes*stride )
             zcomm.set_tag( prop_tag )
 
             # exchange the data
@@ -291,12 +305,20 @@ cdef class ParticleArrayExchange:
         cdef ParticleArray pa = self.pa
         cdef dict sendbufs = {}
         cdef str prop
+        cdef int stride
 
         cdef np.ndarray indices = exportIndices.get_npy_array()
 
+        strides = set(pa.stride.values())
+        s_indices = {1:indices}
+        for stride in strides:
+            if stride > 1:
+                s_indices[stride] = get_strided_indices(indices, stride)
+
         for prop in pa.properties:
             prop_arr = pa.properties[prop].get_npy_array()
-            sendbufs[prop] = prop_arr[ indices ]
+            stride = pa.stride.get(prop, 1)
+            sendbufs[prop] = prop_arr[s_indices[stride]]
 
         return sendbufs
 

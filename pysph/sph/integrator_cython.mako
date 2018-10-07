@@ -23,11 +23,13 @@ cdef class Integrator:
     cdef public NNPS nnps
     cdef public double dt, t, orig_t
     cdef object _post_stage_callback
+    cdef object steppers
 
     ${indent(helper.get_stepper_defs(), 1)}
 
     def __init__(self, acceleration_eval, steppers):
         self.acceleration_eval = acceleration_eval
+        self.steppers = steppers
         self._post_stage_callback = None
         % for name in sorted(helper.object.steppers.keys()):
         self.${name} = acceleration_eval.${name}
@@ -93,10 +95,15 @@ cdef class Integrator:
         # ---------------------------------------------------------------------
         # Destination ${dest}.
         dst = self.${dest}
+        ##
+        ${indent(helper.get_py_stage_code(dest, method), 2)}
+        ##
+        % if helper.has_stepper_loop(dest, method):
         # Only iterate over real particles.
         NP_DEST = dst.size(real=True)
         ${indent(helper.get_array_setup(dest, method), 2)}
         for d_idx in range(NP_DEST):
             ${indent(helper.get_stepper_loop(dest, method), 3)}
+        % endif
         % endfor
     % endfor

@@ -37,6 +37,10 @@ methods of a typical :py:class:`Equation` subclass::
           # Overload this only if you need to pass additional constants
           # Otherwise, no need to override __init__
 
+      def py_initialize(self, dst, t, dt):
+          # Called once per destination before initialize.
+          # This is a pure Python function and is not translated.
+
       def initialize(self, d_idx, ...):
           # Called once per destination before loop.
 
@@ -66,6 +70,13 @@ the equation is used as ``YourEquation(dest='fluid', sources=['fluid',
 'solid'])``. Now given this context, let us see what happens when this
 equation is used.  What happens is as follows:
 
+- for each destination particle array (``'fluid'`` in this case), the
+  ``py_initialize`` method is called and is passed the destination particle
+  array, ``t`` and ``dt`` (similar to ``reduce``). This function is a pure
+  Python function so you can do what you want here, including importing any
+  Python code and run anything you want. The code is NOT transpiled into
+  C/OpenCL/CUDA.
+
 - for each fluid particle, the ``initialize`` method is called with the
   required arrays.
 
@@ -86,7 +97,9 @@ equation is used.  What happens is as follows:
   required properties.
 
 - If a reduce method exists, it is called for the destination (only once, not
-  once per particle). It is passed the destination particle array.
+  once per particle). It is passed the destination particle array and the time
+  and timestep. It is transpiled when you are using Cython but is a pure
+  Python function when you run this via OpenCL or CUDA.
 
 The ``initialize, loop_all, loop, post_loop`` methods all may be called in
 separate threads (both on CPU/GPU) depending on the implementation of the
@@ -96,12 +109,14 @@ It is possible to set a scalar value in the equation as an instance attribute,
 i.e. by setting ``self.something = value`` but remember that this is just one
 value for the equation. This value must also be initialized in the
 ``__init__`` method. Also make sure that the attributes are public and not
-private. There is only one equation instance used in the code, not one
-equation per thread or particle. So if you wish to calculate a temporary
-quantity for each particle, you should create a separate property for it and
-use that instead of assuming that the initialize and loop functions run in
-serial. They do not when you use OpenMP or OpenCL. So do not create temporary
-arrays inside the equation for these sort of things.
+private (i.e. do not start with an underscore). There is only one equation
+instance used in the code, not one equation per thread or particle. So if you
+wish to calculate a temporary quantity for each particle, you should create a
+separate property for it and use that instead of assuming that the initialize
+and loop functions run in serial. They do not when you use OpenMP or OpenCL.
+So do not create temporary arrays inside the equation for these sort of
+things. In general if you need a constant per destination array, add it as a
+constant to the particle array.
 
 Now, if the group containing the equation has ``iterate`` set to True, then
 the group will be iterated until convergence is attained for all the equations
@@ -406,6 +421,58 @@ Here is a more complex helper function.
 The trace function effectively is converted into a function with signature
 ``double trace(double* x, int nx)`` and thus can be called with any
 one-dimensional array.
+
+Calling arbitrary Python functions from a Group
+------------------------------------------------
+
+Sometimes, you may need to implement something that is hard to write (at least
+initially) with the constraints that PySPH places. For example if you need to
+implement an algorithm that requires more complex data structures and you want
+to do it easily in Python. There are ways to call arbitrary Python code from
+the application already but sometimes you need to do this during every
+acceleration evaluation. To support this the :py:class:`Group` class supports
+two additional keyword arguments called ``pre`` and ``post``. These can be any
+Python callable that take no arguments. Any callable passed as ``pre`` will be
+called *before* any equation related code is executed and ``post`` will be
+executed after the entire group is finished. If the group is iterated, it
+should call those functions repeatedly.
+
+Now these functions are pure Python functions so you may choose to do anything
+in them. These are not called within an OpenMP context and if you are using
+the OpenCL or CUDA backends again this will simply be a Python function call
+that has nothing to do with the particular backend. However, since it is
+arbitrary Python, you can choose to implement the code using any approach you
+choose to do. This should be flexible enough to customize PySPH greatly.
+
+Writing integrators
+--------------------
+
+.. py:currentmodule:: pysph.sph.integrator_step
+
+
+Similar rules apply when writing an :py:class:`IntegratorStep`. One can create
+a multi-stage integrator as follows:
+
+.. code-block:: python
+
+   class MyStepper(IntegratorStep):
+       def initialize(self, d_idx, d_x):
+           # ...
+       def py_stage1(self, dst, t, dt):
+           # ...
+       def stage1(self, d_idx, d_x, d_ax):
+           # ...
+       def py_stage2(self, dst, t, dt):
+           # ...
+       def stage2(self, d_idx, d_x, d_ax):
+           # ...
+
+In this case, the ``initialize, stage1, stage2``, methods are transpiled and
+called but the ``py_stage1, py_stage2`` are pure Python functions called
+before the respective ``stage`` functions are called. Defining the
+``py_stage1`` or ``py_stage2`` methods are optional. If you have defined them,
+they will be called automatically. They are passed the destination particle
+array, the current time, and current timestep.
 
 
 Examples to study

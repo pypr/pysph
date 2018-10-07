@@ -523,10 +523,94 @@ works on all backends, even on Cython.
 ``Scan``
 ~~~~~~~~~~
 
-TODO
+Scans are generalizations of prefix sums / cumulative sums and can be used as
+building blocks to construct a number of parallel algorithms. These include but
+not are limited to sorting, polynomial evaluation, and tree
+operations. Blelloch's literature on prefix sums (`Prefix Sums and Their
+Applications <https://www.cs.cmu.edu/~guyb/papers/Ble93.pdf>`_) has many more
+examples and is a recommended read before using scans. The ``cpy.parallel``
+module provides a ``Scan`` class which can be used to develop and execute such
+scans. The scans can be run on GPUs using the OpenCL backend or on CPUs using
+either the OpenCL or Cython backend. A CUDA backend is not yet supported.
 
+The scan semantics in cpy are similar to those of the GenericScanKernel in
+PyOpenCL
+(https://documen.tician.de/pyopencl/algorithm.html#pyopencl.scan.GenericScanKernel). Similar
+to the case for reduction, the main differences from the PyOpenCL implementation
+are that the expressions (`input_expr`, `segment_expr`, `output_expr`) are all
+functions rather than strings.
 
+The following examples demonstrate how scans can be used in cpy. The first
+example is to find the cumulative sum of all elements of an array::
 
+  ary = np.arange(10000, dtype=np.int32)
+  ary = wrap(ary, backend=backend)
+  
+  @annotate(i='int', ary='intp', return_='int')
+  def input_expr(i, ary):
+      return ary[i]
+
+  @annotate(int='i, item', ary='intp')
+  def output_expr(i, item, ary):
+      ary[i] = item
+
+  scan = Scan(input_expr, output_expr, 'a+b', dtype=np.int32,
+              backend=backend)
+  scan(ary=ary)
+  ary.pull()
+
+  # Result = ary.data
+
+Here is a more complex example of a function that finds the unique elements in
+an array::
+
+  ary = np.random.randint(0, 100, 1000, dtype=np.int32)
+  unique_ary = np.zeros(len(ary.data), dtype=np.int32)
+  unique_ary = wrap(unique_ary, backend=backend)
+  unique_count = np.zeros(1, dtype=np.int32)
+  unique_count = wrap(unique_count, backend=backend)
+  ary = wrap(ary, backend=backend)
+  
+  @annotate(i='int', ary='intp', return_='int')
+  def input_expr(i, ary):
+      if i == 0 or ary[i] != ary[i - 1]:
+          return 1
+      else:
+          return 0
+
+  @annotate(int='i, prev_item, item, N', ary='intp',
+            unique='intp', unique_count='intp')
+  def output_expr(i, prev_item, item, N, ary, unique, unique_count):
+      if item != prev_item:
+          unique[item - 1] = ary[i]
+      if i == N - 1:
+          unique_count[0] = item
+
+  scan = Scan(input_expr, output_expr, 'a+b', dtype=np.int32, backend=backend)
+  scan(ary=ary, unique=unique_ary, unique_count=unique_count)
+  unique_ary.pull()
+  unique_count.pull()
+  unique_count = unique_count.data[0]
+  unique_ary = unique_ary.data[:unique_count]
+
+  # Result = unique_ary
+  
+The following points highlight some important details and quirks about using
+scans in cpy:
+
+1. The scan call does not return anything. All output must be handled manually.
+   Usually this involves writing the results available in ``output_expr``
+   (``prev_item``, ``item`` and ``last_item``) to an array.
+2. ``input_expr`` might be evaluated multiple times. However, it can be assumed
+   that ``input_expr`` for an element or index ``i`` is not evaluated again
+   after the output expression ``output_expr`` for that element is
+   evaluated. Therefore, it is safe to write the output of a scan back to an
+   array also used for the input like in the first example.
+3. (For PyOpenCL users) If a segmented scan is used, unlike PyOpenCL where the
+   ``across_seg_boundary`` is used to handle the segment logic in the scan
+   expression, in cpy the logic is handled automatically. More specifically,
+   using ``a + b`` as the scan expression in cpy is equivalent to using
+   ``(across_seg_boundary ? b : a + b)`` in PyOpenCL.
 
 Abstracting out arrays
 -----------------------

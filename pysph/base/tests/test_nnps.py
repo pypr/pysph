@@ -343,14 +343,13 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
 
         self.nps = gpu_nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -364,14 +363,13 @@ class BruteForceNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
 
         self.nps = gpu_nnps.BruteForceNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -385,13 +383,12 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = True
         self.nps = gpu_nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -404,13 +401,12 @@ class TestZOrderGPUNNPSWithSorting(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
         self.nps = gpu_nnps.ZOrderGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            backend='opencl'
         )
         self.nps.spatially_order_particles(0)
         self.nps.spatially_order_particles(1)
@@ -429,11 +425,10 @@ class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
 
         self.nps = gpu_nnps.StratifiedSFCGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            num_levels=2, ctx=ctx
+            num_levels=2, backend='opencl'
         )
 
 

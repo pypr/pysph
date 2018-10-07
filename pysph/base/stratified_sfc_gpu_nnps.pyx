@@ -14,8 +14,11 @@ import pyopencl as cl
 import pyopencl.array
 import pyopencl.algorithm
 from pyopencl.scan import GenericScanKernel
-from pyopencl.scan import GenericDebugScanKernel
 from pyopencl.elementwise import ElementwiseKernel
+
+from pysph.cpy.array import Array
+import pysph.cpy.array as array
+from pysph.cpy.opencl import get_context
 
 # Cython for compiler directives
 cimport cython
@@ -39,16 +42,17 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
             bint cache=True, bint sort_gids=False,
-            int num_levels=2, ctx=None):
+            int num_levels=2, backend='opencl'):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, ctx
+            cache, sort_gids, backend
         )
 
         self.radius_scale2 = radius_scale*radius_scale
 
-        self.helper = GPUNNPSHelper(self.ctx, "stratified_sfc_gpu_nnps.mako",
-                                    self.use_double)
+        self.helper = GPUNNPSHelper("stratified_sfc_gpu_nnps.mako",
+                                    use_double=self.use_double,
+                                    backend=self.backend)
         self.eps = 16*np.finfo(np.float32).eps
 
         self.num_levels = num_levels
@@ -78,14 +82,14 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
             num_particles = pa_wrapper.get_number_of_particles()
 
-            self.pids.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint32))
-            self.pid_keys.append(cl.array.empty(self.queue,
-                num_particles, dtype=np.uint64))
-            start_idx_i = num_particles + cl.array.zeros(self.queue,
-                self.num_levels, dtype=np.uint32)
+            self.pids.append(array.empty(num_particles, dtype=np.uint32,
+                             backend=self.backend))
+            self.pid_keys.append(array.empty(num_particles, dtype=np.uint64,
+                                 backend=self.backend))
+            start_idx_i = num_particles + array.zeros(self.num_levels,
+                    dtype=np.uint32, backend=self.backend)
             self.start_idx_levels.append(start_idx_i)
-            self.num_particles_levels.append(cl.array.zeros_like(start_idx_i))
+            self.num_particles_levels.append(array.zeros_like(start_idx_i))
 
         cdef double max_length = fmax(fmax((self.xmax[0] - self.xmin[0]),
             (self.xmax[1] - self.xmin[1])), (self.xmax[2] - self.xmin[2]))
@@ -102,35 +106,38 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
         fill_pids = self.helper.get_kernel("fill_pids")
 
-        levels = cl.array.empty(self.queue,
-                                pa_wrapper.get_number_of_particles(),
-                                dtype=np.int32)
+        levels = array.empty(pa_wrapper.get_number_of_particles(),
+                             dtype=np.int32, backend=self.backend)
 
         pa_gpu = pa_wrapper.pa.gpu
-        fill_pids(pa_gpu.x, pa_gpu.y, pa_gpu.z, pa_gpu.h,
+        fill_pids(pa_gpu.x.dev, pa_gpu.y.dev, pa_gpu.z.dev, pa_gpu.h.dev,
                 self.interval_size, self.xmin[0], self.xmin[1], self.xmin[2],
-                self.hmin, self.pid_keys[pa_index], self.pids[pa_index],
+                self.hmin, self.pid_keys[pa_index].dev, self.pids[pa_index].dev,
                 self.radius_scale, self.max_num_bits)
 
-        radix_sort = cl.algorithm.RadixSort(self.ctx,
+        radix_sort = cl.algorithm.RadixSort(get_context(),
                 "unsigned int* pids, unsigned long* keys",
                 scan_kernel=GenericScanKernel, key_expr="keys[i]",
                 sort_arg_names=["pids", "keys"])
 
-        (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index],
-                self.pid_keys[pa_index], key_bits=64)
-        self.pids[pa_index] = sorted_indices
-        self.pid_keys[pa_index] = sorted_keys
+        cdef int max_num_bits = <int> (self.max_num_bits - 1 + \
+                ceil(log2(self.num_levels)))
 
+        (sorted_indices, sorted_keys), evnt = radix_sort(self.pids[pa_index].dev,
+                self.pid_keys[pa_index].dev, key_bits=max_num_bits)
+        self.pids[pa_index].set_data(sorted_indices)
+        self.pid_keys[pa_index].set_data(sorted_keys)
+
+        #FIXME: This will only work on OpenCL and CUDA backends
         cdef unsigned long long key = <unsigned long long> (sorted_keys[0].get())
 
         self.start_idx_levels[pa_index][key >> self.max_num_bits] = 0
 
         fill_start_indices = self.helper.get_kernel("fill_start_indices")
 
-        fill_start_indices(self.pid_keys[pa_index],
-                self.start_idx_levels[pa_index],
-                self.max_num_bits, self.num_particles_levels[pa_index])
+        fill_start_indices(self.pid_keys[pa_index].dev,
+                self.start_idx_levels[pa_index].dev,
+                self.max_num_bits, self.num_particles_levels[pa_index].dev)
 
     cpdef set_context(self, int src_index, int dst_index):
         """Setup the context before asking for neighbors.  The `dst_index`
@@ -156,19 +163,22 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         make_vec = cl.array.vec.make_double3 if self.use_double \
                 else cl.array.vec.make_float3
 
-        mask_lengths = cl.array.zeros(self.queue, self.dst.get_number_of_particles(),
-                dtype=np.int32)
+        mask_lengths = array.zeros(self.dst.get_number_of_particles(),
+                dtype=np.int32, backend=self.backend)
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        find_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
-                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
+        find_nbr_lengths(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
+                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
+                src_gpu.h.dev,
                 make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index],
-                self.pids[self.dst_index], self.pids[self.src_index], nbr_lengths,
-                self.radius_scale, self.hmin, self.interval_size,
-                self.start_idx_levels[self.src_index],
-                self.max_num_bits, self.num_levels, self.num_particles_levels[self.src_index])
+                self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index].dev,
+                self.pids[self.dst_index].dev, self.pids[self.src_index].dev,
+                nbr_lengths.dev, self.radius_scale, self.hmin,
+                self.interval_size, self.start_idx_levels[self.src_index].dev,
+                self.max_num_bits, self.num_levels,
+                self.num_particles_levels[self.src_index].dev)
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
         find_nbrs = self.helper.get_kernel("find_nbrs",
@@ -179,11 +189,14 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        find_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
-                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z, src_gpu.h,
+        find_nbrs(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
+                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
+                src_gpu.h.dev,
                 make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
-                self.src.get_number_of_particles(), self.pid_keys[self.src_index],
-                self.pids[self.dst_index], self.pids[self.src_index],
-                start_indices, nbrs, self.radius_scale, self.hmin, self.interval_size,
-                self.start_idx_levels[self.src_index],
-                self.max_num_bits, self.num_levels, self.num_particles_levels[self.src_index])
+                self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index].dev,
+                self.pids[self.dst_index].dev, self.pids[self.src_index].dev,
+                start_indices.dev, nbrs.dev, self.radius_scale, self.hmin,
+                self.interval_size, self.start_idx_levels[self.src_index].dev,
+                self.max_num_bits, self.num_levels,
+                self.num_particles_levels[self.src_index].dev)

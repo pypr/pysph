@@ -8,6 +8,12 @@ ${' '*4*level}${l}
 
 <%def name="do_group(helper, group, level=0)" buffered="True">
 #######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+${indent(helper.get_pre_call(group), 0)}
+% endif
+#######################################################################
 ## Iterate over destinations in this group.
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
@@ -21,6 +27,10 @@ dst = self.${dest}
 ${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 0)}
 dst_array_index = dst.index
 
+#######################################################################
+## Call py_initialize for all equations for this destination.
+#######################################################################
+${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
@@ -113,6 +123,12 @@ nnps.update()
 % endif
 
 % endfor
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+${indent(helper.get_post_call(group), 0)}
+% endif
 </%def>
 
 from libc.stdio cimport printf
@@ -179,11 +195,14 @@ cdef class AccelerationEval:
     cdef void **nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
+    cdef object groups
+    cdef object all_equations
     ${indent(helper.get_kernel_defs(), 1)}
     ${indent(helper.get_equation_defs(), 1)}
 
-    def __init__(self, kernel, equations, particle_arrays):
+    def __init__(self, kernel, equations, particle_arrays, groups):
         self.particle_arrays = tuple(particle_arrays)
+        self.groups = groups
         self.n_threads = get_number_of_threads()
         cdef int i
         for i, pa in enumerate(particle_arrays):
@@ -201,6 +220,10 @@ cdef class AccelerationEval:
 
         ${indent(helper.get_kernel_init(), 2)}
         ${indent(helper.get_equation_init(), 2)}
+        all_equations = {}
+        for equation in equations:
+            all_equations[equation.var_name] = equation
+        self.all_equations = all_equations
 
     def __dealloc__(self):
         aligned_free(self.nbrs)
