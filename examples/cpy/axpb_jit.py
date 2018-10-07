@@ -1,5 +1,4 @@
-from pysph.cpy.api import Elementwise, wrap, get_config
-from pysph.cpy.jit import annotate
+from pysph.cpy.api import annotate, Elementwise, wrap, get_config
 import numpy as np
 
 

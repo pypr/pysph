@@ -229,17 +229,21 @@ def annotate(func=None, **kw):
     """
     data = {}
 
-    for name, type in kw.items():
-        if isinstance(type, str) and ',' in type:
-            for x in type.split(','):
-                data[_clean_name(x.strip())] = _get_type(name)
-        else:
-            data[_clean_name(name)] = _get_type(type)
+    if not kw:
+        def wrapper(func):
+            func.is_jit = True
+            return func
+    else:
+        for name, type in kw.items():
+            if isinstance(type, str) and ',' in type:
+                for x in type.split(','):
+                    data[_clean_name(x.strip())] = _get_type(name)
+            else:
+                data[_clean_name(name)] = _get_type(type)
 
-    def wrapper(func):
-        func.__annotations__ = data
-        func.has_annotations = True
-        return func
+        def wrapper(func):
+            func.__annotations__ = data
+            return func
 
     if func is None:
         return wrapper

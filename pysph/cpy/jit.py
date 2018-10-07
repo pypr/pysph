@@ -18,24 +18,12 @@ from .transpiler import (
     get_external_symbols_and_calls,
     BUILTINS)
 from .types import (dtype_to_ctype, get_declare_info,
-                    dtype_to_knowntype)
+                    dtype_to_knowntype, annotate)
 from .extern import Extern
 from .ast_utils import get_unknown_names_and_calls
 
 import pysph.cpy.array as array
 import pysph.cpy.parallel as parallel
-import pysph.cpy.types as types
-
-
-def annotate(func):
-    def wrapper(func):
-        func.is_jit = True
-        return func
-
-    if func is None:
-        return wrapper
-    else:
-        return wrapper(func)
 
 
 def memoize(f):
@@ -51,10 +39,9 @@ def memoize(f):
 
 
 def getargspec(f):
-    if sys.version_info[0] < 3:
-        return inspect.getargspec(f)[0]
-    else:
-        return inspect.getfullargspec(f)[0]
+    getargspec_f = getattr(inspect, 'getfullargspec',
+                           getattr(inspect, 'getargspec'))
+    return getargspec_f(f)[0]
 
 
 def get_ctype_from_arg(arg):
@@ -94,7 +81,13 @@ class AnnotationHelper(ast.NodeVisitor):
         self.func = func
         self.arg_types = arg_types
         self.var_types = arg_types.copy()
-        self.children = {}
+        self.external_funcs = {}
+        self.warning_msg = ('''
+            Function called is not marked by the annotate decorator. Argument
+            type defaulting to 'double'. If the type is not 'double', store
+            the value in a variable of appropriate type and pass the variable
+            '''
+        )
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)
@@ -109,7 +102,7 @@ class AnnotationHelper(ast.NodeVisitor):
         self._src = src.splitlines()
         code = ast.parse(src)
         self.visit(code)
-        self.func = types.annotate(self.func, **self.arg_types)
+        self.func = annotate(self.func, **self.arg_types)
 
     def error(self, message, node):
         msg = '\nError in code in line %d:\n' % node.lineno
@@ -139,8 +132,8 @@ class AnnotationHelper(ast.NodeVisitor):
         f = getattr(mod, node.func.id, None)
         if not hasattr(f, 'is_jit'):
             return None
-        if node.func.id in self.children:
-            return self.children[node.func.id].arg_types.get(
+        if node.func.id in self.external_funcs:
+            return self.external_funcs[node.func.id].arg_types.get(
                 'return_', None)
         if isinstance(node.func, ast.Name) and \
                 node.func.id not in BUILTINS:
@@ -151,12 +144,13 @@ class AnnotationHelper(ast.NodeVisitor):
                 for arg in node.args:
                     arg_type = self.visit(arg)
                     if not arg_type:
-                        msg = "Function called is not marked by the jit "\
-                            "decorator. Argument type defaulting to "\
-                            "'double'. If the type is not 'double', "\
-                            "store the value in a variable of "\
-                            "appropriate type and pass the variable"
-                        self.warn(msg, arg)
+                        msg = ('''
+                        Function called is not marked by the jit decorator.
+                        Argument type defaulting to 'double'. If the type
+                        is not 'double',store the value in a variable of
+                        appropriate type and pass the variable'''
+                               )
+                        self.warn(dedent(self.warning_msg), arg)
                         arg_type = 'double'
                     arg_types.append(arg_type)
                 # make a new helper and call visit
@@ -164,7 +158,7 @@ class AnnotationHelper(ast.NodeVisitor):
                 f_arg_types = dict(zip(f_arg_names, arg_types))
                 f_helper = AnnotationHelper(f, f_arg_types)
                 f_helper.annotate()
-                self.children[node.func.id] = f_helper
+                self.external_funcs[node.func.id] = f_helper
                 return f_helper.arg_types.get('return_', None)
 
     def visit_Subscript(self, node):
@@ -194,6 +188,9 @@ class AnnotationHelper(ast.NodeVisitor):
                 for name in names:
                     self.var_types[name] = self.get_type(type)
 
+    def visit_Compare(self, node):
+        return 'int'
+
     def visit_BinOp(self, node):
         if isinstance(node.op, ast.Pow):
             return self.visit(node.left)
@@ -222,12 +219,7 @@ class AnnotationHelper(ast.NodeVisitor):
             if result_type:
                 self.arg_types['return_'] = self.visit(node.value)
             else:
-                msg = "Function called is not marked by the jit "\
-                    "decorator. Return value defaulting to 'double'."\
-                    "If the return type is not 'double', store the value "\
-                    "in a variable of appropriate type and return the "\
-                    "variable"
-                self.warn(msg, node.value)
+                self.warn(dedent(self.warning_msg), node.value)
                 self.arg_types['return_'] = 'double'
         else:
             self.warn("Unknown type for return value. "
@@ -239,7 +231,7 @@ def gather_external_funcs(f_helper, external_f):
     node_name = f_helper.func.__name__
     if node_name not in external_f:
         external_f[node_name] = []
-    for name, child in f_helper.children.items():
+    for name, child in f_helper.external_funcs.items():
         external_f[node_name].append(child.func)
         gather_external_funcs(child, external_f)
 

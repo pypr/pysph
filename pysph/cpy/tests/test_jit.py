@@ -6,7 +6,8 @@ from pytest import importorskip
 
 from ..config import get_config, use_config
 from ..array import wrap
-from ..jit import annotate, get_binop_return_type, AnnotationHelper
+from ..jit import get_binop_return_type, AnnotationHelper
+from ..types import annotate
 from ..parallel import Elementwise, Reduction, Scan
 
 
@@ -33,7 +34,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
         # Given
         @annotate
@@ -46,7 +47,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'long'
+        assert helper.external_funcs['g'].arg_types['x'] == 'long'
 
         # Given
         @annotate
@@ -59,7 +60,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'double'
+        assert helper.external_funcs['g'].arg_types['x'] == 'double'
 
     def test_variable_as_call_arg(self):
         # Given
@@ -75,7 +76,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
     def test_subscript_as_call_arg(self):
         # Given
@@ -89,7 +90,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
     def test_binop_as_call_arg(self):
         # Given
@@ -103,7 +104,21 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
+
+    def test_compare_as_call_arg(self):
+        # Given
+        @annotate
+        def f(a, b):
+            return g(a == b)
+
+        # When
+        types = {'a': 'int', 'b': 'int'}
+        helper = AnnotationHelper(f, types)
+        helper.annotate()
+
+        # Then
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
     def test_call_as_call_arg(self):
         # Given
@@ -117,7 +132,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
     def test_binop_with_call_as_call_arg(self):
         # Given
@@ -131,7 +146,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'int'
+        assert helper.external_funcs['g'].arg_types['x'] == 'int'
 
     def test_non_jit_call_as_call_arg(self):
         # Given
@@ -145,7 +160,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert helper.children['g'].arg_types['x'] == 'double'
+        assert helper.external_funcs['g'].arg_types['x'] == 'double'
 
     def test_variable_in_return(self):
         # Given
@@ -241,7 +256,7 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert 'g' in helper.children
+        assert 'g' in helper.external_funcs
         assert helper.arg_types['return_'] == 'int'
 
     def test_binop_with_call_in_return(self):
@@ -270,8 +285,8 @@ class TestAnnotationHelper(unittest.TestCase):
         helper.annotate()
 
         # Then
-        assert 'h' in helper.children
-        assert 'g' in helper.children['h'].children
+        assert 'h' in helper.external_funcs
+        assert 'g' in helper.external_funcs['h'].external_funcs
         assert helper.arg_types['return_'] == 'int'
 
     def test_non_jit_call_in_return(self):
