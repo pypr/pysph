@@ -8,7 +8,7 @@ import ast
 import importlib
 import warnings
 import sys
-
+from pytools import memoize
 from .config import get_config
 from .cython_generator import get_parallel_range, CythonGenerator
 from .transpiler import (
@@ -26,16 +26,16 @@ import pysph.cpy.array as array
 import pysph.cpy.parallel as parallel
 
 
-def memoize(f):
-    @wraps(f)
-    def wrapper(obj, *args, **kwargs):
-        if not hasattr(obj, 'cache'):
-            obj.cache = dict()
-        key = tuple([get_ctype_from_arg(arg) for arg in args])
-        if key not in obj.cache:
-            obj.cache[key] = f(obj, *args, **kwargs)
-        return obj.cache[key]
-    return wrapper
+def kernel_cache_key_args(obj, *args):
+    key = [get_ctype_from_arg(arg) for arg in args]
+    key.append(obj)
+    return tuple(key)
+
+
+def kernel_cache_key_kwargs(obj, **kwargs):
+    key = [get_ctype_from_arg(arg) for arg in kwargs.values()]
+    key.append(obj)
+    return tuple(key)
 
 
 def getargspec(f):
@@ -284,7 +284,7 @@ class ElementwiseJIT(parallel.ElementwiseBase):
             type_info[name] = arg_type
         return type_info
 
-    @memoize
+    @memoize(key=kernel_cache_key_args)
     def _generate_kernel(self, *args):
         if self.func is not None:
             arg_types = self.get_type_info_from_args(*args)
@@ -360,7 +360,7 @@ class ReductionJIT(parallel.ReductionBase):
             type_info[name] = arg_type
         return type_info
 
-    @memoize
+    @memoize(key=kernel_cache_key_args)
     def _generate_kernel(self, *args):
         if self.func is not None:
             arg_types = self.get_type_info_from_args(*args)
@@ -450,7 +450,7 @@ class ScanJIT(parallel.ScanBase):
             type_info[name] = arg_type
         return type_info
 
-    @memoize
+    @memoize(key=kernel_cache_key_kwargs, use_kwargs=True)
     def _generate_kernel(self, **kwargs):
         external_funcs = {}
         if self.input_func is not None:
