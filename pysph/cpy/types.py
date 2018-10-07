@@ -86,6 +86,7 @@ class KnownType(object):
     Smells but is convenient as the type may be one available only inside
     Cython without a corresponding Python type.
     """
+
     def __init__(self, type_str, base_type=''):
         """Constructor
 
@@ -188,7 +189,7 @@ def ctype_to_dtype(ctype):
     return C_NP_TYPE_MAP[ctype]
 
 
-def dtype_to_knowntype(dtype, address=None):
+def dtype_to_knowntype(dtype, address='scalar'):
     ctype = dtype_to_ctype(dtype)
     if 'unsigned' in ctype:
         ctype = 'u%s' % ctype.replace('unsigned ', '')
@@ -199,8 +200,9 @@ def dtype_to_knowntype(dtype, address=None):
         knowntype = 'g%sp' % knowntype
     elif address == 'local':
         knowntype = 'l%sp' % knowntype
-    else:
-        raise ValueError("address can only be ptr, global or local")
+    elif address != 'scalar':
+        raise ValueError("address can only be scalar,"
+                         " ptr, global or local")
 
     if knowntype in TYPES:
         return knowntype
@@ -227,16 +229,21 @@ def annotate(func=None, **kw):
     """
     data = {}
 
-    for name, type in kw.items():
-        if isinstance(type, str) and ',' in type:
-            for x in type.split(','):
-                data[_clean_name(x.strip())] = _get_type(name)
-        else:
-            data[_clean_name(name)] = _get_type(type)
+    if not kw:
+        def wrapper(func):
+            func.is_jit = True
+            return func
+    else:
+        for name, type in kw.items():
+            if isinstance(type, str) and ',' in type:
+                for x in type.split(','):
+                    data[_clean_name(x.strip())] = _get_type(name)
+            else:
+                data[_clean_name(name)] = _get_type(type)
 
-    def wrapper(func):
-        func.__annotations__ = data
-        return func
+        def wrapper(func):
+            func.__annotations__ = data
+            return func
 
     if func is None:
         return wrapper

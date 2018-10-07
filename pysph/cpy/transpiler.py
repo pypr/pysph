@@ -158,6 +158,10 @@ class Transpiler(object):
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
+            #ifdef __APPLE__
+            #define M_PI 3.14159265358979323846
+            #endif
+
             __constant double pi=M_PI;
             ''')
         elif backend == 'cuda':
