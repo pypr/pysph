@@ -261,7 +261,8 @@ For example,::
         return abs(x[i])
 
 This will set the return type of function ``f`` to the default
-type, ``double``. To avoid this problem, one could define ``f`` instead as,::
+type, ``double`` even when ``x`` is an array of integers.
+To avoid this problem, one could define ``f`` instead as,::
 
     @annotate
     def f(i, x):
