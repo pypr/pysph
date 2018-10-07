@@ -237,6 +237,40 @@ arguments and NOT for the local variables. The only caveat is you must use the
 types in ``pysph.cpy.types``, i.e. you must use ``KnownType`` instances as the
 types for things to work.
 
+JIT transpilation
+-----------------
+
+CPy also support just-in-time transpilation when annotations of a function
+are not provided. These functions are annotated at runtime when the
+call arguments are passed. The generated kernel and annotated functions
+are then cached with the types of the call arguments as key. Thus,
+the function ``f`` defined in the previous section can also be defined
+as follows::
+
+    @annotate
+    def f(i, x):
+        return x[i]*2.0
+
+While using in-built functions such as ``sin``, ``cos``, ``abs`` etc. it is
+recommended that you store the value in a variable or appropriate type
+before returning it. If not the return type will default to ``double``.
+For example,::
+
+    @annotate
+    def f(i, x):
+        return abs(x[i])
+
+This will set the return type of function ``f`` to the default
+type, ``double``. To avoid this problem, one could define ``f`` instead as,::
+
+    @annotate
+    def f(i, x):
+        y = declare('int')
+        y = abs(x[i])
+        return y
+
+Currently JIT support is only limited to the common parallel algorithms explained
+in a later section.
 
 Declaring variables
 -------------------
