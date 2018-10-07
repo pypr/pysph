@@ -415,7 +415,6 @@ def get_particle_array_swe(constants=None, **props):
         'dw_inner_reimann', 'u_inner_reimann', 'v_inner_reimann', 'shep_corr',
         'is_wall_boun_pa', 'dw_at_t', 'pa_out_of_domain', 'ob_pa_to_remove',
         'ob_pa_to_tag', 'pa_alpha_zero', 'fluid_pa_to_remove']
-]
 
     Parameters
     ----------
