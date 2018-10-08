@@ -8,7 +8,7 @@ from ..config import get_config, use_config
 from ..array import wrap
 from ..types import annotate
 from ..parallel import Elementwise, Reduction, Scan
-from test_jit import g
+from .test_jit import g
 
 
 @annotate(x='int', return_='int')
@@ -483,26 +483,6 @@ class TestParallelUtilsJIT(ParallelUtilsBase, unittest.TestCase):
 
         # Then
         self.assertAlmostEqual(result, 499500)
-
-    def _check_reduction_with_external_func_jit(self, backend):
-        # Given
-        from math import cos, sin
-        x = np.linspace(0, 1, 1000) / 1000
-        y = x.copy()
-        x, y = wrap(x, y, backend=backend)
-
-        @annotate
-        def map(i=0, x=[0.0], y=[0.0]):
-            result = declare('double')
-            result = cos(x[i]) * sin(y[i])
-            return g(result)
-
-        # When
-        r = Reduction('a+b', map_func=map, backend=backend)
-        result = r(x, y)
-
-        # Then
-        self.assertAlmostEqual(result, 0.5, 6)
 
     def _test_scan(self, backend):
         # Given
