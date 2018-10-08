@@ -164,9 +164,9 @@ class RigidBodyMoments(Equation):
             dst.force[base + 2] = fz
 
             # Acceleration of CM.
-            dst.ac[base + 0] = fx/m
-            dst.ac[base + 1] = fy/m
-            dst.ac[base + 2] = fz/m
+            #dst.ac[base + 0] = fx/m
+            #dst.ac[base + 1] = fy/m
+            #dst.ac[base + 2] = fz/m
 
             # Find torque about the Center of Mass and not origin.
             tx = d_mi[base_mi + 13]
@@ -199,10 +199,10 @@ class RigidBodyMoments(Equation):
             tmp12 = -tmp11*wx + tmp8*wy + tz
             tmp13 = tmp11*wz - tmp7*wy + tx
             tmp14 = ixx*iyz - tmp4
-            dst.omega_dot[base + 0] = tmp5*(-tmp10*tmp12 -
-                                            tmp13*(iyy*izz - tmp0) + tmp6*tmp9)
-            dst.omega_dot[base + 1] = tmp5*(tmp12*tmp14 +
-                                            tmp13*tmp6 - tmp9*(ixx*izz - tmp2))
+            #dst.omega_dot[base + 0] = tmp5*(-tmp10*tmp12 -
+            #                                tmp13*(iyy*izz - tmp0) + tmp6*tmp9)
+            #dst.omega_dot[base + 1] = tmp5*(tmp12*tmp14 +
+            #                                tmp13*tmp6 - tmp9*(ixx*izz - tmp2))
             dst.omega_dot[base + 2] = tmp5*(-tmp10*tmp13 -
                                             tmp12*(-tmp1 + tmp3) + tmp14*tmp9)
         if dst.gpu:
@@ -294,7 +294,7 @@ class ViscosityRigidBody(Equation):
              s_idx, s_V, s_fx, s_fy, s_fz,
              EPS, VIJ, XIJ, R2IJ, DWIJ):
         phi_b = self.rho0/(s_V[s_idx]*d_rho[d_idx])
-        vijdotxij = min(VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2], 0.0)
+        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
 
         fac = self.nu*phi_b*vijdotxij/(R2IJ + EPS)
         ax = fac*DWIJ[0]
