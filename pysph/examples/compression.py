@@ -30,7 +30,7 @@ co = 10
 hdx = 1.0
 dx = 0.004
 
-tf = 3.6
+tf = 3.524
 
 class Compression(Application):
     def add_user_options(self, group):
@@ -69,7 +69,7 @@ class Compression(Application):
         m0 = rho0 * dx**3
 
         # FLUID
-        n = np.arange(1,self.options.N,1)
+        n = np.arange(0,self.options.N,1)
         x = np.arange(0.5*dx,self.D-0.25*dx,dx)
         x,n = np.meshgrid(x,n)
         r = self.r*np.sqrt(n/self.options.N)
@@ -83,8 +83,8 @@ class Compression(Application):
 
         # TOP WALL
         N = (self.R/self.r)**2*self.options.N
-        n = np.arange(1,N,1)
-        x = np.array([self.D+0.5*dx,self.D+1.5*dx,self.D+2.5*dx])
+        n = np.arange(0,N,1)
+        x = np.array([self.D+0.5*dx,self.D+1.5*dx])
         x,n = np.meshgrid(x,n)
         r = self.R*np.sqrt(n/N)
         theta = 2*np.pi/golden_ratio**2*n
@@ -97,8 +97,8 @@ class Compression(Application):
 
         # BOTTOM WALL
         N = (self.R/self.r)**2*self.options.N
-        n = np.arange(1,N,1)
-        x = np.array([-2.5*dx,-1.5*dx, -0.5*dx])
+        n = np.arange(0,N,1)
+        x = np.array([-1.5*dx, -0.5*dx])
         x,n = np.meshgrid(x,n)
         r = self.R*np.sqrt(n/N)
         theta = 2*np.pi/golden_ratio**2*n
@@ -112,6 +112,8 @@ class Compression(Application):
         self.scheme.setup_properties([fluid, top_wall, bottom_wall])
         top_wall.ax[:] = u0
         top_wall.u[:] = u0
+        print("Fluid : %d particles"% (fluid.get_number_of_particles()))
+        print("Molds : %d particles"% (top_wall.get_number_of_particles()))
         return [fluid, top_wall, bottom_wall]
 
     def post_process(self, info_file_or_dir):
@@ -130,11 +132,15 @@ class Compression(Application):
                     force += press*dx*dx
             F.append(force)
 
+        csv_file = os.path.join(self.output_dir, "force.csv")
+        np.savetxt(csv_file, np.c_[time,F], delimiter=',')
+
+
         plt.figure()
         plt.plot(time, F, '-k')
         plt.title("Compression Force")
-        plt.xlabel('Time')
-        plt.ylabel('Force')
+        plt.xlabel('Time t in s')
+        plt.ylabel('Force F in N')
         plt.tight_layout()
         pdf_fig = os.path.join(self.output_dir, "force.pdf")
         plt.savefig(pdf_fig)
@@ -145,7 +151,65 @@ class Compression(Application):
         except ImportError:
             print("Did not write tikz figure.")
 
+        # plot radius
+        time = []
+        R = []
+
+        for sd, array in iter_output(self.output_files, 'fluid'):
+            t = sd['t']
+            time.append(t)
+            y,z = array.get('y', 'z')
+            R.append(max(np.sqrt(y**2+z**2)))
+
+        csv_file = os.path.join(self.output_dir, "radius.csv")
+        np.savetxt(csv_file, np.c_[time,R], delimiter=',')
+
+        plt.figure()
+        plt.plot(time, R, '-k')
+        plt.title("Radius (max. radial position of particle)")
+        plt.xlabel('Time t in s')
+        plt.ylabel('Radius R in m')
+        plt.tight_layout()
+        pdf_fig = os.path.join(self.output_dir, "radius.pdf")
+        plt.savefig(pdf_fig)
+        try:
+            tex_fig = os.path.join(self.output_dir, "radius.tex")
+            from matplotlib2tikz import save as tikz_save
+            tikz_save(tex_fig)
+        except ImportError:
+            print("Did not write tikz figure.")
+
+        # plot pressure at center
+        time = []
+        press = []
+
+        for sd, array in iter_output(self.output_files, 'fluid'):
+            t = sd['t']
+            time.append(t)
+            p, y, z = array.get('p', 'y', 'z')
+            idx = np.where(np.sqrt(y**2+z**2)< 0.1*self.D)
+            press.append(np.average(p[idx]))
+
+        csv_file = os.path.join(self.output_dir, "pressure.csv")
+        np.savetxt(csv_file, np.c_[time,press], delimiter=',')
+
+
+        plt.figure()
+        plt.plot(time, press, '-k')
+        plt.title("Pressure at center")
+        plt.xlabel('Time t in s')
+        plt.ylabel('Pressure p in Pa')
+        plt.tight_layout()
+        pdf_fig = os.path.join(self.output_dir, "pressure.pdf")
+        plt.savefig(pdf_fig)
+        try:
+            tex_fig = os.path.join(self.output_dir, "pressure.tex")
+            from matplotlib2tikz import save as tikz_save
+            tikz_save(tex_fig)
+        except ImportError:
+            print("Did not write tikz figure.")
+
 if __name__ == '__main__':
     app = Compression()
     app.run()
-    #app.post_process(app.info_filename)
+    app.post_process(app.info_filename)
