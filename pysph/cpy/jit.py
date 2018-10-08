@@ -87,7 +87,7 @@ class AnnotationHelper(ast.NodeVisitor):
             type defaulting to 'double'. If the type is not 'double', store
             the value in a variable of appropriate type and use the variable
             '''
-        )
+                            )
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)

@@ -581,7 +581,6 @@ class TestParallelUtilsJIT(ParallelUtilsBase, unittest.TestCase):
         np.testing.assert_equal(unique_ary_actual,
                                 unique_ary.data[:unique_count])
 
-
     def _test_segmented_scan(self, backend):
         # Given
         a = np.random.randint(0, 100, 50000, dtype=np.int32)
@@ -617,7 +616,6 @@ class TestParallelUtilsJIT(ParallelUtilsBase, unittest.TestCase):
         # Then
         np.testing.assert_equal(output_actual, a.data)
 
-
     def _test_scan_last_item(self, backend):
         # Given
         a = np.random.randint(0, 100, 50000, dtype=np.int32)
@@ -639,5 +637,3 @@ class TestParallelUtilsJIT(ParallelUtilsBase, unittest.TestCase):
 
         # Then
         np.testing.assert_equal(expect, a.data)
-
-
