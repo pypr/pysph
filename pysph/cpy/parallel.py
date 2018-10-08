@@ -666,8 +666,13 @@ class ReductionBase(object):
 
     def _correct_return_type(self, c_data):
         code = self.tp.blocks[-1].code.splitlines()
-        code[0] = "cdef inline {type} {name}({args}) nogil:".format(
-            type=self.type, name=self.func.__name__, args=', '.join(c_data[0])
+        if self._config.use_openmp:
+            gil = " nogil"
+        else:
+            gil = ""
+        code[0] = "cdef inline {type} {name}({args}){gil}:".format(
+            type=self.type, name=self.func.__name__, args=', '.join(c_data[0]),
+            gil=gil
         )
         self.tp.blocks[-1].code = '\n'.join(code)
 
@@ -775,9 +780,13 @@ class ScanBase(object):
 
     def _correct_return_type(self, c_data, modifier):
         code = self.tp.blocks[-1].code.splitlines()
-        code[0] = "cdef inline {type} {name}_{modifier}({args}) nogil:".format(
+        if self._config.use_openmp:
+            gil = " nogil"
+        else:
+            gil = ""
+        code[0] = "cdef inline {type} {name}_{modifier}({args}){gil}:".format(
             type=self.type, name=self.name, modifier=modifier,
-            args=', '.join(c_data[0])
+            args=', '.join(c_data[0]), gil=gil
         )
         self.tp.blocks[-1].code = '\n'.join(code)
 
