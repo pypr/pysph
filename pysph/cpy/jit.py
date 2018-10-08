@@ -87,7 +87,7 @@ class AnnotationHelper(ast.NodeVisitor):
             type defaulting to 'double'. If the type is not 'double', store
             the value in a variable of appropriate type and use the variable
             '''
-        )
+                            )
 
     def get_type(self, type_str):
         kind, address_space, ctype, shape = get_declare_info(type_str)
@@ -221,49 +221,10 @@ class AnnotationHelper(ast.NodeVisitor):
             self.arg_types['return_'] = 'double'
 
 
-def gather_external_funcs(f_helper, external_f):
-    node_name = f_helper.func.__name__
-    if node_name not in external_f:
-        external_f[node_name] = []
-    for name, external in f_helper.external_funcs.items():
-        external_f[node_name].append(external.func)
-        gather_external_funcs(external, external_f)
-
-
-class TranspilerJIT(Transpiler):
-    def __init__(self, backend='cython', incl_cluda=True):
-        """Constructor.
-
-        Parameters
-        ----------
-
-        backend: str: Backend to use.
-            Can be one of 'cython', 'opencl', 'cuda' or 'python'
-        """
-        Transpiler.__init__(self, backend=backend, incl_cluda=incl_cluda)
-
-    def _handle_external(self, func):
-        syms, implicit, calls, externs = get_external_symbols_and_calls(
-            func, self.backend
-        )
-
-        if implicit:
-            msg = ('Warning: the following symbols are implicitly defined.\n'
-                   '  %s\n'
-                   'You may want to explicitly declare/define them.')
-            print(msg)
-
-        self._handle_externs(externs)
-        self._handle_symbols(syms)
-
-        for f in self.external_funcs[func.__name__]:
-            self.add(f)
-
-
 class ElementwiseJIT(parallel.ElementwiseBase):
     def __init__(self, func, backend='cython'):
         backend = array.get_backend(backend)
-        self.tp = TranspilerJIT(backend=backend)
+        self.tp = Transpiler(backend=backend)
         self.backend = backend
         self.name = func.__name__
         self.func = func
@@ -291,9 +252,6 @@ class ElementwiseJIT(parallel.ElementwiseBase):
             helper = AnnotationHelper(self.func, arg_types)
             helper.annotate()
             self.func = helper.func
-            external_funcs = {}
-            gather_external_funcs(helper, external_funcs)
-            self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
@@ -367,9 +325,6 @@ class ReductionJIT(parallel.ReductionBase):
             helper = AnnotationHelper(self.func, arg_types)
             helper.annotate()
             self.func = helper.func
-            external_funcs = {}
-            gather_external_funcs(helper, external_funcs)
-            self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
@@ -452,7 +407,6 @@ class ScanJIT(parallel.ScanBase):
 
     @memoize(key=kernel_cache_key_kwargs, use_kwargs=True)
     def _generate_kernel(self, **kwargs):
-        external_funcs = {}
         if self.input_func is not None:
             arg_types = self.get_type_info_from_kwargs(
                 self.input_func, **kwargs)
@@ -460,7 +414,6 @@ class ScanJIT(parallel.ScanBase):
             helper = AnnotationHelper(self.input_func, arg_types)
             helper.annotate()
             self.input_func = helper.func
-            gather_external_funcs(helper, external_funcs)
 
         if self.output_func is not None:
             arg_types = self.get_type_info_from_kwargs(
@@ -468,7 +421,6 @@ class ScanJIT(parallel.ScanBase):
             helper = AnnotationHelper(self.output_func, arg_types)
             helper.annotate()
             self.output_func = helper.func
-            gather_external_funcs(helper, external_funcs)
 
         if self.is_segment_func is not None:
             arg_types = self.get_type_info_from_kwargs(
@@ -477,9 +429,7 @@ class ScanJIT(parallel.ScanBase):
             helper = AnnotationHelper(self.is_segment_func, arg_types)
             helper.annotate()
             self.is_segment_func = helper.func
-            gather_external_funcs(helper, external_funcs)
 
-        self.tp.external_funcs = external_funcs
         return self._generate()
 
     def _massage_arg(self, x):
