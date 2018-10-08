@@ -16,6 +16,11 @@ from pysph.sph.equation import get_array_names
 from pysph.cpy.api import CythonGenerator, get_func_definition
 
 
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
+)
+
+
 class IntegratorCythonHelper(object):
     """A helper that generates Cython code for the Integrator class.
     """
@@ -87,8 +92,11 @@ class IntegratorCythonHelper(object):
 
     def get_args(self, dest, method):
         stepper = self.object.steppers[dest]
-        meth = getattr(stepper, method)
-        return inspect.getargspec(meth).args
+        meth = getattr(stepper, method, None)
+        if meth is None:
+            return []
+        else:
+            return getfullargspec(meth).args
 
     def get_array_declarations(self, method):
         arrays = set()
@@ -121,14 +129,31 @@ class IntegratorCythonHelper(object):
         )
         return c
 
+    def get_py_stage_code(self, dest, method):
+        stepper = self.object.steppers[dest]
+        method = 'py_' + method
+        if hasattr(stepper, method):
+            return 'self.steppers["{dest}"].{method}(dst.array, t, dt)'.format(
+                dest=dest, method=method
+            )
+        else:
+            return ''
+
+    def has_stepper_loop(self, dest, method):
+        return hasattr(self.object.steppers[dest], method)
+
     def get_stepper_method_wrapper_names(self):
         """Returns the names of the methods we should wrap.  For a 2 stage
         method this will return ('initialize', 'stage1', 'stage2')
         """
         methods = set()
         for stepper in self.object.steppers.values():
-            stages = [x for x in dir(stepper)
-                      if x.startswith('stage') or x == 'initialize']
+            stages = []
+            for x in dir(stepper):
+                if x.startswith('py_stage'):
+                    stages.append(x[3:])
+                elif x.startswith('stage') or x == 'initialize':
+                    stages.append(x)
             methods.update(stages)
         return list(sorted(methods))
 

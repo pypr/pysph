@@ -20,6 +20,35 @@ def _to_str(s):
         return str(s)
 
 
+def gather_array_data(all_array_data, comm):
+    """Given array_data from the current processor and an MPI
+    communicator,return a joined array_data from all processors
+    on rank 0 and the same array_data on the other machines.
+    """
+
+    array_names = all_array_data.keys()
+
+    # gather the data from all processors
+    collected_data = comm.gather(all_array_data, root=0)
+
+    if comm.Get_rank() == 0:
+        all_array_data = {}
+        size = comm.Get_size()
+
+        # concatenate the arrays
+        for array_name in array_names:
+            array_data = {}
+            all_array_data[array_name] = array_data
+
+            _props = collected_data[0][array_name].keys()
+            for prop in _props:
+                data = [collected_data[pid][array_name][prop]
+                        for pid in range(size)]
+                prop_arr = numpy.concatenate(data)
+                array_data[prop] = prop_arr
+    return all_array_data
+
+
 class Output(object):
     """ Class that handles output for simulation """
     def __init__(self, detailed_output=False, only_real=True, mpi_comm=None,
@@ -39,43 +68,15 @@ class Output(object):
                 )
         mpi_comm = self.mpi_comm
         if mpi_comm is not None:
-            self.all_array_data = self._gather_array_data(
-                    self.all_array_data, mpi_comm
-                    )
+            self.all_array_data = gather_array_data(
+                self.all_array_data, mpi_comm
+            )
         self.solver_data = solver_data
         if mpi_comm is None or mpi_comm.Get_rank() == 0:
             self._dump(fname)
 
     def load(self, fname):
         return self._load(fname)
-
-    def _gather_array_data(self, all_array_data, comm):
-        """Given array_data from the current processor and an MPI
-        communicator,return a joined array_data from all processors
-        on rank 0 and the same array_data on the other machines.
-        """
-
-        array_names = all_array_data.keys()
-
-        # gather the data from all processors
-        collected_data = comm.gather(all_array_data, root=0)
-
-        if comm.Get_rank() == 0:
-            all_array_data = {}
-            size = comm.Get_size()
-
-            # concatenate the arrays
-            for array_name in array_names:
-                array_data = {}
-                all_array_data[array_name] = array_data
-
-                _props = collected_data[0][array_name].keys()
-                for prop in _props:
-                    data = [collected_data[pid][array_name][prop]
-                            for pid in range(size)]
-                    prop_arr = numpy.concatenate(data)
-                    array_data[prop] = prop_arr
-        return all_array_data
 
     def _dump(self, fname):
         """ Implement the method for writing the output to a file here """
@@ -84,6 +85,32 @@ class Output(object):
     def _load(self, fname):
         """ Implement the method for loading from file here """
         raise NotImplementedError()
+
+
+def _dict_bytes_to_str(d):
+    # This craziness is needed as if the npz file is saved in Python2
+    # then all the strings are bytes and if this is loaded in Python 3,
+    # the keys will be bytes and not strings leading to strange errors.
+    res = {}
+    for key, value in d.items():
+        if isinstance(value, dict):
+            value = _dict_bytes_to_str(value)
+        if isinstance(value, bytes):
+            value = _to_str(value)
+        if isinstance(value, list):
+            if value and isinstance(value[0], bytes):
+                value = [_to_str(x) for x in value]
+        res[_to_str(key)] = value
+    return res
+
+
+def _get_dict_from_arrays(arrays):
+    arrays.shape = (1,)
+    res = arrays[0]
+    if res and isinstance(list(res.keys())[0], bytes):
+        return _dict_bytes_to_str(res)
+    else:
+        return res
 
 
 class NumpyOutput(Output):
@@ -97,10 +124,7 @@ class NumpyOutput(Output):
         save_method(filename, version=2, **output_data)
 
     def _load(self, fname):
-        def _get_dict_from_arrays(arrays):
-            arrays.shape = (1,)
-            return arrays[0]
-        data = numpy.load(fname)
+        data = numpy.load(fname, encoding='bytes')
 
         if 'version' not in data.files:
             msg = "Wrong file type! No version number recorded."
@@ -122,15 +146,14 @@ class NumpyOutput(Output):
             particles = _get_dict_from_arrays(data["particles"])
 
             for array_name, array_info in particles.items():
+                for prop, data in array_info['arrays'].items():
+                    array_info['properties'][prop]['data'] = data
                 array = ParticleArray(name=array_name,
                                       constants=array_info["constants"],
-                                      **array_info["arrays"])
+                                      **array_info["properties"])
                 array.set_output_arrays(
                     array_info.get('output_property_arrays', [])
                 )
-                for prop, prop_info in array_info["properties"].items():
-                    if prop not in array_info["arrays"]:
-                        array.add_property(**prop_info)
                 ret["arrays"][array_name] = array
 
         else:
@@ -182,12 +205,16 @@ class HDFOutput(Output):
                 prop_name = _to_str(h5obj.attrs['name'])
                 type_ = _to_str(h5obj.attrs['type'])
                 default = h5obj.attrs['default']
+                stride = h5obj.attrs.get('stride', 1)
                 if h5obj.attrs['stored']:
                     output_array.append(_to_str(pname))
                     array.add_property(
-                            prop_name, type_, default, numpy.array(h5obj))
+                        prop_name, type=type_, default=default,
+                        data=numpy.array(h5obj),
+                        stride=stride
+                    )
                 else:
-                    array.add_property(prop_name, type_)
+                    array.add_property(prop_name, type=type_, stride=stride)
             array.set_output_arrays(output_array)
             particles[str(name)] = array
         return particles

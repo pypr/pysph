@@ -87,6 +87,15 @@ class EllipticalDrop(Application):
         self.dx = 0.025
         self.alpha = 0.1
 
+    def add_user_options(self, group):
+        group.add_argument(
+            "--nx", action="store", type=int, dest="nx", default=40,
+            help="Number of points along x direction. (default 40)"
+        )
+
+    def consume_user_options(self):
+        self.dx = 1.0/self.options.nx
+
     def create_scheme(self):
         wcsph = WCSPHScheme(
             ['fluid'], [], dim=2, rho0=self.ro, c0=self.co,
@@ -101,9 +110,10 @@ class EllipticalDrop(Application):
     def configure_scheme(self):
         scheme = self.scheme
         kernel = Gaussian(dim=2)
-        dt = 5e-6
         tf = 0.0076
+        dt = 0.25*self.hdx*self.dx/(141 + self.co)
         if self.options.scheme == 'wcsph':
+            scheme.configure(h0=self.hdx*self.dx)
             scheme.configure_solver(
                 kernel=kernel, integrator_cls=EPECIntegrator, dt=dt, tf=tf,
                 adaptive_timestep=True, cfl=0.3, n_damp=50,

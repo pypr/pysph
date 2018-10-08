@@ -20,11 +20,9 @@ from cpython cimport PyObject
 from cpython cimport *
 from cython cimport *
 
-# Parallel imports
-try:
-    from mpi4py import MPI
-except ImportError:
-    MPI = None
+from pysph.cpy.config import get_config
+from pysph.cpy.array import Array, get_backend, to_device
+from pysph.base.device_helper import DeviceHelper
 
 # Maximum value of an unsigned int
 cdef extern from "limits.h":
@@ -106,7 +104,7 @@ cdef class ParticleArray:
     # `object` interface
     ######################################################################
     def __init__(self, str name='', default_particle_tag=Local,
-                 constants=None, **props):
+                 constants=None, backend=None, **props):
         """Constructor
 
         Parameters
@@ -128,13 +126,13 @@ cdef class ParticleArray:
             for each property.
 
         """
+        self.backend = get_backend(backend)
         self.time = 0.0
         self.name = name
-        self.is_dirty = True
-        self.indices_invalid = True
 
         self.properties = {}
         self.default_values = {'tag':default_particle_tag}
+        self.stride = {}
 
         self._initialize(**props)
 
@@ -148,6 +146,12 @@ cdef class ParticleArray:
 
         # list of output property arrays
         self.output_property_arrays = []
+
+        if self.backend is not 'cython':
+            h = DeviceHelper(self, backend=self.backend)
+            self.set_device_helper(h)
+        else:
+            self.gpu = None
 
     def __getattr__(self, name):
         """Convenience, to access particle property arrays as an attribute
@@ -182,6 +186,7 @@ cdef class ParticleArray:
             pinfo['type'] = arr.get_c_type()
             pinfo['data'] = arr.get_npy_array()
             pinfo['default'] = self.default_values[prop]
+            pinfo['stride'] = self.stride.get(prop, 1)
             props[prop] = pinfo
 
         d['properties'] = props
@@ -201,8 +206,6 @@ cdef class ParticleArray:
         self.constants = {}
         self.property_arrays = []
         self.default_values = {}
-        self.is_dirty = True
-        self.indices_invalid = True
         self.num_real_particles = 0
 
         self.name = d['name']
@@ -255,10 +258,11 @@ cdef class ParticleArray:
             if isinstance(prop, dict):
                 if 'data' in prop:
                     d = prop['data']
+                    stride = prop.get('stride', 1)
                     if d is not None:
                         d = numpy.ravel(prop['data'])
                         prop['data'] = d
-                        nv = max(nv, len(d))
+                        nv = max(nv, len(d)//stride)
                 _props[name] = prop
             elif prop is not None:
                 d = numpy.ravel(prop)
@@ -364,23 +368,19 @@ cdef class ParticleArray:
 
         # number of particles
         num_particles = self.get_number_of_particles(only_real)
-        if self.gpu is not None:
+        if self.gpu is not None and self.backend is not 'cython':
             self.gpu.pull(*props)
 
         # add the property arrays
         for prop in props:
-            prop_array = self.properties[ prop ].get_npy_array()[:num_particles]
-            arrays[prop] = prop_array
+            stride = self.stride.get(prop, 1)
+            prop_array = self.properties[prop].get_npy_array()
+            arrays[prop] = prop_array[:num_particles*stride]
 
         return arrays
 
-    cpdef set_dirty(self, bint value):
-        """Set the is_dirty variable to given value """
-        self.is_dirty = value
-
-    cpdef set_indices_invalid(self, bint value):
-        """Set the indices_invalid to the given value """
-        self.indices_invalid = value
+    cpdef set_num_real_particles(self, long value):
+        self.num_real_particles = value
 
     cpdef has_array(self, str arr_name):
         """Returns true if the array arr_name is present """
@@ -392,9 +392,6 @@ cdef class ParticleArray:
         tag_def_values = self.default_values['tag']
         self.default_values.clear()
         self.default_values = {'tag':tag_def_values, 'pid':0, 'gid':_UINT_MAX}
-
-        self.is_dirty = True
-        self.indices_invalid = True
 
     cpdef set_time(self, double time):
         self.time = time
@@ -419,12 +416,17 @@ cdef class ParticleArray:
 
     cpdef int get_number_of_particles(self, bint real=False):
         """ Return the number of particles """
+        if self.gpu is not None and self.backend is not 'cython':
+            return self.gpu.get_number_of_particles()
         if real:
             return self.num_real_particles
         else:
-            if len(self.properties) > 0:
-                prop0 = list(self.properties.values())[0]
-                return prop0.length
+            if 'tag' in self.properties:
+                return self.properties['tag'].length
+            elif len(self.properties) > 0:
+                prop = list(self.properties.keys())[0]
+                stride = self.stride.get(prop, 1)
+                return self.properties[prop].length//stride
             else:
                 return 0
 
@@ -456,6 +458,16 @@ cdef class ParticleArray:
                 array.remove(sorted_indices)
 
         """
+        if self.gpu is not None and self.backend is not 'cython':
+            if type(indices) != Array:
+                if isinstance(indices, BaseArray):
+                    indices = indices.get_npy_array()
+                else:
+                    indices = numpy.asarray(indices)
+                indices = to_device(indices.astype(numpy.uint32),
+                                    backend=self.backend)
+            return self.gpu.remove_particles(indices)
+
         cdef BaseArray index_list
         if isinstance(indices, BaseArray):
             index_list = indices
@@ -473,21 +485,17 @@ cdef class ParticleArray:
         if index_list.length > self.get_number_of_particles():
             msg = 'Number of particles to be removed is greater than'
             msg += 'number of particles in array'
-            raise ValueError, msg
+            raise ValueError(msg)
 
         sorted_indices = numpy.sort(index_list.get_npy_array())
         num_arrays = len(self.properties)
 
-        property_arrays = list(self.properties.values())
-
-        for i in range(num_arrays):
-            prop_array = property_arrays[i]
-            prop_array.remove(sorted_indices, 1)
+        for name, prop_array in self.properties.items():
+            stride = self.stride.get(name, 1)
+            prop_array.remove(sorted_indices, 1, stride)
 
         if index_list.length > 0:
             self.align_particles()
-            self.is_dirty = True
-            self.indices_invalid = True
 
     cpdef remove_tagged_particles(self, int tag):
         """ Remove particles that have the given tag.
@@ -499,6 +507,8 @@ cdef class ParticleArray:
             the type of particles that need to be removed.
 
         """
+        if self.gpu is not None and self.backend is not 'cython':
+            return self.gpu.remove_tagged_particles(tag)
         cdef LongArray indices = LongArray()
         cdef IntArray tag_array = self.properties['tag']
         cdef int *tagarrptr = tag_array.get_data_ptr()
@@ -529,42 +539,59 @@ cdef class ParticleArray:
          - all properties should have same length arrays.
          - all properties should already be present in this particles array.
            if new properties are seen, an exception will be raised.
-           properties.
 
         """
-        cdef int num_extra_particles, old_num_particles, new_num_particles
         cdef str prop
         cdef BaseArray arr
-        cdef numpy.ndarray s_arr, nparr
 
         if len(particle_props) == 0:
             return 0
 
+        if self.gpu is not None and self.backend is not 'cython':
+            gpu_particle_props = {}
+            for prop, ary in particle_props.items():
+                if prop in self.gpu.properties:
+                    dtype = self.gpu.get_device_array(prop).dtype
+                else:
+                    dtype = self.default_values[prop]
+                gpu_particle_props[prop] = to_device(
+                        numpy.array(ary, dtype=dtype),
+                        backend=self.backend)
+            return self.gpu.add_particles(**gpu_particle_props)
+
+        cdef int num_extra_particles, old_num_particles, new_num_particles
+        cdef numpy.ndarray s_arr, nparr
+
         # check if the input properties are valid.
+        prop = ''
         for prop in particle_props:
             self._check_property(prop)
 
-        num_extra_particles = len(list(particle_props.values())[0])
+        if len(prop) == 0:
+            num_extra_particles = 0
+        else:
+            stride = self.stride.get(prop, 1)
+            num_extra_particles = len(particle_props[prop])//stride
         old_num_particles = self.get_number_of_particles()
         new_num_particles = num_extra_particles + old_num_particles
 
         for prop in self.properties:
             arr = <BaseArray>PyDict_GetItem(self.properties, prop)
+            stride = self.stride.get(prop, 1)
 
             if PyDict_Contains(particle_props, prop)== 1:
                 d_type = arr.get_npy_array().dtype
                 s_arr = numpy.asarray(particle_props[prop], dtype=d_type)
                 arr.extend(s_arr)
             else:
-                arr.resize(new_num_particles)
+                arr.resize(new_num_particles*stride)
                 # set the properties of the new particles to the default ones.
                 nparr = arr.get_npy_array()
-                nparr[old_num_particles:] = self.default_values[prop]
+                nparr[old_num_particles*stride:] = self.default_values[prop]
 
         if num_extra_particles > 0:
             # make sure particles are aligned properly.
             self.align_particles()
-            self.is_dirty = True
 
         return 0
 
@@ -574,6 +601,10 @@ cdef class ParticleArray:
         properties that are not there in self will be added
         """
         if parray.get_number_of_particles() == 0:
+            return 0
+
+        if self.gpu is not None and self.backend is not 'cython':
+            self.gpu.append_parray(parray)
             return 0
 
         cdef int num_extra_particles = parray.get_number_of_particles()
@@ -592,56 +623,60 @@ cdef class ParticleArray:
             else:
                 arr = None
 
+            stride = self.stride.get(prop_name, 1)
             if arr is not None:
                 source = <BaseArray>PyDict_GetItem(parray.properties, prop_name)
                 nparr_source = source.get_npy_array()
                 nparr_dest = arr.get_npy_array()
-                nparr_dest[old_num_particles:] = nparr_source
+                nparr_dest[old_num_particles*stride:] = nparr_source
             else:
                 # meaning this property is not there in self.
+                stride = parray.stride.get(prop_name, 1)
                 self.add_property(name=prop_name,
                                   type=parray.properties[prop_name].get_c_type(),
-                                  default=parray.default_values[prop_name]
+                                  default=parray.default_values[prop_name],
+                                  stride=stride
                                   )
                 # now add the values to the end of the created array
                 dest = <BaseArray>PyDict_GetItem(self.properties, prop_name)
                 nparr_dest = dest.get_npy_array()
                 source = <BaseArray>PyDict_GetItem(parray.properties, prop_name)
                 nparr_source = source.get_npy_array()
-                nparr_dest[old_num_particles:] = nparr_source
+                nparr_dest[old_num_particles*stride:] = nparr_source
 
         for const in parray.constants:
             self.constants.setdefault(const, parray.constants[const])
 
         if num_extra_particles > 0:
             self.align_particles()
-            self.is_dirty = True
 
         return 0
 
     cpdef extend(self, int num_particles):
         """ Increase the total number of particles by the requested amount
 
-        New particles are added at the end of the list, you may have to manually
-        call align_particles later.
+        New particles are added at the end of the list, you will have to manually
+        call align_particles later in order to update the number of particles.
         """
         if num_particles <= 0:
             return
+
+        if self.gpu is not None and self.backend is not 'cython':
+            self.gpu.extend(num_particles)
+            return 0
 
         cdef int old_size = self.get_number_of_particles()
         cdef int new_size = old_size + num_particles
         cdef BaseArray arr
         cdef numpy.ndarray nparr
+        cdef int stride
 
         for key in self.properties:
+            stride = self.stride.get(key, 1)
             arr = self.properties[key]
-            arr.resize(new_size)
+            arr.resize(new_size*stride)
             nparr = arr.get_npy_array()
-            nparr[old_size:] = self.default_values[key]
-
-    def get_property_index(self, prop_name):
-        """ Get the index of the property in the property array """
-        return self.properties.get(prop_name)
+            nparr[old_size*stride:] = self.default_values[key]
 
     cdef numpy.ndarray _get_real_particle_prop(self, str prop_name):
         """ get the npy array of property corresponding to only real particles
@@ -651,8 +686,9 @@ cdef class ParticleArray:
         """
         cdef BaseArray prop_array
         prop_array = self.properties.get(prop_name)
+        stride = self.stride.get(prop_name, 1)
         if prop_array is not None:
-            return prop_array.get_npy_array()[:self.num_real_particles]
+            return prop_array.get_npy_array()[:self.num_real_particles*stride]
         else:
             return None
 
@@ -685,7 +721,7 @@ cdef class ParticleArray:
         cdef int nargs = len(args)
         cdef list result = []
         cdef str arg
-        cdef int i
+        cdef int i, stride
         cdef BaseArray arg_array
 
         if nargs == 0:
@@ -695,11 +731,11 @@ cdef class ParticleArray:
             for i in range(nargs):
                 arg = args[i]
                 self._check_property(arg)
-
+                stride = self.stride.get(arg, 1)
                 if arg in self.properties:
                     arg_array = self.properties[arg]
                     result.append(
-                        arg_array.get_npy_array()[:self.num_real_particles])
+                        arg_array.get_npy_array()[:self.num_real_particles*stride])
 
                 else:
                     result.append(self.constants[arg].get_npy_array())
@@ -762,10 +798,6 @@ cdef class ParticleArray:
 
             # if the tag property is being set, the alignment will have to be
             # changed.
-            if prop == 'tag':
-                self.align_particles()
-            if prop == 'x' or prop == 'y' or prop == 'z':
-                self.set_dirty(True)
 
     cpdef BaseArray get_carray(self, str prop):
         """Return the c-array for the property or constant.
@@ -803,12 +835,16 @@ cdef class ParticleArray:
         array_data = numpy.ravel(data)
         self.constants[name] = self._create_c_array_from_npy_array(array_data)
         if self.gpu is not None:
-            self.gpu.add_prop(name, self.constants[name])
+            self.gpu.add_const(name, self.constants[name])
 
-    cpdef add_property(self, str name, str type='double', default=None, data=None):
+    cpdef add_property(self, str name, str type='double', default=None, data=None,
+                       stride=1):
         """Add a new property to the particle array.
 
-        If a `default` is not supplied 0 is assumed.
+        If a `default` is not supplied 0 is assumed.  The stride is useful when
+        many elements are needed per particle.  For example if stride is 3 then
+        3 elements are allocated per particle.
+
 
         Parameters
         ----------
@@ -822,6 +858,8 @@ cdef class ParticleArray:
             specifying the default value of this property.
         data : ndarray
             specifying the data associated with each particle.
+        stride : int
+            the number of elements per particle.
 
         Notes
         -----
@@ -861,7 +899,7 @@ cdef class ParticleArray:
             try:
                 len(data)
             except TypeError:
-                data = numpy.ones(self.get_number_of_particles())*data
+                data = numpy.ones(self.get_number_of_particles()*stride)*data
             else:
                 data = numpy.ravel(data)
 
@@ -870,21 +908,25 @@ cdef class ParticleArray:
             len(data) == 0):
             array_size_proper = True
         else:
-            if self.get_number_of_particles() == len(data):
+            if (self.get_number_of_particles() == len(data)//stride) and \
+               (len(data) % stride == 0):
                 array_size_proper = True
 
         if array_size_proper == False:
-            logger.error('Array sizes incompatible')
-            raise ValueError, 'Array sizes incompatible'
+            msg = 'Array sizes incompatible for property: %s' % name
+            logger.error(msg)
+            raise ValueError(msg)
 
         # setup the default values
         if default is None:
-            if PyDict_Contains(self.properties, prop_name) != 1:
+            if prop_name not in self.properties:
                 default = 0
             else:
-                default = <object>PyDict_GetItem(self.default_values, prop_name)
+                default = self.default_values[prop_name]
 
-        PyDict_SetItem(self.default_values, prop_name, default)
+        self.default_values[prop_name] = default
+        if stride != 1:
+            self.stride[name] = stride
 
         # array sizes are compatible, now resize the required arrays
         # appropriately and add.
@@ -892,7 +934,7 @@ cdef class ParticleArray:
             if data is None or len(data) == 0:
                 # if a property with that name already exists, do not do
                 # anything.
-                if PyDict_Contains(self.properties, prop_name) != 1:
+                if prop_name not in self.properties:
                     # just add the property with a zero array.
                     self.properties[prop_name] = self._create_carray(
                         data_type, 0, default)
@@ -901,15 +943,17 @@ cdef class ParticleArray:
                 # particles are currently present. First resize the current
                 # properties to this new length, and then add this new
                 # property.
+                n_elem = len(data)//stride
                 for prop in self.properties:
                     arr = self.properties[prop]
-                    arr.resize(len(data))
+                    prop_stride = self.stride.get(prop, 1)
+                    arr.resize(n_elem*prop_stride)
                     arr.get_npy_array()[:] = self.default_values[prop]
                 if prop_name == 'tag':
                     arr = numpy.asarray(data)
                     self.num_real_particles = numpy.sum(arr==Local)
                 else:
-                    self.num_real_particles = len(data)
+                    self.num_real_particles = n_elem
 
                 if self.properties.has_key(prop_name):
                     # just add the particles to the already existing array.
@@ -921,42 +965,43 @@ cdef class ParticleArray:
                     # if a type was specifed create that type of array
                     if data_type is None:
                         # get an array for this data
-                        arr = numpy.asarray(data, dtype=numpy.double)
                         self.properties[prop_name] = (
-                            self._create_c_array_from_npy_array(arr))
+                            self._create_c_array_from_npy_array(data))
                     else:
                         arr = self._create_carray(data_type, len(data), default)
                         np_arr = arr.get_npy_array()
-                        np_arr[:] = numpy.asarray(data)
+                        np_arr[:] = data
                         self.properties[prop_name] = arr
         else:
             if data is None or len(data) == 0:
                 # new property is added without any initial data, resize it to
                 # current particle count.
                 if not self.properties.has_key(prop_name):
-                    arr = self._create_carray(data_type,
-                                              self.get_number_of_particles(),
-                                              default)
+                    arr = self._create_carray(
+                        data_type, self.get_number_of_particles()*stride,
+                        default
+                    )
                     self.properties[prop_name] = arr
             else:
                 if self.properties.has_key(prop_name):
                     d_type = self.properties[prop_name].get_npy_array().dtype
                     arr = numpy.asarray(data, dtype=d_type)
                     self.properties[prop_name].set_data(arr)
-                    # realign the particles if the tag variable is being set.
                 else:
                     if data_type is None:
                         # just add the property array
-                        arr = numpy.asarray(data, dtype=numpy.double)
                         self.properties[prop_name] = (
-                            self._create_c_array_from_npy_array(arr))
+                            self._create_c_array_from_npy_array(data))
                     else:
                         arr = self._create_carray(data_type, len(data), default)
                         np_arr = arr.get_npy_array()
-                        arr.get_npy_array()[:] = numpy.asarray(data)
+                        arr.get_npy_array()[:] = data
                         self.properties[prop_name] = arr
+
         if self.gpu is not None:
             self.gpu.add_prop(prop_name, self.properties[prop_name])
+            if self.gpu.get_number_of_particles() == 0:
+                self.gpu.push()
 
     ######################################################################
     # Non-public interface
@@ -1070,14 +1115,16 @@ cdef class ParticleArray:
                          prop[i] = prop[index_arr[i]]
                          prop[index_arr[i]] = tmp
         """
+        if self.gpu is not None and self.backend is not 'cython':
+            self.gpu.align_particles()
+            return 0
+
         cdef size_t i, num_particles
         cdef size_t next_insert
-        cdef size_t num_arrays
         cdef int tmp
         cdef IntArray tag_arr
         cdef LongArray index_array
         cdef BaseArray arr
-        cdef list arrays
         cdef long num_real_particles = 0
         cdef long num_moves = 0
 
@@ -1107,16 +1154,11 @@ cdef class ParticleArray:
         self.num_real_particles = num_real_particles
         # we now have the aligned indices. Rearrange the particles
         # accordingly.
-        arrays = list(self.properties.values())
-        num_arrays = len(arrays)
-
-        for i in range(num_arrays):
-            arr = arrays[i]
-            arr.c_align_array(index_array)
 
         if num_moves > 0:
-            self.is_dirty = True
-            self.indices_invalid = True
+            for name, arr in self.properties.items():
+                stride = self.stride.get(name, 1)
+                arr.c_align_array(index_array, stride)
 
     cpdef ParticleArray extract_particles(self, indices, list props=None):
         """Create new particle array for particles with indices in index_array
@@ -1142,6 +1184,13 @@ cdef class ParticleArray:
              - copy the properties from the existing array to the new array.
 
         """
+        if self.gpu is not None and self.backend is not 'cython':
+            if type(indices) != Array:
+                indices = to_device(
+                        numpy.array(indices, dtype=numpy.uint32),
+                        backend=self.backend)
+            return self.gpu.extract_particles(indices, props=props)
+
         cdef BaseArray index_array
         if isinstance(indices, BaseArray):
             index_array = indices
@@ -1154,6 +1203,7 @@ cdef class ParticleArray:
         cdef list prop_names, output_arrays
         cdef BaseArray dst_prop_array, src_prop_array
         cdef str prop_type, prop
+        cdef int stride
 
         if props is None:
             prop_names = list(self.properties.keys())
@@ -1163,9 +1213,10 @@ cdef class ParticleArray:
         for prop in prop_names:
             prop_type = self.properties[prop].get_c_type()
             prop_default = self.default_values[prop]
+            stride = self.stride.get(prop, 1)
             result_array.add_property(name=prop,
                                       type=prop_type,
-                                      default=prop_default)
+                                      default=prop_default, stride=stride)
 
         # now we have the result array setup.
         # resize it
@@ -1178,7 +1229,8 @@ cdef class ParticleArray:
         for prop in prop_names:
             src_prop_array = self.get_carray(prop)
             dst_prop_array = result_array.get_carray(prop)
-            src_prop_array.copy_values(index_array, dst_prop_array)
+            stride = self.stride.get(prop, 1)
+            src_prop_array.copy_values(index_array, dst_prop_array, stride)
 
         for const in self.constants:
             result_array.constants[const] = self.constants[const]
@@ -1227,7 +1279,8 @@ cdef class ParticleArray:
             dst_array = self.get_carray(prop_name)
 
             if src_array != None and dst_array != None:
-                dst_array.copy_subset(src_array, start_index, end_index)
+                stride = self.stride.get(prop_name, 1)
+                dst_array.copy_subset(src_array, start_index, end_index, stride)
 
     cpdef copy_over_properties(self, dict props):
         """ Copy the properties from one set to another.
@@ -1248,46 +1301,35 @@ cdef class ParticleArray:
         """
         cdef DoubleArray dst, src
         cdef str prop
+        cdef int stride
 
         cdef long np = self.get_number_of_particles()
-        cdef long a
+        cdef long i
 
         for prop in props:
 
-            src = self.get_carray( prop )
-            dst = self.get_carray( props[prop] )
+            src = self.get_carray(prop)
+            dst = self.get_carray(props[prop])
+            stride = self.stride.get(prop, 1)
 
-            for a in range( np ):
-                dst.data[ a ] = src.data[ a ]
+            for i in range(np*stride):
+                dst.data[i] = src.data[i]
 
     cpdef set_to_zero(self, list props):
 
         cdef long np = self.get_number_of_particles()
-        cdef long a
+        cdef long i
+        cdef int stride
 
         cdef DoubleArray prop_arr
         cdef str prop
 
         for prop in props:
             prop_arr = self.get_carray(prop)
+            stride = self.stride.get(prop, 1)
 
-            for a in range(np):
-                prop_arr.data[a] = 0.0
-
-    cpdef update_property(self, BaseArray a, BaseArray a0,
-                          BaseArray acc, double dt):
-        """Update an array from another array and a scalar.
-
-        This situation arises often when we want to update an array
-        from computed accelrations. The scalar in this case will be
-        the the time step.
-
-        """
-        cdef size_t npart = self.get_number_of_particles()
-        cdef size_t i
-
-        for i in range(npart):
-            a.data[i] = a0.data[i] + dt*acc.data[i]
+            for i in range(np*stride):
+                prop_arr.data[i] = 0.0
 
     cpdef set_pid(self, int pid):
         """Set the processor id for all particles """
@@ -1306,118 +1348,36 @@ cdef class ParticleArray:
         if prop_name in self.output_property_arrays:
             self.output_property_arrays.remove(prop_name)
         if self.gpu is not None:
-            self.gpu.remove_prop(prop_name)
+            return self.gpu.remove_prop(prop_name)
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
+        if self.gpu is not None and self.backend is not 'cython':
+            backend = self.gpu
+        else:
+            backend = self
+
         if props:
             for prop in props:
-                array = self.properties[prop]
+                array = backend.properties[prop]
                 array.update_min_max()
         else:
-            for array in self.properties.values():
+            for array in backend.properties.values():
                 array.update_min_max()
 
     cpdef resize(self, long size):
-        """Resize all arrays to the new size"""
+        """Resize all arrays to the new size.  Note that this does not
+        update the number of particles, as this just resizes the internal arrays.
+        To do that, you need to call `align_particles`.
+
+        """
+        if self.gpu is not None and self.backend is not 'cython':
+            return self.gpu.resize(size)
+
         for prop, array in self.properties.items():
-            array.resize(size)
+            stride = self.stride.get(prop, 1)
+            array.resize(size*stride)
 
-    ######################################################################
-    # Parallel interface
-    ######################################################################
-    def Send(self, int recv_proc, props=None) :
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nprocs = comm.Get_size()
-        if rank < 10 :
-            rank_str = '0' + str(rank)
-        else :
-            rank_str = str(rank)
-        if recv_proc < 10 :
-            recv_proc_str = '0' + str(recv_proc)
-        else :
-            recv_proc_str = str(recv_proc)
-        pre_tag = str(1) + rank_str + recv_proc_str
-        tag_count = 0
-        if recv_proc < nprocs :
-            datasize = numpy.zeros(1)
-            for prop in props :
-                if self.properties.has_key(prop) :
-                    datasize[0] = len(self.properties[prop])
-                else :
-                    props.remove(prop)
-            if datasize[0] != 0 and len(props) != 0 :
-                prop_count = numpy.zeros(1)
-                prop_count[0] = len(props)
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(prop_count, recv_proc, tag=tag)
-                tag_count+=1
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(datasize, recv_proc, tag=tag)
-                tag_count+=1
-                prop_len = numpy.zeros(len(props))
-                i = 0
-                for prop in props :
-                    prop_len[i] = len(prop)
-                    i+=1
-                tag = int(pre_tag + str(tag_count))
-                comm.Send(prop_len, recv_proc, tag=tag)
-                tag_count+=1
-                for prop in props :
-                    prop_char = numpy.zeros(len(prop), dtype=numpy.character)
-                    prop_char[0:] = list(prop)
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Send([prop_char, MPI.CHARACTER], recv_proc, tag=tag)
-                    tag_count+=1
-                for prop in props :
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Send(self.get(prop), recv_proc, tag=tag)
-                    tag_count+=1
-
-    def Receive(self, int send_proc) :
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nprocs = comm.Get_size()
-        if rank < 10 :
-            rank_str = '0' + str(rank)
-        else :
-            rank_str = str(rank)
-        if send_proc < 10 :
-            send_proc_str = '0' + str(send_proc)
-        else :
-            send_proc_str = str(send_proc)
-        pre_tag = str(1) + send_proc_str + rank_str
-        tag_count = 0
-        recv_props = {}
-        props = []
-        if send_proc < nprocs :
-            prop_count = numpy.zeros(1)
-            tag = int(pre_tag + str(tag_count))
-            comm.Recv(prop_count, send_proc, tag=tag)
-            tag_count+=1
-            datasize = numpy.zeros(1)
-            tag = int(pre_tag + str(tag_count))
-            comm.Recv(datasize, send_proc, tag=tag)
-            tag_count+=1
-            if datasize[0] != 0 and prop_count[0] != 0 :
-                prop_len = numpy.zeros(int(prop_count[0]))
-                tag = int(pre_tag + str(tag_count))
-                comm.Recv(prop_len, send_proc, tag=tag)
-                tag_count+=1
-                for i in range(int(prop_count[0])) :
-                    prop_char = numpy.zeros(int(prop_len[i]), dtype=numpy.character)
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Recv([prop_char, MPI.CHARACTER], send_proc, tag=tag)
-                    tag_count+=1
-                    prop = "".join(prop_char)
-                    props.append(prop)
-                    recv_props[prop] = numpy.zeros(int(datasize[0]))
-                for prop in props :
-                    tag = int(pre_tag + str(tag_count))
-                    comm.Recv(recv_props[prop], send_proc, tag=tag)
-                    tag_count+=1
-                self.add_particles(**recv_props)
 
 # End of ParticleArray class
 ##############################################################################

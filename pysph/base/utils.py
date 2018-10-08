@@ -44,7 +44,8 @@ DEFAULT_PROPS = set(
 )
 
 
-def get_particle_array(additional_props=None, constants=None, **props):
+def get_particle_array(additional_props=None, constants=None, backend=None,
+                       **props):
     """Create and return a particle array with default properties.
 
     The default properties are ['x', 'y', 'z', 'u', 'v', 'w', 'm', 'h', 'rho',
@@ -137,7 +138,8 @@ def get_particle_array(additional_props=None, constants=None, **props):
                                    'default': 0}
 
     # create the particle array
-    pa = ParticleArray(name=name, constants=constants, **prop_dict)
+    pa = ParticleArray(name=name, constants=constants, backend=backend,
+                       **prop_dict)
 
     # default property arrays to save out. Any reasonable SPH particle
     # should define these
@@ -416,6 +418,7 @@ def get_particles_info(particles):
             prop_info[prop_name] = {
                 'name': prop_name, 'type': prop.get_c_type(),
                 'default': parray.default_values[prop_name],
+                'stride': parray.stride.get(prop_name, 1),
                 'data': None}
         const_info = {}
         if parray.gpu is not None:

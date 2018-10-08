@@ -165,6 +165,8 @@ class Application(object):
         self.num_procs = 1
         self.rank = 0
         if in_parallel():
+            if not mpi.Is_initialized():
+                mpi.Init()
             self.comm = comm = mpi.COMM_WORLD
             self.num_procs = comm.Get_size()
             self.rank = comm.Get_rank()

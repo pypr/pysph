@@ -85,8 +85,8 @@ import pyopencl.array  # noqa: 401
 import pyopencl.tools  # noqa: 401
 
 from pysph.base.utils import is_overloaded_method
-from pysph.base.opencl import (profile_kernel, get_context, get_queue,
-                               DeviceHelper)
+from pysph.cpy.opencl import profile_kernel, get_context, get_queue
+from pysph.base.device_helper import DeviceHelper
 from pysph.cpy.ext_module import get_platform_dir
 from pysph.cpy.config import get_config
 from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
@@ -95,6 +95,10 @@ from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
+)
+
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
 )
 
 
@@ -152,9 +156,9 @@ class OpenCLAccelerationEval(object):
             cache.get_neighbors_gpu()
             self._queue.finish()
             args = args + [
-                cache._nbr_lengths_gpu.array.data,
-                cache._start_idx_gpu.array.data,
-                cache._neighbors_gpu.array.data
+                cache._nbr_lengths_gpu.dev.data,
+                cache._start_idx_gpu.dev.data,
+                cache._neighbors_gpu.dev.data
             ] + extra_args
             call(*args)
         else:
@@ -191,6 +195,13 @@ class OpenCLAccelerationEval(object):
                     method(_args[0], _args[1], t, dt)
                 else:
                     method(*info.get('args'))
+            elif type == 'py_initialize':
+                args = info['dest'], t, dt
+                for call in info['calls']:
+                    call(*args)
+            elif type == 'pre_post':
+                func = info.get('callable')
+                func(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -282,7 +293,7 @@ class AccelerationEvalOpenCLHelper(object):
         array_index = {}
         for idx, pa in enumerate(pas):
             if pa.gpu is None:
-                pa.set_device_helper(DeviceHelper(pa))
+                pa.set_device_helper(DeviceHelper(pa, backend='opencl'))
             array_map[pa.name] = pa
             array_index[pa.name] = idx
 
@@ -310,7 +321,7 @@ class AccelerationEvalOpenCLHelper(object):
         # This is needed for late binding on the device helper's attributes
         # which may change at each iteration when particles are added/removed.
         def _get_array(gpu_helper, attr):
-            return getattr(gpu_helper, attr).data
+            return getattr(gpu_helper, attr).dev.data
 
         def _get_struct(obj):
             return obj
@@ -353,7 +364,11 @@ class AccelerationEvalOpenCLHelper(object):
                     args[0] = [x for x in grp.equations
                                if hasattr(x, 'reduce')]
                     args[1] = self._array_map[args[1]]
-
+            elif type == 'pre_post':
+                info = dict(item)
+            elif type == 'py_initialize':
+                info = dict(item)
+                info['dest'] = self._array_map[item.get('dest')]
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -511,7 +526,7 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
+                call_args = list(getfullargspec(method).args)
                 if 'self' in call_args:
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
@@ -562,6 +577,23 @@ class AccelerationEvalOpenCLHelper(object):
             return code.replace('KERNEL(', kern).replace('GRADH(', grad_h)
         else:
             return code
+
+    def call_post(self, group):
+        self.data.append(dict(callable=group.post, type='pre_post', args=()))
+
+    def call_pre(self, group):
+        self.data.append(dict(callable=group.pre, type='pre_post', args=()))
+
+    def call_py_initialize(self, all_eq_group, dest):
+        calls = []
+        for eq in all_eq_group.equations:
+            method = getattr(eq, 'py_initialize', None)
+            if method is not None:
+                calls.append(method)
+        if len(calls) > 0:
+            self.data.append(
+                dict(calls=calls, type='py_initialize', dest=dest)
+            )
 
     def call_reduce(self, all_eq_group, dest):
         self.data.append(dict(method='do_reduce', type='method',

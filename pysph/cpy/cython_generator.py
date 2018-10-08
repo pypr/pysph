@@ -326,7 +326,7 @@ class CythonGenerator(object):
     def _get_methods(self, cls):
         methods = []
         for name in dir(cls):
-            if name.startswith('_'):
+            if name.startswith(('_', 'py_')):
                 continue
             meth = getattr(cls, name)
             if callable(meth):

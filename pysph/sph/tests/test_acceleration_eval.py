@@ -184,6 +184,19 @@ class SimpleReduction(Equation):
             dst.gpu.push('total_mass')
 
 
+class PyInit(Equation):
+    def py_initialize(self, dst, t, dt):
+        self.called_with = t, dt
+        if dst.gpu:
+            dst.gpu.pull('au')
+        dst.au[:] = 1.0
+        if dst.gpu:
+            dst.gpu.push('au')
+
+    def initialize(self, d_idx, d_au):
+        d_au[d_idx] += 1.0
+
+
 class LoopAllEquation(Equation):
     def initialize(self, d_idx, d_rho):
         d_rho[d_idx] = 0.0
@@ -238,6 +251,24 @@ class TestMegaGroup(unittest.TestCase):
         f_eqs = [x.__class__.__name__ for x in sources['f'].equations]
         expect = ['SimpleEquation', 'DummyEquation', 'MixedTypeEquation']
         self.assertEqual(f_eqs, expect)
+
+    def test_mega_group_copies_props_of_group(self):
+        # Given
+        def nothing():
+            pass
+        g = Group(
+            equations=[], real=False, update_nnps=True, iterate=True,
+            max_iterations=20, min_iterations=2, pre=nothing, post=nothing
+        )
+
+        # When
+        mg = MegaGroup(g, CythonGroup)
+
+        # Then
+        props = ('real update_nnps iterate max_iterations '
+                 'min_iterations pre post').split()
+        for prop in props:
+            self.assertEqual(getattr(mg, prop), getattr(g, prop))
 
 
 class TestAccelerationEval1D(unittest.TestCase):
@@ -358,6 +389,24 @@ class TestAccelerationEval1D(unittest.TestCase):
         expect = np.sum(pa.m)
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
 
+    def test_should_call_py_initialize(self):
+        # Given.
+        pa = self.pa
+        equations = [PyInit(dest='fluid', sources=None)]
+        eq = equations[0]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(1.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('au')
+        np.testing.assert_array_almost_equal(
+            pa.au, np.ones_like(pa.x)*2.0
+        )
+        self.assertEqual(eq.called_with, (1.0, 0.1))
+
     def test_should_work_with_non_double_arrays(self):
         # Given
         pa = self.pa
@@ -414,6 +463,34 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.ones(10)*3.0
         self.assertListEqual(list(pa.au), list(expect))
+
+    def test_should_call_pre_post_functions_in_group(self):
+        # Given
+        pa = self.pa
+
+        def pre():
+            pa.m += 1.0
+
+        def post():
+            pa.u += 1.0
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                pre=pre, post=post
+
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11.,  9.,  7.])
+        self.assertListEqual(list(pa.u), list(expect))
 
 
 class EqWithTime(Equation):
@@ -676,6 +753,24 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa.gpu.pull('total_mass')
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
 
+    def test_should_call_py_initialize_for_gpu_backend(self):
+        # Given.
+        pa = self.pa
+        equations = [PyInit(dest='fluid', sources=None)]
+        eq = equations[0]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(1.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('au')
+        np.testing.assert_array_almost_equal(
+            pa.au, np.ones_like(pa.x)*2.0
+        )
+        self.assertEqual(eq.called_with, (1.0, 0.1))
+
     def test_get_equations_with_converged(self):
         pytest.importorskip('pysph.base.gpu_nnps')
         from pysph.sph.acceleration_eval_opencl_helper import \
@@ -721,3 +816,33 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         # both are called.
         pa.gpu.pull('rho')
         self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
+
+    def test_should_call_pre_post_functions_in_group_on_gpu(self):
+        # Given
+        pa = self.pa
+
+        def pre():
+            pa.m += 1.0
+            pa.gpu.push('m')
+
+        def post():
+            pa.gpu.pull('u')
+            pa.u += 1.0
+
+        equations = [
+            Group(
+                equations=[
+                    SimpleEquation(dest='fluid', sources=['fluid'])
+                ],
+                pre=pre, post=post
+
+            )
+        ]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.1, 0.1)
+
+        # Then
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11.,  9.,  7.])
+        self.assertListEqual(list(pa.u), list(expect))

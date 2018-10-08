@@ -142,7 +142,7 @@ cdef class BaseArray:
     """
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
         pass
@@ -206,7 +206,7 @@ cdef class BaseArray:
         """
         raise NotImplementedError, 'BaseArray::squeeze'
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
         """
         raise NotImplementedError, 'BaseArray::remove'
@@ -216,25 +216,25 @@ cdef class BaseArray:
         """
         raise NotImplementedError, 'BaseArray::extend'
 
-    cpdef align_array(self, LongArray new_indices):
+    cpdef align_array(self, LongArray new_indices, int stride=1):
         """Rearrange the array contents according to the new indices.
         """
-        if new_indices.length != self.length:
-            raise ValueError, 'Unequal array lengths'
-        self.c_align_array(new_indices)
+        if new_indices.length != self.length//stride:
+            raise ValueError('Unequal array lengths')
+        self.c_align_array(new_indices, stride)
 
     cpdef reset(self):
         """Reset the length of the array to 0.
         """
         raise NotImplementedError, 'BaseArray::reset'
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copy values of indexed particles from self to dest.
         """
         raise NotImplementedError, 'BaseArray::copy_values'
 
     cpdef copy_subset(self, BaseArray source,
-                      long start_index=-1, long end_index=-1):
+                      long start_index=-1, long end_index=-1, int stride=1):
         """Copy subset of values from source to self.
         """
         raise NotImplementedError, 'BaseArray::copy_subset'
@@ -385,11 +385,11 @@ cdef class IntArray(BaseArray):
         )
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
 
-        cdef long i
+        cdef long i, j, new_index
         cdef long length = self.length
         cdef long n_bytes
         cdef int *temp
@@ -400,9 +400,17 @@ cdef class IntArray(BaseArray):
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
         # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
+        if stride == 1:
+            for i in range(length):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    self.data[i] = temp[new_index]
+        else:
+            for i in range(length//stride):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    for j in range(stride):
+                        self.data[i*stride + j] = temp[new_index*stride + j]
 
         aligned_free(<void*>temp)
 
@@ -566,7 +574,7 @@ cdef class IntArray(BaseArray):
 
         self.c_squeeze()
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
 
         Parameters
@@ -577,6 +585,8 @@ cdef class IntArray(BaseArray):
         input_sorted : bool
             indicates if the input is sorted in ascending order.  if
             not, the array will be sorted internally.
+        stride : int
+            indicates the stride size for the indices.
 
         Notes
         -----
@@ -586,10 +596,14 @@ cdef class IntArray(BaseArray):
          element at the said index with the last element in the data and update
          the length of the array.
 
+         If stride is 3, then the indices are multiplied by 3 and chunks of 3
+         elements are removed.
+
         """
         if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
+        cdef int j
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
         cdef long id
@@ -603,12 +617,20 @@ cdef class IntArray(BaseArray):
         else:
             sorted_indices = index_list
 
-        for i in range(inlength):
-            id = sorted_indices[inlength-(i+1)]
-            if id < self.length:
-                self.data[id] = self.data[self.length-1]
-                self.length = self.length - 1
-                arr.dimensions[0] = self.length
+        if stride == 1:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]
+                if id < self.length:
+                    self.data[id] = self.data[self.length-1]
+                    self.length = self.length - 1
+        else:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]*stride
+                if id < self.length:
+                    for j in range(stride):
+                        self.data[id + j] = self.data[self.length - stride + j]
+                    self.length = self.length - stride
+        arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
         """Extend the array with data from in_array.
@@ -633,7 +655,7 @@ cdef class IntArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
@@ -641,26 +663,37 @@ cdef class IntArray(BaseArray):
         """
         cdef IntArray dest_array = <IntArray>dest
         cdef long i, num_values
+        cdef int j
         num_values = indices.length
 
-        for i in range(num_values):
-            dest_array.data[i] = self.data[indices.data[i]]
+        if stride == 1:
+            for i in range(num_values):
+                dest_array.data[i] = self.data[indices.data[i]]
+        else:
+            for i in range(num_values):
+                for j in range(stride):
+                    dest_array.data[i*stride + j] = self.data[indices.data[i]*stride + j]
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
-                      long end_index=-1):
+                      long end_index=-1, int stride=1):
         """Copy a subset of values from src to self.
 
         Parameters
         ----------
 
         start_index : long
-            the first index in dest that corresponds to the 0th
+            the first index in self that corresponds to the 0th
             index in source
 
         end_index : long
-            the first index in dest from start_index that is not copied
+            the first index in self from start_index that is not copied
+
+        stride : int
+            the stride along indices, basically copy over chunks of
+            the given stride.
         """
         cdef long si, ei, s_length, d_length, i, j
+        cdef int k
         cdef IntArray src = <IntArray>source
         s_length = src.length
         d_length = self.length
@@ -706,10 +739,17 @@ cdef class IntArray(BaseArray):
                 ei = end_index
 
         # we have valid start and end indices now. can start copying now.
-        j = 0
-        for i in range(si, ei):
-            self.data[i] = src.data[j]
-            j += 1
+        if stride == 1:
+            j = 0
+            for i in range(si, ei):
+                self.data[i] = src.data[j]
+                j += 1
+        else:
+            j = 0
+            for i in range(si, ei):
+                for k in range(stride):
+                    self.data[i*stride + k] = src.data[j*stride + k]
+                j += 1
 
     cpdef update_min_max(self):
         """Updates the min and max values of the array.
@@ -850,11 +890,11 @@ cdef class UIntArray(BaseArray):
         )
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
 
-        cdef long i
+        cdef long i, j, new_index
         cdef long length = self.length
         cdef long n_bytes
         cdef unsigned int *temp
@@ -865,9 +905,17 @@ cdef class UIntArray(BaseArray):
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
         # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
+        if stride == 1:
+            for i in range(length):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    self.data[i] = temp[new_index]
+        else:
+            for i in range(length//stride):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    for j in range(stride):
+                        self.data[i*stride + j] = temp[new_index*stride + j]
 
         aligned_free(<void*>temp)
 
@@ -1031,7 +1079,7 @@ cdef class UIntArray(BaseArray):
 
         self.c_squeeze()
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
 
         Parameters
@@ -1042,6 +1090,8 @@ cdef class UIntArray(BaseArray):
         input_sorted : bool
             indicates if the input is sorted in ascending order.  if
             not, the array will be sorted internally.
+        stride : int
+            indicates the stride size for the indices.
 
         Notes
         -----
@@ -1051,10 +1101,14 @@ cdef class UIntArray(BaseArray):
          element at the said index with the last element in the data and update
          the length of the array.
 
+         If stride is 3, then the indices are multiplied by 3 and chunks of 3
+         elements are removed.
+
         """
         if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
+        cdef int j
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
         cdef long id
@@ -1068,12 +1122,20 @@ cdef class UIntArray(BaseArray):
         else:
             sorted_indices = index_list
 
-        for i in range(inlength):
-            id = sorted_indices[inlength-(i+1)]
-            if id < self.length:
-                self.data[id] = self.data[self.length-1]
-                self.length = self.length - 1
-                arr.dimensions[0] = self.length
+        if stride == 1:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]
+                if id < self.length:
+                    self.data[id] = self.data[self.length-1]
+                    self.length = self.length - 1
+        else:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]*stride
+                if id < self.length:
+                    for j in range(stride):
+                        self.data[id + j] = self.data[self.length - stride + j]
+                    self.length = self.length - stride
+        arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
         """Extend the array with data from in_array.
@@ -1098,7 +1160,7 @@ cdef class UIntArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
@@ -1106,26 +1168,37 @@ cdef class UIntArray(BaseArray):
         """
         cdef UIntArray dest_array = <UIntArray>dest
         cdef long i, num_values
+        cdef int j
         num_values = indices.length
 
-        for i in range(num_values):
-            dest_array.data[i] = self.data[indices.data[i]]
+        if stride == 1:
+            for i in range(num_values):
+                dest_array.data[i] = self.data[indices.data[i]]
+        else:
+            for i in range(num_values):
+                for j in range(stride):
+                    dest_array.data[i*stride + j] = self.data[indices.data[i]*stride + j]
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
-                      long end_index=-1):
+                      long end_index=-1, int stride=1):
         """Copy a subset of values from src to self.
 
         Parameters
         ----------
 
         start_index : long
-            the first index in dest that corresponds to the 0th
+            the first index in self that corresponds to the 0th
             index in source
 
         end_index : long
-            the first index in dest from start_index that is not copied
+            the first index in self from start_index that is not copied
+
+        stride : int
+            the stride along indices, basically copy over chunks of
+            the given stride.
         """
         cdef long si, ei, s_length, d_length, i, j
+        cdef int k
         cdef UIntArray src = <UIntArray>source
         s_length = src.length
         d_length = self.length
@@ -1171,10 +1244,17 @@ cdef class UIntArray(BaseArray):
                 ei = end_index
 
         # we have valid start and end indices now. can start copying now.
-        j = 0
-        for i in range(si, ei):
-            self.data[i] = src.data[j]
-            j += 1
+        if stride == 1:
+            j = 0
+            for i in range(si, ei):
+                self.data[i] = src.data[j]
+                j += 1
+        else:
+            j = 0
+            for i in range(si, ei):
+                for k in range(stride):
+                    self.data[i*stride + k] = src.data[j*stride + k]
+                j += 1
 
     cpdef update_min_max(self):
         """Updates the min and max values of the array.
@@ -1315,11 +1395,11 @@ cdef class LongArray(BaseArray):
         )
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
 
-        cdef long i
+        cdef long i, j, new_index
         cdef long length = self.length
         cdef long n_bytes
         cdef long *temp
@@ -1330,9 +1410,17 @@ cdef class LongArray(BaseArray):
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
         # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
+        if stride == 1:
+            for i in range(length):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    self.data[i] = temp[new_index]
+        else:
+            for i in range(length//stride):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    for j in range(stride):
+                        self.data[i*stride + j] = temp[new_index*stride + j]
 
         aligned_free(<void*>temp)
 
@@ -1496,7 +1584,7 @@ cdef class LongArray(BaseArray):
 
         self.c_squeeze()
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
 
         Parameters
@@ -1507,6 +1595,8 @@ cdef class LongArray(BaseArray):
         input_sorted : bool
             indicates if the input is sorted in ascending order.  if
             not, the array will be sorted internally.
+        stride : int
+            indicates the stride size for the indices.
 
         Notes
         -----
@@ -1516,10 +1606,14 @@ cdef class LongArray(BaseArray):
          element at the said index with the last element in the data and update
          the length of the array.
 
+         If stride is 3, then the indices are multiplied by 3 and chunks of 3
+         elements are removed.
+
         """
         if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
+        cdef int j
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
         cdef long id
@@ -1533,12 +1627,20 @@ cdef class LongArray(BaseArray):
         else:
             sorted_indices = index_list
 
-        for i in range(inlength):
-            id = sorted_indices[inlength-(i+1)]
-            if id < self.length:
-                self.data[id] = self.data[self.length-1]
-                self.length = self.length - 1
-                arr.dimensions[0] = self.length
+        if stride == 1:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]
+                if id < self.length:
+                    self.data[id] = self.data[self.length-1]
+                    self.length = self.length - 1
+        else:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]*stride
+                if id < self.length:
+                    for j in range(stride):
+                        self.data[id + j] = self.data[self.length - stride + j]
+                    self.length = self.length - stride
+        arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
         """Extend the array with data from in_array.
@@ -1563,7 +1665,7 @@ cdef class LongArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
@@ -1571,26 +1673,37 @@ cdef class LongArray(BaseArray):
         """
         cdef LongArray dest_array = <LongArray>dest
         cdef long i, num_values
+        cdef int j
         num_values = indices.length
 
-        for i in range(num_values):
-            dest_array.data[i] = self.data[indices.data[i]]
+        if stride == 1:
+            for i in range(num_values):
+                dest_array.data[i] = self.data[indices.data[i]]
+        else:
+            for i in range(num_values):
+                for j in range(stride):
+                    dest_array.data[i*stride + j] = self.data[indices.data[i]*stride + j]
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
-                      long end_index=-1):
+                      long end_index=-1, int stride=1):
         """Copy a subset of values from src to self.
 
         Parameters
         ----------
 
         start_index : long
-            the first index in dest that corresponds to the 0th
+            the first index in self that corresponds to the 0th
             index in source
 
         end_index : long
-            the first index in dest from start_index that is not copied
+            the first index in self from start_index that is not copied
+
+        stride : int
+            the stride along indices, basically copy over chunks of
+            the given stride.
         """
         cdef long si, ei, s_length, d_length, i, j
+        cdef int k
         cdef LongArray src = <LongArray>source
         s_length = src.length
         d_length = self.length
@@ -1636,10 +1749,17 @@ cdef class LongArray(BaseArray):
                 ei = end_index
 
         # we have valid start and end indices now. can start copying now.
-        j = 0
-        for i in range(si, ei):
-            self.data[i] = src.data[j]
-            j += 1
+        if stride == 1:
+            j = 0
+            for i in range(si, ei):
+                self.data[i] = src.data[j]
+                j += 1
+        else:
+            j = 0
+            for i in range(si, ei):
+                for k in range(stride):
+                    self.data[i*stride + k] = src.data[j*stride + k]
+                j += 1
 
     cpdef update_min_max(self):
         """Updates the min and max values of the array.
@@ -1780,11 +1900,11 @@ cdef class FloatArray(BaseArray):
         )
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
 
-        cdef long i
+        cdef long i, j, new_index
         cdef long length = self.length
         cdef long n_bytes
         cdef float *temp
@@ -1795,9 +1915,17 @@ cdef class FloatArray(BaseArray):
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
         # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
+        if stride == 1:
+            for i in range(length):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    self.data[i] = temp[new_index]
+        else:
+            for i in range(length//stride):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    for j in range(stride):
+                        self.data[i*stride + j] = temp[new_index*stride + j]
 
         aligned_free(<void*>temp)
 
@@ -1961,7 +2089,7 @@ cdef class FloatArray(BaseArray):
 
         self.c_squeeze()
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
 
         Parameters
@@ -1972,6 +2100,8 @@ cdef class FloatArray(BaseArray):
         input_sorted : bool
             indicates if the input is sorted in ascending order.  if
             not, the array will be sorted internally.
+        stride : int
+            indicates the stride size for the indices.
 
         Notes
         -----
@@ -1981,10 +2111,14 @@ cdef class FloatArray(BaseArray):
          element at the said index with the last element in the data and update
          the length of the array.
 
+         If stride is 3, then the indices are multiplied by 3 and chunks of 3
+         elements are removed.
+
         """
         if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
+        cdef int j
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
         cdef long id
@@ -1998,12 +2132,20 @@ cdef class FloatArray(BaseArray):
         else:
             sorted_indices = index_list
 
-        for i in range(inlength):
-            id = sorted_indices[inlength-(i+1)]
-            if id < self.length:
-                self.data[id] = self.data[self.length-1]
-                self.length = self.length - 1
-                arr.dimensions[0] = self.length
+        if stride == 1:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]
+                if id < self.length:
+                    self.data[id] = self.data[self.length-1]
+                    self.length = self.length - 1
+        else:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]*stride
+                if id < self.length:
+                    for j in range(stride):
+                        self.data[id + j] = self.data[self.length - stride + j]
+                    self.length = self.length - stride
+        arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
         """Extend the array with data from in_array.
@@ -2028,7 +2170,7 @@ cdef class FloatArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
@@ -2036,26 +2178,37 @@ cdef class FloatArray(BaseArray):
         """
         cdef FloatArray dest_array = <FloatArray>dest
         cdef long i, num_values
+        cdef int j
         num_values = indices.length
 
-        for i in range(num_values):
-            dest_array.data[i] = self.data[indices.data[i]]
+        if stride == 1:
+            for i in range(num_values):
+                dest_array.data[i] = self.data[indices.data[i]]
+        else:
+            for i in range(num_values):
+                for j in range(stride):
+                    dest_array.data[i*stride + j] = self.data[indices.data[i]*stride + j]
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
-                      long end_index=-1):
+                      long end_index=-1, int stride=1):
         """Copy a subset of values from src to self.
 
         Parameters
         ----------
 
         start_index : long
-            the first index in dest that corresponds to the 0th
+            the first index in self that corresponds to the 0th
             index in source
 
         end_index : long
-            the first index in dest from start_index that is not copied
+            the first index in self from start_index that is not copied
+
+        stride : int
+            the stride along indices, basically copy over chunks of
+            the given stride.
         """
         cdef long si, ei, s_length, d_length, i, j
+        cdef int k
         cdef FloatArray src = <FloatArray>source
         s_length = src.length
         d_length = self.length
@@ -2101,10 +2254,17 @@ cdef class FloatArray(BaseArray):
                 ei = end_index
 
         # we have valid start and end indices now. can start copying now.
-        j = 0
-        for i in range(si, ei):
-            self.data[i] = src.data[j]
-            j += 1
+        if stride == 1:
+            j = 0
+            for i in range(si, ei):
+                self.data[i] = src.data[j]
+                j += 1
+        else:
+            j = 0
+            for i in range(si, ei):
+                for k in range(stride):
+                    self.data[i*stride + k] = src.data[j*stride + k]
+                j += 1
 
     cpdef update_min_max(self):
         """Updates the min and max values of the array.
@@ -2245,11 +2405,11 @@ cdef class DoubleArray(BaseArray):
         )
 
 
-    cdef void c_align_array(self, LongArray new_indices) nogil:
+    cdef void c_align_array(self, LongArray new_indices, int stride=1) nogil:
         """Rearrange the array contents according to the new indices.
         """
 
-        cdef long i
+        cdef long i, j, new_index
         cdef long length = self.length
         cdef long n_bytes
         cdef double *temp
@@ -2260,9 +2420,17 @@ cdef class DoubleArray(BaseArray):
         memcpy(<void*>temp, <void*>self.data, n_bytes)
 
         # copy the data from the resized portion to the actual positions.
-        for i in range(length):
-            if i != new_indices.data[i]:
-                self.data[i] = temp[new_indices.data[i]]
+        if stride == 1:
+            for i in range(length):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    self.data[i] = temp[new_index]
+        else:
+            for i in range(length//stride):
+                new_index = new_indices.data[i]
+                if i != new_index:
+                    for j in range(stride):
+                        self.data[i*stride + j] = temp[new_index*stride + j]
 
         aligned_free(<void*>temp)
 
@@ -2426,7 +2594,7 @@ cdef class DoubleArray(BaseArray):
 
         self.c_squeeze()
 
-    cpdef remove(self, np.ndarray index_list, bint input_sorted=0):
+    cpdef remove(self, np.ndarray index_list, bint input_sorted=0, int stride=1):
         """Remove the particles with indices in index_list.
 
         Parameters
@@ -2437,6 +2605,8 @@ cdef class DoubleArray(BaseArray):
         input_sorted : bool
             indicates if the input is sorted in ascending order.  if
             not, the array will be sorted internally.
+        stride : int
+            indicates the stride size for the indices.
 
         Notes
         -----
@@ -2446,10 +2616,14 @@ cdef class DoubleArray(BaseArray):
          element at the said index with the last element in the data and update
          the length of the array.
 
+         If stride is 3, then the indices are multiplied by 3 and chunks of 3
+         elements are removed.
+
         """
         if self._old_data != NULL:
             raise RuntimeError('Cannot remove elements from view array.')
         cdef long i
+        cdef int j
         cdef long inlength = index_list.size
         cdef np.ndarray sorted_indices
         cdef long id
@@ -2463,12 +2637,20 @@ cdef class DoubleArray(BaseArray):
         else:
             sorted_indices = index_list
 
-        for i in range(inlength):
-            id = sorted_indices[inlength-(i+1)]
-            if id < self.length:
-                self.data[id] = self.data[self.length-1]
-                self.length = self.length - 1
-                arr.dimensions[0] = self.length
+        if stride == 1:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]
+                if id < self.length:
+                    self.data[id] = self.data[self.length-1]
+                    self.length = self.length - 1
+        else:
+            for i in range(inlength):
+                id = sorted_indices[inlength-(i+1)]*stride
+                if id < self.length:
+                    for j in range(stride):
+                        self.data[id + j] = self.data[self.length - stride + j]
+                    self.length = self.length - stride
+        arr.dimensions[0] = self.length
 
     cpdef extend(self, np.ndarray in_array):
         """Extend the array with data from in_array.
@@ -2493,7 +2675,7 @@ cdef class DoubleArray(BaseArray):
         for i in range(len):
             self.append(in_array[i])
 
-    cpdef copy_values(self, LongArray indices, BaseArray dest):
+    cpdef copy_values(self, LongArray indices, BaseArray dest, int stride=1):
         """Copies values of indices in indices from self to `dest`.
 
         No size check if performed, we assume the dest to of proper size
@@ -2501,26 +2683,37 @@ cdef class DoubleArray(BaseArray):
         """
         cdef DoubleArray dest_array = <DoubleArray>dest
         cdef long i, num_values
+        cdef int j
         num_values = indices.length
 
-        for i in range(num_values):
-            dest_array.data[i] = self.data[indices.data[i]]
+        if stride == 1:
+            for i in range(num_values):
+                dest_array.data[i] = self.data[indices.data[i]]
+        else:
+            for i in range(num_values):
+                for j in range(stride):
+                    dest_array.data[i*stride + j] = self.data[indices.data[i]*stride + j]
 
     cpdef copy_subset(self, BaseArray source, long start_index=-1,
-                      long end_index=-1):
+                      long end_index=-1, int stride=1):
         """Copy a subset of values from src to self.
 
         Parameters
         ----------
 
         start_index : long
-            the first index in dest that corresponds to the 0th
+            the first index in self that corresponds to the 0th
             index in source
 
         end_index : long
-            the first index in dest from start_index that is not copied
+            the first index in self from start_index that is not copied
+
+        stride : int
+            the stride along indices, basically copy over chunks of
+            the given stride.
         """
         cdef long si, ei, s_length, d_length, i, j
+        cdef int k
         cdef DoubleArray src = <DoubleArray>source
         s_length = src.length
         d_length = self.length
@@ -2566,10 +2759,17 @@ cdef class DoubleArray(BaseArray):
                 ei = end_index
 
         # we have valid start and end indices now. can start copying now.
-        j = 0
-        for i in range(si, ei):
-            self.data[i] = src.data[j]
-            j += 1
+        if stride == 1:
+            j = 0
+            for i in range(si, ei):
+                self.data[i] = src.data[j]
+                j += 1
+        else:
+            j = 0
+            for i in range(si, ei):
+                for k in range(stride):
+                    self.data[i*stride + k] = src.data[j*stride + k]
+                j += 1
 
     cpdef update_min_max(self):
         """Updates the min and max values of the array.

@@ -91,6 +91,18 @@ The role of the particle properties like positions, velocities and
 other variables should be clear. These define either the kinematic or
 dynamic properties associated with SPH particles in a simulation.
 
+In addition to scalar properties, particle arrays also support "strided"
+properties i.e. associating multiple elements per particle.  For example::
+
+  >>> pa.add_property('A', data=2.0, stride=2)
+  >>> pa.A
+
+This will add a new property with name ``'A'`` but which has 2 elements
+associated with each particle. When one adds/remove particles this is taken
+into account automatically. When accessing such a particle, one has to be
+careful though as the underlying array is still stored as a one-dimensional
+array.
+
 PySPH introduces a global identifier for a particle which is required
 to be *unique* for that particle. This is represented with the
 property **gid** which is of type **unsigned int**. This property is
