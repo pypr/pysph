@@ -41,7 +41,7 @@ def jeffery_ode(phi, t, ar, G):
 
 class RigidFluidCoupling(Application):
     def initialize(self):
-        self.scale = 100
+        self.scale = 1000
         self.L = 0.0012
         self.dx = 2*0.000025
         self.hdx = 1.2
@@ -160,6 +160,7 @@ class RigidFluidCoupling(Application):
     def create_equations(self):
         equations = [
             Group(equations=[
+                BodyForce(dest='ellipsoid', sources=None),
                 NumberDensity(dest='ellipsoid', sources=['ellipsoid']),
                 NumberDensity(dest='walls', sources=['walls'])
             ]),
@@ -182,7 +183,7 @@ class RigidFluidCoupling(Application):
                                    sources=['fluid', 'walls', 'ellipsoid']),
                 ContinuityEquation(dest='ellipsoid',sources=['fluid']),
                 ContinuityEquation(dest='walls',sources=['fluid']),
-                LaminarViscosity(dest='fluid', sources=['fluid', 'walls', 'ellipsoid'],
+                LaminarViscosity(dest='fluid', sources=['fluid', 'walls'],
                                 nu = self.nu),
                 MomentumEquation(dest='fluid', sources=['fluid', 'walls'],
                                  alpha=self.alpha, beta=0.0, c0=self.co),
