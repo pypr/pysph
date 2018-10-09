@@ -1,6 +1,6 @@
-"""Ellipsoid suspended in shear flow.
+"""Ellipsoid suspended in shear flow. (2 hours)
 
-An example to illustrate 3d pysph framework
+An example to illustrate 3d pysph rigid_body framework
 """
 from __future__ import print_function
 import os
@@ -43,7 +43,7 @@ class RigidFluidCoupling(Application):
     def initialize(self):
         self.scale = 1000
         self.L = 0.0012
-        self.dx = 2*0.000025
+        self.dx = 0.000025
         self.hdx = 1.2
         self.rho = 1000*self.scale
         self.alpha = 0.0
