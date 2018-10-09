@@ -294,9 +294,9 @@ class ViscosityRigidBody(Equation):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
-        #s_fx[s_idx] = 0.0
-        #s_fy[s_idx] = 0.0
-        #s_fz[s_idx] = 0.0
+        # s_fx[s_idx] = 0.0
+        # s_fy[s_idx] = 0.0
+        # s_fz[s_idx] = 0.0
 
     def loop(self, d_idx, d_m, d_au, d_av, d_aw, d_rho,
              s_idx, s_V, s_fx, s_fy, s_fz,
@@ -332,9 +332,9 @@ class PressureRigidBody(Equation):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
-        #s_fx[s_idx] = 0.0
-        #s_fy[s_idx] = 0.0
-        #s_fz[s_idx] = 0.0
+        # s_fx[s_idx] = 0.0
+        # s_fy[s_idx] = 0.0
+        # s_fz[s_idx] = 0.0
 
     def loop(self, d_idx, d_m, d_rho, d_au, d_av, d_aw,  d_p,
              s_idx, s_V, s_fx, s_fy, s_fz, DWIJ):

@@ -1,18 +1,10 @@
-"""Ellipsoid suspended in shear flow. (2 hours)
+"""Ellipsoid suspended in shear flow (2 hours).
 
 An example to illustrate 3d pysph rigid_body framework
 """
 from __future__ import print_function
-import os
 import numpy as np
 from scipy.integrate import odeint
-
-import matplotlib
-matplotlib.use('Agg')
-from matplotlib import pyplot as plt
-from matplotlib import rc
-rc('font', **{'family': 'serif', 'serif': ['Computer Modern'], 'size':18})
-rc('text', usetex=True)
 
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import (get_particle_array_wcsph,
@@ -30,17 +22,22 @@ from pysph.sph.basic_equations import (XSPHCorrection, ContinuityEquation)
 from pysph.sph.wc.basic import TaitEOSHGCorrection, MomentumEquation, TaitEOS
 from pysph.sph.wc.viscosity import LaminarViscosity
 from pysph.solver.application import Application
-from pysph.sph.rigid_body import ( NumberDensity,
-    BodyForce, RigidBodyCollision, RigidBodyMoments, ViscosityRigidBody,
-    PressureRigidBody, RigidBodyMotion, AkinciRigidFluidCoupling, RK2StepRigidBody)
+from pysph.sph.rigid_body import (NumberDensity, BodyForce, RigidBodyMoments,
+                                  ViscosityRigidBody, PressureRigidBody,
+                                  RigidBodyMotion, RK2StepRigidBody)
 
-# Jeffery's Equation for planar rotation of a rigid (theta=0)
+
 def jeffery_ode(phi, t, ar, G):
+    """Jeffery's Equation for planar rotation of a rigid ellipsoid."""
     lbd = (ar**2-1.0)/(ar**2+1.0)
     return 0.5*G*(1.0+lbd*np.cos(2.0*phi))
 
+
 class RigidFluidCoupling(Application):
+    """Example of a rigid ellipsoid rotating in a shear flow."""
+
     def initialize(self):
+        """Set up of general variables."""
         self.scale = 1000
         self.L = 0.0012
         self.dx = 0.000025
@@ -51,14 +48,12 @@ class RigidFluidCoupling(Application):
         self.co = 0.010
 
     def create_particles(self):
-        # The fluid might be scaled compared to the fiber. fdx is a shorthand
-        # for the fluid spacing and dx2 is a shorthand for the half of it.
-
-        # Creating grid points for particles
+        """Create particle arrays for fluis, ellipsiod and walls."""
+        # General box
         _x = np.arange(-self.L/2+self.dx/2, self.L/2+self.dx/2, self.dx)
         _y = np.arange(-self.L/2+self.dx/2, self.L/2+self.dx/2, self.dx)
         _z = np.arange(-self.L/4+self.dx/2, self.L/4+self.dx/2, self.dx)
-        x,y,z = np.meshgrid(_x, _y, _z)
+        x, y, z = np.meshgrid(_x, _y, _z)
         xf = x.ravel()
         yf = y.ravel()
         zf = z.ravel()
@@ -66,16 +61,18 @@ class RigidFluidCoupling(Application):
         # Determine the size of dummy region
         ghost_extend = 3*self.dx
 
-        # Create the channel particles at the top
-        _y = np.linspace(self.L/2+self.dx/2, self.L/2-self.dx/2+ghost_extend, 3)
-        x,y,z = np.meshgrid(_x, _y, _z)
+        # Create the wall particles at the top
+        _y = np.linspace(self.L/2+self.dx/2,
+                         self.L/2-self.dx/2+ghost_extend, 3)
+        x, y, z = np.meshgrid(_x, _y, _z)
         xt = x.ravel()
         yt = y.ravel()
         zt = z.ravel()
 
-        # Create the channel particles at the bottom
-        _y = np.linspace(-self.L/2+self.dx/2-ghost_extend, -self.L/2-self.dx/2, 3)
-        x,y,z = np.meshgrid(_x, _y, _z)
+        # Create the wall particles at the bottom
+        _y = np.linspace(-self.L/2+self.dx/2-ghost_extend,
+                         -self.L/2-self.dx/2, 3)
+        x, y, z = np.meshgrid(_x, _y, _z)
         xb = x.ravel()
         yb = y.ravel()
         zb = z.ravel()
@@ -91,22 +88,26 @@ class RigidFluidCoupling(Application):
         rad_s = self.dx/2
         V = self.dx**3
         cs = 0.0
-        fluid = get_particle_array_wcsph(x=xf, y=yf, z=zf, h=h, m=m, rho=self.rho,
-                                         name="fluid")
+        fluid = get_particle_array_wcsph(x=xf, y=yf, z=zf, h=h, m=m,
+                                         rho=self.rho, name="fluid")
 
         # Create particle array for walls
-        walls = get_particle_array_wcsph(x=xw, y=yw, z=zw, h=h, m=m, rho=self.rho,
-                                         rad_s=rad_s, V=V, name="walls")
+        walls = get_particle_array_wcsph(x=xw, y=yw, z=zw, h=h, m=m,
+                                         rho=self.rho, rad_s=rad_s, V=V,
+                                         name="walls")
         for name in ['fx', 'fy', 'fz']:
             walls.add_property(name)
 
         # Create particle array for ellipsoid
-        cond = ((xf/(self.L/12))**2 + (yf/(self.L/4))**2 + (zf/(self.L/12))**2) <= 1.0
+        cond = (((xf/(self.L/12))**2 +
+                 (yf/(self.L/4))**2 +
+                 (zf/(self.L/12))**2) <= 1.0)
         xe, ye, ze = xf[cond], yf[cond], zf[cond]
 
         ellipsoid = get_particle_array_rigid_body(x=xe, y=ye, z=ze, h=h, m=m,
-                                             rho=self.rho, rad_s=rad_s, V=V, cs=cs,
-                                             body_id=0,name="ellipsoid")
+                                                  rho=self.rho, rad_s=rad_s,
+                                                  V=V, cs=cs, body_id=0,
+                                                  name="ellipsoid")
 
         ellipsoid.total_mass[0] = np.sum(m)
         ellipsoid.add_property('cs')
@@ -116,8 +117,7 @@ class RigidFluidCoupling(Application):
             ['x', 'y', 'z', 'u', 'v', 'w', 'fx', 'fy', 'fz',
              'rho', 'm', 'h', 'p', 'tag', 'pid', 'gid'])
 
-
-        fluid.remove_particles([i for i,c in enumerate(cond) if c])
+        fluid.remove_particles([i for i, c in enumerate(cond) if c])
         fluid.u[:] = fluid.y[:]
         ellipsoid.u[:] = ellipsoid.y[:]
         walls.u[:] = walls.y[:]
@@ -129,15 +129,16 @@ class RigidFluidCoupling(Application):
         return [fluid, walls, ellipsoid]
 
     def create_domain(self):
-        return DomainManager(xmin=-self.L/2, xmax=self.L/2, zmin=-self.L/4, zmax=self.L/4,
-                            periodic_in_x=True, periodic_in_z=True)
+        """Create the domain as periodic domain in x and z."""
+        return DomainManager(xmin=-self.L/2, xmax=self.L/2, zmin=-self.L/4,
+                             zmax=self.L/4, periodic_in_x=True,
+                             periodic_in_z=True)
 
     def create_solver(self):
+        """Create Solver with min. time step from CFL and viscous step."""
         kernel = CubicSpline(dim=3)
-
         integrator = EPECIntegrator(fluid=WCSPHStep(), walls=WCSPHStep(),
-                                    ellipsoid=RK2StepRigidBody()
-                                    )
+                                    ellipsoid=RK2StepRigidBody())
 
         h = self.hdx*self.dx
         dt_cfl = 0.4 * h/(1.1*self.co)
@@ -158,6 +159,11 @@ class RigidFluidCoupling(Application):
         return solver
 
     def create_equations(self):
+        """Set up equations.
+
+        Body force is necessary to reset fx,fy,fz, although
+        not body force is applied.
+        """
         equations = [
             Group(equations=[
                 BodyForce(dest='ellipsoid', sources=None),
@@ -181,34 +187,55 @@ class RigidFluidCoupling(Application):
             Group(equations=[
                 ContinuityEquation(dest='fluid',
                                    sources=['fluid', 'walls', 'ellipsoid']),
-                ContinuityEquation(dest='ellipsoid',sources=['fluid']),
-                ContinuityEquation(dest='walls',sources=['fluid']),
+                ContinuityEquation(dest='ellipsoid', sources=['fluid']),
+                ContinuityEquation(dest='walls', sources=['fluid']),
                 LaminarViscosity(dest='fluid', sources=['fluid', 'walls'],
-                                nu = self.nu),
+                                 nu=self.nu),
                 MomentumEquation(dest='fluid', sources=['fluid', 'walls'],
                                  alpha=self.alpha, beta=0.0, c0=self.co),
                 ViscosityRigidBody(dest='fluid', sources=['ellipsoid'],
-                                nu=self.nu, rho0=self.rho),
+                                   nu=self.nu, rho0=self.rho),
                 PressureRigidBody(dest='fluid', sources=['ellipsoid'],
-                                rho0=self.rho),
+                                  rho0=self.rho),
                 XSPHCorrection(dest='fluid', sources=['fluid']),
             ]),
-            Group(equations=[RigidBodyMoments(dest='ellipsoid', sources=None)]),
-            Group(equations=[RigidBodyMotion(dest='ellipsoid', sources=None)]),
+            Group(equations=[RigidBodyMoments(dest='ellipsoid',
+                                              sources=None)]),
+            Group(equations=[RigidBodyMotion(dest='ellipsoid',
+                                             sources=None)]),
         ]
         return equations
 
     def post_process(self, info_fname):
+        """Plot ellispoid angle and compare it to Jeffery's ODE."""
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            from matplotlib import pyplot as plt
+            from matplotlib import rc
+            rc('font', **{'family': 'serif',
+                          'serif': ['Computer Modern'],
+                          'size': 18})
+            rc('text', usetex=True)
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
         t = []
         phi = []
         output_files = remove_irrelevant_files(self.output_files)
+
+        # Going through output files
         for i, fname in enumerate(output_files):
             data = load(fname)
+            # Extract time
             t.append(data['solver_data']['t'])
+
+            # extract relative positions of ellipsoid particles
             ellipsoid = data['arrays']['ellipsoid']
-            dist = np.sqrt(ellipsoid.x**2+ellipsoid.y**2)
             x = ellipsoid.x-np.mean(ellipsoid.x)
             y = ellipsoid.y-np.mean(ellipsoid.y)
+
+            # compute orienation as covariance matrix
             coords = np.vstack([x, y])
             cov = np.cov(coords)
             evals, evecs = np.linalg.eig(cov)
@@ -219,15 +246,11 @@ class RigidFluidCoupling(Application):
             else:
                 phi.append(np.pi/2.0-np.arctan(dy/dx))
 
-
-
+        # reference solution
         t = np.array(t)
         phi0 = 0.0
-        angle_jeffery = odeint(jeffery_ode, phi0, t, atol=1E-15, args=(3.0,1.0))
-
-        #csv_file = os.path.join(self.output_dir, 'angle.csv')
-        #angle_jeffery = np.reshape(angle_jeffery,(angle_jeffery.size,))
-        #np.savetxt(csv_file, (t, phi, angle_jeffery), delimiter=',')
+        angle_jeffery = odeint(jeffery_ode, phi0, t, atol=1E-15,
+                               args=(3.0, 1.0))
 
         # open new plot
         plt.figure()
@@ -241,16 +264,14 @@ class RigidFluidCoupling(Application):
         plt.ylabel('Rotation angle $\phi$')
         plt.legend(['SPH Simulation', 'Jeffery'])
         plt.grid()
-        x1,x2,y1,y2 = plt.axis()
-        plt.axis((0,x2,0,y2))
+        x1, x2, y1, y2 = plt.axis()
+        plt.axis((0, x2, 0, y2))
         ax = plt.gca()
         ax.set_yticks([0, 0.5*np.pi, np.pi, 1.5*np.pi])
         ax.set_yticklabels(['0', '$\pi/2$', '$\pi$', '$3/2\pi$'])
         plt.tight_layout()
 
         plt.savefig("test.pdf", bbox_inches='tight')
-
-
 
 
 if __name__ == '__main__':
