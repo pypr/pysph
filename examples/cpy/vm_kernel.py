@@ -113,5 +113,6 @@ if __name__ == '__main__':
                    default=10000, help='Number of particles.')
     o = p.parse_args()
     get_config().use_double = o.use_double
-    assert o.backend in ['opencl'], "Only OpenCL backend is supported."
+    assert o.backend in ['opencl', 'cuda'], ("Only OpenCL/CUDA backend is "
+                                             "supported.")
     run(o.n, o.backend)

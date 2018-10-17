@@ -61,7 +61,7 @@ class TestKernel(unittest.TestCase):
         y.pull()
         self.assertTrue(np.allclose(y.data, x.data * a))
 
-    def test_kernel_with_local_memory(self):
+    def test_kernel_with_local_memory_opencl(self):
         importorskip('pyopencl')
 
         # Given
@@ -85,6 +85,37 @@ class TestKernel(unittest.TestCase):
 
         # When
         k = Kernel(knl, backend='opencl')
+        a = 21.0
+        k(x, y, xc, a)
+
+        # Then
+        y.pull()
+        self.assertTrue(np.allclose(y.data, x.data * a))
+
+    def test_kernel_with_local_memory_cuda(self):
+        importorskip('pycuda')
+
+        # Given
+        @annotate(gdoublep='x, y', xc='ldoublep', a='float')
+        def knl(x, y, xc, a):
+            i, lid = declare('int', 2)
+            lid = LID_0
+            i = GID_0 * LDIM_0 + lid
+
+            xc[lid] = x[i]
+
+            local_barrier()
+
+            y[i] = xc[lid] * a
+
+        x = np.linspace(0, 1, 1024)
+        y = np.zeros_like(x)
+        xc = LocalMem(1, backend='cuda')
+
+        x, y = wrap(x, y, backend='cuda')
+
+        # When
+        k = Kernel(knl, backend='cuda')
         a = 21.0
         k(x, y, xc, a)
 
