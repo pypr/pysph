@@ -23,7 +23,7 @@ make_vec_dict = {
 
 
 @memoize
-def get_helper(ctx, src_file, c_type=None):
+def get_helper(src_file, c_type=None):
     # ctx and c_type are the only parameters that
     # change here
     return GPUNNPSHelper(src_file, backend='opencl',

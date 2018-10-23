@@ -2,7 +2,7 @@ from pysph.base.tree.tree import Tree
 from pysph.base.tree.helpers import ParticleArrayWrapper, get_helper, \
     make_vec_dict, ctype_to_dtype, get_vector_dtype
 from pysph.cpy.opencl import profile_kernel, DeviceWGSException, get_queue, \
-    named_profile
+    named_profile, get_context
 from pysph.cpy.array import Array
 from pytools import memoize
 
@@ -274,11 +274,12 @@ class PointTree(Tree):
         self.radius_scale = radius_scale
         self.use_double = use_double
 
-        self.helper = get_helper(self.ctx, 'tree/point_tree.mako', self.c_type)
+        self.helper = get_helper('tree/point_tree.mako', self.c_type)
         self.xmin = None
         self.xmax = None
         self.hmin = None
         self.make_vec = make_vec_dict[c_type][self.dim]
+        self.ctx = get_context()
 
     def set_index_function_info(self):
         self.index_function_args = ["sfc"]
@@ -480,14 +481,16 @@ class PointTree(Tree):
                              self.pids.dev,
                              self.cids.dev,
                              tree_src.pbounds.dev, self.pbounds.dev,
-                             pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z,
-                             pa_gpu_src.h,
-                             pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z,
-                             pa_gpu_dst.h,
+                             pa_gpu_src.x.dev, pa_gpu_src.y.dev,
+                             pa_gpu_src.z.dev,
+                             pa_gpu_src.h.dev,
+                             pa_gpu_dst.x.dev, pa_gpu_dst.y.dev,
+                             pa_gpu_dst.z.dev,
+                             pa_gpu_dst.h.dev,
                              dtype(self.radius_scale),
                              neighbor_cid_count.dev,
                              neighbor_cids.dev,
-                             neighbor_count)
+                             neighbor_count.dev)
 
     def find_neighbors_elementwise(self, neighbor_cid_count, neighbor_cids,
                                    tree_src, start_indices, neighbors):
@@ -504,13 +507,15 @@ class PointTree(Tree):
                        self.pids.dev,
                        self.cids.dev,
                        tree_src.pbounds.dev, self.pbounds.dev,
-                       pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z, pa_gpu_src.h,
-                       pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z, pa_gpu_dst.h,
+                       pa_gpu_src.x.dev, pa_gpu_src.y.dev, pa_gpu_src.z.dev,
+                       pa_gpu_src.h.dev,
+                       pa_gpu_dst.x.dev, pa_gpu_dst.y.dev, pa_gpu_dst.z.dev,
+                       pa_gpu_dst.h.dev,
                        dtype(self.radius_scale),
                        neighbor_cid_count.dev,
                        neighbor_cids.dev,
-                       start_indices,
-                       neighbors)
+                       start_indices.dev,
+                       neighbors.dev)
 
     def _is_valid_nnps_wgs(self):
         # Max work group size can only be found by building the

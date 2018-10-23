@@ -6,7 +6,7 @@ from pysph.base.tree.point_tree import PointTree
 cdef class OctreeGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint fixed_h=False,
-                 bint cache=True, bint sort_gids=False, ctx=None,
+                 bint cache=True, bint sort_gids=False,
                  allow_sort=False, leaf_size=32,
                  bint use_elementwise=False, bint use_partitions=False):
         GPUNNPS.__init__(

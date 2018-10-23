@@ -1,6 +1,6 @@
 import ast
 import numpy as np
-from pyopencl.compyte.dtypes import dtype_to_ctype as dtype_to_ctype_pyopencl
+
 
 def declare(type, num=1):
     """Declare the variable to be of the given type.
@@ -50,8 +50,8 @@ def get_declare_info(arg):
         kind = 'matrix'
         m_arg = ast.literal_eval(arg[7:-1])
         if isinstance(m_arg, tuple) and \
-           len(m_arg) > 1 and \
-           isinstance(m_arg[1], str):
+                        len(m_arg) > 1 and \
+                isinstance(m_arg[1], str):
             shape = m_arg[0]
             type = m_arg[1]
         else:
@@ -155,7 +155,6 @@ def _inject_types_in_module():
 # A convenience so users can import types directly from the module.
 _inject_types_in_module()
 
-
 NP_C_TYPE_MAP = {
     np.dtype(np.bool): 'char',
     np.dtype(np.float32): 'float', np.dtype(np.float64): 'double',
@@ -183,8 +182,13 @@ C_NP_TYPE_MAP = {
 def dtype_to_ctype(dtype):
     try:
         # FIXME: pyopencl depency
+
+        from pyopencl.compyte.dtypes import \
+            dtype_to_ctype as dtype_to_ctype_pyopencl
         ctype = dtype_to_ctype_pyopencl(dtype)
     except ValueError:
+        pass
+    except ImportError:
         pass
     else:
         return ctype

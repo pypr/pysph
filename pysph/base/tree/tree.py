@@ -381,8 +381,7 @@ class Tree(object):
         self.ctx = get_context()
         self.queue = get_queue()
         self.sorted = False
-        self.main_helper = get_helper(self.ctx,
-                                      os.path.join('tree', 'tree.mako'))
+        self.main_helper = get_helper(os.path.join('tree', 'tree.mako'))
 
         self.initialized = False
         self.preamble = ""

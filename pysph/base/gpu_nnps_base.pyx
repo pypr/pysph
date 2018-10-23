@@ -171,8 +171,8 @@ cdef class GPUNNPS(NNPSBase):
             This is useful when comparing parallel results with those
             from a serial run.
 
-        ctx : pyopencl.Context
-            For testing purpose
+        backend : string
+            Backend on which to build NNPS Module
         """
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
