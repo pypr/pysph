@@ -1,6 +1,6 @@
 import ast
 import numpy as np
-
+from pyopencl.compyte.dtypes import dtype_to_ctype as dtype_to_ctype_pyopencl
 
 def declare(type, num=1):
     """Declare the variable to be of the given type.
@@ -86,6 +86,7 @@ class KnownType(object):
     Smells but is convenient as the type may be one available only inside
     Cython without a corresponding Python type.
     """
+
     def __init__(self, type_str, base_type=''):
         """Constructor
 
@@ -156,12 +157,12 @@ _inject_types_in_module()
 
 
 NP_C_TYPE_MAP = {
-    np.bool: 'char',
-    np.float32: 'float', np.float64: 'double',
-    np.int8: 'char', np.uint8: 'unsigned char',
-    np.int16: 'short', np.uint16: 'unsigned short',
-    np.int32: 'int', np.uint32: 'unsigned int',
-    np.int64: 'long', np.uint64: 'unsigned long'
+    np.dtype(np.bool): 'char',
+    np.dtype(np.float32): 'float', np.dtype(np.float64): 'double',
+    np.dtype(np.int8): 'char', np.dtype(np.uint8): 'unsigned char',
+    np.dtype(np.int16): 'short', np.dtype(np.uint16): 'unsigned short',
+    np.dtype(np.int32): 'int', np.dtype(np.uint32): 'unsigned int',
+    np.dtype(np.int64): 'long', np.dtype(np.uint64): 'unsigned long'
 }
 
 C_NP_TYPE_MAP = {
@@ -180,11 +181,41 @@ C_NP_TYPE_MAP = {
 
 
 def dtype_to_ctype(dtype):
+    try:
+        # FIXME: pyopencl depency
+        ctype = dtype_to_ctype_pyopencl(dtype)
+    except ValueError:
+        pass
+    else:
+        return ctype
+    dtype = np.dtype(dtype)
     return NP_C_TYPE_MAP[dtype]
 
 
 def ctype_to_dtype(ctype):
     return C_NP_TYPE_MAP[ctype]
+
+
+def dtype_to_knowntype(dtype, address='scalar'):
+    ctype = dtype_to_ctype(dtype)
+    if 'unsigned' in ctype:
+        ctype = 'u%s' % ctype.replace('unsigned ', '')
+    knowntype = ctype
+    if address == 'ptr':
+        knowntype = '%sp' % knowntype
+    elif address == 'global':
+        knowntype = 'g%sp' % knowntype
+    elif address == 'local':
+        knowntype = 'l%sp' % knowntype
+    elif address != 'scalar':
+        raise ValueError("address can only be scalar,"
+                         " ptr, global or local")
+
+    return knowntype
+    if knowntype in TYPES:
+        return knowntype
+    else:
+        raise TypeError("Not a vaild KnownType")
 
 
 def annotate(func=None, **kw):
@@ -206,16 +237,21 @@ def annotate(func=None, **kw):
     """
     data = {}
 
-    for name, type in kw.items():
-        if isinstance(type, str) and ',' in type:
-            for x in type.split(','):
-                data[_clean_name(x.strip())] = _get_type(name)
-        else:
-            data[_clean_name(name)] = _get_type(type)
+    if not kw:
+        def wrapper(func):
+            func.is_jit = True
+            return func
+    else:
+        for name, type in kw.items():
+            if isinstance(type, str) and ',' in type:
+                for x in type.split(','):
+                    data[_clean_name(x.strip())] = _get_type(name)
+            else:
+                data[_clean_name(name)] = _get_type(type)
 
-    def wrapper(func):
-        func.__annotations__ = data
-        return func
+        def wrapper(func):
+            func.__annotations__ = data
+            return func
 
     if func is None:
         return wrapper

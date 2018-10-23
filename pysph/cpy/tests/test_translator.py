@@ -990,11 +990,11 @@ def test_class():
     src = dedent('''
     class Foo(object):
         def g(self, x=0.0):
-            pass
+            return x*2.0
         def f(self, x=0.0):
             y = x + 1
             do(self.a, x)
-            self.g(y)
+            z = self.g(y)
     ''')
 
     # When
@@ -1002,17 +1002,18 @@ def test_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(Foo* self, double x)
+    double Foo_g(Foo* self, double x)
     {
-        ;
+        return (x * 2.0);
     }
 
     void Foo_f(Foo* self, double x)
     {
         double y;
+        double z;
         y = (x + 1);
         do(self->a, x);
-        Foo_g(self, y);
+        z = Foo_g(self, y);
     }
     ''')
     assert code.strip() == expect.strip()
@@ -1172,14 +1173,14 @@ def test_opencl_conversion():
     ''')
 
     # When
-    known_types = {'d_p': KnownType('__global int*')}
+    known_types = {'d_p': KnownType('GLOBAL_MEM int*')}
     converter = OpenCLConverter(known_types=known_types)
     code = converter.convert(src)
 
     # Then
     expect = dedent('''
-void f(long s_idx, __global double* s_p, long d_idx, __global int* d_p, long
-    J, double t, double* l, double* xx)
+WITHIN_KERNEL void f(long s_idx, GLOBAL_MEM double* s_p, long d_idx,
+    GLOBAL_MEM int* d_p, long J, double t, double* l, double* xx)
 {
     s_p[s_idx] = (LID_0 * GID_0);
 }
@@ -1200,7 +1201,7 @@ def test_opencl_class():
 
     # Then
     expect = dedent('''
-    void Foo_g(__global Foo* self, double x)
+    WITHIN_KERNEL void Foo_g(GLOBAL_MEM Foo* self, double x)
     {
         ;
     }

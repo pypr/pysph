@@ -11,7 +11,7 @@ cdef class OctreeGPUNNPS(GPUNNPS):
                  bint use_elementwise=False, bint use_partitions=False):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, ctx
+            cache, sort_gids, backend='opencl'
         )
 
         self.src_index = -1
@@ -63,7 +63,7 @@ cdef class OctreeGPUNNPS(GPUNNPS):
         def update():
             self.octrees[pa_index]._sort()
 
-        return self.octrees[pa_index].pids.array, update
+        return self.octrees[pa_index].pids, update
 
     cpdef _refresh(self):
         pass
@@ -129,18 +129,18 @@ cdef class OctreeGPUNNPS(GPUNNPS):
         pa_gpu_src = octree_src.pa.gpu
 
         return [
-                   octree_dst.unique_cids.array.data,
-                   octree_src.pids.array.data,
-                   octree_dst.pids.array.data,
-                   octree_dst.cids.array.data,
-                   octree_src.pbounds.array.data, octree_dst.pbounds.array.data,
+                   octree_dst.unique_cids.dev.data,
+                   octree_src.pids.dev.data,
+                   octree_dst.pids.dev.data,
+                   octree_dst.cids.dev.data,
+                   octree_src.pbounds.dev.data, octree_dst.pbounds.dev.data,
                    np.float32(octree_dst.radius_scale),
-                   self.neighbor_cid_counts.array.data,
-                   self.neighbor_cids.array.data,
-                   pa_gpu_dst.x.data, pa_gpu_dst.y.data,
-                   pa_gpu_dst.z.data, pa_gpu_dst.h.data,
-                   pa_gpu_src.x.data, pa_gpu_src.y.data,
-                   pa_gpu_src.z.data, pa_gpu_src.h.data
+                   self.neighbor_cid_counts.dev.data,
+                   self.neighbor_cids.dev.data,
+                   pa_gpu_dst.x.dev.data, pa_gpu_dst.y.dev.data,
+                   pa_gpu_dst.z.dev.data, pa_gpu_dst.h.dev.data,
+                   pa_gpu_src.x.dev.data, pa_gpu_src.y.dev.data,
+                   pa_gpu_src.z.dev.data, pa_gpu_src.h.dev.data
                ], [
                    (self.leaf_size * octree_dst.unique_cid_count,),
                    (self.leaf_size,)

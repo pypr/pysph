@@ -4,7 +4,8 @@ from pytest import importorskip
 
 cl = importorskip('pyopencl')
 
-from pysph.base.opencl import DeviceHelper  # noqa: E402
+import pysph.base.particle_array
+from pysph.base.device_helper import DeviceHelper   # noqa: E402
 from pysph.base.utils import get_particle_array  # noqa: E402
 from pysph.base.tree.point_tree import PointTree  # noqa: E402
 
@@ -14,7 +15,7 @@ def _gen_uniform_dataset_2d(n, h, seed=None):
         np.random.seed(seed)
     u = np.random.uniform
     pa = get_particle_array(x=u(size=n), y=u(size=n), h=h)
-    h = DeviceHelper(pa)
+    h = DeviceHelper(pa, backend='opencl')
     pa.set_device_helper(h)
 
     return pa
@@ -25,7 +26,7 @@ def _gen_uniform_dataset(n, h, seed=None):
         np.random.seed(seed)
     u = np.random.uniform
     pa = get_particle_array(x=u(size=n), y=u(size=n), z=u(size=n), h=h)
-    h = DeviceHelper(pa)
+    h = DeviceHelper(pa, backend='opencl')
     pa.set_device_helper(h)
 
     return pa
@@ -41,8 +42,8 @@ def _dfs_find_leaf(tree):
         output_expr=""
     )
 
-    dfs_find_leaf(tree, tree, leaf_id_count.array)
-    return leaf_id_count.array.get()
+    dfs_find_leaf(tree, tree, leaf_id_count.dev)
+    return leaf_id_count.dev.get()
 
 
 def _check_children_overlap_2d(node_xmin, node_xmax, child_offset):
@@ -81,8 +82,8 @@ def _test_tree_structure(tree, k):
     s = [0, ]
     d = [0, ]
 
-    offsets = tree.offsets.array.get()
-    pbounds = tree.pbounds.array.get()
+    offsets = tree.offsets.dev.get()
+    pbounds = tree.pbounds.dev.get()
 
     max_depth = tree.depth
     max_depth_here = 0
@@ -131,7 +132,7 @@ class QuadtreeTestCase(unittest.TestCase):
         self.pa = pa
 
     def test_pids(self):
-        pids = self.quadtree.pids.array.get()
+        pids = self.quadtree.pids.dev.get()
         s = set()
         for i in range(len(pids)):
             if 0 <= pids[i] < self.N:
@@ -145,12 +146,12 @@ class QuadtreeTestCase(unittest.TestCase):
     def test_node_bounds(self):
 
         self.quadtree.set_node_bounds()
-        pids = self.quadtree.pids.array.get()
-        offsets = self.quadtree.offsets.array.get()
-        pbounds = self.quadtree.pbounds.array.get()
-        node_xmin = self.quadtree.node_xmin.array.get()
-        node_xmax = self.quadtree.node_xmax.array.get()
-        node_hmax = self.quadtree.node_hmax.array.get()
+        pids = self.quadtree.pids.dev.get()
+        offsets = self.quadtree.offsets.dev.get()
+        pbounds = self.quadtree.pbounds.dev.get()
+        node_xmin = self.quadtree.node_xmin.dev.get()
+        node_xmax = self.quadtree.node_xmax.dev.get()
+        node_hmax = self.quadtree.node_hmax.dev.get()
 
         x = self.pa.x[pids]
         y = self.pa.y[pids]
@@ -180,11 +181,11 @@ class QuadtreeTestCase(unittest.TestCase):
         a, b = np.random.randint(0, self.leaf_size, size=2)
         a, b = min(a, b), max(a, b)
 
-        pbounds = self.quadtree.pbounds.array.get()
-        offsets = self.quadtree.offsets.array.get()
+        pbounds = self.quadtree.pbounds.dev.get()
+        offsets = self.quadtree.offsets.dev.get()
 
         mapping, count = self.quadtree.get_leaf_size_partitions(a, b)
-        mapping = mapping.array.get()
+        mapping = mapping.dev.get()
         map_set_gpu = {mapping[i] for i in range(count)}
         map_set_here = {i for i in range(len(offsets))
                         if offsets[i] == -1 and
@@ -209,7 +210,7 @@ class OctreeTestCase(unittest.TestCase):
         self.pa = pa
 
     def test_pids(self):
-        pids = self.octree.pids.array.get()
+        pids = self.octree.pids.dev.get()
         s = set()
         for i in range(len(pids)):
             if 0 <= pids[i] < self.N:
@@ -223,13 +224,13 @@ class OctreeTestCase(unittest.TestCase):
     def test_node_bounds(self):
 
         self.octree.set_node_bounds()
-        print(self.octree.node_hmax.array.get())
-        pids = self.octree.pids.array.get()
-        offsets = self.octree.offsets.array.get()
-        pbounds = self.octree.pbounds.array.get()
-        node_xmin = self.octree.node_xmin.array.get()
-        node_xmax = self.octree.node_xmax.array.get()
-        node_hmax = self.octree.node_hmax.array.get()
+        print(self.octree.node_hmax.dev.get())
+        pids = self.octree.pids.dev.get()
+        offsets = self.octree.offsets.dev.get()
+        pbounds = self.octree.pbounds.dev.get()
+        node_xmin = self.octree.node_xmin.dev.get()
+        node_xmax = self.octree.node_xmax.dev.get()
+        node_hmax = self.octree.node_hmax.dev.get()
 
         x = self.pa.x[pids]
         y = self.pa.y[pids]
@@ -261,11 +262,11 @@ class OctreeTestCase(unittest.TestCase):
         a, b = np.random.randint(0, self.leaf_size, size=2)
         a, b = min(a, b), max(a, b)
 
-        pbounds = self.octree.pbounds.array.get()
-        offsets = self.octree.offsets.array.get()
+        pbounds = self.octree.pbounds.dev.get()
+        offsets = self.octree.offsets.dev.get()
 
         mapping, count = self.octree.get_leaf_size_partitions(a, b)
-        mapping = mapping.array.get()
+        mapping = mapping.dev.get()
         map_set_gpu = {mapping[i] for i in range(count)}
         map_set_here = {i for i in range(len(offsets))
                         if offsets[i] == -1 and

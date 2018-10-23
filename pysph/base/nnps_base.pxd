@@ -148,6 +148,7 @@ cdef class NNPSParticleArrayWrapper:
     cdef int get_number_of_particles(self)
 
 cdef class DomainManager:
+    cdef public object backend
     cdef public object manager
 
 # Domain limits for the simulation
@@ -288,6 +289,7 @@ cdef class NNPS(NNPSBase):
     cdef public DoubleArray xmin      # co-ordinate min values
     cdef public DoubleArray xmax      # co-ordinate max values
     cdef public NeighborCache current_cache  # The current cache
+    cdef public double _last_domain_size # last size of domain.
 
     cdef public bint sort_gids        # Sort neighbors by their gids.
 

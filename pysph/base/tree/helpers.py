@@ -4,8 +4,9 @@ import pyopencl.array
 import pyopencl.cltypes
 from pyopencl.elementwise import ElementwiseKernel
 from pytools import memoize
-from pysph.base.opencl import get_context, get_queue
+from pysph.cpy.opencl import get_context, get_queue
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
+from pysph.cpy.array import Array
 
 make_vec_dict = {
     'float': {
@@ -25,7 +26,7 @@ make_vec_dict = {
 def get_helper(ctx, src_file, c_type=None):
     # ctx and c_type are the only parameters that
     # change here
-    return GPUNNPSHelper(ctx, src_file,
+    return GPUNNPSHelper(src_file, backend='opencl',
                          c_type=c_type)
 
 
@@ -92,22 +93,21 @@ class GPUParticleArrayWrapper(object):
     def _gpu_copy(self, pa_gpu):
         copy_kernel = get_copy_kernel(get_context(), self.c_type_src,
                                       self.c_type, self.varnames)
-        args = [getattr(pa_gpu, v) for v in self.varnames]
-        args += [getattr(self, v) for v in self.varnames]
+        args = [getattr(pa_gpu, v).dev for v in self.varnames]
+        args += [getattr(self, v).dev for v in self.varnames]
         copy_kernel(*args)
 
     def _allocate_memory(self, pa_gpu):
-        shape = getattr(pa_gpu, self.varnames[0]).shape
+        shape = getattr(pa_gpu, self.varnames[0]).dev.shape[0]
         for v in self.varnames:
             setattr(self, v,
-                    cl.array.zeros(get_queue(), shape,
-                                   ctype_to_dtype(self.c_type))
-                    )
+                    Array(ctype_to_dtype(self.c_type),
+                          n=shape, backend='opencl'))
 
     def _gpu_sync(self, pa_gpu):
         v0 = self.varnames[0]
 
-        if getattr(self, v0).shape != getattr(pa_gpu, v0).shape:
+        if getattr(self, v0).dev.shape != getattr(pa_gpu, v0).dev.shape:
             self._allocate_memory(pa_gpu)
         self._gpu_copy(pa_gpu)
 

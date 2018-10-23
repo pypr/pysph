@@ -143,6 +143,7 @@ class CConverter(ast.NodeVisitor):
             'True': '1', 'False': '0', 'None': 'NULL',
             True: '1', False: '0', None: 'NULL',
         }
+        self.function_address_space = ''
 
     def _body_has_return(self, body):
         return re.search(r'\breturn\b', body) is not None
@@ -268,7 +269,8 @@ class CConverter(ast.NodeVisitor):
         src = dedent(inspect.getsource(obj.__class__))
         ignore_methods = [] if ignore_methods is None else ignore_methods
         for method in dir(obj):
-            if not method.startswith('_') and method not in ignore_methods:
+            if not method.startswith(('_', 'py_')) \
+               and method not in ignore_methods:
                 ann = getattr(getattr(obj, method), '__annotations__', None)
                 self._annotations[method] = ann
         code += self.convert(src, ignore_methods)
@@ -293,7 +295,8 @@ class CConverter(ast.NodeVisitor):
         if len(node.targets) != 1:
             self.error("Assignments can have only one target.", node)
         left, right = node.targets[0], node.value
-        if isinstance(right, ast.Call) and right.func.id == 'declare':
+        if isinstance(right, ast.Call) and \
+           isinstance(right.func, ast.Name) and right.func.id == 'declare':
             if not isinstance(right.args[0], ast.Str):
                 self.error("Argument to declare should be a string.", node)
             type = right.args[0].s
@@ -514,9 +517,8 @@ class CConverter(ast.NodeVisitor):
         assert node.args.kwarg is None, \
             "Functions with kwargs not supported in line %d." % node.lineno
 
-        if self._class_name and \
-                (node.name.startswith('_') or
-                    node.name in self._ignore_methods):
+        if self._class_name and (node.name.startswith(('_', 'py_')) or
+                                 node.name in self._ignore_methods):
             return ''
 
         orig_declares = self._declares
@@ -535,7 +537,7 @@ class CConverter(ast.NodeVisitor):
         else:
             func_name = node.name
         return_type = self._get_return_type(body, node)
-        sig = '{ret} {name}({args})'.format(
+        sig = self.function_address_space + '{ret} {name}({args})'.format(
             ret=return_type, name=func_name, args=args
         )
 
@@ -695,7 +697,7 @@ def ocl_detect_type(name, value):
     if isinstance(value, KnownType):
         return value.type
     elif name.startswith(('s_', 'd_')) and name not in ['s_idx', 'd_idx']:
-        return '__global double*'
+        return 'GLOBAL_MEM double*'
     else:
         return detect_type(name, value)
 
@@ -703,6 +705,7 @@ def ocl_detect_type(name, value):
 class OpenCLConverter(CConverter):
     def __init__(self, detect_type=ocl_detect_type, known_types=None):
         super(OpenCLConverter, self).__init__(detect_type, known_types)
+        self.function_address_space = 'WITHIN_KERNEL '
         self._known.update((
             'LID_0', 'LID_1', 'LID_2',
             'GID_0', 'GID_1', 'GID_2',
@@ -711,4 +714,4 @@ class OpenCLConverter(CConverter):
         ))
 
     def _get_self_type(self):
-        return KnownType('__global %s*' % self._class_name)
+        return KnownType('GLOBAL_MEM %s*' % self._class_name)

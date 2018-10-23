@@ -8,7 +8,7 @@ from pysph.cpy.parallel import Elementwise
 from pysph.cpy.array import wrap
 
 
-@annotate(double='xi, yi, xj, yj, gamma', result='doublep')
+@annotate
 def point_vortex(xi, yi, xj, yj, gamma, result):
     xij = xi - xj
     yij = yi - yj
@@ -22,7 +22,7 @@ def point_vortex(xi, yi, xj, yj, gamma, result):
         result[1] = tmp*xij
 
 
-@annotate(int='i, nv', gdoublep='x, y, gamma, u, v')
+@annotate
 def velocity(i, x, y, gamma, u, v, nv):
     j = declare('int')
     tmp = declare('matrix(2)')

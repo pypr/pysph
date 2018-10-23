@@ -240,7 +240,7 @@ cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0):
+                 double n_layers=2.0, backend=None):
         """Constructor
 
         Parameters
@@ -252,8 +252,9 @@ cdef class DomainManager:
         n_layers: double: number of ghost layers as a multiple of
             h_max*radius_scale
         """
+        self.backend = backend
         is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
-        if get_config().use_opencl and not is_periodic:
+        if self.backend and not is_periodic:
             from pysph.base.gpu_domain_manager import GPUDomainManager
             domain_manager = GPUDomainManager
         else:
@@ -262,7 +263,7 @@ cdef class DomainManager:
             xmin=xmin, xmax=xmax, ymin=ymin,
             ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
             periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z,
-            n_layers=n_layers
+            n_layers=n_layers, backend=self.backend
         )
 
     def set_pa_wrappers(self, wrappers):
@@ -308,7 +309,7 @@ cdef class CPUDomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0):
+                 double n_layers=2.0, backend=None):
         """Constructor
 
         The n_layers argument specifies the number of ghost layers as multiples
@@ -1127,6 +1128,7 @@ cdef class NNPS(NNPSBase):
         # min and max coordinate values
         self.xmin = DoubleArray(3)
         self.xmax = DoubleArray(3)
+        self._last_domain_size = 0.0
 
         # The cache.
         self.use_cache = cache
@@ -1200,7 +1202,7 @@ cdef class NNPS(NNPSBase):
         cdef DoubleArray x, y, z
         cdef double xmax = -1e100, ymax = -1e100, zmax = -1e100
         cdef double xmin = 1e100, ymin = 1e100, zmin = 1e100
-        cdef double lx, ly, lz
+        cdef double lx, ly, lz, domain_size
 
         for pa_wrapper in pa_wrappers:
             x = pa_wrapper.x
@@ -1224,6 +1226,19 @@ cdef class NNPS(NNPSBase):
         lx, ly, lz = xmax - xmin, ymax - ymin, zmax - zmin
         xmin -= lx*0.01; ymin -= ly*0.01; zmin -= lz*0.01
         xmax += lx*0.01; ymax += ly*0.01; zmax += lz*0.01
+
+        domain_size = fmax(lx, ly)
+        domain_size = fmax(domain_size, lz)
+        if self._last_domain_size > 1e-16 and \
+           domain_size > 2.0*self._last_domain_size:
+            msg = (
+                '*'*70 +
+                '\nWARNING: Domain size has increased by a large amount.\n' +
+                'Particles are probably diverging, please check your code!\n' +
+                '*'*70
+            )
+            print(msg)
+        self._last_domain_size = domain_size
 
         # If all of the dimensions have very small extent give it a unit size.
         cdef double _eps = 1e-12

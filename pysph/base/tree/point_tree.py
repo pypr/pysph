@@ -1,9 +1,9 @@
 from pysph.base.tree.tree import Tree
 from pysph.base.tree.helpers import ParticleArrayWrapper, get_helper, \
     make_vec_dict, ctype_to_dtype, get_vector_dtype
-from pysph.base.opencl import profile_kernel, DeviceArray, \
-    DeviceWGSException, get_queue
-from pysph.cpy.opencl import named_profile
+from pysph.cpy.opencl import profile_kernel, DeviceWGSException, get_queue, \
+    named_profile
+from pysph.cpy.array import Array
 from pytools import memoize
 
 import sys
@@ -307,10 +307,10 @@ class PointTree(Tree):
                                                     dim=self.dim,
                                                     xvars=self.xvars)
         pa_gpu = self.pa.gpu
-        args = [getattr(pa_gpu, v) for v in self.xvars]
+        args = [getattr(pa_gpu, v).dev for v in self.xvars]
         args += [dtype(self.cell_size),
                  self.make_vec(*[self.xmin[i] for i in range(self.dim)]),
-                 self.sfc.array, self.pids.array]
+                 self.sfc.dev, self.pids.dev]
         fill_particle_data(*args)
 
     def get_index_constants(self, depth):
@@ -384,12 +384,12 @@ class PointTree(Tree):
         pa_gpu = self.pa.gpu
         dtype = ctype_to_dtype(self.c_type)
 
-        args = [self, self.pids.array]
-        args += [getattr(pa_gpu, v) for v in self.xvars]
-        args += [pa_gpu.h,
+        args = [self, self.pids.dev]
+        args += [getattr(pa_gpu, v).dev for v in self.xvars]
+        args += [pa_gpu.h.dev,
                  dtype(self.radius_scale),
-                 self.node_xmin.array, self.node_xmax.array,
-                 self.node_hmax.array]
+                 self.node_xmin.dev, self.node_xmax.dev,
+                 self.node_hmax.dev]
 
         set_node_bounds(*args)
 
@@ -411,17 +411,18 @@ class PointTree(Tree):
 
         def callable(*args):
             return kernel(tree_src, self,
-                          tree_src.node_xmin.array,
-                          tree_src.node_xmax.array,
-                          tree_src.node_hmax.array,
-                          self.node_xmin.array, self.node_xmax.array,
-                          self.node_hmax.array,
+                          tree_src.node_xmin.dev,
+                          tree_src.node_xmax.dev,
+                          tree_src.node_hmax.dev,
+                          self.node_xmin.dev, self.node_xmax.dev,
+                          self.node_hmax.dev,
                           *args)
 
         return callable
 
     def find_neighbor_cids(self, tree_src):
-        neighbor_cid_count = DeviceArray(np.uint32, self.unique_cid_count + 1)
+        neighbor_cid_count = Array(np.uint32, n=self.unique_cid_count + 1,
+                                   backend='opencl')
         find_neighbor_cid_counts = self._leaf_neighbor_operation(
             tree_src,
             args="uint2 *pbounds, int *cnt",
@@ -434,14 +435,15 @@ class PointTree(Tree):
         )
         find_neighbor_cid_counts = profile_kernel(
             find_neighbor_cid_counts, 'find_neighbor_cid_count')
-        find_neighbor_cid_counts(tree_src.pbounds.array,
-                                 neighbor_cid_count.array)
+        find_neighbor_cid_counts(tree_src.pbounds.dev,
+                                 neighbor_cid_count.dev)
 
         neighbor_psum = _get_neighbor_count_prefix_sum_kernel(self.ctx)
-        neighbor_psum(neighbor_cid_count.array)
+        neighbor_psum(neighbor_cid_count.dev)
 
-        total_neighbors = int(neighbor_cid_count.array[-1].get())
-        neighbor_cids = DeviceArray(np.uint32, total_neighbors)
+        total_neighbors = int(neighbor_cid_count.dev[-1].get())
+        neighbor_cids = Array(np.uint32, n=total_neighbors,
+                                    backend='opencl')
 
         find_neighbor_cids = self._leaf_neighbor_operation(
             tree_src,
@@ -455,8 +457,8 @@ class PointTree(Tree):
         )
         find_neighbor_cids = profile_kernel(
             find_neighbor_cids, 'find_neighbor_cids')
-        find_neighbor_cids(tree_src.pbounds.array,
-                           neighbor_cid_count.array, neighbor_cids.array)
+        find_neighbor_cids(tree_src.pbounds.dev,
+                           neighbor_cid_count.dev, neighbor_cids.dev)
         return neighbor_cid_count, neighbor_cids
 
     # TODO?: 1D and 2D NNPS not properly supported here.
@@ -474,17 +476,17 @@ class PointTree(Tree):
         find_neighbor_counts = self.helper.get_kernel(
             'find_neighbor_counts_elementwise', sorted=self.sorted
         )
-        find_neighbor_counts(self.unique_cids_map.array, tree_src.pids.array,
-                             self.pids.array,
-                             self.cids.array,
-                             tree_src.pbounds.array, self.pbounds.array,
+        find_neighbor_counts(self.unique_cids_map.dev, tree_src.pids.dev,
+                             self.pids.dev,
+                             self.cids.dev,
+                             tree_src.pbounds.dev, self.pbounds.dev,
                              pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z,
                              pa_gpu_src.h,
                              pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z,
                              pa_gpu_dst.h,
                              dtype(self.radius_scale),
-                             neighbor_cid_count.array,
-                             neighbor_cids.array,
+                             neighbor_cid_count.dev,
+                             neighbor_cids.dev,
                              neighbor_count)
 
     def find_neighbors_elementwise(self, neighbor_cid_count, neighbor_cids,
@@ -498,15 +500,15 @@ class PointTree(Tree):
 
         find_neighbors = self.helper.get_kernel(
             'find_neighbors_elementwise', sorted=self.sorted)
-        find_neighbors(self.unique_cids_map.array, tree_src.pids.array,
-                       self.pids.array,
-                       self.cids.array,
-                       tree_src.pbounds.array, self.pbounds.array,
+        find_neighbors(self.unique_cids_map.dev, tree_src.pids.dev,
+                       self.pids.dev,
+                       self.cids.dev,
+                       tree_src.pbounds.dev, self.pbounds.dev,
                        pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z, pa_gpu_src.h,
                        pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z, pa_gpu_dst.h,
                        dtype(self.radius_scale),
-                       neighbor_cid_count.array,
-                       neighbor_cids.array,
+                       neighbor_cid_count.dev,
+                       neighbor_cids.dev,
                        start_indices,
                        neighbors)
 
@@ -541,18 +543,20 @@ class PointTree(Tree):
             find_neighbor_counts = self.helper.get_kernel(
                 'find_neighbor_counts', sorted=self.sorted, wgs=wgs
             )
-            find_neighbor_counts(partition_cids.array, tree_src.pids.array,
-                                 self.pids.array,
-                                 self.cids.array,
-                                 tree_src.pbounds.array, self.pbounds.array,
-                                 pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z,
-                                 pa_gpu_src.h,
-                                 pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z,
-                                 pa_gpu_dst.h,
+            find_neighbor_counts(partition_cids.dev, tree_src.pids.dev,
+                                 self.pids.dev,
+                                 self.cids.dev,
+                                 tree_src.pbounds.dev, self.pbounds.dev,
+                                 pa_gpu_src.x.dev, pa_gpu_src.y.dev,
+                                 pa_gpu_src.z.dev,
+                                 pa_gpu_src.h.dev,
+                                 pa_gpu_dst.x.dev, pa_gpu_dst.y.dev,
+                                 pa_gpu_dst.z.dev,
+                                 pa_gpu_dst.h.dev,
                                  dtype(self.radius_scale),
-                                 neighbor_cid_count.array,
-                                 neighbor_cids.array,
-                                 neighbor_count,
+                                 neighbor_cid_count.dev,
+                                 neighbor_cids.dev,
+                                 neighbor_count.dev,
                                  gs=(partition_wgs * partition_size,),
                                  ls=(partition_wgs,),
                                  queue=(get_queue() if q is None else q))
@@ -587,19 +591,19 @@ class PointTree(Tree):
             find_neighbors = self.helper.get_kernel('find_neighbors',
                                                     sorted=self.sorted,
                                                     wgs=wgs)
-            find_neighbors(partition_cids.array, tree_src.pids.array,
-                           self.pids.array,
-                           self.cids.array,
-                           tree_src.pbounds.array, self.pbounds.array,
-                           pa_gpu_src.x, pa_gpu_src.y, pa_gpu_src.z,
-                           pa_gpu_src.h,
-                           pa_gpu_dst.x, pa_gpu_dst.y, pa_gpu_dst.z,
-                           pa_gpu_dst.h,
+            find_neighbors(partition_cids.dev, tree_src.pids.dev,
+                           self.pids.dev,
+                           self.cids.dev,
+                           tree_src.pbounds.dev, self.pbounds.dev,
+                           pa_gpu_src.x.dev, pa_gpu_src.y.dev, pa_gpu_src.z.dev,
+                           pa_gpu_src.h.dev,
+                           pa_gpu_dst.x.dev, pa_gpu_dst.y.dev, pa_gpu_dst.z.dev,
+                           pa_gpu_dst.h.dev,
                            dtype(self.radius_scale),
-                           neighbor_cid_count.array,
-                           neighbor_cids.array,
-                           start_indices,
-                           neighbors,
+                           neighbor_cid_count.dev,
+                           neighbor_cids.dev,
+                           start_indices.dev,
+                           neighbors.dev,
                            gs=(partition_wgs * partition_size,),
                            ls=(partition_wgs,),
                            queue=(get_queue() if q is None else q))

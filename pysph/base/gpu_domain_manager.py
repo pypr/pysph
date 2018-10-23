@@ -1,15 +1,12 @@
 import numpy as np
-import pyopencl as cl
-import pyopencl.array
-
-from pysph.base.opencl import get_config
+from pysph.cpy.config import get_config
 
 
 class GPUDomainManager(object):
     def __init__(self, xmin=-1000., xmax=1000., ymin=0.,
                  ymax=0., zmin=0., zmax=0.,
                  periodic_in_x=False, periodic_in_y=False,
-                 periodic_in_z=False, n_layers=2.0):
+                 periodic_in_z=False, n_layers=2.0, backend=None):
         """Constructor"""
         self.xmin = xmin
         self.xmax = xmax

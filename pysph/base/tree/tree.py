@@ -7,8 +7,8 @@ import pyopencl.cltypes
 from pyopencl.elementwise import ElementwiseKernel
 from pyopencl.scan import GenericScanKernel
 
-from pysph.base.opencl import DeviceArray
 from pysph.cpy.opencl import get_context, get_queue, named_profile
+from pysph.cpy.array import Array
 from pysph.base.tree.helpers import get_vector_dtype, get_helper
 
 NODE_KERNEL_TEMPLATE = r"""
@@ -310,7 +310,7 @@ def tree_bottom_up(ctx, args, setup, leaf_operation, node_operation,
         for i in range(tree.depth, -1, -1):
             csum_nodes_next = csum_nodes
             csum_nodes -= tree.num_nodes[i]
-            out = kernel(tree.offsets.array, tree.pbounds.array,
+            out = kernel(tree.offsets.dev, tree.pbounds.dev,
                          *args,
                          slice=slice(csum_nodes, csum_nodes_next))
         return out
@@ -339,8 +339,8 @@ def leaf_tree_traverse(ctx, k, args, setup, node_operation, leaf_operation,
 
     def callable(tree_src, tree_dst, *args):
         return kernel(
-            tree_dst.unique_cids.array[:tree_dst.unique_cid_count],
-            tree_dst.cids.array, tree_src.offsets.array, *args
+            tree_dst.unique_cids.dev[:tree_dst.unique_cid_count],
+            tree_dst.cids.dev, tree_src.offsets.dev, *args
         )
 
     return callable
@@ -367,7 +367,7 @@ def point_tree_traverse(ctx, k, args, setup, node_operation, leaf_operation,
 
     def callable(tree_src, tree_dst, *args):
         return kernel(
-            tree_dst.cids.array, tree_src.offsets.array, *args
+            tree_dst.cids.dev, tree_src.offsets.dev, *args
         )
 
     return callable
@@ -413,13 +413,13 @@ class Tree(object):
     def _initialize_data(self):
         self.sorted = False
         num_particles = self.n
-        self.pids = DeviceArray(np.uint32, n=num_particles)
-        self.cids = DeviceArray(np.uint32, n=num_particles)
+        self.pids = Array(np.uint32, n=num_particles, backend='opencl')
+        self.cids = Array(np.uint32, n=num_particles, backend='opencl')
         self.cids.fill(0)
 
         for var, dtype in zip(self.index_function_args,
                               self.index_function_arg_dtypes):
-            setattr(self, var, DeviceArray(dtype, n=num_particles))
+            setattr(self, var, Array(dtype, n=num_particles, backend='opencl'))
 
         # Filled after tree built
         self.pbounds = None
@@ -461,11 +461,11 @@ class Tree(object):
     # a better approach to save on memory
     def _create_temp_vars(self, temp_vars):
         n = self.n
-        temp_vars['pids'] = DeviceArray(np.uint32, n)
+        temp_vars['pids'] = Array(np.uint32, n=n, backend='opencl')
         for var, dtype in zip(self.index_function_args,
                               self.index_function_arg_dtypes):
-            temp_vars[var] = DeviceArray(dtype, n)
-        temp_vars['cids'] = DeviceArray(np.uint32, n)
+            temp_vars[var] = Array(dtype, n=n, backend='opencl')
+        temp_vars['cids'] = Array(np.uint32, n=n, backend='opencl')
 
     def _exchange_temp_vars(self, temp_vars):
         for k in temp_vars.keys():
@@ -495,8 +495,8 @@ class Tree(object):
 
         particle_kernel = _get_particle_kernel(self.ctx, self.k,
                                                args, self.index_code)
-        args = [seg_flag.array, child_count_prefix_sum.array]
-        args += [x.array for x in self.get_data_args()]
+        args = [seg_flag.dev, child_count_prefix_sum.dev]
+        args += [x.dev for x in self.get_data_args()]
         args += self.get_index_constants(depth)
         particle_kernel(*args)
 
@@ -510,13 +510,13 @@ class Tree(object):
             index_code=self.index_code
         )
 
-        args = [self.pids.array, self.cids.array,
-                seg_flag.array,
-                pbounds_parent.array, offsets_parent.array,
-                child_count_prefix_sum.array,
-                temp_vars['pids'].array, temp_vars['cids'].array]
-        args += [x.array for x in self.get_data_args()]
-        args += [x.array for x in self._get_temp_data_args(temp_vars)]
+        args = [self.pids.dev, self.cids.dev,
+                seg_flag.dev,
+                pbounds_parent.dev, offsets_parent.dev,
+                child_count_prefix_sum.dev,
+                temp_vars['pids'].dev, temp_vars['cids'].dev]
+        args += [x.dev for x in self.get_data_args()]
+        args += [x.dev for x in self._get_temp_data_args(temp_vars)]
         args += self.get_index_constants(depth)
         args += [np.uint32(csum_nodes_prev)]
 
@@ -530,16 +530,16 @@ class Tree(object):
         for i in range(self.depth + 1):
             total_nodes += self.num_nodes[i]
 
-        self.offsets = DeviceArray(np.int32, total_nodes)
-        self.pbounds = DeviceArray(cl.cltypes.uint2, total_nodes)
+        self.offsets = Array(np.int32, n=total_nodes, backend='opencl')
+        self.pbounds = Array(cl.cltypes.uint2, n=total_nodes, backend='opencl')
 
         append_layer = self.main_helper.get_kernel('append_layer')
 
         self.total_nodes = total_nodes
         for i in range(self.depth + 1):
             append_layer(
-                offsets_temp[i].array, pbounds_temp[i].array,
-                self.offsets.array, self.pbounds.array,
+                offsets_temp[i].dev, pbounds_temp[i].dev,
+                self.offsets.dev, self.pbounds.dev,
                 np.int32(curr_offset), np.uint8(i == self.depth)
             )
             curr_offset += self.num_nodes[i]
@@ -551,18 +551,18 @@ class Tree(object):
 
         # Update particle-related data of children
         set_node_data = self.main_helper.get_kernel("set_node_data", k=self.k)
-        set_node_data(offsets_prev.array, pbounds_prev.array,
-                      offsets.array, pbounds.array,
-                      seg_flag.array, child_count_prefix_sum.array,
+        set_node_data(offsets_prev.dev, pbounds_prev.dev,
+                      offsets.dev, pbounds.dev,
+                      seg_flag.dev, child_count_prefix_sum.dev,
                       np.uint32(csum_nodes),
                       np.uint32(n))
 
         # Set children offsets
-        leaf_count = DeviceArray(np.uint32, 1)
+        leaf_count = Array(np.uint32, n=1, backend='opencl')
         set_offsets = _get_set_offset_kernel(self.ctx, self.k, self.leaf_size)
-        set_offsets(pbounds.array, offsets.array, leaf_count.array,
+        set_offsets(pbounds.dev, offsets.dev, leaf_count.dev,
                     np.uint32(csum_nodes_next))
-        return leaf_count.array[0].get()
+        return leaf_count.dev[0].get()
 
     def _build_tree(self, fixed_depth=None):
         # We build the tree one layer at a time. We stop building new
@@ -607,18 +607,18 @@ class Tree(object):
         # Initialize temporary data (but persistent across layers)
         self._create_temp_vars(temp_vars)
 
-        child_count_prefix_sum = DeviceArray(get_vector_dtype('uint', self.k),
-                                             n)
+        child_count_prefix_sum = Array(get_vector_dtype('uint', self.k),
+                                       n=n, backend='opencl')
 
-        seg_flag = DeviceArray(cl.cltypes.char, n)
+        seg_flag = Array(cl.cltypes.char, n=n, backend='opencl')
         seg_flag.fill(0)
-        seg_flag.array[0] = 1
+        seg_flag.dev[0] = 1
 
-        offsets_temp = [DeviceArray(np.int32, 1)]
+        offsets_temp = [Array(np.int32, n=1, backend='opencl')]
         offsets_temp[-1].fill(1)
 
-        pbounds_temp = [DeviceArray(cl.cltypes.uint2, 1)]
-        pbounds_temp[-1].array[0].set(cl.cltypes.make_uint2(0, n))
+        pbounds_temp = [Array(cl.cltypes.uint2, n=1, backend='opencl')]
+        pbounds_temp[-1].dev[0].set(cl.cltypes.make_uint2(0, n))
 
         # FIXME: Depths above 20 possible and feasible for binary / quad trees
         loop_lim = min(fixed_depth, 20)
@@ -632,9 +632,10 @@ class Tree(object):
             self.num_nodes.append(num_nodes)
 
             # Allocate new layer
-            offsets_temp.append(DeviceArray(np.int32, self.num_nodes[-1]))
-            pbounds_temp.append(DeviceArray(cl.cltypes.uint2,
-                                            self.num_nodes[-1]))
+            offsets_temp.append(Array(np.int32, n=self.num_nodes[-1],
+                                      backend='opencl'))
+            pbounds_temp.append(Array(cl.cltypes.uint2,
+                                      n=self.num_nodes[-1], backend='opencl'))
 
             # Generate particle index and reorder the particles
             self._reorder_particles(depth, child_count_prefix_sum,
@@ -662,23 +663,23 @@ class Tree(object):
 
     def _get_unique_cids_and_count(self):
         n = self.n
-        self.unique_cids = DeviceArray(np.uint32, n=n)
-        self.unique_cids_map = DeviceArray(np.uint32, n=n)
-        uniq_count = DeviceArray(np.uint32, n=1)
+        self.unique_cids = Array(np.uint32, n=n, backend='opencl')
+        self.unique_cids_map = Array(np.uint32, n=n, backend='opencl')
+        uniq_count = Array(np.uint32, n=1, backend='opencl')
         unique_cids_kernel = _get_unique_cids_kernel(self.ctx)
-        unique_cids_kernel(self.cids.array, self.unique_cids_map.array,
-                           self.unique_cids.array, uniq_count.array)
-        self.unique_cid_count = uniq_count.array[0].get()
+        unique_cids_kernel(self.cids.dev, self.unique_cids_map.dev,
+                           self.unique_cids.dev, uniq_count.dev)
+        self.unique_cid_count = uniq_count.dev[0].get()
 
     def get_leaves(self):
-        leaves = DeviceArray(np.uint32, n=self.offsets.array.shape[0])
-        num_leaves = DeviceArray(np.uint32, n=1)
+        leaves = Array(np.uint32, n=self.offsets.dev.shape[0], backend='opencl')
+        num_leaves = Array(np.uint32, n=1, backend='opencl')
         leaves_kernel = _get_leaves_kernel(self.ctx, self.leaf_size)
-        leaves_kernel(self.offsets.array, self.pbounds.array,
-                      leaves.array, num_leaves.array)
+        leaves_kernel(self.offsets.dev, self.pbounds.dev,
+                      leaves.dev, num_leaves.dev)
 
-        num_leaves = num_leaves.array[0].get()
-        return leaves.array[:num_leaves], num_leaves
+        num_leaves = num_leaves.dev[0].get()
+        return leaves.dev[:num_leaves], num_leaves
 
     def _sort(self):
         """Set tree as being sorted
@@ -692,10 +693,10 @@ class Tree(object):
     # Tree API
     ###########################################################################
     def allocate_node_prop(self, dtype):
-        return DeviceArray(dtype, self.total_nodes)
+        return Array(dtype, n=self.total_nodes, backend='opencl')
 
     def allocate_leaf_prop(self, dtype):
-        return DeviceArray(dtype, int(self.unique_cid_count))
+        return Array(dtype, n=int(self.unique_cid_count), backend='opencl')
 
     def get_preamble(self):
         if self.sorted:
@@ -714,21 +715,22 @@ class Tree(object):
             Maximum leaf size
         Returns
         -------
-        groups : DeviceArray
+        groups : Array
             An array which contains the cell ids of leaves
             with leaf size > group_min and leaf size <= group_max
         group_count : int
             The number of leaves which satisfy the given condition
             on the leaf size
         """
-        groups = DeviceArray(np.uint32, int(self.unique_cid_count))
-        group_count = DeviceArray(np.uint32, 1)
+        groups = Array(np.uint32, n=int(self.unique_cid_count),
+                       backend='opencl')
+        group_count = Array(np.uint32, n=1, backend='opencl')
 
         get_cid_groups = _get_cid_groups_kernel(self.ctx)
-        get_cid_groups(self.unique_cids.array[:self.unique_cid_count],
-                       self.pbounds.array, groups.array, group_count.array,
+        get_cid_groups(self.unique_cids.dev[:self.unique_cid_count],
+                       self.pbounds.dev, groups.dev, group_count.dev,
                        np.int32(group_min), np.int32(group_max))
-        result = groups, int(group_count.array[0].get())
+        result = groups, int(group_count.dev[0].get())
         return result
 
     def tree_bottom_up(self, args, setup, leaf_operation, node_operation,

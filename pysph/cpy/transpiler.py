@@ -123,14 +123,14 @@ class CodeBlock(object):
 
 
 class Transpiler(object):
-    def __init__(self, backend='cython'):
+    def __init__(self, backend='cython', incl_cluda=True):
         """Constructor.
 
         Parameters
         ----------
 
         backend: str: Backend to use.
-            Can be one of 'cython', 'opencl', or 'python'
+            Can be one of 'cython', 'opencl', 'cuda' or 'python'
         """
         self.backend = backend
         self.blocks = []
@@ -150,13 +150,32 @@ class Transpiler(object):
         elif backend == 'opencl':
             from pyopencl._cluda import CLUDA_PREAMBLE
             self._cgen = OpenCLConverter()
-            cluda = Template(text=CLUDA_PREAMBLE).render(
-                double_support=True
-            )
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
             self.header = cluda + dedent('''
             #define max(x, y) fmax((double)(x), (double)(y))
 
+            #ifdef __APPLE__
+            #define M_PI 3.14159265358979323846
+            #endif
+
             __constant double pi=M_PI;
+            ''')
+        elif backend == 'cuda':
+            from pycuda._cluda import CLUDA_PREAMBLE
+            self._cgen = OpenCLConverter()
+            cluda = ''
+            if incl_cluda:
+                cluda = Template(text=CLUDA_PREAMBLE).render(
+                    double_support=True
+                )
+            self.header = cluda + dedent('''
+            #define max(x, y) fmax((double)(x), (double)(y))
+
+            __constant__ double pi= 3.141592654f;
             ''')
 
     def _handle_symbol(self, name, value):
@@ -171,7 +190,7 @@ class Transpiler(object):
             ctype = 'double'
         elif isinstance(value, bool):
             ctype = 'bint' if backend == 'cython' else 'int'
-            if backend == 'opencl':
+            if backend == 'opencl' or backend == 'cuda':
                 value = str(value).lower()
         else:
             msg = 'Unsupported type (%s) of variable "%s"' % (
@@ -183,7 +202,7 @@ class Transpiler(object):
             return 'cdef {type} {name} = {value}'.format(
                 type=ctype, name=name, value=value
             )
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             return '#define {name} {value}'.format(
                 name=name, value=value
             )
@@ -195,7 +214,7 @@ class Transpiler(object):
         lines = []
         comment = self._get_comment()
         if len(syms):
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             code = '{com} Global constants from user namespace'.format(
                 com=comment
             )
@@ -210,7 +229,7 @@ class Transpiler(object):
         # Link is ignored for now until we have a concrete example.
         if code:
             comment = self._get_comment()
-            hline = '{com} {line}'.format(com=comment, line='-'*70)
+            hline = '{com} {line}'.format(com=comment, line='-' * 70)
             info = '{com} External definitions.'.format(com=comment)
             lines = [hline, info, ''] + code + [hline]
             self.header += '\n'.join(lines)
@@ -240,7 +259,7 @@ class Transpiler(object):
         if self.backend == 'cython':
             self._cgen.parse(obj)
             code = self._cgen.get_code()
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             code = self._cgen.parse(obj)
 
         cb = CodeBlock(obj, code)
@@ -267,3 +286,8 @@ class Transpiler(object):
             self.mod = cl.Program(ctx, self.source).build(
                 options=['-w']
             )
+        elif self.backend == 'cuda':
+            import pycuda as cu
+            from pycuda.compiler import SourceModule
+            self.source = convert_to_float_if_needed(self.get_code())
+            self.mod = SourceModule(self.source)
