@@ -247,14 +247,13 @@ class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
         NNPS2DTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
+
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            dim=2, particles=self.particles, radius_scale=2.0
         )
 
     def tearDown(self):
@@ -269,14 +268,12 @@ class OctreeGPUNNPSDouble2DTestCase(DictBoxSortNNPS2DTestCase):
         NNPS2DTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = True
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            dim=2, particles=self.particles, radius_scale=2.0
         )
 
     def tearDown(self):
@@ -623,14 +620,12 @@ class OctreeGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            dim=3, particles=self.particles, radius_scale=2.0
         )
 
     def tearDown(self):
@@ -665,13 +660,11 @@ class OctreeGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = True
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            dim=3, particles=self.particles, radius_scale=2.0
         )
 
     def tearDown(self):
@@ -707,13 +700,11 @@ class OctreeGPUNNPSWithSortingTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx
+            dim=3, particles=self.particles, radius_scale=2.0
         )
         self.nps.spatially_order_particles(0)
         self.nps.spatially_order_particles(1)
@@ -731,13 +722,12 @@ class OctreeGPUNNPSWithPartitioningTestCase(DictBoxSortNNPSTestCase):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
         from pysph.base import gpu_nnps
-        ctx = cl.create_some_context(interactive=False)
         cfg = get_config()
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            ctx=ctx, use_partitions=True
+            use_partitions=True
         )
 
         for pa in self.particles:

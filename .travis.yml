@@ -20,9 +20,9 @@ install:
     - conda update -q conda
     - conda info -a
     - conda config --add channels conda-forge
-    - conda config --add channels anaconda
+    - conda config --add channels defaults
     - conda install -c conda-forge pocl pyopencl
-    - conda install -c anaconda virtualenv
+    - conda install -c defaults virtualenv
     - python -c 'import pyopencl as cl'
     - pip install beaker tox tox-travis
 
