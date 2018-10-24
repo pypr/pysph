@@ -223,15 +223,12 @@ class TaylorGreen(Application):
         if corr == 'kernel-corr' or corr == 'mixed-corr':
             fluid.add_property('cwij')
         if corr == 'mixed-corr' or corr == 'grad-corr':
-            len_f = len(fluid.x) * 13
-            fluid.add_constant('m_mat', [0.0] * len_f)
+            fluid.add_property('m_mat', stride=9)
         elif corr == 'crksph':
             fluid.add_property('ai')
-            len_f = len(fluid.x) * 13
-            fluid.add_constant('gradbi', [0.0] * len_f)
-            len_f = len(fluid.x) * 5
-            for const in ['gradai', 'bi']:
-                fluid.add_constant(const, [0.0] * len_f)
+            fluid.add_property('gradbi', stride=9)
+            for prop in ['gradai', 'bi']:
+                fluid.add_property(prop, stride=2)
 
         # return the particle list
         return [fluid]
