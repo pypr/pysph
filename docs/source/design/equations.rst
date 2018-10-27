@@ -246,7 +246,7 @@ number of variables. While this is ignored during transpilation, this is
 useful when writing functions in pure Python, the
 :py:func:`pysph.base.cython_generator.declare` function provides a pure Python
 implementation of this so that the code works both when compiled as well as
-when run from pure Python. For example::
+when run from pure Python. For example:
 
 .. code-block:: python
 
@@ -339,7 +339,7 @@ perform what the ``loop`` method usually does ourselves.
                xij[0] = d_x[d_idx] - s_x[s_idx]
                xij[1] = d_y[d_idx] - s_y[s_idx]
                xij[2] = d_z[d_idx] - s_z[s_idx]
-               rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
+               rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] + xij[2]*xij[2])
                sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
            d_rho[d_idx] += sum
 
