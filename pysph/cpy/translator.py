@@ -159,6 +159,9 @@ class CConverter(ast.NodeVisitor):
     def _get_self_type(self):
         return KnownType('%s*' % self._class_name)
 
+    def _get_local_arg(self, arg, type):
+        return arg, type
+
     def _get_function_args(self, node):
         node_args = node.args.args
         if PY_VER == 2:
@@ -190,6 +193,8 @@ class CConverter(ast.NodeVisitor):
         for arg in args:
             value = call_args[arg]
             type = self._detect_type(arg, value)
+            if 'LOCAL_MEM' in type:
+                arg, type = self._get_local_arg(arg, type)
             call_sig.append('{type} {arg}'.format(type=type, arg=arg))
 
         return ', '.join(call_sig)
@@ -214,7 +219,7 @@ class CConverter(ast.NodeVisitor):
 
     def _indent_block(self, code):
         lines = code.splitlines()
-        pad = ' '*4
+        pad = ' ' * 4
         return '\n'.join(pad + x for x in lines)
 
     def _remove_docstring(self, body):
@@ -223,6 +228,9 @@ class CConverter(ast.NodeVisitor):
             return body[1:]
         else:
             return body
+
+    def _get_local_declarations(self):
+        return ''
 
     def convert(self, src, ignore_methods=None):
         if ignore_methods is not None:
@@ -239,7 +247,7 @@ class CConverter(ast.NodeVisitor):
             if node.lineno > 1:  # pragma no branch
                 msg += self._src[node.lineno - 2] + '\n'
             msg += self._src[node.lineno - 1] + '\n'
-            msg += ' '*node.col_offset + '^' + '\n\n'
+            msg += ' ' * node.col_offset + '^' + '\n\n'
         msg += message
         raise NotImplementedError(msg)
 
@@ -258,11 +266,12 @@ class CConverter(ast.NodeVisitor):
     def parse(self, obj):
         obj_type = type(obj)
         if isinstance(obj, types.FunctionType):
-            return self.parse_function(obj)
+            code = self.parse_function(obj)
         elif hasattr(obj, '__class__'):
-            return self.parse_instance(obj)
+            code = self.parse_instance(obj)
         else:
             raise TypeError('Unsupported type to wrap: %s' % obj_type)
+        return code
 
     def parse_instance(self, obj, ignore_methods=None):
         code = self.get_struct_from_instance(obj)
@@ -446,7 +455,7 @@ class CConverter(ast.NodeVisitor):
                      block='\n'.join(
                          self._indent_block(self.visit(x)) for x in node.body
                      )
-                 )
+            )
         else:
             count = self._for_count
             self._for_count += 1
@@ -471,7 +480,7 @@ class CConverter(ast.NodeVisitor):
                           i=target, type=target_type,
                           start=start, stop=stop, incr=incr,
                           comp=comparator, block=block
-                      )
+                )
             else:
                 step_var = '__cpy_step_{count}'.format(count=count)
                 type = 'long ' if step_var not in self._known else ''
@@ -532,6 +541,7 @@ class CConverter(ast.NodeVisitor):
         args = self._get_function_args(node)
         body = '\n'.join(self._indent_block(self.visit(item))
                          for item in self._remove_docstring(node.body))
+        local_decl = self._get_local_declarations()
         if len(self._class_name) > 0:
             func_name = self._class_name + '_' + node.name
         else:
@@ -546,11 +556,11 @@ class CConverter(ast.NodeVisitor):
             declares += '\n'
 
         sig = '\n'.join(wrap(
-            sig, width=78, subsequent_indent=' '*4, break_long_words=False
+            sig, width=78, subsequent_indent=' ' * 4, break_long_words=False
         ))
         self._known = orig_known
         self._declares = orig_declares
-        return sig + '\n{\n' + declares + body + '\n}\n'
+        return sig + '\n{\n' + local_decl + declares + body + '\n}\n'
 
     def visit_Gt(self, node):
         return '>'
@@ -693,3 +703,57 @@ class OpenCLConverter(CConverter):
 
     def _get_self_type(self):
         return KnownType('GLOBAL_MEM %s*' % self._class_name)
+
+
+class CUDAConverter(OpenCLConverter):
+    def __init__(self, detect_type=ocl_detect_type, known_types=None):
+        super(CUDAConverter, self).__init__(detect_type, known_types)
+        self._local_decl = None
+
+    def _get_local_arg(self, arg, type):
+        return 'size_%s' % arg, 'int'
+
+    def _get_local_info(self, obj):
+        fname = obj.__name__
+        annotations = self._annotations[fname]
+        local_info = {}
+        for arg, kt in annotations.items():
+            if 'LOCAL_MEM' in kt.type:
+                local_info[arg] = kt.base_type
+        if local_info:
+            return local_info
+        return None
+
+    def parse_function(self, obj):
+        src = dedent(inspect.getsource(obj))
+        fname = obj.__name__
+        self._annotations[fname] = getattr(obj, '__annotations__', None)
+        self._local_decl = self._get_local_info(obj)
+        code = self.convert(src)
+        self._local_decl = None
+        self._annotations = {}
+        return code
+
+    def _get_local_declarations(self):
+        local_decl = ''
+        if self._local_decl:
+            decls = ['extern LOCAL_MEM float shared_buff[];']
+            # Reference:
+            # https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#shared
+            for arg, dtype in self._local_decl.items():
+                if len(decls) == 1:
+                    local_decl = ('%(dtype)s* %(arg)s = '
+                                  '(%(dtype)s*) shared_buff;')
+                    local_decl = local_decl % {'dtype': dtype, 'arg': arg}
+                    decls.append(local_decl)
+                    prev_arg = arg
+                else:
+                    local_decl = ('%(dtype)s* %(arg)s = (%(dtype)s*) '
+                                  '&%(prev_arg)s[size_%(prev_arg)s];')
+                    local_decl = local_decl % {'dtype': dtype, 'arg': arg,
+                                               'prev_arg': prev_arg}
+                    decls.append(local_decl)
+                    prev_arg = arg
+            local_decl = self._indent_block('\n'.join(decls))
+            local_decl += '\n'
+        return local_decl
