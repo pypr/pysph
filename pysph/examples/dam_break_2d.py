@@ -201,22 +201,16 @@ class DamBreak2D(Application):
             fluid.add_property('cwij')
             boundary.add_property('cwij')
         if corr == 'mixed-corr' or corr == 'grad-corr':
-            len_f = len(fluid.x) * 9
-            len_b = len(boundary.x) * 9
-            fluid.add_constant('m_mat', [0.0] * len_f)
-            boundary.add_constant('m_mat', [0.0] * len_b)
+            fluid.add_property('m_mat', stride=9)
+            boundary.add_property('m_mat', stride=9)
         elif corr == 'crksph':
             fluid.add_property('ai')
             boundary.add_property('ai')
-            len_f = len(fluid.x) * 9
-            len_b = len(boundary.x) * 9
-            fluid.add_constant('gradbi', [0.0] * len_f)
-            boundary.add_constant('gradbi', [0.0] * len_b)
-            len_f = len(fluid.x) * 3
-            len_b = len(boundary.x) * 3
-            for const in ['gradai', 'bi']:
-                fluid.add_constant(const, [0.0] * len_f)
-                boundary.add_constant(const, [0.0] * len_b)
+            fluid.add_property('gradbi', stride=9)
+            boundary.add_property('gradbi', stride=9)
+            for prop in ['gradai', 'bi']:
+                fluid.add_property(prop, stride=3)
+                boundary.add_property(prop, stride=3)
 
         return [fluid, boundary]
 
