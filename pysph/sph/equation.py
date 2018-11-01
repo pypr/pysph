@@ -833,3 +833,25 @@ class OpenCLGroup(Group):
             src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
             wrappers.append(src)
         return '\n'.join(wrappers)
+
+
+class MultiStageEquations(object):
+    '''A class that allows a user to specify different equations
+    for different stages.
+
+    The object doesn't do much, except contain the different collections of
+    equations.
+
+    '''
+
+    def __init__(self, groups):
+        '''
+        Parameters
+        ----------
+
+        groups: list/tuple
+            A list/tuple of list of groups/equations, one for each stage.
+
+        '''
+        assert type(groups) in (list, tuple)
+        self.groups = groups

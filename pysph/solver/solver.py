@@ -430,7 +430,7 @@ class Solver(object):
 
         # Compute the accelerations once for the predictor corrector
         # integrator to work correctly at the first time step.
-        self.acceleration_eval.compute(self.t, self.dt)
+        self.integrator.initial_acceleration(self.t, self.dt)
 
         # Now get a suitable adaptive (if requested) and damped timestep to
         # integrate with.
