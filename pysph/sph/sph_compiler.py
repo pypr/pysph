@@ -1,5 +1,5 @@
 class SPHCompiler(object):
-    def __init__(self, acceleration_eval, integrator):
+    def __init__(self, acceleration_evals, integrator):
         """Compiles the acceleration evaluator and integrator to produce a
         fast version using one of the supported backends. If the backend is
         not given, one is automatically chosen based on the configuration.
@@ -11,12 +11,10 @@ class SPHCompiler(object):
             or list of instances.
         integrator: .integrator.Integrator instance
         """
-        if not isinstance(acceleration_eval, (list, tuple)):
-            acceleration_evals = [acceleration_eval]
-        else:
-            acceleration_evals = acceleration_eval
+        if not isinstance(acceleration_evals, (list, tuple)):
+            acceleration_evals = [acceleration_evals]
 
-        self.acceleration_evals = acceleration_evals
+        self.acceleration_evals = list(acceleration_evals)
         self.integrator = integrator
         if integrator is not None:
             integrator.set_acceleration_evals(self.acceleration_evals)

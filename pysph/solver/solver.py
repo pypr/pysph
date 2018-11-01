@@ -6,7 +6,7 @@ import numpy
 
 # PySPH imports
 from pysph.base.kernels import CubicSpline
-from pysph.sph.acceleration_eval import AccelerationEval
+from pysph.sph.acceleration_eval import make_acceleration_evals
 from pysph.sph.sph_compiler import SPHCompiler
 
 from pysph.solver.utils import FloatPBar, load, dump
@@ -90,8 +90,7 @@ class Solver(object):
         # set the particles to None
         self.particles = None
 
-        # Set the AccelerationEval instance to None.
-        self.acceleration_eval = None
+        self.acceleration_evals = None
 
         # solver time and iteration count
         self.t = 0
@@ -194,7 +193,7 @@ class Solver(object):
             self.kernel = kernel
 
         mode = 'mpi' if self.in_parallel else 'serial'
-        self.acceleration_eval = AccelerationEval(
+        self.acceleration_evals = make_acceleration_evals(
             particles, equations, self.kernel, mode
         )
 
@@ -206,12 +205,13 @@ class Solver(object):
         )
 
         sph_compiler = SPHCompiler(
-            self.acceleration_eval, self.integrator
+            self.acceleration_evals, self.integrator
         )
         sph_compiler.compile()
 
         # Set the nnps for all concerned objects.
-        self.acceleration_eval.set_nnps(nnps)
+        for ae in self.acceleration_evals:
+            ae.set_nnps(nnps)
         self.integrator.set_nnps(nnps)
 
         # set the parallel manager for the integrator
