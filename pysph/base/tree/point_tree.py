@@ -129,7 +129,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         ${data_t} xmin[${dim}] = {${', '.join(['INFINITY'] * dim)}};
         ${data_t} xmax[${dim}] = {${', '.join(['-INFINITY'] * dim)}};
         ${data_t} hmax = 0;
-        """).render(dim=dim, data_t=data_t)
+        """, disable_unicode=disable_unicode).render(dim=dim, data_t=data_t)
 
     result['args'] = Template(
         r"""int *pids,
@@ -141,7 +141,9 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         ${data_t}${dim} *node_xmin,
         ${data_t}${dim} *node_xmax,
         ${data_t} *node_hmax
-        """).render(dim=dim, data_t=data_t, xvars=xvars)
+        """, disable_unicode=disable_unicode).render(dim=dim,
+                                                     data_t=data_t,
+                                                     xvars=xvars)
 
     result['leaf_operation'] = Template(
         r"""
@@ -153,7 +155,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
         % endfor
         hmax = fmax(h[pid] * radius_scale, hmax);
         }
-        """).render(dim=dim, xvars=xvars)
+        """, disable_unicode=disable_unicode).render(dim=dim, xvars=xvars)
 
     result['node_operation'] = Template(
         r"""
@@ -168,7 +170,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
             % endfor
             hmax = fmax(hmax, node_hmax[child_offset + ${i}]);
         % endfor
-        """).render(dim=dim)
+        """, disable_unicode=disable_unicode).render(dim=dim)
 
     result['output_expr'] = Template(
         """
@@ -177,7 +179,7 @@ def _get_node_bound_kernel_parameters(dim, data_t, xvars):
             node_xmax[node_idx].s${d} = xmax[${d}];
         % endfor
         node_hmax[node_idx] = hmax;
-        """).render(dim=dim)
+        """, disable_unicode=disable_unicode).render(dim=dim)
 
     return result
 
@@ -200,7 +202,9 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
             node_hmax1 = node_hmax_dst[cid_dst];
 
             %(setup)s;
-            """ % dict(setup=setup)).render(data_t=data_t, dim=dim),
+            """ % dict(setup=setup),
+                          disable_unicode=disable_unicode).render(
+            data_t=data_t, dim=dim),
         'node_operation': Template("""
             node_xmin2 = node_xmin_src[cid_src];
             node_xmax2 = node_xmax_src[cid_src];
@@ -212,7 +216,7 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
                 flag = 0;
                 break;
             }
-            """).render(data_t=data_t),
+            """, disable_unicode=disable_unicode).render(data_t=data_t),
         'leaf_operation': Template("""
             node_xmin2 = node_xmin_src[cid_src];
             node_xmax2 = node_xmax_src[cid_src];
@@ -224,14 +228,16 @@ def _get_leaf_neighbor_kernel_parameters(data_t, dim, args, setup, operation,
                                 node_xmin2, node_xmax2)) {
                 %(operation)s;
             }
-            """ % dict(operation=operation)).render(),
+            """ % dict(operation=operation),
+                                   disable_unicode=disable_unicode).render(),
         'output_expr': output_expr,
         'args': Template("""
             ${data_t}${dim} *node_xmin_src, ${data_t}${dim} *node_xmax_src,
             ${data_t} *node_hmax_src,
             ${data_t}${dim} *node_xmin_dst, ${data_t}${dim} *node_xmax_dst,
             ${data_t} *node_hmax_dst,
-            """ + args).render(data_t=data_t, dim=dim)
+            """ + args, disable_unicode=disable_unicode).render(data_t=data_t,
+                                                                dim=dim)
 
     }
     return result
@@ -444,7 +450,7 @@ class PointTree(Tree):
 
         total_neighbors = int(neighbor_cid_count.dev[-1].get())
         neighbor_cids = Array(np.uint32, n=total_neighbors,
-                                    backend='opencl')
+                              backend='opencl')
 
         find_neighbor_cids = self._leaf_neighbor_operation(
             tree_src,
