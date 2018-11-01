@@ -24,6 +24,7 @@ class OpenCLIntegrator(object):
         self.acceleration_eval = c_acceleration_eval
         self.nnps = None
         self.parallel_manager = None
+        self.integrator = helper.object
         self._post_stage_callback = None
         self._use_double = get_config().use_double
         self._setup_methods()
@@ -78,14 +79,8 @@ class OpenCLIntegrator(object):
     def set_post_stage_callback(self, callback):
         self._post_stage_callback = callback
 
-    def compute_accelerations(self):
-        # update NNPS since particles have moved
-        if self.parallel_manager:
-            self.parallel_manager.update()
-        self.nnps.update()
-
-        # Evaluate
-        self.acceleration_eval.compute(self.t, self.dt)
+    def compute_accelerations(self, index=0, update_nnps=True):
+        self.integrator.compute_accelerations(index, update_nnps)
 
     def do_post_stage(self, stage_dt, stage):
         """This is called after every stage of the integrator.
@@ -184,9 +179,9 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         # Create the compiled module.
         self.program = module
         self._setup_call_data()
-        cython_integrator = OpenCLIntegrator(self, acceleration_eval)
+        opencl_integrator = OpenCLIntegrator(self, acceleration_eval)
         # Setup the integrator to use this compiled module.
-        self.object.set_compiled_object(cython_integrator)
+        self.object.set_compiled_object(opencl_integrator)
 
     def get_py_stage_code(self, dest, method):
         stepper = self.object.steppers[dest]

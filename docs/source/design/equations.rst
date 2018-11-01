@@ -475,6 +475,65 @@ they will be called automatically. They are passed the destination particle
 array, the current time, and current timestep.
 
 
+Different equations for different stages
+-----------------------------------------
+
+By default, when one creates equations the implicit assumption is that the
+same right-hand-side is evaluated at each stage of the integrator. However,
+Some schemes require that one solve different equations for different
+integrator stages. PySPH does support this but to do this when one creates
+equations in the application, one should return an instance of
+:py:class:`pysph.sph.equation.MultiStageEquations`. For example:
+
+.. code-block:: python
+
+    def create_equations(self):
+        # ...
+        eqs = [
+            [Eq1(dest='fluid', sources=['fluid'])],
+            [Eq2(dest='fluid', sources=['fluid'])]
+        ]
+        from pysph.sph.equation import MultiStageEquations
+        return MultiStageEquations(eqs)
+
+In the above, note that each element of ``eqs`` is a list, it could have also
+been a group. Each item of the given equations is treated as a separate
+collection of equations which is to be used. The use of the
+:py:class:`pysph.sph.equation.MultiStageEquations` tells PySPH that multiple
+equation sets are being used.
+
+Now that we have this, how do we call the right accelerations at the right
+times? We do this by sub-classing the
+:py:class:`pysph.sph.integrator.Integrator`. We show a simple example from our
+test suite to illustrate this:
+
+.. code-block:: python
+
+    from pysph.sph.integrator import Integrator
+
+    class MyIntegrator(Integrator):
+        def one_timestep(self, t, dt):
+
+            self.compute_accelerations(0)
+            # Equivalent to self.compute_accelerations()
+            self.stage1()
+            self.do_post_stage(dt, 1)
+
+            self.compute_accelerations(1, update_nnps=False)
+            self.stage2()
+
+Note that the ``compute_accelerations`` method takes two arguments, the
+``index`` (which defaults to zero) and ``update_nnps`` which defaults to
+``True``. A simple integrator with a single RHS would simply call
+``self.compute_accelerations()``. However, in the above, the first set of
+equations is called first, and then for the second stage the second set of
+equations is evaluated but without updating the NNPS (handy if the particles
+do not move in stage1).
+
+The above illustrates how one can create more complex integrators that employ
+different accelerations in each stage.
+
+
 Examples to study
 ------------------
 
@@ -489,3 +548,10 @@ The equations that demonstrate the ``converged`` method are:
 
 - :py:class:`pysph.sph.gas_dynamics.basic.SummationDensity`: relatively simple.
 - :py:class:`pysph.sph.iisph.PressureSolve`.
+
+Some equations that demonstrate using matrices and solving systems of
+equations are:
+
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder2D`.
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder3D`.
+- :py:class:`pysph.sph.wc.kernel_correction.GradientCorrection`.

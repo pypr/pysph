@@ -5,8 +5,9 @@ except ImportError:
     from ordereddict import OrderedDict
 
 from pysph.cpy.config import get_config
-from pysph.sph.equation import (CythonGroup, Group, OpenCLGroup,
-                                get_arrays_used_in_equation)
+from pysph.sph.equation import (
+    CythonGroup, Group, MultiStageEquations, OpenCLGroup,
+    get_arrays_used_in_equation)
 
 
 ###############################################################################
@@ -70,6 +71,23 @@ def check_equation_array_properties(equation, particle_arrays):
             msg += "Array '%s' missing properties %s.\n" % (name, missing)
         print(msg)
         raise RuntimeError(msg)
+
+
+def make_acceleration_evals(particle_arrays, equations, kernel,
+                            mode='serial', backend=None):
+    '''Returns a list of acceleration evaluators.
+
+    If a MultiStageEquations object is given the resulting list will have
+    multiple evaluators else it will have a single one.
+    '''
+    if isinstance(equations, MultiStageEquations):
+        groups = equations.groups
+    else:
+        groups = [equations]
+    return [
+        AccelerationEval(particle_arrays, group, kernel, mode, backend)
+        for group in groups
+    ]
 
 
 ###############################################################################

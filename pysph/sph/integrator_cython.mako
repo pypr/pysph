@@ -19,15 +19,15 @@ ${helper.get_stepper_code()}
 cdef class Integrator:
     cdef public ParticleArrayWrapper ${helper.get_particle_array_names()}
     cdef public AccelerationEval acceleration_eval
-    cdef public object parallel_manager
-    cdef public NNPS nnps
+    cdef public object integrator
     cdef public double dt, t, orig_t
     cdef object _post_stage_callback
     cdef object steppers
 
     ${indent(helper.get_stepper_defs(), 1)}
 
-    def __init__(self, acceleration_eval, steppers):
+    def __init__(self, integrator, acceleration_eval, steppers):
+        self.integrator = integrator
         self.acceleration_eval = acceleration_eval
         self.steppers = steppers
         self._post_stage_callback = None
@@ -37,22 +37,16 @@ cdef class Integrator:
         ${indent(helper.get_stepper_init(), 2)}
 
     def set_nnps(self, NNPS nnps):
-        self.nnps = nnps
+        pass
 
     def set_parallel_manager(self, object pm):
-        self.parallel_manager = pm
+        pass
 
     def set_post_stage_callback(self, object callback):
         self._post_stage_callback = callback
 
-    cpdef compute_accelerations(self):
-        # update NNPS since particles have moved
-        if self.parallel_manager:
-            self.parallel_manager.update()
-        self.nnps.update()
-
-        # Evaluate
-        self.acceleration_eval.compute(self.t, self.dt)
+    cpdef compute_accelerations(self, int index=0, update_nnps=True):
+        self.integrator.compute_accelerations(index, update_nnps)
 
     cpdef do_post_stage(self, double stage_dt, int stage):
         """This is called after every stage of the integrator.
