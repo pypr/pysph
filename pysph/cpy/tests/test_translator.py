@@ -7,7 +7,7 @@ from ..config import get_config
 from ..types import annotate, declare
 from ..translator import (
     CConverter, CodeGenerationError, CStructHelper, KnownType,
-    OpenCLConverter, py2c
+    OpenCLConverter, CUDAConverter, py2c
 )
 
 
@@ -1164,7 +1164,7 @@ def test_wrapping_class_with_ignore_methods():
     assert result.strip() == expect.strip()
 
 
-def test_opencl_conversion():
+def check_opencl_cuda_conversion(converter_obj):
     # Note that LID_0 etc. are predefined symbols when we include the CLUDA
     # preamble, therefore should be known.
     src = dedent('''
@@ -1174,7 +1174,7 @@ def test_opencl_conversion():
 
     # When
     known_types = {'d_p': KnownType('GLOBAL_MEM int*')}
-    converter = OpenCLConverter(known_types=known_types)
+    converter = converter_obj(known_types=known_types)
     code = converter.convert(src)
 
     # Then
@@ -1186,6 +1186,14 @@ WITHIN_KERNEL void f(long s_idx, GLOBAL_MEM double* s_p, long d_idx,
 }
     ''')
     assert code.strip() == expect.strip()
+
+
+def test_cuda_conversion():
+    check_opencl_cuda_conversion(CUDAConverter)
+
+
+def test_opencl_conversion():
+    check_opencl_cuda_conversion(OpenCLConverter)
 
 
 def test_opencl_class():
@@ -1207,6 +1215,42 @@ def test_opencl_class():
     }
     ''')
     assert code.strip() == expect.strip()
+
+
+def test_cuda_local_conversion():
+    @annotate(xc='ldoublep', yc='lintp')
+    def knl(xc, yc):
+        xc[LID_0] = 1
+        yc[LID_0] = 1
+
+    # When
+    converter = CUDAConverter()
+    code = converter.parse(knl)
+
+    # Then
+    expect_1 = dedent('''
+WITHIN_KERNEL void knl(int size_xc, int size_yc)
+{
+    extern LOCAL_MEM float shared_buff[];
+    double* xc = (double*) shared_buff;
+    int* yc = (int*) &xc[size_xc];
+    xc[LID_0] = 1;
+    yc[LID_0] = 1;
+}
+    ''')
+
+    expect_2 = dedent('''
+WITHIN_KERNEL void knl(int size_xc, int size_yc)
+{
+    extern LOCAL_MEM float shared_buff[];
+    int* yc = (int*) shared_buff;
+    double* xc = (double*) &yc[size_yc];
+    xc[LID_0] = 1;
+    yc[LID_0] = 1;
+}
+    ''')
+
+    assert code.strip() == expect_1.strip() or code.strip() == expect_2.strip()
 
 
 def test_handles_parsing_functions():

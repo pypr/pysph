@@ -197,7 +197,7 @@ def dtype_to_ctype(dtype):
 
 
 def ctype_to_dtype(ctype):
-    return C_NP_TYPE_MAP[ctype]
+    return np.dtype(C_NP_TYPE_MAP[ctype])
 
 
 def dtype_to_knowntype(dtype, address='scalar'):

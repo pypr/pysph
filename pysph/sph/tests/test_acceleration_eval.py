@@ -220,6 +220,13 @@ class LoopAllEquation(Equation):
         d_rho[d_idx] += sum
 
 
+class InitializePair(Equation):
+    def initialize_pair(self, d_idx, d_u, s_u):
+        # Will only work if the source/destinations are the same
+        # but should do for a test.
+        d_u[d_idx] = s_u[d_idx]*1.5
+
+
 class TestMegaGroup(unittest.TestCase):
     def test_ensure_group_retains_user_order_of_equations(self):
         # Given
@@ -388,6 +395,25 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         expect = np.sum(pa.m)
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_should_call_initialize_pair(self):
+        # Given.
+        pa = self.pa
+        pa.u[:] = 1.0
+        if pa.gpu:
+            pa.gpu.push('u')
+        equations = [InitializePair(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('u')
+        np.testing.assert_array_almost_equal(
+            pa.u, np.ones_like(pa.x)*1.5
+        )
 
     def test_should_call_py_initialize(self):
         # Given.
@@ -753,6 +779,25 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         expect = np.sum(pa.m)
         pa.gpu.pull('total_mass')
         self.assertAlmostEqual(pa.total_mass[0], expect, 14)
+
+    def test_should_call_initialize_pair_on_gpu(self):
+        # Given.
+        pa = self.pa
+        pa.u[:] = 1.0
+        if pa.gpu:
+            pa.gpu.push('u')
+        equations = [InitializePair(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('u')
+        np.testing.assert_array_almost_equal(
+            pa.u, np.ones_like(pa.x)*1.5
+        )
 
     def test_should_call_py_initialize_for_gpu_backend(self):
         # Given.

@@ -43,7 +43,7 @@ class IntegratorCythonHelper(object):
     def setup_compiled_module(self, module, acceleration_eval):
         # Create the compiled module.
         cython_integrator = module.Integrator(
-            acceleration_eval, self.object.steppers
+            self.object, acceleration_eval, self.object.steppers
         )
         # Setup the integrator to use this compiled module.
         self.object.set_compiled_object(cython_integrator)

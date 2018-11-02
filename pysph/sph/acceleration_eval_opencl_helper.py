@@ -496,12 +496,18 @@ class AccelerationEvalOpenCLHelper(object):
             if a in args:
                 args.remove(a)
 
-    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind):
-        assert kind in ('initialize', 'post_loop', 'loop')
+    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind,
+                           source=None):
+        assert kind in ('initialize', 'initialize_pair', 'post_loop', 'loop')
         sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
-        kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
-            g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
-        )
+        if source is None:
+            kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
+                g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
+            )
+        else:
+            kernel = 'g{g_idx}{sg}_{source}_on_{dest}_{kind}'.format(
+                g_idx=g_idx, sg=sub_grp, source=source, dest=dest, kind=kind
+            )
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
@@ -514,9 +520,13 @@ class AccelerationEvalOpenCLHelper(object):
         code.extend(_calls)
 
         s_ary, d_ary = all_eqs.get_array_names()
-        # We only need the dest arrays here as these are simple kernels
-        # without a loop so there is no "source".
-        _args = list(d_ary)
+        if source is None:
+            # We only need the dest arrays here as these are simple kernels
+            # without a loop so there is no "source".
+            _args = list(d_ary)
+        else:
+            d_ary.update(s_ary)
+            _args = list(d_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
@@ -630,6 +640,13 @@ class AccelerationEvalOpenCLHelper(object):
     def get_initialize_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
             g_idx, sg_idx, group, dest, all_eqs, kind='initialize'
+        )
+
+    def get_initialize_pair_kernel(self, g_idx, sg_idx, group, dest, source,
+                                   eq_group):
+        return self._get_simple_kernel(
+            g_idx, sg_idx, group, dest, eq_group, kind='initialize_pair',
+            source=source
         )
 
     def get_simple_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
