@@ -34,6 +34,13 @@ ${helper.get_simple_loop_kernel(g_idx, sg_idx, group, dest, eqs_with_no_source)}
 % for source, eq_group in sources.items():
 // Source ${source}.
 ###################################################################
+## Do any pairwise initializations.
+###################################################################
+% if eq_group.has_initialize_pair():
+// Initialization for destination ${dest} with source ${source}.
+${helper.get_initialize_pair_kernel(g_idx, sg_idx, group, dest, source, eq_group)}
+% endif
+###################################################################
 ## Do any loop interactions between source and destination.
 ###################################################################
 % if eq_group.has_loop() or eq_group.has_loop_all():
