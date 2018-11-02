@@ -63,6 +63,11 @@ src = self.${source}
 ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
 
+% if eq_group.has_initialize_pair():
+for d_idx in range(NP_DEST):
+    ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
+% endif
+
 % if eq_group.has_loop() or eq_group.has_loop_all():
 #######################################################################
 ## Iterate over destination particles.

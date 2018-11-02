@@ -348,7 +348,8 @@ def get_arrays_used_in_equation(equation):
     """
     src_arrays = set()
     dest_arrays = set()
-    for meth_name in ('initialize', 'loop', 'loop_all', 'post_loop'):
+    methods = ('initialize', 'initialize_pair', 'loop', 'loop_all', 'post_loop')
+    for meth_name in methods:
         meth = getattr(equation, meth_name, None)
         if meth is not None:
             args = getfullargspec(meth).args
@@ -508,7 +509,7 @@ class Group(object):
         )
 
     def _has_code(self, kind='loop'):
-        assert kind in ('initialize', 'loop', 'loop_all',
+        assert kind in ('initialize', 'initialize_pair', 'loop', 'loop_all',
                         'post_loop', 'reduce')
         for equation in self.equations:
             if hasattr(equation, kind):
@@ -622,6 +623,9 @@ class Group(object):
     def has_initialize(self):
         return self._has_code('initialize')
 
+    def has_initialize_pair(self):
+        return self._has_code('initialize_pair')
+
     def has_loop(self):
         return self._has_code('loop')
 
@@ -671,7 +675,7 @@ class CythonGroup(Group):
         return '\n'.join(decl)
 
     def _get_code(self, kernel=None, kind='loop'):
-        assert kind in ('initialize', 'loop', 'loop_all',
+        assert kind in ('initialize', 'initialize_pair', 'loop', 'loop_all',
                         'post_loop', 'reduce')
         # We assume here that precomputed quantities are only relevant
         # for loops and not post_loops and initialization.
@@ -748,6 +752,9 @@ class CythonGroup(Group):
 
     def get_initialize_code(self, kernel=None):
         return self._get_code(kernel, kind='initialize')
+
+    def get_initialize_pair_code(self, kernel=None):
+        return self._get_code(kernel, kind='initialize_pair')
 
     def get_loop_code(self, kernel=None):
         return self._get_code(kernel, kind='loop')
