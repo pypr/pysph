@@ -38,7 +38,7 @@ class SimpleRemesher(Tool):
     """
 
     def __init__(self, app, array_name, props, freq=100, xi=None, yi=None,
-                 zi=None, kernel=None):
+                 zi=None, kernel=None, equations=None):
         """Constructor.
 
         Parameters
@@ -56,6 +56,9 @@ class SimpleRemesher(Tool):
             Positions to remesh the properties onto.  If not specified they
             are taken from the particle arrays at the time of construction.
         kernel: any kernel from pysph.base.kernels
+
+        equations: list or None
+            Equations to use for the interpolation, passed to the interpolator.
 
         """
         from pysph.solver.utils import get_array_by_name
@@ -77,7 +80,8 @@ class SimpleRemesher(Tool):
         self.interp = Interpolator(
             self.particles, x=self.xi, y=self.yi, z=self.zi,
             kernel=kernel,
-            domain_manager=app.create_domain()
+            domain_manager=app.create_domain(),
+            equations=equations
         )
 
     def post_step(self, solver):

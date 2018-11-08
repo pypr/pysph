@@ -27,6 +27,34 @@ c0 = 10 * U
 p0 = c0**2 * rho0
 
 
+def m4p(x=0.0):
+    """From the paper by Chaniotis et al. (JCP 2002).
+    """
+    if x < 0.0:
+        return 0.0
+    elif x < 1.0:
+        return 1.0 - 0.5*x*x*(5.0 - 3.0*x)
+    elif x < 2.0:
+        return (1 - x)*(2 - x)*(2 - x)*0.5
+    else:
+        return 0.0
+
+
+class M4(Equation):
+    '''An equation to be used for remeshing.
+    '''
+    def initialize(self, d_idx, d_prop):
+        d_prop[d_idx] = 0.0
+
+    def _get_helpers_(self):
+        return [m4p]
+
+    def loop(self, s_idx, d_idx, s_temp_prop, d_prop, d_h, XIJ):
+        xij = abs(XIJ[0]/d_h[d_idx])
+        yij = abs(XIJ[1]/d_h[d_idx])
+        d_prop[d_idx] += m4p(xij)*m4p(yij)*s_temp_prop[s_idx]
+
+
 def exact_solution(U, b, t, x, y):
     pi = np.pi
     sin = np.sin
@@ -73,6 +101,16 @@ class TaylorGreen(Application):
         group.add_argument(
             "--kernel-corr", action="store", type=str, dest='kernel_corr',
             default='', help="Type of Kernel Correction", choices=corrections
+        )
+        group.add_argument(
+            "--remesh", action="store", type=int, dest="remesh", default=0,
+            help="Remeshing frequency (setting it to zero disables it)."
+        )
+        remesh_types = ['m4', 'sph']
+        group.add_argument(
+            "--remesh-eq", action="store", type=str, dest="remesh_eq",
+            default='m4', choices=remesh_types,
+            help="Remeshing strategy to use."
         )
 
     def consume_user_options(self):
@@ -232,6 +270,34 @@ class TaylorGreen(Application):
 
         # return the particle list
         return [fluid]
+
+    def create_tools(self):
+        tools = []
+        options = self.options
+        if options.remesh > 0:
+            if options.remesh_eq == 'm4':
+                equations = [M4(dest='interpolate', sources=['fluid'])]
+            else:
+                equations = None
+            from pysph.solver.tools import SimpleRemesher
+            if options.scheme == 'wcsph':
+                props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
+            elif options.scheme == 'tvf':
+                props = ['u', 'v', 'uhat', 'vhat',
+                         'au', 'av', 'auhat', 'avhat']
+            elif options.scheme == 'edac':
+                if 'uhat' in self.particles[0].properties:
+                    props = ['u', 'v', 'uhat', 'vhat', 'p',
+                             'au', 'av', 'auhat', 'avhat', 'ap']
+                else:
+                    props = ['u', 'v', 'p', 'au', 'av', 'ax', 'ay', 'ap']
+
+            remesher = SimpleRemesher(
+                self, 'fluid', props=props,
+                freq=self.options.remesh, equations=equations
+            )
+            tools.append(remesher)
+        return tools
 
     # The following are all related to post-processing.
     def _get_post_process_props(self, array):
