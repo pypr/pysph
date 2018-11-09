@@ -55,11 +55,11 @@ class GradientCorrectionPreStep(Equation):
             dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
                       + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-12:
+            if r > 1.0e-12:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
-                        xj = xij[j]
+                        xj = -xij[j]
                         d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
 
 
@@ -71,7 +71,7 @@ class GradientCorrection(Equation):
 
     .. math::
             L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}}\nabla W_{ab}
-            \mathbf{\times}x_{ab} \right)^{-1}
+            \mathbf{\times}x_{ba} \right)^{-1}
     References
     ----------
     .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
@@ -118,7 +118,7 @@ class MixedKernelCorrectionPreStep(Equation):
 
     .. math::
             L_{a} = \left(\sum_{b} V_{b}}\nabla \bar{W}_{ab}
-            \mathbf{\times}x_{ab} \right)^{-1}
+            \mathbf{\times}x_{ba} \right)^{-1}
 
     .. math::
             \nabla \bar{W}_{ab} = \frac{\nabla W_{ab} - \gamma}
@@ -190,9 +190,9 @@ class MixedKernelCorrectionPreStep(Equation):
             dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
                       * dwij1[1] + dwij1[2] * dwij1[2])
             V = s_m[s_idx] / s_rho[s_idx]
-            if r >= 1.0e-12:
+            if r > 1.0e-12:
                 for i in range(n):
                     xi = xij[i]
                     for j in range(n):
-                        xj = xij[j]
+                        xj = -xij[j]
                         d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
