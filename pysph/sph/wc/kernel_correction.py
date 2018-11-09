@@ -1,3 +1,5 @@
+from math import sqrt
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation
 from pysph.sph.wc.density_correction import gj_solve
 
@@ -144,8 +146,8 @@ class MixedKernelCorrectionPreStep(Equation):
         for i in range(9):
             d_m_mat[9 * d_idx + i] = 0.0
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, SPH_KERNEL,
-                 N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij):
+    def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h,
+                 SPH_KERNEL, N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
