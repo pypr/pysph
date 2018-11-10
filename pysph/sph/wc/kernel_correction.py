@@ -54,15 +54,12 @@ class GradientCorrectionPreStep(Equation):
             hij = (h + s_h[s_idx]) * 0.5
             r = sqrt(xij[0] * xij[0] + xij[1] * xij[1] + xij[2] * xij[2])
             SPH_KERNEL.gradient(xij, r, hij, dwij)
-            dw = sqrt(dwij[0] * dwij[0] + dwij[1] * dwij[1]
-                      + dwij[2] * dwij[2])
             V = s_m[s_idx] / s_rho[s_idx]
             if r > 1.0e-12:
                 for i in range(n):
-                    xi = xij[i]
                     for j in range(n):
-                        xj = -xij[j]
-                        d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
+                        xj = xij[j]
+                        d_m_mat[9 * d_idx + 3 * i + j] -= V * dwij[i] * xj
 
 
 class GradientCorrection(Equation):
@@ -72,7 +69,7 @@ class GradientCorrection(Equation):
             \nabla \tilde{W}_{ab} = L_{a}\nabla W_{ab}
 
     .. math::
-            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}}\nabla W_{ab}
+            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}} \nabla W_{ab}
             \mathbf{\times}x_{ba} \right)^{-1}
     References
     ----------
@@ -84,7 +81,7 @@ class GradientCorrection(Equation):
     def _get_helpers_(self):
         return [gj_solve]
 
-    def __init__(self, dest, sources, dim=2, tol=0.5):
+    def __init__(self, dest, sources, dim=2, tol=0.1):
         self.dim = dim
         self.tol = tol
         super(GradientCorrection, self).__init__(dest, sources)
@@ -98,11 +95,16 @@ class GradientCorrection(Equation):
         for i in range(n):
             for j in range(n):
                 temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+
         gj_solve(temp, DWIJ, n, res)
-        change = 0.0
+
+        res_mag = 0.0
+        dwij_mag = 0.0
         for i in range(n):
-            change += abs(DWIJ[i] - res[i]) / (abs(DWIJ[i]) + eps)
-        if change <= self.tol:
+            res_mag += abs(res[i])
+            dwij_mag += abs(DWIJ[i])
+        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
+        if change < self.tol:
             for i in range(n):
                 DWIJ[i] = res[i]
 
@@ -189,12 +191,9 @@ class MixedKernelCorrectionPreStep(Equation):
             SPH_KERNEL.gradient(xij, r, hij, dwij)
             for i in range(n):
                 dwij1[i] = (dwij[i] - numerator[i] / den) / den
-            dw = sqrt(dwij1[0] * dwij1[0] + dwij1[1]
-                      * dwij1[1] + dwij1[2] * dwij1[2])
             V = s_m[s_idx] / s_rho[s_idx]
             if r > 1.0e-12:
                 for i in range(n):
-                    xi = xij[i]
                     for j in range(n):
-                        xj = -xij[j]
-                        d_m_mat[9 * d_idx + 3 * i + j] += dw * V * xi * xj / r
+                        xj = xij[j]
+                        d_m_mat[9 * d_idx + 3 * i + j] -= V * dwij1[i] * xj

@@ -165,7 +165,7 @@ class TaylorGreen(Application):
     def create_equations(self):
         eqns = self.scheme.get_equations()
         n = len(eqns)
-        tol = 1.0
+        tol = 0.1
         if self.kernel_corr == 'grad-corr':
             eqn1 = Group(equations=[
                 GradientCorrectionPreStep('fluid', ['fluid'])
