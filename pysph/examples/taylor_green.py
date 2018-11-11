@@ -13,9 +13,10 @@ from pysph.sph.equation import Group, Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
 
-from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
-                                            GradientCorrection,
-                                            MixedKernelCorrectionPreStep)
+from pysph.sph.wc.kernel_correction import (
+    GradientCorrectionPreStep, GradientCorrection,
+    MixedKernelCorrectionPreStep, MixedGradientCorrection
+)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
 
 
@@ -179,7 +180,7 @@ class TaylorGreen(Application):
                 MixedKernelCorrectionPreStep('fluid', ['fluid'])
             ], real=False)
             for i in range(n):
-                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
+                eqn2 = MixedGradientCorrection('fluid', ['fluid'], 2, tol)
                 eqns[i].equations.insert(0, eqn2)
             eqns.insert(0, eqn1)
         elif self.kernel_corr == 'crksph':
@@ -262,6 +263,7 @@ class TaylorGreen(Application):
             fluid.add_property('cwij')
         if corr == 'mixed-corr' or corr == 'grad-corr':
             fluid.add_property('m_mat', stride=9)
+            fluid.add_property('dw_gamma', stride=3)
         elif corr == 'crksph':
             fluid.add_property('ai')
             fluid.add_property('gradbi', stride=9)

@@ -149,7 +149,8 @@ class MixedKernelCorrectionPreStep(Equation):
             d_m_mat[9 * d_idx + i] = 0.0
 
     def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h,
-                 SPH_KERNEL, N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij):
+                 SPH_KERNEL, N_NBRS, NBRS, d_m_mat, s_m, s_rho, d_cwij,
+                 d_dw_gamma):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -163,7 +164,6 @@ class MixedKernelCorrectionPreStep(Equation):
 
         for i in range(3):
             numerator[i] = 0.0
-            dwij1[i] = 0.0
         den = 0.0
 
         for k in range(N_NBRS):
@@ -179,6 +179,9 @@ class MixedKernelCorrectionPreStep(Equation):
             den += V * wij
             for i in range(n):
                 numerator[i] += V * dwij[i]
+
+        for i in range(n):
+            d_dw_gamma[3*d_idx + i] = numerator[i]/den
         d_cwij[d_idx] = den
 
         for k in range(N_NBRS):
@@ -197,3 +200,52 @@ class MixedKernelCorrectionPreStep(Equation):
                     for j in range(n):
                         xj = xij[j]
                         d_m_mat[9 * d_idx + 3 * i + j] -= V * dwij1[i] * xj
+
+
+class MixedGradientCorrection(Equation):
+    r"""**Kernel Gradient Correction**
+
+    .. math::
+            \nabla \tilde{W}_{ab} = L_{a}\nabla W_{ab}
+
+    .. math::
+            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}} \nabla W_{ab}
+            \mathbf{\times}x_{ba} \right)^{-1}
+    References
+    ----------
+    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
+        Variational and Momentum Preservation Aspects of Smoothed
+        Particle Hydrodynamic Formulations.
+    """
+
+    def _get_helpers_(self):
+        return [gj_solve]
+
+    def __init__(self, dest, sources, dim=2, tol=0.1):
+        self.dim = dim
+        self.tol = tol
+        super(MixedGradientCorrection, self).__init__(dest, sources)
+
+    def loop(self, d_idx, d_m_mat, d_dw_gamma, d_cwij, DWIJ, HIJ):
+        i, j, n = declare('int', 3)
+        n = self.dim
+        temp = declare('matrix(9)')
+        res = declare('matrix(3)')
+        dwij = declare('matrix(3)')
+        eps = 1.0e-04 * HIJ
+        for i in range(n):
+            dwij[i] = (DWIJ[i] - d_dw_gamma[3*d_idx + i])/d_cwij[d_idx]
+            for j in range(n):
+                temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+
+        gj_solve(temp, dwij, n, res)
+
+        res_mag = 0.0
+        dwij_mag = 0.0
+        for i in range(n):
+            res_mag += abs(res[i])
+            dwij_mag += abs(dwij[i])
+        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
+        if change < self.tol:
+            for i in range(n):
+                DWIJ[i] = res[i]
