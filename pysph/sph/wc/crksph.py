@@ -1,3 +1,5 @@
+from math import sqrt
+from pysph.cpy.api import declare
 from pysph.sph.equation import Equation
 
 
@@ -8,7 +10,8 @@ class CRKSPHPreStep(Equation):
         super(CRKSPHPreStep, self).__init__(dest, sources)
 
     def loop_all(self, d_idx, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, s_m,
-                 s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi, d_gradbi):
+                 s_rho, SPH_KERNEL, NBRS, N_NBRS, d_ai, d_gradai, d_bi,
+                 d_gradbi):
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
