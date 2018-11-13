@@ -5,9 +5,7 @@ import numpy as np
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline
 from pysph.sph.equation import Equation, Group
-from pysph.sph.acceleration_eval import AccelerationEval
-from pysph.base.nnps import LinkedListNNPS as NNPS
-from pysph.sph.sph_compiler import SPHCompiler
+from pysph.tools.sph_evaluator import SPHEvaluator
 from pysph.sph.basic_equations import SummationDensity
 from pysph.sph.wc.kernel_correction import (
     GradientCorrectionPreStep,  MixedKernelCorrectionPreStep,
@@ -42,17 +40,12 @@ class TestKernelCorrection(unittest.TestCase):
         self.pa = pa
 
     def _make_accel_eval(self, equations):
-        arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
-        a_eval = AccelerationEval(
-            particle_arrays=arrays, equations=equations, kernel=kernel
+        seval = SPHEvaluator(
+            arrays=[self.pa], equations=equations,
+            dim=self.dim, kernel=kernel
         )
-        comp = SPHCompiler(a_eval, integrator=None)
-        comp.compile()
-        nnps = NNPS(dim=kernel.dim, particles=arrays)
-        nnps.update()
-        a_eval.set_nnps(nnps)
-        return a_eval
+        return seval
 
     def test_gradient_correction(self):
         # Given
@@ -75,7 +68,7 @@ class TestKernelCorrection(unittest.TestCase):
         a_eval = self._make_accel_eval(eqs)
 
         # When
-        a_eval.compute(0.0, 0.1)
+        a_eval.evaluate(0.0, 0.1)
 
         # Then
         np.testing.assert_array_almost_equal(pa.gradu, 1.0)
@@ -112,7 +105,7 @@ class TestKernelCorrection(unittest.TestCase):
         a_eval = self._make_accel_eval(eqs)
 
         # When
-        a_eval.compute(0.0, 0.1)
+        a_eval.evaluate(0.0, 0.1)
 
         # Then
         np.testing.assert_array_almost_equal(pa.gradu, 1.0)
