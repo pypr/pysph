@@ -1,3 +1,19 @@
+'''
+Kernel Corrections
+###################
+
+These are the equations for the kernel corrections that are mentioned in the
+paper by Bonet and Lok [BonetLok1999].
+
+References
+-----------
+
+    .. [BonetLok1999] Bonet, J. and Lok T.-S.L. (1999)
+        Variational and Momentum Preservation Aspects of Smoothed
+        Particle Hydrodynamic Formulations.
+
+'''
+
 from math import sqrt
 from pysph.cpy.api import declare
 from pysph.sph.equation import Equation
@@ -7,15 +23,11 @@ from pysph.sph.wc.density_correction import gj_solve
 class KernelCorrection(Equation):
     r"""**Kernel Correction**
 
+    From [BonetLok1999], equation (53):
+
     .. math::
             \mathbf{f}_{a} = \frac{\sum_{b}\frac{m_{b}}{\rho_{b}}
             \mathbf{f}_{b}W_{ab}}{\sum_{b}\frac{m_{b}}{\rho_{b}}W_{ab}}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
-
     """
 
     def initialize(self, d_idx, d_cwij):
@@ -65,17 +77,14 @@ class GradientCorrectionPreStep(Equation):
 class GradientCorrection(Equation):
     r"""**Kernel Gradient Correction**
 
+    From [BonetLok1999], equations (42) and (45)
+
     .. math::
             \nabla \tilde{W}_{ab} = L_{a}\nabla W_{ab}
 
     .. math::
             L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}} \nabla W_{ab}
-            \mathbf{\times}x_{ba} \right)^{-1}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
+            \mathbf{\otimes}x_{ba} \right)^{-1}
     """
 
     def _get_helpers_(self):
@@ -112,6 +121,8 @@ class GradientCorrection(Equation):
 class MixedKernelCorrectionPreStep(Equation):
     r"""**Mixed Kernel Correction**
 
+    From [BonetLok1999], equations (54), (57) and (58)
+
     .. math::
             \tilde{W}_{ab} = \frac{W_{ab}}{\sum_{b} V_{b}W_{ab}}
 
@@ -122,7 +133,7 @@ class MixedKernelCorrectionPreStep(Equation):
 
     .. math::
             L_{a} = \left(\sum_{b} V_{b}}\nabla \bar{W}_{ab}
-            \mathbf{\times}x_{ba} \right)^{-1}
+            \mathbf{\otimes}x_{ba} \right)^{-1}
 
     .. math::
             \nabla \bar{W}_{ab} = \frac{\nabla W_{ab} - \gamma}
@@ -131,11 +142,6 @@ class MixedKernelCorrectionPreStep(Equation):
     ..math::
             \gamma = \frac{\sum_{b} V_{b}\nabla W_{ab}}
             {\sum_{b} V_{b}W_{ab}}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
 
     """
 
@@ -203,19 +209,11 @@ class MixedKernelCorrectionPreStep(Equation):
 
 
 class MixedGradientCorrection(Equation):
-    r"""**Kernel Gradient Correction**
+    r"""**Mixed Kernel Gradient Correction**
 
-    .. math::
-            \nabla \tilde{W}_{ab} = L_{a}\nabla W_{ab}
+    This is as per [BonetLok1999]. See the MixedKernelCorrectionPreStep for the
+    equations.
 
-    .. math::
-            L_{a} = \left(\sum \frac{m_{b}}{\rho_{b}} \nabla W_{ab}
-            \mathbf{\times}x_{ba} \right)^{-1}
-    References
-    ----------
-    .. [Bonet and Lok, 1999] Bonet, J. and Lok T.-S.L. (1999)
-        Variational and Momentum Preservation Aspects of Smoothed
-        Particle Hydrodynamic Formulations.
     """
 
     def _get_helpers_(self):
