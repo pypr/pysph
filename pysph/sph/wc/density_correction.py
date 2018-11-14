@@ -1,7 +1,7 @@
 from math import sqrt
 from pysph.sph.equation import Equation
 from pysph.cpy.api import declare
-from pysph.sph.wc.linalg import gj_solve
+from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 
 
 class ShepardFilter(Equation):
@@ -81,7 +81,7 @@ class MLSFirstOrder2D(Equation):
     """
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [gj_solve, augmented_matrix]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
@@ -91,6 +91,7 @@ class MLSFirstOrder2D(Equation):
         n, i, j, k, s_idx = declare('int', 5)
         n = 3
         amls = declare('matrix(9)')
+        aug_mls = declare('matrix(12)')
         x = d_x[d_idx]
         y = d_y[d_idx]
         xij = declare('matrix(3)')
@@ -118,7 +119,11 @@ class MLSFirstOrder2D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix(3)')
-        gj_solve(amls, [1., 0., 0.], n, res)
+        res[0] = 1.0
+        res[1] = 0.0
+        res[2] = 0.0
+        augmented_matrix(amls, res, 3, 1, aug_mls)
+        gj_solve(aug_mls, n, 1, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]
@@ -138,7 +143,7 @@ class MLSFirstOrder2D(Equation):
 class MLSFirstOrder3D(Equation):
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [gj_solve, augmented_matrix]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
@@ -148,6 +153,7 @@ class MLSFirstOrder3D(Equation):
         n, i, j, k, s_idx = declare('int', 5)
         n = 4
         amls = declare('matrix(16)')
+        aug_mls = declare('matrix(20)')
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -176,7 +182,12 @@ class MLSFirstOrder3D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix(4)')
-        gj_solve(amls, [1., 0., 0., 0.], n, res)
+        res[0] = 1.0
+        res[1] = 0.0
+        res[2] = 0.0
+        res[3] = 0.0
+        augmented_matrix(amls, res, n, 1, aug_mls)
+        gj_solve(aug_mls, n, 1, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]

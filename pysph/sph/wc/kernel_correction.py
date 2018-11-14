@@ -96,16 +96,21 @@ class GradientCorrection(Equation):
         super(GradientCorrection, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_m_mat, DWIJ, HIJ):
-        i, j, n = declare('int', 3)
+        i, j, n, nt = declare('int', 4)
         n = self.dim
-        temp = declare('matrix(9)')
+        nt = n + 1
+        # Note that we allocate enough for a 3D case but may only use a
+        # part of the matrix.
+        temp = declare('matrix(12)')
         res = declare('matrix(3)')
         eps = 1.0e-04 * HIJ
         for i in range(n):
             for j in range(n):
-                temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            # Augmented part of matrix
+            temp[nt*i + n] = DWIJ[i]
 
-        gj_solve(temp, DWIJ, n, res)
+        gj_solve(temp, n, 1, res)
 
         res_mag = 0.0
         dwij_mag = 0.0
@@ -225,18 +230,19 @@ class MixedGradientCorrection(Equation):
         super(MixedGradientCorrection, self).__init__(dest, sources)
 
     def loop(self, d_idx, d_m_mat, d_dw_gamma, d_cwij, DWIJ, HIJ):
-        i, j, n = declare('int', 3)
+        i, j, n, nt = declare('int', 4)
         n = self.dim
-        temp = declare('matrix(9)')
+        nt = n + 1
+        temp = declare('matrix(12)')  # The augmented matrix
         res = declare('matrix(3)')
         dwij = declare('matrix(3)')
         eps = 1.0e-04 * HIJ
         for i in range(n):
             dwij[i] = (DWIJ[i] - d_dw_gamma[3*d_idx + i])/d_cwij[d_idx]
             for j in range(n):
-                temp[n * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
-
-        gj_solve(temp, dwij, n, res)
+                temp[nt * i + j] = d_m_mat[9 * d_idx + 3 * i + j]
+            temp[nt*i + n] = dwij[i]
+        gj_solve(temp, n, 1, res)
 
         res_mag = 0.0
         dwij_mag = 0.0
