@@ -13,9 +13,10 @@ from pysph.sph.equation import Group, Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
 
-from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
-                                            GradientCorrection,
-                                            MixedKernelCorrectionPreStep)
+from pysph.sph.wc.kernel_correction import (
+    GradientCorrectionPreStep, GradientCorrection,
+    MixedKernelCorrectionPreStep, MixedGradientCorrection
+)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
 
 
@@ -71,7 +72,6 @@ def exact_solution(U, b, t, x, y):
 class TaylorGreen(Application):
 
     def add_user_options(self, group):
-        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
@@ -98,8 +98,10 @@ class TaylorGreen(Application):
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
+        corrections = ['', 'mixed', 'gradient', 'crksph']
         group.add_argument(
-            "--kernel-corr", action="store", type=str, dest='kernel_corr',
+            "--kernel-correction", action="store", type=str,
+            dest='kernel_correction',
             default='', help="Type of Kernel Correction", choices=corrections
         )
         group.add_argument(
@@ -130,7 +132,7 @@ class TaylorGreen(Application):
 
         self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
-        self.kernel_corr = self.options.kernel_corr
+        self.kernel_correction = self.options.kernel_correction
 
     def configure_scheme(self):
         scheme = self.scheme
@@ -164,32 +166,31 @@ class TaylorGreen(Application):
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        n = len(eqns)
-        tol = 1.0
-        if self.kernel_corr == 'grad-corr':
-            eqn1 = Group(equations=[
-                GradientCorrectionPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
-        elif self.kernel_corr == 'mixed-corr':
-            eqn1 = Group(equations=[
-                MixedKernelCorrectionPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
-        elif self.kernel_corr == 'crksph':
-            eqn1 = Group(equations=[
-                CRKSPHPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = CRKSPH('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
+        tol = 0.1
+        if self.kernel_correction == 'gradient':
+            cls1 = GradientCorrectionPreStep
+            cls2 = GradientCorrection
+        elif self.kernel_correction == 'mixed':
+            cls1 = MixedKernelCorrectionPreStep
+            cls2 = MixedGradientCorrection
+        elif self.kernel_correction == 'crksph':
+            cls1 = CRKSPHPreStep
+            cls2 = CRKSPH
+
+        if self.kernel_correction:
+            g1 = Group(equations=[cls1('fluid', ['fluid'], dim=2)])
+            eq2 = cls2(dest='fluid', sources=['fluid'], dim=2, tol=tol)
+
+            if self.options.scheme == 'wcsph':
+                eqns.insert(1, g1)
+                eqns[2].equations.insert(0, eq2)
+            elif self.options.scheme == 'tvf':
+                eqns[1].equations.append(g1.equations[0])
+                eqns[2].equations.insert(0, eq2)
+            elif self.options.scheme == 'edac':
+                eqns.insert(1, g1)
+                eqns[2].equations.insert(0, eq2)
+
         return eqns
 
     def create_domain(self):
@@ -257,11 +258,12 @@ class TaylorGreen(Application):
         # smoothing lengths
         fluid.h[:] = self.hdx * dx
 
-        corr = self.kernel_corr
-        if corr == 'kernel-corr' or corr == 'mixed-corr':
+        corr = self.kernel_correction
+        if corr == 'mixed':
             fluid.add_property('cwij')
-        if corr == 'mixed-corr' or corr == 'grad-corr':
+        if corr == 'mixed' or corr == 'gradient':
             fluid.add_property('m_mat', stride=9)
+            fluid.add_property('dw_gamma', stride=3)
         elif corr == 'crksph':
             fluid.add_property('ai')
             fluid.add_property('gradbi', stride=9)
