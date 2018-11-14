@@ -1,4 +1,6 @@
-from pysph.sph.wc.density_correction import gj_solve
+from pysph.sph.wc.density_correction import (
+    gj_solve, gj_solve_m, mat_mult, mat_vec_mult
+)
 import numpy as np
 import unittest
 
@@ -80,6 +82,53 @@ class TestGjSolve(unittest.TestCase):
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+
+    def test_inverse(self):
+        # Given
+        n = 3
+        mat = [[1.0, 2.0, 2.5], [2.5, 1.0, 0.0], [0.0, 0.0, 1.0]]
+        b = np.identity(3).tolist()
+        result = np.zeros((3, 3)).ravel().tolist()
+
+        # When
+        gj_solve_m(np.ravel(mat), np.ravel(b), n, n, result)
+
+        # Then
+        mat = np.asarray(mat)
+        res = np.asarray(result)
+        res.shape = 3, 3
+        np.testing.assert_allclose(res, np.linalg.inv(mat))
+
+    def test_matmult(self):
+        # Given
+        n = 3
+        a = np.random.random((3, 3))
+        b = np.random.random((3, 3))
+        result = [0.0]*9
+
+        # When
+        mat_mult(a.ravel(), b.ravel(), n, result)
+
+        # Then.
+        expect = np.dot(a, b)
+        result = np.asarray(result)
+        result.shape = 3, 3
+        np.testing.assert_allclose(result, expect)
+
+    def test_mat_vec_mult(self):
+        # Given
+        n = 3
+        a = np.random.random((3, 3))
+        b = np.random.random((3,))
+        result = [0.0]*3
+
+        # When
+        mat_vec_mult(a.ravel(), b, n, result)
+
+        # Then.
+        expect = np.dot(a, b)
+        result = np.asarray(result)
+        np.testing.assert_allclose(result, expect)
 
 
 if __name__ == '__main__':
