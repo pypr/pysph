@@ -1,11 +1,11 @@
-from pysph.sph.wc.density_correction import (
+from pysph.sph.wc.linalg import (
     gj_solve, gj_solve_m, mat_mult, mat_vec_mult
 )
 import numpy as np
 import unittest
 
 
-class TestGjSolve(unittest.TestCase):
+class TestLinalg(unittest.TestCase):
 
     def test_general_matrix(self):
         """
