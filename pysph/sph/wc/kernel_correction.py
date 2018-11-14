@@ -132,7 +132,7 @@ class MixedKernelCorrectionPreStep(Equation):
     where,
 
     .. math::
-            L_{a} = \left(\sum_{b} V_{b}}\nabla \bar{W}_{ab}
+            L_{a} = \left(\sum_{b} V_{b} \nabla \bar{W}_{ab}
             \mathbf{\otimes}x_{ba} \right)^{-1}
 
     .. math::
