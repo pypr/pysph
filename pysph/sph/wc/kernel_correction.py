@@ -144,7 +144,7 @@ class MixedKernelCorrectionPreStep(Equation):
             \nabla \bar{W}_{ab} = \frac{\nabla W_{ab} - \gamma}
             {\sum_{b} V_{b}W_{ab}}
 
-    ..math::
+    .. math::
             \gamma = \frac{\sum_{b} V_{b}\nabla W_{ab}}
             {\sum_{b} V_{b}W_{ab}}
 

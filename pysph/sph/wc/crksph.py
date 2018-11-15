@@ -1,3 +1,18 @@
+'''
+CRKSPH corrections
+###################
+
+These are equations for the basic kernel corrections in [CRKSPH2017].
+
+References
+-----------
+
+    .. [CRKSPH2017] Nicholas Frontiere, Cody D. Raskin, J. Michael Owen (2017)
+        CRKSPH - A Conservative Reproducing Kernel Smoothed Particle
+        Hydrodynamics Scheme.
+
+'''
+
 from math import sqrt
 from pysph.cpy.api import declare
 from pysph.sph.equation import Equation
@@ -149,6 +164,8 @@ class CRKSPHPreStep(Equation):
 class CRKSPH(Equation):
     r"""**Conservative Reproducing Kernel SPH**
 
+    Equations from the paper [CRKSPH2017].
+
     .. math::
             W_{ij}^{R} = A_{i}\left(1+B_{i}^{\alpha}x_{ij}^{\alpha}
             \right)W_{ij}
@@ -166,21 +183,22 @@ class CRKSPH(Equation):
 
     .. math::
             A_{i} = \left[m_{0} - \left(m_{2}^{-1}\right)^{\alpha \beta}
-            m1_{\beta}m1_{\alpha}\right]^{-1}
+            m_1^{\beta}m_1^{\alpha}\right]^{-1}
     .. math::
             B_{i}^{\alpha} = -\left(m_{2}^{-1}\right)^{\alpha \beta}
             m_{1}^{\beta}
     .. math::
             \partial_{\gamma}A_{i} = -A_{i}^{2}\left(\partial_{\gamma}
-            m_{0}-\left[m_{2}^{-1}\right]^{\alpha \beta}\left[
-            m_{1}^{\beta}\partial_{\gamma}m_{1}^{\beta}m_{1}^{\alpha} +
-            \partial_{\gamma}m_{1}^{\alpha}m_{1}^{\beta}\right] +
-            \left[m_{2}^{-1}\right]^{\alpha \phi}\partial_{\gamma}
-            m_{2}^{\phi \psi}\left[m_{2}^{-1}\right]^{\psi \beta}
+            m_{0}-\left(m_{2}^{-1}\right)^{\alpha \beta}\left(
+            m_{1}^{\beta}\partial_{\gamma}m_{1}^{\alpha} +
+            \partial_{\gamma}m_{1}^{\beta}m_{1}^{\alpha}\right) +
+            \left(m_{2}^{-1}\right)^{\alpha \phi}\partial_{\gamma}
+            m_{2}^{\phi \psi}\left(m_{2}^{-1}\right)^{\psi \beta}
             m_{1}^{\beta}m_{1}^{\alpha} \right)
     .. math::
-            \partial_{\gamma}B_{i}^{\alpha} = -\left[m_{2}^{-1}\right]^
-            {\alpha \beta}\left[m_{1}^{\beta} + \left(m_{2}^{-1}\right)^
+            \partial_{\gamma}B_{i}^{\alpha} = -\left(m_{2}^{-1}\right)^
+            {\alpha \beta}\partial_{\gamma}m_{1}^{\beta} +
+            \left(m_{2}^{-1}\right)^
             {\alpha \phi}\partial_{\gamma}m_{2}^{\phi \psi}\left(m_{2}^
             {-1}\right)^{\psi \beta}m_{1}^{\beta}
     .. math::
@@ -202,11 +220,6 @@ class CRKSPH(Equation):
             x_{ij}^{\alpha}x_{ij}^{\beta}\partial_{\gamma}W_{ij} +
             \left(x_{ij}^{\alpha}\delta^{\beta \gamma} + x_{ij}^{\beta}
             \delta^{\alpha \gamma} \right)W_{ij} \right]
-    References
-    ----------
-    .. [N Frontiere, C D Raskin and J M Owen] Nicholas Frontiere,
-        Cody D. Raskin, J. Michael Owen (2017) CRKSPH - A Conservative
-        Reproducing Kernel Smoothed Particle Hydrodynamics Scheme.
     """
 
     def __init__(self, dest, sources, dim=2, tol=0.5):
@@ -254,6 +267,8 @@ class CRKSPHSymmetric(Equation):
 
     This is symmetric and will only work for particles of the same array.
 
+    Equations from the paper [CRKSPH2017].
+
     .. math::
             W_{ij}^{R} = A_{i}\left(1+B_{i}^{\alpha}x_{ij}^{\alpha}
             \right)W_{ij}
@@ -307,12 +322,6 @@ class CRKSPHSymmetric(Equation):
             x_{ij}^{\alpha}x_{ij}^{\beta}\partial_{\gamma}W_{ij} +
             \left(x_{ij}^{\alpha}\delta^{\beta \gamma} + x_{ij}^{\beta}
             \delta^{\alpha \gamma} \right)W_{ij} \right]
-    References
-    ----------
-    .. [N Frontiere, C D Raskin and J M Owen] Nicholas Frontiere,
-        Cody D. Raskin, J. Michael Owen (2017) CRKSPH - A Conservative
-        Reproducing Kernel Smoothed Particle Hydrodynamics Scheme.
-
     """
 
     def __init__(self, dest, sources, dim=2, tol=0.5):
