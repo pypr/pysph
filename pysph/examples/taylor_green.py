@@ -166,7 +166,8 @@ class TaylorGreen(Application):
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        tol = 0.1
+        # This tolerance needs to be fixed.
+        tol = 0.5
         if self.kernel_correction == 'gradient':
             cls1 = GradientCorrectionPreStep
             cls2 = GradientCorrection
@@ -259,14 +260,14 @@ class TaylorGreen(Application):
         fluid.h[:] = self.hdx * dx
 
         corr = self.kernel_correction
-        if corr == 'mixed':
+        if corr in ['mixed', 'crksph']:
             fluid.add_property('cwij')
         if corr == 'mixed' or corr == 'gradient':
             fluid.add_property('m_mat', stride=9)
             fluid.add_property('dw_gamma', stride=3)
         elif corr == 'crksph':
             fluid.add_property('ai')
-            fluid.add_property('gradbi', stride=9)
+            fluid.add_property('gradbi', stride=4)
             for prop in ['gradai', 'bi']:
                 fluid.add_property(prop, stride=2)
 
