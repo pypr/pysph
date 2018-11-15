@@ -126,17 +126,21 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
     rr, rrcol, rb, rbr, kup, kupr, kleft, kleftr = declare('int', 8)
     for rrcol in range(0, colrange):
         for rr in range(rrcol + 1, eqns):
-            cc = -(float(m[nt*rr + rrcol]) / float(m[nt*rrcol + rrcol]))
+            dnr = float(m[nt*rrcol + rrcol])
+            if abs(dnr) < 1e-12:
+                return 1.0
+            cc = -float(m[nt*rr + rrcol]) / dnr
             for j in range(augCol):
                 m[nt*rr + j] = m[nt*rr + j] + cc * m[nt*rrcol + j]
 
     backCol, backColr = declare('int', 2)
-    tol = 1.0e-05
+    tol = 1.0e-12
     for rbr in range(eqns):
         rb = eqns - rbr - 1
         if (m[nt*rb + rb] == 0):
-            if abs(m[nt*rb + augCol - 1]) >= tol:
-                return 0.0
+            if abs(m[nt*rb + augCol - 1]) > tol:
+                # Error, singular matrix.
+                return 1.0
         else:
             for backColr in range(rb, augCol):
                 backCol = rb + augCol - backColr - 1
@@ -153,3 +157,5 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
     for i in range(n):
         for j in range(nb):
             result[nb*i + j] = m[nt*i + n + j]
+
+    return 0.0

@@ -9,8 +9,8 @@ def gj_solve_helper(a, b, n):
     m = np.zeros((n, n+1)).ravel().tolist()
     augmented_matrix(a, b, n, 1, m)
     result = [0.0]*n
-    gj_solve(m, n, 1, result)
-    return result
+    is_singular = gj_solve(m, n, 1, result)
+    return is_singular, result
 
 
 class TestLinalg(unittest.TestCase):
@@ -48,63 +48,69 @@ class TestLinalg(unittest.TestCase):
         mat = [[0.02, 0.01, 0., 0.], [1., 2., 1., 0.], [0., 1., 2., 1.],
                [0., 0., 100., 200.]]
         b = [0.02, 1., 4., 800.]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_band_matrix(self):
         n = 3
         mat = [[1., -2., 0.], [1., -1., 3.], [2., 5., 0.]]
         b = [-3., 1., 0.5]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_dense_matrix(self):
         n = 3
         mat = [[0.96, 4.6, -3.7], [2.7, 4.3, -0.67], [0.9, 0., -5.]]
         b = [2.4, 3.6, -5.8]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_tridiagonal_matrix(self):
         n = 4
         mat = [[-2., 1., 0., 0.], [1., -2., 1., 0.], [0., 1., -2., 0.],
                [0., 0., 1., -2.]]
         b = [-1., 0., 0., -5.]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_symmetric_matrix(self):
         n = 3
         mat = [[0.96, 4.6, -3.7], [4.6, 4.3, -0.67], [-3.7, -0.67, -5.]]
         b = [2.4, 3.6, -5.8]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_symmetric_positivedefinite_Matrix(self):
         n = 4
         mat = [[1., 1., 4., -1.], [1., 5., 0., -1.], [4., 0., 21., -4.],
                [-1., -1., -4., 10.]]
         b = [2.4, 3.6, -5.8, 0.5]
-        result = gj_solve_helper(np.ravel(mat), b, n)
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
         mat = np.matrix(mat)
         new_b = mat * np.transpose(np.matrix(result))
         new_b = np.ravel(np.array(new_b))
         assert np.allclose(new_b, np.array(b))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_inverse(self):
         # Given
@@ -116,13 +122,14 @@ class TestLinalg(unittest.TestCase):
         result = np.zeros((3, 3)).ravel().tolist()
 
         # When
-        gj_solve(A, n, n, result)
+        sing = gj_solve(A, n, n, result)
 
         # Then
         mat = np.asarray(mat)
         res = np.asarray(result)
         res.shape = 3, 3
         np.testing.assert_allclose(res, np.linalg.inv(mat))
+        self.assertAlmostEqual(sing, 0.0)
 
     def test_matmult(self):
         # Given
@@ -154,6 +161,15 @@ class TestLinalg(unittest.TestCase):
         expect = np.dot(a, b)
         result = np.asarray(result)
         np.testing.assert_allclose(result, expect)
+
+    def test_singular_matrix(self):
+        # Given
+        n = 3
+        mat = [[1., 1., 0.], [1., 1., 0.], [1., 1., 1.]]
+        b = [1.0, 1.0, 1.0]
+        #
+        sing, result = gj_solve_helper(np.ravel(mat), b, n)
+        self.assertAlmostEqual(sing, 1.0)
 
 
 if __name__ == '__main__':
