@@ -12,6 +12,7 @@ from pysph.solver.application import Application
 from pysph.sph.equation import Group, Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
+from pysph.sph.iisph import IISPHScheme
 
 from pysph.sph.wc.kernel_correction import (
     GradientCorrectionPreStep, GradientCorrection,
@@ -126,7 +127,10 @@ class TaylorGreen(Application):
         self.hdx = self.options.hdx
 
         h0 = self.hdx * self.dx
-        dt_cfl = 0.25 * h0 / (c0 + U)
+        if self.options.scheme == 'iisph':
+            dt_cfl = 0.25 * h0 / U
+        else:
+            dt_cfl = 0.25 * h0 / (c0 + U)
         dt_viscous = 0.125 * h0**2 / nu
         dt_force = 0.25 * 1.0
 
@@ -137,14 +141,19 @@ class TaylorGreen(Application):
     def configure_scheme(self):
         scheme = self.scheme
         h0 = self.hdx * self.dx
+        pfreq = 100
         if self.options.scheme == 'tvf':
             scheme.configure(pb=self.options.pb_factor * p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         elif self.options.scheme == 'edac':
             scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor * p0)
+        elif self.options.scheme == 'iisph':
+            scheme.configure(nu=self.nu)
+            pfreq = 10
         kernel = QuinticSpline(dim=2)
-        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
+        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
+                                pfreq=pfreq)
 
     def create_scheme(self):
         h0 = None
@@ -161,7 +170,13 @@ class TaylorGreen(Application):
             ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
             pb=p0, h=h0
         )
-        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf, edac=edac)
+        iisph = IISPHScheme(
+            fluids=['fluid'], solids=[], dim=2, nu=None,
+            rho0=rho0, has_ghosts=True
+        )
+        s = SchemeChooser(
+            default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph
+        )
         return s
 
     def create_equations(self):
@@ -255,6 +270,11 @@ class TaylorGreen(Application):
         # volume is set as dx^2
         if self.options.scheme == 'tvf':
             fluid.V[:] = 1. / self.volume
+        if self.options.scheme == 'iisph':
+            # These are needed to update the ghost particle properties.
+            nfp = fluid.get_number_of_particles()
+            fluid.orig_idx[:] = np.arange(nfp)
+            fluid.add_output_arrays(['orig_idx'])
 
         # smoothing lengths
         fluid.h[:] = self.hdx * dx
@@ -294,6 +314,10 @@ class TaylorGreen(Application):
                              'au', 'av', 'auhat', 'avhat', 'ap']
                 else:
                     props = ['u', 'v', 'p', 'au', 'av', 'ax', 'ay', 'ap']
+            elif options.scheme == 'iisph':
+                # The accelerations are not really needed since the current
+                # stepper is a single stage stepper.
+                props = ['u', 'v', 'p']
 
             remesher = SimpleRemesher(
                 self, 'fluid', props=props,
