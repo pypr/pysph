@@ -10,6 +10,8 @@ from os.path import (abspath, basename, dirname, isdir, join, realpath,
 import socket
 import sys
 import time
+import numpy
+import warnings
 
 # PySPH imports.
 from pysph.base import utils
@@ -807,6 +809,16 @@ class Application(object):
 
             else:
                 self.particles = particle_factory(*args, **kw)
+
+            for pa in self.particles:
+                if numpy.all(pa.h) == 0.0:
+                    warnings.warn(
+                        "'h' for particle array '{}' is 0.0".format(pa.name),
+                        UserWarning)
+                if numpy.all(pa.m == 0.0):
+                    warnings.warn(
+                        "Mass 'm' for particle array '{}' is 0.0".format(
+                            pa.name), UserWarning)
 
             # get the array info which will be b'casted to other procs
             particles_info = utils.get_particles_info(self.particles)
