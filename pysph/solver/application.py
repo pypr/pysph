@@ -10,7 +10,7 @@ from os.path import (abspath, basename, dirname, isdir, join, realpath,
 import socket
 import sys
 import time
-import numpy
+import numpy as np
 import warnings
 
 # PySPH imports.
@@ -811,11 +811,11 @@ class Application(object):
                 self.particles = particle_factory(*args, **kw)
 
             for pa in self.particles:
-                if numpy.all(pa.h) == 0.0:
+                if np.max(pa.h) < 1e-12:
                     warnings.warn(
                         "'h' for particle array '{}' is 0.0".format(pa.name),
                         UserWarning)
-                if numpy.all(pa.m == 0.0):
+                if np.max(pa.m) < 1e-12:
                     warnings.warn(
                         "Mass 'm' for particle array '{}' is 0.0".format(
                             pa.name), UserWarning)
