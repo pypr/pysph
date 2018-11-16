@@ -91,6 +91,7 @@ class SimpleRemesher(Tool):
             for prop in self.props:
                 data[prop] = self.interp.interpolate(prop)
             self.array.set(**data)
+            self.interp.nnps.update_domain()
 
 
 class DensityCorrection(Tool):
