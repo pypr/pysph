@@ -811,14 +811,15 @@ class Application(object):
                 self.particles = particle_factory(*args, **kw)
 
             for pa in self.particles:
-                if np.max(pa.h) < 1e-12:
-                    warnings.warn(
-                        "'h' for particle array '{}' is 0.0".format(pa.name),
-                        UserWarning)
-                if np.max(pa.m) < 1e-12:
-                    warnings.warn(
-                        "Mass 'm' for particle array '{}' is 0.0".format(
-                            pa.name), UserWarning)
+                if len(pa.x) > 0:
+                    if np.max(pa.h) < 1e-12:
+                        warnings.warn(
+                            "'h' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
+                    if np.max(pa.m) < 1e-12:
+                        warnings.warn(
+                            "Mass 'm' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
 
             # get the array info which will be b'casted to other procs
             particles_info = utils.get_particles_info(self.particles)
