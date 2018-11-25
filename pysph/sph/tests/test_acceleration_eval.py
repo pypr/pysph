@@ -905,6 +905,26 @@ class TestAccelerationEval1DGPUNonCached(TestAccelerationEval1DGPU):
     def test_should_support_loop_all_and_loop_on_gpu(self):
         pass
 
+    @pytest.mark.xfail
+    def test_should_call_initialize_pair_on_gpu(self):
+        # Given.
+        pa = self.pa
+        pa.u[:] = 1.0
+        if pa.gpu:
+            pa.gpu.push('u')
+        equations = [InitializePair(dest='fluid', sources=['fluid'])]
+        a_eval = self._make_accel_eval(equations)
+
+        # When
+        a_eval.compute(0.0, 0.1)
+
+        # Then
+        if pa.gpu:
+            pa.gpu.pull('u')
+        np.testing.assert_array_almost_equal(
+            pa.u, np.ones_like(pa.x)*1.5
+        )
+
     def tearDown(self):
         super(TestAccelerationEval1DGPUNonCached, self).tearDown()
         get_config().use_local_memory = self.old_flag

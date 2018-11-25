@@ -751,6 +751,22 @@ class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
             num_levels=2, backend='opencl'
         )
 
+    @pytest.mark.xfail(reason="StratifiedSFCGPUNNPS failing for \
+                       variable h cases")
+    def test_neighbors_dd(self):
+        self._test_neighbors_by_particle(src_index=3, dst_index=3,
+                                         dst_numPoints=self.numPoints4)
+
+    @pytest.mark.xfail(reason="StratifiedSFCGPUNNPS failing for \
+                       variable h cases")
+    def test_repeated(self):
+        self.test_neighbors_aa()
+        self.test_neighbors_ab()
+        self.test_neighbors_ba()
+        self.test_neighbors_bb()
+        self.test_neighbors_cc()
+        self.test_neighbors_dd()
+
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Compressed Octree based algorithm"""
