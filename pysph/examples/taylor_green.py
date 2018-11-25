@@ -12,10 +12,12 @@ from pysph.solver.application import Application
 from pysph.sph.equation import Group, Equation
 from pysph.sph.scheme import TVFScheme, WCSPHScheme, SchemeChooser
 from pysph.sph.wc.edac import ComputeAveragePressure, EDACScheme
+from pysph.sph.iisph import IISPHScheme
 
-from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
-                                            GradientCorrection,
-                                            MixedKernelCorrectionPreStep)
+from pysph.sph.wc.kernel_correction import (
+    GradientCorrectionPreStep, GradientCorrection,
+    MixedKernelCorrectionPreStep, MixedGradientCorrection
+)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
 
 
@@ -25,6 +27,34 @@ U = 1.0
 rho0 = 1.0
 c0 = 10 * U
 p0 = c0**2 * rho0
+
+
+def m4p(x=0.0):
+    """From the paper by Chaniotis et al. (JCP 2002).
+    """
+    if x < 0.0:
+        return 0.0
+    elif x < 1.0:
+        return 1.0 - 0.5*x*x*(5.0 - 3.0*x)
+    elif x < 2.0:
+        return (1 - x)*(2 - x)*(2 - x)*0.5
+    else:
+        return 0.0
+
+
+class M4(Equation):
+    '''An equation to be used for remeshing.
+    '''
+    def initialize(self, d_idx, d_prop):
+        d_prop[d_idx] = 0.0
+
+    def _get_helpers_(self):
+        return [m4p]
+
+    def loop(self, s_idx, d_idx, s_temp_prop, d_prop, d_h, XIJ):
+        xij = abs(XIJ[0]/d_h[d_idx])
+        yij = abs(XIJ[1]/d_h[d_idx])
+        d_prop[d_idx] += m4p(xij)*m4p(yij)*s_temp_prop[s_idx]
 
 
 def exact_solution(U, b, t, x, y):
@@ -43,7 +73,6 @@ def exact_solution(U, b, t, x, y):
 class TaylorGreen(Application):
 
     def add_user_options(self, group):
-        corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
             "--init", action="store", type=str, default=None,
             help="Initialize particle positions from given file."
@@ -70,9 +99,21 @@ class TaylorGreen(Application):
             default=1.0,
             help="Use fraction of the background pressure (default: 1.0)."
         )
+        corrections = ['', 'mixed', 'gradient', 'crksph']
         group.add_argument(
-            "--kernel-corr", action="store", type=str, dest='kernel_corr',
+            "--kernel-correction", action="store", type=str,
+            dest='kernel_correction',
             default='', help="Type of Kernel Correction", choices=corrections
+        )
+        group.add_argument(
+            "--remesh", action="store", type=int, dest="remesh", default=0,
+            help="Remeshing frequency (setting it to zero disables it)."
+        )
+        remesh_types = ['m4', 'sph']
+        group.add_argument(
+            "--remesh-eq", action="store", type=str, dest="remesh_eq",
+            default='m4', choices=remesh_types,
+            help="Remeshing strategy to use."
         )
 
     def consume_user_options(self):
@@ -86,25 +127,33 @@ class TaylorGreen(Application):
         self.hdx = self.options.hdx
 
         h0 = self.hdx * self.dx
-        dt_cfl = 0.25 * h0 / (c0 + U)
+        if self.options.scheme == 'iisph':
+            dt_cfl = 0.25 * h0 / U
+        else:
+            dt_cfl = 0.25 * h0 / (c0 + U)
         dt_viscous = 0.125 * h0**2 / nu
         dt_force = 0.25 * 1.0
 
         self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
-        self.kernel_corr = self.options.kernel_corr
+        self.kernel_correction = self.options.kernel_correction
 
     def configure_scheme(self):
         scheme = self.scheme
         h0 = self.hdx * self.dx
+        pfreq = 100
         if self.options.scheme == 'tvf':
             scheme.configure(pb=self.options.pb_factor * p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         elif self.options.scheme == 'edac':
             scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor * p0)
+        elif self.options.scheme == 'iisph':
+            scheme.configure(nu=self.nu)
+            pfreq = 10
         kernel = QuinticSpline(dim=2)
-        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt)
+        scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
+                                pfreq=pfreq)
 
     def create_scheme(self):
         h0 = None
@@ -121,37 +170,43 @@ class TaylorGreen(Application):
             ['fluid'], [], dim=2, rho0=rho0, c0=c0, nu=None,
             pb=p0, h=h0
         )
-        s = SchemeChooser(default='tvf', wcsph=wcsph, tvf=tvf, edac=edac)
+        iisph = IISPHScheme(
+            fluids=['fluid'], solids=[], dim=2, nu=None,
+            rho0=rho0, has_ghosts=True
+        )
+        s = SchemeChooser(
+            default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph
+        )
         return s
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
-        n = len(eqns)
-        tol = 1.0
-        if self.kernel_corr == 'grad-corr':
-            eqn1 = Group(equations=[
-                GradientCorrectionPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
-        elif self.kernel_corr == 'mixed-corr':
-            eqn1 = Group(equations=[
-                MixedKernelCorrectionPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = GradientCorrection('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
-        elif self.kernel_corr == 'crksph':
-            eqn1 = Group(equations=[
-                CRKSPHPreStep('fluid', ['fluid'])
-            ], real=False)
-            for i in range(n):
-                eqn2 = CRKSPH('fluid', ['fluid'], 2, tol)
-                eqns[i].equations.insert(0, eqn2)
-            eqns.insert(0, eqn1)
+        # This tolerance needs to be fixed.
+        tol = 0.5
+        if self.kernel_correction == 'gradient':
+            cls1 = GradientCorrectionPreStep
+            cls2 = GradientCorrection
+        elif self.kernel_correction == 'mixed':
+            cls1 = MixedKernelCorrectionPreStep
+            cls2 = MixedGradientCorrection
+        elif self.kernel_correction == 'crksph':
+            cls1 = CRKSPHPreStep
+            cls2 = CRKSPH
+
+        if self.kernel_correction:
+            g1 = Group(equations=[cls1('fluid', ['fluid'], dim=2)])
+            eq2 = cls2(dest='fluid', sources=['fluid'], dim=2, tol=tol)
+
+            if self.options.scheme == 'wcsph':
+                eqns.insert(1, g1)
+                eqns[2].equations.insert(0, eq2)
+            elif self.options.scheme == 'tvf':
+                eqns[1].equations.append(g1.equations[0])
+                eqns[2].equations.insert(0, eq2)
+            elif self.options.scheme == 'edac':
+                eqns.insert(1, g1)
+                eqns[2].equations.insert(0, eq2)
+
         return eqns
 
     def create_domain(self):
@@ -215,23 +270,61 @@ class TaylorGreen(Application):
         # volume is set as dx^2
         if self.options.scheme == 'tvf':
             fluid.V[:] = 1. / self.volume
+        if self.options.scheme == 'iisph':
+            # These are needed to update the ghost particle properties.
+            nfp = fluid.get_number_of_particles()
+            fluid.orig_idx[:] = np.arange(nfp)
+            fluid.add_output_arrays(['orig_idx'])
 
         # smoothing lengths
         fluid.h[:] = self.hdx * dx
 
-        corr = self.kernel_corr
-        if corr == 'kernel-corr' or corr == 'mixed-corr':
+        corr = self.kernel_correction
+        if corr in ['mixed', 'crksph']:
             fluid.add_property('cwij')
-        if corr == 'mixed-corr' or corr == 'grad-corr':
+        if corr == 'mixed' or corr == 'gradient':
             fluid.add_property('m_mat', stride=9)
+            fluid.add_property('dw_gamma', stride=3)
         elif corr == 'crksph':
             fluid.add_property('ai')
-            fluid.add_property('gradbi', stride=9)
+            fluid.add_property('gradbi', stride=4)
             for prop in ['gradai', 'bi']:
                 fluid.add_property(prop, stride=2)
 
         # return the particle list
         return [fluid]
+
+    def create_tools(self):
+        tools = []
+        options = self.options
+        if options.remesh > 0:
+            if options.remesh_eq == 'm4':
+                equations = [M4(dest='interpolate', sources=['fluid'])]
+            else:
+                equations = None
+            from pysph.solver.tools import SimpleRemesher
+            if options.scheme == 'wcsph':
+                props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
+            elif options.scheme == 'tvf':
+                props = ['u', 'v', 'uhat', 'vhat',
+                         'au', 'av', 'auhat', 'avhat']
+            elif options.scheme == 'edac':
+                if 'uhat' in self.particles[0].properties:
+                    props = ['u', 'v', 'uhat', 'vhat', 'p',
+                             'au', 'av', 'auhat', 'avhat', 'ap']
+                else:
+                    props = ['u', 'v', 'p', 'au', 'av', 'ax', 'ay', 'ap']
+            elif options.scheme == 'iisph':
+                # The accelerations are not really needed since the current
+                # stepper is a single stage stepper.
+                props = ['u', 'v', 'p']
+
+            remesher = SimpleRemesher(
+                self, 'fluid', props=props,
+                freq=self.options.remesh, equations=equations
+            )
+            tools.append(remesher)
+        return tools
 
     # The following are all related to post-processing.
     def _get_post_process_props(self, array):

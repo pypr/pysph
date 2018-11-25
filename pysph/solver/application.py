@@ -10,6 +10,8 @@ from os.path import (abspath, basename, dirname, isdir, join, realpath,
 import socket
 import sys
 import time
+import numpy as np
+import warnings
 
 # PySPH imports.
 from pysph.base import utils
@@ -836,6 +838,17 @@ class Application(object):
             else:
                 self.particles = particle_factory(*args, **kw)
 
+            for pa in self.particles:
+                if len(pa.x) > 0:
+                    if np.max(pa.h) < 1e-12:
+                        warnings.warn(
+                            "'h' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
+                    if np.max(pa.m) < 1e-12:
+                        warnings.warn(
+                            "Mass 'm' for particle array '{}' is 0.0".format(
+                                pa.name), UserWarning)
+
             # get the array info which will be b'casted to other procs
             particles_info = utils.get_particles_info(self.particles)
 
@@ -1111,6 +1124,7 @@ class Application(object):
             nnps=nnps,
             kernel=kernel,
             fixed_h=fixed_h)
+        self._log_solver_info(solver)
 
         # add solver interfaces
         self.command_manager = CommandManager(solver, self.comm)
@@ -1259,15 +1273,15 @@ class Application(object):
             self.solver.add_post_step_callback(obj.post_step)
 
     def _message(self, msg):
-        if self.options.quiet:
-            return
         if self.num_procs == 1:
             logger.info(msg)
-            print(msg)
+            if not self.options.quiet:
+                print(msg)
         elif (self.num_procs > 1 and self.rank in (0, 1)):
             s = "Rank %d: %s" % (self.rank, msg)
             logger.info(s)
-            print(s)
+            if not self.options.quiet:
+                print(s)
 
     def _write_info(self, filename, **kw):
         """Write the information dictionary to given filename. Any extra
@@ -1277,6 +1291,34 @@ class Application(object):
             fname=self.fname, output_dir=self.output_dir, args=self.args)
         info.update(kw)
         json.dump(info, open(filename, 'w'))
+
+    def _log_solver_info(self, solver):
+        sep = '-'*70
+
+        particle_info = '\n  '.join(
+            ['%s: %d' % (p.name, len(p.gid)) for p in solver.particles]
+        )
+        p_msg = 'No of particles:\n%s\n  %s\n%s' % (sep, particle_info, sep)
+        self._message(p_msg)
+
+        kernel_name = solver.kernel.__class__.__name__
+        kernel_info = '%s(dim=%s)' % (kernel_name, solver.dim)
+        logger.info('Using kernel:\n%s\n  %s\n%s', sep, kernel_info, sep)
+
+        nnps_name = self.nnps.__class__.__name__
+        nnps_info = '%s(dim=%s)' % (nnps_name, solver.dim)
+        logger.info('Using nnps:\n%s\n  %s\n%s', sep, nnps_info, sep)
+
+        logger.info(
+            'Using integrator:\n%s\n  %s\n%s', sep, solver.integrator, sep
+        )
+
+        equations = self.equations
+        if isinstance(equations, list):
+            eqn_info = '[\n' + ',\n'.join([str(e) for e in equations]) + '\n]'
+        else:
+            eqn_info = equations
+        logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
 
     ######################################################################
     # Public interface.
@@ -1469,8 +1511,8 @@ class Application(object):
 
     def configure_scheme(self):
         """This is called after :py:meth:`consume_user_options` is called.
-        One can configure the SPH scheme here as at this point all the
-        command line options are known.
+        One can configure the SPH scheme here as at this point all the command
+        line options are known.
         """
         pass
 

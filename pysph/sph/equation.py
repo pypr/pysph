@@ -351,7 +351,9 @@ def get_arrays_used_in_equation(equation):
     """
     src_arrays = set()
     dest_arrays = set()
-    methods = ('initialize', 'initialize_pair', 'loop', 'loop_all', 'post_loop')
+    methods = (
+        'initialize', 'initialize_pair', 'loop', 'loop_all', 'post_loop'
+    )
     for meth_name in methods:
         meth = getattr(equation, meth_name, None)
         if meth is not None:
@@ -873,3 +875,10 @@ class MultiStageEquations(object):
         '''
         assert type(groups) in (list, tuple)
         self.groups = groups
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        kw = [', \n'.join(str(grps) for grps in stg) for stg in self.groups]
+        return '%s(groups=[[\n%s\n    ]]\n)' % (
+            name, '], [\n'.join(kw)
+        )
