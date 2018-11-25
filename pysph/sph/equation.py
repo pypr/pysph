@@ -5,6 +5,7 @@ the Group class.
 import ast
 
 from collections import defaultdict
+
 try:
     from collections import OrderedDict
 except ImportError:
@@ -20,6 +21,7 @@ from textwrap import dedent
 # Local imports.
 from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
                            get_symbols)
+from pysph.cpy.config import get_config
 
 
 getfullargspec = getattr(
@@ -59,6 +61,7 @@ class Context(dict):
         >>> c.keys()
         ['a', 'x', 'b']
     """
+
     def __getattr__(self, key):
         try:
             return self.__getitem__(key)
@@ -375,7 +378,6 @@ def get_init_args(obj, method, ignore=None):
 # `Equation` class.
 ##############################################################################
 class Equation(object):
-
     ##########################################################################
     # `object` interface.
     ##########################################################################
@@ -701,7 +703,7 @@ class CythonGroup(Group):
                 if kind == 'reduce':
                     args = ['dst.array', 't', 'dt']
                 call_args = ', '.join(args)
-                c = 'self.{eq_name}.{method}({args})'\
+                c = 'self.{eq_name}.{method}({args})' \
                     .format(eq_name=eq.var_name, method=kind, args=call_args)
                 code.append(c)
         if len(code) > 0:
@@ -810,9 +812,9 @@ class CythonGroup(Group):
     def get_equation_init(self):
         lines = []
         for i, equation in enumerate(self.equations):
-            code = 'self.{name} = {cls}(**equations[{idx}].__dict__)'\
-                        .format(name=equation.var_name, cls=equation.name,
-                                idx=i)
+            code = 'self.{name} = {cls}(**equations[{idx}].__dict__)' \
+                .format(name=equation.var_name, cls=equation.name,
+                        idx=i)
             lines.append(code)
         return '\n'.join(lines)
 
@@ -836,6 +838,15 @@ class OpenCLGroup(Group):
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
         predefined['NBRS'] = KnownType('__global unsigned int*')
+
+        if get_config().use_local_memory:
+            for k in predefined.keys():
+                if 's_' in k:
+                    # TODO: Make each argument have their own KnownType
+                    # right from the start
+                    predefined[k] = KnownType(
+                        predefined[k].type.replace('__global', '__local')
+                    )
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):

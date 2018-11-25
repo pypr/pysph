@@ -89,6 +89,7 @@ cdef class GPUNeighborCache:
         # - Store sum kernel
         # - don't allocate neighbors_gpu each time.
         # - Don't allocate _nbr_lengths and start_idx.
+
         total_size_gpu = array.sum(self._nbr_lengths_gpu)
 
         cdef unsigned long total_size = <unsigned long>(total_size_gpu)
@@ -170,8 +171,8 @@ cdef class GPUNNPS(NNPSBase):
             This is useful when comparing parallel results with those
             from a serial run.
 
-        ctx : pyopencl.Context
-            For testing purpose
+        backend : string
+            Backend on which to build NNPS Module
         """
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
@@ -272,7 +273,6 @@ cdef class GPUNNPS(NNPSBase):
             x.update_min_max()
             y.update_min_max()
             z.update_min_max()
-
             # find min and max of variables
             xmax = np.maximum(x.maximum, xmax)
             ymax = np.maximum(y.maximum, ymax)

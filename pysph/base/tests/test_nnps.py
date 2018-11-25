@@ -28,6 +28,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
     We distribute particles manually and perform sanity checks on NNPS
 
     """
+
     def setUp(self):
         """Default set-up used by all the tests
 
@@ -55,13 +56,13 @@ class SimpleNNPSTestCase(unittest.TestCase):
 
         """
         x = numpy.array([
-                -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
+            -1.5, 0.33, 1.25, 0.05, -0.5, -0.75, -1.25, 0.5, 0.5, 0.5])
 
         y = numpy.array([
-                0.25, -0.25, -1.25, 1.25, 0.5, 0.75, 0.5, 1.5, -0.5, 1.75])
+            0.25, -0.25, -1.25, 1.25, 0.5, 0.75, 0.5, 1.5, -0.5, 1.75])
 
         z = numpy.array([
-                0.5, 0.25, 1.25, -0.5, -1.25, -1.25, 0.5, -0.5, 0.5, -0.75])
+            0.5, 0.25, 1.25, -0.5, -1.25, -1.25, 0.5, -0.5, 0.5, -0.75])
 
         # using a degenrate (h=0) array will set cell size to 1 for NNPS
         h = numpy.zeros_like(x)
@@ -85,11 +86,11 @@ class SimpleNNPSTestCase(unittest.TestCase):
         )
 
         self.ext_sp_hash_nnps = nnps.ExtendedSpatialHashNNPS(
-                dim=3, particles=[pa], radius_scale=1.0
+            dim=3, particles=[pa], radius_scale=1.0
         )
 
         self.strat_radius_nnps = nnps.StratifiedHashNNPS(
-                dim=3, particles=[pa], radius_scale=1.0
+            dim=3, particles=[pa], radius_scale=1.0
         )
 
         # these are the expected cells
@@ -138,15 +139,7 @@ class SimpleNNPSTestCase(unittest.TestCase):
             self.assertTrue(cell_indices == expected_indices)
 
 
-class NNPSTestCase(unittest.TestCase):
-    """Standard nearest neighbor queries and comparison with the brute
-    force approach.
-
-    We randomly distribute particles in 3-space and compare the list
-    of neighbors using the NNPS algorithms and the brute force
-    approach.
-
-    """
+class NNPS2DTestCase(unittest.TestCase):
     def setUp(self):
         """Default set-up used by all the tests
 
@@ -154,8 +147,8 @@ class NNPSTestCase(unittest.TestCase):
         are checked from a -> b, b -> a , a -> a and b -> b
 
         """
-        self.numPoints1 = numPoints1 = 1 << 10
-        self.numPoints2 = numPoints2 = 1 << 11
+        self.numPoints1 = numPoints1 = 1 << 11
+        self.numPoints2 = numPoints2 = 1 << 10
 
         self.pa1 = pa1 = self._create_random(numPoints1)
         self.pa2 = pa2 = self._create_random(numPoints2)
@@ -165,12 +158,212 @@ class NNPSTestCase(unittest.TestCase):
 
     def _create_random(self, numPoints):
         # average particle spacing and volume in the unit cube
-        dx = pow(1.0/numPoints, 1./3.)
+        dx = pow(1.0 / numPoints, 1. / 2.)
+
+        # create random points in the interval [-1, 1]^3
+        x1, y1 = random.random((2, numPoints)) * 2.0 - 1.0
+        z1 = numpy.zeros_like(x1)
+
+        h1 = numpy.ones_like(x1) * 1.2 * dx
+        gid1 = numpy.arange(numPoints).astype(numpy.uint32)
+
+        # first particle array
+        pa = get_particle_array(
+            x=x1, y=y1, z=z1, h=h1, gid=gid1)
+
+        return pa
+
+    def _assert_neighbors(self, nbrs_nnps, nbrs_brute_force):
+        # ensure that the lengths of the arrays are the same
+        self.assertEqual(nbrs_nnps.length, nbrs_brute_force.length)
+        nnbrs = nbrs_nnps.length
+
+        _nbrs1 = nbrs_nnps.get_npy_array()
+        _nbrs2 = nbrs_brute_force.get_npy_array()
+
+        # sort the neighbors
+        nbrs1 = _nbrs1[:nnbrs]
+        nbrs1.sort()
+        nbrs2 = _nbrs2
+        nbrs2.sort()
+
+        # check each neighbor
+        for i in range(nnbrs):
+            self.assertEqual(nbrs1[i], nbrs2[i])
+
+    def _test_neighbors_by_particle(self, src_index, dst_index, dst_numPoints):
+        # nnps and the two neighbor lists
+        nps = self.nps
+        nbrs1 = UIntArray()
+        nbrs2 = UIntArray()
+
+        nps.set_context(src_index, dst_index)
+
+        # get the neighbors and sort the result
+        for i in range(dst_numPoints):
+            nps.get_nearest_particles(src_index, dst_index, i, nbrs1)
+            nps.brute_force_neighbors(src_index, dst_index, i, nbrs2)
+
+            # ensure that the neighbor lists are the same
+            self._assert_neighbors(nbrs1, nbrs2)
+
+
+class DictBoxSortNNPS2DTestCase(NNPS2DTestCase):
+    """Test for the original box-sort algorithm"""
+
+    def setUp(self):
+        NNPS2DTestCase.setUp(self)
+        self.nps = nnps.DictBoxSortNNPS(
+            dim=2, particles=self.particles, radius_scale=2.0
+        )
+
+    def test_neighbors_aa(self):
+        self._test_neighbors_by_particle(src_index=0, dst_index=0,
+                                         dst_numPoints=self.numPoints1)
+
+    def test_neighbors_ab(self):
+        self._test_neighbors_by_particle(src_index=0, dst_index=1,
+                                         dst_numPoints=self.numPoints2)
+
+    def test_neighbors_ba(self):
+        self._test_neighbors_by_particle(src_index=1, dst_index=0,
+                                         dst_numPoints=self.numPoints1)
+
+    def test_neighbors_bb(self):
+        self._test_neighbors_by_particle(src_index=1, dst_index=1,
+                                         dst_numPoints=self.numPoints2)
+
+    def test_repeated(self):
+        self.test_neighbors_aa()
+        self.test_neighbors_ab()
+        self.test_neighbors_ba()
+        self.test_neighbors_bb()
+
+
+class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+
+    def setUp(self):
+        NNPS2DTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=2, particles=self.particles, radius_scale=2.0
+        )
+
+    def tearDown(self):
+        super(OctreeGPUNNPS2DTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class OctreeGPUNNPSDouble2DTestCase(DictBoxSortNNPS2DTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+
+    def setUp(self):
+        NNPS2DTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = True
+
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=2, particles=self.particles, radius_scale=2.0
+        )
+
+    def tearDown(self):
+        super(OctreeGPUNNPSDouble2DTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class NNPSTestCase(unittest.TestCase):
+    """Standard nearest neighbor queries and comparison with the brute
+    force approach.
+
+    We randomly distribute particles in 3-space and compare the list
+    of neighbors using the NNPS algorithms and the brute force
+    approach.
+
+    The following particle arrays are set up for testing
+    1) pa1, pa2: uniformly distributed distribution with a constant h. pa1
+    and p2 have a different number of particles and hence, a different h.
+    2) pa3: Uniformly distributed distribution for both the coordinates and
+    for h.
+    3) pa4: h varies along with spatial coordinates.
+    """
+
+    def setUp(self):
+        """Default set-up used by all the tests
+        """
+        # Datasets with constant h
+        self.numPoints1 = numPoints1 = 1 << 11
+        self.numPoints2 = numPoints2 = 1 << 10
+
+        # Datasets with varying h
+        self.numPoints3 = numPoints3 = 1 << 10
+
+        # FIXME: Tets fail with m4=9
+        # Looks like the issue arises due to rounding errors which should be
+        # acceptable to a degree. Need to modify tests or brute force NNPS to
+        # handle such cases appropriately
+        m4 = 8
+        self.numPoints4 = numPoints4 = m4 ** 3
+
+        self.pa1 = pa1 = self._create_random(numPoints1)
+        self.pa2 = pa2 = self._create_random(numPoints2)
+        self.pa3 = pa3 = self._create_random_variable_h(numPoints3)
+        self.pa4 = pa4 = self._create_linear_radius(0.1, 0.4, m4)
+
+        # the list of particles
+        self.particles = [pa1, pa2, pa3, pa4]
+
+    def _create_random(self, numPoints):
+        # average particle spacing and volume in the unit cube
+        dx = pow(1.0 / numPoints, 1. / 3.)
 
         # create random points in the interval [-1, 1]^3
         x1, y1, z1 = random.random((3, numPoints)) * 2.0 - 1.0
         h1 = numpy.ones_like(x1) * 1.2 * dx
         gid1 = numpy.arange(numPoints).astype(numpy.uint32)
+
+        # first particle array
+        pa = get_particle_array(
+            x=x1, y=y1, z=z1, h=h1, gid=gid1)
+
+        return pa
+
+    def _create_linear_radius(self, dx_min, dx_max, m):
+        n = m ** 3
+        base = numpy.linspace(1., (dx_max / dx_min), m)
+        hl = base * dx_min
+        xl = numpy.cumsum(hl)
+        x, y, z = numpy.meshgrid(xl, xl, xl)
+        x, y, z = x.ravel(), y.ravel(), z.ravel()
+        h1, h2, h3 = numpy.meshgrid(hl, hl, hl)
+        h = (h1 ** 2 + h2 ** 2 + h3 ** 2) ** 0.5
+        h = h.ravel()
+        gid = numpy.arange(n).astype(numpy.uint32)
+
+        pa = get_particle_array(
+            x=x, y=y, z=z, h=h, gid=gid
+        )
+
+        return pa
+
+    def _create_random_variable_h(self, num_points):
+        # average particle spacing and volume in the unit cube
+        dx = pow(1.0 / num_points, 1. / 3.)
+
+        # create random points in the interval [-1, 1]^3
+        x1, y1, z1 = random.random((3, num_points)) * 2.0 - 1.0
+        h1 = numpy.ones_like(x1) * \
+            numpy.random.uniform(1, 4, size=num_points) * 1.2 * dx
+        gid1 = numpy.arange(num_points).astype(numpy.uint32)
 
         # first particle array
         pa = get_particle_array(
@@ -216,7 +409,28 @@ class NNPSTestCase(unittest.TestCase):
 
 class DictBoxSortNNPSTestCase(NNPSTestCase):
     """Test for the original box-sort algorithm"""
+
     def setUp(self):
+        """
+        Default setup and tests used for 3D NNPS tests
+
+        We run the tests on the following pairs of particle arrays:
+
+        Set 1) Same particle arrays. Both have constant h.
+        1) a -> a
+        2) b -> b
+
+        Set 2) Different particle arrays with constant h.
+        1) a -> b
+        2) b -> a
+
+        Set 3) Variable h
+        1) c -> c
+        2) d -> d
+
+        We then repeat the above tests again to ensure that we get the
+        correct results even when running NNPS repeatedly
+        """
         NNPSTestCase.setUp(self)
         self.nps = nnps.DictBoxSortNNPS(
             dim=3, particles=self.particles, radius_scale=2.0
@@ -238,15 +452,26 @@ class DictBoxSortNNPSTestCase(NNPSTestCase):
         self._test_neighbors_by_particle(src_index=1, dst_index=1,
                                          dst_numPoints=self.numPoints2)
 
+    def test_neighbors_cc(self):
+        self._test_neighbors_by_particle(src_index=2, dst_index=2,
+                                         dst_numPoints=self.numPoints3)
+
+    def test_neighbors_dd(self):
+        self._test_neighbors_by_particle(src_index=3, dst_index=3,
+                                         dst_numPoints=self.numPoints4)
+
     def test_repeated(self):
         self.test_neighbors_aa()
         self.test_neighbors_ab()
         self.test_neighbors_ba()
         self.test_neighbors_bb()
+        self.test_neighbors_cc()
+        self.test_neighbors_dd()
 
 
 class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.BoxSortNNPS(
@@ -256,6 +481,7 @@ class BoxSortNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Spatial Hash algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.SpatialHashNNPS(
@@ -265,6 +491,7 @@ class SpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class SingleLevelStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified hash algorithm with num_levels = 1"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.StratifiedHashNNPS(
@@ -274,6 +501,7 @@ class SingleLevelStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class MultipleLevelsStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified hash algorithm with num_levels = 2"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.StratifiedHashNNPS(
@@ -284,6 +512,7 @@ class MultipleLevelsStratifiedHashNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class SingleLevelStratifiedSFCNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC algorithm with num_levels = 1"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.StratifiedSFCNNPS(
@@ -293,6 +522,7 @@ class SingleLevelStratifiedSFCNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class MultipleLevelsStratifiedSFCNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC algorithm with num_levels = 2"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.StratifiedSFCNNPS(
@@ -303,6 +533,7 @@ class MultipleLevelsStratifiedSFCNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Extended Spatial Hash algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ExtendedSpatialHashNNPS(
@@ -312,6 +543,7 @@ class ExtendedSpatialHashNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Octree based algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.OctreeNNPS(
@@ -321,6 +553,7 @@ class OctreeNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Cell Indexing based algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.CellIndexingNNPS(
@@ -330,6 +563,7 @@ class CellIndexingNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.ZOrderNNPS(
@@ -339,6 +573,7 @@ class ZOrderNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
@@ -359,6 +594,7 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class BruteForceNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for OpenCL brute force algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
@@ -377,8 +613,29 @@ class BruteForceNNPSTestCase(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class OctreeGPUNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+    def tearDown(self):
+        super(OctreeGPUNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Z-Order SFC based OpenCL algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
@@ -393,6 +650,25 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
 
     def tearDown(self):
         super(ZOrderGPUDoubleNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class OctreeGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
+    """Test for Octree based OpenCL algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = True
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+
+    def tearDown(self):
+        super(OctreeGPUDoubleNNPSTestCase, self).tearDown()
         get_config().use_double = self._orig_use_double
 
 
@@ -419,8 +695,52 @@ class TestZOrderGPUNNPSWithSorting(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class OctreeGPUNNPSWithSortingTestCase(DictBoxSortNNPSTestCase):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0
+        )
+        self.nps.spatially_order_particles(0)
+        self.nps.spatially_order_particles(1)
+
+        for pa in self.particles:
+            pa.gpu.pull()
+
+    def tearDown(self):
+        super(OctreeGPUNNPSWithSortingTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
+class OctreeGPUNNPSWithPartitioningTestCase(DictBoxSortNNPSTestCase):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pyopencl")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+        self.nps = gpu_nnps.OctreeGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            use_partitions=True
+        )
+
+        for pa in self.particles:
+            pa.gpu.pull()
+
+    def tearDown(self):
+        super(OctreeGPUNNPSWithPartitioningTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Stratified SFC based OpenCL algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         cl = importorskip("pyopencl")
@@ -434,6 +754,7 @@ class StratifiedSFCGPUNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Compressed Octree based algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.CompressedOctreeNNPS(
@@ -443,6 +764,7 @@ class CompressedOctreeNNPSTestCase(DictBoxSortNNPSTestCase):
 
 class LinkedListNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for the original box-sort algorithm"""
+
     def setUp(self):
         NNPSTestCase.setUp(self)
         self.nps = nnps.LinkedListNNPS(
@@ -472,7 +794,7 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
         x = numpy.ravel(x)
         y = numpy.ravel(y)
         z = numpy.ravel(z)
-        h = numpy.ones_like(x)*1.3/nx
+        h = numpy.ones_like(x) * 1.3 / nx
 
         pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=h)
         # Place one particle far far away
@@ -581,7 +903,7 @@ class TestNNPSOnLargeDomain(unittest.TestCase):
 class TestLinkedListNNPSWithSorting(unittest.TestCase):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
-        h = numpy.ones_like(x)/(nx-1)
+        h = numpy.ones_like(x) / (nx - 1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
         nps = nnps.LinkedListNNPS(dim=1, particles=[pa], sort_gids=True)
@@ -615,7 +937,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
         # When
         nps.set_context(0, 0)
         # Test the that gids are actually valid.
-        self.assertEqual(numpy.max(pa.gid), pa.gid.size-1)
+        self.assertEqual(numpy.max(pa.gid), pa.gid.size - 1)
         self.assertEqual(numpy.min(pa.gid), 0)
 
         # Then
@@ -631,7 +953,7 @@ class TestLinkedListNNPSWithSorting(unittest.TestCase):
 class TestSpatialHashNNPSWithSorting(TestLinkedListNNPSWithSorting):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
-        h = numpy.ones_like(x)/(nx-1)
+        h = numpy.ones_like(x) / (nx - 1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
         nps = nnps.SpatialHashNNPS(dim=1, particles=[pa], sort_gids=True)
@@ -642,7 +964,7 @@ class TestMultipleLevelsStratifiedHashNNPSWithSorting(
         TestLinkedListNNPSWithSorting):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
-        h = numpy.ones_like(x)/(nx-1)
+        h = numpy.ones_like(x) / (nx - 1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
         nps = nnps.StratifiedHashNNPS(dim=1, particles=[pa], num_levels=2,
@@ -654,7 +976,7 @@ class TestMultipleLevelsStratifiedSFCNNPSWithSorting(
         TestLinkedListNNPSWithSorting):
     def _make_particles(self, nx=20):
         x = numpy.linspace(0, 1, nx)
-        h = numpy.ones_like(x)/(nx-1)
+        h = numpy.ones_like(x) / (nx - 1)
 
         pa = get_particle_array(name='fluid', x=x, h=h)
         nps = nnps.StratifiedSFCNNPS(dim=1, particles=[pa], num_levels=2,
@@ -663,7 +985,7 @@ class TestMultipleLevelsStratifiedSFCNNPSWithSorting(
 
 
 def test_large_number_of_neighbors_linked_list():
-    x = numpy.random.random(1 << 14)*0.1
+    x = numpy.random.random(1 << 14) * 0.1
     y = x.copy()
     z = x.copy()
     h = numpy.ones_like(x)
@@ -726,7 +1048,7 @@ def test_use_3d_for_1d_data_with_llnps():
 
 
 def test_large_number_of_neighbors_spatial_hash():
-    x = numpy.random.random(1 << 14)*0.1
+    x = numpy.random.random(1 << 14) * 0.1
     y = x.copy()
     z = x.copy()
     h = numpy.ones_like(x)
@@ -740,7 +1062,7 @@ def test_large_number_of_neighbors_spatial_hash():
 
 
 def test_large_number_of_neighbors_octree():
-    x = numpy.random.random(1 << 14)*0.1
+    x = numpy.random.random(1 << 14) * 0.1
     y = x.copy()
     z = x.copy()
     h = numpy.ones_like(x)
@@ -769,7 +1091,7 @@ def test_flatten_unflatten():
         unflattened = nnps.py_unflatten(flattened, ncells_per_dim, dim)
 
         # the unflattened index should match with cid
-        assert(cid == unflattened)
+        assert (cid == unflattened)
 
     # 3D
     dim = 3
@@ -786,7 +1108,7 @@ def test_flatten_unflatten():
         unflattened = nnps.py_unflatten(flattened, ncells_per_dim, dim)
 
         # the unflattened index should match with cid
-        assert(cid == unflattened)
+        assert (cid == unflattened)
 
 
 def test_1D_get_valid_cell_index():
@@ -809,19 +1131,19 @@ def test_1D_get_valid_cell_index():
     # flattened cell index for the cell
     for i in [-1, 0, 1]:
         index = nnps.py_get_valid_cell_index(
-            IntPoint(cx+i, cy, cz), ncells_per_dim, dim, n_cells)
+            IntPoint(cx + i, cy, cz), ncells_per_dim, dim, n_cells)
         assert index != -1
 
     # index should be -1 whenever cy and cz are > 1. This is
     # specifically the case that was failing earlier.
-    for j in [-1,  1]:
+    for j in [-1, 1]:
         for k in [-1, 1]:
             index = nnps.py_get_valid_cell_index(
-                IntPoint(cx, cy+j, cz+k), ncells_per_dim, dim, n_cells)
+                IntPoint(cx, cy + j, cz + k), ncells_per_dim, dim, n_cells)
             assert index == -1
 
     # When the cx > n_cells or < -1 it should be invalid
-    for i in [-2, -1, n_cells, n_cells+1]:
+    for i in [-2, -1, n_cells, n_cells + 1]:
         index = nnps.py_get_valid_cell_index(
             IntPoint(i, cy, cz), ncells_per_dim, dim, n_cells)
         assert index == -1
@@ -832,16 +1154,16 @@ def test_get_centroid():
     centroid = Point()
     cell.get_centroid(centroid)
 
-    assert(abs(centroid.x - 0.05) < 1e-10)
-    assert(abs(centroid.y - 0.05) < 1e-10)
-    assert(abs(centroid.z - 0.05) < 1e-10)
+    assert (abs(centroid.x - 0.05) < 1e-10)
+    assert (abs(centroid.y - 0.05) < 1e-10)
+    assert (abs(centroid.z - 0.05) < 1e-10)
 
     cell = nnps.Cell(IntPoint(1, 2, 3), cell_size=0.5, narrays=1)
     cell.get_centroid(centroid)
 
-    assert(abs(centroid.x - 0.75) < 1e-10)
-    assert(abs(centroid.y - 1.25) < 1e-10)
-    assert(abs(centroid.z - 1.75) < 1e-10)
+    assert (abs(centroid.x - 0.75) < 1e-10)
+    assert (abs(centroid.y - 1.25) < 1e-10)
+    assert (abs(centroid.z - 1.75) < 1e-10)
 
 
 def test_get_bbox():
@@ -854,13 +1176,13 @@ def test_get_bbox():
     cell.get_centroid(centroid)
     cell.get_bounding_box(boxmin, boxmax)
 
-    assert(abs(boxmin.x - (centroid.x - 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmin.y - (centroid.y - 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmin.z - (centroid.z - 1.5*cell_size)) < 1e-10)
+    assert (abs(boxmin.x - (centroid.x - 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmin.y - (centroid.y - 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmin.z - (centroid.z - 1.5 * cell_size)) < 1e-10)
 
-    assert(abs(boxmax.x - (centroid.x + 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
+    assert (abs(boxmax.x - (centroid.x + 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmax.y - (centroid.y + 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmax.z - (centroid.z + 1.5 * cell_size)) < 1e-10)
 
     cell_size = 0.5
     cell = nnps.Cell(IntPoint(1, 2, 0), cell_size=cell_size, narrays=1)
@@ -868,13 +1190,13 @@ def test_get_bbox():
     cell.get_centroid(centroid)
     cell.get_bounding_box(boxmin, boxmax)
 
-    assert(abs(boxmin.x - (centroid.x - 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmin.y - (centroid.y - 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmin.z - (centroid.z - 1.5*cell_size)) < 1e-10)
+    assert (abs(boxmin.x - (centroid.x - 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmin.y - (centroid.y - 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmin.z - (centroid.z - 1.5 * cell_size)) < 1e-10)
 
-    assert(abs(boxmax.x - (centroid.x + 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmax.y - (centroid.y + 1.5*cell_size)) < 1e-10)
-    assert(abs(boxmax.z - (centroid.z + 1.5*cell_size)) < 1e-10)
+    assert (abs(boxmax.x - (centroid.x + 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmax.y - (centroid.y + 1.5 * cell_size)) < 1e-10)
+    assert (abs(boxmax.z - (centroid.z + 1.5 * cell_size)) < 1e-10)
 
 
 if __name__ == '__main__':

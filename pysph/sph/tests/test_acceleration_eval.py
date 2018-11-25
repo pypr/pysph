@@ -31,7 +31,7 @@ class DummyEquation(Equation):
         d_rho[d_idx] = d_V[d_idx]
 
     def loop(self, d_idx, d_rho, s_idx, s_m, s_u, WIJ):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+        d_rho[d_idx] += s_m[s_idx] * WIJ
 
     def post_loop(self, d_idx, d_rho, s_idx, s_m, s_V):
         d_rho[d_idx] += s_m[d_idx]
@@ -48,7 +48,6 @@ class FindTotalMass(Equation):
 
 
 class TestCheckEquationArrayProps(unittest.TestCase):
-
     def test_should_raise_runtime_error_when_invalid_dest_source(self):
         # Given
         f = get_particle_array(name='f')
@@ -202,7 +201,7 @@ class LoopAllEquation(Equation):
         d_rho[d_idx] = 0.0
 
     def loop(self, d_idx, d_rho, s_m, s_idx, WIJ):
-        d_rho[d_idx] += s_m[s_idx]*WIJ
+        d_rho[d_idx] += s_m[s_idx] * WIJ
 
     def loop_all(self, d_idx, d_x, d_rho, s_m, s_x, s_h, SPH_KERNEL, NBRS,
                  N_NBRS):
@@ -217,7 +216,7 @@ class LoopAllEquation(Equation):
             s_idx = NBRS[i]
             xij[0] = d_x[d_idx] - s_x[s_idx]
             rij = abs(xij[0])
-            sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, s_h[s_idx])
+            sum += s_m[s_idx] * SPH_KERNEL.kernel(xij, rij, s_h[s_idx])
         d_rho[d_idx] += sum
 
 
@@ -263,6 +262,7 @@ class TestMegaGroup(unittest.TestCase):
         # Given
         def nothing():
             pass
+
         g = Group(
             equations=[], real=False, update_nnps=True, iterate=True,
             max_iterations=20, min_iterations=2, pre=nothing, post=nothing
@@ -282,10 +282,10 @@ class TestAccelerationEval1D(unittest.TestCase):
     def setUp(self):
         self.dim = 1
         n = 10
-        dx = 1.0/(n-1)
+        dx = 1.0 / (n - 1)
         x = np.linspace(0, 1, n)
         m = np.ones_like(x)
-        h = np.ones_like(x)*dx*1.05
+        h = np.ones_like(x) * dx * 1.05
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
@@ -325,7 +325,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.])
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_work_with_cached_nnps(self):
@@ -338,7 +338,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.])
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_iterate_iterated_group(self):
@@ -357,7 +357,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*2
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.]) * 2
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_iterate_nested_groups(self):
@@ -379,7 +379,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.])
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_run_reduce(self):
@@ -429,7 +429,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         if pa.gpu:
             pa.gpu.pull('au')
         np.testing.assert_array_almost_equal(
-            pa.au, np.ones_like(pa.x)*2.0
+            pa.au, np.ones_like(pa.x) * 2.0
         )
         self.assertEqual(eq.called_with, (1.0, 0.1))
 
@@ -443,7 +443,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.])
         self.assertListEqual(list(pa.u), list(expect))
 
     def test_should_support_loop_all_and_loop(self):
@@ -463,13 +463,13 @@ class TestAccelerationEval1D(unittest.TestCase):
         # Then
         # 2*ref_rho as we are doing both the loop and loop_all to test if
         # both are called.
-        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
+        self.assertTrue(np.allclose(pa.rho, 2.0 * ref_rho))
 
     def test_should_handle_repeated_helper_functions(self):
         pa = self.pa
 
         def helper(x=1.0):
-            return x*1.5
+            return x * 1.5
 
         class SillyEquation2(Equation):
             def initialize(self, d_idx, d_au, d_m):
@@ -487,7 +487,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.ones(10)*3.0
+        expect = np.ones(10) * 3.0
         self.assertListEqual(list(pa.au), list(expect))
 
     def test_should_call_pre_post_functions_in_group(self):
@@ -515,7 +515,7 @@ class TestAccelerationEval1D(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11.,  9.,  7.])
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
 
 
@@ -533,16 +533,16 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
     def setUp(self):
         self.dim = 1
         n = 10
-        dx = 1.0/(n-1)
+        dx = 1.0 / (n - 1)
         x = np.linspace(0, 1, n)
         m = np.ones_like(x)
-        h = np.ones_like(x)*dx*1.05
+        h = np.ones_like(x) * dx * 1.05
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
     def _make_accel_eval(self, equations, cache_nnps=True):
         pytest.importorskip('pysph.base.gpu_nnps')
-        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
+        from pysph.base.gpu_nnps import OctreeGPUNNPS as GPUNNPS
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
@@ -567,7 +567,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.])
         pa.gpu.pull('u')
         self.assertListEqual(list(pa.u), list(expect))
 
@@ -581,7 +581,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9.,  9.,  7.357])
+        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9., 9., 7.357])
         pa.gpu.pull('rho')
 
         print(pa.rho, pa.gpu.rho)
@@ -592,6 +592,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
         def _cleanup():
             get_config().use_double = orig
+
         get_config().use_double = True
         self.addCleanup(_cleanup)
         # Given
@@ -603,7 +604,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9.,  9.,  7.357])
+        expect = np.asarray([7.357, 9.0, 9., 9., 9., 9., 9., 9., 9., 7.357])
         pa.gpu.pull('rho')
 
         print(pa.rho, pa.gpu.rho)
@@ -619,7 +620,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.2, 0.1)
 
         # Then
-        expect = np.asarray([4., 5., 6., 6., 6., 6., 6., 6.,  5.,  4.])*0.3
+        expect = np.asarray([4., 5., 6., 6., 6., 6., 6., 6., 5., 4.]) * 0.3
         pa.gpu.pull('au')
         print(pa.au, expect)
         self.assertTrue(np.allclose(expect, pa.au))
@@ -695,7 +696,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*4.0
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.]) * 4.0
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
 
@@ -734,7 +735,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5.,  4.,  3.])*6.0
+        expect = np.asarray([3., 4., 5., 5., 5., 5., 5., 5., 4., 3.]) * 6.0
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
 
@@ -742,7 +743,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa = self.pa
 
         def helper(x=1.0):
-            return x*1.5
+            return x * 1.5
 
         class SillyEquation2(Equation):
             def initialize(self, d_idx, d_au, d_m):
@@ -760,7 +761,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.ones(10)*3.0
+        expect = np.ones(10) * 3.0
         pa.gpu.pull('au')
         self.assertListEqual(list(pa.au), list(expect))
 
@@ -812,7 +813,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         if pa.gpu:
             pa.gpu.pull('au')
         np.testing.assert_array_almost_equal(
-            pa.au, np.ones_like(pa.x)*2.0
+            pa.au, np.ones_like(pa.x) * 2.0
         )
         self.assertEqual(eq.called_with, (1.0, 0.1))
 
@@ -860,7 +861,8 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         # 2*ref_rho as we are doing both the loop and loop_all to test if
         # both are called.
         pa.gpu.pull('rho')
-        self.assertTrue(np.allclose(pa.rho, 2.0*ref_rho))
+
+        self.assertTrue(np.allclose(pa.rho, 2.0 * ref_rho))
 
     def test_should_call_pre_post_functions_in_group_on_gpu(self):
         # Given
@@ -889,5 +891,20 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         a_eval.compute(0.1, 0.1)
 
         # Then
-        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11.,  9.,  7.])
+        expect = np.asarray([7., 9., 11., 11., 11., 11., 11., 11., 9., 7.])
         self.assertListEqual(list(pa.u), list(expect))
+
+
+class TestAccelerationEval1DGPUNonCached(TestAccelerationEval1DGPU):
+    def setUp(self):
+        self.old_flag = get_config().use_local_memory
+        get_config().use_local_memory = True
+        super(TestAccelerationEval1DGPUNonCached, self).setUp()
+
+    @pytest.mark.skip("Loop all not supported with non-cached NNPS")
+    def test_should_support_loop_all_and_loop_on_gpu(self):
+        pass
+
+    def tearDown(self):
+        super(TestAccelerationEval1DGPUNonCached, self).tearDown()
+        get_config().use_local_memory = self.old_flag

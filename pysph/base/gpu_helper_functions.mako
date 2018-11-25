@@ -12,6 +12,54 @@
     inline int neighbor_boxes(int c_x, int c_y, int c_z, \
             ulong* nbr_boxes);
 
+    inline ulong interleave1(ulong p)
+    {
+        return p;
+    }
+
+    inline ulong interleave2(ulong p, ulong q)
+    {
+        p = p & 0xffffffff;
+        p = (p | (p << 16)) & 0x0000ffff0000ffff;
+        p = (p | (p << 8))  & 0x00ff00ff00ff00ff;
+        p = (p | (p << 4))  & 0x0f0f0f0f0f0f0f0f;
+        p = (p | (p << 2))  & 0x3333333333333333;
+        p = (p | (p << 1))  & 0x5555555555555555;
+
+        q = q & 0xffffffff;
+        q = (q | (q << 16)) & 0x0000ffff0000ffff;
+        q = (q | (q << 8))  & 0x00ff00ff00ff00ff;
+        q = (q | (q << 4))  & 0x0f0f0f0f0f0f0f0f;
+        q = (q | (q << 2))  & 0x3333333333333333;
+        q = (q | (q << 1))  & 0x5555555555555555;
+
+        return (p | (q << 1));
+    }
+
+    inline ulong interleave3(ulong p, \
+            ulong q, ulong r)
+    {
+        p = (p | (p << 32)) & 0x1f00000000ffff;
+        p = (p | (p << 16)) & 0x1f0000ff0000ff;
+        p = (p | (p <<  8)) & 0x100f00f00f00f00f;
+        p = (p | (p <<  4)) & 0x10c30c30c30c30c3;
+        p = (p | (p <<  2)) & 0x1249249249249249;
+
+        q = (q | (q << 32)) & 0x1f00000000ffff;
+        q = (q | (q << 16)) & 0x1f0000ff0000ff;
+        q = (q | (q <<  8)) & 0x100f00f00f00f00f;
+        q = (q | (q <<  4)) & 0x10c30c30c30c30c3;
+        q = (q | (q <<  2)) & 0x1249249249249249;
+
+        r = (r | (r << 32)) & 0x1f00000000ffff;
+        r = (r | (r << 16)) & 0x1f0000ff0000ff;
+        r = (r | (r <<  8)) & 0x100f00f00f00f00f;
+        r = (r | (r <<  4)) & 0x10c30c30c30c30c3;
+        r = (r | (r <<  2)) & 0x1249249249249249;
+
+        return (p | (q << 1) | (r << 2));
+    }
+
     inline ulong interleave(ulong p, \
             ulong q, ulong r)
     {
