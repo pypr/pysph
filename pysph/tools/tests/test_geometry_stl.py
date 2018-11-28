@@ -2,6 +2,9 @@ import numpy as np
 import unittest
 import pytest
 import tempfile
+
+pytest.importorskip("stl")
+
 import pysph.tools.geometry_stl as G
 from pysph.base.utils import get_particle_array
 

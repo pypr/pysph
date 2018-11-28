@@ -3,3 +3,4 @@ setuptools>=6.0
 Cython>=0.20
 mako
 pytools
+Beaker

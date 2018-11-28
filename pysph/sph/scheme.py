@@ -468,7 +468,7 @@ class WCSPHScheme(Scheme):
 
             if abs(self.nu) > 1e-14:
                 eq = LaminarViscosity(
-                    dest=name, sources=self.fluids, nu=self.nu
+                    dest=name, sources=all, nu=self.nu
                 )
                 g2.insert(-1, eq)
         equations.append(Group(equations=g2))
