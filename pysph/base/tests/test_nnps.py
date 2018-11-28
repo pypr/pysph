@@ -147,6 +147,7 @@ class NNPS2DTestCase(unittest.TestCase):
         are checked from a -> b, b -> a , a -> a and b -> b
 
         """
+        numpy.random.seed(123)
         self.numPoints1 = numPoints1 = 1 << 11
         self.numPoints2 = numPoints2 = 1 << 10
 
@@ -300,6 +301,7 @@ class NNPSTestCase(unittest.TestCase):
     def setUp(self):
         """Default set-up used by all the tests
         """
+        numpy.random.seed(123)
         # Datasets with constant h
         self.numPoints1 = numPoints1 = 1 << 11
         self.numPoints2 = numPoints2 = 1 << 10
@@ -373,6 +375,8 @@ class NNPSTestCase(unittest.TestCase):
 
     def _assert_neighbors(self, nbrs_nnps, nbrs_brute_force):
         # ensure that the lengths of the arrays are the same
+        if nbrs_nnps.length != nbrs_brute_force.length:
+            print(nbrs_nnps.get_npy_array(), nbrs_brute_force.get_npy_array())
         self.assertEqual(nbrs_nnps.length, nbrs_brute_force.length)
         nnbrs = nbrs_nnps.length
 
