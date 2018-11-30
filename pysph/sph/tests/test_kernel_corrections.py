@@ -50,7 +50,7 @@ class VerifyCRKSPH(Equation):
 
     def loop(self, d_idx, d_zero_mom, d_first_mom, d_cwij, s_idx, s_m,
              s_rho, WIJ, XIJ):
-        vjwijp = s_m[s_idx]/s_rho[s_idx]*WIJ/d_cwij[d_idx]
+        vjwijp = s_m[s_idx]/s_rho[s_idx]*WIJ*d_cwij[d_idx]
         d_zero_mom[d_idx] += vjwijp
         d_first_mom[3*d_idx] += vjwijp * XIJ[0]
         d_first_mom[3*d_idx + 1] += vjwijp * XIJ[1]

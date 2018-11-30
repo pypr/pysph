@@ -364,7 +364,7 @@ class CRKSPHSymmetric(Equation):
             dbxij[gam] = temp
             dbxji[gam] = temp1
 
-        d_cwij[d_idx] = 1.0/(ai*(1 + bxij))
+        d_cwij[d_idx] = (ai*(1 + bxij))
 
         for gam in range(d):
             temp = ((ai * DWIJ[gam] + d_gradai[d * d_idx + gam] * WIJ) *
