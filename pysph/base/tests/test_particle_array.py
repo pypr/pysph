@@ -1013,8 +1013,13 @@ class ParticleArrayTestCPU(unittest.TestCase, ParticleArrayTest):
 class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
         ocl = pytest.importorskip("pyopencl")
-        get_config().use_double = True
+        cfg = get_config()
+        self.orig_use_double = cfg.use_double
+        cfg.use_double = True
         self.backend = 'opencl'
+
+    def tearDown(self):
+        get_config().use_double = self.orig_use_double
 
     def pull(self, p):
         p.gpu.pull()
@@ -1026,8 +1031,13 @@ class ParticleArrayTestOpenCL(unittest.TestCase, ParticleArrayTest):
 class ParticleArrayTestCUDA(unittest.TestCase, ParticleArrayTest):
     def setUp(self):
         cu = pytest.importorskip("pycuda")
-        get_config().use_double = True
+        cfg = get_config()
+        self.orig_use_double = cfg.use_double
+        cfg.use_double = True
         self.backend = 'cuda'
+
+    def tearDown(self):
+        get_config().use_double = self.orig_use_double
 
     def pull(self, p):
         p.gpu.pull()
