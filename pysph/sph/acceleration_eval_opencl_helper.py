@@ -144,7 +144,9 @@ class OpenCLAccelerationEval(object):
         self.particle_arrays = helper.object.particle_arrays
         self.nnps = None
         self._queue = helper._queue
-        self._use_double = get_config().use_double
+        cfg = get_config()
+        self._use_double = cfg.use_double
+        self._use_local_memory = cfg.use_local_memory
 
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
@@ -156,7 +158,7 @@ class OpenCLAccelerationEval(object):
         args[3:] = [x() for x in args[3:]]
 
         if info.get('loop'):
-            if get_config().use_local_memory:
+            if self._use_local_memory:
                 nnps.set_context(info['src_idx'], info['dst_idx'])
 
                 nnps_args, gs_ls = self.nnps.get_kernel_args('float')

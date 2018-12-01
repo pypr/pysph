@@ -840,13 +840,18 @@ class OpenCLGroup(Group):
         predefined['NBRS'] = KnownType('__global unsigned int*')
 
         if get_config().use_local_memory:
-            for k in predefined.keys():
+            loop_ann = predefined.copy()
+            for k in loop_ann.keys():
                 if 's_' in k:
                     # TODO: Make each argument have their own KnownType
                     # right from the start
-                    predefined[k] = KnownType(
-                        predefined[k].type.replace('__global', '__local')
+                    loop_ann[k] = KnownType(
+                        loop_ann[k].type.replace('__global', '__local')
                     )
+            for eq in eqs.values():
+                cls = eq.__class__
+                if hasattr(cls, 'loop'):
+                    cls.loop.__annotations__ = loop_ann
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):
