@@ -7,7 +7,7 @@ import numpy
 from .particle_array import ParticleArray, \
     get_local_tag, get_remote_tag, get_ghost_tag
 
-from pyzoltan.core.carray import LongArray
+from cyarray.api import LongArray
 
 UINT_MAX = (1 << 32) - 1
 

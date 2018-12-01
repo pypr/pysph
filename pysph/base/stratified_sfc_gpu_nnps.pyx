@@ -160,8 +160,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         find_nbr_lengths = self.helper.get_kernel("find_nbr_lengths",
                 sorted=self._sorted)
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         mask_lengths = array.zeros(self.dst.get_number_of_particles(),
                 dtype=np.int32, backend=self.backend)
@@ -184,8 +184,8 @@ cdef class StratifiedSFCGPUNNPS(GPUNNPS):
         find_nbrs = self.helper.get_kernel("find_nbrs",
                 sorted=self._sorted)
 
-        make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu

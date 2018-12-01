@@ -13,7 +13,7 @@ cimport numpy
 import numpy
 
 # PyZoltan imports
-from pyzoltan.core.carray cimport *
+from cyarray.carray cimport *
 
 # Local imports
 from cpython cimport PyObject

@@ -33,6 +33,7 @@ of some example problems solved using PySPH.
 
 
 .. _PyOpenCL: https://documen.tician.de/pyopencl/
+.. _PyZoltan: https://github.com/pypr/pyzoltan
 
 Features
 --------
@@ -45,7 +46,7 @@ Features
 - Seamless multi-core support with OpenMP.
 - Seamless GPU support with PyOpenCL_.
 - Seamless parallel support using
-  `Zoltan <http://www.cs.sandia.gov/zoltan/>`_.
+  `Zoltan <http://www.cs.sandia.gov/zoltan/>`_ and PyZoltan_.
 
 SPH formulations
 -----------------

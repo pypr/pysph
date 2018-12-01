@@ -10,7 +10,7 @@ import numpy
 from pysph.base import particle_array
 from pysph.base import utils
 
-from pyzoltan.core.carray import LongArray, IntArray, DoubleArray
+from cyarray.carray import LongArray, IntArray, DoubleArray
 
 import pickle
 import pytest

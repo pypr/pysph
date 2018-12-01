@@ -6,7 +6,7 @@ from libcpp.map cimport map
 from libcpp.vector cimport vector
 
 # PyZoltan CArrays
-from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+from cyarray.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
 # local imports
 from particle_array cimport ParticleArray

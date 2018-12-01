@@ -48,8 +48,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
         self.radix_sort = None
-        self.make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        self.make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         self.helper = GPUNNPSHelper("z_order_gpu_nnps.mako",
                                     use_double=self.use_double,

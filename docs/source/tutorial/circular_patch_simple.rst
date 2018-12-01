@@ -194,11 +194,10 @@ outside a circular region:
 
    pa.remove_particles(indices)
 
-.. py:currentmodule:: pyzoltan.core.carray
 
-where, a list of indices is provided.  One could also provide the indices in
-the form of a :py:class:`LongArray` which, as the name suggests, is an array
-of 64 bit integers.
+where, a list of indices is provided. One could also provide the indices in the
+form of a :py:class:`cyarray.carray.LongArray` which, as the name suggests, is
+an array of 64 bit integers.
 
 The particle array also supports what we call strided properties where you may
 associate multiple values per particle. Normally the stride length is 1. This

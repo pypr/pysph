@@ -32,7 +32,7 @@ import os.path
 import numpy as np
 
 # PyZoltan imports
-from pyzoltan.core.carray import LongArray
+from cyarray.api import LongArray
 
 # PySPH imports
 from pysph.base.utils import get_particle_array_wcsph as gpa
