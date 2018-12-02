@@ -616,10 +616,8 @@ def setup_package():
     exec(compile(open(module).read(), module, 'exec'), info)
 
     # The requirements.
-    setup_requires = [
-        'numpy', 'mako', 'cyarray', 'Cython>=0.20', 'setuptools>=6.0'
-    ]
-    install_requires = setup_requires + [
+    install_requires = [
+        'numpy', 'mako', 'cyarray', 'Cython>=0.20', 'setuptools>=6.0',
         'pytest>=3.0', 'pytools', 'Beaker'
     ]
     if sys.version_info[:2] == (2, 6):
@@ -668,7 +666,7 @@ def setup_package():
           url='http://github.com/pypr/pysph',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          setup_requires=['pytest-runner'] + setup_requires,
+          setup_requires=['pytest-runner'],
           tests_require=['pytest'],
           packages=find_packages(),
           package_data={
