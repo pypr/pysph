@@ -835,9 +835,15 @@ class OpenCLGroup(Group):
             cls = eq.__class__
             loop = getattr(cls, 'loop', None)
             if loop is not None:
-                loop.__annotations__ = loop_ann
+                self._set_loop_annotation(loop, loop_ann)
                 modified_classes.append(cls)
         return modified_classes
+
+    def _set_loop_annotation(self, func, value):
+        try:
+            func.__annotations__ = value
+        except AttributeError:
+            func.im_func.__annotations__ = value
 
     ##########################################################################
     # Public interface.
@@ -872,7 +878,7 @@ class OpenCLGroup(Group):
         if use_local_memory:
             # Remove the added annotations
             for cls in modified_classes:
-                cls.loop.__annotations__ = {}
+                self._set_loop_annotation(cls.loop, {})
 
         return '\n'.join(wrappers)
 

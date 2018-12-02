@@ -254,7 +254,10 @@ def annotate(func=None, **kw):
                 data[_clean_name(name)] = _get_type(type)
 
         def wrapper(func):
-            func.__annotations__ = data
+            try:
+                func.__annotations__ = data
+            except AttributeError:
+                func.im_func.__annotations__ = data
             return func
 
     if func is None:
