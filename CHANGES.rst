@@ -1,3 +1,9 @@
+1.0b1
+-----
+
+* Release date: Still under development.
+* Remove pyzoltan, cyarray into their own packages on pypi.
+
 1.0a6
 -----
 

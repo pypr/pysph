@@ -1,12 +1,9 @@
 ROOT = $(shell pwd)
 MAKEFILE = $(ROOT)/Makefile
 SRC = $(ROOT)
-PKG2 = $(SRC)/pysph
-SUBPKG2 = base sph sph/solid_mech parallel
-PKG1 = $(SRC)/pyzoltan
-SUBPKG1 = core sph
-DIRS := $(foreach dir,$(SUBPKG1),$(PKG1)/$(dir)) \
-        $(foreach dir,$(SUBPKG2),$(PKG2)/$(dir))
+PKG1 = $(SRC)/pysph
+SUBPKG1 = base sph sph/solid_mech parallel
+DIRS := $(foreach dir,$(SUBPKG1),$(PKG1)/$(dir))
 
 # this is used for cython files on recursive call to make
 PYX = $(wildcard *.pyx)
@@ -69,8 +66,3 @@ develop :
 
 install :
 	python setup.py install
-
-clang :
-	python $(ROOT)/pyzoltan/core/generator.py
-	for f in $(DIRS); do $(MAKE) -f $(MAKEFILE) -C $${f} cythoncpp ROOT=$(ROOT); done
-	cd pysph/; for f in */*.cpp */*/*.cpp; do clang++ -g -O2 -shared -fPIC -o $${f%.*}.so $$f -I /usr/include/python2.7/ $(shell mpicxx --showme:compile) $(shell mpicxx --showme:link); done

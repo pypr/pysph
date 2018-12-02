@@ -3,7 +3,7 @@ import numpy as np
 import copy
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pyzoltan.core.carray import UIntArray
+from cyarray.api import UIntArray
 from numpy.linalg import norm
 
 

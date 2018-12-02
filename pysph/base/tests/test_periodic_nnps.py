@@ -11,7 +11,7 @@ from pysph.base.kernels import Gaussian, get_compiled_kernel
 import pysph.tools.geometry as G
 
 # PyZoltan CArrays
-from pyzoltan.core.carray import UIntArray
+from cyarray.carray import UIntArray
 
 # Python unit testing framework
 import unittest

@@ -3,7 +3,7 @@ from pysph.base import nnps
 import numpy as np
 from stl import mesh
 from numpy.linalg import norm
-from pyzoltan.core.carray import UIntArray
+from cyarray.api import UIntArray
 
 
 class ZeroAreaTriangleException(Exception):

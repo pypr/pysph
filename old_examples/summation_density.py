@@ -15,7 +15,7 @@ This tutorial illustrates the following:
 """
 
 # PySPH imports
-from pyzoltan.core.carray import UIntArray
+from cyarray.api import UIntArray
 from pysph.base import utils
 from pysph.base.nnps import DomainManager, LinkedListNNPS
 from pysph.base.kernels import CubicSpline, Gaussian, QuinticSpline, WendlandQuintic
@@ -81,7 +81,7 @@ t1 = time()
 max_ngb = -1
 for i in range( pa.num_real_particles ):
     xi = x[i]; yi = y[i]; hi = h[i]
-    
+
     # get list of neighbors
     nps.get_nearest_particles(0, 0, i, nbrs)
     neighbors = nbrs.get_npy_array()

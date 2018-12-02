@@ -11,13 +11,13 @@ from pysph.cpy.array import Array
 make_vec_dict = {
     'float': {
         1: np.float32,
-        2: cl.array.vec.make_float2,
-        3: cl.array.vec.make_float3
+        2: cl.cltypes.make_float2,
+        3: cl.cltypes.make_float3
     },
     'double': {
         1: np.float64,
-        2: cl.array.vec.make_double2,
-        3: cl.array.vec.make_double3
+        2: cl.cltypes.make_double2,
+        3: cl.cltypes.make_double3
     }
 }
 

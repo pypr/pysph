@@ -14,7 +14,7 @@ from pysph.base import nnps
 from pysph.cpy.config import get_config
 
 # Carrays from PyZoltan
-from pyzoltan.core.carray import UIntArray, IntArray
+from cyarray.carray import UIntArray, IntArray
 
 # Python testing framework
 import unittest

@@ -1,6 +1,6 @@
 cimport numpy as np
 
-from pyzoltan.core.carray cimport BaseArray, UIntArray, IntArray, LongArray
+from cyarray.carray cimport BaseArray, UIntArray, IntArray, LongArray
 
 # ParticleTag
 # Declares various tags for particles, and functions to check them.

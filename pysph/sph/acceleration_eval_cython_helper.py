@@ -2,7 +2,7 @@ from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
-from pyzoltan.core import carray
+from cyarray import carray
 
 from pysph.cpy.config import get_config
 from pysph.cpy.cython_generator import (CythonGenerator, KnownType,

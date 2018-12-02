@@ -6,7 +6,7 @@ import numpy
 from numpy import random
 
 # Carray from PyZoltan
-from pyzoltan.core.carray import UIntArray
+from cyarray.carray import UIntArray
 
 # PySPH imports
 from pysph.base.nnps import BoxSortNNPS

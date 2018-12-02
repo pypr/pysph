@@ -40,7 +40,7 @@ from pysph.cpy.opencl import (get_context, get_queue,
 import pysph.cpy.array as array
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
+from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 from nnps_base cimport *

@@ -85,7 +85,7 @@ Data buffers and the carray
 The numpy arrays that are used to create the :class:`ParticleArray`
 object are used to construct a raw data buffer which is accessible
 through Cython at C speed. Internally, each property for the particle
-array is stored as a :class:`carray`.
+array is stored as a :class:`cyarray.carray.BaseArray`.
 
 .. note::
 
@@ -173,5 +173,3 @@ the only restriction that their *names* are unique.  The
 :class:`Particles` object which is used by PySPH. This container may
 be heterogeneous in that different particle arrays correspond to
 different *types*.
-
-..  LocalWords:  ParticleArray num deault carray

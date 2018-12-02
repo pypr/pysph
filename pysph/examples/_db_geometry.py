@@ -23,6 +23,8 @@ Y
 import numpy
 from numpy import concatenate, where, array
 from pysph.base.utils import get_particle_array_wcsph, get_particle_array_iisph
+from cyarray.api import LongArray
+
 
 def create_2D_tank(x1,y1,x2,y2,dx):
     """ Generate an open rectangular tank.
@@ -234,7 +236,6 @@ class DamBreak2DGeometry(object):
 
         return particles
 
-from pyzoltan.core.carray import LongArray
 class DamBreak3DGeometry(object):
     def __init__(
         self, container_height=1.0, container_width=1.0, container_length=3.22,

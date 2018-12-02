@@ -51,7 +51,7 @@ IF UNAME_SYSNAME == "Windows":
         return x if x > y else y
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
+from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local
