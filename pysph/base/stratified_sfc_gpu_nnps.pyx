@@ -16,9 +16,9 @@ import pyopencl.algorithm
 from pyopencl.scan import GenericScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
-from pysph.cpy.array import Array
-import pysph.cpy.array as array
-from pysph.cpy.opencl import get_context
+from compyle.array import Array
+import compyle.array as array
+from compyle.opencl import get_context
 
 # Cython for compiler directives
 cimport cython

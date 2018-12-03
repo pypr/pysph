@@ -85,16 +85,16 @@ import pyopencl.array  # noqa: 401
 import pyopencl.tools  # noqa: 401
 
 from pysph.base.utils import is_overloaded_method
-from pysph.cpy.opencl import profile_kernel, get_context, get_queue
+from compyle.opencl import profile_kernel, get_context, get_queue
 from pysph.base.device_helper import DeviceHelper
 
 from pysph.sph.acceleration_nnps_helper import generate_body, \
     get_kernel_args_list
 
-from pysph.cpy.ext_module import get_platform_dir
-from pysph.cpy.config import get_config
-from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
-                                  ocl_detect_type, ocl_detect_pointer_base_type)
+from compyle.ext_module import get_platform_dir
+from compyle.config import get_config
+from compyle.translator import (CStructHelper, OpenCLConverter,
+                                ocl_detect_type, ocl_detect_pointer_base_type)
 
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (

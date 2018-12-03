@@ -14,7 +14,7 @@ References
 '''
 
 from math import sqrt
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.sph.equation import Equation
 from pysph.sph.wc.linalg import (
     augmented_matrix, dot, gj_solve, identity, mat_vec_mult

@@ -1,5 +1,5 @@
 import numpy as np
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 
 
 class GPUDomainManager(object):

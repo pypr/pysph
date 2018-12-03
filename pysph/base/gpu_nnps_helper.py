@@ -3,7 +3,7 @@ from mako.lookup import TemplateLookup
 import os
 import sys
 
-from pysph.cpy.opencl import get_context, profile_kernel, SimpleKernel
+from compyle.opencl import get_context, profile_kernel, SimpleKernel
 
 
 def get_simple_kernel(kernel_name, args, src, wgs, preamble=""):

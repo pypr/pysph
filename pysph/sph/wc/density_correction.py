@@ -1,6 +1,6 @@
 from math import sqrt
 from pysph.sph.equation import Equation
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 
 

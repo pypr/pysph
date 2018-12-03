@@ -2,7 +2,7 @@
 
 from math import sqrt
 
-from pysph.cpy.api import declare
+from compyle.api import declare
 
 
 def SIGN(x=0.0, y=0.0):

@@ -22,7 +22,7 @@ from pysph.base.nnps import LinkedListNNPS, BoxSortNNPS, SpatialHashNNPS, \
     StratifiedSFCNNPS, OctreeNNPS, CompressedOctreeNNPS, ZOrderNNPS
 
 from pysph.base import kernels
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 from pysph.solver.controller import CommandManager
 from pysph.solver.utils import mkdir, load, get_files
 
