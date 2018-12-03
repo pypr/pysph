@@ -1,9 +1,9 @@
 from pysph.base.tree.tree import Tree
 from pysph.base.tree.helpers import ParticleArrayWrapper, get_helper, \
     make_vec_dict, ctype_to_dtype, get_vector_dtype
-from pysph.cpy.opencl import profile_kernel, DeviceWGSException, get_queue, \
+from compyle.opencl import profile_kernel, DeviceWGSException, get_queue, \
     named_profile, get_context
-from pysph.cpy.array import Array
+from compyle.array import Array
 from pytools import memoize
 
 import sys

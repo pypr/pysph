@@ -2,12 +2,12 @@ import logging
 import numpy as np
 from pytools import memoize_method
 
-from pysph.cpy.config import get_config
-from pysph.cpy.array import get_backend, wrap_array, Array
-from pysph.cpy.parallel import Elementwise, Scan
-from pysph.cpy.api import declare, annotate
-from pysph.cpy.types import dtype_to_ctype
-import pysph.cpy.array as array
+from compyle.config import get_config
+from compyle.array import get_backend, wrap_array, Array
+from compyle.parallel import Elementwise, Scan
+from compyle.api import declare, annotate
+from compyle.types import dtype_to_ctype
+import compyle.array as array
 import pysph.base.particle_array
 
 

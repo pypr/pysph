@@ -11,8 +11,8 @@ import numpy as np
 
 # Local imports.
 from pysph.base.utils import get_particle_array
-from pysph.cpy.config import get_config
-from pysph.cpy.api import declare
+from compyle.config import get_config
+from compyle.api import declare
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (
     AccelerationEval, MegaGroup, CythonGroup,

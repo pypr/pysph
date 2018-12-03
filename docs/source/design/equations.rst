@@ -257,7 +257,7 @@ one desires a ``long`` data type, one may use ``i = declare("long")``.
 Note that the additional (optional) argument in the declare specifies the
 number of variables. While this is ignored during transpilation, this is
 useful when writing functions in pure Python, the
-:py:func:`pysph.cpy.api.declare` function provides a pure Python
+:py:func:`compyle.api.declare` function provides a pure Python
 implementation of this so that the code works both when compiled as well as
 when run from pure Python. For example:
 

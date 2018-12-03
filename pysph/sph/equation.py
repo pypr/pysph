@@ -19,9 +19,9 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
-                           get_symbols)
-from pysph.cpy.config import get_config
+from compyle.api import (CythonGenerator, KnownType, OpenCLConverter,
+                         get_symbols)
+from compyle.config import get_config
 
 
 getfullargspec = getattr(

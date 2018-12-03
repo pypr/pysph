@@ -1,11 +1,10 @@
-from unittest import TestCase
 import pytest
 import numpy as np
 
 from pysph.base.utils import get_particle_array  # noqa: E402
 from pysph.base.device_helper import DeviceHelper
-from pysph.cpy.config import get_config
-import pysph.cpy.array as array
+from compyle.config import get_config
+import compyle.array as array
 
 
 def setup_module():

@@ -13,7 +13,7 @@ from mako.template import Template
 
 # Local imports.
 from pysph.sph.equation import get_array_names
-from pysph.cpy.api import CythonGenerator, get_func_definition
+from compyle.api import CythonGenerator, get_func_definition
 
 
 getfullargspec = getattr(

@@ -1,4 +1,4 @@
-from pysph.cpy.api import declare
+from compyle.api import declare
 
 
 def identity(a=[0.0, 0.0], n=3):

@@ -15,7 +15,7 @@ from cyarray.carray import LongArray, IntArray, DoubleArray
 import pickle
 import pytest
 
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 
 
 def check_array(x, y):

@@ -11,7 +11,7 @@ from numpy import random
 from pysph.base.point import IntPoint, Point
 from pysph.base.utils import get_particle_array
 from pysph.base import nnps
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 
 # Carrays from PyZoltan
 from cyarray.carray import UIntArray, IntArray

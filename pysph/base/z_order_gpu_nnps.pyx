@@ -21,9 +21,9 @@ cimport numpy as np
 from mako.template import Template
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.cpy.array import Array
-import pysph.cpy.array as array
-from pysph.cpy.opencl import get_context, get_config, profile_kernel
+from compyle.array import Array
+import compyle.array as array
+from compyle.opencl import get_context, get_config, profile_kernel
 
 
 IF UNAME_SYSNAME == "Windows":

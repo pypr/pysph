@@ -4,9 +4,9 @@ import pyopencl.array
 import pyopencl.cltypes
 from pyopencl.elementwise import ElementwiseKernel
 from pytools import memoize
-from pysph.cpy.opencl import get_context, get_queue
+from compyle.opencl import get_context
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.cpy.array import Array
+from compyle.array import Array
 
 make_vec_dict = {
     'float': {

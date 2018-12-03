@@ -617,8 +617,8 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'cyarray', 'Cython>=0.20', 'setuptools>=6.0',
-        'pytest>=3.0', 'pytools', 'Beaker'
+        'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
+        'setuptools>=6.0', 'pytest>=3.0', 'pytools', 'Beaker'
     ]
     if sys.version_info[:2] == (2, 6):
         install_requires += [

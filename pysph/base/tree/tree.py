@@ -7,8 +7,8 @@ import pyopencl.cltypes
 from pyopencl.elementwise import ElementwiseKernel
 from pyopencl.scan import GenericScanKernel
 
-from pysph.cpy.opencl import get_context, get_queue, named_profile
-from pysph.cpy.array import Array
+from compyle.opencl import get_context, get_queue, named_profile
+from compyle.array import Array
 from pysph.base.tree.helpers import get_vector_dtype, get_helper
 
 NODE_KERNEL_TEMPLATE = r"""
