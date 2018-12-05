@@ -17,7 +17,7 @@ from pysph.sph.integrator import Integrator
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.equation import Group, MultiStageEquations
 from pysph.sph.scheme import Scheme
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.sph.wc.linalg import mat_vec_mult, mat_mult
 
 
@@ -306,17 +306,14 @@ class MomentumEquationArtificialStress(Equation):
         rhoi = d_rho[d_idx]
         rhoj = s_rho[s_idx]
 
-        d, max_d, i, j = declare('int', 4)
+        i, j = declare('int', 2)
         ui, uj, uidif, ujdif, res = declare('matrix(3)', 5)
         Aij = declare('matrix(9)')
 
-        d = self.dim
-        max_d = 3
-
-        for i in range(max_d):
+        for i in range(3):
             res[i] = 0.0
-            for j in range(max_d):
-                Aij[d*i + j] = 0.0
+            for j in range(3):
+                Aij[3*i + j] = 0.0
 
         ui[0] = d_u[d_idx]
         ui[1] = d_v[d_idx]
@@ -334,11 +331,11 @@ class MomentumEquationArtificialStress(Equation):
         ujdif[1] = s_vhat[s_idx] - s_v[s_idx]
         ujdif[2] = s_what[s_idx] - s_w[s_idx]
 
-        for i in range(d):
-            for j in range(d):
-                Aij[d*i + j] = (ui[i]*uidif[j] / rhoi + uj[i]*ujdif[j] / rhoj)
+        for i in range(3):
+            for j in range(3):
+                Aij[3*i + j] = (ui[i]*uidif[j] / rhoi + uj[i]*ujdif[j] / rhoj)
 
-        mat_vec_mult(Aij, DWIJ, d, res)
+        mat_vec_mult(Aij, DWIJ, 3, res)
 
         d_au[d_idx] += s_m[s_idx] * res[0]
         d_av[d_idx] += s_m[s_idx] * res[1]
@@ -368,18 +365,17 @@ class VelocityGradient(Equation):
 
     def loop(self, s_idx, d_idx, s_m, d_uhat, d_vhat, d_what, s_uhat, s_vhat,
              s_what, s_rho, d_gradvhat, DWIJ):
-        i, j, d = declare('int', 3)
+        i, j = declare('int', 2)
         uhatij = declare('matrix(3)')
-        d = self.dim
         Vj = s_m[s_idx]/s_rho[s_idx]
 
         uhatij[0] = d_uhat[d_idx] - s_uhat[s_idx]
         uhatij[1] = d_vhat[d_idx] - s_vhat[s_idx]
         uhatij[2] = d_what[d_idx] - s_what[s_idx]
 
-        for i in range(d):
-            for j in range(d):
-                d_gradvhat[d_idx*d*d + d*i + j] += Vj * uhatij[i] * DWIJ[j]
+        for i in range(3):
+            for j in range(3):
+                d_gradvhat[d_idx*9 + 3*i + j] += Vj * uhatij[i] * DWIJ[j]
 
 
 class DeviatoricStressRate(Equation):
@@ -423,8 +419,6 @@ class DeviatoricStressRate(Equation):
         i = declare('int')
         for i in range(9):
             d_asigma[d_idx*9 + i] = 0.0
-            printf("%d, %f\n", d_idx*9 + i, d_asigma[d_idx*9 + 1])
-            printf("HI")
 
     def _get_helpers_(self):
         return [mat_vec_mult, mat_mult]
@@ -432,10 +426,9 @@ class DeviatoricStressRate(Equation):
     def loop(self, d_idx, s_idx, d_sigma, d_u, d_v, d_w, s_uhat, s_vhat,
              s_what, d_uhat, d_vhat, d_what, d_asigma, s_sigma, d_gradvhat,
              s_gradvhat, DWIJ):
-        i, j, d = declare('int', 3)
+        i, j = declare('int', 2)
         eps, omega, omegaT, sigmai, dvi, dvj = declare('matrix(9)', 6)
 
-        d = self.dim
         G = self.G
 
         for i in range(9):
@@ -444,27 +437,28 @@ class DeviatoricStressRate(Equation):
             dvj[i] = s_gradvhat[s_idx*9 + i]
 
         eps_trace = 0.0
-        for i in range(d):
-            for j in range(d):
-                eps[d*i + j] = 0.5*(dvi[d*i + j] + dvj[d*j + i])
-                omega[d*i + j] = 0.5*(dvi[d*i + j] - dvj[d*j + i])
+        for i in range(3):
+            for j in range(3):
+                eps[3*i + j] = 0.5*(dvi[3*i + j] + dvj[3*j + i])
+                omega[3*i + j] = 0.5*(dvi[3*i + j] - dvj[3*j + i])
                 if i == j:
-                    eps_trace += eps[d*i + j]
+                    eps_trace += eps[3*i + j]
 
-        for i in range(d):
-            for j in range(d):
-                omegaT[d*j + i] = omega[d*i + j]
+        for i in range(3):
+            for j in range(3):
+                omegaT[3*j + i] = omega[3*i + j]
 
         tmp1, tmp2 = declare('matrix(9)', 2)
-        mat_mult(sigmai, omegaT, d, tmp1)
-        mat_mult(omega, sigmai, d, tmp2)
+        mat_mult(sigmai, omegaT, 3, tmp1)
+        mat_mult(omega, sigmai, 3, tmp2)
 
-        for i in range(d):
-            for j in range(d):
-                d_asigma[d_idx*d*d + d*i + j] = 2*G * eps[d*i + j]
-                d_asigma[d_idx*d*d + d*i + j] += -2*G * eps_trace/3.0
-                d_asigma[d_idx*d*d + d*i + j] += tmp1[d*i + j]
-                d_asigma[d_idx*d*d + d*i + j] += tmp2[d*i + j]
+        for i in range(3):
+            for j in range(3):
+                d_asigma[d_idx*9 + 3*i + j] = 2*G * eps[3*i + j]
+                d_asigma[d_idx*9 + 3*i + j] += tmp1[3*i + j]
+                d_asigma[d_idx*9 + 3*i + j] += tmp2[3*i + j]
+                if i == j:
+                    d_asigma[d_idx*9 + 3*i + j] += -2*G * eps_trace/3.0
 
 
 class MomentumEquationArtificialStressSolid(Equation):
@@ -493,18 +487,14 @@ class MomentumEquationArtificialStressSolid(Equation):
 
     def loop(self, d_idx, s_idx, d_sigma, s_sigma, d_au, d_av, d_aw, s_m,
              DWIJ):
-        d, i = declare('int', 3)
+        i = declare('int')
         sigmaij = declare('matrix(9)')
         res = declare('matrix(3)')
 
-        d = self.dim
-
-        for i in range(d):
-            sigmaij[i] = d_sigma[d_idx*9 + i] + s_sigma[s_idx*9 + i]
-            sigmaij[i] = d_sigma[d_idx*9 + i] + s_sigma[s_idx*9 + i]
+        for i in range(9):
             sigmaij[i] = d_sigma[d_idx*9 + i] + s_sigma[s_idx*9 + i]
 
-        mat_vec_mult(sigmaij, DWIJ, d, res)
+        mat_vec_mult(sigmaij, DWIJ, 3, res)
 
         d_au[d_idx] += s_m[s_idx] * res[0]
         d_av[d_idx] += s_m[s_idx] * res[1]
@@ -512,15 +502,13 @@ class MomentumEquationArtificialStressSolid(Equation):
 
 
 class GTVFScheme(Scheme):
-    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0, p0, pref,
+    def __init__(self, fluids, dim, rho0, c0, nu, h0, p0, pref,
                  gx=0.0, gy=0.0, gz=0.0, b=1.0):
         r"""Parameters
         ----------
 
         fluids: list
             List of names of fluid particle arrays.
-        solids: list
-            List of names of solid particle arrays (or boundaries).
         dim: int
             Dimensionality of the problem.
         rho0: float
@@ -546,7 +534,6 @@ class GTVFScheme(Scheme):
         """
 
         self.fluids = fluids
-        self.solids = solids
         self.dim = dim
         self.rho0 = rho0
         self.c0 = c0
@@ -648,6 +635,7 @@ class GTVFScheme(Scheme):
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_gtvf(name='junk')
         props = list(dummy.properties.keys())
+        props += [dict(name=p, stride=v) for p, v in dummy.stride.items()]
         output_props = dummy.output_property_arrays
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
