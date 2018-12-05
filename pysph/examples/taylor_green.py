@@ -175,7 +175,7 @@ class TaylorGreen(Application):
             rho0=rho0, has_ghosts=True
         )
         crksph = CRKSPHScheme(
-            fluids=['fluid'], solids=[], dim=2, nu=None,
+            fluids=['fluid'], dim=2, nu=None,
             rho0=rho0, h0=h0, c0=c0, p0=0.0
         )
         s = SchemeChooser(

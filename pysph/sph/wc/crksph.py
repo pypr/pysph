@@ -14,7 +14,7 @@ References
 '''
 
 from math import sqrt, exp
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.sph.equation import Equation, Group
 from pysph.sph.wc.linalg import (
     augmented_matrix, dot, gj_solve, identity, mat_vec_mult
@@ -393,6 +393,9 @@ class NumberDensity(Equation):
 
     .. math::
         V_{i}^{-1} = \sum_{j} W_{i}
+
+    Note that the quantity `V` is the inverse of particle volume, so when using
+    in the equation use :math:`\frac{1}{V}`.
     """
     def initialize(self, d_idx, d_V):
         d_V[d_idx] = 0.0
@@ -409,6 +412,17 @@ class SummationDensityCRKSPH(Equation):
     .. math::
         \rho_{i} = \frac{\sum_j m_{ij} V_j W_{ij}^R}
         {\sum_{j} V_{j}^{2} W_{ij}^R}
+
+    where,
+
+    .. math::
+        mij = \begin{cases}
+        m_j, &i \text{ and } j \text{ are same material} \\
+        m_i, &i \text{ and } j \text{ are different material}
+        \end{cases}
+
+    Note that in this equation we are just using :math:`m_{ij}` to be
+    :math:`m_i` as the mass remains constant through out the simulation.
     """
 
     def initialize(self, d_idx, d_rho, d_rhofac):
@@ -451,14 +465,14 @@ class VelocityGradient(Equation):
             d_gradv[9*d_idx + i] = 0.0
 
     def loop(self, d_idx, s_idx, s_V, d_gradv, d_h, s_h, XIJ, DWIJ, VIJ):
-        alp, bet, d = declare('int', 5)
+        alp, bet, d = declare('int', 3)
         d = self.dim
 
         Vj = 1.0/s_V[s_idx]
 
         for alp in range(d):
             for bet in range(d):
-                d_gradv[d_idx*d*d + d*alp + bet] += -Vj * VIJ[alp] * DWIJ[bet]
+                d_gradv[d_idx*d*d + d*bet + alp] += -Vj * VIJ[alp] * DWIJ[bet]
 
 
 class MomentumEquation(Equation):
@@ -577,12 +591,13 @@ class MomentumEquation(Equation):
                 tmprj += s_gradv[d*d*s_idx + d*alp + bet] * XIJ[alp] * XIJ[bet]
         rij = tmpri/tmprj
 
-        tmprij = min(1, 4*rij/(1 + rij)**2.0)
+        tmprij = min(1, 4*rij/((1 + rij)*(1 + rij)))
         phiij = max(0, tmprij)
 
         tmpxij = dot(XIJ, XIJ, d)
-        etai_scalar = sqrt(tmpxij)/hi
-        etaj_scalar = sqrt(tmpxij)/hj
+        tmpxij2 = sqrt(tmpxij)
+        etai_scalar = tmpxij2/hi
+        etaj_scalar = tmpxij2/hj
         etaij = min(etai_scalar, etaj_scalar)
 
         if etaij < eta_crit:
@@ -689,6 +704,15 @@ class EnergyEquation(Equation):
 
 
 class StateEquation(Equation):
+    r"""**State Equation**
+
+    State equation for ideal gas, from [CRKSPH2017] equation (77):
+
+    .. math::
+        p_i = (\gamma - 1)\rho_{i} u_i
+
+    where, :math:`u_i` is the specific thermal energy.
+    """
     def __init__(self, dest, sources, gamma):
         self.gamma = gamma
         super(StateEquation, self).__init__(dest, sources)
@@ -717,11 +741,10 @@ def get_particle_array_crksph(constants=None, **props):
 
 
 class CRKSPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0, p0, gx=0.0,
+    def __init__(self, fluids, dim, rho0, c0, nu, h0, p0, gx=0.0,
                  gy=0.0, gz=0.0, cl=2, cq=1, gamma=7.0, eta_crit=0.5,
                  eta_fold=0.2, tol=0.5):
         self.fluids = fluids
-        self.solids = solids
         self.solver = None
         self.dim = dim
         self.rho0 = rho0
@@ -780,7 +803,7 @@ class CRKSPHScheme(Scheme):
         )
 
     def get_equations(self):
-        from pysph.sph.basic_equations import XSPHCorrection, SummationDensity
+        from pysph.sph.basic_equations import XSPHCorrection
         from pysph.sph.wc.basic import TaitEOS
         from pysph.sph.wc.viscosity import LaminarViscosity
         all = self.fluids
@@ -844,6 +867,7 @@ class CRKSPHScheme(Scheme):
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_crksph(name='junk')
         props = list(dummy.properties.keys())
+        props += [dict(name=p, stride=v) for p, v in dummy.stride.items()]
         output_props = dummy.output_property_arrays
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
