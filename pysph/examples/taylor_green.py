@@ -20,6 +20,7 @@ from pysph.sph.wc.kernel_correction import (
     MixedKernelCorrectionPreStep, MixedGradientCorrection
 )
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHScheme
+from pysph.sph.wc.gtvf import GTVFScheme
 
 
 # domain and constants
@@ -140,6 +141,7 @@ class TaylorGreen(Application):
         scheme = self.scheme
         h0 = self.hdx * self.dx
         pfreq = 100
+        kernel = QuinticSpline(dim=2)
         if self.options.scheme == 'tvf':
             scheme.configure(pb=self.options.pb_factor * p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
@@ -151,7 +153,8 @@ class TaylorGreen(Application):
             pfreq = 10
         elif self.options.scheme == 'crksph':
             scheme.configure(h0=h0, nu=self.nu)
-        kernel = QuinticSpline(dim=2)
+        elif self.options.scheme == 'gtvf':
+            scheme.configure(pref=10*p0, p0=p0, nu=self.nu, h0=h0)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
 
@@ -178,9 +181,13 @@ class TaylorGreen(Application):
             fluids=['fluid'], dim=2, nu=None,
             rho0=rho0, h0=h0, c0=c0, p0=0.0
         )
+        gtvf = GTVFScheme(
+            fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
+            nu=None, h0=None, p0=p0, pref=None
+        )
         s = SchemeChooser(
             default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
-            crksph=crksph
+            crksph=crksph, gtvf=gtvf
         )
         return s
 
@@ -302,6 +309,11 @@ class TaylorGreen(Application):
                 # The accelerations are not really needed since the current
                 # stepper is a single stage stepper.
                 props = ['u', 'v', 'p']
+            elif options.scheme == 'gtvf':
+                props = [
+                    'uhat', 'vhat', 'what', 'rho0', 'rhodiv', 'p0',
+                    'auhat', 'avhat', 'awhat', 'vmag2', 'arho', 'arho0'
+                ]
 
             remesher = SimpleRemesher(
                 self, 'fluid', props=props,

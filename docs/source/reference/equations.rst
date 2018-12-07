@@ -20,6 +20,10 @@ SPH equations
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.wc.gtvf
+   :members:
+   :undoc-members:
+
 .. automodule:: pysph.sph.wc.density_correction
    :members:
    :undoc-members:

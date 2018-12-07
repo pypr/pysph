@@ -108,19 +108,27 @@ class Scheme(object):
         pa : ParticleArray
             Desired particle array.
         desired_props : sequence
-            Desired properties to have in the array.
+            Desired properties to have in the array, can be a list of strings
+            or dicts with stride info or both.
         clean : bool
             Remove undesirable properties.
         """
-        all_props = set(desired_props)
+        all_props = {}
+        for p in desired_props:
+            if isinstance(p, dict):
+                all_props.update({p['name']: p})
+            elif p not in all_props:
+                all_props.update({p: {'name': p}})
+
+        pa_props = set(pa.properties.keys())
         if clean:
-            to_remove = set(pa.properties.keys()) - all_props
+            to_remove = pa_props - set(all_props.keys())
             for prop in to_remove:
                 pa.remove_property(prop)
 
-        to_add = all_props - set(pa.properties.keys())
+        to_add = set(all_props.keys()) - pa_props
         for prop in to_add:
-            pa.add_property(prop)
+            pa.add_property(**all_props[prop])
 
     def _smart_getattr(self, obj, var):
         res = getattr(obj, var)
