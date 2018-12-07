@@ -2,6 +2,7 @@
 """
 
 import numpy as np
+from numpy import pi, sin, cos, exp
 import os
 
 from pysph.base.nnps import DomainManager
@@ -18,7 +19,7 @@ from pysph.sph.wc.kernel_correction import (
     GradientCorrectionPreStep, GradientCorrection,
     MixedKernelCorrectionPreStep, MixedGradientCorrection
 )
-from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
+from pysph.sph.wc.gtvf import GTVFScheme
 
 
 # domain and constants
@@ -58,14 +59,11 @@ class M4(Equation):
 
 
 def exact_solution(U, b, t, x, y):
-    pi = np.pi
-    sin = np.sin
-    cos = np.cos
-    factor = U * np.exp(b * t)
+    factor = U * exp(b*t)
 
-    u = -cos(2 * pi * x) * sin(2 * pi * y)
-    v = sin(2 * pi * x) * cos(2 * pi * y)
-    p = -0.25 * (cos(4 * pi * x) + cos(4 * pi * y))
+    u = -cos(2*pi*x) * sin(2*pi*y)
+    v = sin(2*pi*x) * cos(2*pi*y)
+    p = -0.25 * (cos(4*pi*x) + cos(4*pi*y))
 
     return factor * u, factor * v, factor * factor * p
 
@@ -134,14 +132,15 @@ class TaylorGreen(Application):
         dt_viscous = 0.125 * h0**2 / nu
         dt_force = 0.25 * 1.0
 
-        self.tf = 5.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
+        self.tf = 5.0
         self.kernel_correction = self.options.kernel_correction
 
     def configure_scheme(self):
         scheme = self.scheme
         h0 = self.hdx * self.dx
         pfreq = 100
+        kernel = QuinticSpline(dim=2)
         if self.options.scheme == 'tvf':
             scheme.configure(pb=self.options.pb_factor * p0, nu=self.nu, h0=h0)
         elif self.options.scheme == 'wcsph':
@@ -151,7 +150,8 @@ class TaylorGreen(Application):
         elif self.options.scheme == 'iisph':
             scheme.configure(nu=self.nu)
             pfreq = 10
-        kernel = QuinticSpline(dim=2)
+        elif self.options.scheme == 'gtvf':
+            scheme.configure(pref=10*p0, p0=p0, nu=self.nu, h0=h0)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
 
@@ -174,8 +174,13 @@ class TaylorGreen(Application):
             fluids=['fluid'], solids=[], dim=2, nu=None,
             rho0=rho0, has_ghosts=True
         )
+        gtvf = GTVFScheme(
+            fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
+            nu=None, h0=None, p0=p0, pref=None
+        )
         s = SchemeChooser(
-            default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph
+            default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
+            gtvf=gtvf
         )
         return s
 
@@ -220,8 +225,6 @@ class TaylorGreen(Application):
         dx = self.dx
         _x = np.arange(dx / 2, L, dx)
         x, y = np.meshgrid(_x, _x)
-        x = x.ravel()
-        y = y.ravel()
         if self.options.init is not None:
             fname = self.options.init
             from pysph.solver.utils import load
@@ -234,38 +237,23 @@ class TaylorGreen(Application):
             factor = dx * self.options.perturb
             x += np.random.random(x.shape) * factor
             y += np.random.random(x.shape) * factor
-        h = np.ones_like(x) * dx
+
+        # Initialize
+        m = self.volume * rho0
+        h = self.hdx * dx
+        re = self.options.re
+        b = -8.0*pi*pi / re
+        u0, v0, p0 = exact_solution(U=U, b=b, t=0, x=x, y=y)
+        color0 = cos(2*pi*x) * cos(4*pi*y)
 
         # create the arrays
-
-        fluid = get_particle_array(name='fluid', x=x, y=y, h=h)
+        fluid = get_particle_array(name='fluid', x=x, y=y, m=m, h=h, u=u0,
+                                   v=v0, rho=rho0, p=p0, color=color0)
 
         self.scheme.setup_properties([fluid])
 
-        # add the requisite arrays
-        fluid.add_property('color')
-        fluid.add_output_arrays(['color'])
-
         print("Taylor green vortex problem :: nfluid = %d, dt = %g" % (
             fluid.get_number_of_particles(), self.dt))
-
-        # setup the particle properties
-        pi = np.pi
-        cos = np.cos
-        sin = np.sin
-
-        # color
-        fluid.color[:] = cos(2 * pi * x) * cos(4 * pi * y)
-
-        # velocities
-        fluid.u[:] = -U * cos(2 * pi * x) * sin(2 * pi * y)
-        fluid.v[:] = +U * sin(2 * pi * x) * cos(2 * pi * y)
-        fluid.p[:] = -U * U * (np.cos(4 * np.pi * x) +
-                               np.cos(4 * np.pi * y)) * 0.25
-
-        # mass is set to get the reference density of each phase
-        fluid.rho[:] = rho0
-        fluid.m[:] = self.volume * fluid.rho
 
         # volume is set as dx^2
         if self.options.scheme == 'tvf':
@@ -275,9 +263,6 @@ class TaylorGreen(Application):
             nfp = fluid.get_number_of_particles()
             fluid.orig_idx[:] = np.arange(nfp)
             fluid.add_output_arrays(['orig_idx'])
-
-        # smoothing lengths
-        fluid.h[:] = self.hdx * dx
 
         corr = self.kernel_correction
         if corr in ['mixed', 'crksph']:
@@ -291,7 +276,6 @@ class TaylorGreen(Application):
             for prop in ['gradai', 'bi']:
                 fluid.add_property(prop, stride=2)
 
-        # return the particle list
         return [fluid]
 
     def create_tools(self):
@@ -318,6 +302,11 @@ class TaylorGreen(Application):
                 # The accelerations are not really needed since the current
                 # stepper is a single stage stepper.
                 props = ['u', 'v', 'p']
+            elif options.scheme == 'gtvf':
+                props = [
+                    'uhat', 'vhat', 'what', 'rho0', 'rhodiv', 'p0',
+                    'auhat', 'avhat', 'awhat', 'vmag2', 'arho', 'arho0'
+                ]
 
             remesher = SimpleRemesher(
                 self, 'fluid', props=props,
