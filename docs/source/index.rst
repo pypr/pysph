@@ -62,7 +62,6 @@ The framework and library
    design/equations.rst
    starcluster/overview
    using_pysph.rst
-   pyzoltan/overview
 
 **************************
 Gallery of PySPH examples

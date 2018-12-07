@@ -9,7 +9,7 @@ import pyopencl as cl
 import pyopencl.array
 
 # PyZoltan CArrays
-from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+from cyarray.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 
 # local imports
 from particle_array cimport ParticleArray

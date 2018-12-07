@@ -1,6 +1,6 @@
 #cython: embedsignature=True
 <%
-from pysph.cpy.api import CythonGenerator
+from compyle.api import CythonGenerator
 from kernels import (
     CubicSpline, WendlandQuintic, Gaussian, QuinticSpline, SuperGaussian,
     WendlandQuinticC4, WendlandQuinticC6, WendlandQuinticC2_1D,

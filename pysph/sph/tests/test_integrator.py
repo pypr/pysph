@@ -7,7 +7,7 @@ import pytest
 
 # Local imports.
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 from pysph.sph.equation import Equation
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.base.kernels import CubicSpline

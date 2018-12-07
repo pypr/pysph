@@ -5,7 +5,7 @@ from textwrap import dedent
 import unittest
 
 # Local imports.
-from pysph.cpy.api import KnownType
+from compyle.api import KnownType
 from pysph.sph.equation import (
     BasicCodeBlock, Context, CythonGroup, Equation, Group, sort_precomputed
 )

@@ -31,16 +31,16 @@ from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
 from pysph.base.device_helper import DeviceHelper
-from pysph.cpy.config import get_config
-from pysph.cpy.array import Array
-from pysph.cpy.parallel import Elementwise, Scan
-from pysph.cpy.types import annotate
-from pysph.cpy.opencl import (get_context, get_queue,
-                              set_context, set_queue)
-import pysph.cpy.array as array
+from compyle.config import get_config
+from compyle.array import Array
+from compyle.parallel import Elementwise, Scan
+from compyle.types import annotate
+from compyle.opencl import (get_context, get_queue,
+                            set_context, set_queue)
+import compyle.array as array
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
+from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 from nnps_base cimport *

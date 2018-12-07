@@ -11,8 +11,8 @@ import numpy as np
 
 # Local imports.
 from pysph.base.utils import get_particle_array
-from pysph.cpy.config import get_config
-from pysph.cpy.api import declare
+from compyle.config import get_config
+from compyle.api import declare
 from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import (
     AccelerationEval, MegaGroup, CythonGroup,
@@ -540,9 +540,13 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         pa = get_particle_array(name='fluid', x=x, h=h, m=m)
         self.pa = pa
 
+    def _get_nnps_cls(self):
+        from pysph.base.gpu_nnps import ZOrderGPUNNPS as GPUNNPS
+        return GPUNNPS
+
     def _make_accel_eval(self, equations, cache_nnps=True):
         pytest.importorskip('pysph.base.gpu_nnps')
-        from pysph.base.gpu_nnps import OctreeGPUNNPS as GPUNNPS
+        GPUNNPS = self._get_nnps_cls()
         arrays = [self.pa]
         kernel = CubicSpline(dim=self.dim)
         a_eval = AccelerationEval(
@@ -895,36 +899,24 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         self.assertListEqual(list(pa.u), list(expect))
 
 
-class TestAccelerationEval1DGPUNonCached(TestAccelerationEval1DGPU):
+class TestAccelerationEval1DGPUOctree(TestAccelerationEval1DGPU):
+    def _get_nnps_cls(self):
+        from pysph.base.gpu_nnps import OctreeGPUNNPS
+        return OctreeGPUNNPS
+
+
+class TestAccelerationEval1DGPUOctreeNonCached(
+        TestAccelerationEval1DGPUOctree
+):
     def setUp(self):
         self.old_flag = get_config().use_local_memory
         get_config().use_local_memory = True
-        super(TestAccelerationEval1DGPUNonCached, self).setUp()
+        super(TestAccelerationEval1DGPUOctreeNonCached, self).setUp()
+
+    def tearDown(self):
+        super(TestAccelerationEval1DGPUOctreeNonCached, self).tearDown()
+        get_config().use_local_memory = self.old_flag
 
     @pytest.mark.skip("Loop all not supported with non-cached NNPS")
     def test_should_support_loop_all_and_loop_on_gpu(self):
         pass
-
-    @pytest.mark.xfail
-    def test_should_call_initialize_pair_on_gpu(self):
-        # Given.
-        pa = self.pa
-        pa.u[:] = 1.0
-        if pa.gpu:
-            pa.gpu.push('u')
-        equations = [InitializePair(dest='fluid', sources=['fluid'])]
-        a_eval = self._make_accel_eval(equations)
-
-        # When
-        a_eval.compute(0.0, 0.1)
-
-        # Then
-        if pa.gpu:
-            pa.gpu.pull('u')
-        np.testing.assert_array_almost_equal(
-            pa.u, np.ones_like(pa.x)*1.5
-        )
-
-    def tearDown(self):
-        super(TestAccelerationEval1DGPUNonCached, self).tearDown()
-        get_config().use_local_memory = self.old_flag

@@ -188,7 +188,7 @@ class TestOctreeFor1DDataset(SimpleOctreeTestCase):
     """Test Octree for 1D dataset
     """
     def setUp(self):
-        N = 1e5
+        N = int(1e5)
         self.x = np.linspace(0, 1, num=N)
         self.y = np.zeros_like(self.x)
         self.z = np.zeros_like(self.x)
@@ -234,7 +234,7 @@ class TestCompressedOctreeFor1DDataset(SimpleOctreeTestCase):
     """Test Octree for 1D dataset
     """
     def setUp(self):
-        N = 1e5
+        N = int(1e5)
         self.x = np.linspace(0, 1, num=N)
         self.y = np.zeros_like(self.x)
         self.z = np.zeros_like(self.x)

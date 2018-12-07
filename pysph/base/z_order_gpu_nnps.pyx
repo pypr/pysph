@@ -21,9 +21,9 @@ cimport numpy as np
 from mako.template import Template
 
 from pysph.base.gpu_nnps_helper import GPUNNPSHelper
-from pysph.cpy.array import Array
-import pysph.cpy.array as array
-from pysph.cpy.opencl import get_context, get_config, profile_kernel
+from compyle.array import Array
+import compyle.array as array
+from compyle.opencl import get_context, get_config, profile_kernel
 
 
 IF UNAME_SYSNAME == "Windows":
@@ -48,8 +48,8 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.radius_scale2 = radius_scale*radius_scale
         self.radix_sort = None
-        self.make_vec = cl.array.vec.make_double3 if self.use_double \
-                else cl.array.vec.make_float3
+        self.make_vec = cl.cltypes.make_double3 if self.use_double \
+                else cl.cltypes.make_float3
 
         self.helper = GPUNNPSHelper("z_order_gpu_nnps.mako",
                                     use_double=self.use_double,

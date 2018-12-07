@@ -3,7 +3,6 @@ PySPH: a Python-based SPH framework
 
 |Travis Status|  |Shippable Status|  |Appveyor Status|  |Codeship Status|
 
-**PySPH has moved here:** https://github.com/pypr/pysph
 
 PySPH is an open source framework for Smoothed Particle Hydrodynamics
 (SPH) simulations. It is implemented in
@@ -33,6 +32,7 @@ of some example problems solved using PySPH.
 
 
 .. _PyOpenCL: https://documen.tician.de/pyopencl/
+.. _PyZoltan: https://github.com/pypr/pyzoltan
 
 Features
 --------
@@ -45,7 +45,7 @@ Features
 - Seamless multi-core support with OpenMP.
 - Seamless GPU support with PyOpenCL_.
 - Seamless parallel support using
-  `Zoltan <http://www.cs.sandia.gov/zoltan/>`_.
+  `Zoltan <http://www.cs.sandia.gov/zoltan/>`_ and PyZoltan_.
 
 SPH formulations
 -----------------

@@ -4,10 +4,24 @@ __version__ = '1.0b1.dev0'
 # Utility functions to determine if Zoltan/MPI are available.
 _has_zoltan = None
 _has_opencl = None
+_has_mpi = None
 _in_parallel = None
 
 
-from pyzoltan import has_mpi  # noqa: 402
+try:
+    from pyzoltan import has_mpi  # noqa: 402
+except ImportError:
+    def has_mpi():
+        global _has_mpi
+        if _has_mpi is None:
+            try:
+                import mpi4py  # noqa: 401
+            except ImportError:
+                _has_mpi = False
+            else:
+                mpi4py.rc.initialize = False
+                mpi4py.rc.finalize = True
+        return _has_mpi
 
 
 def has_opencl():

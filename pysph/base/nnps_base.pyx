@@ -24,7 +24,7 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_GET_ITEM
 # Cython for compiler directives
 cimport cython
 
-from pysph.cpy.config import get_config
+from compyle.config import get_config
 
 
 IF OPENMP:
@@ -51,7 +51,7 @@ IF UNAME_SYSNAME == "Windows":
         return x if x > y else y
 
 # Particle Tag information
-from pyzoltan.core.carray cimport BaseArray, aligned_malloc, aligned_free
+from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 cdef int Local = ParticleTAGS.Local

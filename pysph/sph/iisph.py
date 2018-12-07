@@ -8,7 +8,7 @@
 """
 
 from numpy import sqrt, fabs
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.base.particle_array import get_ghost_tag
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep

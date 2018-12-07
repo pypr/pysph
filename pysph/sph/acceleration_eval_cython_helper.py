@@ -2,12 +2,12 @@ from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
-from pyzoltan.core import carray
+from cyarray import carray
 
-from pysph.cpy.config import get_config
-from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
-                                        get_parallel_range)
-from pysph.cpy.ext_module import ExtModule, get_platform_dir
+from compyle.config import get_config
+from compyle.cython_generator import (CythonGenerator, KnownType,
+                                      get_parallel_range)
+from compyle.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################

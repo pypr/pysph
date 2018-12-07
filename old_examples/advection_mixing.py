@@ -20,7 +20,7 @@ equation", Emmanuel Germaine, Laurent Mydlarski, Luca Cortelezzi, JCP
 
 """
 # PyZoltan imports
-from pyzoltan.core.carray import LongArray
+from cyarray.api import LongArray
 
 # PySPH imports
 from pysph.base.nnps import DomainManager

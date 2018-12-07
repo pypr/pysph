@@ -19,9 +19,9 @@ import numpy
 from textwrap import dedent
 
 # Local imports.
-from pysph.cpy.api import (CythonGenerator, KnownType, OpenCLConverter,
-                           get_symbols)
-from pysph.cpy.config import get_config
+from compyle.api import (CythonGenerator, KnownType, OpenCLConverter,
+                         get_symbols)
+from compyle.config import get_config
 
 
 getfullargspec = getattr(
@@ -820,6 +820,31 @@ class CythonGroup(Group):
 
 
 class OpenCLGroup(Group):
+    # #### Private interface  #####
+    def _update_for_local_memory(self, predefined, eqs):
+        modified_classes = []
+        loop_ann = predefined.copy()
+        for k in loop_ann.keys():
+            if 's_' in k:
+                # TODO: Make each argument have their own KnownType
+                # right from the start
+                loop_ann[k] = KnownType(
+                    loop_ann[k].type.replace('__global', '__local')
+                )
+        for eq in eqs.values():
+            cls = eq.__class__
+            loop = getattr(cls, 'loop', None)
+            if loop is not None:
+                self._set_loop_annotation(loop, loop_ann)
+                modified_classes.append(cls)
+        return modified_classes
+
+    def _set_loop_annotation(self, func, value):
+        try:
+            func.__annotations__ = value
+        except AttributeError:
+            func.im_func.__annotations__ = value
+
     ##########################################################################
     # Public interface.
     ##########################################################################
@@ -839,19 +864,22 @@ class OpenCLGroup(Group):
         predefined.update(known_types)
         predefined['NBRS'] = KnownType('__global unsigned int*')
 
-        if get_config().use_local_memory:
-            for k in predefined.keys():
-                if 's_' in k:
-                    # TODO: Make each argument have their own KnownType
-                    # right from the start
-                    predefined[k] = KnownType(
-                        predefined[k].type.replace('__global', '__local')
-                    )
+        use_local_memory = get_config().use_local_memory
+        modified_classes = []
+        if use_local_memory:
+            modified_classes = self._update_for_local_memory(predefined, eqs)
+
         code_gen = OpenCLConverter(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):
             src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
             wrappers.append(src)
+
+        if use_local_memory:
+            # Remove the added annotations
+            for cls in modified_classes:
+                self._set_loop_annotation(cls.loop, {})
+
         return '\n'.join(wrappers)
 
 

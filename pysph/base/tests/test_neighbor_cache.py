@@ -6,7 +6,8 @@ import unittest
 
 from pysph.base.nnps import NeighborCache, LinkedListNNPS
 from pysph.base.utils import get_particle_array
-from pyzoltan.core.carray import UIntArray
+from cyarray.carray import UIntArray
+
 
 class TestNeighborCache(unittest.TestCase):
     def _make_random_parray(self, name, nx=5):

@@ -5,7 +5,7 @@ from cpython cimport dict
 from cpython cimport list
 
 # PyZoltan
-from pyzoltan.core.carray cimport UIntArray, IntArray, DoubleArray, LongArray
+from cyarray.carray cimport UIntArray, IntArray, DoubleArray, LongArray
 from pyzoltan.core.zoltan cimport PyZoltan, ZoltanGeometricPartitioner
 from pyzoltan.core.zoltan_comm cimport ZComm
 from pyzoltan.czoltan.czoltan_types cimport ZOLTAN_ID_TYPE, ZOLTAN_ID_PTR, ZOLTAN_OK

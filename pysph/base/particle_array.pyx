@@ -13,15 +13,15 @@ cimport numpy
 import numpy
 
 # PyZoltan imports
-from pyzoltan.core.carray cimport *
+from cyarray.carray cimport *
 
 # Local imports
 from cpython cimport PyObject
 from cpython cimport *
 from cython cimport *
 
-from pysph.cpy.config import get_config
-from pysph.cpy.array import Array, get_backend, to_device
+from compyle.config import get_config
+from compyle.array import Array, get_backend, to_device
 from pysph.base.device_helper import DeviceHelper
 
 # Maximum value of an unsigned int
