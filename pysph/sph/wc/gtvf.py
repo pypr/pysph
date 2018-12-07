@@ -2,6 +2,12 @@
 Generalized Transport Velocity Formulation
 ##########################################
 
+Some notes on the paper,
+
+- In the viscosity term of equation (17) a factor of '2' is missing.
+- A negative sign is missing from equation (22) i.e, either put a negative
+  sign in equation (22) or at the integrator step equation(25).
+
 References
 -----------
 
@@ -23,8 +29,8 @@ from pysph.sph.wc.linalg import mat_vec_mult, mat_mult
 
 def get_particle_array_gtvf(constants=None, **props):
     gtvf_props = [
-        'uhat', 'vhat', 'what', 'rho0', 'rhodiv', 'p0',
-        'auhat', 'avhat', 'awhat', 'vmag2', 'arho', 'arho0'
+        'uhat', 'vhat', 'what', 'rho0', 'rhodiv', 'p0', 'auhat', 'avhat',
+        'awhat', 'arho', 'arho0'
     ]
 
     pa = get_particle_array(
@@ -35,9 +41,8 @@ def get_particle_array_gtvf(constants=None, **props):
     pa.add_property('asigma', stride=9)
 
     pa.set_output_arrays([
-        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h',
-        'm', 'au', 'av', 'aw', 'vmag2', 'pid', 'gid',
-        'tag'
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p', 'h', 'm', 'au', 'av', 'aw',
+        'pid', 'gid', 'tag'
     ])
     return pa
 
@@ -81,15 +86,11 @@ class GTVFStep(IntegratorStep):
         d_y[d_idx] += dt*d_vhat[d_idx]
         d_z[d_idx] += dt*d_what[d_idx]
 
-    def stage3(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt,
-               d_vmag2, d_uhat, d_vhat, d_what):
+    def stage3(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         dtb2 = 0.5*dt
         d_u[d_idx] += dtb2*d_au[d_idx]
         d_v[d_idx] += dtb2*d_av[d_idx]
         d_w[d_idx] += dtb2*d_aw[d_idx]
-
-        d_vmag2[d_idx] = (d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
-                          d_w[d_idx]*d_w[d_idx])
 
 
 class DensityEvolution(Equation):
@@ -169,11 +170,11 @@ class MomentumEquationPressureGradient(Equation):
     for solids, replace :math:`\boldsymbol{A}_{i/j}` with
     :math:`\boldsymbol{\sigma}'_{i/j}`.
 
-    The rate of change of transport velocity is given by
+    The rate of change of transport velocity is given by,
 
     .. math::
-            (\frac{d\boldsymbol{v}}{dt})_i = p_i^0 \sum_j \frac{m_j}{\rho_i^2}
-            \nabla \tilde{W}_{ij}
+            (\frac{d\boldsymbol{v}_i}{dt})_c = -p_i^0 \sum_j \frac{m_j}
+            {\rho_i^2} \nabla \tilde{W}_{ij}
 
     where,
 
@@ -181,6 +182,11 @@ class MomentumEquationPressureGradient(Equation):
             \tilde{W}_{ij} = W(\boldsymbol{x}_ij, \tilde{0.5 h_{ij}})
     .. math::
             p_i^0 = \min(10|p_i|, p_{ref})
+
+    Notes:
+
+    A negative sign in :math:`(\frac{d\boldsymbol{v}_i}{dt})_c` is
+    missing in the paper [ZhangHuAdams2017].
     """
 
     def __init__(self, dest, sources, pref, gx=0.0, gy=0.0, gz=0.0):
@@ -243,6 +249,11 @@ class MomentumEquationViscosity(Equation):
     r"""**Momentum equation Artificial stress for solids**
 
     See the class MomentumEquationPressureGradient for details.
+
+    Notes:
+
+    A factor of '2' is missing in the viscosity equation given by
+    [ZhangHuAdams2017].
     """
     def __init__(self, dest, sources, nu):
         r"""
@@ -255,17 +266,12 @@ class MomentumEquationViscosity(Equation):
         self.nu = nu
         super(MomentumEquationViscosity, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
-
     def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_au,
              d_av, d_aw, VIJ, R2IJ, EPS, DWIJ, XIJ):
         etai = self.nu * d_rho[d_idx]
         etaj = self.nu * s_rho[s_idx]
 
-        etaij = 2 * (etai * etaj)/(etai + etaj)
+        etaij = 4 * (etai * etaj)/(etai + etaj)
 
         xdotdij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
 
@@ -294,11 +300,6 @@ class MomentumEquationArtificialStress(Equation):
 
     def _get_helpers_(self):
         return [mat_vec_mult]
-
-    def initialize(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, s_rho, d_u, d_v, d_w, d_uhat, d_vhat,
              d_what, s_u, s_v, s_w, s_uhat, s_vhat, s_what, d_au, d_av, d_aw,
@@ -426,7 +427,7 @@ class DeviatoricStressRate(Equation):
     def loop(self, d_idx, s_idx, d_sigma, d_u, d_v, d_w, s_uhat, s_vhat,
              s_what, d_uhat, d_vhat, d_what, d_asigma, s_sigma, d_gradvhat,
              s_gradvhat, DWIJ):
-        i, j = declare('int', 2)
+        i, j, ind = declare('int', 3)
         eps, omega, omegaT, sigmai, dvi, dvj = declare('matrix(9)', 6)
 
         G = self.G
@@ -448,17 +449,16 @@ class DeviatoricStressRate(Equation):
             for j in range(3):
                 omegaT[3*j + i] = omega[3*i + j]
 
-        tmp1, tmp2 = declare('matrix(9)', 2)
-        mat_mult(sigmai, omegaT, 3, tmp1)
-        mat_mult(omega, sigmai, 3, tmp2)
+        smo, oms = declare('matrix(9)', 2)
+        mat_mult(sigmai, omegaT, 3, smo)
+        mat_mult(omega, sigmai, 3, oms)
 
         for i in range(3):
             for j in range(3):
-                d_asigma[d_idx*9 + 3*i + j] = 2*G * eps[3*i + j]
-                d_asigma[d_idx*9 + 3*i + j] += tmp1[3*i + j]
-                d_asigma[d_idx*9 + 3*i + j] += tmp2[3*i + j]
+                ind = 3*i + j
+                d_asigma[d_idx*9 + ind] = 2*G * eps[ind] + smo[ind] + oms[ind]
                 if i == j:
-                    d_asigma[d_idx*9 + 3*i + j] += -2*G * eps_trace/3.0
+                    d_asigma[d_idx*9 + ind] += -2*G * eps_trace/3.0
 
 
 class MomentumEquationArtificialStressSolid(Equation):
@@ -479,11 +479,6 @@ class MomentumEquationArtificialStressSolid(Equation):
 
     def _get_helpers_(self):
         return [mat_vec_mult]
-
-    def initialize(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_sigma, s_sigma, d_au, d_av, d_aw, s_m,
              DWIJ):

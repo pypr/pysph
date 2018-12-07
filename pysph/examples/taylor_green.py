@@ -7,7 +7,7 @@ import os
 
 from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
-from pysph.base.kernels import QuinticSpline, WendlandQuintic
+from pysph.base.kernels import QuinticSpline
 from pysph.solver.application import Application
 
 from pysph.sph.equation import Group, Equation
@@ -151,7 +151,6 @@ class TaylorGreen(Application):
             scheme.configure(nu=self.nu)
             pfreq = 10
         elif self.options.scheme == 'gtvf':
-            kernel = WendlandQuintic(dim=2)
             scheme.configure(pref=10*p0, p0=p0, nu=self.nu, h0=h0)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
