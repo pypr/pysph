@@ -19,6 +19,7 @@ from pysph.sph.wc.kernel_correction import (
     GradientCorrectionPreStep, GradientCorrection,
     MixedKernelCorrectionPreStep, MixedGradientCorrection
 )
+from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHScheme
 from pysph.sph.wc.gtvf import GTVFScheme
 
 
@@ -150,6 +151,8 @@ class TaylorGreen(Application):
         elif self.options.scheme == 'iisph':
             scheme.configure(nu=self.nu)
             pfreq = 10
+        elif self.options.scheme == 'crksph':
+            scheme.configure(h0=h0, nu=self.nu)
         elif self.options.scheme == 'gtvf':
             scheme.configure(pref=10*p0, p0=p0, nu=self.nu, h0=h0)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
@@ -174,13 +177,17 @@ class TaylorGreen(Application):
             fluids=['fluid'], solids=[], dim=2, nu=None,
             rho0=rho0, has_ghosts=True
         )
+        crksph = CRKSPHScheme(
+            fluids=['fluid'], dim=2, nu=None,
+            rho0=rho0, h0=h0, c0=c0, p0=0.0
+        )
         gtvf = GTVFScheme(
             fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
             nu=None, h0=None, p0=p0, pref=None
         )
         s = SchemeChooser(
             default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
-            gtvf=gtvf
+            crksph=crksph, gtvf=gtvf
         )
         return s
 
@@ -287,7 +294,7 @@ class TaylorGreen(Application):
             else:
                 equations = None
             from pysph.solver.tools import SimpleRemesher
-            if options.scheme == 'wcsph':
+            if options.scheme == 'wcsph' or options.scheme == 'crksph':
                 props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
             elif options.scheme == 'tvf':
                 props = ['u', 'v', 'uhat', 'vhat',
