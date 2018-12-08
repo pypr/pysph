@@ -21,6 +21,7 @@ from pysph.sph.wc.kernel_correction import (
 )
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHScheme
 from pysph.sph.wc.gtvf import GTVFScheme
+from pysph.sph.wc.pcisph import PCISPHScheme
 
 
 # domain and constants
@@ -126,7 +127,7 @@ class TaylorGreen(Application):
         self.hdx = self.options.hdx
 
         h0 = self.hdx * self.dx
-        if self.options.scheme == 'iisph':
+        if self.options.scheme == 'iisph' or self.options.scheme == 'pcisph':
             dt_cfl = 0.25 * h0 / U
         else:
             dt_cfl = 0.25 * h0 / (c0 + U)
@@ -148,7 +149,7 @@ class TaylorGreen(Application):
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         elif self.options.scheme == 'edac':
             scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor * p0)
-        elif self.options.scheme == 'iisph':
+        elif self.options.scheme == 'iisph' or self.options.scheme == 'pcisph':
             scheme.configure(nu=self.nu)
             pfreq = 10
         elif self.options.scheme == 'crksph':
@@ -185,9 +186,12 @@ class TaylorGreen(Application):
             fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
             nu=None, h0=None, p0=p0, pref=None
         )
+        pcisph = PCISPHScheme(
+            fluids=['fluid'], dim=2, rho0=rho0, nu=None
+        )
         s = SchemeChooser(
             default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
-            crksph=crksph, gtvf=gtvf
+            crksph=crksph, gtvf=gtvf, pcisph=pcisph
         )
         return s
 
@@ -294,7 +298,8 @@ class TaylorGreen(Application):
             else:
                 equations = None
             from pysph.solver.tools import SimpleRemesher
-            if options.scheme == 'wcsph' or options.scheme == 'crksph':
+            if options.scheme == 'wcsph' or options.scheme == 'crksph' \
+               or options.scheme == 'pcisph':
                 props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
             elif options.scheme == 'tvf':
                 props = ['u', 'v', 'uhat', 'vhat',
