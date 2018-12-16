@@ -1,25 +1,55 @@
+"""
+Shift particle positions
+########################
+
+Equations to maintain uniform particle distribution.
+
+There are two ways proposed:
+1. 'SimpleShift' is the earlier one, see [XuStaLau2009].
+2. 'FickianShift' is based on Fick's diffusion law, see [LiXuStaRo2012].
+
+TODO: Implement for free surface.
+
+References
+----------
+
+    .. [XuStaLau2009] Rui Xu, Peter Stansby, Dominique Laurence (2009)
+        Accuracy and stability in incompressible SPH (ISPH) based
+        on the projection method and a new approach.
+
+    .. [LiXuStaRo2012] S.J Lind, R. Xu, P.K. Stansby, B.D. Rogers (2012)
+        Incompressible smoothed particle hydrodynamics for free-surface flows:
+        A generalised diffusion-based algorithm for stability and validations
+        for impulsive flows and propagating waves.
+
+    .. [SkLiStaRo2013] Alex Skillen, S. Lind, P.K. Stansby, B.D. Rogers (2013)
+        Incompressible smoothed particle hydrodynamics (SPH) with reduced
+        temporal noise and generalised Fickian smoothing applied to
+        body water slam and efficient wave body interaction.
+"""
+
 from math import sqrt
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.base.reduce_array import serial_reduce_array
+from pysph.base.reduce_array import parallel_reduce_array
 from pysph.solver.tools import Tool
 
 
 class SimpleShift(Equation):
-    """See the paper by R. Xu et al. (JCP 2009), equation(35)
+    r"""**Simple shift**
+    See the paper [XuStaLau2009], equation(35)
     """
     def __init__(self, dest, sources, const=0.04):
         self.beta = const
         super(SimpleShift, self).__init__(dest, sources)
 
     def py_initialize(self, dst, t, dt):
-        from math import sqrt
-        vmag = dst.u[:]*dst.u[:] + dst.v[:]*dst.v[:] + dst.w[:]*dst.w[:]
-        vmax = serial_reduce_array(vmag, 'max')
-        dst.vmax[0] = sqrt(vmax)
+        from numpy import sqrt
+        vmag = sqrt(dst.u**2 + dst.v**2 + dst.w**2)
+        dst.vmax[0] = parallel_reduce_array(vmag, 'max')
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, s_u, s_v, s_w,
-                 d_u, d_v, d_w, d_vmax, d_dpos, dt, N_NBRS, NBRS):
+    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, d_u, d_v, d_w,
+                 d_vmax, d_dpos, dt, N_NBRS, NBRS):
         i, s_idx = declare('int', 2)
         ri = 0.0
         dxi = 0.0
@@ -50,12 +80,13 @@ class SimpleShift(Equation):
 
 
 class FickianShift(Equation):
-    """See the paper by S. J. Lind et al. (JCP 2012), equation(21-24),
-    for the constant see A. Skillen et al. (CMAME 2013), equation(13).
+    r"""**Fickian-shift**
+    See the paper [LiXuStaRo2012], equation(21-24),
+    for the constant see [SkLiStaRo2013], equation(13).
     """
-    def __init__(self, dest, sources, const=10, tensile_const=0.2,
+    def __init__(self, dest, sources, fickian_const=10, tensile_const=0.2,
                  tensile_pow=4, hdx=1.0, tensile_correction=False):
-        self.fickian_const = const
+        self.fickian_const = fickian_const
         self.tensile_const = tensile_const
         self.tensile_pow = tensile_pow
         self.hdx = hdx
@@ -114,6 +145,17 @@ class FickianShift(Equation):
 
 
 class CorrectVelocities(Equation):
+    r"""**Correct velocities**
+    Correct the velocities after shifting to a new position by using taylor
+    series approximation, see equation (34) of [XuStaLau2009].
+
+    .. math::
+        \phi_{i}^' = \phi_i + (\nabla \phi)_i \cdot \delta \mathbf{r}_{ii^'}
+
+    where, \phi_{i} is the hydrodynamic variable at old position, \phi_{i}^'
+    is at new position, delta \mathbf{r}_{ii^'} is the vector between new and
+    old position.
+    """
     def initialize(self, d_idx, d_gradv):
         i = declare('int')
         for i in range(9):
@@ -199,7 +241,8 @@ class ShiftPositions(Tool):
             elif kind == 'fickian':
                 const = 4 if not self.parameter else self.parameter
                 eqns.append(Group(
-                    equations=[FickianShift(name, [name], const=const)],
+                    equations=[FickianShift(name, [name],
+                                            fickian_const=const)],
                     update_nnps=True)
                 )
             if self.correct_velocity:
