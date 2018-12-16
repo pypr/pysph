@@ -199,7 +199,8 @@ class ShiftPositions(Tool):
             elif kind == 'fickian':
                 const = 4 if not self.parameter else self.parameter
                 eqns.append(Group(
-                    equations=[FickianShift(name, [name], const=const)], update_nnps=True)
+                    equations=[FickianShift(name, [name], const=const)],
+                    update_nnps=True)
                 )
             if self.correct_velocity:
                 if 'gradv' not in arr.properties.keys():
