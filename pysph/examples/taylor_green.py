@@ -22,6 +22,7 @@ from pysph.sph.wc.kernel_correction import (
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH, CRKSPHScheme
 from pysph.sph.wc.gtvf import GTVFScheme
 from pysph.sph.wc.pcisph import PCISPHScheme
+from pysph.sph.wc.shift import ShiftPositions
 
 
 # domain and constants
@@ -114,6 +115,28 @@ class TaylorGreen(Application):
             "--remesh-eq", action="store", type=str, dest="remesh_eq",
             default='m4', choices=remesh_types,
             help="Remeshing strategy to use."
+        )
+        group.add_argument(
+            "--shift-freq", action="store", type=int, dest="shift_freq",
+            default=0,
+            help="Particle position shift frequency.(set zero to disable)."
+        )
+        shift_types = ['simple', 'fickian']
+        group.add_argument(
+            "--shift-kind", action="store", type=str, dest="shift_kind",
+            default='simple', choices=shift_types,
+            help="Use of fickian shift in positions."
+        )
+        group.add_argument(
+            "--shift-parameter", action="store", type=float,
+            dest="shift_parameter", default=None,
+            help="Constant used in shift, range for 'simple' is 0.01-0.1"
+            "range 'fickian' is 1-10."
+        )
+        group.add_argument(
+            "--shift-correct-vel", action="store_true",
+            dest="correct_vel", default=False,
+            help="Correct velocities after shifting (defaults to false)."
         )
 
     def consume_user_options(self):
@@ -287,6 +310,11 @@ class TaylorGreen(Application):
             for prop in ['gradai', 'bi']:
                 fluid.add_property(prop, stride=2)
 
+        if self.options.shift_freq > 0:
+            fluid.add_constant('vmax', [0.0])
+            fluid.add_property('dpos', stride=3)
+            fluid.add_property('gradv', stride=9)
+
         return [fluid]
 
     def create_tools(self):
@@ -325,6 +353,16 @@ class TaylorGreen(Application):
                 freq=self.options.remesh, equations=equations
             )
             tools.append(remesher)
+
+        if options.shift_freq > 0:
+            shift = ShiftPositions(
+                self, 'fluid', freq=self.options.shift_freq,
+                shift_kind=self.options.shift_kind,
+                correct_velocity=self.options.correct_vel,
+                parameter=self.options.shift_parameter
+            )
+            tools.append(shift)
+
         return tools
 
     # The following are all related to post-processing.
