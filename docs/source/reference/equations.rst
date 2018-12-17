@@ -36,6 +36,10 @@ SPH equations
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.wc.pcisph
+   :members:
+   :undoc-members:
+
 .. automodule:: pysph.sph.boundary_equations
    :members:
    :undoc-members:
