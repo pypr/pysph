@@ -11,9 +11,10 @@ Some notes on the paper,
 References
 -----------
 
-    .. [ZhangHuAdams2017] Chi Zhang, Xiangyu Y. Hu, Nikolaus A. Adams (2017)
-       A generalized transport-velocity formulation for smoothed particle
-       hydrodynamics .
+    .. [ZhangHuAdams2017] Chi Zhang, Xiangyu Y. Hu, Nikolaus A. Adams
+       "A generalized transport-velocity formulation for smoothed particle
+       hydrodynamics", Journal of Computational Physics 237 (2017),
+       pp. 216--232.
 """
 
 
