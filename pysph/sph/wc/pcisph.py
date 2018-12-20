@@ -7,8 +7,8 @@ Note: beta is missing a factor of :math:`m_i`, which works well for TG.
 References
 -----------
 
-    .. [SolPaj2009] B. Solenthaler, R. Pajarola (2009)
-       Predictive-Corrective Incompressible SPH.
+    .. [SolPaj2009] B. Solenthaler, R. Pajarola "Predictive-Corrective
+        Incompressible SPH", ACM Trans. Graph 28 (2009), pp. 1--6.
 
 """
 

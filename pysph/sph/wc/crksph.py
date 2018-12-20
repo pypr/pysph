@@ -7,9 +7,10 @@ These are equations for the basic kernel corrections in [CRKSPH2017].
 References
 -----------
 
-    .. [CRKSPH2017] Nicholas Frontiere, Cody D. Raskin, J. Michael Owen (2017)
-        CRKSPH - A Conservative Reproducing Kernel Smoothed Particle
-        Hydrodynamics Scheme.
+    .. [CRKSPH2017] Nicholas Frontiere, Cody D. Raskin, J. Michael Owen
+        "CRKSPH - A Conservative Reproducing Kernel Smoothed Particle
+        Hydrodynamics Scheme", Journal of Computational Physics 332 (2017),
+        pp. 160--209.
 
 '''
 

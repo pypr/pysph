@@ -13,25 +13,28 @@ TODO: Implement for free surface.
 References
 ----------
 
-    .. [XuStaLau2009] Rui Xu, Peter Stansby, Dominique Laurence (2009)
-        Accuracy and stability in incompressible SPH (ISPH) based
-        on the projection method and a new approach.
+    .. [XuStaLau2009] Rui Xu, Peter Stansby, Dominique Laurence "Accuracy
+        and stability in incompressible SPH (ISPH) based on the projection
+        method and a new approach", Journal of Computational Physics 228
+        (2009), pp. 6703--6725.
 
-    .. [LiXuStaRo2012] S.J Lind, R. Xu, P.K. Stansby, B.D. Rogers (2012)
-        Incompressible smoothed particle hydrodynamics for free-surface flows:
+    .. [LiXuStaRo2012] S.J Lind, R. Xu, P.K. Stansby, B.D. Rogers
+        "Incompressible smoothed particle hydrodynamics for free-surface flows:
         A generalised diffusion-based algorithm for stability and validations
-        for impulsive flows and propagating waves.
+        for impulsive flows and propagating waves", Journal of Computational
+        Physics 231 (2009), pp. 1499--1523.
 
-    .. [SkLiStaRo2013] Alex Skillen, S. Lind, P.K. Stansby, B.D. Rogers (2013)
-        Incompressible smoothed particle hydrodynamics (SPH) with reduced
+    .. [SkLiStaRo2013] Alex Skillen, S. Lind, P.K. Stansby, B.D. Rogers
+        "Incompressible smoothed particle hydrodynamics (SPH) with reduced
         temporal noise and generalised Fickian smoothing applied to
-        body water slam and efficient wave body interaction.
+        body-water slam and efficient wave-body interaction", Computer Methods
+        in Applied Mechanics and Engineering 265 (2013), pp. 163--173.
 """
 
 from math import sqrt
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.base.reduce_array import parallel_reduce_array
+from pysph.base.reduce_array import parallel_reduce_array, serial_reduce_array
 from pysph.solver.tools import Tool
 
 
@@ -46,10 +49,11 @@ class SimpleShift(Equation):
     def py_initialize(self, dst, t, dt):
         from numpy import sqrt
         vmag = sqrt(dst.u**2 + dst.v**2 + dst.w**2)
-        dst.vmax[0] = parallel_reduce_array(vmag, 'max')
+        dst.vmax[0] = serial_reduce_array(vmag, 'max')
+        dst.vmax[:] = parallel_reduce_array(dst.vmax, 'max')
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, d_u, d_v, d_w,
-                 d_vmax, d_dpos, dt, N_NBRS, NBRS):
+    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, d_vmax, d_dpos, dt,
+                 N_NBRS, NBRS):
         i, s_idx = declare('int', 2)
         ri = 0.0
         dxi = 0.0
@@ -93,8 +97,8 @@ class FickianShift(Equation):
         self.tensile_correction = tensile_correction
         super(FickianShift, self).__init__(dest, sources)
 
-    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, s_u, s_v, s_w,
-                 d_u, d_v, d_w, d_h, s_h, s_m, s_rho, dt, d_dpos,
+    def loop_all(self, d_idx, d_x, d_y, d_z, s_x, s_y, s_z, d_u, d_v, d_w, d_h,
+                 s_h, s_m, s_rho, dt, d_dpos,
                  N_NBRS, NBRS, SPH_KERNEL):
         i, s_idx = declare('int', 2)
         xij, dwij, grad_c = declare('matrix(3)', 3)
@@ -161,9 +165,8 @@ class CorrectVelocities(Equation):
         for i in range(9):
             d_gradv[9*d_idx + i] = 0.0
 
-    def loop(self, d_idx, s_idx, s_m, s_rho, d_gradv, d_h, s_h, XIJ, DWIJ,
-             VIJ):
-        alp, bet, d = declare('int', 3)
+    def loop(self, d_idx, s_idx, s_m, s_rho, d_gradv, DWIJ, VIJ):
+        alp, bet = declare('int', 2)
 
         Vj = s_m[s_idx] / s_rho[s_idx]
 

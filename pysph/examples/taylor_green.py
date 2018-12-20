@@ -345,7 +345,7 @@ class TaylorGreen(Application):
             elif options.scheme == 'gtvf':
                 props = [
                     'uhat', 'vhat', 'what', 'rho0', 'rhodiv', 'p0',
-                    'auhat', 'avhat', 'awhat', 'vmag2', 'arho', 'arho0'
+                    'auhat', 'avhat', 'awhat', 'arho', 'arho0'
                 ]
 
             remesher = SimpleRemesher(
