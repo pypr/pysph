@@ -4,9 +4,10 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
-from pysph.cpy.config import get_config
-from pysph.sph.equation import (CythonGroup, Group, OpenCLGroup,
-                                get_arrays_used_in_equation)
+from compyle.config import get_config
+from pysph.sph.equation import (
+    CythonGroup, Group, MultiStageEquations, OpenCLGroup,
+    get_arrays_used_in_equation)
 
 
 ###############################################################################
@@ -72,6 +73,23 @@ def check_equation_array_properties(equation, particle_arrays):
         raise RuntimeError(msg)
 
 
+def make_acceleration_evals(particle_arrays, equations, kernel,
+                            mode='serial', backend=None):
+    '''Returns a list of acceleration evaluators.
+
+    If a MultiStageEquations object is given the resulting list will have
+    multiple evaluators else it will have a single one.
+    '''
+    if isinstance(equations, MultiStageEquations):
+        groups = equations.groups
+    else:
+        groups = [equations]
+    return [
+        AccelerationEval(particle_arrays, group, kernel, mode, backend)
+        for group in groups
+    ]
+
+
 ###############################################################################
 class MegaGroup(object):
     """A mega-group refactors actual equation Groups into a more
@@ -101,7 +119,7 @@ class MegaGroup(object):
         return self._orig_group.get_converged_condition()
 
     def _copy_props(self, group):
-        for key in ('real', 'update_nnps', 'iterate',
+        for key in ('real', 'update_nnps', 'iterate', 'pre', 'post',
                     'max_iterations', 'min_iterations', 'has_subgroups'):
             setattr(self, key, getattr(group, key))
 

@@ -169,7 +169,7 @@ History
 
 
 .. _SPH2D: https://bitbucket.org/kunalp/sph2d
-.. _PyZoltan: https://bitbucket.org/pysph/pyzoltan
+.. _PyZoltan: https://github.com/pypr/pyzoltan
 .. _Zoltan: http://www.cs.sandia.gov/zoltan/
 
 

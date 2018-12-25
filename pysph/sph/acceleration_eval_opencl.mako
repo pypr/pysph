@@ -1,9 +1,17 @@
 <%def name="do_group(helper, g_idx, sg_idx, group)" buffered="True">
 #######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+<% helper.call_pre(group) %>
+% endif
+#######################################################################
 ## Iterate over destinations in this group.
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
 // Destination ${dest}
+## Call py_initialize if it is defined for the equations.
+<% helper.call_py_initialize(all_eqs, dest) %>
 #######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
@@ -25,6 +33,13 @@ ${helper.get_simple_loop_kernel(g_idx, sg_idx, group, dest, eqs_with_no_source)}
 #######################################################################
 % for source, eq_group in sources.items():
 // Source ${source}.
+###################################################################
+## Do any pairwise initializations.
+###################################################################
+% if eq_group.has_initialize_pair():
+// Initialization for destination ${dest} with source ${source}.
+${helper.get_initialize_pair_kernel(g_idx, sg_idx, group, dest, source, eq_group)}
+% endif
 ###################################################################
 ## Do any loop interactions between source and destination.
 ###################################################################
@@ -53,14 +68,21 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 <% helper.call_update_nnps(group) %>
 % endif
 % endfor
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+<% helper.call_post(group) %>
+% endif
 </%def>
 
 #define abs fabs
 #define max(x, y) fmax((double)(x), (double)(y))
+#define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
+#define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
 
 __constant double pi=M_PI;
 ${helper.get_header()}
-
 #######################################################################
 ## Iterate over groups
 #######################################################################

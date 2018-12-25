@@ -8,18 +8,20 @@
 """
 
 from numpy import sqrt, fabs
+from compyle.api import declare
+from pysph.base.particle_array import get_ghost_tag
 from pysph.sph.equation import Equation
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 from pysph.sph.scheme import Scheme, add_bool_argument
 
 
+GHOST_TAG = get_ghost_tag()
+
+
 class IISPHStep(IntegratorStep):
     """A straightforward and simple integrator to be used for IISPH.
     """
-    def initialize(self):
-        pass
-
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w,
                d_uadv, d_vadv, d_wadv, d_au, d_av, d_aw,
                d_ax, d_ay, d_az, dt):
@@ -88,9 +90,6 @@ class AdvectionAcceleration(Equation):
         d_uadv[d_idx] = 0.0
         d_vadv[d_idx] = 0.0
         d_wadv[d_idx] = 0.0
-
-    def loop(self):
-        pass
 
     def post_loop(self, d_idx, d_au, d_av, d_aw, d_uadv, d_vadv, d_wadv,
                   d_u, d_v, d_w, dt=0.0):
@@ -241,6 +240,27 @@ class ComputeDIJPJ(Equation):
         d_dijpj2[d_idx] += fac*DWIJ[2]
 
 
+class UpdateGhostProps(Equation):
+    def __init__(self, dest, sources=None):
+        super(UpdateGhostProps, self).__init__(dest, sources)
+        # We do this to ensure that the ghost tag is indeed 2.
+        # If not the initialize method will never work.
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_tag, d_orig_idx, d_dijpj0, d_dijpj1,
+                   d_dijpj2, d_dii0, d_dii1, d_dii2, d_piter):
+        idx = declare('int')
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_dijpj0[d_idx] = d_dijpj0[idx]
+            d_dijpj1[d_idx] = d_dijpj1[idx]
+            d_dijpj2[d_idx] = d_dijpj2[idx]
+            d_dii0[d_idx] = d_dii0[idx]
+            d_dii1[d_idx] = d_dii1[idx]
+            d_dii2[d_idx] = d_dii2[idx]
+            d_piter[d_idx] = d_piter[idx]
+
+
 class PressureSolve(Equation):
     def __init__(self, dest, sources, rho0, omega=0.5,
                  tolerance=1e-2, debug=False):
@@ -335,6 +355,15 @@ class PressureSolveBoundary(Equation):
         d_p[d_idx] += phi_b*dijdotwij
 
 
+class UpdateGhostPressure(Equation):
+    def initialize(self, d_idx, d_tag, d_orig_idx, d_p, d_piter):
+        idx = declare('int')
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_piter[d_idx] = d_piter[idx]
+            d_p[d_idx] = d_p[idx]
+
+
 class PressureForce(Equation):
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
@@ -376,7 +405,7 @@ class PressureForceBoundary(Equation):
 class IISPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, rho0, nu=0.0,
                  gx=0.0, gy=0.0, gz=0.0, omega=0.5, tolerance=1e-2,
-                 debug=False):
+                 debug=False, has_ghosts=False):
         '''The IISPH scheme
 
         Parameters
@@ -400,6 +429,8 @@ class IISPHScheme(Scheme):
             Tolerance for the convergence of pressure iterations as a fraction.
         debug: bool
             Produce some debugging output on iterations.
+        has_ghosts: bool
+            The problem has ghost particles so add equations for those.
         '''
         self.fluids = fluids
         self.solids = solids
@@ -412,6 +443,7 @@ class IISPHScheme(Scheme):
         self.omega = omega
         self.tolerance = tolerance
         self.debug = debug
+        self.has_ghosts = has_ghosts
 
     def add_user_options(self, group):
         group.add_argument(
@@ -478,6 +510,7 @@ class IISPHScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
+        has_ghosts = self.has_ghosts
         equations = []
         if self.solids:
             g1 = Group(
@@ -533,7 +566,7 @@ class IISPHScheme(Scheme):
                                        rho0=self.rho0)
                 )
 
-        g4 = Group(equations=eq)
+        g4 = Group(equations=eq, real=False)
         equations.append(g4)
 
         eq = []
@@ -572,8 +605,23 @@ class IISPHScheme(Scheme):
                     )
                 )
         sg2 = Group(equations=eq)
+
+        if has_ghosts:
+            ghost1 = Group(
+                equations=[UpdateGhostProps(dest=x, sources=None)
+                           for x in self.fluids],
+                real=False
+            )
+            ghost2 = Group(
+                equations=[UpdateGhostPressure(dest=x, sources=None)
+                           for x in self.fluids],
+                real=False
+            )
+            solver_eqs = [sg1, ghost1, sg2, ghost2]
+        else:
+            solver_eqs = [sg1, sg2]
         g6 = Group(
-            equations=[sg1, sg2],
+            equations=solver_eqs,
             iterate=True, max_iterations=30, min_iterations=2
         )
         equations.append(g6)
@@ -616,3 +664,9 @@ class IISPHScheme(Scheme):
                 if c not in pa.constants:
                     pa.add_constant(c, v)
             pa.set_output_arrays(dummy.output_property_arrays)
+
+        if self.has_ghosts:
+            particle_arrays = dict([(p.name, p) for p in particles])
+            for fluid in self.fluids:
+                pa = particle_arrays[fluid]
+                pa.add_property('orig_idx', type='int')

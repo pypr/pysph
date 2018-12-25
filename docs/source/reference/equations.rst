@@ -20,6 +20,26 @@ SPH equations
    :members:
    :undoc-members:
 
+.. automodule:: pysph.sph.wc.gtvf
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.wc.density_correction
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.wc.kernel_correction
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.wc.crksph
+   :members:
+   :undoc-members:
+
+.. automodule:: pysph.sph.wc.pcisph
+   :members:
+   :undoc-members:
+
 .. automodule:: pysph.sph.boundary_equations
    :members:
    :undoc-members:
@@ -79,3 +99,5 @@ Group of equations
 .. autoclass:: pysph.sph.equation.Group
    :special-members:
 
+.. autoclass:: pysph.sph.equation.MultiStageEquations
+   :special-members:

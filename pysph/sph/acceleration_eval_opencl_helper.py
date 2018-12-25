@@ -85,16 +85,24 @@ import pyopencl.array  # noqa: 401
 import pyopencl.tools  # noqa: 401
 
 from pysph.base.utils import is_overloaded_method
-from pysph.base.opencl import (profile_kernel, get_context, get_queue,
-                               DeviceHelper)
-from pysph.cpy.ext_module import get_platform_dir
-from pysph.cpy.config import get_config
-from pysph.cpy.translator import (CStructHelper, OpenCLConverter,
-                                  ocl_detect_type)
+from compyle.opencl import profile_kernel, get_context, get_queue
+from pysph.base.device_helper import DeviceHelper
+
+from pysph.sph.acceleration_nnps_helper import generate_body, \
+    get_kernel_args_list
+
+from compyle.ext_module import get_platform_dir
+from compyle.config import get_config
+from compyle.translator import (CStructHelper, OpenCLConverter,
+                                ocl_detect_type, ocl_detect_pointer_base_type)
 
 from .equation import get_predefined_types, KnownType
 from .acceleration_eval_cython_helper import (
     get_all_array_names, get_known_types_for_arrays
+)
+
+getfullargspec = getattr(
+    inspect, 'getfullargspec', inspect.getargspec
 )
 
 
@@ -136,7 +144,9 @@ class OpenCLAccelerationEval(object):
         self.particle_arrays = helper.object.particle_arrays
         self.nnps = None
         self._queue = helper._queue
-        self._use_double = get_config().use_double
+        cfg = get_config()
+        self._use_double = cfg.use_double
+        self._use_local_memory = cfg.use_local_memory
 
     def _call_kernel(self, info, extra_args):
         nnps = self.nnps
@@ -146,17 +156,31 @@ class OpenCLAccelerationEval(object):
         n = dest.get_number_of_particles(info.get('real', True))
         args[1] = (n,)
         args[3:] = [x() for x in args[3:]]
+
         if info.get('loop'):
-            nnps.set_context(info['src_idx'], info['dst_idx'])
-            cache = nnps.current_cache
-            cache.get_neighbors_gpu()
-            self._queue.finish()
-            args = args + [
-                cache._nbr_lengths_gpu.array.data,
-                cache._start_idx_gpu.array.data,
-                cache._neighbors_gpu.array.data
-            ] + extra_args
-            call(*args)
+            if self._use_local_memory:
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+
+                nnps_args, gs_ls = self.nnps.get_kernel_args('float')
+                self._queue.finish()
+                args[1] = gs_ls[0]
+                args[2] = gs_ls[1]
+
+                args = args + extra_args + nnps_args
+
+                call(*args)
+                self._queue.finish()
+            else:
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+                cache = nnps.current_cache
+                cache.get_neighbors_gpu()
+                self._queue.finish()
+                args = args + [
+                    cache._nbr_lengths_gpu.dev.data,
+                    cache._start_idx_gpu.dev.data,
+                    cache._neighbors_gpu.dev.data
+                ] + extra_args
+                call(*args)
         else:
             call(*(args + extra_args))
         self._queue.finish()
@@ -191,6 +215,13 @@ class OpenCLAccelerationEval(object):
                     method(_args[0], _args[1], t, dt)
                 else:
                     method(*info.get('args'))
+            elif type == 'py_initialize':
+                args = info['dest'], t, dt
+                for call in info['calls']:
+                    call(*args)
+            elif type == 'pre_post':
+                func = info.get('callable')
+                func(*info.get('args'))
             elif type == 'kernel':
                 self._call_kernel(info, extra_args)
             elif type == 'start_iteration':
@@ -201,8 +232,8 @@ class OpenCLAccelerationEval(object):
                 group = info['group']
                 iter_count += 1
                 if ((iter_count >= group.min_iterations) and
-                    (iter_count == group.max_iterations or
-                     self._converged(eqs))):
+                        (iter_count == group.max_iterations or
+                         self._converged(eqs))):
                     pass
                 else:
                     i = iter_start
@@ -238,6 +269,7 @@ def get_equations_with_converged(group):
             return res
         else:
             return g.equations
+
     eqs = [x for x in _get_eqs(group)
            if is_overloaded_method(getattr(x, 'converged'))]
     return eqs
@@ -282,7 +314,7 @@ class AccelerationEvalOpenCLHelper(object):
         array_index = {}
         for idx, pa in enumerate(pas):
             if pa.gpu is None:
-                pa.set_device_helper(DeviceHelper(pa))
+                pa.set_device_helper(DeviceHelper(pa, backend='opencl'))
             array_map[pa.name] = pa
             array_index[pa.name] = idx
 
@@ -310,7 +342,7 @@ class AccelerationEvalOpenCLHelper(object):
         # This is needed for late binding on the device helper's attributes
         # which may change at each iteration when particles are added/removed.
         def _get_array(gpu_helper, attr):
-            return getattr(gpu_helper, attr).data
+            return getattr(gpu_helper, attr).dev.data
 
         def _get_struct(obj):
             return obj
@@ -353,7 +385,11 @@ class AccelerationEvalOpenCLHelper(object):
                     args[0] = [x for x in grp.equations
                                if hasattr(x, 'reduce')]
                     args[1] = self._array_map[args[1]]
-
+            elif type == 'pre_post':
+                info = dict(item)
+            elif type == 'py_initialize':
+                info = dict(item)
+                info['dest'] = self._array_map[item.get('dest')]
             elif 'iteration' in type:
                 group = item['group']
                 equations = get_equations_with_converged(group._orig_group)
@@ -371,6 +407,10 @@ class AccelerationEvalOpenCLHelper(object):
                             'acceleration_eval_opencl.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
+        from pyopencl._cluda import CLUDA_PREAMBLE
+        double_support = get_config().use_double
+        cluda = Template(CLUDA_PREAMBLE).render(double_support=double_support)
+        main = "\n".join([cluda, main])
         return main
 
     def setup_compiled_module(self, module):
@@ -416,7 +456,6 @@ class AccelerationEvalOpenCLHelper(object):
                         helpers.append(helper)
         headers.extend(get_helper_code(helpers, transpiler))
         headers.append(transpiler.parse_instance(object.kernel))
-
         cls_name = object.kernel.__class__.__name__
         self.known_types['SPH_KERNEL'] = KnownType(
             '__global %s*' % cls_name, base_type=cls_name
@@ -424,7 +463,6 @@ class AccelerationEvalOpenCLHelper(object):
         headers.append(object.all_group.get_equation_wrappers(
             self.known_types
         ))
-
         # This is to be done after the above as the equation names are assigned
         # only at this point.
         cpu_structs = self._cpu_structs
@@ -434,8 +472,15 @@ class AccelerationEvalOpenCLHelper(object):
             self._equations[eq.var_name] = eq
             h.parse(eq)
             cpu_structs[eq.var_name] = h.get_array()
-
         return '\n'.join(headers)
+
+    def _get_arg_base_types(self, args):
+        base_types = []
+        for arg in args:
+            base_types.append(
+                ocl_detect_pointer_base_type(arg, self.known_types.get(arg))
+            )
+        return base_types
 
     def _get_typed_args(self, args):
         code = []
@@ -453,12 +498,18 @@ class AccelerationEvalOpenCLHelper(object):
             if a in args:
                 args.remove(a)
 
-    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind):
-        assert kind in ('initialize', 'post_loop', 'loop')
+    def _get_simple_kernel(self, g_idx, sg_idx, group, dest, all_eqs, kind,
+                           source=None):
+        assert kind in ('initialize', 'initialize_pair', 'post_loop', 'loop')
         sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
-        kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
-            g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
-        )
+        if source is None:
+            kernel = 'g{g_idx}{sub}_{dest}_{kind}'.format(
+                g_idx=g_idx, sub=sub_grp, dest=dest, kind=kind
+            )
+        else:
+            kernel = 'g{g_idx}{sg}_{source}_on_{dest}_{kind}'.format(
+                g_idx=g_idx, sg=sub_grp, source=source, dest=dest, kind=kind
+            )
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
@@ -471,9 +522,13 @@ class AccelerationEvalOpenCLHelper(object):
         code.extend(_calls)
 
         s_ary, d_ary = all_eqs.get_array_names()
-        # We only need the dest arrays here as these are simple kernels
-        # without a loop so there is no "source".
-        _args = list(d_ary)
+        if source is None:
+            # We only need the dest arrays here as these are simple kernels
+            # without a loop so there is no "source".
+            _args = list(d_ary)
+        else:
+            d_ary.update(s_ary)
+            _args = list(d_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
@@ -507,7 +562,7 @@ class AccelerationEvalOpenCLHelper(object):
                 )
                 all_args.append(arg)
                 py_args.append(eq.var_name)
-                call_args = list(inspect.getargspec(method).args)
+                call_args = list(getfullargspec(method).args)
                 if 'self' in call_args:
                     call_args.remove('self')
                 call_args.insert(0, eq.var_name)
@@ -559,6 +614,23 @@ class AccelerationEvalOpenCLHelper(object):
         else:
             return code
 
+    def call_post(self, group):
+        self.data.append(dict(callable=group.post, type='pre_post', args=()))
+
+    def call_pre(self, group):
+        self.data.append(dict(callable=group.pre, type='pre_post', args=()))
+
+    def call_py_initialize(self, all_eq_group, dest):
+        calls = []
+        for eq in all_eq_group.equations:
+            method = getattr(eq, 'py_initialize', None)
+            if method is not None:
+                calls.append(method)
+        if len(calls) > 0:
+            self.data.append(
+                dict(calls=calls, type='py_initialize', dest=dest)
+            )
+
     def call_reduce(self, all_eq_group, dest):
         self.data.append(dict(method='do_reduce', type='method',
                               args=[all_eq_group, dest]))
@@ -572,6 +644,13 @@ class AccelerationEvalOpenCLHelper(object):
             g_idx, sg_idx, group, dest, all_eqs, kind='initialize'
         )
 
+    def get_initialize_pair_kernel(self, g_idx, sg_idx, group, dest, source,
+                                   eq_group):
+        return self._get_simple_kernel(
+            g_idx, sg_idx, group, dest, eq_group, kind='initialize_pair',
+            source=source
+        )
+
     def get_simple_loop_kernel(self, g_idx, sg_idx, group, dest, all_eqs):
         return self._get_simple_kernel(
             g_idx, sg_idx, group, dest, all_eqs, kind='loop'
@@ -583,6 +662,9 @@ class AccelerationEvalOpenCLHelper(object):
         )
 
     def get_loop_kernel(self, g_idx, sg_idx, group, dest, source, eq_group):
+        if get_config().use_local_memory:
+            return self.get_lmem_loop_kernel(g_idx, sg_idx, group,
+                                             dest, source, eq_group)
         kind = 'loop'
         sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
         kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
@@ -633,12 +715,14 @@ class AccelerationEvalOpenCLHelper(object):
 
         s_ary, d_ary = eq_group.get_array_names()
         s_ary.update(d_ary)
+
         _args = list(s_ary)
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
 
         body = '\n'.join([' ' * 4 + x for x in code])
         body = self._set_kernel(body, self.object.kernel)
+
         all_args.extend(
             ['__global {kernel}* kern'.format(kernel=sph_k_name),
              '__global unsigned int *nbr_length',
@@ -646,10 +730,93 @@ class AccelerationEvalOpenCLHelper(object):
              '__global unsigned int *neighbors',
              'double t', 'double dt']
         )
+
         self.data.append(dict(
             kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
             real=group.real, type='kernel'
         ))
+
+        sig = get_kernel_definition(kernel, all_args)
+        return (
+            '{sig}\n{{\n{body}\n\n}}\n'.format(
+                sig=sig, body=body
+            )
+        )
+
+    def get_lmem_loop_kernel(self, g_idx, sg_idx, group, dest, source,
+                             eq_group):
+        kind = 'loop'
+        sub_grp = '' if sg_idx == -1 else 's{idx}'.format(idx=sg_idx)
+        kernel = 'g{g_idx}{sg}_{source}_on_{dest}_loop'.format(
+            g_idx=g_idx, sg=sub_grp, source=source, dest=dest
+        )
+        sph_k_name = self.object.kernel.__class__.__name__
+        context = eq_group.context
+        all_args, py_args = [], []
+        setup_code = self._declare_precomp_vars(context)
+        setup_code.append('__global %s* SPH_KERNEL = kern;' % sph_k_name)
+
+        if eq_group.has_loop_all():
+            raise NotImplementedError("loop_all not suported with local "
+                                      "memory")
+
+        loop_code = []
+        pre = []
+        for p, cb in eq_group.precomputed.items():
+            src = cb.code.strip().splitlines()
+            pre.extend([' ' * 4 + x + ';' for x in src])
+        if len(pre) > 0:
+            pre.append('')
+        loop_code.extend(pre)
+
+        _all_args, _py_args, _calls = self._get_equation_method_calls(
+            eq_group, kind, indent='    '
+        )
+        loop_code.extend(_calls)
+        for arg, py_arg in zip(_all_args, _py_args):
+            if arg not in all_args:
+                all_args.append(arg)
+                py_args.append(py_arg)
+
+        s_ary, d_ary = eq_group.get_array_names()
+
+        source_vars = set(s_ary)
+        source_var_types = self._get_arg_base_types(source_vars)
+
+        def modify_var_name(x):
+            if x.startswith('s_'):
+                return x + '_global'
+            else:
+                return x
+
+        s_ary.update(d_ary)
+
+        _args = list(s_ary)
+        py_args.extend(_args)
+
+        _args_modified = [modify_var_name(x) for x in _args]
+        all_args.extend(self._get_typed_args(_args_modified))
+
+        setup_body = '\n'.join([' ' * 4 + x for x in setup_code])
+        setup_body = self._set_kernel(setup_body, self.object.kernel)
+
+        loop_body = '\n'.join([' ' * 4 + x for x in loop_code])
+        loop_body = self._set_kernel(loop_body, self.object.kernel)
+
+        all_args.extend(
+            ['__global {kernel}* kern'.format(kernel=sph_k_name),
+             'double t', 'double dt']
+        )
+        all_args.extend(get_kernel_args_list())
+
+        self.data.append(dict(
+            kernel=kernel, args=py_args, dest=dest, source=source, loop=True,
+            real=group.real, type='kernel'
+        ))
+
+        body = generate_body(setup=setup_body, loop=loop_body,
+                             vars=source_vars, types=source_var_types,
+                             wgs=get_config().wgs)
 
         sig = get_kernel_definition(kernel, all_args)
         return (

@@ -108,19 +108,27 @@ class Scheme(object):
         pa : ParticleArray
             Desired particle array.
         desired_props : sequence
-            Desired properties to have in the array.
+            Desired properties to have in the array, can be a list of strings
+            or dicts with stride info or both.
         clean : bool
             Remove undesirable properties.
         """
-        all_props = set(desired_props)
+        all_props = {}
+        for p in desired_props:
+            if isinstance(p, dict):
+                all_props.update({p['name']: p})
+            elif p not in all_props:
+                all_props.update({p: {'name': p}})
+
+        pa_props = set(pa.properties.keys())
         if clean:
-            to_remove = set(pa.properties.keys()) - all_props
+            to_remove = pa_props - set(all_props.keys())
             for prop in to_remove:
                 pa.remove_property(prop)
 
-        to_add = all_props - set(pa.properties.keys())
+        to_add = set(all_props.keys()) - pa_props
         for prop in to_add:
-            pa.add_property(prop)
+            pa.add_property(**all_props[prop])
 
     def _smart_getattr(self, obj, var):
         res = getattr(obj, var)
@@ -468,7 +476,7 @@ class WCSPHScheme(Scheme):
 
             if abs(self.nu) > 1e-14:
                 eq = LaminarViscosity(
-                    dest=name, sources=self.fluids, nu=self.nu
+                    dest=name, sources=all, nu=self.nu
                 )
                 g2.insert(-1, eq)
         equations.append(Group(equations=g2))
@@ -604,7 +612,8 @@ class TVFScheme(Scheme):
         for solid in self.solids:
             g2.append(SetWallVelocity(dest=solid, sources=self.fluids))
 
-        equations.append(Group(equations=g2, real=False))
+        if len(g2) > 0:
+            equations.append(Group(equations=g2, real=False))
 
         g3 = []
         for solid in self.solids:
@@ -613,7 +622,8 @@ class TVFScheme(Scheme):
                 p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
             ))
 
-        equations.append(Group(equations=g3, real=False))
+        if len(g3) > 0:
+            equations.append(Group(equations=g3, real=False))
 
         g4 = []
         for fluid in self.fluids:

@@ -2,12 +2,12 @@ from collections import defaultdict
 from os.path import dirname, join, expanduser, realpath
 
 from mako.template import Template
-from pyzoltan.core import carray
+from cyarray import carray
 
-from pysph.cpy.config import get_config
-from pysph.cpy.cython_generator import (CythonGenerator, KnownType,
-                                        get_parallel_range)
-from pysph.cpy.ext_module import ExtModule, get_platform_dir
+from compyle.config import get_config
+from compyle.cython_generator import (CythonGenerator, KnownType,
+                                      get_parallel_range)
+from compyle.ext_module import ExtModule, get_platform_dir
 
 
 ###############################################################################
@@ -120,6 +120,24 @@ class AccelerationEvalCythonHelper(object):
         )
         self._ext_mod = None
         self._module = None
+        self._compute_group_map()
+
+    ##########################################################################
+    # Private interface.
+    ##########################################################################
+    def _compute_group_map(self):
+        # Given all the groups, create a mapping from the group to an index of
+        # sorts that can be used when adding the pre/post callback code.
+        mapping = {}
+        for g_idx, group in enumerate(self.object.mega_groups):
+            mapping[group] = 'self.groups[%d]' % g_idx
+            if group.has_subgroups:
+                for sg_idx, sub_group in enumerate(group.data):
+                    code = 'self.groups[{gid}].data[{sgid}]'.format(
+                        gid=g_idx, sgid=sg_idx
+                    )
+                    mapping[sub_group] = code
+        self._group_map = mapping
 
     ##########################################################################
     # Public interface.
@@ -135,7 +153,7 @@ class AccelerationEvalCythonHelper(object):
         object = self.object
         acceleration_eval = module.AccelerationEval(
             object.kernel, object.all_group.equations,
-            object.particle_arrays
+            object.particle_arrays, object.mega_groups
         )
         object.set_compiled_object(acceleration_eval)
 
@@ -260,3 +278,9 @@ class AccelerationEvalCythonHelper(object):
     def get_particle_array_names(self):
         parrays = [pa.name for pa in self.object.particle_arrays]
         return ', '.join(parrays)
+
+    def get_pre_call(self, group):
+        return self._group_map[group] + '.pre()'
+
+    def get_post_call(self, group):
+        return self._group_map[group] + '.post()'

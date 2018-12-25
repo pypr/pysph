@@ -1,65 +1,7 @@
+from math import sqrt
 from pysph.sph.equation import Equation
-from pysph.cpy.api import declare
-
-
-def gj_solve(A=[1., 0.], b=[1., 0.], n=3, result=[0., 1.]):
-    r""" A gauss-jordan method to solve an augmented matrix for the
-        unknown variables, x, in Ax = b.
-
-    References
-    ----------
-    https://ricardianambivalence.com/2012/10/20/pure-python-gauss-jordan
-    -solve-ax-b-invert-a/
-    """
-
-    i, j, eqns, colrange, augCol, col, row, bigrow = declare('int', 8)
-    m = declare('matrix((4, 5))')
-    for i in range(n):
-        for j in range(n):
-            m[i][j] = A[n * i + j]
-        m[i][n] = b[i]
-
-    eqns = n
-    colrange = n
-    augCol = n + 1
-
-    for col in range(colrange):
-        bigrow = col
-        for row in range(col + 1, colrange):
-            if abs(m[row][col]) > abs(m[bigrow][col]):
-                bigrow = row
-                temp = m[row][col]
-                m[row][col] = m[bigrow][col]
-                m[bigrow][col] = temp
-
-    rr, rrcol, rb, rbr, kup, kupr, kleft, kleftr = declare('int', 8)
-    for rrcol in range(0, colrange):
-        for rr in range(rrcol + 1, eqns):
-            cc = -(float(m[rr][rrcol]) / float(m[rrcol][rrcol]))
-            for j in range(augCol):
-                m[rr][j] = m[rr][j] + cc * m[rrcol][j]
-
-    backCol, backColr = declare('int', 2)
-    tol = 1.0e-05
-    for rbr in range(eqns):
-        rb = eqns - rbr - 1
-        if (m[rb][rb] == 0):
-            if abs(m[rb][augCol - 1]) >= tol:
-                return 0.0
-        else:
-            for backColr in range(rb, augCol):
-                backCol = rb + augCol - backColr - 1
-                m[rb][backCol] = float(m[rb][backCol]) / float(m[rb][rb])
-            if not (rb == 0):
-                for kupr in range(rb):
-                    kup = rb - kupr - 1
-                    for kleftr in range(rb, augCol):
-                        kleft = rb + augCol - kleftr - 1
-                        kk = -float(m[kup][rb]) / float(m[rb][rb])
-                        m[kup][kleft] = m[kup][kleft] + \
-                            kk * float(m[rb][kleft])
-    for i in range(n):
-        result[i] = m[i][n]
+from compyle.api import declare
+from pysph.sph.wc.linalg import gj_solve, augmented_matrix
 
 
 class ShepardFilter(Equation):
@@ -139,7 +81,7 @@ class MLSFirstOrder2D(Equation):
     """
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [gj_solve, augmented_matrix]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
@@ -149,6 +91,7 @@ class MLSFirstOrder2D(Equation):
         n, i, j, k, s_idx = declare('int', 5)
         n = 3
         amls = declare('matrix(9)')
+        aug_mls = declare('matrix(12)')
         x = d_x[d_idx]
         y = d_y[d_idx]
         xij = declare('matrix(3)')
@@ -176,7 +119,11 @@ class MLSFirstOrder2D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix(3)')
-        gj_solve(amls, [1., 0., 0.], n, res)
+        res[0] = 1.0
+        res[1] = 0.0
+        res[2] = 0.0
+        augmented_matrix(amls, res, 3, 1, aug_mls)
+        gj_solve(aug_mls, n, 1, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]
@@ -196,7 +143,7 @@ class MLSFirstOrder2D(Equation):
 class MLSFirstOrder3D(Equation):
 
     def _get_helpers_(self):
-        return [gj_solve]
+        return [gj_solve, augmented_matrix]
 
     def initialize(self, d_idx, d_rho, d_rhotmp):
         d_rhotmp[d_idx] = d_rho[d_idx]
@@ -206,6 +153,7 @@ class MLSFirstOrder3D(Equation):
         n, i, j, k, s_idx = declare('int', 5)
         n = 4
         amls = declare('matrix(16)')
+        aug_mls = declare('matrix(20)')
         x = d_x[d_idx]
         y = d_y[d_idx]
         z = d_z[d_idx]
@@ -234,7 +182,12 @@ class MLSFirstOrder3D(Equation):
                     amls[n * i + j] += fac1 * fac2 * \
                         s_m[s_idx] * wij / s_rhotmp[s_idx]
         res = declare('matrix(4)')
-        gj_solve(amls, [1., 0., 0., 0.], n, res)
+        res[0] = 1.0
+        res[1] = 0.0
+        res[2] = 0.0
+        res[3] = 0.0
+        augmented_matrix(amls, res, n, 1, aug_mls)
+        gj_solve(aug_mls, n, 1, res)
         b0 = res[0]
         b1 = res[1]
         b2 = res[2]

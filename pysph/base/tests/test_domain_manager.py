@@ -10,7 +10,7 @@ from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, get_compiled_kernel
 
 # PyZoltan CArrays
-from pyzoltan.core.carray import UIntArray
+from cyarray.carray import UIntArray
 
 # Python unit testing framework
 import unittest

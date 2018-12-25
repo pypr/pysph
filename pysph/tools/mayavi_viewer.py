@@ -387,7 +387,7 @@ class ParticleArrayHelper(HasTraits):
         if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
             p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
-            p.actor.property.point_size = 3
+            p.actor.property.point_size = 6
             scm = p.module_manager.scalar_lut_manager
             scm.set(show_legend=self.show_legend,
                     use_default_name=False,

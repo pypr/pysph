@@ -14,23 +14,23 @@ cdef class CubicSpline:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 2. / 3
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
-        cdef double tmp
         cdef double tmp2
         cdef double val
+        """Gradient of a kernel is given by
+        .. math::
+            \nabla W = normalization  \frac{dW}{dq} \frac{dq}{dx}
+            \nabla W = w_dash  \frac{dq}{dx}
+
+        Here we get `w_dash` by using `dwdq` method
+        """
         h1 = 1. / h
         q = rij * h1
 
-        # get the kernel normalizing factor
+        # get the kernel normalizing factor ( sigma )
         if self.dim == 1:
             fac = self.fac * h1
         elif self.dim == 2:
@@ -38,19 +38,41 @@ cdef class CubicSpline:
         elif self.dim == 3:
             fac = self.fac * h1 * h1 * h1
 
-        # compute the gradient.
+        # compute sigma * dw_dq
         tmp2 = 2. - q
         if (rij > 1e-12):
             if (q > 2.0):
                 val = 0.0
             elif (q > 1.0):
-                val = -0.75 * tmp2 * tmp2 * h1 / rij
+                val = -0.75 * tmp2 * tmp2
             else:
-                val = -3.0 * q * (1 - 0.75 * q) * h1 / rij
+                val = -3.0 * q * (1 - 0.75 * q)
         else:
             val = 0.0
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 2. / 3
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -169,13 +191,7 @@ cdef class WendlandQuintic:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 0.5
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -197,9 +213,32 @@ cdef class WendlandQuintic:
         tmp = 1.0 - 0.5 * q
         if (q < 2.0):
             if (rij > 1e-12):
-                val = -5.0 * q * tmp * tmp * tmp * h1 / rij
+                val = -5.0 * q * tmp * tmp * tmp
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 0.5
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -310,21 +349,10 @@ cdef class Gaussian:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        # The inflection point is at q=1/sqrt(2)
-        # the deltap values for some standard kernels
-        # have been tabulated in sec 3.2 of
-        # http://cfd.mace.manchester.ac.uk/sph/SPH_PhDs/2008/crespo_thesis.pdf
-        return 0.70710678118654746
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
-        cdef double tmp
         cdef double val
         h1 = 1. / h
         q = rij * h1
@@ -341,9 +369,36 @@ cdef class Gaussian:
         val = 0.0
         if (q < 3.0):
             if (rij > 1e-12):
-                val = -2.0 * q * exp(-q * q) * h1 / rij
+                val = -2.0 * q * exp(-q * q)
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        # The inflection point is at q=1/sqrt(2)
+        # the deltap values for some standard kernels
+        # have been tabulated in sec 3.2 of
+        # http://cfd.mace.manchester.ac.uk/sph/SPH_PhDs/2008/crespo_thesis.pdf
+        return 0.70710678118654746
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -449,20 +504,10 @@ cdef class QuinticSpline:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        # The inflection points for the polynomial are obtained as
-        # http://www.wolframalpha.com/input/?i=%28%283-x%29%5E5+-+6*%282-x%29%5E5+%2B+15*%281-x%29%5E5%29%27%27
-        # the only permissible value is taken
-        return 0.759298480738450
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
-        cdef double tmp
         cdef double tmp1
         cdef double tmp2
         cdef double tmp3
@@ -489,21 +534,44 @@ cdef class QuinticSpline:
 
             elif (q > 2.0):
                 val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
-                val *= h1 / rij
 
             elif (q > 1.0):
                 val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
                 val += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
-                val *= h1 / rij
             else:
                 val = -5.0 * tmp3 * tmp3 * tmp3 * tmp3
                 val += 30.0 * tmp2 * tmp2 * tmp2 * tmp2
                 val -= 75.0 * tmp1 * tmp1 * tmp1 * tmp1
-                val *= h1 / rij
         else:
             val = 0.0
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        # The inflection points for the polynomial are obtained as
+        # http://www.wolframalpha.com/input/?i=%28%283-x%29%5E5+-+6*%282-x%29%5E5+%2B+15*%281-x%29%5E5%29%27%27
+        # the only permissible value is taken
+        return 0.759298480738450
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -650,24 +718,11 @@ cdef class SuperGaussian:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        # Found inflection point using sympy.
-        if self.dim == 1:
-            return 0.584540507426389
-        elif self.dim == 2:
-            return 0.6021141014644256
-        else:
-            return 0.615369528365158
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
         cdef double q2
-        cdef double tmp
         cdef double val
         h1 = 1. / h
         q = rij * h1
@@ -685,9 +740,37 @@ cdef class SuperGaussian:
         if (q < 3.0):
             if (rij > 1e-12):
                 q2 = q * q
-                val = q * (2.0 * q2 - self.dim - 4) * exp(-q2) * h1 / rij
+                val = q * (2.0 * q2 - self.dim - 4) * exp(-q2)
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        # Found inflection point using sympy.
+        if self.dim == 1:
+            return 0.584540507426389
+        elif self.dim == 2:
+            return 0.6021141014644256
+        else:
+            return 0.615369528365158
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -797,13 +880,7 @@ cdef class WendlandQuinticC4:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 0.47114274
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -826,9 +903,32 @@ cdef class WendlandQuinticC4:
         if (q < 2.0):
             if (rij > 1e-12):
                 val = (-14.0 / 3.0) * q * (1 + 2.5 * q) * \
-                    tmp * tmp * tmp * tmp * tmp * h1 / rij
+                    tmp * tmp * tmp * tmp * tmp
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 0.47114274
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -942,13 +1042,7 @@ cdef class WendlandQuinticC6:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 0.4305720757
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -971,9 +1065,31 @@ cdef class WendlandQuinticC6:
         if (q < 2.0):
             if (rij > 1e-12):
                 val = -5.50 * q * tmp * tmp * tmp * tmp * tmp * \
-                    tmp * tmp * (1.0 + 3.5 * q + 4 * q * q) * h1 / rij
+                    tmp * tmp * (1.0 + 3.5 * q + 4 * q * q)
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 0.4305720757
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -1087,13 +1203,7 @@ cdef class WendlandQuinticC2_1D:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 2.0/3
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -1115,9 +1225,32 @@ cdef class WendlandQuinticC2_1D:
         tmp = 1.0 - 0.5 * q
         if (q < 2.0):
             if (rij > 1e-12):
-                val = -3.0 * q * tmp * tmp * h1 / rij
+                val = -3.0 * q * tmp * tmp
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 2.0/3
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -1228,13 +1361,7 @@ cdef class WendlandQuinticC4_1D:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 0.55195628
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -1256,9 +1383,32 @@ cdef class WendlandQuinticC4_1D:
         tmp = 1.0 - 0.5 * q
         if (q < 2.0):
             if (rij > 1e-12):
-                val = -3.5 * q * (2 * q + 1) * tmp * tmp * tmp * tmp * h1 / rij
+                val = -3.5 * q * (2 * q + 1) * tmp * tmp * tmp * tmp
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 0.55195628
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]
@@ -1369,13 +1519,7 @@ cdef class WendlandQuinticC6_1D:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    cdef inline double get_deltap(self):
-        return 0.47996698
-
-    cpdef double py_get_deltap(self):
-        return self.get_deltap()
-
-    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+    cdef inline double dwdq(self, double rij, double h):
         cdef double fac
         cdef double h1
         cdef double q
@@ -1398,9 +1542,31 @@ cdef class WendlandQuinticC6_1D:
         if (q < 2.0):
             if (rij > 1e-12):
                 val = -0.5 * q * (26.25 * q * q + 27 * q + 9.0) * \
-                    tmp * tmp * tmp * tmp * tmp * tmp * h1 / rij
+                    tmp * tmp * tmp * tmp * tmp * tmp
 
-        tmp = val * fac
+        return val * fac
+
+    cpdef double py_dwdq(self, double rij, double h):
+        return self.dwdq(rij, h)
+
+    cdef inline double get_deltap(self):
+        return 0.47996698
+
+    cpdef double py_get_deltap(self):
+        return self.get_deltap()
+
+    cdef inline void gradient(self, double* xij, double rij, double h, double* grad):
+        cdef double h1
+        cdef double tmp
+        cdef double wdash
+        h1 = 1. / h
+        # compute the gradient.
+        if (rij > 1e-12):
+            wdash = self.dwdq(rij, h)
+            tmp = wdash * h1 / rij
+        else:
+            tmp = 0.0
+
         grad[0] = tmp * xij[0]
         grad[1] = tmp * xij[1]
         grad[2] = tmp * xij[2]

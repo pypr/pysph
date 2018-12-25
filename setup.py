@@ -53,6 +53,11 @@ except ImportError:
     HAVE_OPENCL = False
 
 USE_ZOLTAN = True
+HAVE_ZOLTAN = True
+try:
+    import pyzoltan  # noqa: F401
+except ImportError:
+    HAVE_ZOLTAN = False
 
 compiler = 'gcc'
 # compiler = 'intel'
@@ -201,9 +206,9 @@ def get_mpi_flags():
 def get_zoltan_args():
     """Returns zoltan_include_dirs, zoltan_library_dirs
     """
-    global HAVE_MPI
+    global HAVE_MPI, USE_ZOLTAN
     zoltan_include_dirs, zoltan_library_dirs = [], []
-    if not HAVE_MPI:
+    if not HAVE_MPI or not HAVE_ZOLTAN:
         return zoltan_include_dirs, zoltan_library_dirs
     # First try with the environment variable 'ZOLTAN'
     zoltan_base = get_zoltan_directory('ZOLTAN')
@@ -219,6 +224,14 @@ def get_zoltan_args():
         inc = get_zoltan_directory('ZOLTAN_INCLUDE')
         lib = get_zoltan_directory('ZOLTAN_LIBRARY')
 
+    if HAVE_ZOLTAN and not USE_ZOLTAN:
+        # Try with default in sys.prefix/{include,lib}, this is what is done
+        # by any conda installs of zoltan.
+        inc = os.path.join(sys.prefix, 'include')
+        lib = os.path.join(sys.prefix, 'lib')
+        if os.path.exists(os.path.join(inc, 'zoltan.h')):
+            USE_ZOLTAN = True
+
     if (not USE_ZOLTAN):
         print("*" * 80)
         print("Zoltan Environment variable not set, not using ZOLTAN!")
@@ -232,7 +245,11 @@ def get_zoltan_args():
         zoltan_library_dirs = [lib]
 
         # PyZoltan includes
-        zoltan_cython_include = [os.path.abspath('./pyzoltan/czoltan')]
+        zoltan_cython_include = [
+            path.abspath(
+                path.join(path.dirname(pyzoltan.__file__), 'czoltan')
+            )
+        ]
         zoltan_include_dirs += zoltan_cython_include
 
     return zoltan_include_dirs, zoltan_library_dirs
@@ -259,17 +276,8 @@ def get_basic_extensions():
 
     ext_modules = [
         Extension(
-            name="pyzoltan.core.carray",
-            sources=["pyzoltan/core/carray.pyx"],
-            include_dirs=include_dirs,
-            extra_compile_args=extra_compile_args,
-            language="c++"
-        ),
-
-        Extension(
             name="pysph.base.particle_array",
             sources=["pysph/base/particle_array.pyx"],
-            depends=get_deps("pyzoltan/core/carray"),
             include_dirs=include_dirs,
             extra_compile_args=extra_compile_args,
             language="c++",
@@ -289,7 +297,7 @@ def get_basic_extensions():
             name="pysph.base.nnps_base",
             sources=["pysph/base/nnps_base.pyx"],
             depends=get_deps(
-                "pyzoltan/core/carray", "pysph/base/point",
+                "pysph/base/point",
                 "pysph/base/particle_array",
             ),
             include_dirs=include_dirs,
@@ -466,7 +474,7 @@ def get_basic_extensions():
                 name="pysph.base.gpu_nnps_base",
                 sources=["pysph/base/gpu_nnps_base.pyx"],
                 depends=get_deps(
-                    "pyzoltan/core/carray", "pysph/base/point",
+                    "pysph/base/point",
                     "pysph/base/particle_array", "pysph/base/nnps_base"
                 ),
                 include_dirs=include_dirs,
@@ -490,10 +498,22 @@ def get_basic_extensions():
                 language="c++",
                 define_macros=MACROS,
             ),
-
             Extension(
                 name="pysph.base.stratified_sfc_gpu_nnps",
                 sources=["pysph/base/stratified_sfc_gpu_nnps.pyx"],
+                depends=get_deps(
+                    "pysph/base/nnps_base"
+                ),
+                include_dirs=include_dirs,
+                extra_compile_args=extra_compile_args + openmp_compile_args,
+                extra_link_args=openmp_link_args,
+                cython_compile_time_env={'OPENMP': openmp_env},
+                language="c++",
+                define_macros=MACROS,
+            ),
+            Extension(
+                name="pysph.base.octree_gpu_nnps",
+                sources=["pysph/base/octree_gpu_nnps.pyx"],
                 depends=get_deps(
                     "pysph/base/nnps_base"
                 ),
@@ -537,69 +557,11 @@ def get_parallel_extensions():
     if os.environ.get('USE_TRILINOS', None) is not None:
         zoltan_lib = 'trilinos_zoltan'
 
-    zoltan_modules = [
-        Extension(
-            name="pyzoltan.core.zoltan",
-            sources=["pyzoltan/core/zoltan.pyx"],
-            depends=get_deps(
-                "pyzoltan/core/carray",
-                "pyzoltan/czoltan/czoltan",
-                "pyzoltan/czoltan/czoltan_types",
-            ),
-            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-            library_dirs=zoltan_library_dirs,
-            libraries=[zoltan_lib, 'mpi'],
-            extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args + extra_compile_args,
-            cython_compile_time_env=cython_compile_time_env,
-            language="c++",
-            define_macros=MACROS,
-        ),
-
-        Extension(
-            name="pyzoltan.core.zoltan_dd",
-            sources=["pyzoltan/core/zoltan_dd.pyx"],
-            depends=get_deps(
-                "pyzoltan/core/carray",
-                "pyzoltan/czoltan/czoltan_dd",
-                "pyzoltan/czoltan/czoltan_types"
-            ),
-            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-            library_dirs=zoltan_library_dirs,
-            libraries=[zoltan_lib, 'mpi'],
-            extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args + extra_compile_args,
-            cython_compile_time_env=cython_compile_time_env,
-            language="c++",
-            define_macros=MACROS,
-        ),
-
-        Extension(
-            name="pyzoltan.core.zoltan_comm",
-            sources=["pyzoltan/core/zoltan_comm.pyx"],
-            depends=get_deps(
-                "pyzoltan/core/carray",
-                "pyzoltan/czoltan/zoltan_comm"
-            ),
-            include_dirs=include_dirs + zoltan_include_dirs + mpi_inc_dirs,
-            library_dirs=zoltan_library_dirs,
-            libraries=[zoltan_lib, 'mpi'],
-            extra_link_args=mpi_link_args,
-            extra_compile_args=mpi_compile_args + extra_compile_args,
-            cython_compile_time_env=cython_compile_time_env,
-            language="c++",
-            define_macros=MACROS,
-        ),
-    ]
-
     parallel_modules = [
-
         Extension(
             name="pysph.parallel.parallel_manager",
             sources=["pysph/parallel/parallel_manager.pyx"],
             depends=get_deps(
-                "pyzoltan/core/carray",
-                "pyzoltan/core/zoltan", "pyzoltan/core/zoltan_comm",
                 "pysph/base/point", "pysph/base/particle_array",
                 "pysph/base/nnps_base"
             ),
@@ -613,16 +575,15 @@ def get_parallel_extensions():
             define_macros=MACROS,
         ),
     ]
-    return zoltan_modules + parallel_modules
+    return parallel_modules
 
 
 def create_sources():
     argv = sys.argv
     if 'build_ext' in argv or 'develop' in sys.argv or 'install' in argv:
-        generator = path.join('pyzoltan', 'core', 'generator.py')
-        for pth in (path.join('pyzoltan', 'core'), path.join('pysph', 'base')):
-            cmd = [sys.executable, generator, path.abspath(pth)]
-            print(check_output(cmd).decode())
+        pth = path.join('pysph', 'base')
+        cmd = [sys.executable, '-m', 'cyarray.generator', path.abspath(pth)]
+        print(check_output(cmd).decode())
 
 
 def _is_cythonize_default():
@@ -647,7 +608,7 @@ def setup_package():
         from Cython.Distutils import build_ext
         cmdclass = {'build_ext': build_ext}
 
-    create_sources()
+        create_sources()
 
     # Extract the version information from pysph/__init__.py
     info = {}
@@ -656,8 +617,8 @@ def setup_package():
 
     # The requirements.
     install_requires = [
-        'numpy', 'mako', 'Cython>=0.20', 'setuptools>=6.0',
-        'pytest>=3.0',
+        'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
+        'setuptools>=6.0', 'pytest>=3.0', 'pytools', 'Beaker'
     ]
     if sys.version_info[:2] == (2, 6):
         install_requires += [
@@ -669,7 +630,7 @@ def setup_package():
         ]
 
     extras_require = dict(
-        mpi=['mpi4py>=1.2'],
+        mpi=['mpi4py>=1.2', 'pyzoltan'],
         ui=['mayavi>=4.0'],
     )
 

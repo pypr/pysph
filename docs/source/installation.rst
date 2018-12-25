@@ -214,7 +214,7 @@ short do the following::
 If you wish to use a compiler which is not currently your default compiler,
 simply update the ``CC`` and ``CXX`` environment variables. For example, to use
 icc run the following commands `before` building PySPH::
-  
+
     $ export CC=icc
     $ export CXX=icpc
 
@@ -228,7 +228,7 @@ icc run the following commands `before` building PySPH::
     ``/path/to/icc/bin``. If you didn't get this file along with your
     installation, you can try running ``export
     LD_LIBRARY_PATH=/path/to/icc/lib``.
-    
+
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
 
@@ -262,13 +262,13 @@ if you installed XCode but can't find clang or gcc.
 OpenMP on OSX
 ^^^^^^^^^^^^^
 
-The default "gcc" available on OSX uses an LLVM backend and does not support 
-OpenMP_. To use OpenMP_ on OSX, you can install the GCC available on brew_ using    :: 
+The default "gcc" available on OSX uses an LLVM backend and does not support
+OpenMP_. To use OpenMP_ on OSX, you can install the GCC available on brew_ using    ::
 
     $ brew install gcc
 
-Once this is done, you need to use this as your default compiler. The ``gcc`` 
-formula on brew currently ships with gcc version 7. Therefore, you can 
+Once this is done, you need to use this as your default compiler. The ``gcc``
+formula on brew currently ships with gcc version 7. Therefore, you can
 tell Python to use the GCC installed by brew by setting::
 
     $ export CC=gcc-7
@@ -713,6 +713,12 @@ This should run all the tests that do not take a long while to complete.  If
 this fails, please contact the `pysph-users mailing list
 <https://groups.google.com/forum/#!forum/pysph-users>`_ or send us `email
 <mailto:pysph-users@googlegroups.com>`_.
+
+There are a few additional test dependencies that need to be installed when
+running the tests.  These can be installed using::
+
+   $ pip install -r requirements-test.txt
+
 
 Once you run the tests, you should see the section on
 :ref:`running-the-examples`.

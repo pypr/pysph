@@ -1,6 +1,6 @@
 """Basic equations for Gas-dynamics"""
 
-from pysph.cpy.api import declare
+from compyle.api import declare
 from pysph.base.reduce_array import serial_reduce_array, parallel_reduce_array
 from pysph.sph.equation import Equation
 from math import sqrt, exp, log

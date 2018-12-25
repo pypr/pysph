@@ -1,15 +1,12 @@
 import numpy as np
-import pyopencl as cl
-import pyopencl.array
-
-from pysph.base.opencl import get_config
+from compyle.config import get_config
 
 
 class GPUDomainManager(object):
     def __init__(self, xmin=-1000., xmax=1000., ymin=0.,
                  ymax=0., zmin=0., zmax=0.,
                  periodic_in_x=False, periodic_in_y=False,
-                 periodic_in_z=False, n_layers=2.0):
+                 periodic_in_z=False, n_layers=2.0, backend=None):
         """Constructor"""
         self.xmin = xmin
         self.xmax = xmax
@@ -37,6 +34,9 @@ class GPUDomainManager(object):
         # default value for the cell size
         self.cell_size = 1.0
         self.hmin = 1.0
+
+        # default value for radius_scale
+        self.radius_scale = 1.0
 
         # default DomainManager in_parallel is set to False
         self.in_parallel = False
@@ -98,7 +98,7 @@ class GPUDomainManager(object):
         processors to decide on the appropriate binning size.
 
         """
-        _hmax, hmax = -1.0, -1.0
+        _hmax, hmax = -self.dtype_max, -self.dtype_max
         _hmin, hmin = self.dtype_max, self.dtype_max
 
         for pa_wrapper in self.pa_wrappers:
@@ -114,8 +114,7 @@ class GPUDomainManager(object):
                 hmin = _hmin
 
         cell_size = self.radius_scale * hmax
-        self.hmin = self.radius_scale * hmin
-
+        self.hmin = hmin
         if cell_size < 1e-6:
             cell_size = 1.0
 

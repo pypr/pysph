@@ -8,6 +8,12 @@ ${' '*4*level}${l}
 
 <%def name="do_group(helper, group, level=0)" buffered="True">
 #######################################################################
+## Call any `pre` functions
+#######################################################################
+% if group.pre:
+${indent(helper.get_pre_call(group), 0)}
+% endif
+#######################################################################
 ## Iterate over destinations in this group.
 #######################################################################
 % for dest, (eqs_with_no_source, sources, all_eqs) in group.data.items():
@@ -21,6 +27,10 @@ dst = self.${dest}
 ${indent(helper.get_dest_array_setup(dest, eqs_with_no_source, sources, group.real), 0)}
 dst_array_index = dst.index
 
+#######################################################################
+## Call py_initialize for all equations for this destination.
+#######################################################################
+${indent(all_eqs.get_py_initialize_code(), 0)}
 #######################################################################
 ## Initialize all equations for this destination.
 #######################################################################
@@ -52,6 +62,11 @@ for d_idx in range(NP_DEST):
 src = self.${source}
 ${indent(helper.get_src_array_setup(source, eq_group), 0)}
 src_array_index = src.index
+
+% if eq_group.has_initialize_pair():
+for d_idx in range(NP_DEST):
+    ${indent(eq_group.get_initialize_pair_code(helper.object.kernel), 1)}
+% endif
 
 % if eq_group.has_loop() or eq_group.has_loop_all():
 #######################################################################
@@ -113,6 +128,12 @@ nnps.update()
 % endif
 
 % endfor
+#######################################################################
+## Call any `post` functions
+#######################################################################
+% if group.post:
+${indent(helper.get_post_call(group), 0)}
+% endif
 </%def>
 
 from libc.stdio cimport printf
@@ -138,7 +159,7 @@ from pysph.base.reduce_array import mpi_reduce_array as parallel_reduce_array
 % endif
 
 from pysph.base.nnps import get_number_of_threads
-from pyzoltan.core.carray cimport (DoubleArray, FloatArray, IntArray, LongArray, UIntArray,
+from cyarray.carray cimport (DoubleArray, FloatArray, IntArray, LongArray, UIntArray,
     aligned, aligned_free, aligned_malloc)
 
 ${helper.get_header()}
@@ -179,11 +200,14 @@ cdef class AccelerationEval:
     cdef void **nbrs
     # CFL time step conditions
     cdef public double dt_cfl, dt_force, dt_viscous
+    cdef object groups
+    cdef object all_equations
     ${indent(helper.get_kernel_defs(), 1)}
     ${indent(helper.get_equation_defs(), 1)}
 
-    def __init__(self, kernel, equations, particle_arrays):
+    def __init__(self, kernel, equations, particle_arrays, groups):
         self.particle_arrays = tuple(particle_arrays)
+        self.groups = groups
         self.n_threads = get_number_of_threads()
         cdef int i
         for i, pa in enumerate(particle_arrays):
@@ -201,6 +225,10 @@ cdef class AccelerationEval:
 
         ${indent(helper.get_kernel_init(), 2)}
         ${indent(helper.get_equation_init(), 2)}
+        all_equations = {}
+        for equation in equations:
+            all_equations[equation.var_name] = equation
+        self.all_equations = all_equations
 
     def __dealloc__(self):
         aligned_free(self.nbrs)

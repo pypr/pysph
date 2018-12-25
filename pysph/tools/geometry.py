@@ -3,7 +3,7 @@ import numpy as np
 import copy
 from pysph.base.nnps import LinkedListNNPS
 from pysph.base.utils import get_particle_array, get_particle_array_wcsph
-from pyzoltan.core.carray import UIntArray
+from cyarray.api import UIntArray
 from numpy.linalg import norm
 
 
@@ -295,7 +295,7 @@ def get_2d_circle(dx=0.01, r=0.5, center=np.array([0.0, 0.0])):
     x, y = np.ravel(x), np.ravel(y)
     condition = (x * x + y * y <= r * r)
     x, y = x[condition], y[condition]
-    return x + center[0], y + center[0]
+    return x + center[0], y + center[1]
 
 
 def get_2d_hollow_circle(dx=0.01, r=1.0, center=np.array([0.0, 0.0]),

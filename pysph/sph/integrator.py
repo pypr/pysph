@@ -38,6 +38,8 @@ class Integrator(object):
 
         self.steppers = kw
         self.parallel_manager = None
+        self.nnps = None
+        self.acceleration_evals = None
         # This is set later when the underlying compiled integrator is created
         # by the SPHCompiler.
         self.c_integrator = None
@@ -49,7 +51,7 @@ class Integrator(object):
         return '%s(%s)' % (name, args)
 
     def _get_dt_adapt_factors(self):
-        a_eval = self.c_integrator.acceleration_eval
+        a_eval = self.acceleration_evals[0]
         factors = [-1.0, -1.0, -1.0]
         for pa in a_eval.particle_arrays:
             for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
@@ -65,6 +67,19 @@ class Integrator(object):
     ##########################################################################
     # Public interface.
     ##########################################################################
+    def set_acceleration_evals(self, a_evals):
+        '''Set the acceleration evaluators.
+
+        This must be done before the integrator is used.
+
+        If you are using the SPHCompiler, it automatically calls this method.
+
+        '''
+        if isinstance(a_evals, (list, tuple)):
+            self.acceleration_evals = a_evals
+        else:
+            self.acceleration_evals = [a_evals]
+
     def set_fixed_h(self, fixed_h):
         # compute h_minimum once for constant smoothing lengths
         if fixed_h:
@@ -73,10 +88,11 @@ class Integrator(object):
         self.fixed_h = fixed_h
 
     def set_nnps(self, nnps):
+        self.nnps = nnps
         self.c_integrator.set_nnps(nnps)
 
     def compute_h_minimum(self):
-        a_eval = self.c_integrator.acceleration_eval
+        a_eval = self.acceleration_evals[0]
 
         hmin = 1.0
         for pa in a_eval.particle_arrays:
@@ -174,6 +190,7 @@ class Integrator(object):
         self.c_integrator = c_integrator
 
     def set_parallel_manager(self, pm):
+        self.parallel_manager = pm
         self.c_integrator.set_parallel_manager(pm)
 
     def set_post_stage_callback(self, callback):
@@ -196,6 +213,28 @@ class Integrator(object):
         ``one_timestep`` method.
         """
         self.c_integrator.step(time, dt)
+
+    def compute_accelerations(self, index=0, update_nnps=True):
+        if update_nnps:
+            # update NNPS since particles have moved
+            if self.parallel_manager:
+                self.parallel_manager.update()
+            self.nnps.update()
+
+        # Evaluate
+        c_integrator = self.c_integrator
+        a_eval = self.acceleration_evals[index]
+        a_eval.compute(c_integrator.t, c_integrator.dt)
+
+    def initial_acceleration(self, t, dt):
+        """Compute the initial accelerations if needed before the iterations start.
+
+        The default implementation only does this for the first acceleration
+        evaluator. So if you have multiple evaluators, you must override this
+        method in a subclass.
+
+        """
+        self.acceleration_evals[0].compute(t, dt)
 
 
 ###############################################################################

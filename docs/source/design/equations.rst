@@ -37,8 +37,17 @@ methods of a typical :py:class:`Equation` subclass::
           # Overload this only if you need to pass additional constants
           # Otherwise, no need to override __init__
 
+      def py_initialize(self, dst, t, dt):
+          # Called once per destination before initialize.
+          # This is a pure Python function and is not translated.
+
       def initialize(self, d_idx, ...):
           # Called once per destination before loop.
+
+      def initialize_pair(self, d_idx, d_*, s_*):
+          # Called once per destination particle for each source.
+          # Can access all source arrays.  Does not have
+          # access to neighbor information.
 
       def loop_all(self, d_idx, ..., NBRS, N_NBRS, ...):
           # Called once before the loop and can be used
@@ -66,8 +75,18 @@ the equation is used as ``YourEquation(dest='fluid', sources=['fluid',
 'solid'])``. Now given this context, let us see what happens when this
 equation is used.  What happens is as follows:
 
+- for each destination particle array (``'fluid'`` in this case), the
+  ``py_initialize`` method is called and is passed the destination particle
+  array, ``t`` and ``dt`` (similar to ``reduce``). This function is a pure
+  Python function so you can do what you want here, including importing any
+  Python code and run anything you want. The code is NOT transpiled into
+  C/OpenCL/CUDA.
+
 - for each fluid particle, the ``initialize`` method is called with the
   required arrays.
+
+- for each fluid particle, the ``initialize_pair`` method is called while
+  having access to all the *fluid* arrays.
 
 - the *fluid* neighbors for each fluid particle are found for each particle
   and can be passed en-masse to the ``loop_all`` method. One can pass ``NBRS``
@@ -79,6 +98,9 @@ equation is used.  What happens is as follows:
 - the *fluid* neighbors for each fluid particle are found and for each pair,
   the ``loop`` method is called with the required properties/values.
 
+- for each fluid particle, the ``initialize_pair`` method is called while
+  having access to all the *solid* arrays.
+
 - the *solid* neighbors for each fluid particle are found and for each pair,
   the ``loop`` method is called with the required properties/values.
 
@@ -86,22 +108,28 @@ equation is used.  What happens is as follows:
   required properties.
 
 - If a reduce method exists, it is called for the destination (only once, not
-  once per particle). It is passed the destination particle array.
+  once per particle). It is passed the destination particle array and the time
+  and timestep. It is transpiled when you are using Cython but is a pure
+  Python function when you run this via OpenCL or CUDA.
 
-The ``initialize, loop_all, loop, post_loop`` methods all may be called in
-separate threads (both on CPU/GPU) depending on the implementation of the
-backend.
+The ``initialize, initialize_pair, loop_all, loop, post_loop`` methods all may
+be called in separate threads (both on CPU/GPU) depending on the
+implementation of the backend.
 
 It is possible to set a scalar value in the equation as an instance attribute,
 i.e. by setting ``self.something = value`` but remember that this is just one
 value for the equation. This value must also be initialized in the
 ``__init__`` method. Also make sure that the attributes are public and not
-private. There is only one equation instance used in the code, not one
-equation per thread or particle. So if you wish to calculate a temporary
-quantity for each particle, you should create a separate property for it and
-use that instead of assuming that the initialize and loop functions run in
-serial. They do not when you use OpenMP or OpenCL. So do not create temporary
-arrays inside the equation for these sort of things.
+private (i.e. do not start with an underscore). There is only one equation
+instance used in the code, not one equation per thread or particle. So if you
+wish to calculate a temporary quantity for each particle, you should create a
+separate property for it and use that instead of assuming that the initialize
+and loop functions run in serial. They do not run in serial when you use
+OpenMP or OpenCL. So do not create temporary arrays inside the equation for
+these sort of things. In general if you need a constant per destination array,
+add it as a constant to the particle array. Also note that you can add
+properties that have strides (see :ref:`simple_tutorial` and look for
+"stride").
 
 Now, if the group containing the equation has ``iterate`` set to True, then
 the group will be iterated until convergence is attained for all the equations
@@ -229,9 +257,9 @@ one desires a ``long`` data type, one may use ``i = declare("long")``.
 Note that the additional (optional) argument in the declare specifies the
 number of variables. While this is ignored during transpilation, this is
 useful when writing functions in pure Python, the
-:py:func:`pysph.base.cython_generator.declare` function provides a pure Python
+:py:func:`compyle.api.declare` function provides a pure Python
 implementation of this so that the code works both when compiled as well as
-when run from pure Python. For example::
+when run from pure Python. For example:
 
 .. code-block:: python
 
@@ -324,7 +352,7 @@ perform what the ``loop`` method usually does ourselves.
                xij[0] = d_x[d_idx] - s_x[s_idx]
                xij[1] = d_y[d_idx] - s_y[s_idx]
                xij[2] = d_z[d_idx] - s_z[s_idx]
-               rij = sqrt(xij[0]*xij[0], xij[1]*xij[1], xij[2]*xij[2])
+               rij = sqrt(xij[0]*xij[0] + xij[1]*xij[1] + xij[2]*xij[2])
                sum += s_m[s_idx]*SPH_KERNEL.kernel(xij, rij, 0.5*(s_h[s_idx] + d_h[d_idx]))
            d_rho[d_idx] += sum
 
@@ -407,6 +435,117 @@ The trace function effectively is converted into a function with signature
 ``double trace(double* x, int nx)`` and thus can be called with any
 one-dimensional array.
 
+Calling arbitrary Python functions from a Group
+------------------------------------------------
+
+Sometimes, you may need to implement something that is hard to write (at least
+initially) with the constraints that PySPH places. For example if you need to
+implement an algorithm that requires more complex data structures and you want
+to do it easily in Python. There are ways to call arbitrary Python code from
+the application already but sometimes you need to do this during every
+acceleration evaluation. To support this the :py:class:`Group` class supports
+two additional keyword arguments called ``pre`` and ``post``. These can be any
+Python callable that take no arguments. Any callable passed as ``pre`` will be
+called *before* any equation related code is executed and ``post`` will be
+executed after the entire group is finished. If the group is iterated, it
+should call those functions repeatedly.
+
+Now these functions are pure Python functions so you may choose to do anything
+in them. These are not called within an OpenMP context and if you are using
+the OpenCL or CUDA backends again this will simply be a Python function call
+that has nothing to do with the particular backend. However, since it is
+arbitrary Python, you can choose to implement the code using any approach you
+choose to do. This should be flexible enough to customize PySPH greatly.
+
+Writing integrators
+--------------------
+
+.. py:currentmodule:: pysph.sph.integrator_step
+
+
+Similar rules apply when writing an :py:class:`IntegratorStep`. One can create
+a multi-stage integrator as follows:
+
+.. code-block:: python
+
+   class MyStepper(IntegratorStep):
+       def initialize(self, d_idx, d_x):
+           # ...
+       def py_stage1(self, dst, t, dt):
+           # ...
+       def stage1(self, d_idx, d_x, d_ax):
+           # ...
+       def py_stage2(self, dst, t, dt):
+           # ...
+       def stage2(self, d_idx, d_x, d_ax):
+           # ...
+
+In this case, the ``initialize, stage1, stage2``, methods are transpiled and
+called but the ``py_stage1, py_stage2`` are pure Python functions called
+before the respective ``stage`` functions are called. Defining the
+``py_stage1`` or ``py_stage2`` methods are optional. If you have defined them,
+they will be called automatically. They are passed the destination particle
+array, the current time, and current timestep.
+
+
+Different equations for different stages
+-----------------------------------------
+
+By default, when one creates equations the implicit assumption is that the
+same right-hand-side is evaluated at each stage of the integrator. However,
+some schemes require that one solve different equations for different
+integrator stages. PySPH does support this but to do this when one creates
+equations in the application, one should return an instance of
+:py:class:`pysph.sph.equation.MultiStageEquations`. For example:
+
+.. code-block:: python
+
+    def create_equations(self):
+        # ...
+        eqs = [
+            [Eq1(dest='fluid', sources=['fluid'])],
+            [Eq2(dest='fluid', sources=['fluid'])]
+        ]
+        from pysph.sph.equation import MultiStageEquations
+        return MultiStageEquations(eqs)
+
+In the above, note that each element of ``eqs`` is a list, it could have also
+been a group. Each item of the given equations is treated as a separate
+collection of equations which is to be used. The use of the
+:py:class:`pysph.sph.equation.MultiStageEquations` tells PySPH that multiple
+equation sets are being used.
+
+Now that we have this, how do we call the right accelerations at the right
+times? We do this by sub-classing the
+:py:class:`pysph.sph.integrator.Integrator`. We show a simple example from our
+test suite to illustrate this:
+
+.. code-block:: python
+
+    from pysph.sph.integrator import Integrator
+
+    class MyIntegrator(Integrator):
+        def one_timestep(self, t, dt):
+
+            self.compute_accelerations(0)
+            # Equivalent to self.compute_accelerations()
+            self.stage1()
+            self.do_post_stage(dt, 1)
+
+            self.compute_accelerations(1, update_nnps=False)
+            self.stage2()
+
+Note that the ``compute_accelerations`` method takes two arguments, the
+``index`` (which defaults to zero) and ``update_nnps`` which defaults to
+``True``. A simple integrator with a single RHS would simply call
+``self.compute_accelerations()``. However, in the above, the first set of
+equations is called first, and then for the second stage the second set of
+equations is evaluated but without updating the NNPS (handy if the particles
+do not move in stage1).
+
+The above illustrates how one can create more complex integrators that employ
+different accelerations in each stage.
+
 
 Examples to study
 ------------------
@@ -422,3 +561,10 @@ The equations that demonstrate the ``converged`` method are:
 
 - :py:class:`pysph.sph.gas_dynamics.basic.SummationDensity`: relatively simple.
 - :py:class:`pysph.sph.iisph.PressureSolve`.
+
+Some equations that demonstrate using matrices and solving systems of
+equations are:
+
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder2D`.
+- :py:class:`pysph.sph.wc.density_correction.MLSFirstOrder3D`.
+- :py:class:`pysph.sph.wc.kernel_correction.GradientCorrection`.
