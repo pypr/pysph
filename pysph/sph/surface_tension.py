@@ -13,6 +13,9 @@ for example in KHI simulations. The references are as under:
    using a reproducing divergence approximation", JCP 2010, 229, pp
    5011--5021 [A10]
 
+ - X.Y.Hu, N.A. Adams. "A multi-phase SPH method for macroscopic and
+   mesoscopic flows", JCP 2006, 213, pp 844-861 [XA06]
+
 """
 from pysph.sph.equation import Equation
 
@@ -20,6 +23,7 @@ from math import sqrt
 
 
 class SurfaceForceAdami(Equation):
+    
     def initialize(self, d_au, d_av, d_idx):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0

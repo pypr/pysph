@@ -157,14 +157,6 @@ class MultiPhase(Application):
             dt=dt, tf=tf, adaptive_timestep=False)
         return solver
 
-    def add_user_options(self, group):
-        choices = ['morris', 'tvf', 'adami_stress', 'adami', 'shadloo']
-        group.add_argument(
-            "--scheme", action="store", dest='scheme', default='morris',
-            choices=choices,
-            help='Specify scheme to use among %s' % choices
-        )
-
     def create_equations(self):
         adami_stress_equations = [
             Group(equations=[
