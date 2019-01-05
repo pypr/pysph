@@ -2,8 +2,6 @@
 Predictive-Corrective Incompressible SPH (PCISPH)
 #################################################
 
-Note: beta is missing a factor of :math:`m_i`, which works well for TG.
-
 References
 -----------
 
@@ -118,7 +116,9 @@ class MomentumEquationViscosity(Equation):
         d_v[d_idx] += dt * d_av[d_idx]
         d_w[d_idx] += dt * d_aw[d_idx]
 
-        d_p[d_idx] = 0.0
+        # Retaining the old pressure seems to give better results for the
+        # TG problem.
+        #d_p[d_idx] = 0.0
 
         d_aup[d_idx] = 0.0
         d_avp[d_idx] = 0.0
@@ -192,8 +192,7 @@ class ComputePressure(Equation):
 
         mi = d_m[d_idx]
         rho0 = self.rho0
-        # beta is missing a factor of 'mi' which is works well for TG.
-        beta = 2*mi*(dt/rho0)*(dt/rho0)
+        beta = 2*mi*mi*(dt/rho0)*(dt/rho0)
         delta = 1.0/(beta * (tmp + d_dwij2[d_idx]))
 
         rho_err = d_rho[d_idx] - rho0
@@ -230,7 +229,7 @@ class MomentumEquationPressureGradient(Equation):
 
     def reduce(self, dst, t, dt):
         import numpy as np
-        self.rho_err = np.max(np.abs(dst.rho - self.rho0))
+        self.rho_err = np.mean(np.abs(dst.rho/self.rho0 - 1.0))
         dst.iters[self.ctr] += 1
 
     def converged(self):
@@ -304,7 +303,7 @@ class PCISPHScheme(Scheme):
         from pysph.solver.solver import Solver
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel,
-            output_at_times=[0, 0.2, 0.4, 0.8], **kw
+            **kw
         )
 
     def get_equations(self):
@@ -312,15 +311,15 @@ class PCISPHScheme(Scheme):
         all = self.fluids
         equations = []
 
-        eq0 = []
+        eq1 = []
         for fluid in self.fluids:
-            eq0.append(
+            eq1.append(
                 MomentumEquationViscosity(
                     dest=fluid, sources=all, nu=self.nu, gx=self.gx,
                     gy=self.gy, gz=self.gz
                 )
             )
-        equations.append(Group(equations=eq0))
+        equations.append(Group(equations=eq1))
 
         eq1, g2 = [], []
         for fluid in self.fluids:
@@ -330,14 +329,14 @@ class PCISPHScheme(Scheme):
         eq2 = []
         for fluid in self.fluids:
             eq2.append(SummationDensity(dest=fluid, sources=all))
-        g2.append(Group(equations=eq2, real=False))
+        g2.append(Group(equations=eq2))
 
         eq3 = []
         for fluid in self.fluids:
             eq3.append(
                 ComputePressure(dest=fluid, sources=all, rho0=self.rho0)
             )
-        g2.append(Group(equations=eq3, real=True))
+        g2.append(Group(equations=eq3, update_nnps=True))
 
         eq4 = []
         for fluid in self.fluids:
@@ -347,7 +346,7 @@ class PCISPHScheme(Scheme):
                     tolerance=self.tolerance, debug=self.debug
                 ),
             )
-        g2.append(Group(equations=eq4, real=True))
+        g2.append(Group(equations=eq4))
 
         equations.append(
             Group(equations=g2, iterate=True,
