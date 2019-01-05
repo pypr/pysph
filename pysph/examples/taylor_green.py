@@ -326,9 +326,10 @@ class TaylorGreen(Application):
             else:
                 equations = None
             from pysph.solver.tools import SimpleRemesher
-            if options.scheme == 'wcsph' or options.scheme == 'crksph' \
-               or options.scheme == 'pcisph':
+            if options.scheme == 'wcsph' or options.scheme == 'crksph':
                 props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
+            elif options.scheme == 'pcisph':
+                props = ['u', 'v', 'p']
             elif options.scheme == 'tvf':
                 props = ['u', 'v', 'uhat', 'vhat',
                          'au', 'av', 'auhat', 'avhat']
