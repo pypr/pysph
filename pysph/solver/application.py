@@ -1394,12 +1394,12 @@ class Application(object):
             if is_overloaded_method(self.create_inlet_outlet):
                 self._create_inlet_outlet(self.create_inlet_outlet)
 
+            self._configure()
+
             if self.domain is None:
                 self.domain = self.create_domain()
 
             self.nnps = self.create_nnps()
-
-            self._configure()
 
             self._setup_solver_callbacks(self)
             for tool in self.create_tools():
@@ -1416,9 +1416,9 @@ class Application(object):
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         if self.options.with_opencl and self.options.profile:
-            from pysph.base.opencl import print_profile, print_mem_usage
+            from compyle.opencl import print_profile
             print_profile()
-            print_mem_usage()
+            #print_mem_usage()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
 

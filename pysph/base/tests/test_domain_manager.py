@@ -6,14 +6,18 @@ import numpy as np
 
 # PySPH imports
 from pysph.base.nnps import DomainManager, BoxSortNNPS, LinkedListNNPS
+from pysph.base.gpu_nnps import ZOrderGPUNNPS
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian, get_compiled_kernel
 
 # PyZoltan CArrays
 from cyarray.carray import UIntArray
 
+from compyle.config import get_config
+
 # Python unit testing framework
 import unittest
+import pytest
 
 class PeriodicBox2DTestCase(unittest.TestCase):
     """Test the periodicity algorithms in the Domain Manager.
@@ -22,7 +26,7 @@ class PeriodicBox2DTestCase(unittest.TestCase):
     produces a constant density with summation density.
 
     """
-    def setUp(self):
+    def common_setup(self):
         # create the particle arrays
         L = 1.0; n = 10; dx = L/n; hdx = 1.5
         self.L = L
@@ -43,9 +47,12 @@ class PeriodicBox2DTestCase(unittest.TestCase):
         # particles and domain
         self.fluid = fluid
         self.domain = DomainManager(xmin=0, xmax=L, ymin=0, ymax=L,
-            periodic_in_x=True, periodic_in_y=True
+            periodic_in_x=True, periodic_in_y=True, backend=self.backend
         )
         self.kernel = get_compiled_kernel(Gaussian(dim=2))
+
+    def pull(self, pa):
+        pass
 
     def _get_pressure(self, x, y, z=0.0):
         L = self.L
@@ -57,6 +64,8 @@ class PeriodicBox2DTestCase(unittest.TestCase):
         kernel = self.kernel
         nnps.update_domain()
         nnps.update()
+
+        self.pull(self.fluid)
 
         # get the fluid arrays
         fx, fy, fz, fh, frho, fV, fm = fluid.get(
@@ -99,14 +108,136 @@ class PeriodicBox2DTestCase(unittest.TestCase):
             self.assertAlmostEqual( frho[i], fm[i]/voli, 14)
 
 
-class BoxSortPeriodicBox2D(PeriodicBox2DTestCase):
+class PeriodicBox2DTestCaseCPU(PeriodicBox2DTestCase):
     def setUp(self):
-        PeriodicBox2DTestCase.setUp(self)
+        self.backend = None
+        self.common_setup()
+
+
+class PeriodicBox2DTestCaseOpenCL(PeriodicBox2DTestCase):
+    def setUp(self):
+        get_config().use_opencl = True
+        get_config().use_double = True
+        self.backend = 'opencl'
+        self.common_setup()
+
+    def tearDown(self):
+        get_config().use_opencl = False
+        get_config().use_double = False
+
+    def pull(self, pa):
+        pa.gpu.pull()
+
+
+class PeriodicBox2DTestCaseCUDA(PeriodicBox2DTestCaseOpenCL):
+    def setUp(self):
+        # FIXME: Test this when NNPS supports CUDA
+        cu = pytest.importorskip("pycuda")
+        get_config().use_cuda = True
+        self.backend = 'cuda'
+        self.common_setup()
+
+    def tearDown(self):
+        get_config().use_cuda = False
+
+
+class ZOrderGPUPeriodicBox2D(PeriodicBox2DTestCaseOpenCL):
+    def setUp(self):
+        PeriodicBox2DTestCaseOpenCL.setUp(self)
+        self.orig_n = self.fluid.get_number_of_particles()
+        self.nnps = ZOrderGPUNNPS(
+            dim=2, particles=[self.fluid],
+            domain=self.domain,
+            radius_scale=self.kernel.radius_scale)
+
+    def test_summation_density(self):
+        self._check_summation_density()
+
+    def plot_debug(self):
+        self.setUp()
+        fluid = self.fluid
+        nnps = self.nnps
+        fluid.x += 0.35
+        fluid.y += 0.35
+        nnps.update_domain()
+        nnps.update()
+        fluid.gpu.pull()
+
+        xr, yr = fluid.get('x', 'y', only_real_particles=True)
+        x, y = fluid.get('x', 'y', only_real_particles=False)
+
+        from mayavi import mlab
+
+        mlab.points3d(xr, yr, np.zeros_like(xr), color=(0,0,1), scale_factor=0.05)
+        mlab.points3d(x[len(xr):], y[len(xr):], np.zeros_like(x[len(xr):]), color=(1,0,0), scale_factor=0.05)
+
+        mlab.show()
+        self.tearDown()
+
+    def test_box_wrapping(self):
+        # Given
+        fluid = self.fluid
+        fluid.x += 0.35
+        fluid.y += 0.35
+        fluid.gpu.pull()
+        #print sorted(fluid.get('x', only_real_particles=False))
+        print fluid.get_number_of_particles()
+        self._check_summation_density()
+
+    def test_periodicity(self):
+        # Given.
+        fluid = self.fluid
+
+        # When
+        self.domain.update()
+
+        self.pull(self.fluid)
+
+        # Then.
+        x, y, p = fluid.get('x', 'y', 'p', only_real_particles=False)
+        xmin, xmax, ymin, ymax = x.min(), x.max(), y.min(), y.max()
+        new_n = fluid.get_number_of_particles()
+        self.assertTrue(new_n > self.orig_n)
+        self.assertTrue(xmin < 0.0)
+        self.assertTrue(xmax > self.L)
+        self.assertTrue(ymin < 0.0)
+        self.assertTrue(ymax > self.L)
+
+        p_expect = self._get_pressure(x, y, 0)
+        diff = np.abs(p - p_expect).max()
+        message = "Pressure not equal, max diff: %s"%diff
+        self.assertTrue(np.allclose(p, p_expect, atol=1e-14), message)
+
+
+class BoxSortPeriodicBox2D(PeriodicBox2DTestCaseCPU):
+    def setUp(self):
+        PeriodicBox2DTestCaseCPU.setUp(self)
         self.orig_n = self.fluid.get_number_of_particles()
         self.nnps = BoxSortNNPS(
             dim=2, particles=[self.fluid],
             domain=self.domain,
             radius_scale=self.kernel.radius_scale)
+
+    def plot_debug(self):
+        self.setUp()
+        fluid = self.fluid
+        nnps = self.nnps
+        fluid.x += 0.35
+        fluid.y += 0.35
+        nnps.update_domain()
+        nnps.update()
+        #fluid.gpu.pull()
+
+        xr, yr = fluid.get('x', 'y', only_real_particles=True)
+        x, y = fluid.get('x', 'y', only_real_particles=False)
+
+        from mayavi import mlab
+
+        mlab.points3d(xr, yr, np.zeros_like(xr), color=(0,0,1), scale_factor=0.05)
+        mlab.points3d(x[len(xr):], y[len(xr):], np.zeros_like(x[len(xr):]), color=(1,0,0), scale_factor=0.05)
+
+        mlab.show()
+        self.tearDown()
 
     def test_summation_density(self):
         self._check_summation_density()
@@ -116,6 +247,8 @@ class BoxSortPeriodicBox2D(PeriodicBox2DTestCase):
         fluid = self.fluid
         fluid.x += 0.35
         fluid.y += 0.35
+        #print sorted(fluid.get('x', only_real_particles=False))
+        print fluid.get_number_of_particles()
         self._check_summation_density()
 
     def test_periodicity(self):
@@ -143,7 +276,7 @@ class BoxSortPeriodicBox2D(PeriodicBox2DTestCase):
 
 class LinkedListPeriodicBox2D(BoxSortPeriodicBox2D):
     def setUp(self):
-        PeriodicBox2DTestCase.setUp(self)
+        PeriodicBox2DTestCaseCPU.setUp(self)
         self.orig_n = self.fluid.get_number_of_particles()
         self.nnps = LinkedListNNPS(
             dim=2, particles=[self.fluid],
@@ -230,3 +363,7 @@ class PeriodicBox3DTestCase(PeriodicBox2DTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+    #obj = ZOrderGPUPeriodicBox2D()
+    #obj.plot_debug()
+    #obj = BoxSortPeriodicBox2D()
+    #obj.plot_debug()
