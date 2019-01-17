@@ -43,8 +43,6 @@ class GPUDomainManager(DomainManagerBase):
         # appropriate parallel NNPS is responsible for the creation of
         # ghost particles.
         if self.is_periodic and not self.in_parallel:
-            #self._update_from_gpu()
-
             # remove periodic ghost particles from a previous step
             self._remove_ghosts()
 
@@ -53,9 +51,6 @@ class GPUDomainManager(DomainManagerBase):
 
             # create new periodic ghosts
             self._create_ghosts_periodic()
-
-            # Update GPU.
-            #self._update_gpu()
 
     def _compute_cell_size_for_binning(self):
         """Compute the cell size for the binning.
@@ -341,9 +336,7 @@ class GPUDomainManager(DomainManagerBase):
                      ymin=ymin, zmin=zmin, xmax=xmax, ymax=ymax, zmax=zmax,
                      cell_size=cell_size, masks=masks, indices=indices)
 
-            # FIXME: This will be ridiculously slow. Use extend to
-            # extend the particle array and use a single kernel to
-            # copy properties once macro support is added to compyle
+            # FIXME: Use compyle templates for extracting particles
 
             pa_ghost = pa_wrapper.pa.extract_particles(indices)
 

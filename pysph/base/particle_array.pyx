@@ -292,6 +292,9 @@ cdef class ParticleArray:
     ######################################################################
     # `Public` interface
     ######################################################################
+    def update_backend(self, backend=None):
+        self.backend = get_backend(backend)
+
     def set_output_arrays(self, list props):
         """Set the list of output arrays for this ParticleArray
 
