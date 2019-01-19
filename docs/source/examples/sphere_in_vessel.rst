@@ -98,7 +98,8 @@ Create equations
       ]
       return equations
 
-There are a few eccentric points dealing with *Akinci* formulation,
+
+A few points to note while dealing with *Akinci* formulation,
 
 1. As a first point, while computing the density of the ``fluid`` due to solid,
    make sure to use ``SummationDensityBoundary``, because usual

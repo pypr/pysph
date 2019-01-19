@@ -29,6 +29,12 @@ Which means you don't a have `sphinx-build` in your system. To install across th
 
    $ sudo apt-get install python3-sphinx
 
+
+or to install in an environment locally do
+::
+
+   $ pip install sphinx
+
 run ``make html`` again. The documentation is built locally at
 ``~/pysph/docs/build/html`` directory. Open ```index.html`` file by running
 
