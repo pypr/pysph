@@ -136,6 +136,38 @@ class Application(object):
     Finally, it is a good idea to overload the :py:meth:`post_process` method
     to perform any post processing for the generated data.
 
+    The application instance also has several important attributes, some of
+    these are as follows:
+
+    - ``args``: command line arguments, typically ``sys.argv[1:]``.
+
+    - ``domain``: optional :py:class:`pysph.base.nnps_base.DomainManager`
+      instance.
+
+    - ``fname``: filename pattern to use when dumping output.
+
+    - ``inlet_outlet``: list of inlet/outlets.
+
+    - ``nnps``: instance of :py:class:`pysph.base.nnps_base.NNPS`.
+
+    - ``num_procs``: total number of processes running.
+
+    - ``output_dir``: Output directory.
+
+    - ``parallel_manager``: in parallel, an instance of
+      :py:class:`pysph.parallel.parallel_manager.ParallelManager`.
+
+    - ``particles``: list of
+      :py:class:`pysph.base.particle_array.ParticleArray`s.
+
+    - ``rank``: Rank of this process.
+
+    - ``scheme``: the optional :py:class:`pysph.sph.scheme.Scheme` instance.
+
+    - ``solver``: the solver instance, :py:class:`pysph.solver.solver.Solver`.
+
+    - ``tools``: a list of possible :py:class:`pysph.solver.tools.Tool`s.
+
     """
 
     def __init__(self, fname=None, domain=None):
