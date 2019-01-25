@@ -38,11 +38,11 @@ methods of a typical :py:class:`Equation` subclass::
           # Otherwise, no need to override __init__
 
       def py_initialize(self, dst, t, dt):
-          # Called once per destination before initialize.
+          # Called once per destination array before initialize.
           # This is a pure Python function and is not translated.
 
       def initialize(self, d_idx, ...):
-          # Called once per destination before loop.
+          # Called once per destination particle before loop.
 
       def initialize_pair(self, d_idx, d_*, s_*):
           # Called once per destination particle for each source.
@@ -146,6 +146,116 @@ carefully -- ideally declare any variables used in this as
 ``declare('object')``. On the GPU, this function is not called via OpenCL and
 is a pure Python function.
 
+Understanding Groups a bit more
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Equations can be grouped together and it is important to understand how
+exactly this works. Let us take a simple example of a :py:class:`Group` with
+two equations. We illustrate two simple equations with pseudo-code::
+
+  class Eq1(Equation):
+      def initialize(self, ...):
+          # ...
+      def loop(...):
+          # ...
+      def post_loop(...):
+          # ...
+
+Let us say that ``Eq2`` has a similar structure with respect to its methods.
+Let us say we have a group defined as::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+      ]
+  )
+
+When this is expanded out and used inside PySPH, this is what happens in terms
+of pseudo-code::
+
+    # Instances of the Eq1, and Eq2.
+    eq1 = Eq1(...)
+    eq2 = Eq2(...)
+
+    for d_idx in range(n_destinations):
+        eq1.initialize(...)
+        eq2.initialize(...)
+
+    # Sources from 'fluid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('fluid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    # Sources from 'solid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('solid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    for d_idx in range(n_destinations):
+        eq1.post_loop(...)
+        eq2.post_loop(...)
+
+That is, all the initialization is done for each equation in sequence,
+followed by the loops for each set of sources, fluid and solid in this case.
+In the end, the ``post_loop`` is called for the destinations. The equations
+are therefore merged inside a group and entirely completed before the next
+group is taken up. Note that the order of the equations will be exactly as
+specified in the group.
+
+When the ``real=False`` is used, then the non-local *destination* particles
+are also iterated over. ``real=True`` by default, which means that only
+destination particles whose ``tag`` property is local or equal to 0 are
+operated on. Otherwise, when ``real=False``, remote and ghost particles are
+also operated on. It is important to note that this does not affect the source
+particles. That is, **ALL** source particles influence the destinations
+whether the sources are local, remote or ghost particles. The ``real`` keyword
+argument only affects the destination particles and not the sources.
+
+Note that if you have different destinations in the same group, they are
+internally split up into different sets of loops for each destination and that
+these are done separately. I.e. one destination is fully processed and then
+the next is considered. So if we had for example, both ``fluid`` and ``solid``
+destinations, they would be processed separately. For example lets say you had
+this::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq1(dest='solid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='solid', sources=['fluid', 'solid']),
+      ]
+  )
+
+This would internally be equivalent to the following::
+
+  [
+      Group(
+          equations=[
+              Eq1(dest='fluid', sources=['fluid', 'solid']),
+              Eq2(dest='fluid', sources=['fluid', 'solid']),
+          ]
+       ),
+       Group(
+          equations=[
+              Eq1(dest='solid', sources=['fluid', 'solid']),
+              Eq2(dest='solid', sources=['fluid', 'solid']),
+          ]
+       )
+  ]
+
+Note that basically the fluids are done first and then the solid particles are
+done. Obviously the first form is a lot more compact.
+
+While it may appear that the PySPH equations and groups are fairly complex,
+they actually do a lot of work for you and allow you to express the
+interactions in a rather compact form.
+
+When debugging it sometimes helps to look at the generated log file which will
+also print out the exact equations and groups that are being used.
 
 
 Conventions followed
