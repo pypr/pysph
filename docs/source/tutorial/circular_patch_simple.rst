@@ -593,7 +593,10 @@ this is a Python related error you should get a traceback and debug it as you
 would debug any Python program.
 
 PySPH writes out a log file in the output directory, looking at that is
-sometimes useful.
+sometimes useful. The log file will usually tell you the kernel, integrator,
+NNPS, and the exact equations and groups used for a simulation. This can be
+often be very useful when sorting out subtle issues with the equations and
+groups.
 
 Things get harder to debug when you get a segmentation fault or your code just
 crashes. Even though PySPH is implemented in Python you can get one of these
