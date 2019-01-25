@@ -6,10 +6,10 @@ Installation and getting started
 
 To install PySPH, you need a working Python environment with the required
 dependencies installed. You may use any of the available Python distributions.
-PySPH is currently tested with Python-2.6.x, 2.7.x and 3.4.x. If you are new
-to Python we recommend `Enthought Canopy`_ or EDM_. PySPH will work fine with
-Anaconda_ or other environments like WinPython_. The following instructions
-should help you get started.
+PySPH is currently tested with Python-2.7.x and 3.x. If you are new to Python
+we recommend `Enthought Canopy`_ or EDM_. PySPH will work fine with
+Miniconda_, Anaconda_ or other environments like WinPython_. The following
+instructions should help you get started.
 
 Since there is a lot of information here, we suggest that you skim the section
 on :ref:`dependencies` and then directly jump to one of the "Installing the
@@ -25,6 +25,7 @@ and links referred therein.
 .. _Enthought Canopy: https://www.enthought.com/products/canopy/
 .. _EDM: https://www.enthought.com/products/edm/
 .. _Anaconda: http://continuum.io/downloads
+.. _Miniconda: https://conda.io/miniconda.html
 
 
 .. _quick-install:
@@ -49,7 +50,7 @@ can download the sources either using the tarball/ZIP or from git, see
 The above will install the latest released version of PySPH, you can install
 the development version using::
 
-    $ pip install git+https://github.com/pypr/pysph.git#egg=PySPH
+    $ pip install https://github.com/pypr/pysph/zipball/master
 
 If you wish to track the development of the package, clone the repository (as
 described in :ref:`downloading-pysph` and do the following::
@@ -77,21 +78,26 @@ The core dependencies are:
   - NumPy_
   - Cython_ (version 0.20 and above)
   - Mako_
+  - cyarray_
+  - compyle_
   - pytest_ for running the unit tests.
 
+The project's `requirements.txt
+<https://github.com/pypr/pysph/tree/master/requirements.txt>`_ lists all the
+required core dependencies.
+
 These packages can be installed from your Python distribution's package
-manager, or using pip_ or ``easy_install``.  For more detailed instructions on
-how to do this for different distributions, see below.
+manager, or using pip_. For more detailed instructions on how to do this for
+different distributions, see below.
 
-On Python-2.6.x a few additional packages are needed and these are listed in
-the project's `requirements-2.6.txt
-<https://github.com/pypr/pysph/tree/master/requirements-2.6.txt>`_
+Running PySPH requires a working C/C++ compiler on your machine. On Linux/OS X
+the gcc toolchain will work well. On Windows, you will need to have a suitable
+MSVC compiler installed, see https://wiki.python.org/moin/WindowsCompilers for
+specific details.
 
-Running PySPH requires a working C/C++ compiler on your machine.  On Linux/OS X
-the gcc toolchain will work well.  On Windows, you will need to have `Microsoft
-Visual C++ Compiler for Python 2.7
-<http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_ or an
-equivalent compiler.  More details are available below.
+On Python 2.7 for example, you will need `Microsoft Visual C++ Compiler for
+Python 2.7 <http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_
+or an equivalent compiler. More details are available below.
 
 .. note::
 
@@ -104,6 +110,9 @@ equivalent compiler.  More details are available below.
 .. _pytest: https://www.pytest.org
 .. _Mako: https://pypi.python.org/pypi/Mako
 .. _pip: http://www.pip-installer.org
+.. _cyarray: https://pypi.python.org/pypi/cyarray
+.. _compyle: https://pypi.python.org/pypi/compyle
+
 
 ^^^^^^^^^^^^^^^^^^^^^^
 Optional dependencies
@@ -125,9 +134,9 @@ The optional dependencies are:
    convenient.
 
  - mpi4py_ and Zoltan_: If you want to use PySPH in parallel, you will need
-   mpi4py_ and the Zoltan_ data management library.  PySPH will work in serial
-   without mpi4py_ or Zoltan_.  Simple build instructions for Zoltan are
-   included below.
+   mpi4py_ and the Zoltan_ data management library along with the PyZoltan_
+   package. PySPH will work in serial without mpi4py_ or Zoltan_. Simple build
+   instructions for Zoltan are included below.
 
 Mayavi_ is packaged with all the major distributions and is easy to install.
 Zoltan_ is very unlikely to be already packaged and will need to be compiled.
@@ -138,28 +147,38 @@ Zoltan_ is very unlikely to be already packaged and will need to be compiled.
 .. _OpenMP: http://openmp.org/
 .. _PyOpenCL: https://documen.tician.de/pyopencl/
 .. _OpenCL: https://www.khronos.org/opencl/
+.. _PyZoltan: https://github.com/pypr/pyzoltan
+
 
 Building and linking PyZoltan on OSX/Linux
 -------------------------------------------
 
-We've provided a simple Zoltan build script in the repository.  This works on
-Linux and OS X but not on Windows.  It can be used as::
+If you want to use PySPH in parallel you will need to install PyZoltan_.
+PyZoltan requires the Zoltan library to be available. We've provided a simple
+`Zoltan build script
+<https://github.com/pypr/pyzoltan/blob/master/build_zoltan.sh>`_ in the
+PyZoltan_ repository. This works on Linux and OS X but not on Windows. It can
+be used as::
 
-    $ ./build_zoltan.sh INSTALL_PREFIX
+    $ ./build_zoltan.sh $INSTALL_PREFIX
 
-where the ``INSTALL_PREFIX`` is where the library and includes will be
+where the ``$INSTALL_PREFIX`` is where the library and includes will be
 installed.  You may edit and tweak the build to suit your installation.
 However, this script is what we use to build Zoltan on our continuous
 integration servers on Travis-CI_ and Shippable_.
 
 After Zoltan is build, set the environment variable ``ZOLTAN`` to point to the
-``INSTALL_PREFIX`` that you used above::
+``$INSTALL_PREFIX`` that you used above::
 
     $ export ZOLTAN=$INSTALL_PREFIX
 
 Note that replace ``$INSTALL_PREFIX`` with the directory you specified above.
-After this, follow the instructions to build PySPH. The PyZoltan wrappers will
-be compiled and available.
+After this, follow the instructions to build PyZoltan. The PyZoltan wrappers
+will be compiled and available.
+
+Now, when you build PySPH, it too needs to know where to link to Zoltan and
+you should keep the ``ZOLTAN`` environment variable set. This is only needed
+until PySPH is compiled, thereafter we do not need the environment variable.
 
 .. note::
 
@@ -268,11 +287,11 @@ OpenMP_. To use OpenMP_ on OSX, you can install the GCC available on brew_ using
     $ brew install gcc
 
 Once this is done, you need to use this as your default compiler. The ``gcc``
-formula on brew currently ships with gcc version 7. Therefore, you can
+formula on brew currently ships with gcc version 8. Therefore, you can
 tell Python to use the GCC installed by brew by setting::
 
-    $ export CC=gcc-7
-    $ export CXX=g++-7
+    $ export CC=gcc-8
+    $ export CXX=g++-8
 
 .. _brew: http://brew.sh/
 
@@ -374,17 +393,13 @@ from `here <https://pypi.python.org/pypi/mpi4py>`_. Then run the following
     $ export SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/
     $ python setup.py install
 
-Change the above environment variables to suite your SDK version.  If this
-installs correctly, mpi4py should be available.  You can now build Zoltan,
-(the script to do this is in the pysph sources, see :ref:`downloading-pysph`)
-::
+Change the above environment variables to suite your SDK version. If this
+installs correctly, mpi4py should be available.
 
-    $ cd pysph
-    $ ./build_zoltan.sh ~/zoltan # Replace ~/zoltan with what you want
-    $ export ZOLTAN=~/zoltan
-
-
-You should be set now and should move to :ref:`building-pysph`.
+You can then follow the instructions on how to build/install Zoltan and
+PyZoltan given above. You should be set now and should move to
+:ref:`building-pysph`. Just make sure you have set the ``ZOLTAN`` environment
+variable so PySPH knows where to find it.
 
 .. _Homebrew: http://brew.sh/
 
@@ -491,11 +506,20 @@ Once you are done with this, please skip ahead to
 .. _installing-visual-c++:
 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Installing Visual C++ Compiler for Python 2.7
+Installing Visual C++ Compiler for Python
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For all of the above Python distributions, it is highly recommended that you
-build PySPH with `Microsoft's Visual C++ for Python 2.7
+build PySPH with Microsoft's Visual C++ for Python. See see
+https://wiki.python.org/moin/WindowsCompilers for specific details for each
+version of Python. Note that different Python versions may have different
+compiler requirements.
+
+On Python 3.6 and above you should use `Microsoft's Build Tools for Visual
+Studio 2017
+<https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2017>`_.
+
+On Python 2.7 for example use `Microsoft's Visual C++ for Python 2.7
 <http://www.microsoft.com/en-us/download/details.aspx?id=44266>`_. We
 recommend that you download and install the ``VCForPython27.msi`` available
 from the `link
@@ -507,8 +531,9 @@ above you will need to install the .NET framework 3.5. Please look at the link
 given above, it should be fairly straightforward. Note that doing this will
 also get OpenMP_ working for you.
 
+
 After you do this, you will find a "Microsoft Visual C++ Compiler Package for
-Python 2.7" in your Start menu.  Choose a suitable command prompt from this
+Python" in your Start menu.  Choose a suitable command prompt from this
 menu for your architecture and start it (we will call this the MSVC command
 prompt).  You may make a short cut to it as you will need to use this command
 prompt to build PySPH and also run any of the examples.
@@ -899,31 +924,17 @@ Often users are able to install PySPH and run the examples but are unable to
 run ``pysph view`` for a variety of reasons. This section discusses how these
 could be resolved.
 
-The PySPH viewer uses Mayavi_ and while Mayavi itself is a Python package and
-can be installed with pip_, it depends on VTK_ which is harder to install and
-cannot be installed using pip.
+The PySPH viewer uses Mayavi_. Mayavi can be installed via pip. Mayavi depends
+on VTK_ which can also be installed via pip_ if your package manager does not
+have a suitable version.
 
 If you are using Ubuntu 16.04 or 16.10 or a VTK version built with Qt5, it is
 possible that you will see a strange segmentation fault when starting the
-viewer. This is because Mayavi uses Qt4 and the VTK build has linked to Qt5. In
-this case your only option is to not use Qt at all and use the wxPython_
-backend for Mayavi.  This can be done on Linux/OS X as follows::
-
-   $ export ETS_TOOLKIT=wx
-   $ pysph view ...
-
-The environment variable ``ETS_TOOLKIT`` tells Mayavi to use wxPython. By
-default, the Mayavi viewer will use the Qt backend. You will obviously need
-wxPython installed to use the wx backend. On Ubuntu this is available via::
-
-   $ sudo apt install python-wxgtk3.0
-
-With EDM_ one can do::
-
-   $ edm install wxpython
-
-If you have VTK installed but you want a more recent version of Mayavi, you
-can always use pip_ to install Mayavi.
+viewer. This is because Mayavi uses Qt4 and the VTK build has linked to Qt5.
+In these cases it may be best to use to use the latest `VTK wheels
+<https://pypi.org/project/vtk/>`_ that are now available on pypi. If you have
+VTK installed but you want a more recent version of Mayavi, you can always use
+pip_ to install Mayavi.
 
 For the very specific case of Mayavi on Ubuntu 16.04 and its derivatives, you
 can use Ubuntu's older VTK package like so::
@@ -948,5 +959,3 @@ the `pysph-users mailing list
 <mailto:pysph-users@googlegroups.com>`_.
 
 .. _VTK: http://www.vtk.org
-
-.. _wxPython: http://www.wxpython.org
