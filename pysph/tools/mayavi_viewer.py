@@ -150,7 +150,8 @@ class InterpolatorView(HasTraits):
     def _setup_interpolator(self):
         if self.interpolator is None:
             interpolator = Interpolator(
-                self.particle_arrays, num_points=self.num_points
+                self.particle_arrays, num_points=self.num_points,
+                use_shepard=False
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
