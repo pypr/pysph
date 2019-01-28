@@ -27,6 +27,14 @@ class InterpolateFunction(Equation):
             d_prop[d_idx] /= d_number_density[d_idx]
 
 
+class InterpolateSPH(Equation):
+    def initialize(self, d_idx, d_prop):
+        d_prop[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_rho, s_m, s_temp_prop, d_prop, WIJ):
+        d_prop[d_idx] += s_m[s_idx]/s_rho[s_idx]*WIJ*s_temp_prop[s_idx]
+
+
 def get_bounding_box(particle_arrays, tight=False, stretch=0.05):
     """Find the size of the domain given a sequence of particle arrays.
 
@@ -56,6 +64,7 @@ def get_bounding_box(particle_arrays, tight=False, stretch=0.05):
 
     return bounds
 
+
 def get_nx_ny_nz(num_points, bounds):
     """Given a number of points to use and the bounds, return a triplet
     of integers for a uniform mesh with approximately that many points.
@@ -83,7 +92,8 @@ class Interpolator(object):
     """
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
-                 x=None, y=None, z=None, domain_manager=None, equations=None):
+                 x=None, y=None, z=None, domain_manager=None,
+                 equations=None, use_shepard=True):
         """
         The x, y, z coordinates need not be specified, and if they are not,
         the bounds of the interpolated domain is automatically computed and
@@ -109,6 +119,9 @@ class Interpolator(object):
         equations: sequence
             A sequence of equations or groups.  Defaults to None.  This is
             used only if the default interpolation equations are inadequate.
+        use_shepard: bool
+            Use Shepard interpolation for the interpolation when no equations
+            are specified. If False, a simple SPH interpolation is performed.
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -125,12 +138,13 @@ class Interpolator(object):
         self.equations = equations
         self.func_eval = None
         self.domain_manager = domain_manager
+        self.use_shepard = use_shepard
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)
         else:
             self.set_interpolation_points(x=x, y=y, z=z)
 
-    #### Interpolator protocol ################################################
+    # ## Interpolator protocol ###############################################
     def set_interpolation_points(self, x=None, y=None, z=None):
         """Set the points on which we must interpolate the arrays.
 
@@ -206,7 +220,7 @@ class Interpolator(object):
             data = array.get(prop, only_real_particles=False)
             array.get('temp_prop', only_real_particles=False)[:] = data
 
-        self.func_eval.compute(0.0, 0.1) # These are junk arguments.
+        self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
         result = self.pa.prop.copy()
         result.shape = self.shape
         return result.squeeze()
@@ -224,7 +238,7 @@ class Interpolator(object):
         self._create_nnps(arrays)
         self.func_eval.update_particle_arrays(arrays)
 
-    #### Private protocol #####################################################
+    # ### Private protocol ###################################################
 
     def _create_nnps(self, arrays):
         # create the neighbor locator object
@@ -238,10 +252,11 @@ class Interpolator(object):
     def _create_default_points(self, bounds, shape):
         b = bounds
         n = shape
-        x, y, z = np.mgrid[b[0]:b[1]:n[0]*1j,
-                           b[2]:b[3]:n[1]*1j,
-                           b[4]:b[5]:n[2]*1j,
-                          ]
+        x, y, z = np.mgrid[
+            b[0]:b[1]:n[0]*1j,
+            b[2]:b[3]:n[1]*1j,
+            b[4]:b[5]:n[2]*1j,
+        ]
         return x, y, z
 
     def _create_particle_array(self, x, y, z):
@@ -267,8 +282,12 @@ class Interpolator(object):
     def _compile_acceleration_eval(self, arrays):
         names = [x.name for x in self.particle_arrays]
         if self.equations is None:
-            equations = [InterpolateFunction(dest='interpolate',
-                                             sources=names)]
+            if self.use_shepard:
+                equations = [InterpolateFunction(dest='interpolate',
+                                                 sources=names)]
+            else:
+                equations = [InterpolateSPH(dest='interpolate',
+                                            sources=names)]
         else:
             equations = self.equations
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
@@ -303,7 +322,6 @@ class Interpolator(object):
                 array.add_property(prop)
 
 
-
 def main(fname, prop, npoint):
     from pysph.solver.utils import load
     print("Loading", fname)
@@ -322,6 +340,7 @@ def main(fname, prop, npoint):
         mlab.pipeline.surface(src)
     mlab.pipeline.outline(src)
     mlab.show()
+
 
 if __name__ == '__main__':
     import sys
