@@ -201,8 +201,7 @@ class DensityCorrection(Tool):
         if self.freq == 0:
             pass
         elif self.count % self.freq == 0:
-            arrs = self.arrs
             self._sph_eval = self._get_sph_eval(self.corr)
-            self._sph_eval.update_particle_arrays(arrs)
+            self._sph_eval.update()
             self._sph_eval.evaluate()
         self.count += 1
