@@ -225,6 +225,19 @@ class Interpolator(object):
         result.shape = self.shape
         return result.squeeze()
 
+    def update(self, update_domain=True):
+        """Update the NNPS when particles have moved.
+
+        If the update_domain is False, the domain is not updated.
+
+        Use this when the arrays are the same but the particles have themselves
+        changed. If the particle arrays themselves change use the
+        `update_particle_arrays` method instead.
+        """
+        if update_domain:
+            self.nnps.update_domain()
+        self.nnps.update()
+
     def update_particle_arrays(self, particle_arrays):
         """Call this for a new set of particle arrays which have the
         same properties as before.
@@ -246,7 +259,6 @@ class Interpolator(object):
                          radius_scale=self.kernel.radius_scale,
                          domain=self.domain_manager,
                          cache=True)
-        self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
 
     def _create_default_points(self, bounds, shape):
