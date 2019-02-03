@@ -59,8 +59,11 @@ described in :ref:`downloading-pysph` and do the following::
     $ python setup.py develop
 
 The following instructions are more detailed and also show how optional
-dependencies can be installed.  Instructions on how to set things up on Windows
+dependencies can be installed. Instructions on how to set things up on Windows
 is also available below.
+
+If you are running into strange issues when you are setting up an installation
+with ZOLTAN, see here, :ref:`pip-cache-issues`.
 
 
 .. _dependencies:
@@ -163,9 +166,10 @@ be used as::
     $ ./build_zoltan.sh $INSTALL_PREFIX
 
 where the ``$INSTALL_PREFIX`` is where the library and includes will be
-installed.  You may edit and tweak the build to suit your installation.
-However, this script is what we use to build Zoltan on our continuous
-integration servers on Travis-CI_ and Shippable_.
+installed (remember, this script is in the PyZoltan repository and not in
+PySPH). You may edit and tweak the build to suit your installation. However,
+this script is what we use to build Zoltan on our continuous integration
+servers on Travis-CI_ and Shippable_.
 
 After Zoltan is build, set the environment variable ``ZOLTAN`` to point to the
 ``$INSTALL_PREFIX`` that you used above::
@@ -179,6 +183,10 @@ will be compiled and available.
 Now, when you build PySPH, it too needs to know where to link to Zoltan and
 you should keep the ``ZOLTAN`` environment variable set. This is only needed
 until PySPH is compiled, thereafter we do not need the environment variable.
+
+If you are running into strange issues when you are setting up pysph with
+ZOLTAN, see here, :ref:`pip-cache-issues`.
+
 
 .. note::
 
@@ -213,7 +221,7 @@ install the dependencies using::
 
 OpenMP_ is typically available but if it is not, it can be installed with::
 
-    $ sudo apt-get install libgomp1
+    $ sudo apt-get install libomp-dev
 
 If you need parallel support::
 
@@ -251,7 +259,7 @@ icc run the following commands `before` building PySPH::
 You should be set now and should skip to :ref:`downloading-pysph` and
 :ref:`building-pysph`.
 
-On recent versions of Ubuntu (16.04 and 16.10) there may be problems with
+On recent versions of Ubuntu (16.10 and 18.04) there may be problems with
 Mayavi viewer, and ``pysph view`` may not work correctly. To see how to
 resolve these, please look at :ref:`viewer-issues`.
 
@@ -264,6 +272,50 @@ resolve these, please look at :ref:`viewer-issues`.
 
 .. _Shippable: http://shippable.com
 .. _Travis-CI: http://travis-ci.org
+
+.. _installing-deps-ubuntu-1804:
+
+--------------------------------------------
+Installing the dependencies on Ubuntu 18.04
+--------------------------------------------
+
+On Ubuntu 18.04 it should be relatively simple to install PySPH with ZOLTAN as
+follows::
+
+  # For OpenMP
+  $ sudo apt-get install libomp-dev
+
+  # For Zoltan
+  $ sudo apt-get install openmpi-bin libopenmpi-dev libtrilinos-zoltan-dev
+
+  $ export ZOLTAN_INCLUDE=/usr/include/trilinos
+  $ export ZOLTAN_LIBRARY=/usr/lib/x86_64-linux-gnu
+  $ export USE_TRILINOS=1
+
+Now depending on your setup you can install the Python related dependencies.
+For example with conda_ you can do::
+
+  $ conda install -c conda-forge cython mako matplotlib jupyter pyside pytest \
+                     mock numpy-stl pytools
+
+  $ conda install -c conda-forge mpi4py
+
+Then you should be able to install pyzoltan and its dependency cyarray using::
+
+  $ pip install pyzoltan
+
+Finally, install PySPH with ::
+
+  $ pip install pysph
+
+Or with::
+
+  $ pip install --no-cache-dir pysph
+
+If you are having trouble due to pip's cache as discussed in
+:ref:`pip-cache-issues`.
+
+You should be all set now and should next consider :ref:`running-the-tests`.
 
 .. _installing-deps-osx:
 
@@ -700,7 +752,11 @@ Once you have the dependencies installed you can install PySPH with::
 
     $ pip install PySPH
 
-If you downloaded PySPH using git or used a tarball you can do::
+You can install the development version using::
+
+    $ pip install https://github.com/pypr/pysph/zipball/master
+
+If you downloaded PySPH using git_ or used a tarball you can do::
 
     $ python setup.py install
 
@@ -715,6 +771,29 @@ git you can update the sources and rebuild using::
     $ python setup.py develop
 
 You should be all set now and should next consider :ref:`running-the-tests`.
+
+
+.. _pip-cache-issues:
+
+Issues with the pip cache
+--------------------------
+
+Note that pip_ caches any packages it has built and installed earlier. So if
+you installed PySPH without Zoltan support, say and then uninstalled PySPH
+using::
+
+  $ pip uninstall pysph
+
+then if you try a ``pip install pysph`` again (and the PySPH version has not
+changed), pip_ will simply re-use the old build it made. You do not want this
+and want it to re-build PySPH to use ZOLTAN say, then you can do the
+following::
+
+
+  $ pip install --no-cache-dir pysph
+
+In this case, pip_ will disregard its default cache and freshly download and
+build PySPH. This is often handy.
 
 
 
