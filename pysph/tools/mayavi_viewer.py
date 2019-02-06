@@ -436,7 +436,7 @@ class ParticleArrayHelper(HasTraits):
     def _list_all_scalars_changed(self, list_all_scalars):
         pa = self.particle_array
         if list_all_scalars:
-            sc_list = pa.properties.keys()
+            sc_list = list(pa.properties.keys())
             self.scalar_list = sorted(set(sc_list + self.extra_scalars))
         else:
             if len(pa.output_property_arrays) > 0:
@@ -444,7 +444,7 @@ class ParticleArrayHelper(HasTraits):
                     set(pa.output_property_arrays + self.extra_scalars)
                 )
             else:
-                sc_list = pa.properties.keys()
+                sc_list = list(pa.properties.keys())
                 self.scalar_list = sorted(set(sc_list + self.extra_scalars))
 
     def _show_time_changed(self, value):
