@@ -433,7 +433,7 @@ cdef class ParticleArray:
             else:
                 return 0
 
-    cpdef remove_particles(self, indices):
+    cpdef remove_particles(self, indices, align=True):
         """ Remove particles whose indices are given in index_list.
 
         We repeatedly interchange the values of the last element and values from
@@ -469,7 +469,7 @@ cdef class ParticleArray:
                     indices = numpy.asarray(indices)
                 indices = to_device(indices.astype(numpy.uint32),
                                     backend=self.backend)
-            return self.gpu.remove_particles(indices)
+            return self.gpu.remove_particles(indices, align=align)
 
         cdef BaseArray index_list
         if isinstance(indices, BaseArray):
@@ -497,10 +497,10 @@ cdef class ParticleArray:
             stride = self.stride.get(name, 1)
             prop_array.remove(sorted_indices, 1, stride)
 
-        if index_list.length > 0:
+        if index_list.length > 0 and align:
             self.align_particles()
 
-    cpdef remove_tagged_particles(self, int tag):
+    cpdef remove_tagged_particles(self, int tag, bint align=True):
         """ Remove particles that have the given tag.
 
         Parameters
@@ -511,7 +511,7 @@ cdef class ParticleArray:
 
         """
         if self.gpu is not None and self.backend is not 'cython':
-            return self.gpu.remove_tagged_particles(tag)
+            return self.gpu.remove_tagged_particles(tag, align=align)
         cdef LongArray indices = LongArray()
         cdef IntArray tag_array = self.properties['tag']
         cdef int *tagarrptr = tag_array.get_data_ptr()
@@ -523,9 +523,9 @@ cdef class ParticleArray:
                 indices.append(i)
 
         # remove the particles.
-        self.remove_particles(indices)
+        self.remove_particles(indices, align=align)
 
-    def add_particles(self, **particle_props):
+    def add_particles(self, align=True, **particle_props):
         """
         Add particles in particle_array to self.
 
@@ -560,7 +560,7 @@ cdef class ParticleArray:
                 gpu_particle_props[prop] = to_device(
                         numpy.array(ary, dtype=dtype),
                         backend=self.backend)
-            return self.gpu.add_particles(**gpu_particle_props)
+            return self.gpu.add_particles(align=align, **gpu_particle_props)
 
         cdef int num_extra_particles, old_num_particles, new_num_particles
         cdef numpy.ndarray s_arr, nparr
@@ -592,13 +592,14 @@ cdef class ParticleArray:
                 nparr = arr.get_npy_array()
                 nparr[old_num_particles*stride:] = self.default_values[prop]
 
-        if num_extra_particles > 0:
+        if num_extra_particles > 0 and align:
             # make sure particles are aligned properly.
             self.align_particles()
 
         return 0
 
-    cpdef int append_parray(self, ParticleArray parray) except -1:
+    cpdef int append_parray(self, ParticleArray parray, bint align=True, 
+            bint update_constants=False) except -1:
         """ Add particles from a particle array
 
         properties that are not there in self will be added
@@ -607,7 +608,8 @@ cdef class ParticleArray:
             return 0
 
         if self.gpu is not None and self.backend is not 'cython':
-            self.gpu.append_parray(parray)
+            self.gpu.append_parray(parray, align=align,
+                                   update_constants=update_constants)
             return 0
 
         cdef int num_extra_particles = parray.get_number_of_particles()
@@ -647,10 +649,11 @@ cdef class ParticleArray:
                 nparr_source = source.get_npy_array()
                 nparr_dest[old_num_particles*stride:] = nparr_source
 
-        for const in parray.constants:
-            self.constants.setdefault(const, parray.constants[const])
+        if update_constants:
+            for const in parray.constants:
+                self.constants.setdefault(const, parray.constants[const])
 
-        if num_extra_particles > 0:
+        if num_extra_particles > 0 and align:
             self.align_particles()
 
         return 0
@@ -1163,7 +1166,51 @@ cdef class ParticleArray:
                 stride = self.stride.get(name, 1)
                 arr.c_align_array(index_array, stride)
 
-    cpdef ParticleArray extract_particles(self, indices, list props=None):
+    cpdef ParticleArray empty_clone(self, props=None):
+        """Creates an empty clone of the particle array
+        """
+        if self.gpu is not None and self.backend is not 'cython':
+            return self.gpu.empty_clone(props=props)
+
+        cdef ParticleArray result_array = ParticleArray()
+        cdef list output_arrays
+        cdef BaseArray src_arr
+        cdef int stride
+        cdef str prop_type, prop_name
+
+        if props is None:
+            prop_names = self.properties
+        else:
+            prop_names = props
+
+        for const in self.constants:
+            result_array.add_constant(const, data=self.constants[const])
+
+        for prop_name in prop_names:
+            prop_type = self.properties[prop_name].get_c_type()
+            prop_default = self.default_values[prop_name]
+            stride = self.stride.get(prop_name, 1)
+            result_array.add_property(name=prop_name,
+                                      type=prop_type,
+                                      default=prop_default,
+                                      stride=stride)
+
+        result_array.set_name(self.name)
+
+        if props is None:
+            output_arrays = list(self.output_property_arrays)
+        else:
+            output_arrays = list(
+                set(props).intersection(
+                    self.output_property_arrays
+                )
+            )
+
+        result_array.set_output_arrays(output_arrays)
+        return result_array
+
+    cpdef extract_particles(self, indices,
+            ParticleArray dest_array, bint align=True, list props=None):
         """Create new particle array for particles with indices in index_array
 
         Parameters
@@ -1192,7 +1239,8 @@ cdef class ParticleArray:
                 indices = to_device(
                         numpy.array(indices, dtype=numpy.uint32),
                         backend=self.backend)
-            return self.gpu.extract_particles(indices, props=props)
+            return self.gpu.extract_particles(indices, dest_array,
+                                              align=align, props=props)
 
         cdef BaseArray index_array
         if isinstance(indices, BaseArray):
@@ -1202,54 +1250,35 @@ cdef class ParticleArray:
             index_array = LongArray(indices.size)
             index_array.set_data(indices)
 
-        cdef ParticleArray result_array = ParticleArray()
         cdef list prop_names, output_arrays
         cdef BaseArray dst_prop_array, src_prop_array
         cdef str prop_type, prop
-        cdef int stride
+        cdef int stride, start_idx
 
         if props is None:
             prop_names = list(self.properties.keys())
         else:
             prop_names = props
 
-        for prop in prop_names:
-            prop_type = self.properties[prop].get_c_type()
-            prop_default = self.default_values[prop]
-            stride = self.stride.get(prop, 1)
-            result_array.add_property(name=prop,
-                                      type=prop_type,
-                                      default=prop_default, stride=stride)
-
         # now we have the result array setup.
         # resize it
         if index_array.length == 0:
-            return result_array
+            return
 
-        result_array.extend(index_array.length)
+        start_idx = dest_array.get_number_of_particles()
+
+        dest_array.extend(index_array.length)
 
         # copy the required indices for each property.
         for prop in prop_names:
             src_prop_array = self.get_carray(prop)
-            dst_prop_array = result_array.get_carray(prop)
+            dst_prop_array = dest_array.get_carray(prop)
             stride = self.stride.get(prop, 1)
-            src_prop_array.copy_values(index_array, dst_prop_array, stride)
+            src_prop_array.copy_values(index_array, dst_prop_array,
+                                       stride, start_idx)
 
-        for const in self.constants:
-            result_array.constants[const] = self.constants[const]
-
-        result_array.align_particles()
-        result_array.set_name(self.name)
-        if props is None:
-            output_arrays = list(self.output_property_arrays)
-        else:
-            output_arrays = list(
-                set(props).intersection(
-                    self.output_property_arrays
-                )
-            )
-        result_array.set_output_arrays(output_arrays)
-        return result_array
+        if align:
+            dest_array.align_particles()
 
     cpdef set_tag(self, long tag_value, LongArray indices):
         """Set value of tag to tag_value for the particles in indices """

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import logging
 import numpy as np
 from pytools import memoize_method
@@ -7,11 +8,38 @@ from compyle.array import get_backend, wrap_array, Array
 from compyle.parallel import Elementwise, Scan
 from compyle.api import declare, annotate
 from compyle.types import dtype_to_ctype
+from compyle.template import Template
 import compyle.array as array
 import pysph.base.particle_array
 
 
 logger = logging.getLogger()
+
+
+class ExtractParticles(Template):
+    def __init__(self, name, prop_names):
+        super(ExtractParticles, self).__init__(name=name)
+        self.prop_names = prop_names
+
+    def extra_args(self):
+        args = []
+        for prop in self.prop_names:
+            args.append('stride_%s' % prop)
+            args.append('dst_%s' % prop)
+            args.append('src_%s' % prop)
+        return args, {}
+
+    def template(self, i, indices, start_idx):
+        '''
+        idx, s_idx, s_i, j = declare('int', 4)
+        idx = indices[i]
+        % for prop in obj.prop_names:
+        s_idx = stride_${prop} * idx
+        s_i = stride_${prop} * i
+        for j in range(stride_${prop}):
+            dst_${prop}[start_idx + s_i + j] = src_${prop}[s_idx + j]
+        % endfor
+        '''
 
 
 class DeviceHelper(object):
@@ -147,7 +175,7 @@ class DeviceHelper(object):
                 if arg in self.properties:
                     p.add_property(arg)
                 if arg in self.constants:
-                    p.add_constant(arg)
+                    p.add_constant(arg, arg_cpu)
                 pa_arr = self._get_prop_or_const(arg)
             if arg_cpu.size != pa_arr.length:
                 pa_arr.resize(arg_cpu.size)
@@ -305,7 +333,7 @@ class DeviceHelper(object):
 
         return remove_knl, stride_knl
 
-    def _remove_particles_bool(self, if_remove):
+    def _remove_particles_bool(self, if_remove, align=True):
         """ Remove particle i if if_remove[i] is True
         """
         num_indices = int(array.sum(if_remove, backend=self.backend))
@@ -343,7 +371,8 @@ class DeviceHelper(object):
             self._data[prop].align(s_index)
             setattr(self, prop, self._data[prop])
 
-        self.align_particles()
+        if align:
+            self.align_particles()
 
     @memoize_method
     def _get_remove_particles_kernel(self):
@@ -357,12 +386,8 @@ class DeviceHelper(object):
 
         return fill_if_remove_knl
 
-    def remove_particles(self, indices):
+    def remove_particles(self, indices, align=True):
         """ Remove particles whose indices are given in index_list.
-
-        We repeatedly interchange the values of the last element and
-        values from the index_list and reduce the size of the array
-        by one. This is done for every property that is being maintained.
 
         Parameters
         ----------
@@ -370,19 +395,6 @@ class DeviceHelper(object):
         indices : array
             an array of indices, this array can be a list, numpy array
             or a LongArray.
-
-        Notes
-        -----
-
-        Pseudo-code for the implementation::
-
-            if index_list.length > number of particles
-                raise ValueError
-
-            sorted_indices <- index_list sorted in ascending order.
-
-            for every every array in property_array
-                array.remove(sorted_indices)
 
         """
         if len(indices) > self.get_number_of_particles():
@@ -397,9 +409,9 @@ class DeviceHelper(object):
         fill_if_remove_knl = self._get_remove_particles_kernel()
         fill_if_remove_knl(indices, if_remove, num_particles)
 
-        self._remove_particles_bool(if_remove)
+        self._remove_particles_bool(if_remove, align=align)
 
-    def remove_tagged_particles(self, tag):
+    def remove_tagged_particles(self, tag, align=True):
         """ Remove particles that have the given tag.
 
         Parameters
@@ -412,9 +424,9 @@ class DeviceHelper(object):
         tag_array = self.tag
         if_remove = wrap_array((tag_array.dev == tag).astype(np.int32),
                                self.backend)
-        self._remove_particles_bool(if_remove)
+        self._remove_particles_bool(if_remove, align=align)
 
-    def add_particles(self, **particle_props):
+    def add_particles(self, align=True, **particle_props):
         """
         Add particles in particle_array to self.
 
@@ -460,7 +472,7 @@ class DeviceHelper(object):
 
             self.update_prop(prop, arr)
 
-        if num_extra_particles > 0:
+        if num_extra_particles > 0 and align:
             # make sure particles are aligned properly.
             self.align_particles()
 
@@ -486,7 +498,7 @@ class DeviceHelper(object):
                 self._particle_array.default_values[prop]
             self.update_prop(prop, arr)
 
-    def append_parray(self, parray):
+    def append_parray(self, parray, align=True, update_constants=False):
         """ Add particles from a particle array
 
         properties that are not there in self will be added
@@ -526,68 +538,38 @@ class DeviceHelper(object):
                 source = parray.gpu.get_device_array(prop_name)
                 dest.dev[old_num_particles * stride:] = source.dev
 
-        for const in parray.gpu.constants:
-            if const not in self.constants:
-                arr = parray.gpu.get_device_array(const)
-                self.update_const(const, arr.copy())
+        if update_constants:
+            for const in parray.gpu.constants:
+                if const not in self.constants:
+                    arr = parray.gpu.get_device_array(const)
+                    self.update_const(const, arr.copy())
 
-        if num_extra_particles > 0:
+        if num_extra_particles > 0 and align:
             self.align_particles()
 
-    def extract_particles(self, indices, props=None):
-        """Create new particle array for particles with given indices
-
-        Parameters
-        ----------
-
-        indices : Array
-            indices of particles to be extracted.
-
-        props : list
-            the list of properties to extract, if None all properties
-            are extracted.
-
-        """
-        result_array = pysph.base.particle_array.ParticleArray()
-        result_array.set_name(self._particle_array.name)
-        result_array.set_device_helper(DeviceHelper(result_array,
-                                                    backend=self.backend))
-
+    def empty_clone(self, props=None):
         if props is None:
             prop_names = self.properties
         else:
             prop_names = props
 
-        if len(indices) == 0:
-            return result_array
+        result_array = pysph.base.particle_array.ParticleArray()
+        result_array.set_name(self._particle_array.name)
+        result_array.set_device_helper(DeviceHelper(result_array,
+                                                    backend=self.backend))
 
         for prop_name in prop_names:
             src_arr = self._data[prop_name]
             stride = self._particle_array.stride.get(prop_name, 1)
-
             prop_type = dtype_to_ctype(src_arr.dtype)
             prop_default = self._particle_array.default_values[prop_name]
             result_array.add_property(name=prop_name,
                                       type=prop_type,
-                                      default=prop_default, stride=stride)
-
-        s_indices = self._build_copy_indices_with_strides(indices)
-
-        result_array.gpu.extend(len(indices))
-
-        for prop in prop_names:
-            stride = self._particle_array.stride.get(prop, 1)
-            s_index = s_indices[stride]
-            src_arr = self._data[prop]
-            dst_arr = result_array.gpu.get_device_array(prop)
-            dst_arr.set_data(array.take(src_arr, s_index,
-                                        backend=self.backend))
+                                      default=prop_default,
+                                      stride=stride)
 
         for const in self.constants:
             result_array.gpu.update_const(const, self._data[const].copy())
-
-        result_array.gpu.align_particles()
-        result_array.set_name(self._particle_array.name)
 
         if props is None:
             output_arrays = list(self._particle_array.output_property_arrays)
@@ -601,32 +583,48 @@ class DeviceHelper(object):
         result_array.set_output_arrays(output_arrays)
         return result_array
 
-    @memoize_method
-    def _get_copy_indices_kernel(self):
-        @annotate(int='i, size, stride', guintp='indices, new_indices')
-        def fill_indices_elwise(i, indices, new_indices, size, stride):
-            tmp_idx, j_s = declare('unsigned int', 2)
-            for j_s in range(stride):
-                tmp_idx = i * stride + j_s
-                if tmp_idx < size:
-                    new_indices[tmp_idx] = indices[i] * stride + j_s
+    def extract_particles(self, indices, dest_array, align=True, props=None):
+        """Create new particle array for particles with given indices
 
-        fill_indices_knl = Elementwise(fill_indices_elwise,
-                                       backend=self.backend)
+        Parameters
+        ----------
 
-        return fill_indices_knl
+        indices : Array
+            indices of particles to be extracted.
 
-    def _build_copy_indices_with_strides(self, indices):
-        result = {1: indices}
-        n_indices = len(indices)
-        strides = set(self._particle_array.stride.values())
-        fill_indices_knl = self._get_copy_indices_kernel()
+        props : list
+            the list of properties to extract, if None all properties
+            are extracted.
 
-        for stride in strides:
-            sz = n_indices * stride
-            new_indices = array.empty(sz, dtype=np.uint32,
-                                      backend=self.backend)
-            fill_indices_knl(indices, new_indices, sz, stride)
-            result[stride] = new_indices
+        """
+        if props is None:
+            prop_names = self.properties
+        else:
+            prop_names = props
 
-        return result
+        if len(indices) == 0:
+            return
+
+        start_idx = dest_array.get_number_of_particles()
+
+        dest_array.gpu.extend(len(indices))
+
+        args_list = [indices, start_idx]
+
+        for prop in prop_names:
+            stride = self._particle_array.stride.get(prop, 1)
+            src_arr = self._data[prop]
+            dst_arr = dest_array.gpu.get_device_array(prop)
+
+            args_list.append(stride)
+            args_list.append(dst_arr)
+            args_list.append(src_arr)
+
+        extract_particles_knl = ExtractParticles('extract_particles_knl',
+                                                 prop_names).function
+        extract_particles_elwise = Elementwise(extract_particles_knl,
+                                               backend=self.backend)
+        extract_particles_elwise(*args_list)
+
+        if align:
+            dest_array.gpu.align_particles()

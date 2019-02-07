@@ -18,6 +18,7 @@ from compyle.config import get_config
 import unittest
 import pytest
 
+
 class PeriodicBox2DTestCase(unittest.TestCase):
     """Test the periodicity algorithms in the Domain Manager.
 
@@ -25,19 +26,24 @@ class PeriodicBox2DTestCase(unittest.TestCase):
     produces a constant density with summation density.
 
     """
+
     def common_setup(self):
         # create the particle arrays
-        L = 1.0; n = 10; dx = L/n; hdx = 1.5
+        L = 1.0
+        n = 10
+        dx = L / n
+        hdx = 1.5
         self.L = L
-        _x = np.arange(dx/2, L, dx)
-        self.vol = vol = dx*dx
+        _x = np.arange(dx / 2, L, dx)
+        self.vol = vol = dx * dx
 
         # fluid particles
         xx, yy = np.meshgrid(_x, _x)
 
-        x = xx.ravel(); y = yy.ravel() # particle positions
+        x = xx.ravel()
+        y = yy.ravel()  # particle positions
         p = self._get_pressure(x, y, 0.0)
-        h = np.ones_like(x) * hdx*dx   # smoothing lengths
+        h = np.ones_like(x) * hdx * dx   # smoothing lengths
         m = np.ones_like(x) * vol      # mass
         V = np.zeros_like(x)           # volumes
 
@@ -46,8 +52,9 @@ class PeriodicBox2DTestCase(unittest.TestCase):
         # particles and domain
         self.fluid = fluid
         self.domain = DomainManager(xmin=0, xmax=L, ymin=0, ymax=L,
-            periodic_in_x=True, periodic_in_y=True, backend=self.backend
-        )
+                                    periodic_in_x=True, periodic_in_y=True,
+                                    backend=self.backend
+                                    )
         self.kernel = get_compiled_kernel(Gaussian(dim=2))
 
     def pull(self, pa):
@@ -73,8 +80,8 @@ class PeriodicBox2DTestCase(unittest.TestCase):
 
         # the source arrays. First source is also the fluid
         sx, sy, sz, sh, sm = fluid.get('x', 'y', 'z', 'h', 'm',
-            only_real_particles=False
-        )
+                                       only_real_particles=False
+                                       )
 
         # initialize the fluid density and volume
         frho[:] = 0.0
@@ -82,11 +89,12 @@ class PeriodicBox2DTestCase(unittest.TestCase):
 
         # compute density on the fluid
         nbrs = UIntArray()
-        for i in range( fluid.num_real_particles ):
+        for i in range(fluid.num_real_particles):
             hi = fh[i]
 
             # compute density from the fluid from the source arrays
-            nnps.get_nearest_particles(src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
+            nnps.get_nearest_particles(
+                src_index=0, dst_index=0, d_idx=i, nbrs=nbrs)
             nnbrs = nbrs.length
 
             for indexj in range(nnbrs):
@@ -101,10 +109,10 @@ class PeriodicBox2DTestCase(unittest.TestCase):
                 )
 
             # check the number density and density by summation
-            voli = 1./fV[i]
-            #print voli, frho[i], fm[i], self.vol
-            self.assertAlmostEqual( voli, self.vol, 5 )
-            self.assertAlmostEqual( frho[i], fm[i]/voli, 14)
+            voli = 1. / fV[i]
+            # print voli, frho[i], fm[i], self.vol
+            self.assertAlmostEqual(voli, self.vol, 5)
+            self.assertAlmostEqual(frho[i], fm[i] / voli, 14)
 
 
 class PeriodicBox2DTestCaseCPU(PeriodicBox2DTestCase):
@@ -182,7 +190,7 @@ class ZOrderGPUPeriodicBox2D(PeriodicBox2DTestCaseOpenCL):
 
         p_expect = self._get_pressure(x, y, 0)
         diff = np.abs(p - p_expect).max()
-        message = "Pressure not equal, max diff: %s"%diff
+        message = "Pressure not equal, max diff: %s" % diff
         self.assertTrue(np.allclose(p, p_expect, atol=1e-14), message)
 
 
@@ -224,7 +232,7 @@ class BoxSortPeriodicBox2D(PeriodicBox2DTestCaseCPU):
 
         p_expect = self._get_pressure(x, y, 0)
         diff = np.abs(p - p_expect).max()
-        message = "Pressure not equal, max diff: %s"%diff
+        message = "Pressure not equal, max diff: %s" % diff
         self.assertTrue(np.allclose(p, p_expect, atol=1e-14), message)
 
 
@@ -245,24 +253,30 @@ class PeriodicBox3DTestCase(PeriodicBox2DTestCase):
     produces a constant density with summation density.
 
     """
+
     def setUp(self):
         # create the particle arrays
-        L = 1.0; n = 5; dx = L/n; hdx = 1.5
+        L = 1.0
+        n = 5
+        dx = L / n
+        hdx = 1.5
         self.L = L
-        self.vol = vol = dx*dx*dx
+        self.vol = vol = dx * dx * dx
 
         # fluid particles
-        xx, yy, zz = np.mgrid[dx/2:L:dx,dx/2:L:dx,dx/2:L:dx]
+        xx, yy, zz = np.mgrid[dx / 2:L:dx, dx / 2:L:dx, dx / 2:L:dx]
 
-        x = xx.ravel(); y = yy.ravel(); z = zz.ravel() # particle positions
+        x = xx.ravel()
+        y = yy.ravel()
+        z = zz.ravel()  # particle positions
         p = self._get_pressure(x, y, z)
-        h = np.ones_like(x) * hdx*dx   # smoothing lengths
+        h = np.ones_like(x) * hdx * dx   # smoothing lengths
         m = np.ones_like(x) * vol      # mass
         V = np.zeros_like(x)           # volumes
 
         fluid = get_particle_array(name='fluid', x=x, y=y, z=z,
-            h=h, m=m, V=V, p=p
-        )
+                                   h=h, m=m, V=V, p=p
+                                   )
 
         # particles and domain
         self.fluid = fluid
@@ -311,7 +325,7 @@ class PeriodicBox3DTestCase(PeriodicBox2DTestCase):
 
         p_expect = self._get_pressure(x, y, z)
         diff = np.abs(p - p_expect).max()
-        message = "Pressure not equal, max diff: %s"%diff
+        message = "Pressure not equal, max diff: %s" % diff
         self.assertTrue(np.allclose(p, p_expect, atol=1e-14), message)
 
 

@@ -409,6 +409,7 @@ cdef class CPUDomainManager(DomainManagerBase):
         self.use_double = True
         self.dtype = float
         self.dtype_max = np.finfo(self.dtype).max
+        self.ghosts = None
 
     #### Public protocol ################################################
     def update(self, *args, **kwargs):
@@ -442,10 +443,10 @@ cdef class CPUDomainManager(DomainManagerBase):
             self._update_gpu()
 
     #### Private protocol ###############################################
-    cdef _add_to_array(self, DoubleArray arr, double disp):
+    cdef _add_to_array(self, DoubleArray arr, double disp, int start=0):
         cdef int i
-        for i in range(arr.length):
-            arr.data[i] += disp
+        for i in range(arr.length - start):
+            arr.data[start + i] += disp
 
     cdef _box_wrap_periodic(self):
         """Box-wrap particles for periodicity
@@ -534,10 +535,10 @@ cdef class CPUDomainManager(DomainManagerBase):
 
         # locals
         cdef NNPSParticleArrayWrapper pa_wrapper
-        cdef ParticleArray pa, added
+        cdef ParticleArray pa, ghost_pa
         cdef DoubleArray x, y, z, xt, yt, zt
         cdef double xi, yi, zi
-        cdef int array_index, i, np
+        cdef int array_index, i, np, start
 
         # temporary indices for particles to be replicated
         cdef LongArray x_low, x_high, y_high, y_low, z_high, z_low, low, high
@@ -547,8 +548,16 @@ cdef class CPUDomainManager(DomainManagerBase):
         z_high = LongArray(); z_low = LongArray()
         low = LongArray(); high = LongArray()
 
+        if not self.ghosts:
+            self.ghosts = [pa_wrapper.pa.empty_clone() \
+                    for pa_wrapper in self.pa_wrappers]
+        else:
+            for ghost_pa in self.ghosts:
+                ghost_pa.resize(0)
+
         for array_index in range(narrays):
-            pa_wrapper = pa_wrappers[ array_index ]
+            ghost_pa = self.ghosts[array_index]
+            pa_wrapper = pa_wrappers[array_index]
             pa = pa_wrapper.pa
             x = pa_wrapper.x; y = pa_wrapper.y; z = pa_wrapper.z
 
@@ -572,22 +581,22 @@ cdef class CPUDomainManager(DomainManagerBase):
                     if ( (zi - zmin) <= cell_size ): z_low.append(i)
                     if ( (zmax - zi) <= cell_size ): z_high.append(i)
 
-
             # now treat each case separately and append to the main array
-            added = ParticleArray(x=None, y=None, z=None)
-            x = added.get_carray('x')
-            y = added.get_carray('y')
-            z = added.get_carray('z')
+            x = ghost_pa.get_carray('x')
+            y = ghost_pa.get_carray('y')
+            z = ghost_pa.get_carray('z')
             if periodic_in_x:
                 # x_low
-                copy = pa.extract_particles( x_low )
-                self._add_to_array(copy.get_carray('x'), xtranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(x_low, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('x'), xtranslate,
+                                   start=start)
 
                 # x_high
-                copy = pa.extract_particles( x_high )
-                self._add_to_array(copy.get_carray('x'), -xtranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(x_high, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('x'), -xtranslate,
+                                   start=start)
 
             if periodic_in_y:
                 # Now do the corners from the previous.
@@ -598,24 +607,28 @@ cdef class CPUDomainManager(DomainManagerBase):
                     if ( (yi - ymin) <= cell_size ): low.append(i)
                     if ( (ymax - yi) <= cell_size ): high.append(i)
 
-                copy = added.extract_particles(low)
-                self._add_to_array(copy.get_carray('y'), ytranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                ghost_pa.extract_particles(low, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('y'), ytranslate,
+                                   start=start)
 
-                copy = added.extract_particles(high)
-                self._add_to_array(copy.get_carray('y'), -ytranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                ghost_pa.extract_particles(high, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('y'), -ytranslate,
+                                   start=start)
 
                 # Add the actual y_high and y_low now.
                 # y_high
-                copy = pa.extract_particles( y_high )
-                self._add_to_array(copy.get_carray('y'), -ytranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(y_high, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('y'), -ytranslate,
+                                   start=start)
 
                 # y_low
-                copy = pa.extract_particles( y_low )
-                self._add_to_array(copy.get_carray('y'), ytranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(y_low, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('y'), ytranslate,
+                                   start=start)
 
             if periodic_in_z:
                 # Now do the corners from the previous.
@@ -626,28 +639,32 @@ cdef class CPUDomainManager(DomainManagerBase):
                     if ( (zi - zmin) <= cell_size ): low.append(i)
                     if ( (zmax - zi) <= cell_size ): high.append(i)
 
-                copy = added.extract_particles(low)
-                self._add_to_array(copy.get_carray('z'), ztranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                ghost_pa.extract_particles(low, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('z'), ztranslate,
+                                   start=start)
 
-                copy = added.extract_particles(high)
-                self._add_to_array(copy.get_carray('z'), -ztranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                ghost_pa.extract_particles(high, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('z'), -ztranslate,
+                                   start=start)
 
                 # Add the actual z_high and z_low now.
                 # z_high
-                copy = pa.extract_particles( z_high )
-                self._add_to_array(copy.get_carray('z'), -ztranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(z_high, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('z'), -ztranslate,
+                                   start=start)
 
                 # z_low
-                copy = pa.extract_particles( z_low )
-                self._add_to_array(copy.get_carray('z'), ztranslate)
-                added.append_parray(copy)
+                start = ghost_pa.get_number_of_particles()
+                pa.extract_particles(z_low, ghost_pa, align=False)
+                self._add_to_array(ghost_pa.get_carray('z'), ztranslate,
+                                   start=start)
 
-
-            added.tag[:] = Ghost
-            pa.append_parray(added)
+            ghost_pa.set_num_real_particles(ghost_pa.get_number_of_particles())
+            ghost_pa.tag[:] = Ghost
+            pa.append_parray(ghost_pa, align=False)
 
     cdef _compute_cell_size_for_binning(self):
         """Compute the cell size for the binning.

@@ -1,3 +1,4 @@
+from __future__ import print_function
 import numpy as np
 
 from pysph.base.nnps_base import DomainManagerBase
@@ -17,15 +18,19 @@ class GPUDomainManager(DomainManagerBase):
                  periodic_in_z=False, n_layers=2.0, backend=None):
         """Constructor"""
         DomainManagerBase.__init__(self, xmin=xmin, xmax=xmax,
-                ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
-                periodic_in_x=periodic_in_x, periodic_in_y=periodic_in_y,
-                periodic_in_z=periodic_in_z, n_layers=n_layers)
+                                   ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
+                                   periodic_in_x=periodic_in_x,
+                                   periodic_in_y=periodic_in_y,
+                                   periodic_in_z=periodic_in_z,
+                                   n_layers=n_layers)
 
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
 
         self.dtype_max = np.finfo(self.dtype).max
         self.backend = get_backend(backend)
+
+        self.ghosts = None
 
     def update(self, *args, **kwargs):
         """General method that is called before NNPS can bin particles.
@@ -91,24 +96,29 @@ class GPUDomainManager(DomainManagerBase):
     def _get_box_wrap_kernel(self):
         @annotate
         def box_wrap(i, x, y, z, xmin, ymin, zmin, xmax, ymax, zmax,
-                xtranslate, ytranslate, ztranslate,
-                periodic_in_x, periodic_in_y, periodic_in_z):
+                     xtranslate, ytranslate, ztranslate,
+                     periodic_in_x, periodic_in_y, periodic_in_z):
             if periodic_in_x:
-                if x[i] < xmin : x[i] = x[i] + xtranslate
-                if x[i] > xmax : x[i] = x[i] - xtranslate
+                if x[i] < xmin:
+                    x[i] = x[i] + xtranslate
+                if x[i] > xmax:
+                    x[i] = x[i] - xtranslate
 
             if periodic_in_y:
-                if y[i] < ymin : y[i] = y[i] + ytranslate
-                if y[i] > ymax : y[i] = y[i] - ytranslate
+                if y[i] < ymin:
+                    y[i] = y[i] + ytranslate
+                if y[i] > ymax:
+                    y[i] = y[i] - ytranslate
 
             if periodic_in_z:
-                if z[i] < zmin : z[i] = z[i] + ztranslate
-                if z[i] > zmax : z[i] = z[i] - ztranslate
+                if z[i] < zmin:
+                    z[i] = z[i] + ztranslate
+                if z[i] > zmax:
+                    z[i] = z[i] - ztranslate
 
         return Elementwise(box_wrap, backend=self.backend)
 
-
-    ###########################CHANGE FROM HERE####################################
+    ###########################CHANGE FROM HERE###############################
 
     def _box_wrap_periodic(self):
         """Box-wrap particles for periodicity
@@ -152,7 +162,7 @@ class GPUDomainManager(DomainManagerBase):
     def _get_ghosts_reduction_kernel(self):
         @annotate
         def map_func(i, periodic_in_x, periodic_in_y, periodic_in_z,
-                x, y, z, xmin, ymin, zmin, xmax, ymax, zmax, cell_size):
+                     x, y, z, xmin, ymin, zmin, xmax, ymax, zmax, cell_size):
             x_copies, y_copies, z_copies = declare('int', 3)
 
             x_copies = 1
@@ -160,16 +170,22 @@ class GPUDomainManager(DomainManagerBase):
             z_copies = 1
 
             if periodic_in_x:
-                if (x[i] - xmin) <= cell_size: x_copies += 1
-                if (xmax - x[i]) <= cell_size: x_copies += 1
+                if (x[i] - xmin) <= cell_size:
+                    x_copies += 1
+                if (xmax - x[i]) <= cell_size:
+                    x_copies += 1
 
             if periodic_in_y:
-                if (y[i] - ymin) <= cell_size: y_copies += 1
-                if (ymax - y[i]) <= cell_size: y_copies += 1
+                if (y[i] - ymin) <= cell_size:
+                    y_copies += 1
+                if (ymax - y[i]) <= cell_size:
+                    y_copies += 1
 
             if periodic_in_z:
-                if (z[i] - zmin) <= cell_size: z_copies += 1
-                if (zmax - z[i]) <= cell_size: z_copies += 1
+                if (z[i] - zmin) <= cell_size:
+                    z_copies += 1
+                if (zmax - z[i]) <= cell_size:
+                    z_copies += 1
 
             return x_copies * y_copies * z_copies - 1
 
@@ -180,7 +196,8 @@ class GPUDomainManager(DomainManagerBase):
     def _get_ghosts_scan_kernel(self):
         @annotate
         def inp_fill_ghosts(i, periodic_in_x, periodic_in_y, periodic_in_z,
-                x, y, z, xmin, ymin, zmin, xmax, ymax, zmax, cell_size):
+                            x, y, z, xmin, ymin, zmin, xmax, ymax, zmax,
+                            cell_size):
             x_copies, y_copies, z_copies = declare('int', 3)
 
             x_copies = 1
@@ -188,24 +205,30 @@ class GPUDomainManager(DomainManagerBase):
             z_copies = 1
 
             if periodic_in_x:
-                if (x[i] - xmin) <= cell_size: x_copies += 1
-                if (xmax - x[i]) <= cell_size: x_copies += 1
+                if (x[i] - xmin) <= cell_size:
+                    x_copies += 1
+                if (xmax - x[i]) <= cell_size:
+                    x_copies += 1
 
             if periodic_in_y:
-                if (y[i] - ymin) <= cell_size: y_copies += 1
-                if (ymax - y[i]) <= cell_size: y_copies += 1
+                if (y[i] - ymin) <= cell_size:
+                    y_copies += 1
+                if (ymax - y[i]) <= cell_size:
+                    y_copies += 1
 
             if periodic_in_z:
-                if (z[i] - zmin) <= cell_size: z_copies += 1
-                if (zmax - z[i]) <= cell_size: z_copies += 1
+                if (z[i] - zmin) <= cell_size:
+                    z_copies += 1
+                if (zmax - z[i]) <= cell_size:
+                    z_copies += 1
 
             return x_copies * y_copies * z_copies - 1
 
         @annotate
         def out_fill_ghosts(i, item, prev_item, periodic_in_x,
-                periodic_in_y, periodic_in_z, x, y, z,
-                xmin, ymin, zmin, xmax, ymax, zmax, cell_size, masks,
-                indices):
+                            periodic_in_y, periodic_in_z, x, y, z,
+                            xmin, ymin, zmin, xmax, ymax, zmax, cell_size,
+                            masks, indices):
             xleft, yleft, zleft = declare('int', 3)
             xright, yright, zright = declare('int', 3)
 
@@ -218,34 +241,39 @@ class GPUDomainManager(DomainManagerBase):
             zright = 0
 
             if periodic_in_x:
-                if (x[i] - xmin) <= cell_size: xright = 1
-                if (xmax - x[i]) <= cell_size: xleft = -1
+                if (x[i] - xmin) <= cell_size:
+                    xright = 1
+                if (xmax - x[i]) <= cell_size:
+                    xleft = -1
 
             if periodic_in_y:
-                if (y[i] - ymin) <= cell_size: yright = 1
-                if (ymax - y[i]) <= cell_size: yleft = -1
+                if (y[i] - ymin) <= cell_size:
+                    yright = 1
+                if (ymax - y[i]) <= cell_size:
+                    yleft = -1
 
             if periodic_in_z:
-                if (z[i] - zmin) <= cell_size: zright = 1
-                if (zmax - z[i]) <= cell_size: zleft = -1
+                if (z[i] - zmin) <= cell_size:
+                    zright = 1
+                if (zmax - z[i]) <= cell_size:
+                    zleft = -1
 
             xp, yp, zp = declare('int', 3)
             idx, mask = declare('int', 2)
 
             idx = prev_item
 
-            # NOTE: Use a while loop here?
             for xp in range(-1, 2):
-                if xp != 0 and ((xleft == 0 and xright == 0) or \
-                        (xp != xleft and xp != xright)):
+                if xp != 0 and ((xleft == 0 and xright == 0) or
+                                (xp != xleft and xp != xright)):
                     continue
                 for yp in range(-1, 2):
-                    if yp != 0 and ((yleft == 0 and yright == 0) or \
-                            (yp != yleft and yp != yright)):
+                    if yp != 0 and ((yleft == 0 and yright == 0) or
+                                    (yp != yleft and yp != yright)):
                         continue
                     for zp in range(-1, 2):
-                        if zp != 0 and ((zleft == 0 and zright == 0) or \
-                                (zp != zleft and zp != zright)):
+                        if zp != 0 and ((zleft == 0 and zright == 0) or
+                                        (zp != zleft and zp != zright)):
                             continue
                         if xp == 0 and yp == 0 and zp == 0:
                             continue
@@ -261,7 +289,7 @@ class GPUDomainManager(DomainManagerBase):
     def _get_translate_kernel(self):
         @annotate
         def translate(i, x, y, z, tag, xtranslate, ytranslate,
-                ztranslate, masks):
+                      ztranslate, masks):
             xmask, ymask, zmask, mask = declare('int', 4)
             mask = masks[i]
 
@@ -316,7 +344,16 @@ class GPUDomainManager(DomainManagerBase):
         scan_knl = self._get_ghosts_scan_kernel()
         translate_knl = self._get_translate_kernel()
 
-        for pa_wrapper in self.pa_wrappers:
+        if not self.ghosts:
+            self.ghosts = [pa_wrapper.pa.empty_clone()
+                           for pa_wrapper in self.pa_wrappers]
+        else:
+            for ghost_pa in self.ghosts:
+                ghost_pa.resize(0)
+
+        for i, pa_wrapper in enumerate(self.pa_wrappers):
+            ghost_pa = self.ghosts[i]
+
             x = pa_wrapper.pa.gpu.x
             y = pa_wrapper.pa.gpu.y
             z = pa_wrapper.pa.gpu.z
@@ -336,12 +373,10 @@ class GPUDomainManager(DomainManagerBase):
                      ymin=ymin, zmin=zmin, xmax=xmax, ymax=ymax, zmax=zmax,
                      cell_size=cell_size, masks=masks, indices=indices)
 
-            # FIXME: Use compyle templates for extracting particles
+            pa_wrapper.pa.extract_particles(indices, ghost_pa, align=False)
 
-            pa_ghost = pa_wrapper.pa.extract_particles(indices)
-
-            translate_knl(pa_ghost.gpu.x, pa_ghost.gpu.y, pa_ghost.gpu.z,
-                          pa_ghost.gpu.tag, xtranslate, ytranslate,
+            translate_knl(ghost_pa.gpu.x, ghost_pa.gpu.y, ghost_pa.gpu.z,
+                          ghost_pa.gpu.tag, xtranslate, ytranslate,
                           ztranslate, masks)
 
-            pa_wrapper.pa.append_parray(pa_ghost)
+            pa_wrapper.pa.append_parray(ghost_pa, align=False)

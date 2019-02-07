@@ -13,10 +13,11 @@ from pysph.sph.scheme import TVFScheme
 import numpy as np
 
 # domain and reference values
-L = 1.0; Umax = 1.0
+L = 1.0
+Umax = 1.0
 c0 = 10 * Umax
 rho0 = 1.0
-p0 = c0*c0*rho0
+p0 = c0 * c0 * rho0
 
 # Numerical setup
 hdx = 1.0
@@ -43,12 +44,12 @@ class LidDrivenCavity(Application):
         nx = self.options.nx
         if self.options.n_avg is not None:
             self.n_avg = self.options.n_avg
-        self.dx = L/nx
+        self.dx = L / nx
         self.re = self.options.re
         h0 = hdx * self.dx
-        self.nu = Umax*L/self.re
-        dt_cfl = 0.25 * h0/( c0 + Umax )
-        dt_viscous = 0.125 * h0**2/self.nu
+        self.nu = Umax * L / self.re
+        dt_cfl = 0.25 * h0 / (c0 + Umax)
+        dt_viscous = 0.125 * h0**2 / self.nu
         dt_force = 1.0
         self.tf = 10.0
         self.dt = min(dt_cfl, dt_viscous, dt_force)
@@ -69,24 +70,28 @@ class LidDrivenCavity(Application):
         dx = self.dx
         ghost_extent = 5 * dx
         # create all the particles
-        _x = np.arange( -ghost_extent - dx/2, L + ghost_extent + dx/2, dx )
-        x, y = np.meshgrid(_x, _x); x = x.ravel(); y = y.ravel()
+        _x = np.arange(-ghost_extent - dx / 2, L + ghost_extent + dx / 2, dx)
+        x, y = np.meshgrid(_x, _x)
+        x = x.ravel()
+        y = y.ravel()
 
         # sort out the fluid and the solid
         indices = []
         for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < L) ):
-                if ( (y[i] > 0.0) and (y[i] < L) ):
+            if ((x[i] > 0.0) and (x[i] < L)):
+                if ((y[i] > 0.0) and (y[i] < L)):
                     indices.append(i)
 
         # create the arrays
         solid = get_particle_array(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+        fluid = solid.empty_clone()
+        solid.extract_particles(indices, fluid)
+        fluid.set_name('fluid')
         solid.remove_particles(indices)
 
-        print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g"%(
+        print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g" % (
             self.re, fluid.get_number_of_particles(),
             solid.get_number_of_particles(), self.dt))
 
@@ -105,8 +110,8 @@ class LidDrivenCavity(Application):
         solid.rho[:] = rho0
 
         # volume is set as dx^2
-        fluid.V[:] = 1./volume
-        solid.V[:] = 1./volume
+        fluid.V[:] = 1. / volume
+        solid.V[:] = 1. / volume
 
         # smoothing lengths
         fluid.h[:] = hdx * dx
@@ -145,7 +150,8 @@ class LidDrivenCavity(Application):
         t, ke = get_ke_history(self.output_files, 'fluid')
         plt.clf()
         plt.plot(t, ke)
-        plt.xlabel('t'); plt.ylabel('Kinetic energy')
+        plt.xlabel('t')
+        plt.ylabel('Kinetic energy')
         fig = os.path.join(self.output_dir, "ke_history.png")
         plt.savefig(fig, dpi=300)
         return t, ke
@@ -155,7 +161,7 @@ class LidDrivenCavity(Application):
         from pysph.solver.utils import load
         from pysph.examples.ghia_cavity_data import get_u_vs_y, get_v_vs_x
         # interpolated velocities
-        _x = np.linspace(0,1,101)
+        _x = np.linspace(0, 1, 101)
         xx, yy = np.meshgrid(_x, _x)
 
         # take the last solution data
@@ -172,8 +178,8 @@ class LidDrivenCavity(Application):
             interp.update_particle_arrays(list(data['arrays'].values()))
             _u = interp.interpolate('u')
             _v = interp.interpolate('v')
-            _u.shape = 101,101
-            _v.shape = 101,101
+            _u.shape = 101, 101
+            _v.shape = 101, 101
             ui += _u
             vi += _v
 
@@ -181,19 +187,21 @@ class LidDrivenCavity(Application):
         vi /= self.n_avg
 
         # velocity magnitude
-        self.vmag = vmag = np.sqrt( ui**2 + vi**2 )
+        self.vmag = vmag = np.sqrt(ui**2 + vi**2)
         import matplotlib.pyplot as plt
 
         f = plt.figure()
 
         plt.streamplot(
-            xx, yy, ui, vi, density=(2, 2), #linewidth=5*vmag/vmag.max(),
+            xx, yy, ui, vi, density=(2, 2),  # linewidth=5*vmag/vmag.max(),
             color=vmag
         )
-        plt.xlim(0, 1); plt.ylim(0, 1)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
         plt.colorbar()
-        plt.xlabel('$x$'); plt.ylabel('$y$')
-        plt.title('Streamlines at %s seconds'%tf)
+        plt.xlabel('$x$')
+        plt.ylabel('$y$')
+        plt.title('Streamlines at %s seconds' % tf)
         fig = os.path.join(self.output_dir, 'streamplot.png')
         plt.savefig(fig, dpi=300)
 
@@ -226,6 +234,7 @@ class LidDrivenCavity(Application):
         fig = os.path.join(self.output_dir, 'centerline.png')
         plt.savefig(fig, dpi=300)
         return _x, ui, vi, ui_c, vi_c
+
 
 if __name__ == '__main__':
     app = LidDrivenCavity()
