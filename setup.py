@@ -59,6 +59,8 @@ try:
 except ImportError:
     HAVE_ZOLTAN = False
 
+base_includes = [] if sys.platform == 'win32' else ['/usr/local/include/']
+
 compiler = 'gcc'
 # compiler = 'intel'
 if compiler == 'intel':
@@ -118,6 +120,7 @@ def get_openmp_flags():
         fp.write(test_code)
     extension = Extension(
         name='check_omp', sources=[fname],
+        include_dirs=base_includes,
         extra_compile_args=omp_compile_flags,
         extra_link_args=omp_link_flags,
     )
@@ -272,6 +275,7 @@ def get_basic_extensions():
         import numpy
         include_dirs = [numpy.get_include()]
 
+    include_dirs += base_includes
     openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
     ext_modules = [
@@ -549,6 +553,8 @@ def get_parallel_extensions():
     # get the MPI flags and are not successful.
     if not HAVE_MPI:
         return []
+
+    include_dirs += base_includes
 
     MPI4PY_V2 = False if mpi4py.__version__.startswith('1.') else True
     cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
