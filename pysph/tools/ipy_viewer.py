@@ -242,10 +242,17 @@ class Viewer2DWidgets(object):
             max=file_count,
             step=1,
             value=0,
-            description='frame',
-            layout=widgets.Layout(width='600px'),
-            continuous_update=False,
+            description='Frame',
+            layout=widgets.Layout(width='500px'),
+            continuous_update=False
         )
+        self.play_button = widgets.Play(
+        	min=0,
+        	max=file_count,
+        	step=1,
+        	disabled=False
+        )
+        widgets.jslink((self.frame, 'value'), (self.play_button, 'value'))
         self.save_figure = widgets.Text(
                 value='',
                 placeholder='example.pdf',
@@ -271,7 +278,12 @@ class Viewer2DWidgets(object):
                     HBox(
                         items,
                     ),
-                    self.frame,
+                    HBox(
+                    	[
+                    		self.play_button,
+                    		self.frame                    	
+                    	]
+                    ),
                     self.save_figure
                 ]
             )
