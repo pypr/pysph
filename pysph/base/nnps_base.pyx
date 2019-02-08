@@ -1279,7 +1279,7 @@ cdef class NNPS(NNPSBase):
                 _entry.second = gids[_id]
                 _data[i] = _entry
             # Sort it.
-            sort(_data.begin(), _data.end(), _compare_gids)
+            sort(_data.begin(), _data.end(), &_compare_gids)
             # Set the sorted neighbors.
             for i in range(length):
                 nbrs[i] = _data[i].first
