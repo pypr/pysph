@@ -18,6 +18,7 @@ class Viewer(object):
 
         self.path = path
         self.paths_list = get_files(path)
+        self._delta_t = -1
 
         # Caching #
         # Note : Caching is only used by get_frame and widget handlers.
@@ -252,7 +253,13 @@ class Viewer2DWidgets(object):
         	step=1,
         	disabled=False
         )
-        widgets.jslink((self.frame, 'value'), (self.play_button, 'value'))
+        self.link = widgets.jslink((self.frame, 'value'), (self.play_button, 'value'))
+        self.delay_box = widgets.FloatText(
+            value=0.2,
+            description='Delay',
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
         self.save_figure = widgets.Text(
                 value='',
                 placeholder='example.pdf',
@@ -284,7 +291,12 @@ class Viewer2DWidgets(object):
                     		self.frame                    	
                     	]
                     ),
-                    self.save_figure
+                    HBox(
+                        [
+                            self.delay_box,
+                            self.save_figure
+                        ]
+                    )                    
                 ]
             )
 
@@ -313,6 +325,7 @@ class Viewer2D(Viewer):
         widgets = self._widgets
         widgets.frame.observe(self._frame_handler, 'value')
         widgets.save_figure.on_submit(self._save_figure_handler)
+        widgets.delay_box.observe(self._delay_box_handler, 'value')
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = widgets.particles[array_name]
@@ -640,6 +653,9 @@ class Viewer2D(Viewer):
                 break
         self._widgets.save_figure.value = ""
 
+    def _delay_box_handler(self, change):
+        self._widgets.play_button.interval = (change['new'])*1000
+
 
 class ParticleArrayWidgets3D(object):
 
@@ -700,8 +716,7 @@ class ParticleArrayWidgets3D(object):
             self.vector_size,
             self.scalar_size,
             self.scalar_cmap,
-
-        ],
+        	],
             layout=Layout(border='1px solid', margin='3px', min_width='320px')
         )
 
