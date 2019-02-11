@@ -243,8 +243,24 @@ class Viewer2DWidgets(object):
             step=1,
             value=0,
             description='frame',
-            layout=widgets.Layout(width='600px'),
+            layout=widgets.Layout(width='500px'),
             continuous_update=False,
+        )
+        self.play_button = widgets.Play(
+            min=0,
+            max=file_count,
+            step=1,
+            disabled=False
+        )
+        self.link = widgets.jslink(
+            (self.frame, 'value'),
+            (self.play_button, 'value')
+        )
+        self.delay_box = widgets.FloatText(
+            value=0.2,
+            description='Delay',
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
         )
         self.save_figure = widgets.Text(
                 value='',
@@ -271,8 +287,18 @@ class Viewer2DWidgets(object):
                     HBox(
                         items,
                     ),
-                    self.frame,
-                    self.save_figure
+                    HBox(
+                     [
+                        self.play_button,
+                        self.frame
+                     ]
+                    ),
+                    HBox(
+                     [
+                        self.delay_box,
+                        self.save_figure
+                     ]
+                    )
                 ]
             )
 
@@ -301,6 +327,7 @@ class Viewer2D(Viewer):
         widgets = self._widgets
         widgets.frame.observe(self._frame_handler, 'value')
         widgets.save_figure.on_submit(self._save_figure_handler)
+        widgets.delay_box.observe(self._delay_box_handler, 'value')
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = widgets.particles[array_name]
@@ -627,6 +654,9 @@ class Viewer2D(Viewer):
                 )
                 break
         self._widgets.save_figure.value = ""
+
+    def _delay_box_handler(self, change):
+        self._widgets.play_button.interval = change['new']*1000
 
 
 class ParticleArrayWidgets3D(object):
