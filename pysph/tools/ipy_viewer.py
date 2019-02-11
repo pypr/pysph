@@ -18,7 +18,6 @@ class Viewer(object):
 
         self.path = path
         self.paths_list = get_files(path)
-        self._delta_t = -1
 
         # Caching #
         # Note : Caching is only used by get_frame and widget handlers.
@@ -243,17 +242,20 @@ class Viewer2DWidgets(object):
             max=file_count,
             step=1,
             value=0,
-            description='Frame',
+            description='frame',
             layout=widgets.Layout(width='500px'),
-            continuous_update=False
+            continuous_update=False,
         )
         self.play_button = widgets.Play(
-        	min=0,
-        	max=file_count,
-        	step=1,
-        	disabled=False
+            min=0,
+            max=file_count,
+            step=1,
+            disabled=False
         )
-        self.link = widgets.jslink((self.frame, 'value'), (self.play_button, 'value'))
+        self.link = widgets.jslink(
+            (self.frame, 'value'),
+            (self.play_button, 'value')
+        )
         self.delay_box = widgets.FloatText(
             value=0.2,
             description='Delay',
@@ -286,17 +288,17 @@ class Viewer2DWidgets(object):
                         items,
                     ),
                     HBox(
-                    	[
-                    		self.play_button,
-                    		self.frame                    	
-                    	]
+                     [
+                        self.play_button,
+                        self.frame
+                     ]
                     ),
                     HBox(
-                        [
-                            self.delay_box,
-                            self.save_figure
-                        ]
-                    )                    
+                     [
+                        self.delay_box,
+                        self.save_figure
+                     ]
+                    )
                 ]
             )
 
@@ -654,7 +656,7 @@ class Viewer2D(Viewer):
         self._widgets.save_figure.value = ""
 
     def _delay_box_handler(self, change):
-        self._widgets.play_button.interval = (change['new'])*1000
+        self._widgets.play_button.interval = change['new']*1000
 
 
 class ParticleArrayWidgets3D(object):
@@ -716,7 +718,8 @@ class ParticleArrayWidgets3D(object):
             self.vector_size,
             self.scalar_size,
             self.scalar_cmap,
-        	],
+
+        ],
             layout=Layout(border='1px solid', margin='3px', min_width='320px')
         )
 
