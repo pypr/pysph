@@ -1,6 +1,6 @@
 """SPHERIC benchmark case 6. (2 hours)
 
-See https://wiki.manchester.ac.uk/spheric/index.php/Test6 for more details.
+See http://spheric-sph.org/tests/test-6 for more details.
 """
 
 # math
