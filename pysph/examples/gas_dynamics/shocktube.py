@@ -172,11 +172,10 @@ class ShockTube2D(Application):
         print(gamma)
         riemann_solver.set_gamma(gamma)
         rho_e, u_e, p_e, e_e, x_e = riemann_solver.solve(
-            x_min=-0.5, x_max=0.5, x_0=0,
+            x_min=0, x_max=1, x_0=0.5,
             t=self.tf, p_l=self.pl, p_r=self.pr, rho_l=self.rhol,
             rho_r=self.rhor, u_l=self.ul, u_r=self.ur, N=101
         )
-        x_e = x_e + self.x0
 
         x = pa.x
         u = pa.u
