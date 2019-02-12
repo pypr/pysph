@@ -14,6 +14,7 @@ import numpy as np
 
 # Local imports
 from pysph.tools.interpolator import get_nx_ny_nz, Interpolator
+from pysph.base.nnps_base import DomainManager
 from pysph.base.utils import get_particle_array
 
 
@@ -81,7 +82,7 @@ class TestGetNxNyNz(unittest.TestCase):
 class TestInterpolator(unittest.TestCase):
     def _make_2d_grid(self, name='fluid'):
         n = 11
-        x, y = np.mgrid[-1:1:n*1j,-1:1:n*1j]
+        x, y = np.mgrid[-1:1:n*1j, -1:1:n*1j]
         dx = 2.0/(n-1)
         z = np.zeros_like(x)
         x, y, z = x.ravel(), y.ravel(), z.ravel()
@@ -106,6 +107,30 @@ class TestInterpolator(unittest.TestCase):
         self.assertTrue(np.allclose(p, expect))
         expect = np.ones_like(u)*0.1
         self.assertTrue(np.allclose(u, expect))
+
+    def test_should_work_without_shepard(self):
+        # Given
+        pa = self._make_2d_grid()
+        dx = 0.2
+        pa.rho[:] = pa.m/(dx*dx)
+        x0 = 1 + dx/2
+        domain = DomainManager(
+            xmin=-x0, xmax=x0, ymin=-x0, ymax=x0,
+            periodic_in_x=True, periodic_in_y=True
+        )
+
+        # When.
+        ip = Interpolator(
+            [pa], num_points=1000, domain_manager=domain, use_shepard=False
+        )
+        p = ip.interpolate('p')
+        u = ip.interpolate('u')
+
+        # Then.
+        expect = np.ones_like(p)*2.0
+        np.testing.assert_allclose(p, expect, rtol=1e-3)
+        expect = np.ones_like(u)*0.1
+        np.testing.assert_allclose(u, expect, rtol=1e-3)
 
     def test_should_work_with_multiple_arrays(self):
         # Given

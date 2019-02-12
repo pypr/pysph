@@ -52,7 +52,27 @@ class SPHEvaluator(object):
         """
         self.func_eval.compute(t, dt)
 
+    def update(self, update_domain=True):
+        """Update the NNPS when particles have moved.
+
+        If the update_domain is False, the domain is not updated.
+
+        Use this when the arrays are the same but the particles have themselves
+        changed. If the particle arrays themselves change use the
+        `update_particle_arrays` method instead.
+        """
+        if update_domain:
+            self.nnps.update_domain()
+        self.nnps.update()
+
     def update_particle_arrays(self, arrays):
+        """Call this for a new set of particle arrays which have the
+        same properties as before.
+
+        For example, if you are reading the particle array data from files,
+        each time you load a new file a new particle array is read with the
+        same properties.  Call this function to reset the arrays.
+        """
         self._create_nnps(arrays)
         self.func_eval.update_particle_arrays(arrays)
 
@@ -63,5 +83,4 @@ class SPHEvaluator(object):
             radius_scale=self.kernel.radius_scale,
             domain=self.domain_manager, cache=True
         )
-        self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
