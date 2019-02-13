@@ -583,7 +583,7 @@ class DeviceHelper(object):
         result_array.set_output_arrays(output_arrays)
         return result_array
 
-    def extract_particles(self, indices, dest_array, align=True, props=None):
+    def extract_particles(self, indices, dest_array=None, align=True, props=None):
         """Create new particle array for particles with given indices
 
         Parameters
@@ -597,13 +597,16 @@ class DeviceHelper(object):
             are extracted.
 
         """
+        if not dest_array:
+            dest_array = self.empty_clone(props=props)
+
         if props is None:
             prop_names = self.properties
         else:
             prop_names = props
 
         if len(indices) == 0:
-            return
+            return dest_array
 
         start_idx = dest_array.get_number_of_particles()
 
@@ -628,3 +631,5 @@ class DeviceHelper(object):
 
         if align:
             dest_array.gpu.align_particles()
+
+        return dest_array

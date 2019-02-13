@@ -1209,8 +1209,8 @@ cdef class ParticleArray:
         result_array.set_output_arrays(output_arrays)
         return result_array
 
-    cpdef extract_particles(self, indices,
-            ParticleArray dest_array, bint align=True, list props=None):
+    cpdef ParticleArray extract_particles(self, indices,
+            ParticleArray dest_array=None, bint align=True, list props=None):
         """Create new particle array for particles with indices in index_array
 
         Parameters
@@ -1239,8 +1239,11 @@ cdef class ParticleArray:
                 indices = to_device(
                         numpy.array(indices, dtype=numpy.uint32),
                         backend=self.backend)
-            return self.gpu.extract_particles(indices, dest_array,
+            return self.gpu.extract_particles(indices, dest_array=dest_array,
                                               align=align, props=props)
+
+        if not dest_array:
+            dest_array = self.empty_clone(props=props)
 
         cdef BaseArray index_array
         if isinstance(indices, BaseArray):
@@ -1263,7 +1266,7 @@ cdef class ParticleArray:
         # now we have the result array setup.
         # resize it
         if index_array.length == 0:
-            return
+            return dest_array
 
         start_idx = dest_array.get_number_of_particles()
 
@@ -1280,6 +1283,8 @@ cdef class ParticleArray:
         if align:
             dest_array.align_particles()
 
+        return dest_array
+
     cpdef set_tag(self, long tag_value, LongArray indices):
         """Set value of tag to tag_value for the particles in indices """
         cdef LongArray tag_array = self.get_carray('tag')
@@ -1288,8 +1293,8 @@ cdef class ParticleArray:
         for i in range(indices.length):
             tag_array.data[indices.data[i]] = tag_value
 
-    cpdef copy_properties(self, ParticleArray source, long start_index=-1, long
-                          end_index=-1):
+    cpdef copy_properties(self, ParticleArray source, long start_index=-1,
+                          long end_index=-1):
         """ Copy properties from source to self
 
         Parameters

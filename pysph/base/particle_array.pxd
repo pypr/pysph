@@ -110,7 +110,7 @@ cdef class ParticleArray:
 
     # create a new particle array with the given particles indices and the
     # properties.
-    cpdef extract_particles(self, indices, ParticleArray dest_array,
+    cpdef ParticleArray extract_particles(self, indices, ParticleArray dest_array=*,
                             bint align=*, list props=*)
 
     # set the tag value for the particles
