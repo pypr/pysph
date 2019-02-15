@@ -218,16 +218,14 @@ class MovingSquare(Application):
 
         # now sort out the interior from all particles
         indices = _get_interior(solid.x, solid.y)
-        fluid = solid.empty_clone()
-        solid.extract_particles(indices, fluid)
+        fluid = solid.extract_particles(indices)
         fluid.set_name('fluid')
 
         solid.remove_particles(indices)
 
         # sort out the obstacle from the interior
         indices = _get_obstacle(fluid.x, fluid.y)
-        obstacle = fluid.empty_clone()
-        fluid.extract_particles(indices, obstacle)
+        obstacle = fluid.extract_particles(indices)
         obstacle.set_name('obstacle')
 
         fluid.remove_particles(indices)

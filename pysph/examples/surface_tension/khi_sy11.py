@@ -134,13 +134,11 @@ class KHISY11(Application):
 
         # extract the top and bottom boundary particles
         indices = numpy.where(fluid.y > domain_height)[0]
-        wall = fluid.empty_clone()
-        fluid.extract_particles(indices, wall)
+        wall = fluid.extract_particles(indices)
         fluid.remove_particles(indices)
 
         indices = numpy.where(fluid.y < 0)[0]
-        bottom = fluid.empty_clone()
-        fluid.extract_particles(indices, bottom)
+        bottom = fluid.extract_particles(indices)
         fluid.remove_particles(indices)
 
         # concatenate the two boundaries

@@ -355,15 +355,13 @@ class DamBreak3DGeometry(object):
         # extract the individual arrays
         fa = LongArray(len(findices))
         fa.set_data(numpy.array(findices))
-        fluid = pa.empty_clone()
-        pa.extract_particles(fa, fluid)
+        fluid = pa.extract_particles(fa)
         fluid.set_name('fluid')
 
         if self.with_obstacle:
             oa = LongArray(len(oindices))
             oa.set_data(numpy.array(oindices))
-            obstacle = pa.empty_clone()
-            pa.extract_particles(oa, obstacle)
+            obstacle = pa.extract_particles(oa)
             obstacle.set_name('obstacle')
 
         indices = concatenate((where(y <= -cw2)[0],
@@ -377,8 +375,7 @@ class DamBreak3DGeometry(object):
 
         wa = LongArray(indices.size)
         wa.set_data(indices)
-        boundary = pa.empty_clone()
-        pa.extract_particles(wa, boundary)
+        boundary = pa.extract_particles(wa)
         boundary.set_name('boundary')
 
         # create the particles

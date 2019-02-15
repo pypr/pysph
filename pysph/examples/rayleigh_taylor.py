@@ -66,8 +66,7 @@ class RayleighTaylor(Application):
         solid = get_particle_array(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.empty_clone()
-        solid.extract_particles(indices, fluid)
+        fluid = solid.extract_particles(indices)
         fluid.set_name('fluid')
         solid.remove_particles(indices)
 
@@ -77,8 +76,7 @@ class RayleighTaylor(Application):
             if fluid.y[i] > 1 - 0.15 * np.sin(2 * np.pi * fluid.x[i]):
                 indices.append(i)
 
-        fluid1 = fluid.empty_clone()
-        fluid.extract_particles(indices, fluid1)
+        fluid1 = fluid.extract_particles(indices)
         fluid1.set_name('fluid1')
         fluid2 = fluid
         fluid2.set_name('fluid2')

@@ -75,8 +75,7 @@ class LatticeCylinders(Application):
         solid = get_particle_array(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.empty_clone()
-        solid.extract_particles(indices, fluid)
+        fluid = solid.extract_particles(indices)
         fluid.set_name('fluid')
         solid.remove_particles(indices)
 

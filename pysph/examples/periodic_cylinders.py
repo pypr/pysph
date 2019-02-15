@@ -91,8 +91,7 @@ class PeriodicCylinders(Application):
         solid = get_particle_array(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.empty_clone()
-        solid.extract_particles(indices, fluid)
+        fluid = solid.extract_particles(indices)
         fluid.set_name('fluid')
         solid.remove_particles(indices)
 
@@ -162,8 +161,7 @@ class PeriodicCylinders(Application):
         cx = 0.5 * L
         cy = 0.5 * H
         inside = np.sqrt((x-cx)**2 + (y-cy)**2) <= a
-        dest = solid.empty_clone()
-        solid.extract_particles(inside.nonzero()[0], dest)
+        dest = solid.extract_particles(inside.nonzero()[0])
         # We use the same equations for this as the simulation, except that we
         # do not include the acceleration terms as these are externally
         # imposed.  The goal of these is to find the force of the fluid on the
