@@ -1,8 +1,8 @@
 numpy
 setuptools>=6.0
 Cython>=0.20
-cyarray
-compyle
+https://github.com/pypr/cyarray/zipball/master
+https://github.com/pypr/compyle/zipball/master
 mako
 pytools
 Beaker

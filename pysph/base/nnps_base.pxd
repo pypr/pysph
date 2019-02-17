@@ -147,12 +147,13 @@ cdef class NNPSParticleArrayWrapper:
     # get the number of particles
     cdef int get_number_of_particles(self)
 
+
 cdef class DomainManager:
     cdef public object backend
     cdef public object manager
 
-# Domain limits for the simulation
-cdef class CPUDomainManager:
+
+cdef class DomainManagerBase:
     cdef public double xmin, xmax
     cdef public double ymin, ymax
     cdef public double zmin, zmax
@@ -173,16 +174,24 @@ cdef class CPUDomainManager:
     cdef public double radius_scale  # Radius scale for kernel
     cdef public double n_layers      # Number of layers of ghost particles
 
-    cdef double dbl_max              # Maximum value of double
+    #cdef double dbl_max              # Maximum value of double
 
     # remove ghost particles from a previous iteration
-    cdef _remove_ghosts(self)
+    cpdef _remove_ghosts(self)
+
+
+# Domain limits for the simulation
+cdef class CPUDomainManager(DomainManagerBase):
+    cdef public bint use_double
+    cdef public object dtype
+    cdef public double dtype_max
+    cdef public list ghosts
 
     # box-wrap particles within the physical domain
     cdef _box_wrap_periodic(self)
 
     # Convenience function to add a value to a carray
-    cdef _add_to_array(self, DoubleArray arr, double disp)
+    cdef _add_to_array(self, DoubleArray arr, double disp, int start=*)
 
     # create new ghosts
     cdef _create_ghosts_periodic(self)

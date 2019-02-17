@@ -63,26 +63,31 @@ from pysph.sph.basic_equations import XSPHCorrection, \
     MonaghanArtificialViscosity
 
 # domain and reference values
-Lx = 2.0; Ly = 1.0; H = 0.9
+Lx = 2.0
+Ly = 1.0
+H = 0.9
 gy = -1.0
 Vmax = np.sqrt(abs(gy) * H)
-c0 = 10 * Vmax; rho0 = 1000.0
-p0 = c0*c0*rho0
+c0 = 10 * Vmax
+rho0 = 1000.0
+p0 = c0 * c0 * rho0
 gamma = 1.0
 
 # Reynolds number and kinematic viscosity
-Re = 100; nu = Vmax * Ly/Re
+Re = 100
+nu = Vmax * Ly / Re
 
 # Numerical setup
-nx = 100; dx = Lx/nx
+nx = 100
+dx = Lx / nx
 ghost_extent = 5.5 * dx
 hdx = 1.2
 
 # adaptive time steps
 h0 = hdx * dx
-dt_cfl = 0.25 * h0/( c0 + Vmax )
-dt_viscous = 0.125 * h0**2/nu
-dt_force = 0.25 * np.sqrt(h0/abs(gy))
+dt_cfl = 0.25 * h0 / (c0 + Vmax)
+dt_viscous = 0.125 * h0**2 / nu
+dt_force = 0.25 * np.sqrt(h0 / abs(gy))
 
 tdamp = 1.0
 tf = 2.0
@@ -92,7 +97,7 @@ output_at_times = np.arange(0.25, 2.1, 0.25)
 
 def damping_factor(t, tdamp):
     if t < tdamp:
-        return 0.5 * ( np.sin((-0.5 + t/tdamp)*np.pi)+ 1.0 )
+        return 0.5 * (np.sin((-0.5 + t / tdamp) * np.pi) + 1.0)
     else:
         return 1.0
 
@@ -107,22 +112,25 @@ class HydrostaticTank(Application):
 
     def create_particles(self):
         # create all the particles
-        _x = np.arange( -ghost_extent, Lx + ghost_extent, dx )
-        _y = np.arange( -ghost_extent, Ly, dx )
-        x, y = np.meshgrid(_x, _y); x = x.ravel(); y = y.ravel()
+        _x = np.arange(-ghost_extent, Lx + ghost_extent, dx)
+        _y = np.arange(-ghost_extent, Ly, dx)
+        x, y = np.meshgrid(_x, _y)
+        x = x.ravel()
+        y = y.ravel()
 
         # sort out the fluid and the solid
         indices = []
         for i in range(x.size):
-            if ( (x[i] > 0.0) and (x[i] < Lx) ):
-                if ( (y[i] > 0.0) and (y[i] < H) ):
+            if ((x[i] > 0.0) and (x[i] < Lx)):
+                if ((y[i] > 0.0) and (y[i] < H)):
                     indices.append(i)
 
         # create the arrays
         solid = gpa(name='solid', x=x, y=y)
 
         # remove the fluid particles from the solid
-        fluid = solid.extract_particles(indices); fluid.set_name('fluid')
+        fluid = solid.extract_particles(indices)
+        fluid.set_name('fluid')
         solid.remove_particles(indices)
 
         # remove the lid to generate an open tank
@@ -133,7 +141,7 @@ class HydrostaticTank(Application):
                     indices.append(i)
         solid.remove_particles(indices)
 
-        print("Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g"%(
+        print("Hydrostatic tank :: nfluid = %d, nsolid=%d, dt = %g" % (
             fluid.get_number_of_particles(),
             solid.get_number_of_particles(), dt))
 
@@ -141,7 +149,7 @@ class HydrostaticTank(Application):
 
         # particle volume
         fluid.add_property('V')
-        solid.add_property('V' )
+        solid.add_property('V')
 
         # kernel sum term for boundary particles
         solid.add_property('wij')
@@ -161,8 +169,8 @@ class HydrostaticTank(Application):
         volume = dx * dx
 
         # volume is set as dx^2
-        fluid.V[:] = 1./volume
-        solid.V[:] = 1./volume
+        fluid.V[:] = 1. / volume
+        solid.V[:] = 1. / volume
 
         fluid.m[:] = volume * rho0
         solid.m[:] = volume * rho0
@@ -193,42 +201,49 @@ class HydrostaticTank(Application):
             # particle volume. This can be either defined from the particle
             # number density or simply as the ratio of mass to density.
             Group(equations=[
-                    VolumeFromMassDensity(dest='fluid', sources=None)
-                    ], ),
+                VolumeFromMassDensity(dest='fluid', sources=None)
+            ], ),
 
             # Equation of state is typically the Tait EOS with a suitable
             # exponent gamma
             Group(equations=[
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    ], ),
+                TaitEOS(
+                    dest='fluid',
+                    sources=None,
+                    rho0=rho0,
+                    c0=c0,
+                    gamma=gamma),
+            ], ),
 
             # The boundary conditions are imposed by extrapolating the fluid
             # pressure, taking into considering the bounday acceleration
             Group(equations=[
-                    SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, gy=gy,
-                                        rho0=rho0, p0=p0),
-                    ], ),
+                SolidWallPressureBC(dest='solid', sources=['fluid'], b=1.0, gy=gy,
+                                    rho0=rho0, p0=p0),
+            ], ),
 
             # Main acceleration block
             Group(equations=[
 
-                    # Continuity equation
-                    ContinuityEquation(dest='fluid', sources=['fluid','solid']),
+                # Continuity equation
+                ContinuityEquation(
+                    dest='fluid', sources=[
+                        'fluid', 'solid']),
 
-                    # Pressure gradient with acceleration damping.
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                        tdamp=tdamp),
+                # Pressure gradient with acceleration damping.
+                MomentumEquationPressureGradient(
+                    dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
+                    tdamp=tdamp),
 
-                    # artificial viscosity for stability
-                    MomentumEquationArtificialViscosity(
-                        dest='fluid', sources=['fluid', 'solid'], alpha=0.24, c0=c0),
+                # artificial viscosity for stability
+                MomentumEquationArtificialViscosity(
+                    dest='fluid', sources=['fluid', 'solid'], alpha=0.24, c0=c0),
 
-                    # Position step with XSPH
-                    XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
+                # Position step with XSPH
+                XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
 
-                    ]),
-            ]
+            ]),
+        ]
 
         # Formulation for REF2. Note that for this formulation to work, the
         # boundary particles need to have a spacing different from the fluid
@@ -240,46 +255,51 @@ class HydrostaticTank(Application):
             # particle volume. This can be either defined from the particle
             # number density or simply as the ratio of mass to density.
             Group(equations=[
-                    VolumeFromMassDensity(dest='fluid', sources=None)
-                    ], ),
+                VolumeFromMassDensity(dest='fluid', sources=None)
+            ], ),
 
             # Equation of state is typically the Tait EOS with a suitable
             # exponent gamma
             Group(equations=[
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    ], ),
+                TaitEOS(
+                    dest='fluid',
+                    sources=None,
+                    rho0=rho0,
+                    c0=c0,
+                    gamma=gamma),
+            ], ),
 
             # Main acceleration block
             Group(equations=[
 
-                    # The boundary conditions are imposed as a force or
-                    # accelerations on the fluid particles. Note that the
-                    # no-penetration condition is to be satisfied with this
-                    # equation. The subsequent equations therefore do not have
-                    # solid as the source. Note the difference between the
-                    # ghost-fluid formulations. K should be 0.01*co**2
-                    # according to REF2. We take it much smaller here on
-                    # account of the multiple layers of boundary particles
-                    MonaghanKajtarBoundaryForce(dest='fluid', sources=['solid'],
-                                                K=0.02, beta=1.0, h=hdx*dx),
+                # The boundary conditions are imposed as a force or
+                # accelerations on the fluid particles. Note that the
+                # no-penetration condition is to be satisfied with this
+                # equation. The subsequent equations therefore do not have
+                # solid as the source. Note the difference between the
+                # ghost-fluid formulations. K should be 0.01*co**2
+                # according to REF2. We take it much smaller here on
+                # account of the multiple layers of boundary particles
+                MonaghanKajtarBoundaryForce(dest='fluid', sources=['solid'],
+                                            K=0.02, beta=1.0, h=hdx * dx),
 
-                    # Continuity equation
-                    ContinuityEquation(dest='fluid', sources=['fluid',]),
+                # Continuity equation
+                ContinuityEquation(dest='fluid', sources=['fluid', ]),
 
-                    # Pressure gradient with acceleration damping.
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid'], pb=0.0, gy=gy,
-                        tdamp=tdamp),
+                # Pressure gradient with acceleration damping.
+                MomentumEquationPressureGradient(
+                    dest='fluid', sources=['fluid'], pb=0.0, gy=gy,
+                    tdamp=tdamp),
 
-                    # artificial viscosity for stability
-                    MomentumEquationArtificialViscosity(
-                        dest='fluid', sources=['fluid'], alpha=0.25, c0=c0),
+                # artificial viscosity for stability
+                MomentumEquationArtificialViscosity(
+                    dest='fluid', sources=['fluid'], alpha=0.25, c0=c0),
 
-                    # Position step with XSPH
-                    XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
+                # Position step with XSPH
+                XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.0)
 
-                    ]),
-            ]
+            ]),
+        ]
 
         # Formulation for REF3
         equations3 = [
@@ -287,16 +307,26 @@ class HydrostaticTank(Application):
             # particle volume. This can be either defined from the particle
             # number density or simply as the ratio of mass to density.
             Group(equations=[
-                    VolumeFromMassDensity(dest='fluid', sources=None)
-                    ], ),
+                VolumeFromMassDensity(dest='fluid', sources=None)
+            ], ),
 
             # Equation of state is typically the Tait EOS with a suitable
             # exponent gamma. The solid phase is treated just as a fluid and
             # the pressure and density operations is updated for this as well.
             Group(equations=[
-                    TaitEOS(dest='fluid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    TaitEOS(dest='solid', sources=None, rho0=rho0, c0=c0, gamma=gamma),
-                    ], ),
+                TaitEOS(
+                    dest='fluid',
+                    sources=None,
+                    rho0=rho0,
+                    c0=c0,
+                    gamma=gamma),
+                TaitEOS(
+                    dest='solid',
+                    sources=None,
+                    rho0=rho0,
+                    c0=c0,
+                    gamma=gamma),
+            ], ),
 
             # Main acceleration block. The boundary conditions are imposed by
             # peforming the continuity equation and gradient of pressure
@@ -304,24 +334,26 @@ class HydrostaticTank(Application):
             # fluid phase
             Group(equations=[
 
-                    # Continuity equation
-                    ContinuityEquation(dest='fluid', sources=['fluid','solid']),
-                    ContinuityEquation(dest='solid', sources=['fluid']),
+                # Continuity equation
+                ContinuityEquation(
+                    dest='fluid', sources=[
+                        'fluid', 'solid']),
+                ContinuityEquation(dest='solid', sources=['fluid']),
 
-                    # Pressure gradient with acceleration damping.
-                    MomentumEquationPressureGradient(
-                        dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
-                        tdamp=tdamp),
+                # Pressure gradient with acceleration damping.
+                MomentumEquationPressureGradient(
+                    dest='fluid', sources=['fluid', 'solid'], pb=0.0, gy=gy,
+                    tdamp=tdamp),
 
-                    # artificial viscosity for stability
-                    MomentumEquationArtificialViscosity(
-                        dest='fluid', sources=['fluid', 'solid'], alpha=0.25, c0=c0),
+                # artificial viscosity for stability
+                MomentumEquationArtificialViscosity(
+                    dest='fluid', sources=['fluid', 'solid'], alpha=0.25, c0=c0),
 
-                    # Position step with XSPH
-                    XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.5)
+                # Position step with XSPH
+                XSPHCorrection(dest='fluid', sources=['fluid'], eps=0.5)
 
-                    ]),
-            ]
+            ]),
+        ]
 
         if self.options.bc_type == 1:
             return equations1
@@ -350,8 +382,8 @@ class HydrostaticTank(Application):
                 interp.update_particle_arrays([fluid, solid])
             t.append(sd['t'])
             p.append(interp.interpolate('p'))
-            g = 1.0*damping_factor(t[-1], tdamp)
-            p_ex.append(abs(rho0*H*g))
+            g = 1.0 * damping_factor(t[-1], tdamp)
+            p_ex.append(abs(rho0 * H * g))
 
         t, p, p_ex = list(map(np.asarray, (t, p, p_ex)))
         res = os.path.join(self.output_dir, 'results.npz')
@@ -360,11 +392,12 @@ class HydrostaticTank(Application):
         import matplotlib
         matplotlib.use('Agg')
 
-        pmax = abs(0.9*rho0*gy)
+        pmax = abs(0.9 * rho0 * gy)
 
         from matplotlib import pyplot as plt
-        plt.plot(t, p[:,0]/pmax, 'o-')
-        plt.xlabel(r'$t$'); plt.ylabel(r'$p$')
+        plt.plot(t, p[:, 0] / pmax, 'o-')
+        plt.xlabel(r'$t$')
+        plt.ylabel(r'$p$')
         fig = os.path.join(self.output_dir, 'p_bottom.png')
         plt.savefig(fig, dpi=300)
 
@@ -373,10 +406,11 @@ class HydrostaticTank(Application):
         count = 0
         for i in range(len(t)):
             if abs(t[i] - output_at[count]) < 1e-8:
-                plt.plot(y, p[i]/pmax, 'o', label='t=%.2f'%t[i])
-                plt.plot(y, p_ex[i]*(H-y)/(H*pmax), 'k-')
+                plt.plot(y, p[i] / pmax, 'o', label='t=%.2f' % t[i])
+                plt.plot(y, p_ex[i] * (H - y) / (H * pmax), 'k-')
                 count += 1
-        plt.xlabel('$y$'); plt.ylabel('$p$')
+        plt.xlabel('$y$')
+        plt.ylabel('$p$')
         plt.legend()
         fig = os.path.join(self.output_dir, 'p_vs_y.png')
         plt.savefig(fig, dpi=300)
