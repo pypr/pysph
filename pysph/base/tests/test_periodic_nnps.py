@@ -179,6 +179,18 @@ class PeriodicChannel2DLinkedList(PeriodicChannel2DTestCase):
         "LinkedListNNPS :: test summation density"
         self._test_summation_density()
 
+    def test_add_property_after_creation_works(self):
+        # Given
+        particles = self.particles
+        fluid = particles[0]
+
+        # When
+        fluid.add_property('junk')
+
+        # Then
+        self.nnps.update_domain()
+        self._test_summation_density()
+
 
 class PeriodicChannel2DSpatialHash(PeriodicChannel2DTestCase):
     def setUp(self):

@@ -598,7 +598,7 @@ cdef class ParticleArray:
 
         return 0
 
-    cpdef int append_parray(self, ParticleArray parray, bint align=True, 
+    cpdef int append_parray(self, ParticleArray parray, bint align=True,
             bint update_constants=False) except -1:
         """ Add particles from a particle array
 
@@ -813,7 +813,9 @@ cdef class ParticleArray:
         elif PyDict_Contains(self.constants, prop) == 1:
             return <BaseArray>PyDict_GetItem(self.constants, prop)
         else:
-            return None
+            raise KeyError(
+                'Property/constant "%s" not present in particle array.' % prop
+            )
 
     cpdef add_constant(self, str name, data):
         """Add a constant property to the particle array.
@@ -1209,6 +1211,26 @@ cdef class ParticleArray:
         result_array.set_output_arrays(output_arrays)
         return result_array
 
+    cpdef ensure_properties(self, ParticleArray src, list props=None):
+        """Ensure that the particle array has the same properties as the
+        one given.
+
+        Note that this does not check for any constants but only properties.
+
+        If the optional props argument is passed it only checks for these.
+        """
+        prop_names = props if props else src.properties.keys()
+
+        for prop_name in prop_names:
+            if prop_name not in self.properties:
+                prop_type = src.properties[prop_name].get_c_type()
+                prop_default = src.default_values[prop_name]
+                stride = src.stride.get(prop_name, 1)
+                self.add_property(
+                    name=prop_name, type=prop_type,
+                    default=prop_default, stride=stride
+                )
+
     cpdef ParticleArray extract_particles(self, indices,
             ParticleArray dest_array=None, bint align=True, list props=None):
         """Create new particle array for particles with indices in index_array
@@ -1219,6 +1241,15 @@ cdef class ParticleArray:
         indices : list/array/LongArray
             indices of particles to be extracted (can be a LongArray or
             list/numpy array).
+
+        dest_array: ParticleArray
+            optional Particle array to populate. Note that this array should
+            have the necessary properties. If none is passed a new particle
+            array is created and returned.
+
+        align: bool
+            Specify if the destination particle array is to be aligned after
+            particle extraction.
 
         props : list
             the list of properties to extract, if None all properties
@@ -1312,10 +1343,9 @@ cdef class ParticleArray:
         """
         cdef BaseArray src_array, dst_array
         for prop_name in source.properties:
-            src_array = source.get_carray(prop_name)
-            dst_array = self.get_carray(prop_name)
-
-            if src_array != None and dst_array != None:
+            if prop_name in self.properties:
+                src_array = source.get_carray(prop_name)
+                dst_array = self.get_carray(prop_name)
                 stride = self.stride.get(prop_name, 1)
                 dst_array.copy_subset(src_array, start_index, end_index, stride)
 
