@@ -166,6 +166,8 @@ cdef class DomainManagerBase:
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
 
+    cdef public object props
+    cdef public list copy_props
     cdef public list pa_wrappers     # NNPS particle array wrappers
     cdef public int narrays          # number of arrays
     cdef public double cell_size     # distance to create ghosts

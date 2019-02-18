@@ -15,14 +15,14 @@ class GPUDomainManager(DomainManagerBase):
     def __init__(self, xmin=-1000., xmax=1000., ymin=0.,
                  ymax=0., zmin=0., zmax=0.,
                  periodic_in_x=False, periodic_in_y=False,
-                 periodic_in_z=False, n_layers=2.0, backend=None):
+                 periodic_in_z=False, n_layers=2.0, backend=None, props=None):
         """Constructor"""
         DomainManagerBase.__init__(self, xmin=xmin, xmax=xmax,
                                    ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
                                    periodic_in_x=periodic_in_x,
                                    periodic_in_y=periodic_in_y,
                                    periodic_in_z=periodic_in_z,
-                                   n_layers=n_layers)
+                                   n_layers=n_layers, props=props)
 
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
@@ -318,6 +318,7 @@ class GPUDomainManager(DomainManagerBase):
         The periodic domain is specified using the DomainManager object
 
         """
+        copy_props = self.copy_props
         pa_wrappers = self.pa_wrappers
         narrays = self.narrays
 
@@ -345,13 +346,15 @@ class GPUDomainManager(DomainManagerBase):
         translate_knl = self._get_translate_kernel()
 
         if not self.ghosts:
-            self.ghosts = [pa_wrapper.pa.empty_clone()
-                           for pa_wrapper in self.pa_wrappers]
+            self.ghosts = [paw.pa.empty_clone(props=copy_props[i])
+                           for i, paw in enumerate(pa_wrappers)]
         else:
             for ghost_pa in self.ghosts:
                 ghost_pa.resize(0)
             for i in range(narrays):
-                self.ghosts[i].ensure_properties(pa_wrappers[i].pa)
+                self.ghosts[i].ensure_properties(
+                    pa_wrappers[i].pa, props=copy_props[i]
+                )
 
         for i, pa_wrapper in enumerate(self.pa_wrappers):
             ghost_pa = self.ghosts[i]
@@ -375,7 +378,9 @@ class GPUDomainManager(DomainManagerBase):
                      ymin=ymin, zmin=zmin, xmax=xmax, ymax=ymax, zmax=zmax,
                      cell_size=cell_size, masks=masks, indices=indices)
 
-            pa_wrapper.pa.extract_particles(indices, ghost_pa, align=False)
+            pa_wrapper.pa.extract_particles(
+                indices, ghost_pa, align=False, props=copy_props[i]
+            )
 
             translate_knl(ghost_pa.gpu.x, ghost_pa.gpu.y, ghost_pa.gpu.z,
                           ghost_pa.gpu.tag, xtranslate, ytranslate,

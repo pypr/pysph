@@ -243,7 +243,7 @@ cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0, backend=None):
+                 double n_layers=2.0, backend=None, props=None):
         """Constructor
 
         Parameters
@@ -254,6 +254,11 @@ cdef class DomainManager:
 
         n_layers: double: number of ghost layers as a multiple of
             h_max*radius_scale
+
+        props: list/dict: properties to copy.
+            Provide a list or dict with the keys as particle array names.
+            Only the specified properties are copied.  If not specified,
+            all props are copied.
         """
         self.backend = get_backend(backend)
         is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
@@ -266,7 +271,7 @@ cdef class DomainManager:
             xmin=xmin, xmax=xmax, ymin=ymin,
             ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
             periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z,
-            n_layers=n_layers, backend=self.backend
+            n_layers=n_layers, backend=self.backend, props=props
         )
 
     def set_pa_wrappers(self, wrappers):
@@ -301,12 +306,16 @@ cdef class DomainManagerBase(object):
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0):
+                 double n_layers=2.0, props=None):
         """Constructor
 
         The n_layers argument specifies the number of ghost layers as multiples
         of hmax*radius_scale.
 
+        props: list/dict: properties to copy.
+            Provide a list or dict with the keys as particle array names.
+            Only the specified properties are copied.  If not specified,
+            all props are copied.
         """
         self._check_limits(xmin, xmax, ymin, ymax, zmin, zmax)
 
@@ -314,6 +323,7 @@ cdef class DomainManagerBase(object):
         self.ymin = ymin; self.ymax = ymax
         self.zmin = zmin; self.zmax = zmax
 
+        self.props = props
         # Indicates if the domain is periodic
         self.periodic_in_x = periodic_in_x
         self.periodic_in_y = periodic_in_y
@@ -345,6 +355,17 @@ cdef class DomainManagerBase(object):
     def set_pa_wrappers(self, wrappers):
         self.pa_wrappers = wrappers
         self.narrays = len(wrappers)
+        copy_props = []
+        props = self.props
+        for i in range(self.narrays):
+            if props is None:
+                copy_props.append(None)
+            elif isinstance(props, dict):
+                name = wrappers[i].pa.name
+                copy_props.append(props[name])
+            else:
+                copy_props.append(props)
+        self.copy_props = copy_props
 
     def set_cell_size(self, cell_size):
         self.cell_size = cell_size
@@ -394,17 +415,23 @@ cdef class CPUDomainManager(DomainManagerBase):
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0, backend=None):
+                 double n_layers=2.0, backend=None, props=None):
         """Constructor
 
         The n_layers argument specifies the number of ghost layers as multiples
         of hmax*radius_scale.
 
+        props: list/dict: properties to copy.
+            Provide a list or dict with the keys as particle array names.
+            Only the specified properties are copied.  If not specified,
+            all props are copied.
         """
-        DomainManagerBase.__init__(self, xmin=xmin, xmax=xmax,
-                ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
-                periodic_in_x=periodic_in_x, periodic_in_y=periodic_in_y,
-                periodic_in_z=periodic_in_z, n_layers=n_layers)
+        DomainManagerBase.__init__(
+            self, xmin=xmin, xmax=xmax,
+            ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
+            periodic_in_x=periodic_in_x, periodic_in_y=periodic_in_y,
+            periodic_in_z=periodic_in_z, n_layers=n_layers, props=props
+        )
 
         self.use_double = True
         self.dtype = float
@@ -513,6 +540,7 @@ cdef class CPUDomainManager(DomainManagerBase):
         """
         cdef list pa_wrappers = self.pa_wrappers
         cdef int narrays = self.narrays
+        cdef list copy_props = self.copy_props
 
         # cell size used to check for periodic ghosts. For summation density
         # like operations, we need to create two layers of ghost images, this
@@ -549,13 +577,15 @@ cdef class CPUDomainManager(DomainManagerBase):
         low = LongArray(); high = LongArray()
 
         if not self.ghosts:
-            self.ghosts = [pa_wrapper.pa.empty_clone()
-                           for pa_wrapper in pa_wrappers]
+            self.ghosts = [paw.pa.empty_clone(props=copy_props[i])
+                           for i, paw in enumerate(pa_wrappers)]
         else:
             for ghost_pa in self.ghosts:
                 ghost_pa.resize(0)
             for i in range(narrays):
-                self.ghosts[i].ensure_properties(pa_wrappers[i].pa)
+                self.ghosts[i].ensure_properties(
+                    pa_wrappers[i].pa, props=copy_props[i]
+                )
 
         for array_index in range(narrays):
             ghost_pa = self.ghosts[array_index]
@@ -590,13 +620,17 @@ cdef class CPUDomainManager(DomainManagerBase):
             if periodic_in_x:
                 # x_low
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(x_low, ghost_pa, align=False)
+                pa.extract_particles(
+                    x_low, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('x'), xtranslate,
                                    start=start)
 
                 # x_high
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(x_high, ghost_pa, align=False)
+                pa.extract_particles(
+                    x_high, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('x'), -xtranslate,
                                    start=start)
 
@@ -610,25 +644,33 @@ cdef class CPUDomainManager(DomainManagerBase):
                     if ( (ymax - yi) <= cell_size ): high.append(i)
 
                 start = ghost_pa.get_number_of_particles()
-                ghost_pa.extract_particles(low, ghost_pa, align=False)
+                ghost_pa.extract_particles(
+                    low, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('y'), ytranslate,
                                    start=start)
 
                 start = ghost_pa.get_number_of_particles()
-                ghost_pa.extract_particles(high, ghost_pa, align=False)
+                ghost_pa.extract_particles(
+                    high, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('y'), -ytranslate,
                                    start=start)
 
                 # Add the actual y_high and y_low now.
                 # y_high
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(y_high, ghost_pa, align=False)
+                pa.extract_particles(
+                    y_high, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('y'), -ytranslate,
                                    start=start)
 
                 # y_low
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(y_low, ghost_pa, align=False)
+                pa.extract_particles(
+                    y_low, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('y'), ytranslate,
                                    start=start)
 
@@ -642,25 +684,33 @@ cdef class CPUDomainManager(DomainManagerBase):
                     if ( (zmax - zi) <= cell_size ): high.append(i)
 
                 start = ghost_pa.get_number_of_particles()
-                ghost_pa.extract_particles(low, ghost_pa, align=False)
+                ghost_pa.extract_particles(
+                    low, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('z'), ztranslate,
                                    start=start)
 
                 start = ghost_pa.get_number_of_particles()
-                ghost_pa.extract_particles(high, ghost_pa, align=False)
+                ghost_pa.extract_particles(
+                    high, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('z'), -ztranslate,
                                    start=start)
 
                 # Add the actual z_high and z_low now.
                 # z_high
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(z_high, ghost_pa, align=False)
+                pa.extract_particles(
+                    z_high, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('z'), -ztranslate,
                                    start=start)
 
                 # z_low
                 start = ghost_pa.get_number_of_particles()
-                pa.extract_particles(z_low, ghost_pa, align=False)
+                pa.extract_particles(
+                    z_low, ghost_pa, align=False, props=copy_props[array_index]
+                )
                 self._add_to_array(ghost_pa.get_carray('z'), ztranslate,
                                    start=start)
 
