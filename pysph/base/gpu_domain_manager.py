@@ -350,6 +350,8 @@ class GPUDomainManager(DomainManagerBase):
         else:
             for ghost_pa in self.ghosts:
                 ghost_pa.resize(0)
+            for i in range(narrays):
+                self.ghosts[i].ensure_properties(pa_wrappers[i].pa)
 
         for i, pa_wrapper in enumerate(self.pa_wrappers):
             ghost_pa = self.ghosts[i]
