@@ -801,7 +801,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
 
             num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z,
                     current_key_to_idx, current_cids, current_hmax,
-                    num_particles, found_indices, h_ptr[pid])
+                    num_particles, found_indices, current_hmax[cid])
 
             for k from 0<=k<num_boxes:
                 found_idx = found_indices[k]
@@ -826,7 +826,7 @@ cdef class ExtendedZOrderNNPS(ZOrderNNPS):
 
                     num_boxes = self._neighbor_boxes_func(c_x, c_y, c_z,
                             current_key_to_idx, current_cids, current_hmax,
-                            num_particles, found_indices, h_ptr[pid])
+                            num_particles, found_indices, current_hmax[cid])
 
                     for k from 0<=k<num_boxes:
                         found_idx = found_indices[k]
