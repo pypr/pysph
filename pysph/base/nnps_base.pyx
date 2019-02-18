@@ -549,11 +549,13 @@ cdef class CPUDomainManager(DomainManagerBase):
         low = LongArray(); high = LongArray()
 
         if not self.ghosts:
-            self.ghosts = [pa_wrapper.pa.empty_clone() \
-                    for pa_wrapper in self.pa_wrappers]
+            self.ghosts = [pa_wrapper.pa.empty_clone()
+                           for pa_wrapper in pa_wrappers]
         else:
             for ghost_pa in self.ghosts:
                 ghost_pa.resize(0)
+            for i in range(narrays):
+                self.ghosts[i].ensure_properties(pa_wrappers[i].pa)
 
         for array_index in range(narrays):
             ghost_pa = self.ghosts[array_index]
