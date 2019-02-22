@@ -58,10 +58,9 @@ class Robert(ShockTubeSetup):
         return self.generate_particles(xmin=self.xmin*self.xb_ratio,
                                        xmax=self.xmax*self.xb_ratio,
                                        dxl=self.dxl, dxr=self.dxr,
-                                       m=self.dxr, pl=self.pl,pr=self.pr,
-                                       h0=self.h0, bx=0.03,gamma1=gamma1,
+                                       m=self.dxr, pl=self.pl, pr=self.pr,
+                                       h0=self.h0, bx=0.03, gamma1=gamma1,
                                        ul=self.ul, ur=self.ur)
-
 
     def create_scheme(self):
         self.dt = dt

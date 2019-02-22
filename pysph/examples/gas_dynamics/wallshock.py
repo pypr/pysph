@@ -54,8 +54,10 @@ class WallShock(ShockTubeSetup):
         self.hdx = self.hdx
 
     def create_particles(self):
-        return self.generate_particles(xmin=self.xmin*self.xb_ratio, xmax=self.xmax*self.xb_ratio, dxl=self.dxl,
-                                       dxr=self.dxr, m=self.dxl, pl=self.pl,
+        return self.generate_particles(xmin=self.xmin*self.xb_ratio,
+                                       xmax=self.xmax*self.xb_ratio,
+                                       dxl=self.dxl, dxr=self.dxr,
+                                       m=self.dxl, pl=self.pl,
                                        pr=self.pr, h0=self.h0, bx=0.02,
                                        gamma1=gamma1, ul=self.ul, ur=self.ur)
 

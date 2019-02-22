@@ -30,11 +30,13 @@ tf = 0.005
 
 
 # domain size
-xmin = 0.; xmax = 1
+xmin = 0.
+xmax = 1
 dx = 0.002
 ny = 50
-ymin = 0; ymax = ny * dx
-x0 = 0.5 # initial discontuinity 
+ymin = 0
+ymax = ny * dx
+x0 = 0.5  # initial discontuinity
 
 # scheme constants
 alpha1 = 1.0
@@ -72,14 +74,16 @@ class ShockTube2D(Application):
         global dx
         data = ud.uniform_distribution_cubic2D(dx, xmin, xmax, ymin, ymax)
 
-        x = data[0]; y = data[1]
-        dx = data[2]; dy = data[3]
+        x = data[0]
+        y = data[1]
+        dx = data[2]
+        dy = data[3]
 
         # volume estimate
         volume = dx * dy
 
         # indices on either side of the initial discontinuity
-        right_indices = numpy.where( x > x0 )[0]
+        right_indices = numpy.where(x > x0)[0]
 
         # density is uniform
         rho = numpy.ones_like(x) * self.rhol
@@ -108,14 +112,15 @@ class ShockTube2D(Application):
                     h0=h.copy(), u=u, v=v)
         self.scheme.setup_properties([fluid])
 
-        print("2D Shocktube with %d particles"%(fluid.get_number_of_particles()))
+        print("2D Shocktube with %d particles" %
+              (fluid.get_number_of_particles()))
 
-        return [fluid,]
+        return [fluid, ]
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        
+
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5)
@@ -138,7 +143,7 @@ class ShockTube2D(Application):
             default='adke', adke=adke, mpm=mpm, gsph=gsph
         )
         return s
-    
+
     def configure_scheme(self):
         s = self.scheme
         if self.options.scheme == 'mpm':
@@ -154,10 +159,16 @@ class ShockTube2D(Application):
 
     def post_process(self):
         try:
+            import matplotlib
+            matplotlib.use('Agg')
             from matplotlib import pyplot
         except ImportError:
             print("Post processing requires matplotlib.")
             return
+
+        if self.rank > 0 or len(self.output_files) == 0:
+            return
+
         import os
         from pysph.solver.utils import load
         from pysph.examples.gas_dynamics import riemann_solver
@@ -195,7 +206,7 @@ class ShockTube2D(Application):
         fig = os.path.join(self.output_dir, "density.png")
         pyplot.savefig(fig, dpi=300)
         pyplot.clf()
-        
+
         pyplot.scatter(
             x, e, label='pysph (' + str(self.options.scheme) + ')',
             s=1, color='k'
@@ -237,6 +248,7 @@ class ShockTube2D(Application):
 
         fname = os.path.join(self.output_dir, 'exact.npz')
         numpy.savez(fname, x=x_e, u=u_e, e=e_e, rho=rho_e, p=p_e)
+
 
 if __name__ == '__main__':
     app = ShockTube2D()

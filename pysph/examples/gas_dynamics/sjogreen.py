@@ -69,17 +69,17 @@ class SjoGreen(ShockTubeSetup):
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        
+
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=0, beta=0.0, k=1.0, eps=1.0, g1=0.0, g2=0.0)
-        
+
         mpm = GasDScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.5, alpha1=0, alpha2=0,
             beta=2.0, update_alpha1=True, update_alpha2=True
         )
-        
+
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.5,
@@ -87,9 +87,10 @@ class SjoGreen(ShockTubeSetup):
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=40, tol=1e-6
         )
-        
+
         s = SchemeChooser(default='adke', adke=adke, mpm=mpm, gsph=gsph)
         return s
+
 
 if __name__ == '__main__':
     app = SjoGreen()
