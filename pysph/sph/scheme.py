@@ -175,11 +175,10 @@ class SchemeChooser(Scheme):
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
-        for scheme in self.schemes.values():
-            self.scheme.configure_solver(
-                kernel=kernel, integrator_cls=integrator_cls,
-                extra_steppers=extra_steppers, **kw
-            )
+        self.scheme.configure_solver(
+            kernel=kernel, integrator_cls=integrator_cls,
+            extra_steppers=extra_steppers, **kw
+        )
 
     def get_equations(self):
         return self.scheme.get_equations()
