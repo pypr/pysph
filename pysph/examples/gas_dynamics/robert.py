@@ -77,7 +77,7 @@ class Robert(ShockTubeSetup):
 
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.0,
+            kernel_factor=2.0,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=2,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=40, tol=1e-6
