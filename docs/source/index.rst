@@ -49,7 +49,6 @@ Installation and getting started
    installation.rst
    tutorial/circular_patch_simple.rst
    tutorial/circular_patch.rst
-   contribution/how_to_write_docs.rst
 
 
 ***************************
@@ -63,6 +62,7 @@ The framework and library
    design/equations.rst
    starcluster/overview
    using_pysph.rst
+   contribution/how_to_write_docs.rst
 
 **************************
 Gallery of PySPH examples
