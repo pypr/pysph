@@ -359,6 +359,23 @@ class TestDeviceHelper(object):
         assert h.get_number_of_particles() == 4
 
     @test_all_backends
+    def test_empty_clone(self, backend):
+        check_import(backend)
+        self.setup()
+        # Given
+        pa = get_particle_array(name='f', x=[0.0, 1.0, 2.0, 3.0],
+                                m=1.0, rho=2.0)
+        h = DeviceHelper(pa, backend=backend)
+        pa.set_device_helper(h)
+
+        # When
+        result_pa = h.empty_clone()
+
+        # Then
+        assert result_pa.gpu.get_number_of_particles() == 0
+        assert result_pa.name == 'f'
+
+    @test_all_backends
     def test_extract_particles(self, backend):
         check_import(backend)
         self.setup()
@@ -372,7 +389,8 @@ class TestDeviceHelper(object):
         indices = np.array([1, 2], dtype=np.uint32)
         indices = array.to_device(indices, backend=backend)
 
-        result_pa = h.extract_particles(indices)
+        result_pa = h.empty_clone()
+        h.extract_particles(indices, result_pa)
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2

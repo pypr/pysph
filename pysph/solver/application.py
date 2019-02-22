@@ -892,10 +892,7 @@ class Application(object):
         if rank != 0:
             self.particles = utils.create_dummy_particles(particles_info)
 
-    def _configure(self):
-        """Configures the application using the options from the
-        command-line.
-        """
+    def _configure_options(self):
         options = self.options
         # Setup configuration options.
         if options.with_openmp is not None:
@@ -912,7 +909,14 @@ class Application(object):
             get_config().use_double = options.use_double
         if options.profile:
             get_config().profile = options.profile
+        for pa in self.particles:
+            pa.update_backend()
 
+    def _configure_solver(self):
+        """Configures the application using the options from the
+        command-line.
+        """
+        options = self.options
         # setup the solver using any options
         self.solver.setup_solver(options.__dict__)
 
@@ -1207,6 +1211,13 @@ class Application(object):
                 logger.info('started multiprocessing interface on %s' %
                             (interface.address, ))
 
+    def _configure(self):
+        """Configures the application using the options from the
+        command-line.
+        """
+        self._configure_options()
+        self._configure_solver()
+
     def _setup_parallel_manager_and_initial_load_balance(self):
         """This will automatically distribute the particles among processors
         if this is a parallel run.
@@ -1421,6 +1432,8 @@ class Application(object):
 
             self._create_particles(self.create_particles)
 
+            self._configure_options()
+
             # This must be done before the initial load balancing
             # as the inlets will create new particles.
             if is_overloaded_method(self.create_inlet_outlet):
@@ -1431,7 +1444,7 @@ class Application(object):
 
             self.nnps = self.create_nnps()
 
-            self._configure()
+            self._configure_solver()
 
             self._setup_solver_callbacks(self)
             for tool in self.create_tools():
@@ -1448,7 +1461,7 @@ class Application(object):
         run_duration = end_time - start_time
         self._message("Run took: %.5f secs" % (run_duration))
         if self.options.with_opencl and self.options.profile:
-            from pysph.base.opencl import print_profile, print_mem_usage
+            from compyle.opencl import print_profile
             print_profile()
             print_mem_usage()
         self._write_info(
@@ -1515,13 +1528,15 @@ class Application(object):
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
 
+        self._configure_options()
+
         # This must be done before the initial load balancing
         # as the inlets will create new particles.
         self._create_inlet_outlet(inlet_outlet_factory)
         if nnps is not None:
             self.nnps = nnps
 
-        self._configure()
+        self._configure_solver()
 
         end_time = time.time()
         setup_duration = end_time - start_time

@@ -86,8 +86,8 @@ cdef class ParticleArray:
     cpdef BaseArray get_carray(self, str prop)
 
     cpdef int get_number_of_particles(self, bint real=*)
-    cpdef remove_particles(self, indices)
-    cpdef remove_tagged_particles(self, int tag)
+    cpdef remove_particles(self, indices, align=*)
+    cpdef remove_tagged_particles(self, int tag, bint align=*)
 
     # function to add any property
     cpdef add_constant(self, str name, data)
@@ -103,11 +103,17 @@ cdef class ParticleArray:
     cpdef int align_particles(self) except -1
 
     # add particles from the parray to self.
-    cpdef int append_parray(self, ParticleArray parray) except -1
+    cpdef int append_parray(self, ParticleArray parray, bint align=*,
+            bint update_constants=*) except -1
+
+    cpdef ParticleArray empty_clone(self, props=*)
+
+    cpdef ensure_properties(self, ParticleArray src, list props=*)
 
     # create a new particle array with the given particles indices and the
     # properties.
-    cpdef ParticleArray extract_particles(self, indices, list props=*)
+    cpdef ParticleArray extract_particles(self, indices, ParticleArray dest_array=*,
+                            bint align=*, list props=*)
 
     # set the tag value for the particles
     cpdef set_tag(self, long tag_value, LongArray indices)

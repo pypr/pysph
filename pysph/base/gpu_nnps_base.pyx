@@ -32,7 +32,7 @@ from pyopencl.elementwise import ElementwiseKernel
 from pysph.base.nnps_base cimport *
 from pysph.base.device_helper import DeviceHelper
 from compyle.config import get_config
-from compyle.array import Array
+from compyle.array import get_backend, Array
 from compyle.parallel import Elementwise, Scan
 from compyle.types import annotate
 from compyle.opencl import (get_context, get_queue,
@@ -177,7 +177,7 @@ cdef class GPUNNPS(NNPSBase):
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
-        self.backend = backend
+        self.backend = get_backend(backend)
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
