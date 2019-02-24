@@ -774,7 +774,7 @@ class AdamiHuAdamsScheme(TVFScheme):
         from pysph.sph.wc.basic import TaitEOS
         from pysph.sph.basic_equations import XSPHCorrection
         from pysph.sph.wc.transport_velocity import (
-            ContinuityEquation,
+            ContinuityEquation, ContinuitySolid,
             MomentumEquationPressureGradient,
             MomentumEquationViscosity, MomentumEquationArtificialViscosity,
             SolidWallPressureBC, SolidWallNoSlipBC, SetWallVelocity,
@@ -809,8 +809,12 @@ class AdamiHuAdamsScheme(TVFScheme):
         g4 = []
         for fluid in self.fluids:
             g4.append(
-                ContinuityEquation(dest=fluid, sources=all)
+                ContinuityEquation(dest=fluid, sources=self.fluids)
             )
+            if self.solids:
+                g4.append(
+                    ContinuitySolid(dest=fluid, sources=self.solids)
+                )
             g4.append(
                 MomentumEquationPressureGradient(
                     dest=fluid, sources=all, pb=0.0, gx=self.gx,
