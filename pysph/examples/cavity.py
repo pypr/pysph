@@ -7,7 +7,8 @@ import os
 from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 
-from pysph.sph.scheme import TVFScheme
+from pysph.sph.scheme import TVFScheme, SchemeChooser
+from pysph.sph.wc.edac import EDACScheme
 
 # numpy
 import numpy as np
@@ -56,14 +57,22 @@ class LidDrivenCavity(Application):
 
     def configure_scheme(self):
         h0 = hdx * self.dx
-        self.scheme.configure(h0=h0, nu=self.nu)
+        if self.options.scheme == 'tvf':
+            self.scheme.configure(h0=h0, nu=self.nu)
+        elif self.options.scheme == 'edac':
+            self.scheme.configure(h=h0, nu=self.nu)
         self.scheme.configure_solver(tf=self.tf, dt=self.dt, pfreq=500)
 
     def create_scheme(self):
-        s = TVFScheme(
+        tvf = TVFScheme(
             ['fluid'], ['solid'], dim=2, rho0=rho0, c0=c0, nu=None,
             p0=p0, pb=p0, h0=hdx
         )
+        edac = EDACScheme(
+            fluids=['fluid'], solids=['solid'], dim=2, c0=c0, rho0=rho0,
+            nu=0.0, pb=p0, eps=0.0, h=0.0,
+        )
+        s = SchemeChooser(default='tvf', tvf=tvf, edac=edac)
         return s
 
     def create_particles(self):
@@ -90,9 +99,7 @@ class LidDrivenCavity(Application):
         fluid.set_name('fluid')
         solid.remove_particles(indices)
 
-        print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g" % (
-            self.re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), self.dt))
+        print("Lid driven cavity :: Re = %d, dt = %g" % (self.re, self.dt))
 
         # add requisite properties to the arrays:
         self.scheme.setup_properties([fluid, solid])
