@@ -888,7 +888,7 @@ class Viewer3D(Viewer):
                 scatters.z = data[array_name].z,
                 scatters.color = c
                 pa_widgets = self._widgets.particles[array_name]
-            if pa_widgets.velocity_vectors.value == True:
+            if pa_widgets.velocity_vectors.value is True:
                 vectors = self.vectors[array_name]
                 vectors.x = data[array_name].x
                 vectors.y = data[array_name].y
@@ -998,6 +998,6 @@ class Viewer3D(Viewer):
                         boundaries=ticks,
                     )
                     self.cbars[array_name].set_label(
-                                    array_name + " : " + pa_widgets.scalar.value
+                                    array_name+" : "+pa_widgets.scalar.value
                             )
             display(self.pltfigure)
