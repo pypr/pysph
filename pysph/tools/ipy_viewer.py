@@ -766,10 +766,33 @@ class Viewer3DWidgets(object):
             step=1,
             value=0,
             description='frame',
-            layout=widgets.Layout(width='600px'),
+            layout=widgets.Layout(width='500px'),
             continuous_update=False
         )
-
+        self.play_button = widgets.Play(
+            min=0,
+            max=file_count,
+            step=1,
+            disabled=False,
+            interval=1000,
+        )
+        self.link = widgets.jslink(
+            (self.frame, 'value'),
+            (self.play_button, 'value')
+        )
+        self.delay_box = widgets.FloatText(
+            value=1.0,
+            description='Delay',
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
+        self.save_figure = widgets.Text(
+                value='',
+                placeholder='example.png',
+                description='Save figure',
+                disabled=False,
+                layout=widgets.Layout(width='240px', display='flex')
+        )
         self.particles = {}
         for array_name in self.temp_data.keys():
             self.particles[array_name] = ParticleArrayWidgets3D(
@@ -788,7 +811,18 @@ class Viewer3DWidgets(object):
                     HBox(
                         items,
                     ),
-                    self.frame
+                    HBox(
+                     [
+                        self.play_button,
+                        self.frame
+                     ]
+                    ),
+                    HBox(
+                     [
+                        self.delay_box,
+                        self.save_figure
+                     ]
+                    )
                 ]
             )
 
@@ -816,6 +850,8 @@ class Viewer3D(Viewer):
         )
 
         self._widgets.frame.observe(self._frame_handler, 'value')
+        self._widgets.save_figure.on_submit(self._save_figure_handler)
+        self._widgets.delay_box.observe(self._delay_box_handler, 'value')
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
@@ -859,11 +895,12 @@ class Viewer3D(Viewer):
                     color=c,
                     size=pa_widgets.scalar_size.value,
                 )
-        plot = p3.gcc()
+        self.plot_container = p3.gcc()
+        self.plot = p3.gcf()  # used in 'self._save_figure_handler()'
         self._legend_handler(None)
         display(widgets.HBox(
                                 [
-                                    widgets.VBox([plot]),
+                                    widgets.VBox([self.plot]),
                                     widgets.VBox([self.legend])
                                 ]
                             )
@@ -887,7 +924,6 @@ class Viewer3D(Viewer):
                 scatters.y = data[array_name].y,
                 scatters.z = data[array_name].z,
                 scatters.color = c
-                pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.velocity_vectors.value is True:
                 vectors = self.vectors[array_name]
                 vectors.x = data[array_name].x
@@ -908,13 +944,22 @@ class Viewer3D(Viewer):
             pass
         elif old != 'None' and new == 'None':
             self.scatters[array_name].visible = False
-        else:
-            self.scatters[array_name].visible = True
+        elif old != 'None' and new != 'None':
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
             data = self.get_frame(self._widgets.frame.value)['arrays']
-            array_name = change['owner'].owner
             c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
             self.scatters[array_name].color = c
+        else:
+            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+            data = self.get_frame(self._widgets.frame.value)['arrays']
+            c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
+            self.scatters[array_name] = p3.scatter(
+                data[array_name].x,
+                data[array_name].y,
+                data[array_name].z,
+                color=c,
+                size=pa_widgets.scalar_size.value,
+            )
         self._legend_handler(None)
 
     def _velocity_vectors_handler(self, change):
@@ -1001,3 +1046,33 @@ class Viewer3D(Viewer):
                                     array_name+" : "+pa_widgets.scalar.value
                             )
             display(self.pltfigure)
+
+    def _save_figure_handler(self, change):
+        self.flag = False
+        for extension in [
+            '.jpg', '.jpeg', '.png', '.svg'
+        ]:
+            if self._widgets.save_figure.value.endswith(extension):
+                p3.savefig(
+                            self._widgets.save_figure.value,
+                            width=1000,
+                            height=1000,
+                            fig=self.plot
+                        )
+                print(
+                    "Saved figure as {} in the present working directory"
+                    .format(
+                        self._widgets.save_figure.value
+                    )
+                )
+                self.flag = True
+                break
+        if self.flag is False:
+            print(
+                "Please use '.jpg', '.jpeg', '.png' or" +
+                "'.svg' as the file extension."
+                )
+        self._widgets.save_figure.value = ""
+
+    def _delay_box_handler(self, change):
+        self._widgets.play_button.interval = change['new']*1000
