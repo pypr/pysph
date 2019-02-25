@@ -59,7 +59,7 @@ class SummationDensity(Equation):
 
 
 class VolumeSummation(Equation):
-    """**Number density for volume computation**
+    r"""**Number density for volume computation**
 
     See `SummationDensity`
 

@@ -99,9 +99,7 @@ class LidDrivenCavity(Application):
         fluid.set_name('fluid')
         solid.remove_particles(indices)
 
-        print("Lid driven cavity :: Re = %d, nfluid = %d, nsolid=%d, dt = %g" % (
-            self.re, fluid.get_number_of_particles(),
-            solid.get_number_of_particles(), self.dt))
+        print("Lid driven cavity :: Re = %d, dt = %g" % (self.re, self.dt))
 
         # add requisite properties to the arrays:
         self.scheme.setup_properties([fluid, solid])
