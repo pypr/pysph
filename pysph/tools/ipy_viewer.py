@@ -612,7 +612,6 @@ class Viewer2D(Viewer):
         self._cbars = {}
 
         for array_name in self._widgets.particles.keys():
-
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.legend.value:
                 if pa_widgets.scalar.value != 'None':
@@ -715,9 +714,9 @@ class ParticleArrayWidgets3D(object):
         self.scalar_cmap.owner = self.array_name
         self.velocity_vectors = widgets.Checkbox(
             value=False,
-            description="Vectors",
+            description="Velocity Vectors",
             disabled=False,
-            layout=widgets.Layout(width='100px', display='flex')
+            layout=widgets.Layout(width='300px', display='flex')
         )
         self.velocity_vectors.owner = self.array_name
         self.vector_size = widgets.FloatSlider(
@@ -789,7 +788,7 @@ class Viewer3DWidgets(object):
                     HBox(
                         items,
                     ),
-                    self.frame,
+                    self.frame
                 ]
             )
 
@@ -835,7 +834,6 @@ class Viewer3D(Viewer):
     def interactive_plot(self):
         self._create_widgets()
         self.scatters = {}
-        display(self._widgets._create_vbox())
         self.vectors = {}
         self.legend = widgets.Output()
         with self.legend:
@@ -849,17 +847,18 @@ class Viewer3D(Viewer):
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
-            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-            c = colormap(
-                getattr(data[array_name], pa_widgets.scalar.value)
-            )
-            self.scatters[array_name] = p3.scatter(
-                data[array_name].x,
-                data[array_name].y,
-                data[array_name].z,
-                color=c,
-                size=pa_widgets.scalar_size.value,
-            )
+            if pa_widgets.scalar.value != 'None':
+                colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                c = colormap(
+                    getattr(data[array_name], pa_widgets.scalar.value)
+                )
+                self.scatters[array_name] = p3.scatter(
+                    data[array_name].x,
+                    data[array_name].y,
+                    data[array_name].z,
+                    color=c,
+                    size=pa_widgets.scalar_size.value,
+                )
         plot = p3.gcc()
         self._legend_handler(None)
         display(widgets.HBox(
@@ -871,46 +870,54 @@ class Viewer3D(Viewer):
                 )
         # HBox does not allow custom layout, therefore using an HBox
         # of two VBoxes to place 'plot' and 'legend' next to each other
+        display(self._widgets._create_vbox())
 
     def _frame_handler(self, change):
 
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
-            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-
-            scatters = self.scatters[array_name]
-            c = colormap(
-                getattr(data[array_name], pa_widgets.scalar.value)
-            )
-            scatters.x = data[array_name].x
-            scatters.y = data[array_name].y,
-            scatters.z = data[array_name].z,
-            scatters.color = c
-            pa_widgets = self._widgets.particles[array_name]
-            if hasattr(self.vectors, array_name):
+            if pa_widgets.scalar.value != 'None':
+                colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                scatters = self.scatters[array_name]
+                c = colormap(
+                    getattr(data[array_name], pa_widgets.scalar.value)
+                )
+                scatters.x = data[array_name].x
+                scatters.y = data[array_name].y,
+                scatters.z = data[array_name].z,
+                scatters.color = c
+                pa_widgets = self._widgets.particles[array_name]
+            if pa_widgets.velocity_vectors.value == True:
                 vectors = self.vectors[array_name]
-                if pa_widgets.velocity_vectors.value is True:
-                    vectors.x = data[array_name].x
-                    vectors.y = data[array_name].y
-                    vectors.z = data[array_name].z
-                    vectors.vx = getattr(data[array_name], 'u')
-                    vectors.vy = getattr(data[array_name], 'v')
-                    vectors.vz = getattr(data[array_name], 'w')
+                vectors.x = data[array_name].x
+                vectors.y = data[array_name].y
+                vectors.z = data[array_name].z
+                vectors.vx = getattr(data[array_name], 'u')
+                vectors.vy = getattr(data[array_name], 'v')
+                vectors.vz = getattr(data[array_name], 'w')
+                vectors.size = pa_widgets.vector_size.value
         self._legend_handler(None)
 
     def _scalar_handler(self, change):
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-        data = self.get_frame(self._widgets.frame.value)['arrays']
-        array_name = change['owner'].owner
-        c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
-        self.scatters[array_name].color = c
+        new = change['new']
+        old = change['old']
+        if old == 'None' and new == 'None':
+            pass
+        elif old != 'None' and new == 'None':
+            self.scatters[array_name].visible = False
+        else:
+            self.scatters[array_name].visible = True
+            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+            data = self.get_frame(self._widgets.frame.value)['arrays']
+            array_name = change['owner'].owner
+            c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
+            self.scatters[array_name].color = c
         self._legend_handler(None)
 
     def _velocity_vectors_handler(self, change):
-        import ipyvolume.pylab as p3
         data = self.get_frame(self._widgets.frame.value)['arrays']
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
@@ -918,9 +925,14 @@ class Viewer3D(Viewer):
             self.vectors[array_name].size = 0
         else:
             if array_name in self.vectors.keys():
-                self.vectors[
-                    array_name
-                ].size = pa_widgets.vector_size.value
+                vectors = self.vectors[array_name]
+                vectors.x = data[array_name].x
+                vectors.y = data[array_name].y
+                vectors.z = data[array_name].z
+                vectors.vx = getattr(data[array_name], 'u')
+                vectors.vy = getattr(data[array_name], 'v')
+                vectors.vz = getattr(data[array_name], 'w')
+                vectors.size = pa_widgets.vector_size.value
             else:
                 self.vectors[array_name] = p3.quiver(
                     data[array_name].x,
@@ -958,33 +970,34 @@ class Viewer3D(Viewer):
             self.cbars_ax = {}
             for array_name in self._widgets.particles.keys():
                 pa_widgets = self._widgets.particles[array_name]
-                cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                ticks = set(list(np.sort(
-                    getattr(
-                        temp_data['arrays'][array_name],
-                        pa_widgets.scalar.value
-                    )
-                )))
-                ticks = list(ticks)
-                ticks.sort()
-                if len(ticks) == 1:
-                    ticks.append(ticks[0] + 0.00000001)
-                    # To avoid passing a singleton set
-
-                self.cbars_ax[array_name] = self.pltfigure.add_axes(
-                    [
-                        0.2*len(self.cbars_ax.keys()),
-                        0,
-                        0.05,
-                        0.5
-                    ]
-                )
-                self.cbars[array_name] = mpl.colorbar.ColorbarBase(
-                    ax=self.cbars_ax[array_name],
-                    cmap=cmap,
-                    boundaries=ticks,
-                )
-                self.cbars[array_name].set_label(
-                                array_name + " : " + pa_widgets.scalar.value
+                if pa_widgets.scalar.value != 'None':
+                    cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                    ticks = set(list(np.sort(
+                        getattr(
+                            temp_data['arrays'][array_name],
+                            pa_widgets.scalar.value
                         )
+                    )))
+                    ticks = list(ticks)
+                    ticks.sort()
+                    if len(ticks) == 1:
+                        ticks.append(ticks[0] + 0.00000001)
+                        # To avoid passing a singleton set
+
+                    self.cbars_ax[array_name] = self.pltfigure.add_axes(
+                        [
+                            0.2*len(self.cbars_ax.keys()),
+                            0,
+                            0.05,
+                            0.5
+                        ]
+                    )
+                    self.cbars[array_name] = mpl.colorbar.ColorbarBase(
+                        ax=self.cbars_ax[array_name],
+                        cmap=cmap,
+                        boundaries=ticks,
+                    )
+                    self.cbars[array_name].set_label(
+                                    array_name + " : " + pa_widgets.scalar.value
+                            )
             display(self.pltfigure)
