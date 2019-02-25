@@ -1,11 +1,13 @@
 import json
 import glob
-from pysph.solver.utils import load, get_files
-from IPython.display import display, Image
+import os
+from pysph.solver.utils import load, get_files, mkdir
+from IPython.display import display, Image, clear_output
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
+import ipyvolume.pylab as p3
 
 
 class Viewer(object):
@@ -269,6 +271,11 @@ class Viewer2DWidgets(object):
                 disabled=False,
                 layout=widgets.Layout(width='240px', display='flex')
         )
+        self.save_all_plots = widgets.Checkbox(
+            value=False,
+            description='Save all plots',
+            disabled=False
+        )
         self.particles = {}
         for array_name in self.temp_data.keys():
             self.particles[array_name] = ParticleArrayWidgets(
@@ -296,7 +303,8 @@ class Viewer2DWidgets(object):
                     HBox(
                      [
                         self.delay_box,
-                        self.save_figure
+                        self.save_figure,
+                        self.save_all_plots
                      ]
                     )
                 ]
@@ -328,6 +336,7 @@ class Viewer2D(Viewer):
         widgets.frame.observe(self._frame_handler, 'value')
         widgets.save_figure.on_submit(self._save_figure_handler)
         widgets.delay_box.observe(self._delay_box_handler, 'value')
+        widgets.save_all_plots.observe(self._save_all_plots_handler, 'value')
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = widgets.particles[array_name]
@@ -349,7 +358,7 @@ class Viewer2D(Viewer):
         '''
         Set attributes for plotting.
         '''
-
+        plt.ion()
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
         self._vector_ax = self.figure.add_axes(
@@ -482,6 +491,14 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
         self._vector_handler(None)
         self._adjust_axes()
+        self._save_plot()
+        if self._widgets.save_all_plots.value:
+            mkdir('all_plots')
+            self.figure.savefig(
+                'all_plots/frame_%s.png' % self._widgets.frame.value,
+                dpi=300
+            )
+            print('saving files in pwd/all_plots')
 
     def _scalar_handler(self, change):
         array_name = change['owner'].owner
@@ -658,6 +675,21 @@ class Viewer2D(Viewer):
     def _delay_box_handler(self, change):
         self._widgets.play_button.interval = change['new']*1000
 
+    def _save_all_plots_handler(self, change):
+        if change['new']:
+            self._widgets.save_figure.disabled = True
+        elif not change['new']:
+            self._widgets.save_figure.disabled = False
+
+    def _save_plot(self):
+        abs_path = os.path.abspath(self.path)
+        if self._widgets.save_all_plots.value:
+            mkdir('/all_plots')
+            self.figure.savefig(
+                'frame_%s.png' % self._widgets.frame.value,
+                dpi=300
+            )
+
 
 class ParticleArrayWidgets3D(object):
 
@@ -674,7 +706,7 @@ class ParticleArrayWidgets3D(object):
         )
         self.scalar.owner = self.array_name
         self.scalar_cmap = widgets.Dropdown(
-            options=map(str, plt.colormaps()),
+            options=list(map(str, plt.colormaps())),
             value='viridis',
             description="Colormap",
             disabled=False,
@@ -736,6 +768,7 @@ class Viewer3DWidgets(object):
             value=0,
             description='frame',
             layout=widgets.Layout(width='600px'),
+            continuous_update=False
         )
 
         self.particles = {}
@@ -782,11 +815,11 @@ class Viewer3D(Viewer):
             file=self.paths_list[0],
             file_count=len(self.paths_list) - 1,
         )
-        widgets = self._widgets
-        widgets.frame.observe(self._frame_handler, 'value')
+
+        self._widgets.frame.observe(self._frame_handler, 'value')
 
         for array_name in self._widgets.particles.keys():
-            pa_widgets = widgets.particles[array_name]
+            pa_widgets = self._widgets.particles[array_name]
             pa_widgets.scalar.observe(self._scalar_handler, 'value')
             pa_widgets.velocity_vectors.observe(
                 self._velocity_vectors_handler,
@@ -805,8 +838,12 @@ class Viewer3D(Viewer):
         display(self._widgets._create_vbox())
         self.vectors = {}
         self.legend = widgets.Output()
-
-        import ipyvolume.pylab as p3
+        with self.legend:
+            plt.ioff()
+            self.pltfigure = plt.figure(figsize=(8, 8))
+            # creating a dummy figure, so that 'self.pltfigure.clf()'
+            # in self._legend_handler() does not throw an error
+            # during initialization
 
         p3.clear()
         data = self.get_frame(self._widgets.frame.value)['arrays']
@@ -823,9 +860,17 @@ class Viewer3D(Viewer):
                 color=c,
                 size=pa_widgets.scalar_size.value,
             )
+        plot = p3.gcc()
         self._legend_handler(None)
-        display(widgets.VBox((p3.gcc(), self.legend)))
-        # HBox does not allow custom layout.
+        display(widgets.HBox(
+                                [
+                                    widgets.VBox([plot]),
+                                    widgets.VBox([self.legend])
+                                ]
+                            )
+                )
+        # HBox does not allow custom layout, therefore using an HBox
+        # of two VBoxes to place 'plot' and 'legend' next to each other
 
     def _frame_handler(self, change):
 
@@ -905,45 +950,41 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _legend_handler(self, change):
-
-        import ipyvolume.pylab as p3
-        import numpy as np
         temp_data = self.get_frame(self._widgets.frame.value)
-        self.pltfigure = plt.figure(figsize=(8, 8))
-        self.cbars = {}
-        self.cbars_ax = {}
-        for array_name in self._widgets.particles.keys():
-            pa_widgets = self._widgets.particles[array_name]
-            cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-            ticks = set(list(np.sort(
-                getattr(
-                    temp_data['arrays'][array_name],
-                    pa_widgets.scalar.value
-                )
-            )))
-            ticks = list(ticks)
-            ticks.sort()
-            if len(ticks) == 1:
-                ticks.append(ticks[0] + 0.00000001)
-                # To avoid passing a singleton set
-
-            self.cbars_ax[array_name] = self.pltfigure.add_axes(
-                [
-                    0.2*len(self.cbars_ax.keys()),
-                    0,
-                    0.05,
-                    0.5
-                ]
-            )
-            self.cbars[array_name] = mpl.colorbar.ColorbarBase(
-                ax=self.cbars_ax[array_name],
-                cmap=cmap,
-                boundaries=ticks,
-            )
-            self.cbars[array_name].set_label(
-                            array_name + " : " + pa_widgets.scalar.value
-                    )
-        clear_output()
         with self.legend:
-            self.legend.clear_output()
+            self.pltfigure.clf()
+            clear_output(wait=True)
+            self.cbars = {}
+            self.cbars_ax = {}
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                ticks = set(list(np.sort(
+                    getattr(
+                        temp_data['arrays'][array_name],
+                        pa_widgets.scalar.value
+                    )
+                )))
+                ticks = list(ticks)
+                ticks.sort()
+                if len(ticks) == 1:
+                    ticks.append(ticks[0] + 0.00000001)
+                    # To avoid passing a singleton set
+
+                self.cbars_ax[array_name] = self.pltfigure.add_axes(
+                    [
+                        0.2*len(self.cbars_ax.keys()),
+                        0,
+                        0.05,
+                        0.5
+                    ]
+                )
+                self.cbars[array_name] = mpl.colorbar.ColorbarBase(
+                    ax=self.cbars_ax[array_name],
+                    cmap=cmap,
+                    boundaries=ticks,
+                )
+                self.cbars[array_name].set_label(
+                                array_name + " : " + pa_widgets.scalar.value
+                        )
             display(self.pltfigure)
