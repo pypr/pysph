@@ -361,7 +361,6 @@ class Viewer2D(Viewer):
         Set attributes for plotting.
         '''
 
-        plt.ion()
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
         self._vector_ax = self.figure.add_axes(
@@ -882,7 +881,6 @@ class Viewer3D(Viewer):
         self.vectors = {}
         self.legend = widgets.Output()
         with self.legend:
-            plt.ioff()
             self.pltfigure = plt.figure(figsize=(8, 8))
             # creating a dummy figure, so that 'self.pltfigure.clf()'
             # in self._legend_handler() does not throw an error
