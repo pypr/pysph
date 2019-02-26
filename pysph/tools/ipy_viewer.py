@@ -910,7 +910,6 @@ class Viewer3D(Viewer):
         display(self._widgets._create_vbox())
 
     def _frame_handler(self, change):
-
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
@@ -936,6 +935,7 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _scalar_handler(self, change):
+        import ipyvolume.pylab as p3
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         new = change['new']
@@ -963,6 +963,7 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _velocity_vectors_handler(self, change):
+        import ipyvolume.pylab as p3
         data = self.get_frame(self._widgets.frame.value)['arrays']
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
@@ -996,8 +997,10 @@ class Viewer3D(Viewer):
 
     def _vector_size_handler(self, change):
         array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
         if array_name in self.vectors.keys():
-            self.vectors[array_name].size = change['new']
+            if pa_widgets.velocity_vectors.value is True:
+                self.vectors[array_name].size = change['new']
 
     def _scalar_cmap_handler(self, change):
         array_name = change['owner'].owner
@@ -1048,6 +1051,7 @@ class Viewer3D(Viewer):
             display(self.pltfigure)
 
     def _save_figure_handler(self, change):
+        import ipyvolume.pylab as p3
         self.flag = False
         for extension in [
             '.jpg', '.jpeg', '.png', '.svg'
