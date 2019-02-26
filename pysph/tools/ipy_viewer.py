@@ -1,6 +1,5 @@
 import json
 import glob
-import os
 from pysph.solver.utils import load, get_files, mkdir
 from IPython.display import display, Image, clear_output
 import ipywidgets as widgets
@@ -149,6 +148,7 @@ class Viewer(object):
 class ParticleArrayWidgets(object):
 
     def __init__(self, particlearray):
+
         self.array_name = particlearray.name
         self.scalar = widgets.Dropdown(
             options=[
@@ -251,29 +251,32 @@ class Viewer2DWidgets(object):
             min=0,
             max=file_count,
             step=1,
-            disabled=False
+            disabled=False,
         )
         self.link = widgets.jslink(
             (self.frame, 'value'),
-            (self.play_button, 'value')
+            (self.play_button, 'value'),
         )
         self.delay_box = widgets.FloatText(
             value=0.2,
             description='Delay',
             disabled=False,
-            layout=widgets.Layout(width='240px', display='flex')
+            layout=widgets.Layout(width='240px', display='flex'),
         )
         self.save_figure = widgets.Text(
                 value='',
                 placeholder='example.pdf',
                 description='Save figure',
                 disabled=False,
-                layout=widgets.Layout(width='240px', display='flex')
+                layout=widgets.Layout(width='240px', display='flex'),
         )
-        self.save_all_plots = widgets.Checkbox(
-            value=False,
-            description='Save all plots',
-            disabled=False
+        self.save_all_plots = widgets.ToggleButton(
+                value=False,
+                description='Save all plots!',
+                disabled=False,
+                tooltip='Saves the corresponding plots for all the \
+                        frames in the presently set styling.',
+                icon='',
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
@@ -357,6 +360,7 @@ class Viewer2D(Viewer):
         '''
         Set attributes for plotting.
         '''
+
         plt.ion()
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
@@ -490,16 +494,9 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
         self._vector_handler(None)
         self._adjust_axes()
-        self._save_plot()
-        if self._widgets.save_all_plots.value:
-            mkdir('all_plots')
-            self.figure.savefig(
-                'all_plots/frame_%s.png' % self._widgets.frame.value,
-                dpi=300
-            )
-            print('saving files in pwd/all_plots')
 
     def _scalar_handler(self, change):
+
         array_name = change['owner'].owner
         temp_data = self.get_frame(
             self._widgets.frame.value
@@ -565,7 +562,6 @@ class Viewer2D(Viewer):
     def _adjust_axes(self):
 
         if hasattr(self, '_vector_ax'):
-
             self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
             self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
         else:
@@ -581,6 +577,7 @@ class Viewer2D(Viewer):
         self._plot_vectors()
 
     def _scalar_cmap_handler(self, change):
+
         temp_data = self.get_frame(
             self._widgets.frame.value
         )['arrays']
@@ -602,6 +599,7 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
 
     def _legend_handler(self, change):
+
         temp_data = self.get_frame(
             self._widgets.frame.value
         )['arrays']
@@ -674,19 +672,30 @@ class Viewer2D(Viewer):
         self._widgets.play_button.interval = change['new']*1000
 
     def _save_all_plots_handler(self, change):
-        if change['new']:
+        if change['new'] is True:
+            mkdir('all_plots')
+            self._widgets.play_button.disabled = True
+            self._widgets.delay_box.disabled = True
             self._widgets.save_figure.disabled = True
-        elif not change['new']:
-            self._widgets.save_figure.disabled = False
-
-    def _save_plot(self):
-        abs_path = os.path.abspath(self.path)
-        if self._widgets.save_all_plots.value:
-            mkdir('/all_plots')
-            self.figure.savefig(
-                'frame_%s.png' % self._widgets.frame.value,
-                dpi=300
+            self._widgets.save_all_plots.disabled = True
+            change = {}  # dummy dictionary to be used in 'self._frame.handler'
+            file_count = len(self.paths_list) - 1
+            for i in np.arange(0, file_count + 1):
+                self._widgets.frame.value = i
+                self._frame_handler(change)
+                self.figure.savefig(
+                    'all_plots/frame_%s.png' % i,
+                    dpi=300
+                )
+            print(
+                "Saved all plots in the folder 'all_plots'" +
+                "in the present working directory"
             )
+            self._widgets.play_button.disabled = False
+            self._widgets.delay_box.disabled = False
+            self._widgets.save_figure.disabled = False
+            self._widgets.save_all_plots.disabled = False
+            self._widgets.save_all_plots.value = False
 
 
 class ParticleArrayWidgets3D(object):
