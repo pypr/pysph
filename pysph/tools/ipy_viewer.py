@@ -7,7 +7,6 @@ import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
-import ipyvolume.pylab as p3
 
 
 class Viewer(object):
@@ -868,6 +867,7 @@ class Viewer3D(Viewer):
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
 
     def interactive_plot(self):
+        import ipyvolume.pylab as p3
         self._create_widgets()
         self.scatters = {}
         self.vectors = {}
