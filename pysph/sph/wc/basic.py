@@ -345,7 +345,11 @@ class MomentumEquationDeltaSPH(Equation):
 
 class ContinuityEquationDeltaSPHPreStep(Equation):
     r"""**Continuity equation with dissipative terms**
-    See pysph.sph.wc.basic.ContinuityEquationDeltaSPH
+    See :class:`pysph.sph.wc.basic.ContinuityEquationDeltaSPH`
+    The matrix :math:`L_a` is multiplied to :math:`\nabla W_{ij}` in the
+    :class:`pysph.sph.scheme.WCSPHScheme` class by using
+    :class:`pysph.sph.wc.kernel_correction.GradientCorrectionPreStep` and
+    :class:`pysph.sph.wc.kernel_correction.GradientCorrection`.
     """
 
     def initialize(self, d_idx, d_gradrho):
