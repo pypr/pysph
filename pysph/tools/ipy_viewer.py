@@ -354,10 +354,11 @@ class Viewer2D(Viewer):
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
 
     def _configure_plot(self):
+
         '''
         Set attributes for plotting.
         '''
-        plt.ion()
+
         self.figure = plt.figure()
         self._scatter_ax = self.figure.add_axes([0, 0, 1, 1])
         self._vector_ax = self.figure.add_axes(
@@ -372,6 +373,7 @@ class Viewer2D(Viewer):
         self._vectors = {}
 
     def interactive_plot(self):
+
         '''
         Set plotting attributes, create widgets and display them
         along with the interactive plot.
@@ -500,6 +502,7 @@ class Viewer2D(Viewer):
             print('saving files in pwd/all_plots')
 
     def _scalar_handler(self, change):
+
         array_name = change['owner'].owner
         temp_data = self.get_frame(
             self._widgets.frame.value
@@ -581,6 +584,7 @@ class Viewer2D(Viewer):
         self._plot_vectors()
 
     def _scalar_cmap_handler(self, change):
+
         temp_data = self.get_frame(
             self._widgets.frame.value
         )['arrays']
@@ -602,6 +606,7 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
 
     def _legend_handler(self, change):
+
         temp_data = self.get_frame(
             self._widgets.frame.value
         )['arrays']
@@ -671,15 +676,18 @@ class Viewer2D(Viewer):
         self._widgets.save_figure.value = ""
 
     def _delay_box_handler(self, change):
+
         self._widgets.play_button.interval = change['new']*1000
 
     def _save_all_plots_handler(self, change):
+
         if change['new']:
             self._widgets.save_figure.disabled = True
         elif not change['new']:
             self._widgets.save_figure.disabled = False
 
     def _save_plot(self):
+
         abs_path = os.path.abspath(self.path)
         if self._widgets.save_all_plots.value:
             mkdir('/all_plots')
@@ -867,13 +875,13 @@ class Viewer3D(Viewer):
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
 
     def interactive_plot(self):
+
         import ipyvolume.pylab as p3
         self._create_widgets()
         self.scatters = {}
         self.vectors = {}
         self.legend = widgets.Output()
         with self.legend:
-            plt.ioff()
             self.pltfigure = plt.figure(figsize=(8, 8))
             # creating a dummy figure, so that 'self.pltfigure.clf()'
             # in self._legend_handler() does not throw an error
@@ -910,6 +918,7 @@ class Viewer3D(Viewer):
         display(self._widgets._create_vbox())
 
     def _frame_handler(self, change):
+
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
@@ -935,6 +944,7 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _scalar_handler(self, change):
+
         import ipyvolume.pylab as p3
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
@@ -963,6 +973,7 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _velocity_vectors_handler(self, change):
+
         import ipyvolume.pylab as p3
         data = self.get_frame(self._widgets.frame.value)['arrays']
         array_name = change['owner'].owner
@@ -991,11 +1002,13 @@ class Viewer3D(Viewer):
                 )
 
     def _scalar_size_handler(self, change):
+
         array_name = change['owner'].owner
         if array_name in self.scatters.keys():
             self.scatters[array_name].size = change['new']
 
     def _vector_size_handler(self, change):
+
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         if array_name in self.vectors.keys():
@@ -1003,6 +1016,7 @@ class Viewer3D(Viewer):
                 self.vectors[array_name].size = change['new']
 
     def _scalar_cmap_handler(self, change):
+
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         change['new'] = pa_widgets.scalar.value
@@ -1010,6 +1024,7 @@ class Viewer3D(Viewer):
         self._legend_handler(None)
 
     def _legend_handler(self, change):
+
         temp_data = self.get_frame(self._widgets.frame.value)
         with self.legend:
             self.pltfigure.clf()
@@ -1051,6 +1066,7 @@ class Viewer3D(Viewer):
             display(self.pltfigure)
 
     def _save_figure_handler(self, change):
+
         import ipyvolume.pylab as p3
         self.flag = False
         for extension in [
@@ -1079,4 +1095,5 @@ class Viewer3D(Viewer):
         self._widgets.save_figure.value = ""
 
     def _delay_box_handler(self, change):
+
         self._widgets.play_button.interval = change['new']*1000
