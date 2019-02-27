@@ -288,6 +288,10 @@ class ParticleArrayHelper(HasTraits):
 
     edit_vectors = Button('More options ...')
 
+    stride = Int(1, desc='stride value for property')
+
+    component = Int(0)
+
     # Private attribute to store the Text module.
     _text = Instance(PipelineBase)
 
@@ -317,6 +321,7 @@ class ParticleArrayHelper(HasTraits):
                          editor=EnumEditor(name='scalar_list')),
                     Item(name='list_all_scalars'),
                     Item(name='show_time'),
+                    Item(name='component', enabled_when='stride > 1'),
                     columns=2,
                 ),
                 Item(name='edit_scalars', show_label=False),
@@ -360,7 +365,14 @@ class ParticleArrayHelper(HasTraits):
             method_name = '_add_' + scalar
             method = getattr(self, method_name)
             method(pa)
-        return pa.get(scalar, only_real_particles=False)
+
+        self.stride = stride = pa.stride.get(scalar, 1)
+        component = max(0, min(self.component, stride - 1))
+        array = pa.get(scalar, only_real_particles=False)
+        if stride > 1:
+            return array[component::stride]
+        else:
+            return array
 
     #  Traits handlers #############################################
     def _edit_scalars_fired(self):
@@ -432,6 +444,9 @@ class ParticleArrayHelper(HasTraits):
                 self.particle_array, value
             )
             p.module_manager.scalar_lut_manager.data_name = value
+
+    def _component_changed(self, value):
+        self._scalar_changed(self.scalar)
 
     def _list_all_scalars_changed(self, list_all_scalars):
         pa = self.particle_array
