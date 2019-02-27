@@ -175,11 +175,10 @@ class SchemeChooser(Scheme):
 
     def configure_solver(self, kernel=None, integrator_cls=None,
                          extra_steppers=None, **kw):
-        for scheme in self.schemes.values():
-            self.scheme.configure_solver(
-                kernel=kernel, integrator_cls=integrator_cls,
-                extra_steppers=extra_steppers, **kw
-            )
+        self.scheme.configure_solver(
+            kernel=kernel, integrator_cls=integrator_cls,
+            extra_steppers=extra_steppers, **kw
+        )
 
     def get_equations(self):
         return self.scheme.get_equations()
@@ -940,9 +939,8 @@ class GasDScheme(Scheme):
         )
 
     def consume_user_options(self, options):
-        self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'alpha2', 'alpha1', 'beta', 'update_alpha1',
-                'update_alpha2']
+                'update_alpha2', 'adaptive_h_scheme']
         data = dict((var, self._smart_getattr(options, var))
                     for var in vars)
         self.configure(**data)
@@ -994,6 +992,7 @@ class GasDScheme(Scheme):
             ScaleSmoothingLength, UpdateSmoothingLengthFromVolume,
             SummationDensity, IdealGasEOS, MPMAccelerations
         )
+        from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
 
         equations = []
         # Find the optimal 'h'
@@ -1056,14 +1055,21 @@ class GasDScheme(Scheme):
         equations.append(Group(equations=g2))
 
         g3 = []
+        for solid in self.solids:
+            g3.append(WallBoundary(solid, sources=self.fluids))
+            equations.append(Group(equations=g3))
+
+        g4 = []
         for fluid in self.fluids:
-            g3.append(MPMAccelerations(
-                dest=fluid, sources=self.fluids, alpha1_min=self.alpha1,
+            g4.append(MPMAccelerations(
+                dest=fluid, sources=self.fluids + self.solids,
+                alpha1_min=self.alpha1,
                 alpha2_min=self.alpha2, beta=self.beta,
                 update_alpha1=self.update_alpha1,
                 update_alpha2=self.update_alpha2
             ))
-        equations.append(Group(equations=g3))
+        equations.append(Group(equations=g4))
+
         return equations
 
     def setup_properties(self, particles, clean=True):
@@ -1075,6 +1081,12 @@ class GasDScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        solid_props = set(props) | set('div cs wij htmp'.split(' '))
+        for solid in self.solids:
+            pa = particle_arrays[solid]
+            self._ensure_properties(pa, solid_props, clean)
             pa.set_output_arrays(output_props)
 
 

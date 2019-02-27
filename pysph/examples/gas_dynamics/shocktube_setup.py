@@ -96,6 +96,8 @@ class ShockTubeSetup(Application):
         cs = pa.cs
         u = pa.u
         p = pa.p
+        h = pa.h
+
         plt.plot(x, rho, label='pysph (' + str(self.options.scheme) + ')')
         plt.plot(x_e, rho_e, label='exact')
         plt.xlabel('x')
@@ -132,7 +134,10 @@ class ShockTubeSetup(Application):
         plt.clf()
 
         fname = os.path.join(self.output_dir, 'results.npz')
-        numpy.savez(fname, x=x, u=u, e=e, cs=cs, rho=rho, p=p)
+        numpy.savez(fname, x=x, u=u, e=e, cs=cs, rho=rho, p=p, h=h)
+
+        fname = os.path.join(self.output_dir, 'exact.npz')
+        numpy.savez(fname, x=x_e, u=u_e, e=e_e, p=p_e, rho=rho_e)
 
     def configure_scheme(self):
         s = self.scheme
