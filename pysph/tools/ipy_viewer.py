@@ -274,8 +274,8 @@ class Viewer2DWidgets(object):
                 value=False,
                 description='Save all plots!',
                 disabled=False,
-                tooltip='Saves the corresponding plots for all the \
-                        frames in the presently set styling.',
+                tooltip='Saves the corresponding plots for all the' +
+                        ' frames in the presently set styling.',
                 icon='',
         )
         self.particles = {}
@@ -306,7 +306,11 @@ class Viewer2DWidgets(object):
                      [
                         self.delay_box,
                         self.save_figure,
-                        self.save_all_plots
+                     ]
+                    ),
+                    HBox(
+                     [
+                        self.save_all_plots,
                      ]
                     )
                 ]
@@ -681,8 +685,20 @@ class Viewer2D(Viewer):
             self._widgets.delay_box.disabled = True
             self._widgets.save_figure.disabled = True
             self._widgets.save_all_plots.disabled = True
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = True
+                pa_widgets.scalar_cmap.disabled = True
+                pa_widgets.legend.disabled = True
+                pa_widgets.vector.disabled = True
+                pa_widgets.vector_width.disabled = True
+                pa_widgets.vector_scale.disabled = True
+                pa_widgets.scalar_size.disabled = True
+
             change = {}  # dummy dictionary to be used in 'self._frame.handler'
             file_count = len(self.paths_list) - 1
+
             for i in np.arange(0, file_count + 1):
                 self._widgets.frame.value = i
                 self._frame_handler(change)
@@ -690,15 +706,27 @@ class Viewer2D(Viewer):
                     'all_plots/frame_%s.png' % i,
                     dpi=300
                 )
+
             print(
-                "Saved all plots in the folder 'all_plots'" +
-                "in the present working directory"
+                "Saved the plots in the folder 'all_plots'" +
+                " in the present working directory"
             )
+
             self._widgets.play_button.disabled = False
             self._widgets.delay_box.disabled = False
             self._widgets.save_figure.disabled = False
             self._widgets.save_all_plots.disabled = False
             self._widgets.save_all_plots.value = False
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = False
+                pa_widgets.scalar_cmap.disabled = False
+                pa_widgets.legend.disabled = False
+                pa_widgets.vector.disabled = False
+                pa_widgets.vector_width.disabled = False
+                pa_widgets.vector_scale.disabled = False
+                pa_widgets.scalar_size.disabled = False
 
 
 class ParticleArrayWidgets3D(object):
@@ -739,7 +767,6 @@ class ParticleArrayWidgets3D(object):
             layout=widgets.Layout(width='300px'),
         )
         self.vector_size.owner = self.array_name
-
         self.scalar_size = widgets.FloatSlider(
             min=0,
             max=3,
@@ -804,6 +831,14 @@ class Viewer3DWidgets(object):
                 disabled=False,
                 layout=widgets.Layout(width='240px', display='flex')
         )
+        self.save_all_plots = widgets.ToggleButton(
+                value=False,
+                description='Save all plots!',
+                disabled=False,
+                tooltip='Saves the corresponding plots for all the' +
+                        ' frames in the presently set styling.',
+                icon='',
+        )
         self.particles = {}
         for array_name in self.temp_data.keys():
             self.particles[array_name] = ParticleArrayWidgets3D(
@@ -832,6 +867,11 @@ class Viewer3DWidgets(object):
                      [
                         self.delay_box,
                         self.save_figure
+                     ]
+                    ),
+                    HBox(
+                     [
+                        self.save_all_plots,
                      ]
                     )
                 ]
@@ -863,6 +903,9 @@ class Viewer3D(Viewer):
         self._widgets.frame.observe(self._frame_handler, 'value')
         self._widgets.save_figure.on_submit(self._save_figure_handler)
         self._widgets.delay_box.observe(self._delay_box_handler, 'value')
+        self._widgets.save_all_plots.observe(
+            self._save_all_plots_handler, 'value'
+        )
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
@@ -1101,3 +1144,53 @@ class Viewer3D(Viewer):
     def _delay_box_handler(self, change):
 
         self._widgets.play_button.interval = change['new']*1000
+
+    def _save_all_plots_handler(self, change):
+
+        import ipyvolume as p3
+        if change['new'] is True:
+            mkdir('all_plots')
+            self._widgets.play_button.disabled = True
+            self._widgets.delay_box.disabled = True
+            self._widgets.save_figure.disabled = True
+            self._widgets.save_all_plots.disabled = True
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = True
+                pa_widgets.scalar_cmap.disabled = True
+                pa_widgets.velocity_vectors.disabled = True
+                pa_widgets.vector_size.disabled = True
+                pa_widgets.scalar_size.disabled = True
+
+            change = {}  # dummy dictionary to be used in 'self._frame.handler'
+            file_count = len(self.paths_list) - 1
+
+            for i in np.arange(0, file_count + 1):
+                self._widgets.frame.value = i
+                self._frame_handler(change)
+                p3.savefig(
+                            'all_plots/frame_%s.png' % i,
+                            width=1000,
+                            height=1000,
+                            fig=self.plot
+                        )
+
+            print(
+                "Saved the plots in the folder 'all_plots'" +
+                " in the present working directory"
+            )
+
+            self._widgets.play_button.disabled = False
+            self._widgets.delay_box.disabled = False
+            self._widgets.save_figure.disabled = False
+            self._widgets.save_all_plots.disabled = False
+            self._widgets.save_all_plots.value = False
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = True
+                pa_widgets.scalar_cmap.disabled = True
+                pa_widgets.velocity_vectors.disabled = True
+                pa_widgets.vector_size.disabled = True
+                pa_widgets.scalar_size.disabled = True
