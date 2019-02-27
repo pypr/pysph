@@ -392,10 +392,14 @@ class WCSPHScheme(Scheme):
             UpdateSmoothingLengthFerrari
         )
         from pysph.sph.wc.basic import (ContinuityEquationDeltaSPH,
+                                        ContinuityEquationDeltaSPHPreStep,
                                         MomentumEquationDeltaSPH)
         from pysph.sph.basic_equations import \
             (ContinuityEquation, SummationDensity, XSPHCorrection)
-        from pysph.sph.wc.viscosity import LaminarViscosity
+        from pysph.sph.wc.viscosity import (LaminarViscosity,
+                                            LaminarViscosityDeltaSPH)
+        from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
+                                                    GradientCorrection)
 
         equations = []
         g1 = []
@@ -425,58 +429,69 @@ class WCSPHScheme(Scheme):
                     dest=name, sources=None, rho0=self.rho0, c0=self.c0,
                     gamma=self.gamma
                 ))
-
         equations.append(Group(equations=g1, real=False))
+
+        if self.delta_sph and not self.summation_density:
+            eq2_pre = []
+            for name in self.fluids:
+                eq2_pre.append(
+                    GradientCorrectionPreStep(dest=name, sources=[name],
+                                              dim=self.dim)
+                )
+            equations.append(Group(equations=eq2_pre, real=False))
+
+            eq2 = []
+            for name in self.fluids:
+                eq2.extend([
+                    GradientCorrection(dest=name, sources=[name]),
+                    ContinuityEquationDeltaSPHPreStep(
+                        dest=name, sources=[name]
+                    )])
+            equations.append(Group(equations=eq2))
 
         g2 = []
         for name in self.solids:
             g2.append(ContinuityEquation(dest=name, sources=self.fluids))
 
         for name in self.fluids:
-            if self.delta_sph:
-                other = all[:]
-                other.remove(name)
+            if not self.summation_density:
+                g2.append(
+                    ContinuityEquation(dest=name, sources=all)
+                )
+            if self.delta_sph and not self.summation_density:
                 g2.append(
                     ContinuityEquationDeltaSPH(
                         dest=name, sources=[name], c0=self.c0,
                         delta=self.delta
-                    )
-                )
-                if len(other) > 0:
-                    g2.append(ContinuityEquation(dest=name, sources=other))
+                    ))
+            # This is required since MomentumEquation (ME) adds artificial
+            # viscosity (AV), so make alpha 0.0 for ME and enable delta sph AV.
+            alpha = 0.0 if self.delta_sph else self.alpha
+            g2.append(
+                MomentumEquation(
+                    dest=name, sources=all, c0=self.c0,
+                    alpha=alpha, beta=self.beta,
+                    gx=self.gx, gy=self.gy, gz=self.gz,
+                    tensile_correction=self.tensile_correction
+                ))
+            if self.delta_sph:
                 g2.append(
                     MomentumEquationDeltaSPH(
                         dest=name, sources=[name], rho0=self.rho0, c0=self.c0,
-                        alpha=self.alpha, gx=self.gx, gy=self.gy, gz=self.gz,
-                    )
-                )
-                if len(other) > 0:
-                    g2.append(
-                        MomentumEquation(
-                            dest=name, sources=other, c0=self.c0,
-                            alpha=self.alpha, beta=self.beta,
-                            gx=self.gx, gy=self.gy, gz=self.gz,
-                            tensile_correction=self.tensile_correction
-                        )
-                    )
-
-                g2.append(XSPHCorrection(dest=name, sources=[name]))
-            else:
-                if not self.summation_density:
-                    g2.append(ContinuityEquation(dest=name, sources=all))
-                g2.extend([
-                    MomentumEquation(
-                        dest=name, sources=all, alpha=self.alpha,
-                        beta=self.beta, gx=self.gx, gy=self.gy, gz=self.gz,
-                        c0=self.c0, tensile_correction=self.tensile_correction
-                    ),
-                    XSPHCorrection(dest=name, sources=[name])
-                ])
+                        alpha=self.alpha
+                    ))
+            g2.append(XSPHCorrection(dest=name, sources=[name]))
 
             if abs(self.nu) > 1e-14:
-                eq = LaminarViscosity(
-                    dest=name, sources=all, nu=self.nu
-                )
+                if self.delta_sph:
+                    eq = LaminarViscosityDeltaSPH(
+                        dest=name, sources=all, dim=self.dim, rho0=self.rho0,
+                        nu=self.nu
+                    )
+                else:
+                    eq = LaminarViscosity(
+                        dest=name, sources=all, nu=self.nu
+                    )
                 g2.insert(-1, eq)
         equations.append(Group(equations=g2))
 
@@ -496,6 +511,12 @@ class WCSPHScheme(Scheme):
         props = list(dummy.properties.keys())
         output_props = ['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
                         'pid', 'gid', 'tag', 'p']
+        if self.delta_sph:
+            delta_sph_props = [
+                {'name': 'm_mat', 'stride': 9},
+                {'name': 'gradrho', 'stride': 3},
+            ]
+            props += delta_sph_props
         for pa in particles:
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)

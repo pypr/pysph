@@ -296,8 +296,8 @@ class MomentumEquationDeltaSPH(Equation):
         pp 1468--1480.
 
     """
-    def __init__(self, dest, sources, rho0, c0, alpha=1.0,
-                 gx=0.0, gy=0.0, gz=0.0):
+
+    def __init__(self, dest, sources, rho0, c0, alpha=1.0):
         r"""
         Parameters
         ----------
@@ -308,12 +308,6 @@ class MomentumEquationDeltaSPH(Equation):
         alpha : float
             coefficient used to control the intensity of the
             diffusion of velocity
-        gx : float
-            body force per unit mass along the x-axis
-        gy : float
-            body force per unit mass along the y-axis
-        gz : float
-            body force per unit mass along the z-axis
 
         Notes
         -----
@@ -324,19 +318,10 @@ class MomentumEquationDeltaSPH(Equation):
         """
 
         self.alpha = alpha
-        self.gx = gx
-        self.gy = gy
-        self.gz = gz
-
         self.c0 = c0
         self.rho0 = rho0
 
         super(MomentumEquationDeltaSPH, self).__init__(dest, sources)
-
-    def initialize(self, d_idx, d_au, d_av, d_aw):
-        d_au[d_idx] = 0.0
-        d_av[d_idx] = 0.0
-        d_aw[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_rho, d_cs, d_p, d_au, d_av, d_aw, s_m,
              s_rho, s_cs, s_p, VIJ, XIJ, HIJ, R2IJ, RHOIJ1, EPS, WIJ, DWIJ):
@@ -344,32 +329,44 @@ class MomentumEquationDeltaSPH(Equation):
         # src paricle volume mj/rhoj
         Vj = s_m[s_idx]/s_rho[s_idx]
 
-        p_i = d_p[d_idx]
-        pj = s_p[s_idx]
-
         # viscous contribution second part of eqn (5b) in [Maronne2011]
         vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
-        piij = self.alpha * HIJ * self.c0 * self.rho0 * vijdotxij/(R2IJ + EPS)
+        fac = self.alpha * HIJ * self.c0 * self.rho0
+        piij = vijdotxij/(R2IJ + EPS)
 
         # gradient and viscous terms eqn 5b in [Maronne2011]
-        tmp = -Vj/d_rho[d_idx] * (p_i + pj) + piij * Vj/d_rho[d_idx]
+        tmp = fac * piij * Vj/d_rho[d_idx]
 
         # accelerations
         d_au[d_idx] += tmp * DWIJ[0]
         d_av[d_idx] += tmp * DWIJ[1]
         d_aw[d_idx] += tmp * DWIJ[2]
 
-    def post_loop(self, d_idx, d_au, d_av, d_aw, d_dt_force):
-        d_au[d_idx] += self.gx
-        d_av[d_idx] += self.gy
-        d_aw[d_idx] += self.gz
 
-        acc2 = (d_au[d_idx]*d_au[d_idx] +
-                d_av[d_idx]*d_av[d_idx] +
-                d_aw[d_idx]*d_aw[d_idx])
+class ContinuityEquationDeltaSPHPreStep(Equation):
+    r"""**Continuity equation with dissipative terms**
+    See :class:`pysph.sph.wc.basic.ContinuityEquationDeltaSPH`
+    The matrix :math:`L_a` is multiplied to :math:`\nabla W_{ij}` in the
+    :class:`pysph.sph.scheme.WCSPHScheme` class by using
+    :class:`pysph.sph.wc.kernel_correction.GradientCorrectionPreStep` and
+    :class:`pysph.sph.wc.kernel_correction.GradientCorrection`.
+    """
 
-        # store the square of the max acceleration
-        d_dt_force[d_idx] = acc2
+    def initialize(self, d_idx, d_gradrho):
+        d_gradrho[d_idx*3 + 0] = 0.0
+        d_gradrho[d_idx*3 + 1] = 0.0
+        d_gradrho[d_idx*3 + 2] = 0.0
+
+    def loop(self, d_idx, d_arho, s_idx, d_rho, s_rho, s_m, d_gradrho, DWIJ):
+
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        Vj = s_m[s_idx]/rhoj
+
+        # renormalized density of eqn (5a)
+        d_gradrho[d_idx*3 + 0] += (rhoj - rhoi) * DWIJ[0] * Vj
+        d_gradrho[d_idx*3 + 1] += (rhoj - rhoi) * DWIJ[1] * Vj
+        d_gradrho[d_idx*3 + 2] += (rhoj - rhoi) * DWIJ[2] * Vj
 
 
 class ContinuityEquationDeltaSPH(Equation):
@@ -386,6 +383,7 @@ class ContinuityEquationDeltaSPH(Equation):
         violent impact flows", Computer Methods in Applied Mechanics and
         Engineering, 200 (2011), pp 1526--1542.
     """
+
     def __init__(self, dest, sources, c0, delta=0.1):
         r"""
         Parameters
@@ -399,29 +397,21 @@ class ContinuityEquationDeltaSPH(Equation):
         self.delta = delta
         super(ContinuityEquationDeltaSPH, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_arho):
-        d_arho[d_idx] = 0.0
-
-    def loop(self, d_idx, d_arho, s_idx, s_m, d_cs, s_cs, d_rho, s_rho,
-             DWIJ, VIJ, XIJ, RIJ, HIJ, EPS):
-
+    def loop(self, d_idx, d_arho, s_idx, s_m, d_rho, s_rho, DWIJ, XIJ, R2IJ,
+             HIJ, EPS, d_gradrho, s_gradrho):
         rhoi = d_rho[d_idx]
         rhoj = s_rho[s_idx]
         Vj = s_m[s_idx]/rhoj
 
-        # v_{ij} \cdot \nabla W
-        vijdotdwij = DWIJ[0]*VIJ[0] + DWIJ[1]*VIJ[1] + DWIJ[2]*VIJ[2]
+        fac = -2.0 * (rhoj - rhoi)/(R2IJ + EPS)
+        psix = fac*XIJ[0] - d_gradrho[d_idx*3 + 0] - s_gradrho[s_idx*3 + 0]
+        psiy = fac*XIJ[1] - d_gradrho[d_idx*3 + 1] - s_gradrho[s_idx*3 + 1]
+        psiz = fac*XIJ[2] - d_gradrho[d_idx*3 + 2] - s_gradrho[s_idx*3 + 2]
 
-        # eta_{ij} \cdot \nabla W
-        etadotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
-        etadotdwij /= (RIJ + EPS)
-
-        # celerity (sound speed)
-        cij = self.c0
-        psi_ij = self.delta * HIJ * cij * (rhoj - rhoi)
+        psidotdwij = psix*DWIJ[0] + psiy*DWIJ[1] + psiz*DWIJ[2]
 
         # standard term with dissipative penalization eqn (5a)
-        d_arho[d_idx] += rhoi*vijdotdwij*Vj + psi_ij*etadotdwij*Vj
+        d_arho[d_idx] += self.delta * HIJ * self.c0 * psidotdwij * Vj
 
 
 class UpdateSmoothingLengthFerrari(Equation):
