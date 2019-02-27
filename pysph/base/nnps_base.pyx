@@ -44,7 +44,7 @@ ELSE:
     cpdef int get_number_of_threads():
         return 1
     cpdef set_number_of_threads(int n):
-        print "OpenMP not available, cannot set number of threads."
+        print("OpenMP not available, cannot set number of threads.")
 
 
 IF UNAME_SYSNAME == "Windows":
@@ -1003,8 +1003,11 @@ cdef class NeighborCache:
         # This is an upper limit for the number of neighbors in a worst
         # case scenario.
         cdef size_t safety = 1024
+        cdef UIntArray arr
         for i in range(n_threads):
-            (<UIntArray>self._neighbors[i]).c_reserve(
+            arr = <UIntArray>self._neighbors[i]
+            arr.c_reset()
+            arr.c_reserve(
                 self._last_avg_nbr_size*np/n_threads + safety
             )
 

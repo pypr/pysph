@@ -1018,6 +1018,26 @@ def test_large_number_of_neighbors_linked_list():
     assert nbrs.length == len(x)
 
 
+def test_neighbor_cache_update_doesnt_leak():
+    # Given
+    x, y, z = numpy.random.random((3, 1000))
+    pa = get_particle_array(name='fluid', x=x, y=y, z=z, h=0.05)
+
+    nps = nnps.LinkedListNNPS(dim=3, particles=[pa], cache=True)
+    nps.set_context(0, 0)
+    nps.cache[0].find_all_neighbors()
+    old_length = sum(x.length for x in nps.cache[0]._neighbor_arrays)
+
+    # When
+    nps.update()
+    nps.set_context(0, 0)
+    nps.cache[0].find_all_neighbors()
+
+    # Then
+    new_length = sum(x.length for x in nps.cache[0]._neighbor_arrays)
+    assert new_length == old_length
+
+
 nnps_classes = [
     nnps.BoxSortNNPS,
     nnps.CellIndexingNNPS,

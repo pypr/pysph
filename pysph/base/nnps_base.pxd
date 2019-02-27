@@ -246,7 +246,8 @@ cdef class NeighborCache:
     cdef UIntArray _start_stop
     cdef IntArray _cached
     cdef void **_neighbors
-    cdef list _neighbor_arrays
+    # This is made public purely for testing!
+    cdef public list _neighbor_arrays
     cdef int _last_avg_nbr_size
 
     cdef void get_neighbors_raw(self, size_t d_idx, UIntArray nbrs) nogil
@@ -265,7 +266,7 @@ cdef class NNPSBase:
     cdef public list pa_wrappers      # list of particle array wrappers
     cdef public int narrays           # Number of particle arrays
     cdef public bint use_cache        # Use cache or not.
-    cdef list cache                   # The neighbor cache.
+    cdef public list cache            # The neighbor cache.
     cdef int src_index, dst_index     # The current source and dest indices
 
     cdef public DomainManager domain  # Domain manager
