@@ -21,6 +21,7 @@ from pysph.sph.wc.kernel_correction import (GradientCorrectionPreStep,
                                             GradientCorrection,
                                             MixedKernelCorrectionPreStep)
 from pysph.sph.wc.crksph import CRKSPHPreStep, CRKSPH
+from pysph.sph.wc.gtvf import GTVFScheme
 
 
 fluid_column_height = 2.0
@@ -110,6 +111,13 @@ class DamBreak2D(Application):
                 )
             )
             print("dt = %f" % dt)
+        elif self.options.scheme == 'gtvf':
+            scheme = self.scheme
+            kernel = QuinticSpline(dim=2)
+            dt = 0.125 * self.h / co
+            kw.update(dict(kernel=kernel, dt=dt))
+            scheme.configure(pref=B*gamma, p0=B*gamma, h0=self.h)
+            print("dt = %f" % dt)
 
         self.scheme.configure_solver(**kw)
 
@@ -131,13 +139,19 @@ class DamBreak2D(Application):
             fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
             rho0=ro, gy=-g
         )
+        gtvf = GTVFScheme(
+            fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
+            rho0=ro, gy=-g, h0=None, c0=co, p0=None, pref=None
+        )
         s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
-                          iisph=iisph)
+                          iisph=iisph, gtvf=gtvf)
         return s
 
     def create_equations(self):
         eqns = self.scheme.get_equations()
         if self.options.scheme == 'iisph':
+            return eqns
+        if self.options.scheme == 'gtvf':
             return eqns
         n = len(eqns)
         if self.kernel_corr == 'grad-corr':

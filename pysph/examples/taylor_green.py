@@ -206,7 +206,7 @@ class TaylorGreen(Application):
             rho0=rho0, h0=h0, c0=c0, p0=0.0
         )
         gtvf = GTVFScheme(
-            fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
+            fluids=['fluid'], solids=[], dim=2, rho0=rho0, c0=c0,
             nu=None, h0=None, p0=p0, pref=None
         )
         pcisph = PCISPHScheme(
