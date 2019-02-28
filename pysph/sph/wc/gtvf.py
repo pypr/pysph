@@ -492,7 +492,7 @@ class MomentumEquationArtificialStressSolid(Equation):
 
 
 class GTVFScheme(Scheme):
-    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0, p0, pref,
+    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0, pref,
                  gx=0.0, gy=0.0, gz=0.0, b=1.0, alpha=0.0):
         r"""Parameters
         ----------
@@ -511,8 +511,6 @@ class GTVFScheme(Scheme):
             Real viscosity of the fluid.
         h0: float
             Reference smoothing length.
-        p0: float
-            reference pressure for the equation of state.
         pref: float
             reference pressure for rate of change of transport velocity.
         gx: float
@@ -532,7 +530,6 @@ class GTVFScheme(Scheme):
         self.c0 = c0
         self.nu = nu
         self.h0 = h0
-        self.p0 = p0
         self.pref = pref
         self.gx = gx
         self.gy = gy
@@ -607,7 +604,7 @@ class GTVFScheme(Scheme):
         eq3 = []
         for fluid in self.fluids:
             eq3.append(
-                StateEquation(dest=fluid, sources=None, p0=self.p0,
+                StateEquation(dest=fluid, sources=None, p0=self.pref,
                               rho0=self.rho0, b=1.0)
             )
         stage2.append(Group(equations=eq3, real=False))
@@ -618,7 +615,7 @@ class GTVFScheme(Scheme):
             g2_s.append(SetWallVelocity(dest=solid, sources=self.fluids))
             g2_s.append(SolidWallPressureBC(
                 dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
-                p0=self.p0, gx=self.gx, gy=self.gy, gz=self.gz
+                p0=self.pref, gx=self.gx, gy=self.gy, gz=self.gz
             ))
         if g2_s:
             stage2.append(Group(equations=g2_s, real=False))

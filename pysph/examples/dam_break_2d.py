@@ -116,7 +116,7 @@ class DamBreak2D(Application):
             kernel = QuinticSpline(dim=2)
             dt = 0.125 * self.h / co
             kw.update(dict(kernel=kernel, dt=dt))
-            scheme.configure(pref=B*gamma, p0=B*gamma, h0=self.h)
+            scheme.configure(pref=B*gamma, h0=self.h)
             print("dt = %f" % dt)
 
         self.scheme.configure_solver(**kw)
@@ -141,7 +141,7 @@ class DamBreak2D(Application):
         )
         gtvf = GTVFScheme(
             fluids=['fluid'], solids=['boundary'], dim=2, nu=nu,
-            rho0=ro, gy=-g, h0=None, c0=co, p0=None, pref=None
+            rho0=ro, gy=-g, h0=None, c0=co, pref=None
         )
         s = SchemeChooser(default='wcsph', wcsph=wcsph, aha=aha, edac=edac,
                           iisph=iisph, gtvf=gtvf)
