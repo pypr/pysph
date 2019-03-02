@@ -51,16 +51,19 @@ def get_particle_array_gtvf(constants=None, **props):
 class GTVFIntegrator(Integrator):
     def one_timestep(self, t, dt):
         self.stage1()
+        self.do_post_stage(dt, 1)
 
         self.compute_accelerations(0, update_nnps=False)
 
         self.stage2()
-
+        # We update domain here alone as positions only change here.
+        self.update_domain()
         self.do_post_stage(dt, 2)
 
         self.compute_accelerations(1)
 
         self.stage3()
+        self.do_post_stage(dt, 3)
 
 
 class GTVFStep(IntegratorStep):

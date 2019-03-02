@@ -249,7 +249,7 @@ cdef class GPUNNPS(NNPSBase):
             for cache in self.cache:
                 cache.update()
 
-    def update_domain(self, *args, **kwargs):
+    def update_domain(self):
         self.domain.update()
 
     cdef _compute_bounds(self):

@@ -39,9 +39,12 @@ class MyIntegrator(Integrator):
     def one_timestep(self, t, dt):
         self.compute_accelerations(0, update_nnps=False)
         self.stage1()
+        self.update_domain()
         self.do_post_stage(dt, 1)
         self.compute_accelerations(1, update_nnps=False)
         self.stage2()
+        self.update_domain()
+        self.do_post_stage(dt, 2)
 
 
 class TestMultiGroupIntegrator(unittest.TestCase):

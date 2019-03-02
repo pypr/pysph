@@ -439,7 +439,7 @@ cdef class CPUDomainManager(DomainManagerBase):
         self.ghosts = None
 
     #### Public protocol ################################################
-    def update(self, *args, **kwargs):
+    def update(self):
         """General method that is called before NNPS can bin particles.
 
         This method is responsible for the computation of cell sizes
@@ -488,7 +488,7 @@ cdef class CPUDomainManager(DomainManagerBase):
         """
         # minimum and maximum values of the domain
         cdef double xmin = self.xmin, xmax = self.xmax
-        cdef double ymin = self.ymin, ymax = self.ymax,
+        cdef double ymin = self.ymin, ymax = self.ymax
         cdef double zmin = self.zmin, zmax = self.zmax
 
         # translations along each coordinate direction
@@ -1238,7 +1238,7 @@ cdef class NNPS(NNPSBase):
     def set_in_parallel(self, bint in_parallel):
         self.domain.manager.in_parallel = in_parallel
 
-    def update_domain(self, *args, **kwargs):
+    def update_domain(self):
         self.domain.update()
 
     cpdef update(self):

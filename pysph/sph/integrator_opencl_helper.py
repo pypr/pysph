@@ -82,6 +82,9 @@ class OpenCLIntegrator(object):
     def compute_accelerations(self, index=0, update_nnps=True):
         self.integrator.compute_accelerations(index, update_nnps)
 
+    def update_domain(self):
+        self.integrator.update_domain()
+
     def do_post_stage(self, stage_dt, stage):
         """This is called after every stage of the integrator.
 

@@ -40,8 +40,9 @@ class PCISPHIntegrator(Integrator):
         self.compute_accelerations(0)
 
         self.stage1()
+        self.update_domain()
 
-        self.do_post_stage(0.5 * dt, 1)
+        self.do_post_stage(dt, 1)
 
     def initial_acceleration(self, t, dt):
         pass
