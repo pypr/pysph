@@ -3,9 +3,15 @@ import glob
 from pysph.solver.utils import load, get_files, mkdir
 from IPython.display import display, Image, clear_output
 import ipywidgets as widgets
-import matplotlib.pyplot as plt
 import matplotlib as mpl
+
+mpl.use('module://ipympl.backend_nbagg')
+# Now the user does not have to use the IPython magic command
+# '%matplotlib ipympl' in the notebook, the script takes care of it
+
+import matplotlib.pyplot as plt
 import numpy as np
+import threading
 
 
 class Viewer(object):
@@ -278,6 +284,13 @@ class Viewer2DWidgets(object):
                         ' frames in the presently set styling.',
                 icon='',
         )
+        self.stop_saving = widgets.ToggleButton(
+                value=False,
+                description='Stop saving',
+                disabled=True,
+                tooltip='Stops saving the plots',
+                icon='',
+        )
         self.particles = {}
         for array_name in self.temp_data.keys():
             self.particles[array_name] = ParticleArrayWidgets(
@@ -311,6 +324,7 @@ class Viewer2DWidgets(object):
                     HBox(
                      [
                         self.save_all_plots,
+                        self.stop_saving,
                      ]
                     )
                 ]
@@ -343,6 +357,14 @@ class Viewer2D(Viewer):
         widgets.save_figure.on_submit(self._save_figure_handler)
         widgets.delay_box.observe(self._delay_box_handler, 'value')
         widgets.save_all_plots.observe(self._save_all_plots_handler, 'value')
+
+        # PLEASE NOTE:
+        # All widget handlers take in 'change' as an argument. This is usually
+        # a dictionary conatining information about the widget and the change in
+        # state. However, these functions are also used outside of the use case of
+        # a user-triggered-event, and in these scenarios None should be passed as
+        # the argument. This is of particular significance because in most of these
+        # functions plt.figure.show() gets called only if the argument passed is not None.
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = widgets.particles[array_name]
@@ -379,13 +401,13 @@ class Viewer2D(Viewer):
         self._cbars = {}
         self._vectors = {}
 
+        self.figure.show()
+
     def interactive_plot(self):
 
         '''
         Set plotting attributes, create widgets and display them
         along with the interactive plot.
-
-        Use %matplotlib ipympl (mandatory).
         '''
 
         self._configure_plot()
@@ -410,13 +432,17 @@ class Viewer2D(Viewer):
                         temp_data[array_name],
                         pa_widgets.scalar.value
                 )
-                c = c + abs(np.min(c))
-                cmap = pa_widgets.scalar_cmap.value
-                colormap = getattr(mpl.cm, cmap)
-                sct = self._scatters[array_name]
-                cmax = np.max(c)
-                if cmax != 0:
-                    sct.set_facecolors(colormap(c*1.0/cmax))
+                colormap = getattr(
+                    plt.cm,
+                    pa_widgets.scalar_cmap.value
+                )
+                arr = self._normalized_for_colormaps(c)
+                # arr[0] = min(c)
+                # arr[1] = max(c)
+                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm)) = max(abs(maxm), abs(minm)) = max(abs(maxm), abs(minm))
+                # arr[3] = c normalized with the absolute maximum
+                if arr[2] != 0:
+                    sct.set_facecolors(colormap(arr[3]))
                 else:
                     sct.set_facecolors(colormap(c*0))
         self._scatter_ax.axis('equal')
@@ -486,19 +512,24 @@ class Viewer2D(Viewer):
                         temp_data[array_name],
                         pa_widgets.scalar.value
                 )
-                c = c + abs(np.min(c))
-                # making it non-zero so that it scales properly from 0 to 1
-                cmap = pa_widgets.scalar_cmap.value
-                colormap = getattr(mpl.cm, cmap)
-                cmax = np.max(c)
-                if cmax != 0:
-                    sct.set_facecolors(colormap(c*1.0/cmax))
+                colormap = getattr(
+                    plt.cm,
+                    pa_widgets.scalar_cmap.value
+                )
+                arr = self._normalized_for_colormaps(c)
+                # arr[0] = min(c)
+                # arr[1] = max(c)
+                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
+                # arr[3] = c normalized with the absolute maximum
+                if arr[2] != 0:
+                    sct.set_facecolors(colormap(arr[3]))
                 else:
                     sct.set_facecolors(colormap(c*0))
 
         self._legend_handler(None)
         self._vector_handler(None)
         self._adjust_axes()
+        self.figure.show()
 
     def _scalar_handler(self, change):
 
@@ -528,12 +559,17 @@ class Viewer2D(Viewer):
                     temp_data[array_name],
                     pa_widgets.scalar.value
             )
-            c = c + abs(np.min(c))
-            cmap = pa_widgets.scalar_cmap.value
-            colormap = getattr(mpl.cm, cmap)
-            cmax = np.max(c)
-            if cmax != 0:
-                sct.set_facecolors(colormap(c*1.0/cmax))
+            colormap = getattr(
+                    plt.cm,
+                    pa_widgets.scalar_cmap.value
+            )
+            arr = self._normalized_for_colormaps(c)
+            # arr[0] = min(c)
+            # arr[1] = max(c)
+            # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
+            # arr[3] = c normalized with the absolute maximum
+            if arr[2] != 0:
+                sct.set_facecolors(colormap(arr[3]))
             else:
                 sct.set_facecolors(colormap(c*0))
 
@@ -542,16 +578,23 @@ class Viewer2D(Viewer):
                     temp_data[array_name],
                     pa_widgets.scalar.value
             )
-            c = c + abs(np.min(c))
-            cmap = pa_widgets.scalar_cmap.value
-            colormap = getattr(mpl.cm, cmap)
-            cmax = np.max(c)
-            if cmax != 0:
-                sct.set_facecolors(colormap(c*1.0/cmax))
+            colormap = getattr(
+                    plt.cm,
+                    pa_widgets.scalar_cmap.value
+            )
+            arr = self._normalized_for_colormaps(c)
+            # arr[0] = min(c)
+            # arr[1] = max(c)
+            # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
+            # arr[3] = c normalized with the absolute maximum
+            if arr[2] != 0:
+                sct.set_facecolors(colormap(arr[3]))
             else:
                 sct.set_facecolors(colormap(c*0))
 
         self._legend_handler(None)
+
+        self.figure.show()
 
     def _vector_handler(self, change):
         '''
@@ -559,10 +602,13 @@ class Viewer2D(Viewer):
         '''
 
         self._plot_vectors()
+        if change is not None:
+            self.figure.show()
 
     def _vector_scale_handler(self, change):
 
         self._plot_vectors()
+        self.figure.show()
 
     def _adjust_axes(self):
 
@@ -576,10 +622,12 @@ class Viewer2D(Viewer):
 
         array_name = change['owner'].owner
         self._scatters[array_name].set_sizes([change['new']])
+        self.figure.show()
 
     def _vector_width_handler(self, change):
 
         self._plot_vectors()
+        self.figure.show()
 
     def _scalar_cmap_handler(self, change):
 
@@ -592,16 +640,22 @@ class Viewer2D(Viewer):
                 temp_data[array_name],
                 pa_widgets.scalar.value
         )
-        c = c + abs(np.min(c))
-        cmap = pa_widgets.scalar_cmap.value
-        colormap = getattr(mpl.cm, cmap)
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
         sct = self._scatters[array_name]
-        cmax = np.max(c)
-        if cmax != 0:
-            sct.set_facecolors(colormap(c*1.0/cmax))
+        arr = self._normalized_for_colormaps(c)
+        # arr[0] = min(c)
+        # arr[1] = max(c)
+        # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm)) = max(abs(maxm), abs(minm))
+        # arr[3] = c normalized with the absolute maximum
+        if arr[2] != 0:
+            sct.set_facecolors(colormap(arr[3]))
         else:
             sct.set_facecolors(colormap(c*0))
         self._legend_handler(None)
+        self.figure.show()
 
     def _legend_handler(self, change):
 
@@ -615,7 +669,7 @@ class Viewer2D(Viewer):
 
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
-            if pa_widgets.legend.value:
+            if pa_widgets.legend.value  is True:
                 if pa_widgets.scalar.value != 'None':
                     c = getattr(
                             temp_data[array_name],
@@ -634,26 +688,32 @@ class Viewer2D(Viewer):
                                 0.82
                             ]
                     )
-                    maxm = np.max(c)
-                    minm = np.min(c)
-                    if (minm == maxm == 0):
-                        boundaries = np.linspace(0, 1, 100)
+
+                    arr = self._normalized_for_colormaps(c)
+                    minm = arr[0]
+                    maxm = arr[1]
+                    absmaxm = arr[2]
+                    # arr[3] = c normalized with the absolute maximum
+
+                    if absmaxm == 0:
+                        boundaries = np.linspace(0, 1, 25)
+                    elif maxm == minm:
+                        boundaries = np.linspace(0, maxm, 25)
                     else:
-                        boundaries = np.linspace(
-                            minm*(1 - np.sign(minm)*0.0001),
-                            maxm*(1 + np.sign(maxm)*0.0001),
-                            100
-                        )
+                        boundaries = np.linspace(minm, maxm, 25)
 
                     self._cbars[array_name] = mpl.colorbar.ColorbarBase(
-                            ax=self._cbar_ax[array_name],
-                            cmap=colormap,
-                            boundaries=boundaries,
+                        ax=self._cbar_ax[array_name],
+                        cmap=colormap,
+                        boundaries=boundaries,
+                        ticks=boundaries
                     )
                     self._cbars[array_name].set_label(
-                            array_name + " : " +
-                            pa_widgets.scalar.value
+                        array_name + " : " +
+                        pa_widgets.scalar.value
                     )
+        if change is not None:
+            self.figure.show()
 
     def _save_figure_handler(self, change):
 
@@ -677,56 +737,82 @@ class Viewer2D(Viewer):
 
         self._widgets.play_button.interval = change['new']*1000
 
-    def _save_all_plots_handler(self, change):
+    def _save_all_plots_handler(self):
 
-        if change['new'] is True:
-            mkdir('all_plots')
-            self._widgets.play_button.disabled = True
-            self._widgets.delay_box.disabled = True
-            self._widgets.save_figure.disabled = True
-            self._widgets.save_all_plots.disabled = True
+        mkdir('all_plots')
+        self._widgets.frame.disabled = True
+        self._widgets.play_button.disabled = True
+        self._widgets.delay_box.disabled = True
+        self._widgets.save_figure.disabled = True
+        self._widgets.save_all_plots.disabled = True
+        self._widgets.stop_saving.disabled = False
 
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = True
-                pa_widgets.scalar_cmap.disabled = True
-                pa_widgets.legend.disabled = True
-                pa_widgets.vector.disabled = True
-                pa_widgets.vector_width.disabled = True
-                pa_widgets.vector_scale.disabled = True
-                pa_widgets.scalar_size.disabled = True
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            pa_widgets.scalar.disabled = True
+            pa_widgets.scalar_cmap.disabled = True
+            pa_widgets.legend.disabled = True
+            pa_widgets.vector.disabled = True
+            pa_widgets.vector_width.disabled = True
+            pa_widgets.vector_scale.disabled = True
+            pa_widgets.scalar_size.disabled = True
 
-            change = {}  # dummy dictionary to be used in 'self._frame.handler'
-            file_count = len(self.paths_list) - 1
+        file_count = len(self.paths_list) - 1
 
-            for i in np.arange(0, file_count + 1):
+        for i in np.arange(0, file_count + 1):
+            if self._widgets.stop_saving.value is True:
+                break
+            elif self._widgets.stop_saving.value is False:
                 self._widgets.frame.value = i
-                self._frame_handler(change)
+                self._frame_handler(None)
                 self.figure.savefig(
                     'all_plots/frame_%s.png' % i,
                     dpi=300
                 )
 
-            print(
-                "Saved the plots in the folder 'all_plots'" +
-                " in the present working directory"
-            )
+        print(
+            "Saved the plots in the folder 'all_plots'" +
+            " in the present working directory"
+        )
 
-            self._widgets.play_button.disabled = False
-            self._widgets.delay_box.disabled = False
-            self._widgets.save_figure.disabled = False
-            self._widgets.save_all_plots.disabled = False
-            self._widgets.save_all_plots.value = False
+        self._widgets.frame.disabled = False
+        self._widgets.play_button.disabled = False
+        self._widgets.delay_box.disabled = False
+        self._widgets.save_figure.disabled = False
+        self._widgets.save_all_plots.disabled = False
+        self._widgets.stop_saving.disabled = True
 
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = False
-                pa_widgets.scalar_cmap.disabled = False
-                pa_widgets.legend.disabled = False
-                pa_widgets.vector.disabled = False
-                pa_widgets.vector_width.disabled = False
-                pa_widgets.vector_scale.disabled = False
-                pa_widgets.scalar_size.disabled = False
+        self._widgets.save_all_plots.value = False
+        self._widgets.stop_saving.value = False  # in the case the user
+                                                 # interupts the function
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            pa_widgets.scalar.disabled = False
+            pa_widgets.scalar_cmap.disabled = False
+            pa_widgets.legend.disabled = False
+            pa_widgets.vector.disabled = False
+            pa_widgets.vector_width.disabled = False
+            pa_widgets.vector_scale.disabled = False
+            pa_widgets.scalar_size.disabled = False
+
+    def _normalized_for_colormaps(self, data):
+        '''
+        Helper Function:
+        Takes in a numpy array and returns its maximum, 
+        minimum and absolute maximum values, along with
+        the input array normalized by the absolute maximum
+        '''
+
+        minm = np.min(data)
+        absmaxm = maxm = np.max(data)
+        if abs(maxm) < abs(minm):
+            absmaxm = abs(minm)
+        if absmaxm != 0:
+            normed_data = data/absmaxm
+            return [minm, maxm, absmaxm, normed_data]
+        else:
+            return [minm, maxm, absmaxm, data]
 
 
 class ParticleArrayWidgets3D(object):
@@ -940,9 +1026,11 @@ class Viewer3D(Viewer):
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.scalar.value != 'None':
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                c = colormap(
-                    getattr(data[array_name], pa_widgets.scalar.value)
-                )
+                c = getattr(data[array_name], pa_widgets.scalar.value)
+                c = c + np.abs(np.min(c))
+                cmax = np.max(c)
+                c = c/cmax
+                c = colormap(c)
                 self.scatters[array_name] = p3.scatter(
                     data[array_name].x,
                     data[array_name].y,
@@ -972,9 +1060,11 @@ class Viewer3D(Viewer):
             if pa_widgets.scalar.value != 'None':
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 scatters = self.scatters[array_name]
-                c = colormap(
-                    getattr(data[array_name], pa_widgets.scalar.value)
-                )
+                c = getattr(data[array_name], pa_widgets.scalar.value)
+                c = c + np.abs(np.min(c))
+                cmax = np.max(c)
+                c = c/cmax
+                c = colormap(c)
                 scatters.x = data[array_name].x
                 scatters.y = data[array_name].y,
                 scatters.z = data[array_name].z,
@@ -1004,12 +1094,20 @@ class Viewer3D(Viewer):
         elif old != 'None' and new != 'None':
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
             data = self.get_frame(self._widgets.frame.value)['arrays']
-            c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
+            c = getattr(data[array_name], pa_widgets.scalar.value)
+            c = c + np.abs(np.min(c))
+            cmax = np.max(c)
+            c = c/cmax
+            c = colormap(c)
             self.scatters[array_name].color = c
         else:
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
             data = self.get_frame(self._widgets.frame.value)['arrays']
-            c = colormap(getattr(data[array_name], pa_widgets.scalar.value))
+            c = getattr(data[array_name], pa_widgets.scalar.value)
+            c = c + np.abs(np.min(c))
+            cmax = np.max(c)
+            c = c/cmax
+            c = colormap(c)
             self.scatters[array_name] = p3.scatter(
                 data[array_name].x,
                 data[array_name].y,
@@ -1082,17 +1180,15 @@ class Viewer3D(Viewer):
                 pa_widgets = self._widgets.particles[array_name]
                 if pa_widgets.scalar.value != 'None':
                     cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                    ticks = set(list(np.sort(
-                        getattr(
-                            temp_data['arrays'][array_name],
-                            pa_widgets.scalar.value
-                        )
-                    )))
-                    ticks = list(ticks)
-                    ticks.sort()
-                    if len(ticks) == 1:
-                        ticks.append(ticks[0] + 0.00000001)
-                        # To avoid passing a singleton set
+                    bounds = getattr(
+                                    temp_data['arrays'][array_name],
+                                    pa_widgets.scalar.value
+                    )
+                    bounds = bounds - np.min(bounds)
+                    bmax = np.max(bounds)
+                    bmin = np.min(bounds)
+
+
 
                     self.cbars_ax[array_name] = self.pltfigure.add_axes(
                         [
@@ -1110,7 +1206,7 @@ class Viewer3D(Viewer):
                     self.cbars[array_name].set_label(
                                     array_name+" : "+pa_widgets.scalar.value
                             )
-            display(self.pltfigure)
+            self.pltfigure.show()
 
     def _save_figure_handler(self, change):
 
@@ -1150,6 +1246,7 @@ class Viewer3D(Viewer):
         import ipyvolume as p3
         if change['new'] is True:
             mkdir('all_plots')
+            self._widgets.frame.disabled = True
             self._widgets.play_button.disabled = True
             self._widgets.delay_box.disabled = True
             self._widgets.save_figure.disabled = True
@@ -1163,16 +1260,15 @@ class Viewer3D(Viewer):
                 pa_widgets.vector_size.disabled = True
                 pa_widgets.scalar_size.disabled = True
 
-            change = {}  # dummy dictionary to be used in 'self._frame.handler'
             file_count = len(self.paths_list) - 1
 
             for i in np.arange(0, file_count + 1):
                 self._widgets.frame.value = i
-                self._frame_handler(change)
+                self._frame_handler(None)
                 p3.savefig(
                             'all_plots/frame_%s.png' % i,
-                            width=1000,
-                            height=1000,
+                            width=600,
+                            height=600,
                             fig=self.plot
                         )
 
@@ -1181,6 +1277,7 @@ class Viewer3D(Viewer):
                 " in the present working directory"
             )
 
+            self._widgets.frame.disabled = False
             self._widgets.play_button.disabled = False
             self._widgets.delay_box.disabled = False
             self._widgets.save_figure.disabled = False
