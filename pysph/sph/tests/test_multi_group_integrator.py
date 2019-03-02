@@ -78,6 +78,7 @@ class TestMultiGroupIntegrator(unittest.TestCase):
         nnps.update()
         for ae in a_evals:
             ae.set_nnps(nnps)
+        integrator.set_nnps(nnps)
         return integrator
 
     def test_different_accels_per_integrator(self):
