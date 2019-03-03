@@ -644,6 +644,8 @@ test suite to illustrate this:
 
             self.compute_accelerations(1, update_nnps=False)
             self.stage2()
+            self.update_domain()
+            self.do_post_stage(dt, 2)
 
 Note that the ``compute_accelerations`` method takes two arguments, the
 ``index`` (which defaults to zero) and ``update_nnps`` which defaults to
@@ -651,7 +653,13 @@ Note that the ``compute_accelerations`` method takes two arguments, the
 ``self.compute_accelerations()``. However, in the above, the first set of
 equations is called first, and then for the second stage the second set of
 equations is evaluated but without updating the NNPS (handy if the particles
-do not move in stage1).
+do not move in stage1). Note the call ``self.update_domain()`` after the
+second stage, this sets up any ghost particles for periodicity when particles
+have been moved, it also updates the neighbor finder to use an appropriate
+neighbor length based on the current smoothing length. If you do not need to
+do this for your particular integrator you may choose not to add this. In the
+above case, the domain is not updated after the first stage as the particles
+have not moved.
 
 The above illustrates how one can create more complex integrators that employ
 different accelerations in each stage.

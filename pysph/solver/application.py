@@ -1080,11 +1080,6 @@ class Application(object):
             self.nnps = nnps
 
         nnps = self.nnps
-        # once the NNPS has been set-up, we set the default Solver
-        # post-stage callback to the DomainManager.setup_domain
-        # method. This method is responsible to computing the new cell
-        # size and doing any periodicity checks if needed.
-        solver.add_post_stage_callback(nnps.update_domain)
 
         # inform NNPS if it's working in parallel
         if self.num_procs > 1:
@@ -1463,7 +1458,6 @@ class Application(object):
         if self.options.with_opencl and self.options.profile:
             from compyle.opencl import print_profile
             print_profile()
-            print_mem_usage()
         self._write_info(
             self.info_filename, completed=True, cpu_time=run_duration)
 

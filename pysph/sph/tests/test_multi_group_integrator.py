@@ -42,6 +42,8 @@ class MyIntegrator(Integrator):
         self.do_post_stage(dt, 1)
         self.compute_accelerations(1, update_nnps=False)
         self.stage2()
+        self.update_domain()
+        self.do_post_stage(dt, 2)
 
 
 class TestMultiGroupIntegrator(unittest.TestCase):
@@ -75,6 +77,7 @@ class TestMultiGroupIntegrator(unittest.TestCase):
         nnps.update()
         for ae in a_evals:
             ae.set_nnps(nnps)
+        integrator.set_nnps(nnps)
         return integrator
 
     def test_different_accels_per_integrator(self):

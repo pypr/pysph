@@ -32,7 +32,7 @@ class GPUDomainManager(DomainManagerBase):
 
         self.ghosts = None
 
-    def update(self, *args, **kwargs):
+    def update(self):
         """General method that is called before NNPS can bin particles.
 
         This method is responsible for the computation of cell sizes
