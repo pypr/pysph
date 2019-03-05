@@ -764,8 +764,8 @@ class Viewer2D(Viewer):
         self._widgets.save_figure.value = ""
         if flag is True:
             print(
-                "Please use a valid extension, that is, one of the following:" +
-                " '.eps', '.pdf', '.pgf', '.png', '.ps', '.raw', '.rgba'," +
+                "Please use a valid extension, that is, one of the following" +
+                ": '.eps', '.pdf', '.pgf', '.png', '.ps', '.raw', '.rgba'," +
                 " '.svg' or '.svgz'."
             )
 
@@ -833,7 +833,7 @@ class Viewer2D(Viewer):
         Helper Function:
         Takes in a numpy array and returns its maximum,
         minimum and absolute maximum values, along with
-        the input array normalized by the absolute maximum
+        the input array normalized by the absolute maximum.
         '''
 
         minm = np.min(data)
@@ -851,11 +851,9 @@ class Viewer2D(Viewer):
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         temp_data = self.get_frame(self._widgets.frame.value)['arrays']
-        #temp_data = temp_data['arrays']
         sct = self._scatters[array_name]
-        
+
         if change['new'] is False:
-            #sct.set_facecolors(colormap(c*0))
             sct.set_offsets(None)
         elif change['new'] is True:
             sct.set_offsets(
@@ -884,9 +882,6 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
         self._plot_vectors()
         self.figure.show()
-
-
-
 
 
 class ParticleArrayWidgets3D(object):
@@ -943,6 +938,13 @@ class ParticleArrayWidgets3D(object):
             layout=widgets.Layout(width='300px'),
         )
         self.scalar_size.owner = self.array_name
+        self.is_visible = widgets.Checkbox(
+            value=True,
+            description="visible",
+            disabled=False,
+            layout=widgets.Layout(width='200px', display='flex')
+        )
+        self.is_visible.owner = self.array_name
 
     def _create_vbox(self):
 
@@ -956,6 +958,7 @@ class ParticleArrayWidgets3D(object):
                 self.scalar_size,
                 self.scalar_cmap,
                 self.legend,
+                self.is_visible,
             ],
             layout=Layout(border='1px solid', margin='3px', min_width='320px')
         )
@@ -1090,13 +1093,11 @@ class Viewer3D(Viewer):
             pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
             pa_widgets.legend.observe(self._legend_handler, 'value')
+            pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
 
     def interactive_plot(self):
 
-        if 'ipyvolume.pylab' in sys.modules:
-            pass
-        else:
-            import ipyvolume.pylab as p3
+        import ipyvolume.pylab as p3
 
         self._create_widgets()
         self.scatters = {}
@@ -1106,9 +1107,10 @@ class Viewer3D(Viewer):
         self.legend = widgets.Output()
         with self.legend:
             self.pltfigure = plt.figure(figsize=(4.5, 4.5))
-            # creating a dummy figure, so that 'self.pltfigure.clf()'
-            # in self._legend_handler() does not throw an error
-            # during initialization
+            self.pltfigure.add_axes([0, 0, 1, 1])
+            # Creating a dummy axes element, that prevents the plot
+            # from glitching and showing random noise when no legends are
+            # being displayed.
 
         p3.clear()
         data = self.get_frame(self._widgets.frame.value)['arrays']
@@ -1125,8 +1127,8 @@ class Viewer3D(Viewer):
                     color=colormap(arr[3]),
                     size=pa_widgets.scalar_size.value,
                 )
-        p3.squarelim()
-        self.plot = p3.gcf()  # used in 'self._save_figure_handler()'
+        p3.squarelim()  # Makes sure the figure doesn't appear distorted.
+        self.plot = p3.gcf()  # Used in 'self._save_figure_handler()'.
         self._legend_handler(None)
         display(
             widgets.HBox(
@@ -1143,96 +1145,99 @@ class Viewer3D(Viewer):
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
-            if pa_widgets.scalar.value != 'None':
-                colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                scatters = self.scatters[array_name]
-                c = getattr(data[array_name], pa_widgets.scalar.value)
-                arr = self._normalized_for_colormaps(c)
-                scatters.x = data[array_name].x
-                scatters.y = data[array_name].y,
-                scatters.z = data[array_name].z,
-                scatters.color = colormap(arr[3])
-            if pa_widgets.velocity_vectors.value is True:
-                vectors = self.vectors[array_name]
-                vectors.x = data[array_name].x
-                vectors.y = data[array_name].y
-                vectors.z = data[array_name].z
-                vectors.vx = getattr(data[array_name], 'u')
-                vectors.vy = getattr(data[array_name], 'v')
-                vectors.vz = getattr(data[array_name], 'w')
-                vectors.size = pa_widgets.vector_size.value
+            if pa_widgets.is_visible.value is True:
+                if pa_widgets.scalar.value != 'None':
+                    colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                    scatters = self.scatters[array_name]
+                    c = getattr(data[array_name], pa_widgets.scalar.value)
+                    arr = self._normalized_for_colormaps(c)
+                    scatters.x = data[array_name].x
+                    scatters.y = data[array_name].y,
+                    scatters.z = data[array_name].z,
+                    scatters.color = colormap(arr[3])
+                if pa_widgets.velocity_vectors.value is True:
+                    vectors = self.vectors[array_name]
+                    vectors.x = data[array_name].x
+                    vectors.y = data[array_name].y
+                    vectors.z = data[array_name].z
+                    vectors.vx = getattr(data[array_name], 'u')
+                    vectors.vy = getattr(data[array_name], 'v')
+                    vectors.vz = getattr(data[array_name], 'w')
+                    vectors.size = pa_widgets.vector_size.value
         self._legend_handler(None)
 
     def _scalar_handler(self, change):
 
-        if 'ipyvolume.pylab' in sys.modules:
-            pass
-        else:
-            import ipyvolume.pylab as p3
+        import ipyvolume.pylab as p3
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         new = change['new']
         old = change['old']
-        if old == 'None' and new == 'None':
-            pass
-        elif old != 'None' and new == 'None':
-            self.scatters[array_name].visible = False
-        elif old != 'None' and new != 'None':
-            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-            data = self.get_frame(self._widgets.frame.value)['arrays']
-            c = getattr(data[array_name], pa_widgets.scalar.value)
-            arr = self._normalized_for_colormaps(c)
-            self.scatters[array_name].color = colormap(arr[3])
-        else:
-            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-            data = self.get_frame(self._widgets.frame.value)['arrays']
-            c = getattr(data[array_name], pa_widgets.scalar.value)
-            arr = self._normalized_for_colormaps(c)
-            self.scatters[array_name] = p3.scatter(
-                data[array_name].x,
-                data[array_name].y,
-                data[array_name].z,
-                color=colormap(arr[3]),
-                size=pa_widgets.scalar_size.value,
-            )
+        if pa_widgets.is_visible.value is True:
+            if old == 'None' and new == 'None':
+                pass
+            elif old != 'None' and new == 'None':
+                self.scatters[array_name].visible = False
+            elif old != 'None' and new != 'None':
+                colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                data = self.get_frame(self._widgets.frame.value)['arrays']
+                c = getattr(data[array_name], pa_widgets.scalar.value)
+                arr = self._normalized_for_colormaps(c)
+                self.scatters[array_name].color = colormap(arr[3])
+            else:
+                colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                data = self.get_frame(self._widgets.frame.value)['arrays']
+                c = getattr(data[array_name], pa_widgets.scalar.value)
+                arr = self._normalized_for_colormaps(c)
+                self.scatters[array_name] = p3.scatter(
+                    data[array_name].x,
+                    data[array_name].y,
+                    data[array_name].z,
+                    color=colormap(arr[3]),
+                    size=pa_widgets.scalar_size.value,
+                )
         self._legend_handler(None)
 
     def _velocity_vectors_handler(self, change):
 
         import ipyvolume.pylab as p3
-        # for some reason the if-else block used everywhere
-        # else does not work here, and a hard import is required
 
         data = self.get_frame(self._widgets.frame.value)['arrays']
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        if change['new'] is False:
-            self.vectors[array_name].size = 0
-        elif array_name in self.vectors.keys():
-            vectors = self.vectors[array_name]
-            vectors.x = data[array_name].x
-            vectors.y = data[array_name].y
-            vectors.z = data[array_name].z
-            vectors.u = getattr(data[array_name], 'u')
-            vectors.v = getattr(data[array_name], 'v')
-            vectors.w = getattr(data[array_name], 'w')
-            vectors.size = pa_widgets.vector_size.value
-        else:
-            self.vectors[array_name] = p3.quiver(
-                x=data[array_name].x,
-                y=data[array_name].y,
-                z=data[array_name].z,
-                u=getattr(data[array_name], 'u'),
-                v=getattr(data[array_name], 'v'),
-                w=getattr(data[array_name], 'w'),
-                size=pa_widgets.vector_size.value,
-            )
+        if pa_widgets.is_visible.value is True:
+            if change['new'] is False:
+                self.vectors[array_name].size = 0
+            elif array_name in self.vectors.keys():
+                # change['new'] is True and the vectors have
+                # already been plotted, just need updation.
+                vectors = self.vectors[array_name]
+                vectors.x = data[array_name].x
+                vectors.y = data[array_name].y
+                vectors.z = data[array_name].z
+                vectors.u = getattr(data[array_name], 'u')
+                vectors.v = getattr(data[array_name], 'v')
+                vectors.w = getattr(data[array_name], 'w')
+                vectors.size = pa_widgets.vector_size.value
+            else:
+                # change['new'] is True, and the vectors are
+                # being plotted for the first time.
+                self.vectors[array_name] = p3.quiver(
+                    x=data[array_name].x,
+                    y=data[array_name].y,
+                    z=data[array_name].z,
+                    u=getattr(data[array_name], 'u'),
+                    v=getattr(data[array_name], 'v'),
+                    w=getattr(data[array_name], 'w'),
+                    size=pa_widgets.vector_size.value,
+                )
 
     def _scalar_size_handler(self, change):
 
         array_name = change['owner'].owner
-        if array_name in self.scatters.keys():
+        if (array_name in self.scatters.keys() and
+                self._widgets.particles[array_name].is_visible.value is True):
             self.scatters[array_name].size = change['new']
 
     def _vector_size_handler(self, change):
@@ -1240,22 +1245,24 @@ class Viewer3D(Viewer):
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         if array_name in self.vectors.keys():
-            if pa_widgets.velocity_vectors.value is True:
+            if (pa_widgets.velocity_vectors.value is True and
+                    pa_widgets.is_visible.value is True):
                 self.vectors[array_name].size = change['new']
 
     def _scalar_cmap_handler(self, change):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        change['new'] = pa_widgets.scalar.value
-        self._scalar_handler(change)
-        self._legend_handler(None)
+        if pa_widgets.is_visible.value is True:
+            change['new'] = pa_widgets.scalar.value
+            self._scalar_handler(change)
 
     def _legend_handler(self, change):
 
-        temp_data = self.get_frame(self._widgets.frame.value)
+        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
         with self.legend:
             for _cbar_ax in self._cbar_ax.values():
+                _cbar_ax.clear()
                 self.pltfigure.delaxes(_cbar_ax)
             self._cbar_ax = {}
             self._cbars = {}
@@ -1263,57 +1270,55 @@ class Viewer3D(Viewer):
                 pa_widgets = self._widgets.particles[array_name]
                 if (pa_widgets.scalar.value != 'None' and
                         pa_widgets.legend.value is True):
-                    cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                    c = getattr(
-                        temp_data['arrays'][array_name],
-                        pa_widgets.scalar.value
-                    )
-                    arr = self._normalized_for_colormaps(c)
-                    minm = arr[0]
-                    maxm = arr[1]
-                    absmaxm = arr[2]
+                    if pa_widgets.is_visible.value is True:
+                        cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                        c = getattr(
+                            temp_data[array_name],
+                            pa_widgets.scalar.value
+                        )
+                        arr = self._normalized_for_colormaps(c)
+                        minm = arr[0]
+                        maxm = arr[1]
+                        absmaxm = arr[2]
 
-                    # Do not change the order of the if-else #
-                    # block below. It is important that the  #
-                    # checks are performed in this order,    #
-                    # otherwise the 'boundaries' array will  #
-                    # not be appropriate.                    #
+                        # Do not change the order of the if-else #
+                        # block below. It is important that the  #
+                        # checks are performed in this order,    #
+                        # otherwise the 'boundaries' array will  #
+                        # not be appropriate.                    #
 
-                    if absmaxm == 0:
-                        boundaries = np.linspace(0, 1, 25)
-                    elif minm == maxm:
-                        # this occurs at initialization for some properties
-                        # like pressure, and stays true throughout for
-                        # others like mass of the particles
-                        boundaries = np.linspace(0, maxm, 25)
-                    else:
-                        boundaries = np.linspace(minm, maxm, 25)
+                        if absmaxm == 0:
+                            boundaries = np.linspace(0, 1, 25)
+                        elif minm == maxm:
+                            # This occurs at initialization for some properties
+                            # like pressure, and stays true throughout for
+                            # others like mass of the particles.
+                            boundaries = np.linspace(0, maxm, 25)
+                        else:
+                            boundaries = np.linspace(minm, maxm, 25)
 
-                    self._cbar_ax[array_name] = self.pltfigure.add_axes(
-                        [
-                            0.25*len(self._cbar_ax.keys()),
-                            0.05,
-                            0.05,
-                            0.90
-                        ]
-                    )
-                    self._cbars[array_name] = mpl.colorbar.ColorbarBase(
-                        ax=self._cbar_ax[array_name],
-                        cmap=cmap,
-                        boundaries=boundaries,
-                        ticks=boundaries
-                    )
-                    self._cbars[array_name].set_label(
-                        array_name + " : " + pa_widgets.scalar.value
-                    )
+                        self._cbar_ax[array_name] = self.pltfigure.add_axes(
+                            [
+                                0.25*len(self._cbar_ax),
+                                0.05,
+                                0.05,
+                                0.90
+                            ]
+                        )
+                        self._cbars[array_name] = mpl.colorbar.ColorbarBase(
+                            ax=self._cbar_ax[array_name],
+                            cmap=cmap,
+                            boundaries=boundaries,
+                            ticks=boundaries
+                        )
+                        self._cbars[array_name].set_label(
+                            array_name + " : " + pa_widgets.scalar.value
+                        )
             self.pltfigure.show()
 
     def _save_figure_handler(self, change):
 
-        if 'ipyvolume.pylab' in sys.modules:
-            pass
-        else:
-            import ipyvolume.pylab as p3
+        import ipyvolume.pylab as p3
 
         flag = False
         for extension in [
@@ -1347,10 +1352,7 @@ class Viewer3D(Viewer):
 
     def _save_all_plots_handler(self, change):
 
-        if 'ipyvolume.pylab' in sys.modules:
-            pass
-        else:
-            import ipyvolume.pylab as p3
+        import ipyvolume.pylab as p3
 
         if change['new'] is True:
             mkdir('all_plots')
@@ -1367,6 +1369,7 @@ class Viewer3D(Viewer):
                 pa_widgets.velocity_vectors.disabled = True
                 pa_widgets.vector_size.disabled = True
                 pa_widgets.scalar_size.disabled = True
+                pa_widgets.is_visible.disabled = True
 
             file_count = len(self.paths_list) - 1
 
@@ -1394,18 +1397,19 @@ class Viewer3D(Viewer):
 
             for array_name in self._widgets.particles.keys():
                 pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = True
-                pa_widgets.scalar_cmap.disabled = True
-                pa_widgets.velocity_vectors.disabled = True
-                pa_widgets.vector_size.disabled = True
-                pa_widgets.scalar_size.disabled = True
+                pa_widgets.scalar.disabled = False
+                pa_widgets.scalar_cmap.disabled = False
+                pa_widgets.velocity_vectors.disabled = False
+                pa_widgets.vector_size.disabled = False
+                pa_widgets.scalar_size.disabled = False
+                pa_widgets.is_visible.disabled = False
 
     def _normalized_for_colormaps(self, data):
         '''
         Helper Function:
         Takes in a numpy array and returns its maximum,
         minimum and absolute maximum values, along with
-        the input array normalized by the absolute maximum
+        the input array normalized by the absolute maximum.
         '''
 
         minm = np.min(data)
@@ -1417,3 +1421,51 @@ class Viewer3D(Viewer):
             return [minm, maxm, absmaxm, normed_data]
         else:
             return [minm, maxm, absmaxm, data]
+
+    def _is_visible_handler(self, change):
+
+        import ipyvolume.pylab as p3
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+
+        if change['new'] is False:
+            self.scatters[array_name].visible = False
+            if array_name in self.vectors.keys():
+                self.vectors[array_name].size = 0
+        elif change['new'] is True:
+            colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+            temp_data = self.get_frame(self._widgets.frame.value)['arrays']
+            c = getattr(temp_data[array_name], pa_widgets.scalar.value)
+            arr = self._normalized_for_colormaps(c)
+            self.scatters[array_name] = p3.scatter(
+                temp_data[array_name].x,
+                temp_data[array_name].y,
+                temp_data[array_name].z,
+                color=colormap(arr[3]),
+                size=pa_widgets.scalar_size.value,
+            )
+            if pa_widgets.velocity_vectors.value is True:
+                if array_name in self.vectors.keys():
+                    # The vectors have been plotted, just need updation.
+                    vectors = self.vectors[array_name]
+                    vectors.x = temp_data[array_name].x
+                    vectors.y = temp_data[array_name].y
+                    vectors.z = temp_data[array_name].z
+                    vectors.u = getattr(temp_data[array_name], 'u')
+                    vectors.v = getattr(temp_data[array_name], 'v')
+                    vectors.w = getattr(temp_data[array_name], 'w')
+                    vectors.size = pa_widgets.vector_size.value
+                else:
+                    # The vectors are being plotted for the first time.
+                    self.vectors[array_name] = p3.quiver(
+                        x=temp_data[array_name].x,
+                        y=temp_data[array_name].y,
+                        z=temp_data[array_name].z,
+                        u=getattr(temp_data[array_name], 'u'),
+                        v=getattr(temp_data[array_name], 'v'),
+                        w=getattr(temp_data[array_name], 'w'),
+                        size=pa_widgets.vector_size.value,
+                    )
+
+        self._legend_handler(None)
