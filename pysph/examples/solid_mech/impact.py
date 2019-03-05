@@ -72,12 +72,12 @@ xsph_eps = 0.5
 # SAV1 artificial viscosity coefficients
 alpha1 = 1.0
 beta1 = 1.5
-eta = 0.1# in piab equation eta2 was written so final value is 0.01.(as req.) 
+eta = 0.1# in piab equation eta2 was written so final value is 0.01.(as req.)
 
 # SAV2
 alpha2 = 2.5
 beta2 = 2.5
-eta = 0.1# in piab equation eta2 was written so final value is 0.01.(as req.) 
+eta = 0.1# in piab equation eta2 was written so final value is 0.01.(as req.)
 
 # XSPH
 eps = 0.5
@@ -89,7 +89,7 @@ def get_projectile_particles():
     x,y = numpy.mgrid[-r:r:dx, -r:r:dx]
     x = x.ravel()
     y = y.ravel()
-    
+
     d = (x*x+y*y)
     keep = numpy.flatnonzero(d<=r*r)
     x = x[keep]
@@ -99,7 +99,7 @@ def get_projectile_particles():
     print('%d Projectile particles'%len(x))
 
     hf = numpy.ones_like(x) * h
-    mf = numpy.ones_like(x) * dx * dy * ro2 
+    mf = numpy.ones_like(x) * dx * dy * ro2
     rhof = numpy.ones_like(x) * ro2
     csf = numpy.ones_like(x) * cs2
     z = numpy.zeros_like(x)
@@ -112,27 +112,34 @@ def get_projectile_particles():
     # add requisite properties
     # sound speed etc.
     add_properties(pa, 'e')
-    
+
     # velocity gradient properties
     add_properties(pa, 'v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20', 'v21', 'v22')
-    
+
     # artificial stress properties
     add_properties(pa, 'r00', 'r01', 'r02', 'r11', 'r12', 'r22')
-    
+
     # deviatoric stress components
     add_properties(pa, 's00', 's01', 's02', 's11', 's12', 's22')
 
     # deviatoric stress accelerations
     add_properties(pa, 'as00', 'as01', 'as02', 'as11', 'as12', 'as22')
-    
+
     # deviatoric stress initial values
     add_properties(pa, 's000', 's010', 's020', 's110', 's120', 's220')
 
     # standard acceleration variables
     add_properties(pa, 'arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae')
-    
+
     # initial values
     add_properties(pa, 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0')
+
+    pa.add_constant('G', G1)
+    pa.add_constant('n', 4)
+
+    kernel = Gaussian(dim=2)
+    wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
+    pa.add_constant('wdeltap', wdeltap)
 
     # load balancing properties
     pa.set_lb_props( list(pa.properties.keys()) )
@@ -142,14 +149,14 @@ def get_projectile_particles():
 def get_plate_particles():
     xarr = numpy.arange(0, 0.002+dx, dx)
     yarr = numpy.arange(-0.020, 0.02+dx, dx)
-    
+
     x,y = numpy.meshgrid( xarr, yarr )
-    x, y = x.ravel(), y.ravel()                    
+    x, y = x.ravel(), y.ravel()
 
     print('%d Target particles'%len(x))
 
     hf = numpy.ones_like(x) * h
-    mf = numpy.ones_like(x) * dx * dy * ro1 
+    mf = numpy.ones_like(x) * dx * dy * ro1
     rhof = numpy.ones_like(x) * ro1
     csf = numpy.ones_like(x) * cs1
     z = numpy.zeros_like(x)
@@ -159,40 +166,47 @@ def get_plate_particles():
     # add requisite properties
     # sound speed etc.
     add_properties(pa, 'e' )
-    
+
     # velocity gradient properties
     add_properties(pa, 'v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20', 'v21', 'v22')
-    
+
     # artificial stress properties
     add_properties(pa, 'r00', 'r01', 'r02', 'r11', 'r12', 'r22')
-    
+
     # deviatoric stress components
     add_properties(pa, 's00', 's01', 's02', 's11', 's12', 's22')
 
     # deviatoric stress accelerations
     add_properties(pa, 'as00', 'as01', 'as02', 'as11', 'as12', 'as22')
-    
+
     # deviatoric stress initial values
     add_properties(pa, 's000', 's010', 's020', 's110', 's120', 's220')
 
     # standard acceleration variables
     add_properties(pa, 'arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae')
-    
+
     # initial values
     add_properties(pa, 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0')
+
+    pa.add_constant('G', G2)
+    pa.add_constant('n', 4)
+
+    kernel = Gaussian(dim=2)
+    wdeltap = kernel.kernel(rij=dx, h=hdx*dx)
+    pa.add_constant('wdeltap', wdeltap)
 
     # load balancing properties
     pa.set_lb_props( list(pa.properties.keys()) )
 
     # removed S_00 and similar components
-    plate.v[:]=0.0 
+    plate.v[:]=0.0
     return plate
 
 class Impact(Application):
     def create_particles(self):
         plate      = get_plate_particles()
         projectile = get_projectile_particles()
-        
+
         return [plate, projectile]
 
     def create_solver(self):
@@ -258,34 +272,34 @@ class Impact(Application):
                     ContinuityEquation(dest='projectile', sources=['projectile','plate']),
 
                     # momentum equation
-                    MomentumEquationWithStress(dest='projectile', sources=['projectile','plate',], n=4,wdeltap=self.wdeltap),
-                    MomentumEquationWithStress(dest='plate',      sources=['projectile','plate',], n=4,wdeltap=self.wdeltap),
-                        
-                    # energy equation: 
-                    EnergyEquationWithStress(dest='plate',      sources=['projectile','plate',], 
+                    MomentumEquationWithStress(dest='projectile', sources=['projectile','plate',]),
+                    MomentumEquationWithStress(dest='plate',      sources=['projectile','plate',]),
+
+                    # energy equation:
+                    EnergyEquationWithStress(dest='plate',      sources=['projectile','plate',],
                                                alpha=avisc_alpha, beta=avisc_beta, eta=avisc_eta),
 
-                    EnergyEquationWithStress(dest='projectile', sources=['projectile','plate',], 
+                    EnergyEquationWithStress(dest='projectile', sources=['projectile','plate',],
                                                alpha=avisc_alpha, beta=avisc_beta,  eta=avisc_eta),
-                                               
+
                     # avisc
-                    MonaghanArtificialViscosity(dest='plate',     sources=['projectile','plate'], 
+                    MonaghanArtificialViscosity(dest='plate',     sources=['projectile','plate'],
                                                 alpha=avisc_alpha, beta=avisc_beta),
 
-                    MonaghanArtificialViscosity(dest='projectile', sources=['projectile','plate'], 
+                    MonaghanArtificialViscosity(dest='projectile', sources=['projectile','plate'],
                                                alpha=avisc_alpha, beta=avisc_beta),
-                    
+
                     # updates to the stress term
-                    HookesDeviatoricStressRate(dest='plate',      sources=None, shear_mod=G1),
-                    HookesDeviatoricStressRate(dest='projectile', sources=None, shear_mod=G2),
+                    HookesDeviatoricStressRate(dest='plate',      sources=None),
+                    HookesDeviatoricStressRate(dest='projectile', sources=None),
 
                     # position stepping
                     XSPHCorrection(dest='plate',      sources=['plate'],      eps=xsph_eps),
                     XSPHCorrection(dest='projectile', sources=['projectile'], eps=xsph_eps),
-                    
+
                 ]
             ),
-            
+
         ] # End Group list
 
         return equations
