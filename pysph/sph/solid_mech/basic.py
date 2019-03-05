@@ -49,43 +49,42 @@ def get_particle_array_elastic_dynamics(constants=None, **props):
 
     """
 
-    solids_props = ['cs', 'e',  # sounds speed
-                    'v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20',
-                    'v21', 'v22',  # velocity gradient properties
-                    # artificial stress properties
-                    'r00', 'r01', 'r02', 'r11', 'r12', 'r22',
-                    # deviatoric stress components
-                    's00', 's01', 's02', 's11', 's12', 's22',
-                    # deviatoric stress accelerations
-                    'as00', 'as01', 'as02', 'as11', 'as12', 'as22',
-                    # deviatoric stress initial values
-                    's000', 's010', 's020', 's110', 's120', 's220',
-                    # standard acceleration variables
-                    'arho', 'au', 'av', 'aw', 'ax', 'ay', 'az', 'ae',
-                    # initial values
-                    'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'e0']
+    solids_props = [
+        'cs', 'e', 'v00', 'v01', 'v02', 'v10', 'v11', 'v12', 'v20', 'v21',
+        'v22', 'r00', 'r01', 'r02', 'r11', 'r12', 'r22', 's00', 's01', 's02',
+        's11', 's12', 's22', 'as00', 'as01', 'as02', 'as11', 'as12', 'as22',
+        's000', 's010', 's020', 's110', 's120', 's220', 'arho', 'au', 'av',
+        'aw', 'ax', 'ay', 'az', 'ae', 'rho0', 'u0', 'v0', 'w0', 'x0', 'y0',
+        'z0', 'e0'
+    ]
 
     # set wdeltap to -1. Which defaults to no self correction
-    consts = {'wdeltap': [-1.0], 'n': 4, 'G': 0.0, 'E': 0.0, 'nu': 0.0,
-              'rho_ref': 1000.0, 'c0_ref': 0.0}
+    consts = {
+        'wdeltap': [-1.0],
+        'n': 4,
+        'G': 0.0,
+        'E': 0.0,
+        'nu': 0.0,
+        'rho_ref': 1000.0,
+        'c0_ref': 0.0
+    }
     if constants:
         consts.update(constants)
 
-    pa = get_particle_array(
-        constants=consts, additional_props=solids_props, **props
-    )
+    pa = get_particle_array(constants=consts, additional_props=solids_props,
+                            **props)
 
     # set the shear modulus G
     pa.G[0] = get_shear_modulus(pa.E[0], pa.nu[0])
 
     # set the speed of sound
-    pa.cs = np.ones_like(pa.x) * get_speed_of_sound(pa.E[0], pa.nu[0], pa.rho_ref[0])
+    pa.cs = np.ones_like(pa.x) * get_speed_of_sound(pa.E[0], pa.nu[0],
+                                                    pa.rho_ref[0])
     pa.c0_ref[0] = get_speed_of_sound(pa.E[0], pa.nu[0], pa.rho_ref[0])
 
     # default property arrays to save out.
     pa.set_output_arrays([
-        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h',
-        'pid', 'gid', 'tag', 'p'
+        'x', 'y', 'z', 'u', 'v', 'w', 'rho', 'm', 'h', 'pid', 'gid', 'tag', 'p'
     ])
 
     return pa
@@ -168,8 +167,7 @@ class MonaghanArtificialStress(Equation):
         """)
         return code
 
-    def loop(self, d_idx, d_rho, d_p,
-             d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+    def loop(self, d_idx, d_rho, d_p, d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
              d_r00, d_r01, d_r02, d_r11, d_r12, d_r22):
         r"""Compute the stress terms
 
@@ -183,7 +181,7 @@ class MonaghanArtificialStress(Equation):
         """
         # 1/rho_a^2
         rhoi = d_rho[d_idx]
-        rhoi21 = 1./(rhoi * rhoi)
+        rhoi21 = 1. / (rhoi * rhoi)
 
         ## Matrix and vector declarations ##
 
@@ -217,21 +215,32 @@ class MonaghanArtificialStress(Equation):
         eigen_decomposition(S, R, cython.address(V[0]))
 
         # artificial stress corrections
-        if V[0] > 0: rd[0] = -self.eps * V[0] * rhoi21
-        else : rd[0] = 0
+        if V[0] > 0:
+            rd[0] = -self.eps * V[0] * rhoi21
+        else:
+            rd[0] = 0
 
-        if V[1] > 0: rd[1] = -self.eps * V[1] * rhoi21
-        else : rd[1] = 0
+        if V[1] > 0:
+            rd[1] = -self.eps * V[1] * rhoi21
+        else:
+            rd[1] = 0
 
-        if V[2] > 0: rd[2] = -self.eps * V[2] * rhoi21
-        else : rd[2] = 0
+        if V[2] > 0:
+            rd[2] = -self.eps * V[2] * rhoi21
+        else:
+            rd[2] = 0
 
         # transform artificial stresses in original frame
         transform_diag_inv(cython.address(rd[0]), R, Rab)
 
         # store the values
-        d_r00[d_idx] = Rab[0][0]; d_r11[d_idx] = Rab[1][1]; d_r22[d_idx] = Rab[2][2]
-        d_r12[d_idx] = Rab[1][2]; d_r02[d_idx] = Rab[0][2]; d_r01[d_idx] = Rab[0][1]
+        d_r00[d_idx] = Rab[0][0]
+        d_r11[d_idx] = Rab[1][1]
+        d_r22[d_idx] = Rab[2][2]
+        d_r12[d_idx] = Rab[1][2]
+        d_r02[d_idx] = Rab[0][2]
+        d_r01[d_idx] = Rab[0][1]
+
 
 class MomentumEquationWithStress(Equation):
     r"""**Momentum Equation with Artificial Stress**
@@ -249,17 +258,17 @@ class MomentumEquationWithStress(Equation):
 
         R_{ab}^{ij} = R_{a}^{ij} + R_{b}^{ij}
     """
+
     def initialize(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
         d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p,
-             d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-             s_s00, s_s01, s_s02, s_s11, s_s12, s_s22,
-             d_r00, d_r01, d_r02, d_r11, d_r12, d_r22,
-             s_r00, s_r01, s_r02, s_r11, s_r12, s_r22,
-             d_au, d_av, d_aw, d_wdeltap, d_n, WIJ, DWIJ):
+    def loop(self, d_idx, s_idx, d_rho, s_rho, s_m, d_p, s_p, d_s00, d_s01,
+             d_s02, d_s11, d_s12, d_s22, s_s00, s_s01, s_s02, s_s11, s_s12,
+             s_s22, d_r00, d_r01, d_r02, d_r11, d_r12, d_r22, s_r00, s_r01,
+             s_r02, s_r11, s_r12, s_r22, d_au, d_av, d_aw, d_wdeltap, d_n, WIJ,
+             DWIJ):
 
         pa = d_p[d_idx]
         pb = s_p[s_idx]
@@ -267,8 +276,8 @@ class MomentumEquationWithStress(Equation):
         rhoa = d_rho[d_idx]
         rhob = s_rho[s_idx]
 
-        rhoa21 = 1./(rhoa * rhoa)
-        rhob21 = 1./(rhob * rhob)
+        rhoa21 = 1. / (rhoa * rhoa)
+        rhob21 = 1. / (rhob * rhob)
 
         s00a = d_s00[d_idx]
         s01a = d_s01[d_idx]
@@ -332,7 +341,7 @@ class MomentumEquationWithStress(Equation):
         # if wdeltap is less than zero then no correction
         # needed
         if d_wdeltap[0] > 0.:
-            fab = WIJ/d_wdeltap[0]
+            fab = WIJ / d_wdeltap[0]
             fab = pow(fab, d_n[0])
 
             art_stress00 = fab * (r00a + r00b)
@@ -362,17 +371,21 @@ class MomentumEquationWithStress(Equation):
         # compute accelerations
         mb = s_m[s_idx]
 
-        d_au[d_idx] += mb * (s00a*rhoa21 + s00b*rhob21 + art_stress00) * DWIJ[0] + \
-                       mb * (s01a*rhoa21 + s01b*rhob21 + art_stress01) * DWIJ[1] + \
-                       mb * (s02a*rhoa21 + s02b*rhob21 + art_stress02) * DWIJ[2]
+        d_au[d_idx] += (
+            mb * (s00a * rhoa21 + s00b * rhob21 + art_stress00) * DWIJ[0] +
+            mb * (s01a * rhoa21 + s01b * rhob21 + art_stress01) * DWIJ[1] +
+            mb * (s02a * rhoa21 + s02b * rhob21 + art_stress02) * DWIJ[2])
 
-        d_av[d_idx] += mb * (s10a*rhoa21 + s10b*rhob21 + art_stress10) * DWIJ[0] + \
-                       mb * (s11a*rhoa21 + s11b*rhob21 + art_stress11) * DWIJ[1] + \
-                       mb * (s12a*rhoa21 + s12b*rhob21 + art_stress12) * DWIJ[2]
+        d_av[d_idx] += (
+            mb * (s10a * rhoa21 + s10b * rhob21 + art_stress10) * DWIJ[0] +
+            mb * (s11a * rhoa21 + s11b * rhob21 + art_stress11) * DWIJ[1] +
+            mb * (s12a * rhoa21 + s12b * rhob21 + art_stress12) * DWIJ[2])
 
-        d_aw[d_idx] += mb * (s20a*rhoa21 + s20b*rhob21 + art_stress20) * DWIJ[0] + \
-                       mb * (s21a*rhoa21 + s21b*rhob21 + art_stress21) * DWIJ[1] + \
-                       mb * (s22a*rhoa21 + s22b*rhob21 + art_stress22) * DWIJ[2]
+        d_aw[d_idx] += (
+            mb * (s20a * rhoa21 + s20b * rhob21 + art_stress20) * DWIJ[0] +
+            mb * (s21a * rhoa21 + s21b * rhob21 + art_stress21) * DWIJ[1] +
+            mb * (s22a * rhoa21 + s22b * rhob21 + art_stress22) * DWIJ[2])
+
 
 class HookesDeviatoricStressRate(Equation):
     r""" **Rate of change of stress **
@@ -392,7 +405,9 @@ class HookesDeviatoricStressRate(Equation):
            \frac{\partial v^j}{\partial x^i} \right)
 
     """
-    def initialize(self, d_idx, d_as00, d_as01, d_as02, d_as11, d_as12, d_as22):
+
+    def initialize(self, d_idx, d_as00, d_as01, d_as02, d_as11, d_as12,
+                   d_as22):
         d_as00[d_idx] = 0.0
         d_as01[d_idx] = 0.0
         d_as02[d_idx] = 0.0
@@ -402,14 +417,9 @@ class HookesDeviatoricStressRate(Equation):
 
         d_as22[d_idx] = 0.0
 
-    def loop(self, d_idx,
-             d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-             d_v00, d_v01, d_v02,
-             d_v10, d_v11, d_v12,
-             d_v20, d_v21, d_v22,
-             d_as00, d_as01, d_as02,
-             d_as11, d_as12,
-             d_as22, d_G):
+    def loop(self, d_idx, d_s00, d_s01, d_s02, d_s11, d_s12, d_s22, d_v00,
+             d_v01, d_v02, d_v10, d_v11, d_v12, d_v20, d_v21, d_v22, d_as00,
+             d_as01, d_as02, d_as11, d_as12, d_as22, d_G):
 
         v00 = d_v00[d_idx]
         v01 = d_v01[d_idx]
@@ -461,8 +471,8 @@ class HookesDeviatoricStressRate(Equation):
         omega21 = -omega12
         omega22 = 0.0
 
-        tmp = 2.0*d_G[0]
-        trace = 1.0/3.0 * (eps00 + eps11)
+        tmp = 2.0 * d_G[0]
+        trace = 1.0 / 3.0 * (eps00 + eps11)
 
         # S_00
         d_as00[d_idx] = tmp*( eps00 - trace ) + \
@@ -494,19 +504,19 @@ class HookesDeviatoricStressRate(Equation):
                         (s20*omega20 + s21*omega21 + s22*omega22) + \
                         (s02*omega20 + s12*omega21 + s22*omega22)
 
+
 class EnergyEquationWithStress(Equation):
-    def __init__(self, dest, sources, alpha=1.0, beta=1.0,
-                 eta=0.01):
+    def __init__(self, dest, sources, alpha=1.0, beta=1.0, eta=0.01):
         self.alpha = float(alpha)
         self.beta = float(beta)
         self.eta = float(eta)
-        super(EnergyEquationWithStress,self).__init__(dest, sources)
+        super(EnergyEquationWithStress, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_ae):
         d_ae[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_p, s_p,
-             d_cs, s_cs, d_ae, XIJ, VIJ, DWIJ, HIJ, R2IJ, RHOIJ1):
+    def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_p, s_p, d_cs, s_cs, d_ae,
+             XIJ, VIJ, DWIJ, HIJ, R2IJ, RHOIJ1):
 
         rhoa = d_rho[d_idx]
         ca = d_cs[d_idx]
@@ -517,33 +527,29 @@ class EnergyEquationWithStress(Equation):
         pb = s_p[s_idx]
         mb = s_m[s_idx]
 
-        rhoa2 = 1./(rhoa*rhoa)
-        rhob2 = 1./(rhob*rhob)
+        rhoa2 = 1. / (rhoa * rhoa)
+        rhob2 = 1. / (rhob * rhob)
 
         # artificial viscosity
-        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
+        vijdotxij = VIJ[0] * XIJ[0] + VIJ[1] * XIJ[1] + VIJ[2] * XIJ[2]
 
         piij = 0.0
         if vijdotxij < 0:
             cij = 0.5 * (d_cs[d_idx] + s_cs[s_idx])
 
-            muij = (HIJ * vijdotxij)/(R2IJ + self.eta*self.eta*HIJ*HIJ)
+            muij = (HIJ * vijdotxij) / (R2IJ + self.eta * self.eta * HIJ * HIJ)
 
-            piij = -self.alpha*cij*muij + self.beta*muij*muij
-            piij = piij*RHOIJ1
+            piij = -self.alpha * cij * muij + self.beta * muij * muij
+            piij = piij * RHOIJ1
 
-
-        vijdotdwij = VIJ[0]*DWIJ[0] + VIJ[1]*DWIJ[1] + VIJ[2]*DWIJ[2]
+        vijdotdwij = VIJ[0] * DWIJ[0] + VIJ[1] * DWIJ[1] + VIJ[2] * DWIJ[2]
 
         # thermal energy contribution
-        d_ae[d_idx] += 0.5 * mb * (pa*rhoa2 + pb*rhob2 + piij)
+        d_ae[d_idx] += 0.5 * mb * (pa * rhoa2 + pb * rhob2 + piij)
 
-    def post_loop(self, d_idx, d_rho,
-                  d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
-                  d_v00, d_v01, d_v02,
-                  d_v10, d_v11, d_v12,
-                  d_v20, d_v21, d_v22,
-                  d_ae):
+    def post_loop(self, d_idx, d_rho, d_s00, d_s01, d_s02, d_s11, d_s12, d_s22,
+                  d_v00, d_v01, d_v02, d_v10, d_v11, d_v12, d_v20, d_v21,
+                  d_v22, d_ae):
 
         # particle density
         rhoa = d_rho[d_idx]
@@ -576,11 +582,11 @@ class EnergyEquationWithStress(Equation):
 
         # energy accelerations
         #sdoteij = s00a*eps00 +  s01a*eps01 + s10a*eps10 + s11a*eps11
-        sdoteij = (s00a*eps00 + s01a*eps01 + s02a*eps02 +
-                   s10a*eps10 + s11a*eps11 + s12a*eps12 +
-                   s20a*eps20 + s21a*eps21 + s22a*eps22)
+        sdoteij = (s00a * eps00 + s01a * eps01 + s02a * eps02 + s10a * eps10 +
+                   s11a * eps11 + s12a * eps12 + s20a * eps20 + s21a * eps21 +
+                   s22a * eps22)
 
-        d_ae[d_idx] += 1./rhoa * sdoteij
+        d_ae[d_idx] += 1. / rhoa * sdoteij
 
 
 class ElasticSolidsScheme(Scheme):
@@ -597,10 +603,9 @@ class ElasticSolidsScheme(Scheme):
 
     def get_equations(self):
         from pysph.sph.equation import Group
-        from pysph.sph.basic_equations import (ContinuityEquation,
-                                               MonaghanArtificialViscosity,
-                                               XSPHCorrection,
-                                               VelocityGradient2D)
+        from pysph.sph.basic_equations import (
+            ContinuityEquation, MonaghanArtificialViscosity, XSPHCorrection,
+            VelocityGradient2D)
         from pysph.sph.solid_mech.basic import (
             IsothermalEOS, MomentumEquationWithStress,
             HookesDeviatoricStressRate, MonaghanArtificialStress)
@@ -611,47 +616,36 @@ class ElasticSolidsScheme(Scheme):
         for elastic_solid in self.elastic_solids:
             g1.append(
                 # p
-                IsothermalEOS(elastic_solid, sources=None)
-            )
+                IsothermalEOS(elastic_solid, sources=None))
             g1.append(
                 # vi,j : requires properties v00, v01, v10, v11
-                VelocityGradient2D(dest=elastic_solid, sources=all)
-            )
+                VelocityGradient2D(dest=elastic_solid, sources=all))
             g1.append(
                 # rij : requires properties r00, r01, r02, r11, r12, r22,
                 #                           s00, s01, s02, s11, s12, s22
                 MonaghanArtificialStress(dest=elastic_solid, sources=None,
-                                         eps=self.artificial_stress_eps)
-            )
+                                         eps=self.artificial_stress_eps))
 
         equations.append(Group(equations=g1))
 
         g2 = []
         for elastic_solid in self.elastic_solids:
-            g2.append(
-                ContinuityEquation(dest=elastic_solid, sources=all),
-            )
+            g2.append(ContinuityEquation(dest=elastic_solid, sources=all), )
             g2.append(
                 # au, av
-                MomentumEquationWithStress(dest=elastic_solid,
-                                           sources=all),
-            )
+                MomentumEquationWithStress(dest=elastic_solid, sources=all), )
             g2.append(
                 # au, av
                 MonaghanArtificialViscosity(dest=elastic_solid, sources=all,
-                                            alpha=self.alpha, beta=self.beta),
-            )
+                                            alpha=self.alpha,
+                                            beta=self.beta), )
             g2.append(
                 # a_s00, a_s01, a_s11
-                HookesDeviatoricStressRate(dest=elastic_solid, sources=None),
-
-            )
+                HookesDeviatoricStressRate(dest=elastic_solid, sources=None), )
             g2.append(
                 # ax, ay, az
-                XSPHCorrection(dest=elastic_solid, sources=[
-                    elastic_solid
-                ], eps=self.xsph_eps),
-            )
+                XSPHCorrection(dest=elastic_solid, sources=[elastic_solid],
+                               eps=self.xsph_eps), )
         equations.append(Group(g2))
 
         return equations
@@ -678,6 +672,5 @@ class ElasticSolidsScheme(Scheme):
         integrator = cls(**steppers)
 
         from pysph.solver.solver import Solver
-        self.solver = Solver(
-            dim=self.dim, integrator=integrator, kernel=kernel, **kw
-        )
+        self.solver = Solver(dim=self.dim, integrator=integrator,
+                             kernel=kernel, **kw)
