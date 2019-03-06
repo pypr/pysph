@@ -60,7 +60,7 @@ def get_particle_array_elastic_dynamics(constants=None, **props):
 
     # set wdeltap to -1. Which defaults to no self correction
     consts = {
-        'wdeltap': [-1.0],
+        'wdeltap': -1.,
         'n': 4,
         'G': 0.0,
         'E': 0.0,
