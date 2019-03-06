@@ -371,7 +371,10 @@ class Viewer2D(Viewer):
         widgets.save_figure.on_submit(self._save_figure_handler)
         widgets.delay_box.observe(self._delay_box_handler, 'value')
         widgets.save_all_plots.observe(self._save_all_plots_handler, 'value')
-        widgets.show_solver_time.observe(self._show_solver_time_handler, 'value')
+        widgets.show_solver_time.observe(
+            self._show_solver_time_handler,
+            'value'
+        )
 
         # PLEASE NOTE:
         # All widget handlers take in 'change' as an argument. This is usually
@@ -469,7 +472,7 @@ class Viewer2D(Viewer):
 
         self._scatter_ax.axis('equal')
         self.solver_time_textbox = None
-        # So that _show_solver_time_handler does not throe an error at intialization.
+        # So that _show_solver_time_handler does not glitch at intialization.
         self._show_solver_time_handler(None)
         self._legend_handler(None)
 
@@ -921,9 +924,9 @@ class Viewer2D(Viewer):
                 horizontalalignment='left',
                 transform=self._scatter_ax.transAxes,
                 fontsize=12,
-                bbox={'facecolor':'white', 'alpha':0.5, 'pad':3},
+                bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 3},
             )
-        elif self._widgets.show_solver_time.value is False: 
+        elif self._widgets.show_solver_time.value is False:
             if self.solver_time_textbox is not None:
                 self.solver_time_textbox.remove()
             self.solver_time_textbox = None
