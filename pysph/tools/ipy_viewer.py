@@ -4,17 +4,13 @@ from pysph.solver.utils import load, get_files, mkdir
 from IPython.display import display, Image, clear_output
 import ipywidgets as widgets
 import numpy as np
-
-import sys
-# Used in the 3DViewer methods to check if ipyvolume has already been imported.
-
 import matplotlib as mpl
 
 mpl.use('module://ipympl.backend_nbagg')
 # Now the user does not have to use the IPython magic command
 # '%matplotlib ipympl' in the notebook, this takes care of it.
-# The backend needs to be set before matplotlib.pyplot is imported
-# and this will end up violating the PEP 8 style guide.
+# The matplotlib backend needs to be set before matplotlib.pyplot
+# is imported and this ends up violating the PEP 8 style guide.
 
 import matplotlib.pyplot as plt
 
@@ -84,7 +80,7 @@ class Viewer(object):
         '''
 
         print("Printing log : \n\n")
-        path = self.path + "*.log"
+        path = self.path + "/*.log"
         with open(glob.glob(path)[0], 'r') as logfile:
             for lines in logfile:
                 print(lines)
@@ -113,7 +109,7 @@ class Viewer(object):
 
         # General Info #
 
-        path = self.path + "*.info"
+        path = self.path + "/*.info"
         with open(glob.glob(path)[0], 'r') as infofile:
             data = json.load(infofile)
 
@@ -255,7 +251,9 @@ class Viewer2DWidgets(object):
 
     def __init__(self, file, file_count):
 
-        self.temp_data = load(file)['arrays']
+        self.temp_data = load(file)
+        self.time = str(self.temp_data['solver_data']['t'])
+        self.temp_data = self.temp_data['arrays']
         self.frame = widgets.IntSlider(
             min=0,
             max=file_count,
@@ -279,7 +277,7 @@ class Viewer2DWidgets(object):
             value=0.2,
             description='Delay',
             disabled=False,
-            layout=widgets.Layout(width='240px', display='flex'),
+            layout=widgets.Layout(width='160px', display='flex'),
         )
         self.save_figure = widgets.Text(
                 value='',
@@ -295,6 +293,10 @@ class Viewer2DWidgets(object):
                 tooltip='Saves the corresponding plots for all the' +
                         ' frames in the presently set styling.',
                 icon='',
+        )
+        self.solver_time = widgets.HTML(
+            value=self.time,
+            description='Solver time:'
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
@@ -329,6 +331,7 @@ class Viewer2DWidgets(object):
                     HBox(
                      [
                         self.save_all_plots,
+                        self.solver_time,
                      ]
                     )
                 ]
@@ -421,6 +424,7 @@ class Viewer2D(Viewer):
         display(self._widgets._create_vbox())
         temp_data = self.get_frame(self._widgets.frame.value)
         temp_data = temp_data['arrays']
+
         for sct in self._scatters.values():
             if sct in self._scatter_ax.collections:
                 self._scatter_ax.collections.remove(sct)
@@ -504,6 +508,8 @@ class Viewer2D(Viewer):
     def _frame_handler(self, change):
 
         temp_data = self.get_frame(self._widgets.frame.value)
+        self.time = str(temp_data['solver_data']['t'])
+        self._widgets.solver_time.value = self.time
         temp_data = temp_data['arrays']
 
         for array_name in self._widgets.particles.keys():
@@ -968,7 +974,9 @@ class Viewer3DWidgets(object):
 
     def __init__(self, file, file_count):
 
-        self.temp_data = load(file)['arrays']
+        self.temp_data = load(file)
+        self.time = str(self.temp_data['solver_data']['t'])
+        self.temp_data = self.temp_data['arrays']
         self.frame = widgets.IntSlider(
             min=0,
             max=file_count,
@@ -993,7 +1001,7 @@ class Viewer3DWidgets(object):
             value=1.0,
             description='Delay',
             disabled=False,
-            layout=widgets.Layout(width='240px', display='flex')
+            layout=widgets.Layout(width='160px', display='flex')
         )
         self.save_figure = widgets.Text(
                 value='',
@@ -1009,6 +1017,10 @@ class Viewer3DWidgets(object):
                 tooltip='Saves the corresponding plots for all the' +
                         ' frames in the presently set styling.',
                 icon='',
+        )
+        self.solver_time = widgets.HTML(
+                value=self.time,
+                description='Solver time:',
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
@@ -1043,6 +1055,7 @@ class Viewer3DWidgets(object):
                     HBox(
                      [
                         self.save_all_plots,
+                        self.solver_time,
                      ]
                     )
                 ]
@@ -1142,7 +1155,10 @@ class Viewer3D(Viewer):
 
     def _frame_handler(self, change):
 
-        data = self.get_frame(self._widgets.frame.value)['arrays']
+        data = self.get_frame(self._widgets.frame.value)
+        self.time = str(data['solver_data']['t'])
+        self._widgets.solver_time.value = self.time
+        data = data['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.is_visible.value is True:
