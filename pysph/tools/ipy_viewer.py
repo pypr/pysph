@@ -298,6 +298,12 @@ class Viewer2DWidgets(object):
             value=self.time,
             description='Solver time:'
         )
+        self.show_solver_time = widgets.Checkbox(
+            value=False,
+            description="Show solver time",
+            disabled=False,
+            layout=widgets.Layout(width='240px', display='flex')
+        )
         self.particles = {}
         for array_name in self.temp_data.keys():
             self.particles[array_name] = ParticleArrayWidgets(
@@ -326,11 +332,12 @@ class Viewer2DWidgets(object):
                      [
                         self.delay_box,
                         self.save_figure,
+                        self.save_all_plots,
                      ]
                     ),
                     HBox(
                      [
-                        self.save_all_plots,
+                        self.show_solver_time,
                         self.solver_time,
                      ]
                     )
@@ -364,6 +371,7 @@ class Viewer2D(Viewer):
         widgets.save_figure.on_submit(self._save_figure_handler)
         widgets.delay_box.observe(self._delay_box_handler, 'value')
         widgets.save_all_plots.observe(self._save_all_plots_handler, 'value')
+        widgets.show_solver_time.observe(self._show_solver_time_handler, 'value')
 
         # PLEASE NOTE:
         # All widget handlers take in 'change' as an argument. This is usually
@@ -409,6 +417,7 @@ class Viewer2D(Viewer):
         self._cbar_ax = {}
         self._cbars = {}
         self._vectors = {}
+        self._solver_time_ax = {}
 
         self.figure.show()
 
@@ -423,6 +432,7 @@ class Viewer2D(Viewer):
         self._create_widgets()
         display(self._widgets._create_vbox())
         temp_data = self.get_frame(self._widgets.frame.value)
+        self.time = str(temp_data['solver_data']['t'])
         temp_data = temp_data['arrays']
 
         for sct in self._scatters.values():
@@ -456,7 +466,11 @@ class Viewer2D(Viewer):
                     sct.set_facecolors(colormap(arr[3]))
                 else:
                     sct.set_facecolors(colormap(c*0))
+
         self._scatter_ax.axis('equal')
+        self.solver_time_textbox = None
+        # So that _show_solver_time_handler does not throe an error at intialization.
+        self._show_solver_time_handler(None)
         self._legend_handler(None)
 
     def _plot_vectors(self):
@@ -543,6 +557,7 @@ class Viewer2D(Viewer):
 
         self._legend_handler(None)
         self._vector_handler(None)
+        self._show_solver_time_handler(None)
         self._adjust_axes()
         self.figure.show()
 
@@ -746,6 +761,10 @@ class Viewer2D(Viewer):
                         array_name + " : " +
                         pa_widgets.scalar.value
                     )
+        if len(self._cbars.keys()) == 0:
+            self._scatter_ax.set_position(
+                [0, 0, 1, 1]
+            )
         if change is not None:
             self.figure.show()
 
@@ -888,6 +907,28 @@ class Viewer2D(Viewer):
         self._legend_handler(None)
         self._plot_vectors()
         self.figure.show()
+
+    def _show_solver_time_handler(self, change):
+
+        if self._widgets.show_solver_time.value is True:
+            if self.solver_time_textbox is not None:
+                self.solver_time_textbox.remove()
+            self.solver_time_textbox = self._scatter_ax.text(
+                x=0.02,
+                y=0.02,
+                s='Solver time: ' + self.time,
+                verticalalignment='bottom',
+                horizontalalignment='left',
+                transform=self._scatter_ax.transAxes,
+                fontsize=12,
+                bbox={'facecolor':'white', 'alpha':0.5, 'pad':3},
+            )
+        elif self._widgets.show_solver_time.value is False: 
+            if self.solver_time_textbox is not None:
+                self.solver_time_textbox.remove()
+            self.solver_time_textbox = None
+        if change is not None:
+            self.figure.show()
 
 
 class ParticleArrayWidgets3D(object):
@@ -1139,6 +1180,7 @@ class Viewer3D(Viewer):
                     data[array_name].z,
                     color=colormap(arr[3]),
                     size=pa_widgets.scalar_size.value,
+                    marker='sphere',
                 )
         p3.squarelim()  # Makes sure the figure doesn't appear distorted.
         self.plot = p3.gcf()  # Used in 'self._save_figure_handler()'.
@@ -1212,6 +1254,7 @@ class Viewer3D(Viewer):
                     data[array_name].z,
                     color=colormap(arr[3]),
                     size=pa_widgets.scalar_size.value,
+                    marker='sphere',
                 )
         self._legend_handler(None)
 
@@ -1460,6 +1503,7 @@ class Viewer3D(Viewer):
                 temp_data[array_name].z,
                 color=colormap(arr[3]),
                 size=pa_widgets.scalar_size.value,
+                marker='sphere',
             )
             if pa_widgets.velocity_vectors.value is True:
                 if array_name in self.vectors.keys():
