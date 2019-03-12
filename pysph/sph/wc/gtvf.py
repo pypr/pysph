@@ -590,10 +590,12 @@ class GTVFScheme(Scheme):
         )
         all = self.fluids + self.solids
 
-        eq0, stage1 = [], []
-        for solid in self.solids:
-            eq0.append(SetWallVelocity(dest=solid, sources=self.fluids))
-        stage1.append(Group(equations=eq0, real=False))
+        stage1 = []
+        if self.solids:
+            eq0 = []
+            for solid in self.solids:
+                eq0.append(SetWallVelocity(dest=solid, sources=self.fluids))
+            stage1.append(Group(equations=eq0, real=False))
 
         eq1 = []
         for fluid in self.fluids:
