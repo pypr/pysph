@@ -151,6 +151,24 @@ class Viewer(object):
         self.show_results()
         self.show_log()
 
+    def _cmap_helper(self, data):
+        '''
+        Helper Function:
+        Takes in a numpy array and returns its maximum,
+        minimum and absolute maximum values, along with
+        the input array normalized by the absolute maximum.
+        '''
+
+        minm = np.min(data)
+        absmaxm = maxm = np.max(data)
+        if abs(maxm) < abs(minm):
+            absmaxm = abs(minm)
+        if absmaxm != 0:
+            normed_data = data/absmaxm
+            return minm, maxm, absmaxm, normed_data
+        else:
+            return minm, maxm, absmaxm, data
+
 
 class ParticleArrayWidgets(object):
 
@@ -249,9 +267,9 @@ class ParticleArrayWidgets(object):
 
 class Viewer2DWidgets(object):
 
-    def __init__(self, file, file_count):
+    def __init__(self, file_name, file_count):
 
-        self.temp_data = load(file)
+        self.temp_data = load(file_name)
         self.time = str(self.temp_data['solver_data']['t'])
         self.temp_data = self.temp_data['arrays']
         self.frame = widgets.IntSlider(
@@ -363,7 +381,7 @@ class Viewer2D(Viewer):
     def _create_widgets(self):
 
         self._widgets = Viewer2DWidgets(
-            file=self.paths_list[0],
+            file_name=self.paths_list[0],
             file_count=len(self.paths_list) - 1,
         )
         widgets = self._widgets
@@ -378,7 +396,7 @@ class Viewer2D(Viewer):
 
         # PLEASE NOTE:
         # All widget handlers take in 'change' as an argument. This is usually
-        # a dictionary conatining information about the widget and the change
+        # a dictionary containing information about the widget and the change
         # in state. However, these functions are also used outside of the use
         # case of a user-triggered-event, and in these scenarios None should
         # be passed as the argument. This is of particular significance
@@ -460,13 +478,10 @@ class Viewer2D(Viewer):
                     plt.cm,
                     pa_widgets.scalar_cmap.value
                 )
-                arr = self._normalized_for_colormaps(c)
-                # arr[0] = min(c)
-                # arr[1] = max(c)
-                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-                # arr[3] = c normalized with the absolute maximum
-                if arr[2] != 0:
-                    sct.set_facecolors(colormap(arr[3]))
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
+                if abs_max_c != 0:
+                    sct.set_facecolors(colormap(c_norm))
                 else:
                     sct.set_facecolors(colormap(c*0))
 
@@ -548,13 +563,10 @@ class Viewer2D(Viewer):
                     plt.cm,
                     pa_widgets.scalar_cmap.value
                 )
-                arr = self._normalized_for_colormaps(c)
-                # arr[0] = min(c)
-                # arr[1] = max(c)
-                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-                # arr[3] = c normalized with the absolute maximum
-                if arr[2] != 0:
-                    sct.set_facecolors(colormap(arr[3]))
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
+                if abs_max_c != 0:
+                    sct.set_facecolors(colormap(c_norm))
                 else:
                     sct.set_facecolors(colormap(c*0))
 
@@ -597,13 +609,10 @@ class Viewer2D(Viewer):
                         plt.cm,
                         pa_widgets.scalar_cmap.value
                 )
-                arr = self._normalized_for_colormaps(c)
-                # arr[0] = min(c)
-                # arr[1] = max(c)
-                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-                # arr[3] = c normalized with the absolute maximum
-                if arr[2] != 0:
-                    sct.set_facecolors(colormap(arr[3]))
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
+                if abs_max_c != 0:
+                    sct.set_facecolors(colormap(c_norm))
                 else:
                     sct.set_facecolors(colormap(c*0))
 
@@ -616,13 +625,10 @@ class Viewer2D(Viewer):
                         plt.cm,
                         pa_widgets.scalar_cmap.value
                 )
-                arr = self._normalized_for_colormaps(c)
-                # arr[0] = min(c)
-                # arr[1] = max(c)
-                # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-                # arr[3] = c normalized with the absolute maximum
-                if arr[2] != 0:
-                    sct.set_facecolors(colormap(arr[3]))
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
+                if abs_max_c != 0:
+                    sct.set_facecolors(colormap(c_norm))
                 else:
                     sct.set_facecolors(colormap(c*0))
 
@@ -688,13 +694,9 @@ class Viewer2D(Viewer):
                 pa_widgets.scalar_cmap.value
             )
             sct = self._scatters[array_name]
-            arr = self._normalized_for_colormaps(c)
-            # arr[0] = min(c)
-            # arr[1] = max(c)
-            # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-            # arr[3] = c normalized with the absolute maximum
-            if arr[2] != 0:
-                sct.set_facecolors(colormap(arr[3]))
+            min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+            if abs_max_c != 0:
+                sct.set_facecolors(colormap(c_norm))
             else:
                 sct.set_facecolors(colormap(c*0))
             self._legend_handler(None)
@@ -733,26 +735,17 @@ class Viewer2D(Viewer):
                             ]
                     )
 
-                    arr = self._normalized_for_colormaps(c)
-                    minm = arr[0]
-                    maxm = arr[1]
-                    absmaxm = arr[2]
+                    min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
 
-                    # Do not change the order of the if-else #
-                    # block below. It is important that the  #
-                    # checks are performed in this order,    #
-                    # otherwise the 'boundaries' array will  #
-                    # not be appropriate.                    #
-
-                    if absmaxm == 0:
+                    if abs_max_c == 0:
                         boundaries = np.linspace(0, 1, 25)
-                    elif maxm == minm:
+                    elif min_c == max_c:
                         # this occurs at initialization for some properties
                         # like pressure, and stays true throughout for
                         # others like mass of the particles
-                        boundaries = np.linspace(0, maxm, 25)
+                        boundaries = np.linspace(0, max_c, 25)
                     else:
-                        boundaries = np.linspace(minm, maxm, 25)
+                        boundaries = np.linspace(min_c, max_c, 25)
 
                     self._cbars[array_name] = mpl.colorbar.ColorbarBase(
                         ax=self._cbar_ax[array_name],
@@ -773,7 +766,7 @@ class Viewer2D(Viewer):
 
     def _save_figure_handler(self, change):
 
-        flag = True
+        file_was_saved = False
         for extension in [
             '.eps', '.pdf', '.pgf',
             '.png', '.ps', '.raw',
@@ -787,10 +780,10 @@ class Viewer2D(Viewer):
                         self._widgets.save_figure.value
                     )
                 )
-                flag = False
+                file_was_saved = True
                 break
         self._widgets.save_figure.value = ""
-        if flag is True:
+        if file_was_saved is False:
             print(
                 "Please use a valid extension, that is, one of the following" +
                 ": '.eps', '.pdf', '.pgf', '.png', '.ps', '.raw', '.rgba'," +
@@ -856,24 +849,6 @@ class Viewer2D(Viewer):
                 pa_widgets.scalar_size.disabled = False
                 pa_widgets.is_visible.disabled = False
 
-    def _normalized_for_colormaps(self, data):
-        '''
-        Helper Function:
-        Takes in a numpy array and returns its maximum,
-        minimum and absolute maximum values, along with
-        the input array normalized by the absolute maximum.
-        '''
-
-        minm = np.min(data)
-        absmaxm = maxm = np.max(data)
-        if abs(maxm) < abs(minm):
-            absmaxm = abs(minm)
-        if absmaxm != 0:
-            normed_data = data/absmaxm
-            return [minm, maxm, absmaxm, normed_data]
-        else:
-            return [minm, maxm, absmaxm, data]
-
     def _is_visible_handler(self, change):
 
         array_name = change['owner'].owner
@@ -897,13 +872,9 @@ class Viewer2D(Viewer):
                 plt.cm,
                 pa_widgets.scalar_cmap.value
             )
-            arr = self._normalized_for_colormaps(c)
-            # arr[0] = min(c)
-            # arr[1] = max(c)
-            # arr[2] = absolute maximum of c = max(abs(maxm), abs(minm))
-            # arr[3] = c normalized with the absolute maximum
-            if arr[2] != 0:
-                sct.set_facecolors(colormap(arr[3]))
+            min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+            if abs_max_c != 0:
+                sct.set_facecolors(colormap(c_norm))
             else:
                 sct.set_facecolors(colormap(c*0))
 
@@ -1176,12 +1147,14 @@ class Viewer3D(Viewer):
             if pa_widgets.scalar.value != 'None':
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 c = getattr(data[array_name], pa_widgets.scalar.value)
-                arr = self._normalized_for_colormaps(c)
+
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
                 self.scatters[array_name] = p3.scatter(
                     data[array_name].x,
                     data[array_name].y,
                     data[array_name].z,
-                    color=colormap(arr[3]),
+                    color=colormap(c_norm),
                     size=pa_widgets.scalar_size.value,
                     marker='sphere',
                 )
@@ -1211,11 +1184,13 @@ class Viewer3D(Viewer):
                     colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                     scatters = self.scatters[array_name]
                     c = getattr(data[array_name], pa_widgets.scalar.value)
-                    arr = self._normalized_for_colormaps(c)
+
+                    min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+
                     scatters.x = data[array_name].x
                     scatters.y = data[array_name].y,
                     scatters.z = data[array_name].z,
-                    scatters.color = colormap(arr[3])
+                    scatters.color = colormap(c_norm)
                 if pa_widgets.velocity_vectors.value is True:
                     vectors = self.vectors[array_name]
                     vectors.x = data[array_name].x
@@ -1244,18 +1219,18 @@ class Viewer3D(Viewer):
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 data = self.get_frame(self._widgets.frame.value)['arrays']
                 c = getattr(data[array_name], pa_widgets.scalar.value)
-                arr = self._normalized_for_colormaps(c)
-                self.scatters[array_name].color = colormap(arr[3])
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
+                self.scatters[array_name].color = colormap(c_norm)
             else:
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 data = self.get_frame(self._widgets.frame.value)['arrays']
                 c = getattr(data[array_name], pa_widgets.scalar.value)
-                arr = self._normalized_for_colormaps(c)
+                min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
                 self.scatters[array_name] = p3.scatter(
                     data[array_name].x,
                     data[array_name].y,
                     data[array_name].z,
-                    color=colormap(arr[3]),
+                    color=colormap(c_norm),
                     size=pa_widgets.scalar_size.value,
                     marker='sphere',
                 )
@@ -1324,7 +1299,6 @@ class Viewer3D(Viewer):
         temp_data = self.get_frame(self._widgets.frame.value)['arrays']
         with self.legend:
             for _cbar_ax in self._cbar_ax.values():
-                _cbar_ax.clear()
                 self.pltfigure.delaxes(_cbar_ax)
             self._cbar_ax = {}
             self._cbars = {}
@@ -1338,26 +1312,17 @@ class Viewer3D(Viewer):
                             temp_data[array_name],
                             pa_widgets.scalar.value
                         )
-                        arr = self._normalized_for_colormaps(c)
-                        minm = arr[0]
-                        maxm = arr[1]
-                        absmaxm = arr[2]
+                        min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
 
-                        # Do not change the order of the if-else #
-                        # block below. It is important that the  #
-                        # checks are performed in this order,    #
-                        # otherwise the 'boundaries' array will  #
-                        # not be appropriate.                    #
-
-                        if absmaxm == 0:
+                        if abs_max_c == 0:
                             boundaries = np.linspace(0, 1, 25)
-                        elif minm == maxm:
+                        elif min_c == max_c:
                             # This occurs at initialization for some properties
                             # like pressure, and stays true throughout for
                             # others like mass of the particles.
-                            boundaries = np.linspace(0, maxm, 25)
+                            boundaries = np.linspace(0, max_c, 25)
                         else:
-                            boundaries = np.linspace(minm, maxm, 25)
+                            boundaries = np.linspace(min_c, max_c, 25)
 
                         self._cbar_ax[array_name] = self.pltfigure.add_axes(
                             [
@@ -1466,24 +1431,6 @@ class Viewer3D(Viewer):
                 pa_widgets.scalar_size.disabled = False
                 pa_widgets.is_visible.disabled = False
 
-    def _normalized_for_colormaps(self, data):
-        '''
-        Helper Function:
-        Takes in a numpy array and returns its maximum,
-        minimum and absolute maximum values, along with
-        the input array normalized by the absolute maximum.
-        '''
-
-        minm = np.min(data)
-        absmaxm = maxm = np.max(data)
-        if abs(maxm) < abs(minm):
-            absmaxm = abs(minm)
-        if absmaxm != 0:
-            normed_data = data/absmaxm
-            return [minm, maxm, absmaxm, normed_data]
-        else:
-            return [minm, maxm, absmaxm, data]
-
     def _is_visible_handler(self, change):
 
         import ipyvolume.pylab as p3
@@ -1499,12 +1446,12 @@ class Viewer3D(Viewer):
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
             temp_data = self.get_frame(self._widgets.frame.value)['arrays']
             c = getattr(temp_data[array_name], pa_widgets.scalar.value)
-            arr = self._normalized_for_colormaps(c)
+            min_c, max_c, abs_max_c, c_norm = self._cmap_helper(c)
             self.scatters[array_name] = p3.scatter(
                 temp_data[array_name].x,
                 temp_data[array_name].y,
                 temp_data[array_name].z,
-                color=colormap(arr[3]),
+                color=colormap(c_norm),
                 size=pa_widgets.scalar_size.value,
                 marker='sphere',
             )
