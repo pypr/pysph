@@ -1,7 +1,7 @@
 import json
 import glob
 from pysph.solver.utils import load, get_files, mkdir
-from IPython.display import display, Image, clear_output
+from IPython.display import display, Image, clear_output, HTML
 import ipywidgets as widgets
 import numpy as np
 import matplotlib as mpl
@@ -195,11 +195,29 @@ class ParticleArrayWidgets(object):
         self.scalar_cmap.owner = self.array_name
         self.legend = widgets.Checkbox(
             value=False,
-            description="legend",
+            description='legend',
             disabled=False,
-            layout=widgets.Layout(width='200px', display='flex')
+            layout=widgets.Layout(width='170px', display='flex')
         )
         self.legend.owner = self.array_name
+        self.legend_lower_lim = widgets.Text(
+            value='',
+            placeholder='min',
+            description='lower limit',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+            continuous_update=False
+        )
+        self.legend_lower_lim.owner = self.array_name
+        self.legend_upper_lim = widgets.Text(
+            value='',
+            placeholder='max',
+            description='upper limit',
+            disabled=False,
+            layout=widgets.Layout(width='160px', display='flex'),
+            continuous_update=False
+        )
+        self.legend_upper_lim.owner = self.array_name
         self.vector = widgets.Text(
             value='',
             placeholder='variable1,variable2',
@@ -241,28 +259,42 @@ class ParticleArrayWidgets(object):
         self.scalar_size.owner = self.array_name
         self.is_visible = widgets.Checkbox(
             value=True,
-            description="visible",
+            description='visible',
             disabled=False,
-            layout=widgets.Layout(width='200px', display='flex')
+            layout=widgets.Layout(width='170px', display='flex')
         )
         self.is_visible.owner = self.array_name
 
-    def _create_vbox(self):
-
-        from ipywidgets import VBox, HTML, Layout
-        return VBox([
-            HTML('<b>' + self.array_name.upper() + '</b>'),
-            self.scalar,
-            self.vector,
-            self.vector_scale,
-            self.vector_width,
-            self.scalar_size,
-            self.scalar_cmap,
-            self.legend,
-            self.is_visible,
-        ],
-            layout=Layout(border='1px solid', margin='3px', min_width='320px')
+    def _tab_config(self):
+        
+        VBox1 = widgets.VBox(
+            [
+                self.scalar,
+                self.scalar_size,
+                self.scalar_cmap,
+            ]
         )
+        VBox2 = widgets.VBox(
+            [
+                self.vector,
+                self.vector_scale,
+                self.vector_width,
+            ]
+        )
+        VBox3 = widgets.VBox(
+            [
+                self.legend,
+                widgets.HBox(
+                    [
+                        self.legend_upper_lim,
+                        self.legend_lower_lim,                       
+                    ]
+                ),
+                self.is_visible,
+            ]
+        )
+        hbox = widgets.HBox([VBox1, VBox2, VBox3])
+        return hbox
 
 
 class Viewer2DWidgets(object):
@@ -328,32 +360,33 @@ class Viewer2DWidgets(object):
                 self.temp_data[array_name],
             )
 
-    def _create_vbox(self):
+    def _create_tabs(self):
 
-        from ipywidgets import HBox, VBox, Label, Layout
-        items = []
+        children = []
         for array_name in self.particles.keys():
-            items.append(self.particles[array_name]._create_vbox())
+            children.append(self.particles[array_name]._tab_config())
 
-        return VBox(
+        tab = widgets.Tab(children=children) 
+        for i in range(len(children)):
+            tab.set_title(i, list(self.particles.keys())[i])
+
+        return widgets.VBox(
                 [
-                    HBox(
-                        items,
-                    ),
-                    HBox(
+                    tab,
+                    widgets.HBox(
                      [
                         self.play_button,
                         self.frame
                      ]
                     ),
-                    HBox(
+                    widgets.HBox(
                      [
                         self.delay_box,
                         self.save_figure,
                         self.save_all_plots,
                      ]
                     ),
-                    HBox(
+                    widgets.HBox(
                      [
                         self.show_solver_time,
                         self.solver_time,
@@ -384,12 +417,14 @@ class Viewer2D(Viewer):
             file_name=self.paths_list[0],
             file_count=len(self.paths_list) - 1,
         )
-        widgets = self._widgets
-        widgets.frame.observe(self._frame_handler, 'value')
-        widgets.save_figure.on_submit(self._save_figure_handler)
-        widgets.delay_box.observe(self._delay_box_handler, 'value')
-        widgets.save_all_plots.observe(self._save_all_plots_handler, 'value')
-        widgets.show_solver_time.observe(
+        self._widgets.frame.observe(self._frame_handler, 'value')
+        self._widgets.save_figure.on_submit(self._save_figure_handler)
+        self._widgets.delay_box.observe(self._delay_box_handler, 'value')
+        self._widgets.save_all_plots.observe(
+            self._save_all_plots_handler,
+            'value'
+        )
+        self._widgets.show_solver_time.observe(
             self._show_solver_time_handler,
             'value'
         )
@@ -404,7 +439,7 @@ class Viewer2D(Viewer):
         # only if the argument passed is not None.
 
         for array_name in self._widgets.particles.keys():
-            pa_widgets = widgets.particles[array_name]
+            pa_widgets = self._widgets.particles[array_name]
             pa_widgets.scalar.observe(self._scalar_handler, 'value')
             pa_widgets.vector.observe(self._vector_handler, 'value')
             pa_widgets.vector_width.observe(
@@ -419,6 +454,14 @@ class Viewer2D(Viewer):
             pa_widgets.legend.observe(self._legend_handler, 'value')
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
             pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
+            pa_widgets.legend_lower_lim.observe(
+                self._legend_lower_lim_handler,
+                'value',
+            )
+            pa_widgets.legend_upper_lim.observe(
+                self._legend_upper_lim_handler,
+                'value',
+            )
 
     def _configure_plot(self):
 
@@ -451,7 +494,7 @@ class Viewer2D(Viewer):
 
         self._configure_plot()
         self._create_widgets()
-        display(self._widgets._create_vbox())
+        display(self._widgets._create_tabs())
         temp_data = self.get_frame(self._widgets.frame.value)
         self.time = str(temp_data['solver_data']['t'])
         temp_data = temp_data['arrays']
@@ -750,6 +793,7 @@ class Viewer2D(Viewer):
                     self._cbars[array_name] = mpl.colorbar.ColorbarBase(
                         ax=self._cbar_ax[array_name],
                         cmap=colormap,
+                        #norm=norm,
                         boundaries=boundaries,
                         ticks=boundaries,
                     )
@@ -904,6 +948,55 @@ class Viewer2D(Viewer):
         if change is not None:
             self.figure.show()
 
+    def _legend_lower_lim_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+        sct = self._scatters[array_name]
+        c = getattr(
+            temp_data[array_name],
+            pa_widgets.scalar.value
+        )
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
+        arr = self._normalized_for_colormaps(c, array_name)
+        # arr[0] = actual_minm
+        # arr[1] = actual_maxm
+        # arr[2] = c normalized with actual_maxm
+        sct.set_facecolors(colormap(arr[2]))
+        
+        self._legend_handler(None)
+        self.figure.show()
+
+    def _legend_upper_lim_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+        sct = self._scatters[array_name]
+        c = getattr(
+            temp_data[array_name],
+            pa_widgets.scalar.value
+        )
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
+        arr = self._normalized_for_colormaps(c, array_name)
+        # arr[0] = actual_minm
+        # arr[1] = actual_maxm
+        # arr[2] = c normalized with actual_maxm
+        sct.set_facecolors(colormap(arr[2]))
+        
+        self._legend_handler(None)
+        self.figure.show()
 
 class ParticleArrayWidgets3D(object):
 
@@ -934,6 +1027,24 @@ class ParticleArrayWidgets3D(object):
             layout=widgets.Layout(width='200px', display='flex')
         )
         self.legend.owner = self.array_name
+        self.legend_lower_lim = widgets.Text(
+            value='',
+            description='lower limit',
+            placeholder='min',
+            disabled=False,
+            continuous_update=False,
+            layout=widgets.Layout(width='170px', display='flex'),
+        )
+        self.legend_lower_lim.owner = self.array_name
+        self.legend_upper_lim = widgets.Text(
+            value='',
+            description='upper limit',
+            placeholder='max',
+            disabled=False,
+            continuous_update=False,
+            layout=widgets.Layout(width='170px', display='flex')
+        )
+        self.legend_upper_lim.owner = self.array_name
         self.velocity_vectors = widgets.Checkbox(
             value=False,
             description="Velocity Vectors",
@@ -967,22 +1078,35 @@ class ParticleArrayWidgets3D(object):
         )
         self.is_visible.owner = self.array_name
 
-    def _create_vbox(self):
-
-        from ipywidgets import VBox, Layout, HTML
-        return VBox(
+    def _tab_config(self):
+        
+        VBox1 = widgets.VBox(
             [
-                HTML('<b>' + self.array_name.upper() + '</b>'),
                 self.scalar,
-                self.velocity_vectors,
-                self.vector_size,
                 self.scalar_size,
                 self.scalar_cmap,
-                self.legend,
-                self.is_visible,
-            ],
-            layout=Layout(border='1px solid', margin='3px', min_width='320px')
+            ]
         )
+        VBox2 = widgets.VBox(
+            [
+                self.velocity_vectors,
+                self.vector_size,
+                self.is_visible,
+            ]
+        )
+        VBox3 = widgets.VBox(
+            [
+                self.legend,
+                widgets.HBox(
+                    [
+                        self.legend_upper_lim,
+                        self.legend_lower_lim,
+                    ]
+                ),
+            ]
+        )
+        hbox = widgets.HBox([VBox1, VBox2, VBox3])
+        return hbox
 
 
 class Viewer3DWidgets(object):
@@ -1043,31 +1167,32 @@ class Viewer3DWidgets(object):
                 self.temp_data[array_name],
             )
 
-    def _create_vbox(self):
+    def _create_tabs(self):
 
-        from ipywidgets import HBox, VBox, Label, Layout
-        items = []
+        children = []
         for array_name in self.particles.keys():
-            items.append(self.particles[array_name]._create_vbox())
+            children.append(self.particles[array_name]._tab_config())
 
-        return VBox(
+        tab = widgets.Tab(children=children) 
+        for i in range(len(children)):
+            tab.set_title(i, list(self.particles.keys())[i])
+
+        return widgets.VBox(
                 [
-                    HBox(
-                        items,
-                    ),
-                    HBox(
+                    tab,
+                    widgets.HBox(
                      [
                         self.play_button,
                         self.frame
                      ]
                     ),
-                    HBox(
+                    widgets.HBox(
                      [
                         self.delay_box,
-                        self.save_figure
+                        self.save_figure,
                      ]
                     ),
-                    HBox(
+                    widgets.HBox(
                      [
                         self.save_all_plots,
                         self.solver_time,
@@ -1122,6 +1247,14 @@ class Viewer3D(Viewer):
             pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
             pa_widgets.legend.observe(self._legend_handler, 'value')
             pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
+            pa_widgets.legend_upper_lim.observe(
+                self._legend_upper_lim_handler,
+                'value'
+            )
+            pa_widgets.legend_lower_lim.observe(
+                self._legend_lower_lim_handler,
+                'value'
+            )
 
     def interactive_plot(self):
 
@@ -1131,16 +1264,16 @@ class Viewer3D(Viewer):
         self.scatters = {}
         self.vectors = {}
         self._cbars = {}
-        self._cbar_ax = {}
-        self.legend = widgets.Output()
-        with self.legend:
-            self.pltfigure = plt.figure(figsize=(4.5, 4.5))
-            self.pltfigure.add_axes([0, 0, 1, 1])
-            # Creating a dummy axes element, that prevents the plot
-            # from glitching and showing random noise when no legends are
-            # being displayed.
+        self._cbar_ax = {}        
 
-        p3.clear()
+        self.pltfigure = plt.figure(figsize=(9, 1.5), dpi=100)
+        self.initial_ax = self.pltfigure.add_axes([0, 0, 1, 1])
+        self.initial_ax.axis('off')
+        # Creating a dummy axes element, that prevents the plot
+        # from glitching and showing random noise when no legends are
+        # being displayed.
+
+        self.plot = p3.figure(width=800)
         data = self.get_frame(self._widgets.frame.value)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
@@ -1159,17 +1292,11 @@ class Viewer3D(Viewer):
                     marker='sphere',
                 )
         p3.squarelim()  # Makes sure the figure doesn't appear distorted.
-        self.plot = p3.gcf()  # Used in 'self._save_figure_handler()'.
+        #self.plot = p3.gcf()  # Used in 'self._save_figure_handler()'.
         self._legend_handler(None)
-        display(
-            widgets.HBox(
-                [
-                    self.plot,
-                    self.legend
-                ]
-            )
-        )
-        display(self._widgets._create_vbox())
+        display(self.plot)
+        self.pltfigure.show()
+        display(self._widgets._create_tabs())
 
     def _frame_handler(self, change):
 
@@ -1290,9 +1417,18 @@ class Viewer3D(Viewer):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
+        data = self.get_frame(self._widgets.frame.value)['arrays']
+
+        colormap = getattr(mpl.cm, change['new'])
+        c = getattr(data[array_name], pa_widgets.scalar.value)
+        arr = self._normalized_for_colormaps(c, array_name)
+
         if pa_widgets.is_visible.value is True:
-            change['new'] = pa_widgets.scalar.value
-            self._scalar_handler(change)
+            #change['new'] = pa_widgets.scalar.value
+            #self._scalar_handler(change)
+            self.scatters[array_name].color = colormap(arr[2])
+
+        self._legend_handler(None)
 
     def _legend_handler(self, change):
 
@@ -1478,4 +1614,52 @@ class Viewer3D(Viewer):
                         size=pa_widgets.vector_size.value,
                     )
 
+        self._legend_handler(None)
+
+    def _legend_lower_lim_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+        sct = self.scatters[array_name]
+        c = getattr(
+            temp_data[array_name],
+            pa_widgets.scalar.value
+        )
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
+        arr = self._normalized_for_colormaps(c, array_name)
+        # arr[0] = actual_minm
+        # arr[1] = actual_maxm
+        # arr[2] = c normalized with actual_maxm
+        sct.color = colormap(arr[2])
+        
+        self._legend_handler(None)
+
+    def _legend_upper_lim_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+        sct = self.scatters[array_name]
+        c = getattr(
+            temp_data[array_name],
+            pa_widgets.scalar.value
+        )
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
+        arr = self._normalized_for_colormaps(c, array_name)
+        # arr[0] = actual_minm
+        # arr[1] = actual_maxm
+        # arr[2] = c normalized with actual_maxm
+        sct.color = colormap(arr[2])
+        
         self._legend_handler(None)
