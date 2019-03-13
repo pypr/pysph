@@ -809,23 +809,23 @@ class Viewer2D(Viewer):
                     )
 
                     if max_c == 0:
-                        boundaries = np.linspace(0, 1, 25)
-                        #norm = mpl.colors.Normalize(vmin=0, vmax=1)
+                        ticks = np.linspace(0, 1, 26)
+                        norm = mpl.colors.Normalize(vmin=0, vmax=1)
                     elif max_c == min_c:
                         # this occurs at initialization for some properties
                         # like pressure, and stays true throughout for
                         # others like mass of the particles
-                        boundaries = np.linspace(0, max_c, 25)
-                        #norm = mpl.colors.Normalize(vmin=0, vmax=actual_maxm)
+                        ticks = np.linspace(0, max_c, 26)
+                        norm = mpl.colors.Normalize(vmin=0, vmax=max_c)
                     else:
-                        boundaries = np.linspace(min_c, max_c, 25)
-                        #norm = mpl.colors.Normalize(vmin=minm, vmax=maxm)
+                        ticks = np.linspace(min_c, max_c, 26)
+                        norm = mpl.colors.Normalize(vmin=min_c, vmax=max_c)
 
                     self._cbars[array_name] = mpl.colorbar.ColorbarBase(
                         ax=self._cbar_ax[array_name],
                         cmap=colormap,
-                        boundaries=boundaries,
-                        ticks=boundaries,
+                        norm=norm,
+                        ticks=ticks,
                     )
                     self._cbars[array_name].set_label(
                         array_name + " : " +
@@ -969,7 +969,7 @@ class Viewer2D(Viewer):
                 horizontalalignment='left',
                 transform=self._scatter_ax.transAxes,
                 fontsize=12,
-                bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 3},
+                bbox={'facecolor': 'white', 'alpha': 0.7, 'pad': 3},
             )
         elif self._widgets.show_solver_time.value is False:
             if self.solver_time_textbox is not None:
@@ -1270,7 +1270,8 @@ class Viewer3D(Viewer):
         self.scatters = {}
         self.vectors = {}
         self._cbars = {}
-        self._cbar_ax = {}        
+        self._cbar_ax = {}
+        self._cbar_labels = {}
 
         self.pltfigure = plt.figure(figsize=(9, 1), dpi=100)
         self._initial_ax = self.pltfigure.add_axes([0, 0, 1, 1])
@@ -1299,10 +1300,9 @@ class Viewer3D(Viewer):
                     marker='sphere',
                 )
         p3.squarelim()  # Makes sure the figure doesn't appear distorted.
-        #self.plot = p3.gcf()  # Used in 'self._save_figure_handler()'.
         self._legend_handler(None)
         display(self.plot)
-        display(self.pltfigure)
+        self.pltfigure.show()
         display(self._widgets._create_tabs())
 
     def _frame_handler(self, change):
@@ -1439,68 +1439,77 @@ class Viewer3D(Viewer):
 
     def _legend_handler(self, change):
 
-        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
-        for _cbar_ax in self._cbar_ax.values():
-            self.pltfigure.delaxes(_cbar_ax)
-        self._cbar_ax = {}
-        self._cbars = {}
-        for array_name in self._widgets.particles.keys():
-            pa_widgets = self._widgets.particles[array_name]
-            if (pa_widgets.scalar.value != 'None' and
-                    pa_widgets.legend.value is True):
-                if pa_widgets.is_visible.value is True:
-                    cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                    c = getattr(
-                        temp_data[array_name],
-                        pa_widgets.scalar.value
-                    )
-                    self._initial_ax.set_position(
-                        [
-                            0,
-                            0,
-                            1,
-                            0.75 - 0.25*len(self._cbar_ax)
-                        ]
-                    )
-                    min_c, max_c, c_norm = self._cmap_helper(
-                        c,
-                        array_name
-                    )
-
-                    if max_c == 0:
-                        boundaries = np.linspace(0, 1, 10)
-                    elif min_c == max_c:
-                        # This occurs at initialization for some properties
-                        # like pressure, and stays true throughout for
-                        # others like mass of the particles.
-                        boundaries = np.linspace(0, max_c, 10)
-                    else:
-                        boundaries = np.linspace(min_c, max_c, 10)
-
-                    self._cbar_ax[array_name] = self.pltfigure.add_axes(
-                        [
-                            0.05,
-                            0.75 - 0.25*len(self._cbar_ax),
-                            0.9,
-                            0.25
-                        ]
-                    )
-                    self._cbars[array_name] = mpl.colorbar.ColorbarBase(
-                        ax=self._cbar_ax[array_name],
-                        cmap=cmap,
-                        boundaries=boundaries,
-                        ticks=boundaries,
-                        orientation='horizontal'
-                    )
-                    self._cbars[array_name].set_label(
-                        array_name + " : " + pa_widgets.scalar.value
-                    )
-        if len(self._cbars) == 0:
-            self._initial_ax.set_position(
-                [0, 0, 1, 1]
+        if len(self._cbar_ax) == 4:
+            print(
+            'Four legends are already being displayed. This is the' +
+            ' maximum number of legends that can be displayed at once.' +
+            'Please deactivate one of them if you wish to display another.'
             )
+        else:
+            temp_data = self.get_frame(self._widgets.frame.value)['arrays']
+            for array_name in self._cbar_ax.keys():
+                self.pltfigure.delaxes(self._cbar_ax[array_name])
+                self._cbar_labels[array_name].remove()
+            self._cbar_labels = {}
+            self._cbar_ax = {}
+            self._cbars = {}
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                if (pa_widgets.scalar.value != 'None' and
+                        pa_widgets.legend.value is True):
+                    if pa_widgets.is_visible.value is True:
+                        cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                        c = getattr(
+                            temp_data[array_name],
+                            pa_widgets.scalar.value
+                        )
+                        min_c, max_c, c_norm = self._cmap_helper(
+                            c,
+                            array_name
+                        )
 
-        self.pltfigure.show()
+                        if max_c == 0:
+                            ticks = np.linspace(0, 1, 11)
+                            norm = mpl.colors.Normalize(vmin=0, vmax=1)
+                        elif min_c == max_c:
+                            # This occurs at initialization for some properties
+                            # like pressure, and stays true throughout for
+                            # others like mass of the particles.
+                            ticks = np.linspace(0, max_c, 11)
+                            norm = mpl.colors.Normalize(vmin=0, vmax=max_c)
+                        else:
+                            ticks = np.linspace(min_c, max_c, 11)
+                            norm = mpl.colors.Normalize(vmin=min_c, vmax=max_c)
+
+                        self._cbar_ax[array_name] = self.pltfigure.add_axes(
+                            [
+                                0.05,
+                                0.75 - 0.25*len(self._cbars.keys()),
+                                0.75,
+                                0.09
+                            ]
+                        )
+                        self._cbars[array_name] = mpl.colorbar.ColorbarBase(
+                            ax=self._cbar_ax[array_name],
+                            cmap=cmap,
+                            norm=norm,
+                            ticks=ticks,
+                            orientation='horizontal'
+                        )
+                        self._cbar_ax[array_name].tick_params(
+                            direction='in',
+                            pad=0,
+                            bottom=False,
+                            top=True,
+                            labelbottom=False,
+                            labeltop=True,
+                        )
+                        self._cbar_labels[array_name] = self._initial_ax.text(
+                            x=0.82,
+                            y=1 - 0.25*len(self._cbars.keys()),
+                            s=array_name + " : " + pa_widgets.scalar.value,
+                        )
+            self.pltfigure.show()
 
     def _save_figure_handler(self, change):
 
