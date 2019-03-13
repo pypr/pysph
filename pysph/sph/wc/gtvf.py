@@ -590,7 +590,14 @@ class GTVFScheme(Scheme):
         )
         all = self.fluids + self.solids
 
-        eq1, stage1 = [], []
+        stage1 = []
+        if self.solids:
+            eq0 = []
+            for solid in self.solids:
+                eq0.append(SetWallVelocity(dest=solid, sources=self.fluids))
+            stage1.append(Group(equations=eq0, real=False))
+
+        eq1 = []
         for fluid in self.fluids:
             eq1.append(ContinuityEquationGTVF(dest=fluid, sources=self.fluids))
             if self.solids:
@@ -615,7 +622,6 @@ class GTVFScheme(Scheme):
         g2_s = []
         for solid in self.solids:
             g2_s.append(VolumeSummation(dest=solid, sources=all))
-            g2_s.append(SetWallVelocity(dest=solid, sources=self.fluids))
             g2_s.append(SolidWallPressureBC(
                 dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
                 p0=self.pref, gx=self.gx, gy=self.gy, gz=self.gz
