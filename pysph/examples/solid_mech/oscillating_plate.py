@@ -1,5 +1,5 @@
 import numpy as np
-from math import cos, sin, cosh, sinh
+from numpy import cos, sin, cosh, sinh
 
 # SPH equations
 from pysph.sph.solid_mech.basic import (ElasticSolidsScheme,
@@ -25,7 +25,6 @@ class OscillatingPlate(Application):
         self.plate_E = 2. * 1e6
         self.plate_nu = 0.3975
 
-        # bulk modulus
         self.plate_inside_wall_length = self.L / 4.
         self.wall_layers = 3
 
@@ -37,14 +36,52 @@ class OscillatingPlate(Application):
         self.tf = 1.0
         self.dt = 1e-5
 
-    def create_particles(self):
-        # plate coordinates
+    def create_plate(self):
+        dx = self.dx_plate
         xp, yp = np.mgrid[-self.plate_inside_wall_length:self.L +
-                          self.dx_plate / 2.:self.dx_plate, -self.H /
-                          2.:self.H / 2. + self.dx_plate / 2.:self.dx_plate]
+                          dx / 2.:dx, -self.H / 2.:self.H / 2. + dx / 2.:dx]
         xp = xp.ravel()
         yp = yp.ravel()
+        return xp, yp
 
+    def create_wall(self):
+        xp, yp = self.create_plate()
+
+        # get the minimum and maximum of the plate
+        xp_min = xp.min()
+        yp_min = yp.min()
+        yp_max = yp.max()
+        dx = self.dx_plate
+        xw_upper, yw_upper = np.mgrid[
+            -self.plate_inside_wall_length:self.dx_plate / 2.:dx, yp_max +
+            dx:yp_max + dx + (self.wall_layers - 1) * dx + dx / 2.:dx]
+        xw_upper = xw_upper.ravel()
+        yw_upper = yw_upper.ravel()
+
+        xw_lower, yw_lower = np.mgrid[
+            -self.plate_inside_wall_length:self.dx_plate / 2.:dx, yp_min -
+            dx:yp_min - dx - (self.wall_layers - 1) * dx - dx / 2.:-dx]
+        xw_lower = xw_lower.ravel()
+        yw_lower = yw_lower.ravel()
+
+        xw_left_max = xp_min - dx
+        xw_left_min = xw_left_max - (self.wall_layers - 1) * dx - dx / 2.
+        yw_left_max = yw_upper.max() + dx / 2.
+        yw_left_min = yw_lower.min()
+
+        xw_left, yw_left = np.mgrid[xw_left_max:xw_left_min:-dx, yw_left_min:
+                                    yw_left_max:dx]
+        xw_left = xw_left.ravel()
+        yw_left = yw_left.ravel()
+
+        # wall coordinates
+        xw, yw = np.concatenate((xw_lower, xw_upper, xw_left)), np.concatenate(
+            (yw_lower, yw_upper, yw_left))
+
+        return xw, yw
+
+    def create_particles(self):
+        xp, yp = self.create_plate()
         m = self.plate_rho0 * self.dx_plate**2.
 
         # get the index of the particle which will be used to compute the
@@ -77,12 +114,12 @@ class OscillatingPlate(Application):
         M = sin(KL) + sinh(KL)
         N = cos(KL) + cosh(KL)
         Q = 2 * (cos(KL) * sinh(KL) - sin(KL) * cosh(KL))
-        for i in range(len(v)):
-            if xp[i] > 0.:
-                # set the velocity
-                tmp1 = (cos(K * xp[i]) - cosh(K * xp[i]))
-                tmp2 = (sin(K * xp[i]) - sinh(K * xp[i]))
-                v[i] = self.Vf * plate.cs[0] * (M * tmp1 - N * tmp2) / Q
+
+        # import pudb; pudb.set_trace()
+        fltr = xp > 0
+        tmp1 = (cos(K * xp[fltr]) - cosh(K * xp[fltr]))
+        tmp2 = (sin(K * xp[fltr]) - sinh(K * xp[fltr]))
+        v[fltr] = self.Vf * plate.cs[0] * (M * tmp1 - N * tmp2) / Q
 
         # set vertical velocity
         plate.v = v
@@ -90,42 +127,8 @@ class OscillatingPlate(Application):
         # #########################################
         # #### Create the wall particle array #####
         # #########################################
-        # get the minimum and maximum of the plate
-        xp_min = xp.min()
-        yp_min = yp.min()
-        yp_max = yp.max()
-        xw_upper, yw_upper = np.mgrid[-self.plate_inside_wall_length:self.
-                                      dx_plate / 2.:self.dx_plate, yp_max +
-                                      self.dx_plate:yp_max + self.dx_plate +
-                                      (self.wall_layers - 1) * self.dx_plate +
-                                      self.dx_plate / 2.:self.dx_plate]
-        xw_upper = xw_upper.ravel()
-        yw_upper = yw_upper.ravel()
-
-        xw_lower, yw_lower = np.mgrid[-self.plate_inside_wall_length:self.
-                                      dx_plate / 2.:self.dx_plate, yp_min -
-                                      self.dx_plate:yp_min - self.dx_plate -
-                                      (self.wall_layers - 1) * self.dx_plate -
-                                      self.dx_plate / 2.:-self.dx_plate]
-        xw_lower = xw_lower.ravel()
-        yw_lower = yw_lower.ravel()
-
-        xw_left_max = xp_min - self.dx_plate
-        xw_left_min = xw_left_max - (
-            self.wall_layers - 1) * self.dx_plate - self.dx_plate / 2.
-        yw_left_max = yw_upper.max() + self.dx_plate / 2.
-        yw_left_min = yw_lower.min()
-
-        xw_left, yw_left = np.mgrid[xw_left_max:xw_left_min:-self.dx_plate,
-                                    yw_left_min:yw_left_max:self.dx_plate]
-        xw_left = xw_left.ravel()
-        yw_left = yw_left.ravel()
-
-        # wall coordinates
-        xw, yw = np.concatenate((xw_lower, xw_upper, xw_left)), np.concatenate(
-            (yw_lower, yw_upper, yw_left))
-
         # create the particle array
+        xw, yw = self.create_wall()
         wall = get_particle_array_elastic_dynamics(
             x=xw, y=yw, m=m, h=self.h, rho=self.plate_rho0, name="wall",
             constants=dict(E=self.plate_E, nu=self.plate_nu))
@@ -133,7 +136,8 @@ class OscillatingPlate(Application):
         return [plate, wall]
 
     def create_scheme(self):
-        s = ElasticSolidsScheme(elastic_solids=['plate'], solids=['wall'], dim=2)
+        s = ElasticSolidsScheme(elastic_solids=['plate'], solids=['wall'],
+                                dim=2)
         s.configure_solver(dt=self.dt, tf=self.tf)
         return s
 
