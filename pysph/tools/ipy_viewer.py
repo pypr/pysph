@@ -194,9 +194,292 @@ class Viewer(object):
             if ulim == '' and llim == '':
                 return actual_minm, actual_maxm, np.ones_like(data)
             else:
-                return actual_minm, actual_maxm, (data-actual_minm)/(actual_maxm-actual_minm)
+                data_norm = (data-actual_minm)/(actual_maxm-actual_minm)
+                return actual_minm, actual_maxm, data_norm
         else:
-            return actual_minm, actual_maxm, (data - actual_minm)/(actual_maxm - actual_minm)
+            data_norm = (data-actual_minm)/(actual_maxm-actual_minm)
+            return actual_minm, actual_maxm, data_norm
+
+    def _create_widgets(self):
+
+        if self.viewer_type == 'Viewer2D':
+            self._widgets = Viewer2DWidgets(
+                file=self.paths_list[0],
+                file_count=len(self.paths_list) - 1,
+            )
+        elif self.viewer_type == 'Viewer3D':
+            self._widgets = Viewer3DWidgets(
+                file=self.paths_list[0],
+                file_count=len(self.paths_list) - 1,
+            )
+
+        if 'general_properties' in self.config.keys():
+            gen_prop = self.config['general_properties']
+            gen_prop_keys = gen_prop.keys()
+            if 'frame' in gen_prop_keys:
+                self._widgets.frame.value = gen_prop['frame']
+            if 'delay_box' in gen_prop_keys:
+                self._widgets.delay_box.value = gen_prop['delay_box']
+            if self.viewer_type == 'Viewer2D':
+                if 'show_solver_time' in gen_prop_keys:
+                    self._widgets.show_solver_time.value = gen_prop[
+                        'show_solver_time'
+                    ]
+
+        self._widgets.frame.observe(self._frame_handler, 'value')
+        self._widgets.save_figure.on_submit(self._save_figure_handler)
+        self._widgets.delay_box.observe(self._delay_box_handler, 'value')
+        self._widgets.save_all_plots.observe(
+            self._save_all_plots_handler,
+            'value'
+        )
+        self._widgets.print_config.on_click(
+            self._print_present_config_dictionary
+        )
+        if self.viewer_type == 'Viewer2D':
+            self._widgets.show_solver_time.observe(
+                self._show_solver_time_handler,
+                'value'
+            )
+
+        # PLEASE NOTE:
+        # All widget handlers take in 'change' as an argument. This is usually
+        # a dictionary conatining information about the widget and the change
+        # in state. However, these functions are also used outside of the use
+        # case of a user-triggered-event, and in these scenarios None should
+        # be passed as the argument. This is of particular significance
+        # because in some of these functions plt.figure.show() gets called
+        # only if the argument passed is not None.
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            # Changing the properties as per the configuration dictionary.
+            if array_name in self.config.keys():
+                pa_config = self.config[array_name]
+                pa_config_keys = pa_config.keys()
+                if 'scalar' in pa_config_keys:
+                    pa_widgets.scalar.value = pa_config['scalar']
+                if 'scalar_size' in pa_config_keys:
+                    pa_widgets.scalar_size.value = pa_config['scalar_size']
+                if 'legend' in pa_config_keys:
+                    pa_widgets.legend.value = pa_config['legend']
+                if 'scalar_cmap' in pa_config_keys:
+                    pa_widgets.scalar_cmap.value = pa_config['scalar_cmap']
+                if 'is_visible' in pa_config_keys:
+                    pa_widgets.is_visible.value = pa_config['is_visible']
+                if 'legend_lower_lim' in pa_config_keys:
+                    pa_widgets.legend_lower_lim.value = pa_config[
+                        'legend_lower_lim'
+                    ]
+                if 'legend_upper_lim' in pa_config_keys:
+                    pa_widgets.legend_upper_lim.value = pa_config[
+                        'legend_upper_lim'
+                    ]
+
+                if self.viewer_type == 'Viewer2D':
+                    if 'vector' in pa_config_keys:
+                        pa_widgets.vector.value = pa_config['vector']
+                    if 'vector_width' in pa_config_keys:
+                        pa_widgets.vector_width.value = pa_config[
+                            'vector_width'
+                        ]
+                    if 'vector_scale' in pa_config_keys:
+                        pa_widgets.vector_scale.value = pa_config[
+                            'vector_scale'
+                        ]
+                elif self.viewer_type == 'Viewer3D':
+                    if 'velocity_vectors' in pa_config_keys:
+                        pa_widgets.velocity_vectors.value = pa_config[
+                            'velocity_vectors'
+                        ]
+                    if 'vector_size' in pa_config_keys:
+                        pa_widgets.vector_size.value = pa_config['vector_size']
+
+            pa_widgets.scalar.observe(self._scalar_handler, 'value')
+            pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
+            pa_widgets.legend.observe(self._legend_handler, 'value')
+            pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
+            pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
+            pa_widgets.legend_lower_lim.observe(
+                self._legend_lim_handler,
+                'value',
+            )
+            pa_widgets.legend_upper_lim.observe(
+                self._legend_lim_handler,
+                'value',
+            )
+
+            if self.viewer_type == 'Viewer2D':
+                pa_widgets.vector.observe(self._vector_handler, 'value')
+                pa_widgets.vector_width.observe(
+                    self._vector_width_handler,
+                    'value'
+                )
+                pa_widgets.vector_scale.observe(
+                    self._vector_scale_handler,
+                    'value'
+                )
+            elif self.viewer_type == 'Viewer3D':
+                pa_widgets.velocity_vectors.observe(
+                    self._velocity_vectors_handler,
+                    'value'
+                )
+                pa_widgets.vector_size.observe(
+                    self._vector_size_handler,
+                    'value'
+                )
+
+    def _legend_lim_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        temp_data = self.get_frame(
+            self._widgets.frame.value
+        )['arrays']
+        sct = self._scatters[array_name]
+        c = getattr(
+            temp_data[array_name],
+            pa_widgets.scalar.value
+        )
+        colormap = getattr(
+            plt.cm,
+            pa_widgets.scalar_cmap.value
+        )
+        min_c, max_c, c_norm = self._cmap_helper(
+            c,
+            array_name
+        )
+        if self.viewer_type == 'Viewer2D':
+            sct.set_facecolors(colormap(c_norm))
+            self._legend_handler(None)
+            self.figure.show()
+        elif self.viewer_type == 'Viewer3D':
+            sct.color = colormap(c_norm)
+            self._legend_handler(None)
+
+    def _delay_box_handler(self, change):
+
+        self._widgets.play_button.interval = change['new']*1000
+
+    def _save_all_plots_handler(self, change):
+
+        if self.viewer_type == 'Viewer3D':
+            import ipyvolume.pylab as p3
+
+        if change['new'] is True:
+            mkdir('all_plots')
+            self._widgets.frame.disabled = True
+            self._widgets.play_button.disabled = True
+            self._widgets.delay_box.disabled = True
+            self._widgets.save_figure.disabled = True
+            self._widgets.save_all_plots.disabled = True
+            self._widgets.print_config.disabled = True
+            if self.viewer_type == 'Viewer2D':
+                self._widgets.show_solver_time.disabled = True
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = True
+                pa_widgets.scalar_cmap.disabled = True
+                pa_widgets.legend.disabled = True
+                pa_widgets.scalar_size.disabled = True
+                pa_widgets.is_visible.disabled = True
+                pa_widgets.legend_upper_lim.disabled = True
+                pa_widgets.legend_lower_lim.disabled = True
+                if self.viewer_type == 'Viewer2D':
+                    pa_widgets.vector.disabled = True
+                    pa_widgets.vector_width.disabled = True
+                    pa_widgets.vector_scale.disabled = True
+                elif self.viewer_type == 'Viewer3D':
+                    pa_widgets.velocity_vectors.disabled = True
+                    pa_widgets.vector_size.disabled = True
+
+            file_count = len(self.paths_list) - 1
+
+            for i in np.arange(0, file_count + 1):
+                self._widgets.frame.value = i
+                self._frame_handler(None)
+                if self.viewer_type == 'Viewer2D':
+                    self.figure.savefig(
+                        'all_plots/frame_%s.png' % i,
+                        dpi=300
+                    )
+                elif self.viewer_type == 'Viewer3D':
+                    p3.savefig(
+                        'all_plots/frame_%s.png' % i,
+                        width=600,
+                        height=600,
+                        fig=self.plot
+                    )
+
+            print(
+                "Saved the plots in the folder 'all_plots'" +
+                " in the present working directory"
+            )
+
+            self._widgets.frame.disabled = False
+            self._widgets.play_button.disabled = False
+            self._widgets.delay_box.disabled = False
+            self._widgets.save_figure.disabled = False
+            self._widgets.save_all_plots.disabled = False
+            self._widgets.print_config.disabled = False
+            if self.viewer_type == 'Viewer2D':
+                self._widgets.show_solver_time.disabled = False
+
+            self._widgets.save_all_plots.value = False
+
+            for array_name in self._widgets.particles.keys():
+                pa_widgets = self._widgets.particles[array_name]
+                pa_widgets.scalar.disabled = False
+                pa_widgets.scalar_cmap.disabled = False
+                pa_widgets.legend.disabled = False
+                pa_widgets.scalar_size.disabled = False
+                pa_widgets.is_visible.disabled = False
+                pa_widgets.legend_upper_lim.disabled = False
+                pa_widgets.legend_lower_lim.disabled = False
+                if self.viewer_type == 'Viewer2D':
+                    pa_widgets.vector.disabled = False
+                    pa_widgets.vector_width.disabled = False
+                    pa_widgets.vector_scale.disabled = False
+                elif self.viewer_type == 'Viewer3D':
+                    pa_widgets.velocity_vectors.disabled = False
+                    pa_widgets.vector_size.disabled = False
+
+    def _print_present_config_dictionary(self, change):
+
+        _widgets = self._widgets
+        config = {'general_properties': {}}
+
+        gen_prop = config['general_properties']
+        gen_prop['frame'] = _widgets.frame.value
+        gen_prop['delay_box'] = _widgets.delay_box.value
+        if self.viewer_type == 'Viewer2D':
+            gen_prop[
+                'show_solver_time'
+            ] = _widgets.show_solver_time.value
+
+        for array_name in self._widgets.particles.keys():
+            pa_widgets = self._widgets.particles[array_name]
+            config[array_name] = {}
+            pa_config = config[array_name]
+            pa_config['scalar'] = pa_widgets.scalar.value
+            pa_config['scalar_size'] = pa_widgets.scalar_size.value
+            pa_config['legend'] = pa_widgets.legend.value
+            pa_config['scalar_cmap'] = pa_widgets.scalar_cmap.value
+            pa_config['is_visible'] = pa_widgets.is_visible.value
+            pa_config['legend_lower_lim'] = pa_widgets.legend_lower_lim.value
+            pa_config['legend_upper_lim'] = pa_widgets.legend_upper_lim.value
+            if self.viewer_type == 'Viewer2D':
+                pa_config['vector'] = pa_widgets.vector.value
+                pa_config['vector_width'] = pa_widgets.vector_width.value
+                pa_config['vector_scale'] = pa_widgets.vector_scale.value
+            elif self.viewer_type == 'Viewer3D':
+                pa_config[
+                    'velocity_vectors'
+                ] = pa_widgets.velocity_vectors.value
+                pa_config['vector_size'] = pa_widgets.vector_size.value
+
+        print(config)
 
 
 class ParticleArrayWidgets(object):
@@ -295,7 +578,7 @@ class ParticleArrayWidgets(object):
         self.is_visible.owner = self.array_name
 
     def _tab_config(self):
-        
+
         VBox1 = widgets.VBox(
             [
                 self.scalar,
@@ -316,7 +599,7 @@ class ParticleArrayWidgets(object):
                 widgets.HBox(
                     [
                         self.legend_upper_lim,
-                        self.legend_lower_lim,                       
+                        self.legend_lower_lim,
                     ]
                 ),
                 self.is_visible,
@@ -372,6 +655,7 @@ class Viewer2DWidgets(object):
                 tooltip='Saves the corresponding plots for all the' +
                         ' frames in the presently set styling.',
                 icon='',
+                layout=widgets.Layout(display='flex'),
         )
         self.solver_time = widgets.HTML(
             value=self.time,
@@ -381,7 +665,14 @@ class Viewer2DWidgets(object):
             value=False,
             description="Show solver time",
             disabled=False,
-            layout=widgets.Layout(width='240px', display='flex')
+            layout=widgets.Layout(display='flex'),
+        )
+        self.print_config = widgets.Button(
+            description='print present config.',
+            tooltip='Prints the configuration dictionary ' +
+                    'for the current viewer state',
+            disabled=False,
+            layout=widgets.Layout(display='flex'),
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
@@ -395,7 +686,7 @@ class Viewer2DWidgets(object):
         for array_name in self.particles.keys():
             children.append(self.particles[array_name]._tab_config())
 
-        tab = widgets.Tab(children=children) 
+        tab = widgets.Tab(children=children)
         for i in range(len(children)):
             tab.set_title(i, list(self.particles.keys())[i])
 
@@ -417,6 +708,7 @@ class Viewer2DWidgets(object):
                     ),
                     widgets.HBox(
                      [
+                        self.print_config,
                         self.show_solver_time,
                         self.solver_time,
                      ]
@@ -440,58 +732,6 @@ class Viewer2D(Viewer):
     >>> sample.show_info()
     '''
 
-    def _create_widgets(self):
-
-        self._widgets = Viewer2DWidgets(
-            file_name=self.paths_list[0],
-            file_count=len(self.paths_list) - 1,
-        )
-        self._widgets.frame.observe(self._frame_handler, 'value')
-        self._widgets.save_figure.on_submit(self._save_figure_handler)
-        self._widgets.delay_box.observe(self._delay_box_handler, 'value')
-        self._widgets.save_all_plots.observe(
-            self._save_all_plots_handler,
-            'value'
-        )
-        self._widgets.show_solver_time.observe(
-            self._show_solver_time_handler,
-            'value'
-        )
-
-        # PLEASE NOTE:
-        # All widget handlers take in 'change' as an argument. This is usually
-        # a dictionary containing information about the widget and the change
-        # in state. However, these functions are also used outside of the use
-        # case of a user-triggered-event, and in these scenarios None should
-        # be passed as the argument. This is of particular significance
-        # because in some of these functions plt.figure.show() gets called
-        # only if the argument passed is not None.
-
-        for array_name in self._widgets.particles.keys():
-            pa_widgets = self._widgets.particles[array_name]
-            pa_widgets.scalar.observe(self._scalar_handler, 'value')
-            pa_widgets.vector.observe(self._vector_handler, 'value')
-            pa_widgets.vector_width.observe(
-                self._vector_width_handler,
-                'value'
-            )
-            pa_widgets.vector_scale.observe(
-                self._vector_scale_handler,
-                'value'
-            )
-            pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
-            pa_widgets.legend.observe(self._legend_handler, 'value')
-            pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
-            pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
-            pa_widgets.legend_lower_lim.observe(
-                self._legend_lim_handler,
-                'value',
-            )
-            pa_widgets.legend_upper_lim.observe(
-                self._legend_lim_handler,
-                'value',
-            )
-
     def _configure_plot(self):
 
         '''
@@ -514,17 +754,19 @@ class Viewer2D(Viewer):
 
         self.figure.show()
 
-    def interactive_plot(self):
+    def interactive_plot(self, config={}):
 
         '''
         Set plotting attributes, create widgets and display them
         along with the interactive plot.
         '''
 
+        self.config = config  # The configuration dictionary.
+        self.viewer_type = 'Viewer2D'
         self._configure_plot()
         self._create_widgets()
         display(self._widgets._create_tabs())
-        temp_data = self.get_frame(self._widgets.frame.value)
+        temp_data = self.get_frame(0)
         self.time = str(temp_data['solver_data']['t'])
         temp_data = temp_data['arrays']
 
@@ -535,8 +777,7 @@ class Viewer2D(Viewer):
         self._scatters = {}
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
-            if (pa_widgets.scalar.value != 'None' and
-                    pa_widgets.is_visible.value is True):
+            if pa_widgets.scalar.value != 'None':
                 sct = self._scatters[array_name] = self._scatter_ax.scatter(
                     temp_data[array_name].x,
                     temp_data[array_name].y,
@@ -555,12 +796,17 @@ class Viewer2D(Viewer):
                     array_name
                 )
                 sct.set_facecolors(colormap(c_norm))
+                if pa_widgets.is_visible.value is False:
+                    sct.set_offsets(None)
 
         self._scatter_ax.axis('equal')
+
         self.solver_time_textbox = None
         # So that _show_solver_time_handler does not glitch at intialization.
+        self._frame_handler(None)
         self._show_solver_time_handler(None)
         self._legend_handler(None)
+        self._plot_vectors()
 
     def _plot_vectors(self):
 
@@ -864,65 +1110,6 @@ class Viewer2D(Viewer):
                 " '.svg' or '.svgz'."
             )
 
-    def _delay_box_handler(self, change):
-
-        self._widgets.play_button.interval = change['new']*1000
-
-    def _save_all_plots_handler(self, change):
-
-        if change['new'] is True:
-            mkdir('all_plots')
-            self._widgets.frame.disabled = True
-            self._widgets.play_button.disabled = True
-            self._widgets.delay_box.disabled = True
-            self._widgets.save_figure.disabled = True
-            self._widgets.save_all_plots.disabled = True
-
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = True
-                pa_widgets.scalar_cmap.disabled = True
-                pa_widgets.legend.disabled = True
-                pa_widgets.vector.disabled = True
-                pa_widgets.vector_width.disabled = True
-                pa_widgets.vector_scale.disabled = True
-                pa_widgets.scalar_size.disabled = True
-                pa_widgets.is_visible.disabled = True
-
-            file_count = len(self.paths_list) - 1
-
-            for i in np.arange(0, file_count + 1):
-                self._widgets.frame.value = i
-                self._frame_handler(None)
-                self.figure.savefig(
-                    'all_plots/frame_%s.png' % i,
-                    dpi=300
-                )
-
-            print(
-                "Saved the plots in the folder 'all_plots'" +
-                " in the present working directory"
-            )
-
-            self._widgets.frame.disabled = False
-            self._widgets.play_button.disabled = False
-            self._widgets.delay_box.disabled = False
-            self._widgets.save_figure.disabled = False
-            self._widgets.save_all_plots.disabled = False
-
-            self._widgets.save_all_plots.value = False
-
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = False
-                pa_widgets.scalar_cmap.disabled = False
-                pa_widgets.legend.disabled = False
-                pa_widgets.vector.disabled = False
-                pa_widgets.vector_width.disabled = False
-                pa_widgets.vector_scale.disabled = False
-                pa_widgets.scalar_size.disabled = False
-                pa_widgets.is_visible.disabled = False
-
     def _is_visible_handler(self, change):
 
         array_name = change['owner'].owner
@@ -977,31 +1164,6 @@ class Viewer2D(Viewer):
             self.solver_time_textbox = None
         if change is not None:
             self.figure.show()
-
-    def _legend_lim_handler(self, change):
-
-        array_name = change['owner'].owner
-        pa_widgets = self._widgets.particles[array_name]
-        temp_data = self.get_frame(
-            self._widgets.frame.value
-        )['arrays']
-        sct = self._scatters[array_name]
-        c = getattr(
-            temp_data[array_name],
-            pa_widgets.scalar.value
-        )
-        colormap = getattr(
-            plt.cm,
-            pa_widgets.scalar_cmap.value
-        )
-        min_c, max_c, c_norm = self._cmap_helper(
-            c,
-            array_name
-        )
-        sct.set_facecolors(colormap(c_norm))
-        
-        self._legend_handler(None)
-        self.figure.show()
 
 
 class ParticleArrayWidgets3D(object):
@@ -1085,7 +1247,7 @@ class ParticleArrayWidgets3D(object):
         self.is_visible.owner = self.array_name
 
     def _tab_config(self):
-        
+
         VBox1 = widgets.VBox(
             [
                 self.scalar,
@@ -1162,10 +1324,18 @@ class Viewer3DWidgets(object):
                 tooltip='Saves the corresponding plots for all the' +
                         ' frames in the presently set styling.',
                 icon='',
+                layout=widgets.Layout(display='flex'),
         )
         self.solver_time = widgets.HTML(
                 value=self.time,
                 description='Solver time:',
+        )
+        self.print_config = widgets.Button(
+            description='print present config.',
+            tooltip='Prints the configuration dictionary ' +
+                    'for the current viewer state',
+            disabled=False,
+            layout=widgets.Layout(display='flex'),
         )
         self.particles = {}
         for array_name in self.temp_data.keys():
@@ -1179,7 +1349,7 @@ class Viewer3DWidgets(object):
         for array_name in self.particles.keys():
             children.append(self.particles[array_name]._tab_config())
 
-        tab = widgets.Tab(children=children) 
+        tab = widgets.Tab(children=children)
         for i in range(len(children)):
             tab.set_title(i, list(self.particles.keys())[i])
 
@@ -1196,11 +1366,12 @@ class Viewer3DWidgets(object):
                      [
                         self.delay_box,
                         self.save_figure,
+                        self.save_all_plots,
                      ]
                     ),
                     widgets.HBox(
                      [
-                        self.save_all_plots,
+                        self.print_config,
                         self.solver_time,
                      ]
                     )
@@ -1223,52 +1394,15 @@ class Viewer3D(Viewer):
     >>> sample.show_info()
     '''
 
-    def _create_widgets(self):
-
-        self._widgets = Viewer3DWidgets(
-            file=self.paths_list[0],
-            file_count=len(self.paths_list) - 1,
-        )
-
-        self._widgets.frame.observe(self._frame_handler, 'value')
-        self._widgets.save_figure.on_submit(self._save_figure_handler)
-        self._widgets.delay_box.observe(self._delay_box_handler, 'value')
-        self._widgets.save_all_plots.observe(
-            self._save_all_plots_handler,
-            'value'
-        )
-
-        for array_name in self._widgets.particles.keys():
-            pa_widgets = self._widgets.particles[array_name]
-            pa_widgets.scalar.observe(self._scalar_handler, 'value')
-            pa_widgets.velocity_vectors.observe(
-                self._velocity_vectors_handler,
-                'value'
-            )
-            pa_widgets.vector_size.observe(
-                self._vector_size_handler,
-                'value'
-            )
-            pa_widgets.scalar_size.observe(self._scalar_size_handler, 'value')
-            pa_widgets.scalar_cmap.observe(self._scalar_cmap_handler, 'value')
-            pa_widgets.legend.observe(self._legend_handler, 'value')
-            pa_widgets.is_visible.observe(self._is_visible_handler, 'value')
-            pa_widgets.legend_upper_lim.observe(
-                self._legend_lim_handler,
-                'value'
-            )
-            pa_widgets.legend_lower_lim.observe(
-                self._legend_lim_handler,
-                'value'
-            )
-
-    def interactive_plot(self):
+    def interactive_plot(self, config={}):
 
         import ipyvolume.pylab as p3
 
+        self.config = config  # The configuration dictionary.
+        self.viewer_type = 'Viewer3D'
         self._create_widgets()
-        self.scatters = {}
-        self.vectors = {}
+        self._scatters = {}
+        self._vectors = {}
         self._cbars = {}
         self._cbar_ax = {}
         self._cbar_labels = {}
@@ -1281,60 +1415,98 @@ class Viewer3D(Viewer):
         # being displayed.
 
         self.plot = p3.figure(width=800)
-        data = self.get_frame(self._widgets.frame.value)['arrays']
+        temp_data = self.get_frame(0)['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.scalar.value != 'None':
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                c = getattr(data[array_name], pa_widgets.scalar.value)
+                c = getattr(temp_data[array_name], pa_widgets.scalar.value)
                 min_c, max_c, c_norm = self._cmap_helper(
                     c,
                     array_name
                 )
-                self.scatters[array_name] = p3.scatter(
-                    data[array_name].x,
-                    data[array_name].y,
-                    data[array_name].z,
+                self._scatters[array_name] = p3.scatter(
+                    temp_data[array_name].x,
+                    temp_data[array_name].y,
+                    temp_data[array_name].z,
                     color=colormap(c_norm),
                     size=pa_widgets.scalar_size.value,
-                    marker='sphere',
+                    marker='diamond',
                 )
+                self._plot_vectors(
+                    pa_widgets,
+                    temp_data[array_name],
+                    array_name
+                )
+                if pa_widgets.is_visible.value is False:
+                    self._scatters[array_name].visible = False
+                    if array_name in self._vectors.keys():
+                        copy = self.plot.scatters.copy()
+                        copy.remove(self._vectors[array_name])
+                        self.plot.scatters = copy
+                        del self._vectors[array_name]
+
         p3.squarelim()  # Makes sure the figure doesn't appear distorted.
+
+        self._frame_handler(None)
         self._legend_handler(None)
-        display(self.plot)
+
         self.pltfigure.show()
+        display(self.plot)
         display(self._widgets._create_tabs())
+
+    def _plot_vectors(self, pa_widgets, temp_data, array_name):
+
+        if pa_widgets.velocity_vectors.value is True:
+            if array_name in self._vectors.keys():
+                vectors = self._vectors[array_name]
+                vectors.x = temp_data.x
+                vectors.y = temp_data.y
+                vectors.z = temp_data.z
+                vectors.u = getattr(temp_data, 'u')
+                vectors.v = getattr(temp_data, 'v')
+                vectors.w = getattr(temp_data, 'w')
+                vectors.size = pa_widgets.vector_size.value
+            else:
+                import ipyvolume.pylab as p3
+                self._vectors[array_name] = p3.quiver(
+                    x=temp_data.x,
+                    y=temp_data.y,
+                    z=temp_data.z,
+                    u=getattr(temp_data, 'u'),
+                    v=getattr(temp_data, 'v'),
+                    w=getattr(temp_data, 'w'),
+                    size=pa_widgets.vector_size.value,
+                )
+        else:
+            pass
 
     def _frame_handler(self, change):
 
-        data = self.get_frame(self._widgets.frame.value)
-        self.time = str(data['solver_data']['t'])
+        temp_data = self.get_frame(self._widgets.frame.value)
+        self.time = str(temp_data['solver_data']['t'])
         self._widgets.solver_time.value = self.time
-        data = data['arrays']
+        temp_data = temp_data['arrays']
         for array_name in self._widgets.particles.keys():
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.is_visible.value is True:
                 if pa_widgets.scalar.value != 'None':
                     colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                    scatters = self.scatters[array_name]
-                    c = getattr(data[array_name], pa_widgets.scalar.value)
+                    scatters = self._scatters[array_name]
+                    c = getattr(temp_data[array_name], pa_widgets.scalar.value)
                     min_c, max_c, c_norm = self._cmap_helper(
                         c,
                         array_name
                     )
-                    scatters.x = data[array_name].x
-                    scatters.y = data[array_name].y,
-                    scatters.z = data[array_name].z,
+                    scatters.x = temp_data[array_name].x
+                    scatters.y = temp_data[array_name].y,
+                    scatters.z = temp_data[array_name].z,
                     scatters.color = colormap(c_norm)
-                if pa_widgets.velocity_vectors.value is True:
-                    vectors = self.vectors[array_name]
-                    vectors.x = data[array_name].x
-                    vectors.y = data[array_name].y
-                    vectors.z = data[array_name].z
-                    vectors.vx = getattr(data[array_name], 'u')
-                    vectors.vy = getattr(data[array_name], 'v')
-                    vectors.vz = getattr(data[array_name], 'w')
-                    vectors.size = pa_widgets.vector_size.value
+                self._plot_vectors(
+                    pa_widgets,
+                    temp_data[array_name],
+                    array_name
+                )
         self._legend_handler(None)
 
     def _scalar_handler(self, change):
@@ -1349,25 +1521,28 @@ class Viewer3D(Viewer):
             if old == 'None' and new == 'None':
                 pass
             elif old != 'None' and new == 'None':
-                self.scatters[array_name].visible = False
+                copy = self.plot.scatters.copy()
+                copy.remove(self._scatters[array_name])
+                self.plot.scatters = copy
+                del self._scatters[array_name]
             else:
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                data = self.get_frame(self._widgets.frame.value)['arrays']
-                c = getattr(data[array_name], pa_widgets.scalar.value)
+                temp_data = self.get_frame(self._widgets.frame.value)['arrays']
+                c = getattr(temp_data[array_name], pa_widgets.scalar.value)
                 min_c, max_c, c_norm = self._cmap_helper(
                     c,
                     array_name
                 )
-                if old != 'None' and new != 'None': 
-                    self.scatters[array_name].color = colormap(c_norm)
-                else:                
-                    self.scatters[array_name] = p3.scatter(
-                        data[array_name].x,
-                        data[array_name].y,
-                        data[array_name].z,
+                if old != 'None' and new != 'None':
+                    self._scatters[array_name].color = colormap(c_norm)
+                else:
+                    self._scatters[array_name] = p3.scatter(
+                        temp_data[array_name].x,
+                        temp_data[array_name].y,
+                        temp_data[array_name].z,
                         color=colormap(c_norm),
                         size=pa_widgets.scalar_size.value,
-                        marker='sphere',
+                        marker='diamond',
                     )
         self._legend_handler(None)
 
@@ -1375,75 +1550,61 @@ class Viewer3D(Viewer):
 
         import ipyvolume.pylab as p3
 
-        data = self.get_frame(self._widgets.frame.value)['arrays']
+        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
         if pa_widgets.is_visible.value is True:
             if change['new'] is False:
-                self.vectors[array_name].size = 0
-            elif array_name in self.vectors.keys():
-                # change['new'] is True and the vectors have
-                # already been plotted, just need updation.
-                vectors = self.vectors[array_name]
-                vectors.x = data[array_name].x
-                vectors.y = data[array_name].y
-                vectors.z = data[array_name].z
-                vectors.u = getattr(data[array_name], 'u')
-                vectors.v = getattr(data[array_name], 'v')
-                vectors.w = getattr(data[array_name], 'w')
-                vectors.size = pa_widgets.vector_size.value
+                copy = self.plot.scatters.copy()
+                copy.remove(self._vectors[array_name])
+                self.plot.scatters = copy
+                del self._vectors[array_name]
             else:
-                # change['new'] is True, and the vectors are
-                # being plotted for the first time.
-                self.vectors[array_name] = p3.quiver(
-                    x=data[array_name].x,
-                    y=data[array_name].y,
-                    z=data[array_name].z,
-                    u=getattr(data[array_name], 'u'),
-                    v=getattr(data[array_name], 'v'),
-                    w=getattr(data[array_name], 'w'),
-                    size=pa_widgets.vector_size.value,
+                self._plot_vectors(
+                    pa_widgets,
+                    temp_data[array_name],
+                    array_name
                 )
 
     def _scalar_size_handler(self, change):
 
         array_name = change['owner'].owner
-        if (array_name in self.scatters.keys() and
+        if (array_name in self._scatters.keys() and
                 self._widgets.particles[array_name].is_visible.value is True):
-            self.scatters[array_name].size = change['new']
+            self._scatters[array_name].size = change['new']
 
     def _vector_size_handler(self, change):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        if array_name in self.vectors.keys():
+        if array_name in self._vectors.keys():
             if (pa_widgets.velocity_vectors.value is True and
                     pa_widgets.is_visible.value is True):
-                self.vectors[array_name].size = change['new']
+                self._vectors[array_name].size = change['new']
 
     def _scalar_cmap_handler(self, change):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        data = self.get_frame(self._widgets.frame.value)['arrays']
+        temp_data = self.get_frame(self._widgets.frame.value)['arrays']
 
         if pa_widgets.is_visible.value is True:
             colormap = getattr(mpl.cm, change['new'])
-            c = getattr(data[array_name], pa_widgets.scalar.value)
+            c = getattr(temp_data[array_name], pa_widgets.scalar.value)
             min_c, max_c, c_norm = self._cmap_helper(
                 c,
                 array_name
             )
-            self.scatters[array_name].color = colormap(c_norm)
+            self._scatters[array_name].color = colormap(c_norm)
             self._legend_handler(None)
 
     def _legend_handler(self, change):
 
         if len(self._cbar_ax) == 4:
             print(
-            'Four legends are already being displayed. This is the' +
-            ' maximum number of legends that can be displayed at once.' +
-            'Please deactivate one of them if you wish to display another.'
+                'Four legends are already being displayed. This is the ' +
+                'maximum number of legends that can be displayed at once. ' +
+                'Please deactivate one of them if you wish to display another.'
             )
         else:
             temp_data = self.get_frame(self._widgets.frame.value)['arrays']
@@ -1541,64 +1702,6 @@ class Viewer3D(Viewer):
                 )
         self._widgets.save_figure.value = ""
 
-    def _delay_box_handler(self, change):
-
-        self._widgets.play_button.interval = change['new']*1000
-
-    def _save_all_plots_handler(self, change):
-
-        import ipyvolume.pylab as p3
-
-        if change['new'] is True:
-            mkdir('all_plots')
-            self._widgets.frame.disabled = True
-            self._widgets.play_button.disabled = True
-            self._widgets.delay_box.disabled = True
-            self._widgets.save_figure.disabled = True
-            self._widgets.save_all_plots.disabled = True
-
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = True
-                pa_widgets.scalar_cmap.disabled = True
-                pa_widgets.velocity_vectors.disabled = True
-                pa_widgets.vector_size.disabled = True
-                pa_widgets.scalar_size.disabled = True
-                pa_widgets.is_visible.disabled = True
-
-            file_count = len(self.paths_list) - 1
-
-            for i in np.arange(0, file_count + 1):
-                self._widgets.frame.value = i
-                self._frame_handler(None)
-                p3.savefig(
-                            'all_plots/frame_%s.png' % i,
-                            width=600,
-                            height=600,
-                            fig=self.plot
-                        )
-
-            print(
-                "Saved the plots in the folder 'all_plots'" +
-                " in the present working directory"
-            )
-
-            self._widgets.frame.disabled = False
-            self._widgets.play_button.disabled = False
-            self._widgets.delay_box.disabled = False
-            self._widgets.save_figure.disabled = False
-            self._widgets.save_all_plots.disabled = False
-            self._widgets.save_all_plots.value = False
-
-            for array_name in self._widgets.particles.keys():
-                pa_widgets = self._widgets.particles[array_name]
-                pa_widgets.scalar.disabled = False
-                pa_widgets.scalar_cmap.disabled = False
-                pa_widgets.velocity_vectors.disabled = False
-                pa_widgets.vector_size.disabled = False
-                pa_widgets.scalar_size.disabled = False
-                pa_widgets.is_visible.disabled = False
-
     def _is_visible_handler(self, change):
 
         import ipyvolume.pylab as p3
@@ -1607,9 +1710,15 @@ class Viewer3D(Viewer):
         pa_widgets = self._widgets.particles[array_name]
 
         if change['new'] is False:
-            self.scatters[array_name].visible = False
-            if array_name in self.vectors.keys():
-                self.vectors[array_name].size = 0
+            copy = self.plot.scatters.copy()
+            copy.remove(self._scatters[array_name])
+            self.plot.scatters = copy
+            del self._scatters[array_name]
+            if array_name in self._vectors.keys():
+                copy = self.plot.scatters.copy()
+                copy.remove(self._vectors[array_name])
+                self.plot.scatters = copy
+                del self._vectors[array_name]
         elif change['new'] is True:
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
             temp_data = self.get_frame(self._widgets.frame.value)['arrays']
@@ -1618,59 +1727,14 @@ class Viewer3D(Viewer):
                 c,
                 array_name
             )
-            self.scatters[array_name] = p3.scatter(
+            self._scatters[array_name] = p3.scatter(
                 temp_data[array_name].x,
                 temp_data[array_name].y,
                 temp_data[array_name].z,
                 color=colormap(c_norm),
                 size=pa_widgets.scalar_size.value,
-                marker='sphere',
+                marker='diamond',
             )
-            if pa_widgets.velocity_vectors.value is True:
-                if array_name in self.vectors.keys():
-                    # The vectors have been plotted, just need updation.
-                    vectors = self.vectors[array_name]
-                    vectors.x = temp_data[array_name].x
-                    vectors.y = temp_data[array_name].y
-                    vectors.z = temp_data[array_name].z
-                    vectors.u = getattr(temp_data[array_name], 'u')
-                    vectors.v = getattr(temp_data[array_name], 'v')
-                    vectors.w = getattr(temp_data[array_name], 'w')
-                    vectors.size = pa_widgets.vector_size.value
-                else:
-                    # The vectors are being plotted for the first time.
-                    self.vectors[array_name] = p3.quiver(
-                        x=temp_data[array_name].x,
-                        y=temp_data[array_name].y,
-                        z=temp_data[array_name].z,
-                        u=getattr(temp_data[array_name], 'u'),
-                        v=getattr(temp_data[array_name], 'v'),
-                        w=getattr(temp_data[array_name], 'w'),
-                        size=pa_widgets.vector_size.value,
-                    )
+            self._velocity_vectors_handler(change)
 
-        self._legend_handler(None)
-
-    def _legend_lim_handler(self, change):
-
-        array_name = change['owner'].owner
-        pa_widgets = self._widgets.particles[array_name]
-        temp_data = self.get_frame(
-            self._widgets.frame.value
-        )['arrays']
-        sct = self.scatters[array_name]
-        c = getattr(
-            temp_data[array_name],
-            pa_widgets.scalar.value
-        )
-        colormap = getattr(
-            plt.cm,
-            pa_widgets.scalar_cmap.value
-        )
-        min_c, max_c, c_norm = self._cmap_helper(
-            c,
-            array_name
-        )
-        sct.color = colormap(c_norm)
-        
         self._legend_handler(None)
