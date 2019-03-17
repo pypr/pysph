@@ -6,6 +6,8 @@ The case is described as a SPHERIC benchmark
 By default the simulation runs for 6 seconds of simulation time.
 """
 
+import numpy as np
+
 from pysph.base.kernels import WendlandQuintic
 from pysph.examples._db_geometry import DamBreak3DGeometry
 from pysph.solver.application import Application
@@ -26,10 +28,19 @@ h0 = dx * hdx
 gamma = 7.0
 alpha = 0.5
 beta = 0.0
+c0 = 10.0 * np.sqrt(2.0 * 9.81 * 0.55)
 
 
 class DamBreak3D(Application):
-    def initialize(self):
+    def add_user_options(self, group):
+        group.add_argument(
+            '--dx', action='store', type=float, dest='dx',  default=dx,
+            help='Particle spacing.'
+        )
+
+    def consume_user_options(self):
+        dx = self.options.dx
+        self.dx = dx
         self.geom = DamBreak3DGeometry(
             dx=dx, nboundary_layers=nboundary_layers, hdx=hdx, rho0=ro
         )
@@ -37,16 +48,22 @@ class DamBreak3D(Application):
 
     def create_scheme(self):
         s = WCSPHScheme(
-            ['fluid'], ['boundary'], dim=dim, rho0=ro, c0=self.co,
+            ['fluid'], ['boundary'], dim=dim, rho0=ro, c0=c0,
             h0=h0, hdx=hdx, gz=-9.81, alpha=alpha, beta=beta, gamma=gamma,
             hg_correction=True, tensile_correction=True
         )
+        return s
+
+    def configure_scheme(self):
+        s = self.scheme
         kernel = WendlandQuintic(dim=dim)
+        h0 = self.dx * hdx
+        s.configure(h0=h0)
+        dt = 0.25*h0/(1.1 * self.co)
         s.configure_solver(
             kernel=kernel, integrator_cls=EPECIntegrator, tf=tf, dt=dt,
             adaptive_timestep=True, n_damp=50
         )
-        return s
 
     def create_particles(self):
         return self.geom.create_particles()
