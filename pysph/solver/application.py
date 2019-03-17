@@ -1333,10 +1333,15 @@ class Application(object):
     def _log_solver_info(self, solver):
         sep = '-'*70
 
+        pa_info = {p.name: p.get_number_of_particles()
+                   for p in solver.particles}
         particle_info = '\n  '.join(
-            ['%s: %d' % (p.name, len(p.gid)) for p in solver.particles]
+            ['%s: %d' % (k, v) for k, v in pa_info.items()]
         )
-        p_msg = 'No of particles:\n%s\n  %s\n%s' % (sep, particle_info, sep)
+        total = sum(pa_info.values())
+        if len(pa_info) > 1:
+            particle_info += '\n  Total: %d' % total
+        p_msg = '%s\nNo of particles:\n  %s\n%s' % (sep, particle_info, sep)
         self._message(p_msg)
 
         kernel_name = solver.kernel.__class__.__name__
