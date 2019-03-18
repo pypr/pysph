@@ -797,6 +797,10 @@ class Application(object):
             filename = self.fname + '.log'
 
         if len(filename) > 0:
+            # This is needed if the application is launched twice,
+            # as in that case, the old handlers must be removed.
+            for handler in logging.root.handlers[:]:
+                logging.root.removeHandler(handler)
             lfn = os.path.join(self.output_dir, filename)
             format = '%(levelname)s|%(asctime)s|%(name)s|%(message)s'
             logging.basicConfig(
