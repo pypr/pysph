@@ -2,7 +2,6 @@ import numpy as np
 import numpy
 import unittest
 from numpy import (cos as c, sin as s)
-import matplotlib.pyplot as plt
 
 from pysph.base.utils import get_particle_array
 from pysph.sph.equation import Equation
