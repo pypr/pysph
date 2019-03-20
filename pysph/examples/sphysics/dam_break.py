@@ -1,10 +1,7 @@
-'''A configurable case5 from the SPHERIC benchmark. (15 mins)
+'''The standard Sphysics dam break benchmark. (4 hours)
 
-The example is similar to the dambreak_sphysics example.  The details of the
-geometry are in "State-of-the-art of classical SPH for free-surface flows" by
-Moncho Gomez-Gesteira , Benedict D. Rogers , Robert A. Dalrymple &
-Alex J.C. Crespo. http://dx.doi.org/10.1080/00221686.2010.9641242
-
+This is intended to be the same as the standard dam break from the
+DualSPhysics code just for comparison.
 '''
 import numpy as np
 
@@ -24,13 +21,13 @@ def rhstack(*args):
     return tuple(np.hstack(ravel(*t)) for t in zip(*args))
 
 
-class Case5(Application):
+class DamBreak(Application):
     def add_user_options(self, group):
         group.add_argument(
-            '--dx', action='store', type=float, dest='dx',  default=0.025,
+            '--dx', action='store', type=float, dest='dx',  default=0.0085,
             help='Particle spacing.'
         )
-        hdx = np.sqrt(3)*0.85
+        hdx = np.sqrt(3)
         group.add_argument(
             '--hdx', action='store', type=float, dest='hdx',  default=hdx,
             help='Specify the hdx factor where h = hdx * dx.'
@@ -43,7 +40,7 @@ class Case5(Application):
 
     def create_scheme(self):
         self.c0 = c0 = 10.0 * np.sqrt(2.0*9.81*0.3)
-        self.hdx = hdx = 1.2
+        self.hdx = hdx = np.sqrt(3)
         dx = 0.01
         h0 = hdx*dx
         alpha = 0.1
@@ -68,39 +65,30 @@ class Case5(Application):
 
     def create_particles(self):
         dx = self.dx
-        dxb2 = dx * 0.5
-        l, b, h = 1.6, 0.61, 0.4
+        l, b, h = 1.6, 0.67, 0.4
         lw, hw = 0.4, 0.3
 
         # Big filled vessel with staggered points.
-        p1 = np.mgrid[-dx:l+dx*1.5:dx, -dx:b+1.5*dx:dx, -dx:h:dx]
-        p2 = np.mgrid[-dxb2:l+dx*1.5:dx, -dxb2:b+1.5*dx:dx, -dxb2:h:dx]
-        x, y, z = rhstack(p1, p2)
+        x, y, z = np.mgrid[0:l+dx:dx, 0:b+dx:dx, 0:h:dx]
 
         # The post
-        p3 = np.mgrid[0.9:1.02:dxb2, 0.25:0.37:dxb2, 0:0.45:dxb2]
-        x3, y3, z3 = ravel(*p3)
-        xmax, ymax = max(x3), max(y3)
-        post_cond = ~((x3 > 0.9) & (x3 < xmax) & (y3 > 0.25) & (y3 < ymax))
+        x3, y3, z3 = np.mgrid[0.9:1.02:dx, 0.25:0.37:dx, dx:0.45:dx]
+        xmax, ymax, zmax = max(x3.flat), max(y3.flat), max(z3.flat)
+        post_cond = ~((x3 > 0.9) & (x3 < xmax) & (y3 > 0.25) &
+                      (y3 < ymax) & (z3 < zmax))
         p_post = x3[post_cond], y3[post_cond], z3[post_cond]
 
         # Masks to extract different parts from the vessel.
-        wcond = ((x >= 0) & (x <= lw) & (y >= 0) &
-                 (y < b) & (z >= 0) & (z <= hw))
-        box = ~((x >= 0) & (x <= l) & (y >= 0) & (y < b) & (z >= 0) & (z <= h))
-        wcond1 = (((x > 0.4) & (x <= l) & (y >= 0) & (y < b) &
-                   (z >= 0) & (z <= 0.02)) &
-                  ~((x >= (0.9 - dx)) & (x <= (xmax + dx)) &
-                    (y >= (0.25 - dx)) & (y <= (ymax + dx))))
+        wcond = ((x > 0) & (x < lw) & (y > 0) &
+                 (y < b) & (z > 0) & (z < hw))
+        box = ~((x > 0) & (x <= l) & (y > 0) & (y < b) & (z > 0) & (z <= h))
 
         p_box = x[box], y[box], z[box]
-        p_water = x[wcond], y[wcond], z[wcond]
-        p_water_floor = x[wcond1], y[wcond1], z[wcond1]
+        xf, yf, zf = x[wcond], y[wcond], z[wcond]
 
         xs, ys, zs = rhstack(p_box, p_post)
-        xf, yf, zf = rhstack(p_water, p_water_floor)
 
-        vol = 0.5*dx**3
+        vol = dx**3
         m = vol*1000
         f = get_particle_array(
             name='fluid', x=xf, y=yf, z=zf, m=m, h=dx*self.hdx,
@@ -116,5 +104,5 @@ class Case5(Application):
 
 
 if __name__ == '__main__':
-    app = Case5()
+    app = DamBreak()
     app.run()
