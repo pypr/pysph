@@ -179,6 +179,7 @@ cdef class GPUNNPS(NNPSBase):
 
         self.backend = get_backend(backend)
         self.use_double = get_config().use_double
+        self.queue = get_queue()
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
         self._last_domain_size = 0.0
