@@ -1397,5 +1397,6 @@ cdef class NNPS(NNPSBase):
         self.get_spatially_ordered_indices(pa_index, indices)
         cdef BaseArray arr
 
-        for arr in pa.properties.values():
-            arr.c_align_array(indices)
+        for name, arr in pa.properties.items():
+            stride = pa.stride.get(name, 1)
+            arr.c_align_array(indices, stride)
