@@ -376,6 +376,12 @@ class Application(object):
             type=int,
             help="Printing frequency for the output")
 
+        parser.add_argument(
+            '--reorder-freq', action="store", dest="reorder_freq",
+            default=None, type=int,
+            help="Frequency between spatially reordering particles."
+        )
+
         # --detailed-output.
         parser.add_argument(
             "--detailed-output",
@@ -1122,6 +1128,12 @@ class Application(object):
         solver.set_compress_output(options.compress_output)
         # disable_output
         solver.set_disable_output(options.disable_output)
+
+        if options.reorder_freq is None:
+            if options.with_opencl:
+                solver.set_reorder_freq(50)
+        else:
+            solver.set_reorder_freq(options.reorder_freq)
 
         # output print frequency
         if options.freq is not None:
