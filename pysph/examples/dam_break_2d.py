@@ -30,7 +30,7 @@ container_height = 4.0
 container_width = 4.0
 nboundary_layers = 2
 nu = 0.0
-h = 0.039
+dx = 0.03
 g = 9.81
 ro = 1000.0
 co = 10.0 * np.sqrt(2 * 9.81 * fluid_column_height)
@@ -39,32 +39,37 @@ alpha = 0.1
 beta = 0.0
 B = co * co * ro / gamma
 p0 = 1000.0
+hdx = 1.3
+h = hdx * dx
 
 
 class DamBreak2D(Application):
 
     def add_user_options(self, group):
-        self.hdx = 1.3
         corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
-            "--h-factor", action="store", type=float, dest="h_factor",
-            default=1.0,
-            help="Divide default h by this factor to change resolution"
+            '--dx', action='store', type=float, dest='dx',  default=dx,
+            help='Particle spacing.'
+        )
+        group.add_argument(
+            '--hdx', action='store', type=float, dest='hdx',  default=hdx,
+            help='Specify the hdx factor where h = hdx * dx.'
         )
         group.add_argument(
             "--kernel-corr", action="store", type=str, dest='kernel_corr',
             default='', help="Type of Kernel Correction", choices=corrections
         )
+        group.add_argument(
+            '--staggered-grid', action="store_true",  dest='staggered_grid',
+            default=False, help="Use a staggered grid for particles.",
+        )
 
     def consume_user_options(self):
-        self.h = h / self.options.h_factor
+        self.hdx = self.options.hdx
+        self.dx = self.options.dx
+        self.h = self.hdx * self.dx
         self.kernel_corr = self.options.kernel_corr
         print("Using h = %f" % self.h)
-        if self.options.scheme == 'wcsph':
-            self.hdx = self.hdx
-        else:
-            self.hdx = 1.0
-        self.dx = self.h / self.hdx
 
     def configure_scheme(self):
         tf = 2.5
@@ -184,7 +189,7 @@ class DamBreak2D(Application):
         return eqns
 
     def create_particles(self):
-        if self.options.scheme == 'wcsph':
+        if self.options.staggered_grid:
             nboundary_layers = 2
             nfluid_offset = 2
             wall_hex_pack = True
