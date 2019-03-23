@@ -151,18 +151,23 @@ class Viewer(object):
         self.show_results()
         self.show_log()
 
-    def _cmap_helper(self, data, array_name):
+    def _cmap_helper(self, data, array_name, for_plot_vectors=False):
         '''
         Helper Function:
         Takes in a numpy array and returns its maximum,
-        minimum and absolute maximum values, subject to the constraints
-        provided by the user in the legend_lower_lim and legend_upper_lim
-        text boxes. Also returns the input array normalized by the maximum.
+        minimum , subject to the constraints provided by the user
+        in the legend_lower_lim and legend_upper_lim text boxes.
+        Also returns the input array normalized by the maximum.
         '''
 
         pa_widgets = self._widgets.particles[array_name]
-        ulim = pa_widgets.legend_upper_lim.value
-        llim = pa_widgets.legend_lower_lim.value
+        if for_plot_vectors is False:
+            ulim = pa_widgets.legend_upper_lim.value
+            llim = pa_widgets.legend_lower_lim.value
+        elif for_plot_vectors is True:
+            ulim = ''
+            llim = ''
+
         if llim == '' and ulim == '':
             pass
         elif llim != '' and ulim == '':
@@ -192,7 +197,10 @@ class Viewer(object):
             # This takes care of the case when all the values are the same.
             # Use case is the initialization of some scalars (like density).
             if ulim == '' and llim == '':
-                return actual_minm, actual_maxm, np.ones_like(data)
+                if actual_maxm != 0:
+                    return actual_minm, actual_maxm, np.ones_like(data)
+                else:
+                    return actual_minm, actual_maxm, np.zeros_like(data)
             else:
                 data_norm = (data-actual_minm)/(actual_maxm-actual_minm)
                 return actual_minm, actual_maxm, data_norm
@@ -204,12 +212,12 @@ class Viewer(object):
 
         if self.viewer_type == 'Viewer2D':
             self._widgets = Viewer2DWidgets(
-                file=self.paths_list[0],
+                file_name=self.paths_list[0],
                 file_count=len(self.paths_list) - 1,
             )
         elif self.viewer_type == 'Viewer3D':
             self._widgets = Viewer3DWidgets(
-                file=self.paths_list[0],
+                file_name=self.paths_list[0],
                 file_count=len(self.paths_list) - 1,
             )
 
@@ -290,26 +298,27 @@ class Viewer(object):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        temp_data = self.get_frame(
-            self._widgets.frame.value
-        )['arrays']
-        sct = self._scatters[array_name]
-        c = self._get_c(pa_widgets, temp_data[array_name])
-        colormap = getattr(
-            plt.cm,
-            pa_widgets.scalar_cmap.value
-        )
-        min_c, max_c, c_norm = self._cmap_helper(
-            c,
-            array_name
-        )
-        if self.viewer_type == 'Viewer2D':
-            sct.set_facecolors(colormap(c_norm))
-            self._legend_handler(None)
-            self.figure.show()
-        elif self.viewer_type == 'Viewer3D':
-            sct.color = colormap(c_norm)
-            self._legend_handler(None)
+        if pa_widgets.scalar.value != 'None':
+            temp_data = self.get_frame(
+                self._widgets.frame.value
+            )['arrays']
+            sct = self._scatters[array_name]
+            c = self._get_c(pa_widgets, temp_data[array_name])
+            colormap = getattr(
+                plt.cm,
+                pa_widgets.scalar_cmap.value
+            )
+            min_c, max_c, c_norm = self._cmap_helper(
+                c,
+                array_name
+            )
+            if self.viewer_type == 'Viewer2D':
+                sct.set_facecolors(colormap(c_norm))
+                self._legend_handler(None)
+                self.figure.show()
+            elif self.viewer_type == 'Viewer3D':
+                sct.color = colormap(c_norm)
+                self._legend_handler(None)
 
     def _delay_box_handler(self, change):
 
@@ -466,12 +475,12 @@ class Viewer(object):
 
     def _get_c(self, pa_widgets, data, need_vmag=False):
         if pa_widgets.scalar.value == 'vmag' or need_vmag is True:
-            u = data.u
-            v = data.v
+            u = getattr(data, 'u')
+            v = getattr(data, 'v')
             c = u**2 + v**2
             if self.viewer_type == 'Viewer3D':
-                w = data.w
-                c = c + w**2
+                w = getattr(data, 'w')
+                c += w**2
             c = c**0.5
         else:
             c = getattr(
@@ -856,6 +865,7 @@ class Viewer2D(Viewer):
                     vmag,
                     scale=pa_widgets.vector_scale.value,
                     width=(pa_widgets.vector_width.value)/10000,
+                    units='xy'
                 )
         self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
         self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
@@ -951,8 +961,8 @@ class Viewer2D(Viewer):
                 )
                 sct.set_facecolors(colormap(c_norm[::n]))
 
+            self._plot_vectors()
             self._legend_handler(None)
-
             self.figure.show()
 
     def _vector_handler(self, change):
@@ -1081,6 +1091,7 @@ class Viewer2D(Viewer):
             self._scatter_ax.set_position(
                 [0, 0, 1, 1]
             )
+        self._plot_vectors()
         if change is not None:
             self.figure.show()
 
@@ -1141,9 +1152,9 @@ class Viewer2D(Viewer):
                 )
                 sct.set_facecolors(colormap(c_norm[::n]))
 
-            self._legend_handler(None)
-            self._plot_vectors()
-            self.figure.show()
+        self._legend_handler(None)
+        self._plot_vectors()
+        self.figure.show()
 
     def _show_solver_time_handler(self, change):
 
@@ -1307,9 +1318,9 @@ class ParticleArrayWidgets3D(object):
 
 class Viewer3DWidgets(object):
 
-    def __init__(self, file, file_count):
+    def __init__(self, file_name, file_count):
 
-        self.temp_data = load(file)
+        self.temp_data = load(file_name)
         self.time = str(self.temp_data['solver_data']['t'])
         self.temp_data = self.temp_data['arrays']
         self.frame = widgets.IntSlider(
@@ -1492,18 +1503,19 @@ class Viewer3D(Viewer):
             c = self._get_c(pa_widgets, data, need_vmag=True)
             min_c, max_c, c_norm = self._cmap_helper(
                 c,
-                array_name
+                array_name,
+                for_plot_vectors=True
             )
             if array_name in self._vectors.keys():
                 vectors = self._vectors[array_name]
                 vectors.x = data.x[::n]
                 vectors.y = data.y[::n]
                 vectors.z = data.z[::n]
-                vectors.u = getattr(data, 'u')[::n]
-                vectors.v = getattr(data, 'v')[::n]
-                vectors.w = getattr(data, 'w')[::n]
+                vectors.vx = getattr(data, 'u')[::n]
+                vectors.vy = getattr(data, 'v')[::n]
+                vectors.vz = getattr(data, 'w')[::n]
                 vectors.size = pa_widgets.vector_size.value
-                vectors.color = colormap(c_norm)
+                vectors.color = colormap(c_norm)[::n]
             else:
                 import ipyvolume.pylab as p3
                 self._vectors[array_name] = p3.quiver(
@@ -1514,7 +1526,7 @@ class Viewer3D(Viewer):
                     v=getattr(data, 'v')[::n],
                     w=getattr(data, 'w')[::n],
                     size=pa_widgets.vector_size.value,
-                    color=colormap(c_norm)
+                    color=colormap(c_norm)[::n]
                 )
         else:
             pass
