@@ -1160,7 +1160,7 @@ def main(args=None):
                     print("Error: file name is not supported")
                     print("filename format accepted is *_number.npz"
                           " or *_number.hdf5")
-                    exit(-1)
+                    sys.exit(1)
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
