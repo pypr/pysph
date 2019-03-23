@@ -1154,6 +1154,13 @@ def main(args=None):
                 scripts.append(arg)
                 continue
             elif arg.endswith(output_formats):
+                try:
+                    _sort_key(arg)
+                except ValueError:
+                    print("Error: file name is not supported")
+                    print("filename format accepted is *_number.npz"
+                          " or *_number.hdf5")
+                    sys.exit(1)
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
