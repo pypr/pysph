@@ -26,7 +26,8 @@ from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
     EnumEditor, TitleEditor, HGroup, ShellEditor)  # noqa: E402
 from mayavi.core.api import PipelineBase  # noqa: E402
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
+from mayavi.core.ui.api import (
+    MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
 from pyface.timer.api import Timer, do_later  # noqa: E402
 from tvtk.api import tvtk  # noqa: E402
 from tvtk.array_handler import array2vtk  # noqa: E402
@@ -35,8 +36,8 @@ from pysph.base.particle_array import ParticleArray  # noqa: E402
 from pysph.solver.solver_interfaces import MultiprocessingClient  # noqa: E402
 from pysph.solver.utils import load, dump, output_formats  # noqa: E402
 from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
-from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,  # noqa: E402
-    Interpolator)
+from pysph.tools.interpolator import (
+        get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
 
 import logging  # noqa: E402
 logger = logging.getLogger()
@@ -151,7 +152,7 @@ class InterpolatorView(HasTraits):
         if self.interpolator is None:
             interpolator = Interpolator(
                 self.particle_arrays, num_points=self.num_points,
-                use_shepard=False
+                method='shepard'
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
