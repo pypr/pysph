@@ -1,7 +1,8 @@
 from __future__ import print_function
 import logging
 import numpy as np
-from pytools import memoize_method
+from pytools import memoize, memoize_method
+import mako.template as mkt
 
 from compyle.config import get_config
 from compyle.array import get_backend, wrap_array, Array
@@ -14,6 +15,77 @@ import pysph.base.particle_array
 
 
 logger = logging.getLogger()
+
+
+minmax_tpl = """//CL//
+
+    minmax_collector_${dtype} mmc_neutral()
+    {
+        minmax_collector_${dtype} result;
+
+        % for prop in ('x', 'y', 'z', 'h'):
+        result.cur_min_${prop} = INFINITY;
+        result.cur_max_${prop} = -INFINITY;
+        % endfor
+
+        return result;
+    }
+
+    minmax_collector_${dtype} mmc_from_scalar(${dtype} x, ${dtype} y,
+                                              ${dtype} z, ${dtype} h)
+    {
+        minmax_collector_${dtype} result;
+
+        % for prop in ('x', 'y', 'z', 'h'):
+        result.cur_min_${prop} = ${prop};
+        result.cur_max_${prop} = ${prop};
+        % endfor
+
+        return result;
+    }
+
+    minmax_collector_${dtype} agg_mmc(minmax_collector_${dtype} a,
+                                      minmax_collector_${dtype} b)
+    {
+        minmax_collector_${dtype} result = a;
+
+        % for prop in ('x', 'y', 'z', 'h'):
+        if (b.cur_min_${prop} < result.cur_min_${prop})
+            result.cur_min_${prop} = b.cur_min_${prop};
+        if (b.cur_max_${prop} > result.cur_max_${prop})
+            result.cur_max_${prop} = b.cur_max_${prop};
+        % endfor
+
+        return result;
+    }
+
+    """
+
+
+def minmax_collector_key(device, dtype, name):
+    return (device, dtype, name)
+
+
+@memoize(key=minmax_collector_key)
+def make_collector_dtype(device, dtype, name):
+    custom_dtype = np.dtype([
+        ("cur_min_x", dtype),
+        ("cur_max_x", dtype),
+        ("cur_min_y", dtype),
+        ("cur_max_y", dtype),
+        ("cur_min_z", dtype),
+        ("cur_max_z", dtype),
+        ("cur_min_h", dtype),
+        ("cur_max_h", dtype),
+        ("pad", np.int32),
+        ])
+
+    from pyopencl.tools import get_or_register_dtype, match_dtype_to_c_struct
+
+    custom_dtype, c_decl = match_dtype_to_c_struct(device, name, custom_dtype)
+    custom_dtype = get_or_register_dtype(name, custom_dtype)
+
+    return custom_dtype, c_decl
 
 
 class ExtractParticles(Template):
@@ -54,8 +126,8 @@ class DeviceHelper(object):
     def __init__(self, particle_array, backend=None):
         self.backend = get_backend(backend)
         self._particle_array = pa = particle_array
-        use_double = get_config().use_double
-        self._dtype = np.float64 if use_double else np.float32
+        self.use_double = get_config().use_double
+        self._dtype = np.float64 if self.use_double else np.float32
         self.num_real_particles = pa.num_real_particles
         self._data = {}
         self.properties = []
@@ -155,6 +227,54 @@ class DeviceHelper(object):
     def max(self, arg):
         return float(array.maximum(getattr(self, arg),
                                    backend=self.backend))
+
+    @memoize(key=lambda obj, ctx, dtype, mmc_dtype, mmc_decl: mmc_decl)
+    def _get_minmax_kernel(self, ctx, dtype, mmc_dtype, mmc_c_decl):
+        mmc_preamble = mmc_c_decl + minmax_tpl
+        preamble = mkt.Template(text=mmc_preamble).render(dtype=dtype)
+
+        args = "__global %(dtype)s *x, __global %(dtype)s *y, \
+                __global %(dtype)s *z, __global %(dtype)s *h"
+
+        from pyopencl.reduction import ReductionKernel
+
+        knl = ReductionKernel(
+                ctx, mmc_dtype, neutral="mmc_neutral()",
+                reduce_expr="agg_mmc(a, b)",
+                map_expr="mmc_from_scalar(x[i], y[i], z[i], h[i])",
+                arguments=args % {'dtype' : dtype},
+                preamble=preamble
+                )
+
+        return knl
+
+    def update_minmax_domain(self):
+        if self.backend != 'opencl':
+            raise ValueError('''Optimized minmax update only supported
+                             using opencl backend''')
+        dtype = 'double' if self.use_double else 'float'
+        name = "minmax_collector_%s" % dtype
+
+        from compyle.opencl import get_context
+        ctx = get_context()
+
+        mmc_dtype, mmc_c_decl = make_collector_dtype(ctx.devices[0],
+                                                     self._dtype, name)
+        knl = self._get_minmax_kernel(ctx, dtype, mmc_dtype, mmc_c_decl)
+
+        result = knl(self.x.dev, self.y.dev, self.z.dev, self.h.dev).get()
+
+        self.x.minimum = result["cur_min_x"]
+        self.x.maximum = result["cur_max_x"]
+
+        self.y.minimum = result["cur_min_y"]
+        self.y.maximum = result["cur_max_y"]
+
+        self.z.minimum = result["cur_min_z"]
+        self.z.maximum = result["cur_max_z"]
+
+        self.h.minimum = result["cur_min_h"]
+        self.h.maximum = result["cur_max_h"]
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """

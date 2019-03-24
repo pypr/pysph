@@ -394,3 +394,34 @@ class TestDeviceHelper(object):
 
         # Then
         assert result_pa.gpu.get_number_of_particles() == 2
+
+    def test_update_minmax_domain(self):
+        backend = 'opencl'
+        check_import(backend)
+        self.setup()
+
+        # Given
+        x=[0.0, -1.0, 2.0, 3.0]
+        y=[0.0, 1.0, -2.0, 3.0]
+        z=[0.0, 1.0, 2.0, -3.0]
+        h=[4.0, 1.0, 2.0, 3.0]
+
+        pa = get_particle_array(x=x, y=y, z=z, h=h)
+        h = DeviceHelper(pa, backend=backend)
+        pa.set_device_helper(h)
+
+        # When
+        h.update_minmax_domain()
+
+        # Then
+        assert h.x.minimum == -1.0
+        assert h.x.maximum == 3.0
+
+        assert h.y.minimum == -2.0
+        assert h.y.maximum == 3.0
+
+        assert h.z.minimum == -3.0
+        assert h.z.maximum == 2.0
+
+        assert h.h.minimum == 1.0
+        assert h.h.maximum == 4.0
