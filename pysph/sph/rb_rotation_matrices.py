@@ -217,7 +217,10 @@ def set_body_frame_position_vectors(pa):
 
 class RigidBodyCollision(Equation):
     def __init__(self, dest, sources, kn=1e3, mu=0.5, en=0.8):
-        """Initialise the required coefficients for force calculation.
+        """
+        A simple force between two colliding rigid bodies.
+
+        Initialise the required coefficients for force calculation.
 
 
         Keyword arguments:

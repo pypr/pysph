@@ -2,6 +2,8 @@
 Simulation of solid-fluid mixture flow using moving particle methods
 Shuai Zhang
 
+link: https://www.sciencedirect.com/science/article/pii/S0021999108006499
+
 Time: 7 minutes
 """
 from __future__ import print_function
@@ -174,7 +176,10 @@ class ZhangStackOfCylinders(Application):
         return x, y, body_id
 
     def geometry(self):
-        import matplotlib.pyplot as plt
+        import matplotlib
+        matplotlib.use('Agg')
+        from matplotlib import pyplot as plt
+
         # please run this function to know how
         # geometry looks like
         xc, yc, body_id = self.create_cylinders_stack()
@@ -198,6 +203,13 @@ class ZhangStackOfCylinders(Application):
                     pa.y += 14 * 1e-2
 
     def post_process(self):
+        """This function will run once per time step after the time step is
+        executed. For some time (self.wall_time), we will keep the wall near
+        the cylinders such that they settle down to equilibrium and replicate
+        the experiment.
+
+        By running the example it becomes much clear.
+        """
         if len(self.output_files) == 0:
             return
 
