@@ -425,3 +425,45 @@ class TestDeviceHelper(object):
 
         assert h.h.minimum == 1.0
         assert h.h.maximum == 4.0
+
+        # When
+        h.x.maximum, h.x.minimum = 100., 100.
+        h.y.maximum, h.y.minimum = 100., 100.
+        h.z.maximum, h.z.minimum = 100., 100.
+        h.h.maximum, h.h.minimum = 100., 100.
+
+        h.update_minmax_cl(['x', 'y', 'z', 'h'], only_min=True)
+
+        # Then
+        assert h.x.minimum == -1.0
+        assert h.x.maximum == 100.0
+
+        assert h.y.minimum == -2.0
+        assert h.y.maximum == 100.0
+
+        assert h.z.minimum == -3.0
+        assert h.z.maximum == 100.0
+
+        assert h.h.minimum == 1.0
+        assert h.h.maximum == 100.0
+
+        # When
+        h.x.maximum, h.x.minimum = 100., 100.
+        h.y.maximum, h.y.minimum = 100., 100.
+        h.z.maximum, h.z.minimum = 100., 100.
+        h.h.maximum, h.h.minimum = 100., 100.
+
+        h.update_minmax_cl(['x', 'y', 'z', 'h'], only_max=True)
+
+        # Then
+        assert h.x.minimum == 100.0
+        assert h.x.maximum == 3.0
+
+        assert h.y.minimum == 100.0
+        assert h.y.maximum == 3.0
+
+        assert h.z.minimum == 100.0
+        assert h.z.maximum == 2.0
+
+        assert h.h.minimum == 100.0
+        assert h.h.maximum == 4.0

@@ -24,8 +24,12 @@ minmax_tpl = """//CL//
         ${dtype} result;
 
         % for prop in prop_names:
+        % if not only_max:
         result.cur_min_${prop} = INFINITY;
+        % endif
+        % if not only_min:
         result.cur_max_${prop} = -INFINITY;
+        % endif
         % endfor
 
         return result;
@@ -36,8 +40,12 @@ minmax_tpl = """//CL//
         ${dtype} result;
 
         % for prop in prop_names:
+        % if not only_max:
         result.cur_min_${prop} = ${prop};
+        % endif
+        % if not only_min:
         result.cur_max_${prop} = ${prop};
+        % endif
         % endfor
 
         return result;
@@ -48,10 +56,14 @@ minmax_tpl = """//CL//
         ${dtype} result = a;
 
         % for prop in prop_names:
+        % if not only_max:
         if (b.cur_min_${prop} < result.cur_min_${prop})
             result.cur_min_${prop} = b.cur_min_${prop};
+        % endif
+        % if not only_min:
         if (b.cur_max_${prop} > result.cur_max_${prop})
             result.cur_max_${prop} = b.cur_max_${prop};
+        % endif
         % endfor
 
         return result;
@@ -60,16 +72,19 @@ minmax_tpl = """//CL//
     """
 
 
-def minmax_collector_key(device, dtype, props, name):
+def minmax_collector_key(device, dtype, props, name, *args):
     return (device, dtype, tuple(props), name)
 
 
 @memoize(key=minmax_collector_key)
-def make_collector_dtype(device, dtype, props, name):
+def make_collector_dtype(device, dtype, props, name, only_min, only_max):
     fields = [("pad", np.int32)]
+
     for prop in props:
-        fields.append(("cur_min_%s" % prop, dtype))
-        fields.append(("cur_max_%s" % prop, dtype))
+        if not only_min:
+            fields.append(("cur_max_%s" % prop, dtype))
+        if not only_max:
+            fields.append(("cur_min_%s" % prop, dtype))
 
     custom_dtype = np.dtype(fields)
 
@@ -223,7 +238,7 @@ class DeviceHelper(object):
 
     @memoize(key=lambda *args: (args[-2], args[-1]))
     def _get_minmax_kernel(self, ctx, dtype, mmc_dtype, prop_names,
-                           name, mmc_c_decl):
+                           only_min, only_max, name, mmc_c_decl):
         tpl_args = ", ".join(
             ["%(dtype)s %(prop)s" % {'dtype': dtype, 'prop': prop}
                 for prop in prop_names]
@@ -231,7 +246,8 @@ class DeviceHelper(object):
 
         mmc_preamble = mmc_c_decl + minmax_tpl
         preamble = mkt.Template(text=mmc_preamble).render(
-            args=tpl_args, prop_names=prop_names, dtype=name
+            args=tpl_args, prop_names=prop_names, dtype=name,
+            only_min=only_min, only_max=only_max
         )
 
         knl_args = ", ".join(
@@ -256,20 +272,26 @@ class DeviceHelper(object):
 
         return knl
 
-    def update_minmax_cl(self, props):
+    def update_minmax_cl(self, props, only_min=False, only_max=False):
         if self.backend != 'opencl':
             raise ValueError('''Optimized minmax update only supported
                              using opencl backend''')
+        if only_min and only_max:
+            raise ValueError("Only one of only_min and only_max can be True")
+
         dtype = 'double' if self.use_double else 'float'
-        name = "minmax_collector_%s" % ''.join([dtype] + props)
+        op = 'min' if not only_max else ''
+        op += 'max' if not only_min else ''
+        name = "%s_collector_%s" % (op, ''.join([dtype] + props))
 
         from compyle.opencl import get_context
         ctx = get_context()
 
         mmc_dtype, mmc_c_decl = make_collector_dtype(ctx.devices[0],
-                                                     self._dtype, props, name)
+                                                     self._dtype, props, name,
+                                                     only_min, only_max)
         knl = self._get_minmax_kernel(ctx, dtype, mmc_dtype, props,
-                                      name, mmc_c_decl)
+                                      only_min, only_max, name, mmc_c_decl)
 
         args = [getattr(self, prop).dev for prop in props]
 
@@ -277,8 +299,10 @@ class DeviceHelper(object):
 
         for prop in props:
             proparr = self._data[prop]
-            proparr.minimum = result["cur_min_%s" % prop]
-            proparr.maximum = result["cur_max_%s" % prop]
+            if not only_max:
+                proparr.minimum = result["cur_min_%s" % prop]
+            if not only_min:
+                proparr.maximum = result["cur_max_%s" % prop]
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
