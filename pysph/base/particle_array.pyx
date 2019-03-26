@@ -569,6 +569,12 @@ cdef class ParticleArray:
         prop = ''
         for prop in particle_props:
             self._check_property(prop)
+            if prop in self.stride.keys():
+                stride = self.stride[prop]
+                prop_len = len(particle_props[prop])
+                base_len = self.get_number_of_particles()
+                msg = 'Property %s length should be %d' % (prop, base_len * stride)
+                assert prop_len == base_len * stride, msg
 
         if len(prop) == 0:
             num_extra_particles = 0
