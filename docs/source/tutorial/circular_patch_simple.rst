@@ -394,6 +394,14 @@ a `Glyph` instance from Mayavi_. It is useful to use the `record feature
 <http://docs.enthought.com/mayavi/mayavi/mlab_changing_object_looks.html#changing-object-properties-interactively>`_
 of Mayavi to learn more about how best to script the view.
 
+The viewer will always look for a ``mayavi_config.py`` script inside the
+output directory to setup the visualization parameters. This file can be
+created by overriding the :py:class:`pysph.solver.application.Application`
+object's ``customize_output`` method. See the `dam break 3d
+<https://github.com/pypr/pysph/blob/master/pysph/examples/dam_break_3d.py>`_
+example to see this being used. Of course, this file can also be created
+manually.
+
 
 Loading output data files
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
