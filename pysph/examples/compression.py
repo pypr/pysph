@@ -1,4 +1,4 @@
-"""Simple compression of a cylindrical charge between two molds.
+"""Simple compression of a cylinder between two molds.
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
             OOOOOOOOOOOOOOO
@@ -61,18 +61,18 @@ class Compression(Application):
         return s
 
     def create_particles(self):
-        golden_ratio = (1 + np.sqrt(5)) / 2
+        golden_ratio = (1.0 + np.sqrt(5.0)) / 2.0
         h0 = hdx * dx
         m0 = rho0 * dx**3
 
         # FLUID
-        n = np.arange(0, self.options.N, 1)
+        n = np.arange(0, self.options.N, 1, dtype=float)
         x = np.arange(0.5 * dx, self.D - 0.25 * dx, dx)
         x, n = np.meshgrid(x, n)
         r = self.r * np.sqrt(n / self.options.N)
         theta = 2 * np.pi / golden_ratio**2 * n
-        y = r * np.cos(theta + np.pi / (4 * dx) * x)
-        z = r * np.sin(theta + np.pi / (4 * dx) * x)
+        y = r * np.cos(theta + np.pi / (4.0 * dx) * x)
+        z = r * np.sin(theta + np.pi / (4.0 * dx) * x)
 
         # set up particle properties
         fluid = get_particle_array_wcsph(name='fluid', x=x, y=y, z=z, m=m0,
@@ -85,8 +85,8 @@ class Compression(Application):
         x, n = np.meshgrid(x, n)
         r = self.R * np.sqrt(n / N)
         theta = 2 * np.pi / golden_ratio**2 * n
-        y = r * np.cos(theta + np.pi / (4 * dx) * x)
-        z = r * np.sin(theta + np.pi / (4 * dx) * x)
+        y = r * np.cos(theta + np.pi / (4.0 * dx) * x)
+        z = r * np.sin(theta + np.pi / (4.0 * dx) * x)
 
         # set up particle properties
         top_wall = get_particle_array_wcsph(name='top_wall', x=x, y=y,
@@ -99,8 +99,8 @@ class Compression(Application):
         x, n = np.meshgrid(x, n)
         r = self.R * np.sqrt(n / N)
         theta = 2 * np.pi / golden_ratio**2 * n
-        y = r * np.cos(theta + np.pi / (4 * dx) * x)
-        z = r * np.sin(theta + np.pi / (4 * dx) * x)
+        y = r * np.cos(theta + np.pi / (4.0 * dx) * x)
+        z = r * np.sin(theta + np.pi / (4.0 * dx) * x)
 
         # set up particle properties
         bottom_wall = get_particle_array_wcsph(name='bottom_wall', x=x, y=y,
