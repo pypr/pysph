@@ -210,9 +210,11 @@ class InterpolatorView(HasTraits):
 
             if self.plot is None:
                 if interp.dim == 3:
-                    plot = mlab.pipeline.scalar_cut_plane(src)
+                    plot = mlab.pipeline.scalar_cut_plane(
+                        src, colormap='viridis'
+                    )
                 else:
-                    plot = mlab.pipeline.surface(src)
+                    plot = mlab.pipeline.surface(src, colormap='viridis')
                 self.plot = plot
                 scm = plot.module_manager.scalar_lut_manager
                 scm.set(show_legend=self.show_legend,
@@ -399,7 +401,9 @@ class ParticleArrayHelper(HasTraits):
             old_empty = len(old_x) == 0
         if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
-            p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
+            p = mlab.pipeline.glyph(
+                src, mode='point', scale_mode='none', colormap='viridis'
+            )
             p.actor.property.point_size = 6
             scm = p.module_manager.scalar_lut_manager
             scm.set(show_legend=self.show_legend,
@@ -505,7 +509,8 @@ class ParticleArrayHelper(HasTraits):
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
                 mask_points=self.mask_on_ratio,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
+                colormap='viridis'
             )
             self.plot_vectors = pv
 
