@@ -1029,6 +1029,9 @@ class MayaviViewer(HasTraits):
             self.file_count = min(self.file_count, len(files))
         else:
             pass
+        config_file = os.path.join(d, 'mayavi_config.py')
+        if os.path.exists(config_file):
+            self.run_script(config_file)
 
     def _live_mode_changed(self, value):
         if value:
@@ -1173,6 +1176,9 @@ def main(args=None):
                 if len(_files) == 0:
                     _files = glob.glob(os.path.join(arg, '*.npz'))
                 files.extend(_files)
+                config_file = os.path.join(arg, 'mayavi_config.py')
+                if os.path.exists(config_file):
+                    scripts.append(config_file)
                 continue
             else:
                 usage()
