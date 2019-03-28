@@ -77,7 +77,7 @@ class DamBreak3D(Application):
     def customize_output(self):
         self._mayavi_config('''
         viewer.scalar = 'u'
-        b = particle_arrays[0]
+        b = particle_arrays['boundary']
         b.plot.actor.mapper.scalar_visibility = False
         b.plot.actor.property.opacity = 0.1
         ''')

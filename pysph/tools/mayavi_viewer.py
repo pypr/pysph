@@ -1015,7 +1015,11 @@ class MayaviViewer(HasTraits):
         obj.edit_traits()
 
     def _get_shell_namespace(self):
-        return dict(viewer=self, particle_arrays=self.particle_arrays,
+        pas = {}
+        for i, x in enumerate(self.particle_arrays):
+            pas[i] = x
+            pas[x.name] = x
+        return dict(viewer=self, particle_arrays=pas,
                     interpolator=self.interpolator, scene=self.scene,
                     mlab=self.scene.mlab)
 

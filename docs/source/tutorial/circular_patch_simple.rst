@@ -370,22 +370,22 @@ interpreter with a few useful objects available.  These are::
     >>> dir()
     ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab',
      'particle_arrays', 'scene', 'self', 'viewer']
-    >>> len(particle_arrays)
-    1
-    >>> particle_arrays[0].name
+    >>> particle_arrays['fluid'].name
     'fluid'
 
-The ``particle_arrays`` object is a list of **ParticleArrayHelpers** which is
-available in :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
+The ``particle_arrays`` object is a dictionary of **ParticleArrayHelpers**
+which is available in
+:py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
 ``interpolator`` is an instance of
 :py:class:`pysph.tools.mayavi_viewer.InterpolatorView` that is used by the
 viewer. The other objects can be used to script the user interface if desired.
+Note that the ``particle_arrays`` can be indexed by array name or index.
 
 Here is an example of scripting the viewer. Let us say we have two particle
 arrays, `'boundary'` and `'fluid'` in that order. Let us say, we wish to make
 the boundary translucent, then we can write the following::
 
-   b = particle_arrays[0]
+   b = particle_arrays['boundary']
    b.plot.actor.property.opacity = 0.2
 
 This does require some knowledge of Mayavi_ and scripting with it. The `plot`

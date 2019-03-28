@@ -117,8 +117,7 @@ class Case5(Application):
     def customize_output(self):
         self._mayavi_config('''
         viewer.scalar = 'vmag'
-        index = 0 if particle_arrays[0].name == 'boundary' else 1
-        b = particle_arrays[index]
+        b = particle_arrays['boundary']
         b.plot.actor.mapper.scalar_visibility = False
         b.plot.actor.property.opacity = 0.1
         ''')
