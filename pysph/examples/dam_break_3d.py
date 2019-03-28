@@ -74,6 +74,14 @@ class DamBreak3D(Application):
     def create_particles(self):
         return self.geom.create_particles()
 
+    def customize_output(self):
+        self._mayavi_config('''
+        viewer.scalar = 'u'
+        b = particle_arrays['boundary']
+        b.plot.actor.mapper.scalar_visibility = False
+        b.plot.actor.property.opacity = 0.1
+        ''')
+
 
 if __name__ == '__main__':
     app = DamBreak3D()

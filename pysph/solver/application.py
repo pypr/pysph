@@ -1,14 +1,15 @@
 # Standard imports.
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
 import inspect
 import json
 import logging
 import os
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
                      splitext)
 import socket
 import sys
+from textwrap import dedent
 import time
 import numpy as np
 import warnings
@@ -124,7 +125,9 @@ class Application(object):
     10. :py:meth:`create_tools()`: Add any ``pysph.solver.tools.Tool``
         instances.
 
-    Additionally, as the appliction runs there are several convenient optional
+    11. :py:meth:`customize_output()`: Customize the output visualization.
+
+    Additionally, as the application runs there are several convenient optional
     callbacks setup:
 
     1. :py:meth:`pre_step`: Called before each time step.
@@ -1379,6 +1382,17 @@ class Application(object):
             eqn_info = equations
         logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
 
+    def _mayavi_config(self, code):
+        """Write out the given code to a `mayavi_config.py` in the output
+        directory.
+
+        Note that this will call `textwrap.dedent` on the code.
+        """
+        cfg = os.path.join(self.output_dir, 'mayavi_config.py')
+        if not os.path.exists(cfg):
+            with open(cfg, 'w') as fp:
+                fp.write(dedent(code))
+
     ######################################################################
     # Public interface.
     ######################################################################
@@ -1470,6 +1484,8 @@ class Application(object):
             setup_duration = end_time - start_time
             self._message("Setup took: %.5f secs" % (setup_duration))
             self._write_info(self.info_filename, completed=False, cpu_time=0)
+
+        self.customize_output()
 
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
@@ -1651,6 +1667,18 @@ class Application(object):
         called after particles/inlets etc. are all setup, configured etc.
         """
         return []
+
+    def customize_output(self):
+        """Customize the output file visualization by adding any files.
+
+        For example, the pysph view command will look for a
+        ``mayavi_config.py`` file that can be used to script the viewer. You
+        can use self._mayavi_config('code') to add a default customization
+        here.
+
+        Note that this is executed before the simulation starts.
+        """
+        pass
 
     def pre_step(self, solver):
         """If overloaded, this is called automatically before each integrator
