@@ -23,7 +23,7 @@ u0 = -0.01
 mu = 10
 co = 10
 hdx = 1.0
-dx = 0.004
+dx = 0.002
 tf = 3.524
 
 
@@ -32,7 +32,7 @@ class Compression(Application):
 
     def add_user_options(self, group):
         group.add_argument(
-            "--N", action="store", type=float, dest="N", default=500,
+            "--N", action="store", type=float, dest="N", default=2000,
             help="Number of particles per layer."
         )
 
