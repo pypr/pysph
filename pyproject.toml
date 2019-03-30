@@ -1,3 +1,4 @@
 [build-system]
 requires = ['compyle', 'cyarray', 'Cython>=0.20', 'mako', 'numpy',
             'setuptools', 'wheel']
+build-backend = "setuptools.build_meta"
