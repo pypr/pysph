@@ -1,0 +1,3 @@
+[build-system]
+requires = ['compyle', 'cyarray', 'Cython>=0.20', 'mako', 'numpy',
+            'setuptools', 'wheel']
