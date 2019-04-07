@@ -1238,6 +1238,12 @@ cdef class NNPS(NNPSBase):
     def set_in_parallel(self, bint in_parallel):
         self.domain.manager.in_parallel = in_parallel
 
+    def set_use_cache(self, bint use_cache):
+        self.use_cache = use_cache
+        if use_cache:
+            for cache in self.cache:
+                cache.update()
+
     def update_domain(self):
         self.domain.update()
 

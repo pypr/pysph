@@ -90,6 +90,31 @@ class TestNeighborCache(unittest.TestCase):
             nb_c = nb_cached.get_npy_array()
             self.assertTrue(np.all(nb_e == nb_c))
 
+    def test_setting_use_cache_does_cache(self):
+        # Given
+        pa = self._make_random_parray('pa1', 3)
+        pa.h[:] = 1.0
+        nnps = LinkedListNNPS(dim=3, particles=[pa], cache=False)
+        n = pa.get_number_of_particles()
+
+        # When
+        nnps.set_use_cache(True)
+        nbrs = UIntArray()
+        nnps.set_context(0, 0)
+        for i in range(n):
+            nnps.get_nearest_particles(0, 0, i, nbrs)
+
+        # Then
+        self.assertEqual(nbrs.length, n)
+        # Find the length of all cached neighbors,
+        # in this case, each particle has n neighbors,
+        # so we should have n*n neighbors in all.
+        total_length = sum(
+            x.length for x in nnps.cache[0]._neighbor_arrays
+        )
+        self.assertEqual(total_length, n*n)
+
+
 
 if __name__ == '__main__':
     unittest.main()
