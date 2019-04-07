@@ -265,7 +265,7 @@ cdef class NNPSBase:
     cdef public list particles        # list of particle arrays
     cdef public list pa_wrappers      # list of particle array wrappers
     cdef public int narrays           # Number of particle arrays
-    cdef public bint use_cache        # Use cache or not.
+    cdef bint use_cache               # Use cache or not.
     cdef public list cache            # The neighbor cache.
     cdef int src_index, dst_index     # The current source and dest indices
 

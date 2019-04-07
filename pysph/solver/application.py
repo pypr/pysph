@@ -221,6 +221,9 @@ class Application(object):
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
+        # The default value that is overridden by the command line
+        # options passed or in initializee.
+        self.cache_nnps = False
 
         self.initialize()
         self.scheme = self.create_scheme()
@@ -577,7 +580,7 @@ class Application(object):
             "--cache-nnps",
             dest="cache_nnps",
             action="store_true",
-            default=False,
+            default=self.cache_nnps,
             help="Option to enable the use of neighbor caching.")
 
         nnps_options.add_argument(
@@ -908,20 +911,21 @@ class Application(object):
     def _configure_options(self):
         options = self.options
         # Setup configuration options.
+        config = get_config()
         if options.with_openmp is not None:
-            get_config().use_openmp = options.with_openmp
+            config.use_openmp = options.with_openmp
         if options.omp_schedule is not None:
-            get_config().set_omp_schedule(options.omp_schedule)
+            config.set_omp_schedule(options.omp_schedule)
         if options.with_opencl:
-            get_config().use_opencl = True
+            config.use_opencl = True
         if options.with_local_memory:
             leaf_size = int(options.octree_leaf_size)
-            get_config().wgs = leaf_size
-            get_config().use_local_memory = True
+            config.wgs = leaf_size
+            config.use_local_memory = True
         if options.use_double:
-            get_config().use_double = options.use_double
+            config.use_double = options.use_double
         if options.profile:
-            get_config().profile = options.profile
+            config.profile = options.profile
         for pa in self.particles:
             pa.update_backend()
 

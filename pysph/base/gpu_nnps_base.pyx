@@ -221,6 +221,12 @@ cdef class GPUNNPS(NNPSBase):
         self.particles[pa_index].gpu.align(indices)
         callback()
 
+    def set_use_cache(self, bint use_cache):
+        self.use_cache = use_cache
+        if use_cache:
+            for cache in self.cache:
+                cache.update()
+
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
 
