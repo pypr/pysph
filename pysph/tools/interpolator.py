@@ -339,7 +339,7 @@ class Interpolator(object):
 
         self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
         if comp and (self.method in ['sph', 'shepard']):
-            raise RuntimeError("Error: used 'order1' method to evaluate"
+            raise RuntimeError("Error: use 'order1' method to evaluate"
                                "gradient")
         elif self.method in ['sph', 'shepard']:
             result = self.pa.prop.copy()
