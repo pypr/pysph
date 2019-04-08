@@ -231,8 +231,7 @@ class WindTunnel(Application):
         np.savez(res, t=t, cd=cd, cl=cl)
 
     def _get_force_evaluator(self):
-        solid = get_particle_array()
-        fluid = get_particle_array()
+        from pysph.solver.utils import load
         from pysph.base.kernels import QuinticSpline
         from pysph.tools.sph_evaluator import SPHEvaluator
         from pysph.sph.equation import Group
@@ -241,6 +240,15 @@ class WindTunnel(Application):
             SolidWallNoSlipBC, VolumeSummation,
             MomentumEquationViscosity
         )
+        data = load(self.output_files[0])
+        solid = data['arrays']['solid']
+        fluid = data['arrays']['fluid']
+
+        prop = ['awhat', 'auhat', 'avhat', 'wg', 'vg', 'ug', 'V', 'uf', 'vf',
+                'wf', 'wij', 'vmag']
+        for p in prop:
+            solid.add_property(p)
+            fluid.add_property(p)
         equations = [
             Group(
                 equations=[
@@ -296,7 +304,7 @@ class WindTunnel(Application):
         plt.plot(t, cd, label=r'$C_d$')
         plt.plot(t, cl, label=r'$C_l$')
         plt.xlabel(r'$t$')
-        plt.ylabel('C_d/C_l')
+        plt.ylabel('$C_d$/$C_l$')
         plt.legend()
         fig = os.path.join(self.output_dir, "lift_drag_vs_t.png")
         plt.savefig(fig, dpi=300)
