@@ -13,7 +13,6 @@ import os
 
 from pysph.base.kernels import QuinticSpline
 from pysph.sph.equation import Equation
-from pysph.base.nnps import DomainManager
 from pysph.base.utils import get_particle_array
 from pysph.solver.application import Application
 from pysph.sph.scheme import SchemeChooser
@@ -40,6 +39,21 @@ c0 = 10 * umax
 p0 = rho * c0 * c0
 
 
+class ExtrapolateUhat(Equation):
+    def initialize(self, d_idx, d_uhat, d_wij):
+        d_uhat[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_uhat, s_uhat, d_wij, s_rho,
+             d_au, d_av, d_aw, WIJ, XIJ):
+        d_uhat[d_idx] += s_uhat[s_idx]*WIJ
+        d_wij[d_idx] += WIJ
+
+    def post_loop(self, d_idx, d_wij, d_uhat, d_rho):
+        if d_wij[d_idx] > 1e-14:
+            d_uhat[d_idx] /= d_wij[d_idx]
+
+
 class ResetInletVelocity(Equation):
     def __init__(self, dest, sources, U, V, W):
         self.U = U
@@ -55,16 +69,6 @@ class ResetInletVelocity(Equation):
 
 
 class WindTunnel(Application):
-    def create_domain(self):
-        dx = self.dx
-        i_ghost = n_inlet*dx
-        o_ghost = n_outlet*dx
-        domain = DomainManager(
-            xmin=-i_ghost, xmax=l_tunnel+o_ghost, ymin=-w_tunnel,
-            ymax=w_tunnel, periodic_in_y=True
-        )
-        return domain
-
     def add_user_options(self, group):
         group.add_argument(
             "--re", action="store", type=float, dest="re", default=200,
@@ -109,6 +113,39 @@ class WindTunnel(Application):
             rho=rho
         )
         return fluid
+
+    def _create_wall(self):
+        dx = self.dx
+        h0 = self.hdx * self.dx
+        x0, y0 = np.mgrid[
+            dx/2: l_tunnel+n_inlet*dx+n_outlet*dx: dx, dx/2: n_wall*dx: dx]
+        x0 -= n_inlet*dx
+        y0 -= n_wall*dx+w_tunnel
+        x0 = np.ravel(x0)
+        y0 = np.ravel(y0)
+
+        x1 = np.copy(x0)
+        y1 = np.copy(y0)
+        y1 += n_wall*dx+2*w_tunnel
+        x1 = np.ravel(x1)
+        y1 = np.ravel(y1)
+        x0 = np.concatenate((x0, x1))
+        y0 = np.concatenate((y0, y1))
+        volume = dx*dx
+        wall = get_particle_array(
+            name='wall', x=x0, y=y0, m=volume*rho, rho=rho, h=h0, V=1.0/volume)
+        return wall
+
+    def _set_wall_normal(self, pa):
+        props = ['xn', 'yn', 'zn']
+        for p in props:
+            pa.add_property(p)
+
+        y = pa.y
+        cond = y > 0.0
+        pa.yn[cond] = 1.0
+        cond = y < 0.0
+        pa.yn[cond] = -1.0
 
     def _create_solid(self):
         dx = self.dx
@@ -159,11 +196,14 @@ class WindTunnel(Application):
         solid = self._create_solid()
         outlet = self._create_outlet()
         inlet = self._create_inlet()
+        wall = self._create_wall()
         G.remove_overlap_particles(fluid, solid, dx_solid=self.dx, dim=2)
 
         particles = [
-            fluid, inlet, outlet, solid
+            fluid, inlet, outlet, solid, wall
         ]
+
+        self._set_wall_normal(wall)
         self.scheme.setup_properties(particles)
 
         return particles
@@ -175,7 +215,8 @@ class WindTunnel(Application):
 
         edac = EDACScheme(
             ['fluid'], ['solid'], dim=2, rho0=rho, c0=c0, h=h0,
-            pb=None, nu=nu, alpha=0.2, inlet_outlet_manager=self.iom
+            pb=None, nu=nu, alpha=0.2, inlet_outlet_manager=self.iom,
+            inviscid_solids=['wall']
         )
 
         s = SchemeChooser(default='edac', edac=edac)
@@ -197,7 +238,8 @@ class WindTunnel(Application):
     def _create_inlet_outlet_manager(self):
         inleteqns = [
             ResetInletVelocity('inlet', [], U=umax, V=0.0, W=0.0),
-            SolidWallPressureBC('inlet', ['fluid'])
+            SolidWallPressureBC('inlet', ['fluid']),
+            ExtrapolateUhat('inlet', ['fluid'])
         ]
 
         inlet_info = InletInfo(
