@@ -473,7 +473,8 @@ class EDACTVFStep(IntegratorStep):
 class EDACScheme(Scheme):
     def __init__(self, fluids, solids, dim, c0, nu, rho0, pb=0.0,
                  gx=0.0, gy=0.0, gz=0.0, tdamp=0.0, eps=0.0, h=0.0,
-                 edac_alpha=0.5, alpha=0.0, bql=True, clamp_p=False):
+                 edac_alpha=0.5, alpha=0.0, bql=True, clamp_p=False,
+                 inlet_outlet_manager=None):
         """The EDAC scheme.
 
         Parameters
@@ -530,6 +531,7 @@ class EDACScheme(Scheme):
         self.edac_alpha = edac_alpha
         self.alpha = alpha
         self.h = h
+        self.inlet_outlet_manager = inlet_outlet_manager
         self.attributes_changed()
 
     # Public protocol ###################################################
@@ -602,18 +604,27 @@ class EDACScheme(Scheme):
             steppers.update(extra_steppers)
 
         step_cls = EDACTVFStep if self.use_tvf else EDACStep
+        cls = integrator_cls if integrator_cls is not None else PECIntegrator
 
         for fluid in self.fluids:
             if fluid not in steppers:
                 steppers[fluid] = step_cls()
 
-        cls = integrator_cls if integrator_cls is not None else PECIntegrator
+        iom = self.inlet_outlet_manager
+        if iom is not None:
+            iom_stepper = iom.get_stepper(self, cls)
+            for name in iom_stepper:
+                steppers[name] = iom_stepper[name]
+
         integrator = cls(**steppers)
 
         from pysph.solver.solver import Solver
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel, **kw
         )
+
+        if iom is not None:
+            iom.setup_iom(dim=self.dim, kernel=kernel)
 
     def get_equations(self):
         if self.use_tvf:
@@ -647,13 +658,20 @@ class EDACScheme(Scheme):
         extra_props = TVF_FLUID_PROPS if self.use_tvf else EDAC_PROPS
 
         all_fluid_props = DEFAULT_PROPS.union(extra_props)
-        for fluid in self.fluids:
+        iom = self.inlet_outlet_manager
+        fluids_with_io = self.fluids
+        if iom is not None:
+            io_particles = iom.get_io_names()
+            fluids_with_io = self.fluids + io_particles
+        for fluid in fluids_with_io:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, all_fluid_props, clean)
             pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
                                   'm', 'h', 'V'])
             if 'pavg' in pa.properties:
                 pa.add_output_arrays(['pavg'])
+            if iom is not None:
+                iom.add_io_properties(pa, self)
 
         TVF_SOLID_PROPS = ['V', 'wij', 'ax', 'ay', 'az',
                            'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
@@ -683,12 +701,24 @@ class EDACScheme(Scheme):
             MomentumEquationViscosity
         )
         edac_nu = self._get_edac_nu()
-        all = self.fluids + self.solids
+
+        iom = self.inlet_outlet_manager
+        fluids_with_io = self.fluids
+        if iom is not None:
+            fluids_with_io = self.fluids + iom.get_io_names()
+        all = fluids_with_io + self.solids
+
         equations = []
+        # inlet-outlet
+        if iom is not None:
+            io_eqns = iom.get_equations(self)
+            for grp in io_eqns:
+                equations.append(grp)
+
         group1 = []
         avg_p_group = []
         has_solids = len(self.solids) > 0
-        for fluid in self.fluids:
+        for fluid in fluids_with_io:
             group1.append(SummationDensity(dest=fluid, sources=all))
             if self.bql:
                 eq = ComputeAveragePressure(dest=fluid, sources=all)
@@ -700,9 +730,9 @@ class EDACScheme(Scheme):
         for solid in self.solids:
             group1.extend([
                 VolumeSummation(dest=solid, sources=all),
-                SolidWallPressureBC(dest=solid, sources=self.fluids,
+                SolidWallPressureBC(dest=solid, sources=fluids_with_io,
                                     gx=self.gx, gy=self.gy, gz=self.gz),
-                SetWallVelocity(dest=solid, sources=self.fluids),
+                SetWallVelocity(dest=solid, sources=fluids_with_io),
             ])
 
         equations.append(Group(equations=group1, real=False))
@@ -720,16 +750,17 @@ class EDACScheme(Scheme):
                 )
             )
             if self.alpha > 0.0:
+                sources = fluids_with_io + self.solids
                 group2.append(
                     MomentumEquationArtificialViscosity(
-                        dest=fluid, sources=all, alpha=self.alpha,
+                        dest=fluid, sources=sources, alpha=self.alpha,
                         c0=self.c0
                     )
                 )
             if self.nu > 0.0:
                 group2.append(
                     MomentumEquationViscosity(
-                        dest=fluid, sources=self.fluids, nu=self.nu
+                        dest=fluid, sources=fluids_with_io, nu=self.nu
                     )
                 )
             if len(self.solids) > 0 and self.nu > 0.0:
@@ -740,7 +771,7 @@ class EDACScheme(Scheme):
                 )
             group2.extend([
                 MomentumEquationArtificialStress(
-                    dest=fluid, sources=self.fluids
+                    dest=fluid, sources=fluids_with_io
                 ),
                 EDACEquation(
                     dest=fluid, sources=all, nu=edac_nu, cs=self.c0,
@@ -752,6 +783,7 @@ class EDACScheme(Scheme):
         return equations
 
     def _get_external_flow_equations(self):
+
         from pysph.sph.basic_equations import XSPHCorrection
         from pysph.sph.wc.transport_velocity import (
             VolumeSummation, SolidWallNoSlipBC, SummationDensity,
@@ -759,6 +791,7 @@ class EDACScheme(Scheme):
             MomentumEquationViscosity
         )
         all = self.fluids + self.solids
+
         edac_nu = self._get_edac_nu()
         equations = []
         group1 = []

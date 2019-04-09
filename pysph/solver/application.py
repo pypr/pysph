@@ -224,6 +224,7 @@ class Application(object):
         # The default value that is overridden by the command line
         # options passed or in initializee.
         self.cache_nnps = False
+        self.iom = None
 
         self.initialize()
         self.scheme = self.create_scheme()
@@ -843,7 +844,7 @@ class Application(object):
             # Hook up the inlet/outlet's update method to be called after
             # each stage.
             for obj in self.inlet_outlet:
-                solver.add_post_step_callback(obj.update)
+                solver.add_post_stage_callback(obj.update)
 
     def _create_particles(self, particle_factory, *args, **kw):
         """ Create particles given a callable `particle_factory` and any
