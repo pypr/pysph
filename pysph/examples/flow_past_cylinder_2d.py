@@ -39,6 +39,21 @@ c0 = 10 * umax
 p0 = rho * c0 * c0
 
 
+class ExtrapolateUhat(Equation):
+    def initialize(self, d_idx, d_uhat, d_wij):
+        d_uhat[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_uhat, s_uhat, d_wij, s_rho,
+             d_au, d_av, d_aw, WIJ, XIJ):
+        d_uhat[d_idx] += s_uhat[s_idx]*WIJ
+        d_wij[d_idx] += WIJ
+
+    def post_loop(self, d_idx, d_wij, d_uhat, d_rho):
+        if d_wij[d_idx] > 1e-14:
+            d_uhat[d_idx] /= d_wij[d_idx]
+
+
 class ResetInletVelocity(Equation):
     def __init__(self, dest, sources, U, V, W):
         self.U = U
@@ -223,7 +238,8 @@ class WindTunnel(Application):
     def _create_inlet_outlet_manager(self):
         inleteqns = [
             ResetInletVelocity('inlet', [], U=umax, V=0.0, W=0.0),
-            SolidWallPressureBC('inlet', ['fluid'])
+            SolidWallPressureBC('inlet', ['fluid']),
+            ExtrapolateUhat('inlet', ['fluid'])
         ]
 
         inlet_info = InletInfo(
