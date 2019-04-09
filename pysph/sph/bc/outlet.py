@@ -52,7 +52,7 @@ class Outlet(object):
         self.zn = outletinfo.normal[2]
         self.length = outletinfo.length
 
-    def _io_eval(self):
+    def _create_io_eval(self):
         if self.io_eval is None:
             from pysph.sph.equation import Group
             from pysph.tools.sph_evaluator import SPHEvaluator
@@ -86,7 +86,7 @@ class Outlet(object):
             outlet_pa = self.outlet_pa
             source_pa = self.source_pa
 
-            self.io_eval = self._io_eval()
+            self.io_eval = self._create_io_eval()
             self.io_eval.update()
             self.io_eval.evaluate()
 

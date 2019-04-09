@@ -51,7 +51,7 @@ class Inlet(object):
         self.zn = inletinfo.normal[2]
         self.length = inletinfo.length
 
-    def _io_eval(self):
+    def _create_io_eval(self):
         if self.io_eval is None:
             from pysph.sph.equation import Group
             from pysph.tools.sph_evaluator import SPHEvaluator
@@ -87,7 +87,7 @@ class Inlet(object):
             dest_pa = self.dest_pa
             inlet_pa = self.inlet_pa
 
-            self.io_eval = self._io_eval()
+            self.io_eval = self._create_io_eval()
             self.io_eval.update()
             self.io_eval.evaluate()
 
