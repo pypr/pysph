@@ -734,3 +734,72 @@ class SolidWallPressureBC(Equation):
 
         # update the density from the pressure Eq. (28)
         d_rho[d_idx] = self.rho0 * (d_p[d_idx]/self.p0 + self.b)
+
+
+class NoSlipVelocityExtrapolation(Equation):
+    '''No Slip boundary condition on the wall
+
+    The velocity of the fluid is extrapolated over to the wall using
+    shepard extrapolation. The velocity normal to the wall is reflected back
+    to impose no penetration.
+    '''
+    def initialize(self, d_idx, d_u, d_v, d_w, d_wij):
+        d_u[d_idx] = 0.0
+        d_v[d_idx] = 0.0
+        d_w[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_u, d_v, d_w, s_u, s_v, s_w, d_wij, WIJ,
+             XIJ):
+        d_u[d_idx] += s_u[s_idx]*WIJ
+        d_v[d_idx] += s_v[s_idx]*WIJ
+        d_w[d_idx] += s_w[s_idx]*WIJ
+        d_wij[d_idx] += WIJ
+
+    def post_loop(self, d_idx, d_wij, d_u, d_v, d_w, d_xn, d_yn, d_zn):
+        if d_wij[d_idx] > 1e-14:
+            d_u[d_idx] /= d_wij[d_idx]
+            d_v[d_idx] /= d_wij[d_idx]
+            d_w[d_idx] /= d_wij[d_idx]
+
+        projection = d_u[d_idx]*d_xn[d_idx] +\
+            d_v[d_idx]*d_yn[d_idx] + d_w[d_idx]*d_zn[d_idx]
+
+        d_u[d_idx] = d_u[d_idx] - 2 * projection * d_xn[d_idx]
+        d_v[d_idx] = d_v[d_idx] - 2 * projection * d_yn[d_idx]
+        d_w[d_idx] = d_w[d_idx] - 2 * projection * d_zn[d_idx]
+
+
+class NoSlipAdvVelocityExtrapolation(Equation):
+    '''No Slip boundary condition on the wall
+
+    The advection velocity of the fluid is extrapolated over to the wall
+    using shepard extrapolation. The advection velocity normal to the wall
+    is reflected back to impose no penetration.
+    '''
+    def initialize(self, d_idx, d_uhat, d_vhat, d_what, d_wij):
+        d_uhat[d_idx] = 0.0
+        d_vhat[d_idx] = 0.0
+        d_what[d_idx] = 0.0
+        d_wij[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_uhat, d_vhat, d_what, s_uhat, s_vhat,
+             s_what, d_wij, WIJ, XIJ):
+        d_uhat[d_idx] += s_uhat[s_idx]*WIJ
+        d_vhat[d_idx] += s_vhat[s_idx]*WIJ
+        d_what[d_idx] += s_what[s_idx]*WIJ
+        d_wij[d_idx] += WIJ
+
+    def post_loop(self, d_idx, d_wij, d_uhat, d_vhat, d_what, d_xn, d_yn,
+                  d_zn):
+        if d_wij[d_idx] > 1e-14:
+            d_uhat[d_idx] /= d_wij[d_idx]
+            d_vhat[d_idx] /= d_wij[d_idx]
+            d_what[d_idx] /= d_wij[d_idx]
+
+        projection = d_uhat[d_idx]*d_xn[d_idx] +\
+            d_vhat[d_idx]*d_yn[d_idx] + d_what[d_idx]*d_zn[d_idx]
+
+        d_uhat[d_idx] = d_uhat[d_idx] - 2 * projection * d_xn[d_idx]
+        d_vhat[d_idx] = d_vhat[d_idx] - 2 * projection * d_yn[d_idx]
+        d_what[d_idx] = d_what[d_idx] - 2 * projection * d_zn[d_idx]

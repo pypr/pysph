@@ -474,7 +474,7 @@ class EDACScheme(Scheme):
     def __init__(self, fluids, solids, dim, c0, nu, rho0, pb=0.0,
                  gx=0.0, gy=0.0, gz=0.0, tdamp=0.0, eps=0.0, h=0.0,
                  edac_alpha=0.5, alpha=0.0, bql=True, clamp_p=False,
-                 inlet_outlet_manager=None):
+                 inlet_outlet_manager=None, inviscid_solids=None):
         """The EDAC scheme.
 
         Parameters
@@ -512,6 +512,10 @@ class EDACScheme(Scheme):
         clamp_p : bool
             Clamp the boundary pressure to positive values.  This is only used
             for external flows.
+        inlet_outlet_manager : InletOutletManager Instance
+            Pass the manager if inlet outlet boundaries are present
+        inviscid_solids : list
+            list of inviscid solid array names
         """
         self.c0 = c0
         self.nu = nu
@@ -532,6 +536,8 @@ class EDACScheme(Scheme):
         self.alpha = alpha
         self.h = h
         self.inlet_outlet_manager = inlet_outlet_manager
+        self.inviscid_solids = [] if inviscid_solids is None else\
+            inviscid_solids
         self.attributes_changed()
 
     # Public protocol ###################################################
@@ -673,11 +679,15 @@ class EDACScheme(Scheme):
             if iom is not None:
                 iom.add_io_properties(pa, self)
 
-        TVF_SOLID_PROPS = ['V', 'wij', 'ax', 'ay', 'az',
-                           'uf', 'vf', 'wf', 'ug', 'vg', 'wg']
+        TVF_SOLID_PROPS = ['V', 'wij', 'ax', 'ay', 'az', 'uf', 'vf', 'wf',
+                           'ug', 'vg', 'wg']
+        if self.inviscid_solids:
+            TVF_SOLID_PROPS += ['xn', 'yn', 'zn', 'uhat',
+                                'vhat', 'what']
+        print(TVF_SOLID_PROPS)
         extra_props = TVF_SOLID_PROPS if self.use_tvf else EDAC_SOLID_PROPS
         all_solid_props = DEFAULT_PROPS.union(extra_props)
-        for solid in self.solids:
+        for solid in (self.solids+self.inviscid_solids):
             pa = particle_arrays[solid]
             self._ensure_properties(pa, all_solid_props, clean)
             pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'rho', 'p',
@@ -698,15 +708,17 @@ class EDACScheme(Scheme):
             VolumeSummation, SolidWallNoSlipBC, SummationDensity,
             MomentumEquationArtificialStress,
             MomentumEquationArtificialViscosity,
-            MomentumEquationViscosity
+            MomentumEquationViscosity, NoSlipVelocityExtrapolation,
+            NoSlipAdvVelocityExtrapolation
         )
         edac_nu = self._get_edac_nu()
 
         iom = self.inlet_outlet_manager
         fluids_with_io = self.fluids
+        all_solids = self.solids + self.inviscid_solids
         if iom is not None:
             fluids_with_io = self.fluids + iom.get_io_names()
-        all = fluids_with_io + self.solids
+        all = fluids_with_io + all_solids
 
         equations = []
         # inlet-outlet
@@ -717,7 +729,7 @@ class EDACScheme(Scheme):
 
         group1 = []
         avg_p_group = []
-        has_solids = len(self.solids) > 0
+        has_solids = len(all_solids) > 0
         for fluid in fluids_with_io:
             group1.append(SummationDensity(dest=fluid, sources=all))
             if self.bql:
@@ -734,6 +746,16 @@ class EDACScheme(Scheme):
                                     gx=self.gx, gy=self.gy, gz=self.gz),
                 SetWallVelocity(dest=solid, sources=fluids_with_io),
             ])
+        for solid in self.inviscid_solids:
+            group1.extend([
+                NoSlipVelocityExtrapolation(
+                    dest=solid, sources=fluids_with_io),
+                NoSlipAdvVelocityExtrapolation(
+                    dest=solid, sources=fluids_with_io),
+                VolumeSummation(dest=solid, sources=all),
+                SolidWallPressureBC(dest=solid, sources=fluids_with_io,
+                                    gx=self.gx, gy=self.gy, gz=self.gz)
+                ])
 
         equations.append(Group(equations=group1, real=False))
 
@@ -780,6 +802,7 @@ class EDACScheme(Scheme):
             ])
         equations.append(Group(equations=group2))
 
+        print(equations)
         return equations
 
     def _get_external_flow_equations(self):
@@ -788,9 +811,10 @@ class EDACScheme(Scheme):
         from pysph.sph.wc.transport_velocity import (
             VolumeSummation, SolidWallNoSlipBC, SummationDensity,
             MomentumEquationArtificialViscosity,
-            MomentumEquationViscosity
+            MomentumEquationViscosity, NoSlipVelocityExtrapolation
         )
-        all = self.fluids + self.solids
+        all_solids = self.solids + self.inviscid_solids
+        all = self.fluids + all_solids
 
         edac_nu = self._get_edac_nu()
         equations = []
@@ -808,6 +832,15 @@ class EDACScheme(Scheme):
                 group1.append(
                     ClampWallPressure(dest=solid, sources=None)
                 )
+
+        for solid in self.inviscid_solids:
+            group1.extend([
+                NoSlipVelocityExtrapolation(
+                    dest=solid, sources=self.fluids),
+                VolumeSummation(dest=solid, sources=all),
+                SolidWallPressureBC(dest=solid, sources=self.fluids,
+                                    gx=self.gx, gy=self.gy, gz=self.gz)
+                ])
 
         equations.append(Group(equations=group1, real=False))
 
