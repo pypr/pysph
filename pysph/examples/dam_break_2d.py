@@ -48,11 +48,11 @@ class DamBreak2D(Application):
     def add_user_options(self, group):
         corrections = ['', 'mixed-corr', 'grad-corr', 'kernel-corr', 'crksph']
         group.add_argument(
-            '--dx', action='store', type=float, dest='dx',  default=dx,
+            '--dx', action='store', type=float, dest='dx', default=dx,
             help='Particle spacing.'
         )
         group.add_argument(
-            '--hdx', action='store', type=float, dest='hdx',  default=hdx,
+            '--hdx', action='store', type=float, dest='hdx', default=hdx,
             help='Specify the hdx factor where h = hdx * dx.'
         )
         group.add_argument(
@@ -60,7 +60,7 @@ class DamBreak2D(Application):
             default='', help="Type of Kernel Correction", choices=corrections
         )
         group.add_argument(
-            '--staggered-grid', action="store_true",  dest='staggered_grid',
+            '--staggered-grid', action="store_true", dest='staggered_grid',
             default=False, help="Use a staggered grid for particles.",
         )
 
@@ -77,14 +77,15 @@ class DamBreak2D(Application):
             tf=tf, output_at_times=[0.4, 0.6, 0.8, 1.0]
         )
         if self.options.scheme == 'wcsph':
+            dt = 0.125 * self.h / co
             self.scheme.configure(h0=self.h, hdx=self.hdx)
             kernel = WendlandQuintic(dim=2)
-            from pysph.sph.integrator import EPECIntegrator
+            from pysph.sph.integrator import PECIntegrator
             kw.update(
                 dict(
-                    integrator_cls=EPECIntegrator,
+                    integrator_cls=PECIntegrator,
                     kernel=kernel, adaptive_timestep=True, n_damp=50,
-                    fixed_h=False
+                    fixed_h=False, dt=dt
                 )
             )
         elif self.options.scheme == 'aha':
