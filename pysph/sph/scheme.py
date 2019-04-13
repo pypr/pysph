@@ -1279,7 +1279,7 @@ class GSPHScheme(Scheme):
         )
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
         from pysph.sph.gas_dynamics.gsph import (
-            GSPHGradients, GSPHAcceleration
+            GSPHGradients, GSPHAcceleration, GSPHUpdateGhostProps
         )
         equations = []
         # Find the optimal 'h'
@@ -1349,7 +1349,12 @@ class GSPHScheme(Scheme):
 
         g3 = []
         for fluid in self.fluids:
-            g3.append(GSPHAcceleration(
+            g3.append(GSPHUpdateGhostProps(dest=fluid, sources=None))
+        equations.append(Group(equations=g3, update_nnps=False, real=False))
+
+        g4 = []
+        for fluid in self.fluids:
+            g4.append(GSPHAcceleration(
                 dest=fluid, sources=all_pa, g1=self.g1,
                 g2=self.g2, monotonicity=self.monotonicity,
                 rsolver=self.rsolver, interpolation=self.interpolation,
@@ -1357,7 +1362,7 @@ class GSPHScheme(Scheme):
                 hybrid=self.hybrid, blend_alpha=self.blend_alpha,
                 gamma=self.gamma, niter=self.niter, tol=self.tol
             ))
-        equations.append(Group(equations=g3))
+        equations.append(Group(equations=g4))
         return equations
 
     def setup_properties(self, particles, clean=True):
@@ -1371,6 +1376,9 @@ class GSPHScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles();
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 
         solid_props = set(props) | set(('wij', 'htmp'))
