@@ -879,7 +879,9 @@ class AdamiHuAdamsScheme(TVFScheme):
 class GasDScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
-                 update_alpha1=False, update_alpha2=False):
+                 update_alpha1=False, update_alpha2=False,
+                 max_density_iterations=250,
+                 density_iteration_tolerance=1e-5):
         """
         Parameters
         ----------
@@ -907,6 +909,10 @@ class GasDScheme(Scheme):
             Update the alpha1 parameter dynamically.
         update_alpha2: bool
             Update the alpha2 parameter dynamically.
+        max_density_iterations: int
+            Maximum number of iterations to run for one density step
+        density_iteration_tolerance: float
+            Maximum difference allowed in two successive density iterations
         """
         self.fluids = fluids
         self.solids = solids
@@ -920,6 +926,8 @@ class GasDScheme(Scheme):
         self.beta = beta
         self.kernel_factor = kernel_factor
         self.adaptive_h_scheme = adaptive_h_scheme
+        self.density_iteration_tolerance = density_iteration_tolerance
+        self.max_density_iterations = max_density_iterations
 
     def add_user_options(self, group):
         choices = ['gsph', 'mpm']
@@ -1023,13 +1031,14 @@ class GasDScheme(Scheme):
                 g1.append(
                     SummationDensity(
                         dest=fluid, sources=self.fluids, k=self.kernel_factor,
-                        density_iterations=True, dim=self.dim, htol=1e-3
+                        density_iterations=True, dim=self.dim,
+                        htol=self.density_iteration_tolerance
                     )
                 )
 
             equations.append(Group(
                 equations=g1, update_nnps=True, iterate=True,
-                max_iterations=50
+                max_iterations=self.max_density_iterations
             ))
 
         elif self.adaptive_h_scheme == 'gsph':
