@@ -1376,6 +1376,7 @@ class GSPHScheme(Scheme):
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_gasd
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_gasd(name='junk')
         props = (list(dummy.properties.keys()) +
