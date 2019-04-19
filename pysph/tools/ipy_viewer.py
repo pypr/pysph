@@ -151,18 +151,23 @@ class Viewer(object):
         self.show_results()
         self.show_log()
 
-    def _cmap_helper(self, data, array_name):
+    def _cmap_helper(self, data, array_name, for_plot_vectors=False):
         '''
         Helper Function:
         Takes in a numpy array and returns its maximum,
-        minimum and absolute maximum values, subject to the constraints
-        provided by the user in the legend_lower_lim and legend_upper_lim
-        text boxes. Also returns the input array normalized by the maximum.
+        minimum , subject to the constraints provided by the user
+        in the legend_lower_lim and legend_upper_lim text boxes.
+        Also returns the input array normalized by the maximum.
         '''
 
         pa_widgets = self._widgets.particles[array_name]
-        ulim = pa_widgets.legend_upper_lim.value
-        llim = pa_widgets.legend_lower_lim.value
+        if for_plot_vectors is False:
+            ulim = pa_widgets.legend_upper_lim.value
+            llim = pa_widgets.legend_lower_lim.value
+        elif for_plot_vectors is True:
+            ulim = ''
+            llim = ''
+
         if llim == '' and ulim == '':
             pass
         elif llim != '' and ulim == '':
@@ -192,7 +197,10 @@ class Viewer(object):
             # This takes care of the case when all the values are the same.
             # Use case is the initialization of some scalars (like density).
             if ulim == '' and llim == '':
-                return actual_minm, actual_maxm, np.ones_like(data)
+                if actual_maxm != 0:
+                    return actual_minm, actual_maxm, np.ones_like(data)
+                else:
+                    return actual_minm, actual_maxm, np.zeros_like(data)
             else:
                 data_norm = (data-actual_minm)/(actual_maxm-actual_minm)
                 return actual_minm, actual_maxm, data_norm
@@ -204,12 +212,12 @@ class Viewer(object):
 
         if self.viewer_type == 'Viewer2D':
             self._widgets = Viewer2DWidgets(
-                file=self.paths_list[0],
+                file_name=self.paths_list[0],
                 file_count=len(self.paths_list) - 1,
             )
         elif self.viewer_type == 'Viewer3D':
             self._widgets = Viewer3DWidgets(
-                file=self.paths_list[0],
+                file_name=self.paths_list[0],
                 file_count=len(self.paths_list) - 1,
             )
 
@@ -290,26 +298,36 @@ class Viewer(object):
 
         array_name = change['owner'].owner
         pa_widgets = self._widgets.particles[array_name]
-        temp_data = self.get_frame(
-            self._widgets.frame.value
-        )['arrays']
-        sct = self._scatters[array_name]
-        c = self._get_c(pa_widgets, temp_data[array_name])
-        colormap = getattr(
-            plt.cm,
-            pa_widgets.scalar_cmap.value
-        )
-        min_c, max_c, c_norm = self._cmap_helper(
-            c,
-            array_name
-        )
-        if self.viewer_type == 'Viewer2D':
-            sct.set_facecolors(colormap(c_norm))
-            self._legend_handler(None)
-            self.figure.show()
-        elif self.viewer_type == 'Viewer3D':
-            sct.color = colormap(c_norm)
-            self._legend_handler(None)
+        if pa_widgets.scalar.value != 'None':
+            temp_data = self.get_frame(
+                self._widgets.frame.value
+            )['arrays']
+            sct = self._scatters[array_name]
+            n = pa_widgets.masking_factor.value
+            stride, component = self._stride_and_component(
+                temp_data[array_name], pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
+            colormap = getattr(
+                plt.cm,
+                pa_widgets.scalar_cmap.value
+            )
+            min_c, max_c, c_norm = self._cmap_helper(
+                c,
+                array_name
+            )
+            if self.viewer_type == 'Viewer2D':
+                sct.set_facecolors(colormap(c_norm[::n]))
+                self._legend_handler(None)
+                self.figure.show()
+            elif self.viewer_type == 'Viewer3D':
+                sct.color = colormap(c_norm[::n])
+                self._legend_handler(None)
 
     def _delay_box_handler(self, change):
 
@@ -418,7 +436,15 @@ class Viewer(object):
             n = pa_widgets.masking_factor.value
             if n > 0:
                 temp_data = self.get_frame(self._widgets.frame.value)['arrays']
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 colormap = getattr(
                     plt.cm,
                     pa_widgets.scalar_cmap.value
@@ -431,8 +457,8 @@ class Viewer(object):
                     self._scatters[array_name].remove()
                     del self._scatters[array_name]
                     self._scatters[array_name] = self._scatter_ax.scatter(
-                        temp_data[array_name].x[::n],
-                        temp_data[array_name].y[::n],
+                        temp_data[array_name].x[component::stride][::n],
+                        temp_data[array_name].y[component::stride][::n],
                         s=pa_widgets.scalar_size.value,
                     )
                     self._scatters[array_name].set_facecolors(
@@ -449,9 +475,9 @@ class Viewer(object):
                         del self._vectors[array_name]
                     self.plot.scatters = copy
                     self._scatters[array_name] = p3.scatter(
-                        temp_data[array_name].x[::n],
-                        temp_data[array_name].y[::n],
-                        temp_data[array_name].z[::n],
+                        temp_data[array_name].x[component::stride][::n],
+                        temp_data[array_name].y[component::stride][::n],
+                        temp_data[array_name].z[component::stride][::n],
                         color=colormap(c_norm[::n]),
                         size=pa_widgets.scalar_size.value,
                         marker=pa_widgets.scatter_plot_marker.value,
@@ -464,21 +490,86 @@ class Viewer(object):
                 else:
                     print('Masking factor must be a positive integer.')
 
-    def _get_c(self, pa_widgets, data, need_vmag=False):
+    def _get_c(self, pa_widgets, data, component=0, stride=1, need_vmag=False):
+
+        c = [0]
         if pa_widgets.scalar.value == 'vmag' or need_vmag is True:
-            u = data.u
-            v = data.v
+            u = getattr(data, 'u')[component::stride]
+            v = getattr(data, 'v')[component::stride]
             c = u**2 + v**2
             if self.viewer_type == 'Viewer3D':
-                w = data.w
-                c = c + w**2
+                w = getattr(data, 'w')[component::stride]
+                c += w**2
             c = c**0.5
-        else:
+        elif pa_widgets.scalar.value != 'None':
             c = getattr(
                 data,
                 pa_widgets.scalar.value
-            )
+            )[component::stride]
         return c
+
+    def _opacity_handler(self, change):
+
+        array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        if pa_widgets.is_visible.value is True:
+            alpha = pa_widgets.opacity.value
+            n = pa_widgets.masking_factor.value
+            temp_data = self.get_frame(
+                self._widgets.frame.value
+            )['arrays']
+            stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
+            colormap = getattr(
+                plt.cm,
+                pa_widgets.scalar_cmap.value
+            )
+            sct = self._scatters[array_name]
+            min_c, max_c, c_norm = self._cmap_helper(
+                c,
+                array_name
+            )
+            cm = colormap(c_norm[::n])
+            cm[0:, 3] *= alpha
+            if self.viewer_type == 'Viewer2D':
+                sct.set_facecolors(cm)
+                self._legend_handler(None)
+                self.figure.show()
+
+    def _components_handler(self, change, array_name=None):
+
+        if array_name is None:
+            array_name = change['owner'].owner
+        pa_widgets = self._widgets.particles[array_name]
+        scalar = pa_widgets.scalar.value
+        if pa_widgets.is_visible.value is True:
+            temp_data = self.get_frame(self._widgets.frame.value)['arrays']
+            if scalar in temp_data[array_name].stride.keys():
+                stride = temp_data[array_name].stride[array_name]
+                if pa_widgets.components.value > stride:
+                    pa_widgets.components.value = stride
+                elif pa_widgets.components.value < 1:
+                    pa_widgets.components.value = 1
+            self._scalar_handler({'owner': pa_widgets.scalar})
+
+    def _stride_and_component(self, data, pa_widgets):
+
+        if pa_widgets.scalar.value in data.stride.keys():
+            pa_widgets.components.disabled = False
+            component = pa_widgets.components.value - 1
+            stride = data.stride[pa_widgets.scalar.value]
+        else:
+            pa_widgets.components.disabled = True
+            stride = 1
+            component = 0
+        return stride, component
 
 
 class ParticleArrayWidgets(object):
@@ -582,12 +673,30 @@ class ParticleArrayWidgets(object):
             layout=widgets.Layout(width='160px', display='flex'),
         )
         self.masking_factor.owner = self.array_name
+        self.opacity = widgets.FloatSlider(
+            min=0,
+            max=1,
+            step=0.01,
+            value=1,
+            description='opacity',
+            layout=widgets.Layout(width='300px'),
+            continuous_update=False,
+        )
+        self.opacity.owner = self.array_name
+        self.components = widgets.IntText(
+            value=1,
+            description='component',
+            disabled=True,
+            layout=widgets.Layout(width='160px', display='flex'),
+        )
+        self.components.owner = self.array_name
 
     def _tab_config(self):
 
         VBox1 = widgets.VBox(
             [
                 self.scalar,
+                self.components,
                 self.scalar_size,
                 self.scalar_cmap,
             ]
@@ -597,6 +706,7 @@ class ParticleArrayWidgets(object):
                 self.vector,
                 self.vector_scale,
                 self.vector_width,
+                self.opacity,
             ]
         )
         VBox3 = widgets.VBox(
@@ -786,12 +896,21 @@ class Viewer2D(Viewer):
             pa_widgets = self._widgets.particles[array_name]
             if pa_widgets.scalar.value != 'None':
                 n = pa_widgets.masking_factor.value
+                alpha = pa_widgets.opacity.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
                 sct = self._scatters[array_name] = self._scatter_ax.scatter(
-                    temp_data[array_name].x[::n],
-                    temp_data[array_name].y[::n],
+                    temp_data[array_name].x[component::stride][::n],
+                    temp_data[array_name].y[component::stride][::n],
                     s=pa_widgets.scalar_size.value,
                 )
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 colormap = getattr(
                     plt.cm,
                     pa_widgets.scalar_cmap.value
@@ -800,7 +919,9 @@ class Viewer2D(Viewer):
                     c,
                     array_name
                 )
-                sct.set_facecolors(colormap(c_norm[::n]))
+                cm = colormap(c_norm[::n])
+                cm[0:, 3] *= alpha
+                sct.set_facecolors(cm)
                 if pa_widgets.is_visible.value is False:
                     sct.set_offsets(None)
 
@@ -831,19 +952,22 @@ class Viewer2D(Viewer):
             if (pa_widgets.vector.value != '' and
                     pa_widgets.is_visible.value is True):
                 n = pa_widgets.masking_factor.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
                 temp_data_arr = temp_data[array_name]
-                x = temp_data_arr.x[::n]
-                y = temp_data_arr.y[::n]
+                x = temp_data_arr.x[component::stride][::n]
+                y = temp_data_arr.y[component::stride][::n]
 
                 try:
                     v1 = getattr(
                         temp_data_arr,
                         pa_widgets.vector.value.split(",")[0]
-                        )[::n]
+                        )[component::stride][::n]
                     v2 = getattr(
                         temp_data_arr,
                         pa_widgets.vector.value.split(",")[1]
-                        )[::n]
+                        )[component::stride][::n]
                 except AttributeError:
                     continue
 
@@ -856,6 +980,7 @@ class Viewer2D(Viewer):
                     vmag,
                     scale=pa_widgets.vector_scale.value,
                     width=(pa_widgets.vector_width.value)/10000,
+                    units='xy'
                 )
         self._vector_ax.set_xlim(self._scatter_ax.get_xlim())
         self._vector_ax.set_ylim(self._scatter_ax.get_ylim())
@@ -872,17 +997,25 @@ class Viewer2D(Viewer):
             if (pa_widgets.scalar.value != 'None' and
                     pa_widgets.is_visible.value is True):
                 n = pa_widgets.masking_factor.value
+                alpha = pa_widgets.opacity.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
                 sct = self._scatters[array_name]
                 sct.set_offsets(
                     np.vstack(
                         (
-                            temp_data[array_name].x[::n],
-                            temp_data[array_name].y[::n]
+                            temp_data[array_name].x[component::stride][::n],
+                            temp_data[array_name].y[component::stride][::n]
                         )
                     ).T
                 )
-
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 colormap = getattr(
                     plt.cm,
                     pa_widgets.scalar_cmap.value
@@ -891,7 +1024,9 @@ class Viewer2D(Viewer):
                     c,
                     array_name
                 )
-                sct.set_facecolors(colormap(c_norm[::n]))
+                cm = colormap(c_norm[::n])
+                cm[0:, 3] *= alpha
+                sct.set_facecolors(cm)
 
         self._legend_handler(None)
         self._vector_handler(None)
@@ -905,54 +1040,53 @@ class Viewer2D(Viewer):
         pa_widgets = self._widgets.particles[array_name]
         if pa_widgets.is_visible.value is True:
             n = pa_widgets.masking_factor.value
+            alpha = pa_widgets.opacity.value
             temp_data = self.get_frame(
                 self._widgets.frame.value
             )['arrays']
+            stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+            )
             sct = self._scatters[array_name]
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
+            colormap = getattr(
+                plt.cm,
+                pa_widgets.scalar_cmap.value
+            )
+            min_c, max_c, c_norm = self._cmap_helper(
+                c,
+                array_name
+            )
+            cm = colormap(c_norm[::n])
+            cm[0:, 3] *= alpha
 
             new = change['new']
             old = change['old']
 
             if (new == 'None' and old == 'None'):
                 pass
-
             elif (new == 'None' and old != 'None'):
                 sct.set_offsets(None)
-
             elif (new != 'None' and old == 'None'):
                 sct.set_offsets(
                     np.vstack(
                         (
-                            temp_data[array_name].x[::n],
-                            temp_data[array_name].y[::n]
+                            temp_data[array_name].x[component::stride][::n],
+                            temp_data[array_name].y[component::stride][::n]
                         )
                     ).T
                 )
-                c = self._get_c(pa_widgets, temp_data[array_name])
-                colormap = getattr(
-                    plt.cm,
-                    pa_widgets.scalar_cmap.value
-                )
-                min_c, max_c, c_norm = self._cmap_helper(
-                    c,
-                    array_name
-                )
-                sct.set_facecolors(colormap(c_norm[::n]))
-
+                sct.set_facecolors(cm)
             elif (new != 'None' and old != 'None'):
-                c = self._get_c(pa_widgets, temp_data[array_name])
-                colormap = getattr(
-                        plt.cm,
-                        pa_widgets.scalar_cmap.value
-                )
-                min_c, max_c, c_norm = self._cmap_helper(
-                    c,
-                    array_name
-                )
-                sct.set_facecolors(colormap(c_norm[::n]))
+                sct.set_facecolors(cm)
 
+            self._plot_vectors()
             self._legend_handler(None)
-
             self.figure.show()
 
     def _vector_handler(self, change):
@@ -1002,10 +1136,19 @@ class Viewer2D(Viewer):
         pa_widgets = self._widgets.particles[array_name]
         if pa_widgets.is_visible.value is True:
             n = pa_widgets.masking_factor.value
+            alpha = pa_widgets.opacity.value
             temp_data = self.get_frame(
                 self._widgets.frame.value
             )['arrays']
-            c = self._get_c(pa_widgets, temp_data[array_name])
+            stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
             colormap = getattr(
                 plt.cm,
                 pa_widgets.scalar_cmap.value
@@ -1015,7 +1158,9 @@ class Viewer2D(Viewer):
                 c,
                 array_name
             )
-            sct.set_facecolors(colormap(c_norm[::n]))
+            cm = colormap(c_norm[::n])
+            cm[0:, 3] *= alpha
+            sct.set_facecolors(cm)
             self._legend_handler(None)
             self.figure.show()
 
@@ -1034,7 +1179,15 @@ class Viewer2D(Viewer):
             if (pa_widgets.legend.value is True and
                     pa_widgets.is_visible.value is True):
                 if pa_widgets.scalar.value != 'None':
-                    c = self._get_c(pa_widgets, temp_data[array_name])
+                    stride, component = self._stride_and_component(
+                        temp_data[array_name], pa_widgets
+                    )
+                    c = self._get_c(
+                        pa_widgets,
+                        temp_data[array_name],
+                        component,
+                        stride
+                    )
                     cmap = pa_widgets.scalar_cmap.value
                     colormap = getattr(mpl.cm, cmap)
                     self._scatter_ax.set_position(
@@ -1081,6 +1234,7 @@ class Viewer2D(Viewer):
             self._scatter_ax.set_position(
                 [0, 0, 1, 1]
             )
+        self._plot_vectors()
         if change is not None:
             self.figure.show()
 
@@ -1122,15 +1276,24 @@ class Viewer2D(Viewer):
                 sct.set_offsets(None)
             elif change['new'] is True:
                 n = pa_widgets.masking_factor.value
+                alpha = pa_widgets.opacity.value
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
                 sct.set_offsets(
                     np.vstack(
                         (
-                            temp_data[array_name].x[::n],
-                            temp_data[array_name].y[::n]
+                            temp_data[array_name].x[component::stride][::n],
+                            temp_data[array_name].y[component::stride][::n]
                         )
                     ).T
                 )
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 colormap = getattr(
                     plt.cm,
                     pa_widgets.scalar_cmap.value
@@ -1139,11 +1302,13 @@ class Viewer2D(Viewer):
                     c,
                     array_name
                 )
-                sct.set_facecolors(colormap(c_norm[::n]))
+                cm = colormap(c_norm[::n])
+                cm[0:, 3] *= alpha
+                sct.set_facecolors()
 
-            self._legend_handler(None)
-            self._plot_vectors()
-            self.figure.show()
+        self._legend_handler(None)
+        self._plot_vectors()
+        self.figure.show()
 
     def _show_solver_time_handler(self, change):
 
@@ -1271,15 +1436,22 @@ class ParticleArrayWidgets3D(object):
             layout=widgets.Layout(width='240px', display='flex')
         )
         self.scatter_plot_marker.owner = self.array_name
+        self.components = widgets.IntText(
+            value=1,
+            description='component',
+            disabled=True,
+            layout=widgets.Layout(width='160px', display='flex'),
+        )
+        self.components.owner = self.array_name
 
     def _tab_config(self):
 
         VBox1 = widgets.VBox(
             [
                 self.scalar,
+                self.components,
                 self.scalar_size,
                 self.scalar_cmap,
-                self.scatter_plot_marker,
             ]
         )
         VBox2 = widgets.VBox(
@@ -1299,6 +1471,7 @@ class ParticleArrayWidgets3D(object):
                     ]
                 ),
                 self.masking_factor,
+                self.scatter_plot_marker,
             ]
         )
         hbox = widgets.HBox([VBox1, VBox2, VBox3])
@@ -1307,9 +1480,9 @@ class ParticleArrayWidgets3D(object):
 
 class Viewer3DWidgets(object):
 
-    def __init__(self, file, file_count):
+    def __init__(self, file_name, file_count):
 
-        self.temp_data = load(file)
+        self.temp_data = load(file_name)
         self.time = str(self.temp_data['solver_data']['t'])
         self.temp_data = self.temp_data['arrays']
         self.frame = widgets.IntSlider(
@@ -1449,16 +1622,25 @@ class Viewer3D(Viewer):
             if pa_widgets.scalar.value != 'None':
                 n = pa_widgets.masking_factor.value
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 min_c, max_c, c_norm = self._cmap_helper(
                     c,
                     array_name
                 )
+                cm = colormap(c_norm[::n])
                 self._scatters[array_name] = p3.scatter(
-                    temp_data[array_name].x[::n],
-                    temp_data[array_name].y[::n],
-                    temp_data[array_name].z[::n],
-                    color=colormap(c_norm[::n]),
+                    temp_data[array_name].x[component::stride][::n],
+                    temp_data[array_name].y[component::stride][::n],
+                    temp_data[array_name].z[component::stride][::n],
+                    color=cm,
                     size=pa_widgets.scalar_size.value,
                     marker=pa_widgets.scatter_plot_marker.value,
                 )
@@ -1489,32 +1671,42 @@ class Viewer3D(Viewer):
         if pa_widgets.velocity_vectors.value is True:
             n = pa_widgets.masking_factor.value
             colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-            c = self._get_c(pa_widgets, data, need_vmag=True)
+            stride, component = self._stride_and_component(
+                data, pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                data,
+                component,
+                stride,
+                need_vmag=True
+            )
             min_c, max_c, c_norm = self._cmap_helper(
                 c,
-                array_name
+                array_name,
+                for_plot_vectors=True
             )
             if array_name in self._vectors.keys():
                 vectors = self._vectors[array_name]
-                vectors.x = data.x[::n]
-                vectors.y = data.y[::n]
-                vectors.z = data.z[::n]
-                vectors.u = getattr(data, 'u')[::n]
-                vectors.v = getattr(data, 'v')[::n]
-                vectors.w = getattr(data, 'w')[::n]
+                vectors.x = data.x[component::stride][::n]
+                vectors.y = data.y[component::stride][::n]
+                vectors.z = data.z[component::stride][::n]
+                vectors.vx = getattr(data, 'u')[component::stride][::n]
+                vectors.vy = getattr(data, 'v')[component::stride][::n]
+                vectors.vz = getattr(data, 'w')[component::stride][::n]
                 vectors.size = pa_widgets.vector_size.value
-                vectors.color = colormap(c_norm)
+                vectors.color = colormap(c_norm)[::n]
             else:
                 import ipyvolume.pylab as p3
                 self._vectors[array_name] = p3.quiver(
-                    x=data.x[::n],
-                    y=data.y[::n],
-                    z=data.z[::n],
-                    u=getattr(data, 'u')[::n],
-                    v=getattr(data, 'v')[::n],
-                    w=getattr(data, 'w')[::n],
+                    x=data.x[component::stride][::n],
+                    y=data.y[component::stride][::n],
+                    z=data.z[component::stride][::n],
+                    u=getattr(data, 'u')[component::stride][::n],
+                    v=getattr(data, 'v')[component::stride][::n],
+                    w=getattr(data, 'w')[component::stride][::n],
                     size=pa_widgets.vector_size.value,
-                    color=colormap(c_norm)
+                    color=colormap(c_norm)[::n]
                 )
         else:
             pass
@@ -1531,16 +1723,25 @@ class Viewer3D(Viewer):
                 if pa_widgets.scalar.value != 'None':
                     n = pa_widgets.masking_factor.value
                     colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
+                    stride, comp = self._stride_and_component(
+                        temp_data[array_name], pa_widgets
+                    )
+                    c = self._get_c(
+                        pa_widgets,
+                        temp_data[array_name],
+                        component,
+                        stride
+                    )
                     scatters = self._scatters[array_name]
-                    c = self._get_c(pa_widgets, temp_data[array_name])
                     min_c, max_c, c_norm = self._cmap_helper(
                         c,
                         array_name
                     )
-                    scatters.x = temp_data[array_name].x[::n]
-                    scatters.y = temp_data[array_name].y[::n]
-                    scatters.z = temp_data[array_name].z[::n]
-                    scatters.color = colormap(c_norm[::n])
+                    cm = colormap(c_norm[::n])
+                    scatters.x = temp_data[array_name].x[comp::stride][::n]
+                    scatters.y = temp_data[array_name].y[comp::stride][::n]
+                    scatters.z = temp_data[array_name].z[comp::stride][::n]
+                    scatters.color = cm
                 self._plot_vectors(
                     pa_widgets,
                     temp_data[array_name],
@@ -1568,19 +1769,28 @@ class Viewer3D(Viewer):
                 n = pa_widgets.masking_factor.value
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 temp_data = self.get_frame(self._widgets.frame.value)['arrays']
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                stride, component = self._stride_and_component(
+                    temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 min_c, max_c, c_norm = self._cmap_helper(
                     c,
                     array_name
                 )
+                cm = colormap(c_norm[::n])
                 if old != 'None' and new != 'None':
-                    self._scatters[array_name].color = colormap(c_norm[::n])
+                    self._scatters[array_name].color = cm
                 else:
                     self._scatters[array_name] = p3.scatter(
-                        temp_data[array_name].x[::n],
-                        temp_data[array_name].y[::n],
-                        temp_data[array_name].z[::n],
-                        color=colormap(c_norm[::n]),
+                        temp_data[array_name].x[component::stride][::n],
+                        temp_data[array_name].y[component::stride][::n],
+                        temp_data[array_name].z[component::stride][::n],
+                        color=cm,
                         size=pa_widgets.scalar_size.value,
                         marker=pa_widgets.scatter_plot_marker.value,
                     )
@@ -1631,12 +1841,21 @@ class Viewer3D(Viewer):
         if pa_widgets.is_visible.value is True:
             n = pa_widgets.masking_factor.value
             colormap = getattr(mpl.cm, change['new'])
-            c = self._get_c(pa_widgets, temp_data[array_name])
+            stride, component = self._stride_and_component(
+                temp_data[array_name], pa_widgets
+            )
+            c = self._get_c(
+                pa_widgets,
+                temp_data[array_name],
+                component,
+                stride
+            )
             min_c, max_c, c_norm = self._cmap_helper(
                 c,
                 array_name
             )
-            self._scatters[array_name].color = colormap(c_norm[::n])
+            cm = colormap(c_norm[::n])
+            self._scatters[array_name].color = cm
             self._legend_handler(None)
 
     def _legend_handler(self, change):
@@ -1661,7 +1880,15 @@ class Viewer3D(Viewer):
                         pa_widgets.legend.value is True):
                     if pa_widgets.is_visible.value is True:
                         cmap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
-                        c = self._get_c(pa_widgets, temp_data[array_name])
+                        stride, component = self._stride_and_component(
+                            temp_data[array_name], pa_widgets
+                        )
+                        c = self._get_c(
+                            pa_widgets,
+                            temp_data[array_name],
+                            component,
+                            stride
+                        )
                         min_c, max_c, c_norm = self._cmap_helper(
                             c,
                             array_name
@@ -1762,16 +1989,25 @@ class Viewer3D(Viewer):
                 n = pa_widgets.masking_factor.value
                 colormap = getattr(mpl.cm, pa_widgets.scalar_cmap.value)
                 temp_data = self.get_frame(self._widgets.frame.value)['arrays']
-                c = self._get_c(pa_widgets, temp_data[array_name])
+                stride, component = self._stride_and_component(
+                            temp_data[array_name], pa_widgets
+                )
+                c = self._get_c(
+                    pa_widgets,
+                    temp_data[array_name],
+                    component,
+                    stride
+                )
                 min_c, max_c, c_norm = self._cmap_helper(
                     c,
                     array_name
                 )
+                cm = colormap(c_norm[::n])
                 self._scatters[array_name] = p3.scatter(
-                    temp_data[array_name].x[::n],
-                    temp_data[array_name].y[::n],
-                    temp_data[array_name].z[::n],
-                    color=colormap(c_norm[::n]),
+                    temp_data[array_name].x[component::stride][::n],
+                    temp_data[array_name].y[component::stride][::n],
+                    temp_data[array_name].z[component::stride][::n],
+                    color=cm,
                     size=pa_widgets.scalar_size.value,
                     marker=pa_widgets.scatter_plot_marker.value,
                 )
