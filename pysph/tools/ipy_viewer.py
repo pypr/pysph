@@ -562,9 +562,9 @@ class Viewer(object):
     def _stride_and_component(self, data, pa_widgets):
 
         if pa_widgets.scalar.value in data.stride.keys():
-                    pa_widgets.components.disabled = False
-                    component = pa_widgets.components.value - 1
-                    stride = data.stride[pa_widgets.scalar.value]
+            pa_widgets.components.disabled = False
+            component = pa_widgets.components.value - 1
+            stride = data.stride[pa_widgets.scalar.value]
         else:
             pa_widgets.components.disabled = True
             stride = 1
