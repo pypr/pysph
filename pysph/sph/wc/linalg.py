@@ -149,15 +149,15 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
         else:
             for backColr in range(rb, augCol):
                 backCol = rb + augCol - backColr - 1
-                m[nt*rb + backCol] = float(m[nt*rb + backCol]) / m[nt*rb + rb]
+                m[nt*rb + backCol] = m[nt*rb + backCol] / m[nt*rb + rb]
             if not (rb == 0):
                 for kupr in range(rb):
                     kup = rb - kupr - 1
                     for kleftr in range(rb, augCol):
                         kleft = rb + augCol - kleftr - 1
-                        kk = -float(m[nt*kup + rb]) / float(m[nt*rb + rb])
+                        kk = -m[nt*kup + rb] / m[nt*rb + rb]
                         m[nt*kup + kleft] = (m[nt*kup + kleft] +
-                                             kk * float(m[nt*rb + kleft]))
+                                             kk * m[nt*rb + kleft])
 
     for i in range(n):
         for j in range(nb):
