@@ -1,9 +1,3 @@
-"""
-Inlet Outlet Manager
-"""
-# Copyright (c) 2015-2017, Prabhu Ramachandran
-# License: BSD
-
 from pysph.sph.equation import Equation
 
 

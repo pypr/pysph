@@ -760,6 +760,7 @@ class Solver(object):
         if (self.t + dt) > (self.tf - self._epsilon):
             dt = self.tf - self.t
 
+        #print(dt)
         return dt
 
     def _get_undamped_timestep(self):
