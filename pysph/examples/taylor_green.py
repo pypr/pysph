@@ -24,6 +24,7 @@ from pysph.sph.wc.gtvf import GTVFScheme
 from pysph.sph.wc.pcisph import PCISPHScheme
 from pysph.sph.wc.shift import ShiftPositions
 from pysph.sph.isph.sisph import SISPHScheme
+from pysph.sph.isph.isph import ISPHScheme
 
 
 # domain and constants
@@ -50,6 +51,7 @@ def m4p(x=0.0):
 class M4(Equation):
     '''An equation to be used for remeshing.
     '''
+
     def initialize(self, d_idx, d_prop):
         d_prop[d_idx] = 0.0
 
@@ -151,9 +153,7 @@ class TaylorGreen(Application):
         self.hdx = self.options.hdx
 
         h0 = self.hdx * self.dx
-        if self.options.scheme == 'iisph' or self.options.scheme == 'pcisph':
-            dt_cfl = 0.25 * h0 / U
-        if self.options.scheme == 'sisph':
+        if self.options.scheme.endswith('isph'):
             dt_cfl = 0.25 * h0 / U
         else:
             dt_cfl = 0.25 * h0 / (c0 + U)
@@ -161,7 +161,7 @@ class TaylorGreen(Application):
         dt_force = 0.25 * 1.0
 
         self.dt = min(dt_cfl, dt_viscous, dt_force)
-        self.tf = 5.0
+        self.tf = 2.0
         self.kernel_correction = self.options.kernel_correction
 
     def configure_scheme(self):
@@ -175,16 +175,13 @@ class TaylorGreen(Application):
             scheme.configure(hdx=self.hdx, nu=self.nu, h0=h0)
         elif self.options.scheme == 'edac':
             scheme.configure(h=h0, nu=self.nu, pb=self.options.pb_factor * p0)
-        elif self.options.scheme == 'iisph' or self.options.scheme == 'pcisph':
-            scheme.configure(nu=self.nu)
+        elif self.options.scheme.endswith('isph'):
             pfreq = 10
+            scheme.configure(nu=self.nu)
         elif self.options.scheme == 'crksph':
             scheme.configure(h0=h0, nu=self.nu)
         elif self.options.scheme == 'gtvf':
             scheme.configure(pref=p0, nu=self.nu, h0=h0)
-        elif self.options.scheme == 'sisph':
-            pfreq = 10
-            scheme.configure(nu=self.nu)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
 
@@ -223,9 +220,13 @@ class TaylorGreen(Application):
             c0=c0, alpha=0.0, has_ghosts=True, pref=p0,
             rho_cutoff=0.2, internal_flow=True, gtvf=True
         )
+        isph = ISPHScheme(
+            fluids=['fluid'], solids=[], dim=2, nu=None, rho0=rho0, c0=c0,
+            alpha=0.0
+        )
         s = SchemeChooser(
             default='tvf', wcsph=wcsph, tvf=tvf, edac=edac, iisph=iisph,
-            crksph=crksph, gtvf=gtvf, pcisph=pcisph, sisph=sisph
+            crksph=crksph, gtvf=gtvf, pcisph=pcisph, sisph=sisph, isph=isph
         )
         return s
 
@@ -330,6 +331,13 @@ class TaylorGreen(Application):
             fluid.add_property('dpos', stride=3)
             fluid.add_property('gradv', stride=9)
 
+        if self.options.scheme == 'isph':
+            gid = np.arange(fluid.get_number_of_particles(real=False))
+            fluid.add_property('gid')
+            fluid.gid[:] = gid[:]
+            fluid.add_property('dpos', stride=3)
+            fluid.add_property('gradv', stride=9)
+
         return [fluid]
 
     def create_tools(self):
@@ -354,7 +362,7 @@ class TaylorGreen(Application):
                              'au', 'av', 'auhat', 'avhat', 'ap']
                 else:
                     props = ['u', 'v', 'p', 'au', 'av', 'ax', 'ay', 'ap']
-            elif options.scheme == 'iisph':
+            elif options.scheme == 'iisph' or options.scheme == 'isph':
                 # The accelerations are not really needed since the current
                 # stepper is a single stage stepper.
                 props = ['u', 'v', 'p']
