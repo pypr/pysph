@@ -107,7 +107,7 @@ getfullargspec = getattr(
 
 
 def get_kernel_definition(kernel, arg_list):
-    sig = '__kernel void\n{kernel}\n({args})'.format(
+    sig = 'KERNEL void\n{kernel}\n({args})'.format(
         kernel=kernel, args=', '.join(arg_list),
     )
     return '\n'.join(wrap(sig, width=78, subsequent_indent=' ' * 4,
@@ -256,8 +256,8 @@ class OpenCLAccelerationEval(object):
 
 def add_address_space(known_types):
     for v in known_types.values():
-        if '__global' not in v.type:
-            v.type = '__global ' + v.type
+        if 'GLOBAL_MEM' not in v.type:
+            v.type = 'GLOBAL_MEM ' + v.type
 
 
 def get_equations_with_converged(group):
@@ -296,7 +296,7 @@ class AccelerationEvalOpenCLHelper(object):
             self.object.all_group.pre_comp
         ))
         self.known_types.update(predefined)
-        self.known_types['NBRS'] = KnownType('__global unsigned int*')
+        self.known_types['NBRS'] = KnownType('GLOBAL_MEM unsigned int*')
         self.data = []
         self._ctx = get_context()
         self._queue = get_queue()
@@ -458,7 +458,7 @@ class AccelerationEvalOpenCLHelper(object):
         headers.append(transpiler.parse_instance(object.kernel))
         cls_name = object.kernel.__class__.__name__
         self.known_types['SPH_KERNEL'] = KnownType(
-            '__global %s*' % cls_name, base_type=cls_name
+            'GLOBAL_MEM %s*' % cls_name, base_type=cls_name
         )
         headers.append(object.all_group.get_equation_wrappers(
             self.known_types
@@ -514,7 +514,7 @@ class AccelerationEvalOpenCLHelper(object):
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
             'int d_idx = get_global_id(0);'
-            '__global %s* SPH_KERNEL = kern;' % sph_k_name
+            'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
             all_eqs, kind, indent=''
@@ -532,7 +532,7 @@ class AccelerationEvalOpenCLHelper(object):
         py_args.extend(_args)
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
-            ['__global {kernel}* kern'.format(kernel=sph_k_name),
+            ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
              'double t', 'double dt']
         )
 
@@ -557,7 +557,7 @@ class AccelerationEvalOpenCLHelper(object):
             method = getattr(eq, kind, None)
             if method is not None:
                 cls = eq.__class__.__name__
-                arg = '__global {cls}* {name}'.format(
+                arg = 'GLOBAL_MEM {cls}* {name}'.format(
                     cls=cls, name=eq.var_name
                 )
                 all_args.append(arg)
@@ -676,9 +676,9 @@ class AccelerationEvalOpenCLHelper(object):
         code = self._declare_precomp_vars(context)
         code.append('unsigned int d_idx = get_global_id(0);')
         code.append('unsigned int s_idx, i;')
-        code.append('__global %s* SPH_KERNEL = kern;' % sph_k_name)
+        code.append('GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name)
         code.append('unsigned int start = start_idx[d_idx];')
-        code.append('__global unsigned int* NBRS = &(neighbors[start]);')
+        code.append('GLOBAL_MEM unsigned int* NBRS = &(neighbors[start]);')
         code.append('int N_NBRS = nbr_length[d_idx];')
         code.append('unsigned int end = start + N_NBRS;')
         if eq_group.has_loop_all():
@@ -724,10 +724,10 @@ class AccelerationEvalOpenCLHelper(object):
         body = self._set_kernel(body, self.object.kernel)
 
         all_args.extend(
-            ['__global {kernel}* kern'.format(kernel=sph_k_name),
-             '__global unsigned int *nbr_length',
-             '__global unsigned int *start_idx',
-             '__global unsigned int *neighbors',
+            ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
+             'GLOBAL_MEM unsigned int *nbr_length',
+             'GLOBAL_MEM unsigned int *start_idx',
+             'GLOBAL_MEM unsigned int *neighbors',
              'double t', 'double dt']
         )
 
@@ -754,7 +754,7 @@ class AccelerationEvalOpenCLHelper(object):
         context = eq_group.context
         all_args, py_args = [], []
         setup_code = self._declare_precomp_vars(context)
-        setup_code.append('__global %s* SPH_KERNEL = kern;' % sph_k_name)
+        setup_code.append('GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name)
 
         if eq_group.has_loop_all():
             raise NotImplementedError("loop_all not suported with local "
@@ -804,7 +804,7 @@ class AccelerationEvalOpenCLHelper(object):
         loop_body = self._set_kernel(loop_body, self.object.kernel)
 
         all_args.extend(
-            ['__global {kernel}* kern'.format(kernel=sph_k_name),
+            ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
              'double t', 'double dt']
         )
         all_args.extend(get_kernel_args_list())

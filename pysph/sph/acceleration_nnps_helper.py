@@ -121,16 +121,16 @@ NNPS_TEMPLATE = r"""
 """
 
 NNPS_ARGS_TEMPLATE = """
-    __global int *_unique_cids, __global int *_pids_src, __global int
+    GLOBAL_MEM int *_unique_cids, GLOBAL_MEM int *_pids_src, GLOBAL_MEM int
     *_pids_dst,
-    __global int *_cids,
-    __global uint2 *_pbounds_src, __global uint2 *_pbounds_dst,
+    GLOBAL_MEM int *_cids,
+    GLOBAL_MEM uint2 *_pbounds_src, GLOBAL_MEM uint2 *_pbounds_dst,
     %(data_t)s _radius_scale,
-    __global int *_neighbor_cid_offset, __global int *_neighbor_cids,
-    __global %(data_t)s *xd, __global %(data_t)s *yd,
-    __global %(data_t)s *zd, __global %(data_t)s *hd,
-    __global %(data_t)s *xs, __global %(data_t)s *ys,
-    __global %(data_t)s *zs, __global %(data_t)s *hs
+    GLOBAL_MEM int *_neighbor_cid_offset, GLOBAL_MEM int *_neighbor_cids,
+    GLOBAL_MEM %(data_t)s *xd, GLOBAL_MEM %(data_t)s *yd,
+    GLOBAL_MEM %(data_t)s *zd, GLOBAL_MEM %(data_t)s *hd,
+    GLOBAL_MEM %(data_t)s *xs, GLOBAL_MEM %(data_t)s *ys,
+    GLOBAL_MEM %(data_t)s *zs, GLOBAL_MEM %(data_t)s *hs
     """
 
 

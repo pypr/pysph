@@ -828,9 +828,10 @@ class OpenCLGroup(Group):
             if 's_' in k:
                 # TODO: Make each argument have their own KnownType
                 # right from the start
-                loop_ann[k] = KnownType(
-                    loop_ann[k].type.replace('__global', '__local')
-                )
+                new_type = loop_ann[k].type.replace(
+                    'GLOBAL_MEM', 'LOCAL_MEM'
+                ).replace('__global', 'LOCAL_MEM')
+                loop_ann[k] = KnownType(new_type)
         for eq in eqs.values():
             cls = eq.__class__
             loop = getattr(cls, 'loop', None)
@@ -862,7 +863,7 @@ class OpenCLGroup(Group):
         wrappers = []
         predefined = dict(get_predefined_types(self.pre_comp))
         predefined.update(known_types)
-        predefined['NBRS'] = KnownType('__global unsigned int*')
+        predefined['NBRS'] = KnownType('GLOBAL_MEM unsigned int*')
 
         use_local_memory = get_config().use_local_memory
         modified_classes = []
