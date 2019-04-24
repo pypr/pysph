@@ -124,7 +124,7 @@ class NumpyOutput(Output):
         save_method(filename, version=2, **output_data)
 
     def _load(self, fname):
-        data = numpy.load(fname, encoding='bytes')
+        data = numpy.load(fname, encoding='bytes', allow_pickle=True)
 
         if 'version' not in data.files:
             msg = "Wrong file type! No version number recorded."
