@@ -189,7 +189,7 @@ class DeviceHelper(object):
             indices = {1: indices}
         for prop in self.properties:
             stride = self._particle_array.stride.get(prop, 1)
-            self._data[prop].align(indices.get(stride))
+            self._data[prop] = self._data[prop].align(indices.get(stride))
             setattr(self, prop, self._data[prop])
 
     def add_prop(self, name, carray):
@@ -516,7 +516,7 @@ class DeviceHelper(object):
         for prop in self.properties:
             stride = self._particle_array.stride.get(prop, 1)
             s_index = s_indices[stride]
-            self._data[prop].align(s_index)
+            self._data[prop] = self._data[prop].align(s_index)
             setattr(self, prop, self._data[prop])
 
         if align:
