@@ -1,5 +1,5 @@
-'''This helper module orchestrates the generation of OpenCL code, compiles it
-and makes it available for use.
+'''This helper module orchestrates the generation of OpenCL/CUDA code, compiles
+it and makes it available for use.
 
 Overview
 ~~~~~~~~~
@@ -80,12 +80,8 @@ from textwrap import wrap
 
 import numpy as np
 from mako.template import Template
-import pyopencl as cl
-import pyopencl.array  # noqa: 401
-import pyopencl.tools  # noqa: 401
 
 from pysph.base.utils import is_overloaded_method
-from compyle.opencl import profile_kernel, get_context, get_queue
 from pysph.base.device_helper import DeviceHelper
 
 from pysph.sph.acceleration_nnps_helper import generate_body, \
@@ -93,7 +89,7 @@ from pysph.sph.acceleration_nnps_helper import generate_body, \
 
 from compyle.ext_module import get_platform_dir
 from compyle.config import get_config
-from compyle.translator import (CStructHelper, OpenCLConverter,
+from compyle.translator import (CStructHelper, CUDAConverter, OpenCLConverter,
                                 ocl_detect_type, ocl_detect_pointer_base_type)
 
 from .equation import get_predefined_types, KnownType
@@ -135,7 +131,42 @@ def get_helper_code(helpers, transpiler=None):
     return result
 
 
-class OpenCLAccelerationEval(object):
+class DummyQueue(object):
+    def finish(self):
+        pass
+
+
+def get_context():
+    cfg = get_config()
+    if cfg.use_cuda:
+        from compyle.cuda import set_context
+        set_context()
+        from pycuda.autoinit import context
+        return context
+    elif cfg.use_opencl:
+        from compyle.opencl import get_context
+        return get_context()
+
+
+def get_queue():
+    cfg = get_config()
+    if cfg.use_cuda:
+        return DummyQueue()
+    elif cfg.use_opencl:
+        from compyle.opencl import get_queue
+        return get_queue()
+
+
+def profile_kernel(knl, name):
+    cfg = get_config()
+    if cfg.use_cuda:
+        return knl
+    elif cfg.use_opencl:
+        from compyle.opencl import profile_kernel
+        return profile_kernel(knl, name)
+
+
+class GPUAccelerationEval(object):
     """Does the actual work of performing the evaluation.
     """
 
@@ -243,7 +274,7 @@ class OpenCLAccelerationEval(object):
         self.nnps = nnps
 
     def update_particle_arrays(self, arrays):
-        raise NotImplementedError('OpenCL backend is incomplete')
+        raise NotImplementedError('GPU backend is incomplete')
 
     def update_nnps(self):
         self.nnps.update_domain()
@@ -282,7 +313,7 @@ def convert_to_float_if_needed(code):
     return code
 
 
-class AccelerationEvalOpenCLHelper(object):
+class AccelerationEvalGPUHelper(object):
     def __init__(self, acceleration_eval):
         self.object = acceleration_eval
         self.all_array_names = get_all_array_names(
@@ -307,6 +338,11 @@ class AccelerationEvalOpenCLHelper(object):
         self._gpu_structs = {}
         self.calls = []
         self.program = None
+        cfg = get_config()
+        if cfg.use_opencl:
+            self.backend = 'opencl'
+        elif cfg.use_cuda:
+            self.backend = 'cuda'
 
     def _setup_arrays_on_device(self):
         pas = self.object.particle_arrays
@@ -314,26 +350,36 @@ class AccelerationEvalOpenCLHelper(object):
         array_index = {}
         for idx, pa in enumerate(pas):
             if pa.gpu is None:
-                pa.set_device_helper(DeviceHelper(pa, backend='opencl'))
+                pa.set_device_helper(DeviceHelper(pa, backend=self.backend))
             array_map[pa.name] = pa
             array_index[pa.name] = idx
 
         self._array_map = array_map
         self._array_index = array_index
 
-        gpu = self._gpu_structs
-        cpu = self._cpu_structs
-        for k, v in cpu.items():
-            if v is None:
-                gpu[k] = v
-            else:
-                g_struct, code = cl.tools.match_dtype_to_c_struct(
-                    self._ctx.devices[0], "dummy", v.dtype
-                )
-                g_v = v.astype(g_struct)
-                gpu[k] = cl.array.to_device(self._queue, g_v)
-                if k in self._equations:
-                    self._equations[k]._gpu = gpu[k]
+        self._setup_structs_on_device()
+
+    def _setup_stucts_on_device(self):
+        if self.backend == 'opencl':
+            import pyopencl as cl
+            import pyopencl.array  # noqa: 401
+            import pyopencl.tools  # noqa: 401
+
+            gpu = self._gpu_structs
+            cpu = self._cpu_structs
+            for k, v in cpu.items():
+                if v is None:
+                    gpu[k] = v
+                else:
+                    g_struct, code = cl.tools.match_dtype_to_c_struct(
+                        self._ctx.devices[0], "dummy", v.dtype
+                    )
+                    g_v = v.astype(g_struct)
+                    gpu[k] = cl.array.to_device(self._queue, g_v)
+                    if k in self._equations:
+                        self._equations[k]._gpu = gpu[k]
+        else:
+            raise NotImplementedError('CUDA not supported yet')
 
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
@@ -404,10 +450,13 @@ class AccelerationEvalOpenCLHelper(object):
     ##########################################################################
     def get_code(self):
         path = os.path.join(os.path.dirname(__file__),
-                            'acceleration_eval_opencl.mako')
+                            'acceleration_eval_gpu.mako')
         template = Template(filename=path)
         main = template.render(helper=self)
-        from pyopencl._cluda import CLUDA_PREAMBLE
+        if self.backend == 'opencl':
+            from pyopencl._cluda import CLUDA_PREAMBLE
+        elif self.backend == 'cuda':
+            from pycuda._cluda import CLUDA_PREAMBLE
         double_support = get_config().use_double
         cluda = Template(CLUDA_PREAMBLE).render(double_support=double_support)
         main = "\n".join([cluda, main])
@@ -417,24 +466,38 @@ class AccelerationEvalOpenCLHelper(object):
         object = self.object
         self._setup_arrays_on_device()
         self.calls = self._setup_calls()
-        acceleration_eval = OpenCLAccelerationEval(self)
+        acceleration_eval = GPUAccelerationEval(self)
         object.set_compiled_object(acceleration_eval)
 
     def compile(self, code):
+        if self.backend == 'opencl':
+            ext = '.cl'
+            backend = 'OpenCL'
+        elif self.backend == 'cuda':
+            ext = '.cu'
+            backend = 'CUDA'
         code = convert_to_float_if_needed(code)
         path = os.path.expanduser(os.path.join(
             '~', '.pysph', 'source', get_platform_dir()
         ))
         if not os.path.exists(path):
             os.makedirs(path)
-        fname = os.path.join(path, 'generated.cl')
+        fname = os.path.join(path, 'generated' + ext)
         with open(fname, 'w') as fp:
             fp.write(code)
-            print("OpenCL code written to %s" % fname)
+            print("{backend} code written to {fname}".format(
+                backend=backend, fname=fname)
+            )
         code = code.encode('ascii') if sys.version_info.major < 3 else code
-        self.program = cl.Program(self._ctx, code).build(
-            options=['-w']
-        )
+
+        if self.backend == 'opencl':
+            import pyopencl as cl
+            self.program = cl.Program(self._ctx, code).build(
+                options=['-w']
+            )
+        elif self.backend == 'cuda':
+            from pycuda.compiler import SourceModule
+            self.program = SourceModule(code)
         return self.program
 
     ##########################################################################
@@ -442,8 +505,11 @@ class AccelerationEvalOpenCLHelper(object):
     ##########################################################################
     def get_header(self):
         object = self.object
-
-        transpiler = OpenCLConverter(known_types=self.known_types)
+        if self.backend == 'opencl':
+            Converter = OpenCLConverter
+        else:
+            Converter = CUDAConverter
+        transpiler = Converter(known_types=self.known_types)
 
         headers = []
         helpers = []
