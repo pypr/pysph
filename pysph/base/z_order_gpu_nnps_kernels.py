@@ -1,11 +1,12 @@
-from gpu_helper_kernels import *
+from pysph.base.gpu_helper_kernels import *
 from compyle.api import declare
+from compyle.template import Template
 
 
 ################# fill pids ###################3
 
 @annotate
-def fill_pids(i, x, y, z, xmin, ymin, zmin, keys, pids):
+def fill_pids(i, x, y, z, cell_size, xmin, ymin, zmin, keys, pids):
     c = declare('matrix(3, "int")')
     find_cell_id(
         x[i] - xmin,
@@ -13,6 +14,7 @@ def fill_pids(i, x, y, z, xmin, ymin, zmin, keys, pids):
         z[i] - zmin,
         cell_size, c
         )
+    key = declare('ulong')
     key = interleave3(c[0], c[1], c[2])
     keys[i] = key
     pids[i] = i
@@ -106,3 +108,103 @@ def fill_overflow_map(dst_to_src, cid_to_idx_dst, x, y, z,
         idx = find_idx(keys_src, num_particles_src, key)
         overflow_cid_to_idx[27*start_idx + j] = idx
 
+
+class ZOrderNNPSKernel(Template):
+    def __init__(self, name, dst_src=False, z_order_length=False,
+                 z_order_nbrs=False):
+        super(ZOrderNNPSKernel, self).__init__(name=name)
+        self.z_order_length = z_order_length
+        self.z_order_nbrs = z_order_nbrs
+        assert self.z_order_nbrs != self.z_order_length
+        self.dst_src = dst_src
+
+    def template(self, i, d_x, d_y, d_z, d_h, s_x, s_y, s_z, s_h, xmin, ymin,
+                 zmin, num_particles, keys, pids_dst, pids_src, max_cid_src,
+                 cids, cid_to_idx, overflow_cid_to_idx, dst_to_src,
+                 radius_scale2, cell_size):
+        '''
+        q = declare('matrix(4)')
+
+        qid = pids_dst[i]
+
+        q[0] = d_x[qid]
+        q[1] = d_y[qid]
+        q[2] = d_z[qid]
+        q[3] = d_h[qid]
+
+        cid = cids[i]
+        nbr_boxes = declare('GLOBAL_MEM int*')
+        nbr_boxes = cid_to_idx
+        h_i = radius_scale2*q[3]*q[3]
+
+        % if obj.dst_src:
+        cid = dst_to_src[cid]
+        start_id_nbr_boxes = 27*cid
+        if cid >= max_cid_src:
+            start_id_nbr_boxes = 27*(cid - max_cid_src)
+            nbr_boxes = overflow_cid_to_idx
+        % else:
+        start_id_nbr_boxes = 27*cid
+        % endif
+
+        % if obj.z_order_length:
+        length = 0
+        % elif obj.z_order_nbrs:
+        start_idx = start_indicies[qid]
+        curr_idx = 0
+        % endif
+
+        s = declare('matrix(4)')
+        j = declare('int')
+
+        for j in range(27):
+            idx = nbr_boxes[start_id_nbr_boxes + j]
+            if idx == -1:
+                continue
+            key = keys[idx]
+
+            while (idx < num_particles and keys[idx] == key):
+                pid = pids_src[idx]
+                s[0] = s_x[pid]
+                s[1] = s_y[pid]
+                s[2] = s_z[pid]
+                s[3] = s_h[pid]
+
+                h_j = radius_scale2 * s[3] * s[3]
+
+                % if obj.z_order_nbrs:
+                dist = norm2(q[0] - s[0], q[1] - s[1], q[2] - s[2])
+                if dist < h_i or dist < h_j:
+                    nbrs[start_idx + curr_idx] = pid
+                    curr_idx += 1
+                % else:
+                dist = norm2(q[0] - s[0], q[1] - s[1], q[2] - s[2])
+                if dist < h_i or dist < h_j:
+                    length += 1
+                %endif
+                idx += 1
+
+        % if obj.z_order_length:
+        nbr_lengths[qid] = length
+        % endif
+        '''
+
+
+class ZOrderLengthKernel(ZOrderNNPSKernel):
+    def __init__(self, name, dst_src):
+        super(ZOrderLengthKernel, self).__init__(
+            name, dst_src, z_order_length=True,
+        )
+
+    def extra_args(self):
+        return ['nbr_lengths'], {}
+
+
+class ZOrderNbrsKernel(ZOrderNNPSKernel):
+    def __init__(self, name, dst_src):
+        super(ZOrderNbrsKernel, self).__init__(
+            name, dst_src, z_order_nbrs=True
+        )
+
+    def extra_args(self):
+        return ['start_indicies', 'nbrs'], {}

@@ -24,12 +24,12 @@ def find_cell_id(x, y, z, h, c):
     c[2] = floor((z) / h)
 
 
-@annotate(p='ulong')
+@annotate(p='ulong', return_='ulong')
 def interleave1(p):
     return p
 
 
-@annotate(ulong='p, q')
+@annotate(ulong='p, q', return_='ulong')
 def interleave2(p, q):
     p = p & 0xffffffff
     p = (p | (p << 16)) & 0x0000ffff0000ffff
@@ -48,7 +48,7 @@ def interleave2(p, q):
     return (p | (q << 1))
 
 
-@annotate(ulong='p, q, r')
+@annotate(ulong='p, q, r', return_='ulong')
 def interleave3(p, q, r):
     p = (p | (p << 32)) & 0x1f00000000ffff
     p = (p | (p << 16)) & 0x1f0000ff0000ff
@@ -97,13 +97,14 @@ def find_idx(keys, num_particles, key):
 @annotate
 def neighbor_boxes(c_x, c_y, c_z, nbr_boxes):
     nbr_boxes_length = 1
-    nbr_boxes[0] = interleave(c_x, c_y, c_z)
+    nbr_boxes[0] = interleave3(c_x, c_y, c_z)
 
+    key = declare('ulong')
     for j in range(-1, 2):
         for k in range(-1, 2):
             for m in range(-1, 2):
                 if (j != 0 or k != 0 or m != 0) and c_x+m >= 0 and c_y+k >= 0 and c_z+j >= 0:
-                    key = interleave(c_x+m, c_y+k, c_z+j)
+                    key = interleave3(c_x+m, c_y+k, c_z+j)
                     nbr_boxes[nbr_boxes_length] = key
                     nbr_boxes_length += 1
 

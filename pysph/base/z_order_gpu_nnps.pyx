@@ -24,9 +24,13 @@ from pysph.base.gpu_nnps_helper import GPUNNPSHelper
 from compyle.array import Array
 import compyle.array as array
 from compyle.opencl import get_context, get_config, profile_kernel
+from compyle.api import Elementwise
 
-from gpu_helper_kernels import get_elwise, get_scan
-from z_order_gpu_nnps_kernels import *
+from pysph.base.z_order_gpu_nnps_kernels import (ZOrderNbrsKernel,
+                                                 ZOrderLengthKernel)
+
+from pysph.base.gpu_helper_kernels import get_elwise, get_scan
+from pysph.base.z_order_gpu_nnps_kernels import *
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
@@ -237,42 +241,51 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        z_order_nbr_lengths = self.helper.get_kernel(
-                "z_order_nbr_lengths", sorted=self.sorted,
-                dst_src=self.dst_src)
+        krnl_source = ZOrderLengthKernel(
+            "z_order_nbr_lengths", dst_src=self.dst_src
+        )
+
+        z_order_nbr_lengths = Elementwise(
+            krnl_source.function, backend='opencl'
+        )
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbr_lengths(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
-                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
-                src_gpu.h.dev,
-                self.make_vec(self.xmin[0], self.xmin[1],
-                    self.xmin[2]), self.src.get_number_of_particles(),
-                self.pid_keys[self.src_index].dev,
-                self.pids[self.dst_index].dev,
-                self.pids[self.src_index].dev,
-                self.max_cid[self.src_index], self.cids[self.dst_index].dev,
-                self.cid_to_idx[self.src_index].dev,
-                self.overflow_cid_to_idx.dev, self.dst_to_src.dev,
-                nbr_lengths.dev, self.radius_scale2, self.cell_size)
+        z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h,
+                self.xmin[0], self.xmin[1], self.xmin[2],
+                self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index],
+                self.pids[self.dst_index],
+                self.pids[self.src_index],
+                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.cid_to_idx[self.src_index],
+                self.overflow_cid_to_idx, self.dst_to_src,
+                self.radius_scale2, self.cell_size, nbr_lengths)
+
+
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        z_order_nbrs = self.helper.get_kernel(
-                "z_order_nbrs", sorted=self.sorted,
-                dst_src=self.dst_src)
+        krnl_source = ZOrderNbrsKernel(
+            "z_order_nbrs", dst_src=self.dst_src
+        )
+
+        z_order_nbrs = Elementwise(
+            krnl_source.function, backend='opencl'
+        )
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbrs(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
-                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
-                src_gpu.h.dev,
-                self.make_vec(self.xmin[0], self.xmin[1],
-                    self.xmin[2]),
+        z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h,
+                self.xmin[0], self.xmin[1], self.xmin[2],
                 self.src.get_number_of_particles(),
-                self.pid_keys[self.src_index].dev,
-                self.pids[self.dst_index].dev,
-                self.pids[self.src_index].dev,
-                self.max_cid[self.src_index], self.cids[self.dst_index].dev,
-                self.cid_to_idx[self.src_index].dev,
-                self.overflow_cid_to_idx.dev, self.dst_to_src.dev,
-                start_indices.dev, nbrs.dev, self.radius_scale2, self.cell_size)
+                self.pid_keys[self.src_index],
+                self.pids[self.dst_index],
+                self.pids[self.src_index],
+                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.cid_to_idx[self.src_index],
+                self.overflow_cid_to_idx, self.dst_to_src,
+                self.radius_scale2, self.cell_size, start_indices, nbrs)
