@@ -455,6 +455,15 @@ class Application(object):
             default=False,
             help="Use OpenCL to run the simulation.")
 
+        # --cuda
+        parser.add_argument(
+            "--cuda",
+            action="store_true",
+            dest="with_cuda",
+            default=False,
+            help="Use CUDA to run the simulation."
+        )
+
         # --use-local-memory
         parser.add_argument(
             "--use-local-memory",
@@ -917,8 +926,12 @@ class Application(object):
             config.use_openmp = options.with_openmp
         if options.omp_schedule is not None:
             config.set_omp_schedule(options.omp_schedule)
+
         if options.with_opencl:
             config.use_opencl = True
+        elif options.with_cuda:
+            config.use_cuda = True
+
         if options.with_local_memory:
             leaf_size = int(options.octree_leaf_size)
             config.wgs = leaf_size
