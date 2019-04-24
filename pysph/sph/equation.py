@@ -18,9 +18,9 @@ import itertools
 import numpy
 from textwrap import dedent
 
-# Local imports.
-from compyle.api import (CythonGenerator, KnownType, OpenCLConverter,
-                         get_symbols)
+from compyle.api import (CythonGenerator, KnownType,
+                         OpenCLConverter, get_symbols)
+from compyle.translator import CUDAConverter
 from compyle.config import get_config
 
 
@@ -820,6 +820,8 @@ class CythonGroup(Group):
 
 
 class OpenCLGroup(Group):
+    _Converter_Class = OpenCLConverter
+
     # #### Private interface  #####
     def _update_for_local_memory(self, predefined, eqs):
         modified_classes = []
@@ -870,7 +872,7 @@ class OpenCLGroup(Group):
         if use_local_memory:
             modified_classes = self._update_for_local_memory(predefined, eqs)
 
-        code_gen = OpenCLConverter(known_types=predefined)
+        code_gen = self._Converter_Class(known_types=predefined)
         ignore = ['reduce']
         for cls in sorted(classes.keys()):
             src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
@@ -882,6 +884,10 @@ class OpenCLGroup(Group):
                 self._set_loop_annotation(cls.loop, {})
 
         return '\n'.join(wrappers)
+
+
+class CUDAGroup(OpenCLGroup):
+    _Converter_Class = CUDAConverter
 
 
 class MultiStageEquations(object):

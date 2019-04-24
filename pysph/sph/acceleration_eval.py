@@ -6,7 +6,7 @@ except ImportError:
 
 from compyle.config import get_config
 from pysph.sph.equation import (
-    CythonGroup, Group, MultiStageEquations, OpenCLGroup,
+    CUDAGroup, CythonGroup, Group, MultiStageEquations, OpenCLGroup,
     get_arrays_used_in_equation)
 
 
@@ -175,9 +175,9 @@ class AccelerationEval(object):
         kernel: The kernel to use.
         mode: str: One of 'serial', 'mpi'.
         backend: str: indicates the backend to use.
-            one of ('opencl', 'cython', '', None)
+            one of ('opencl', 'cython', 'cuda', '', None)
         """
-        assert backend in ('opencl', 'cython', '', None)
+        assert backend in ('opencl', 'cython', 'cuda', '', None)
         self.backend = self._get_backend(backend)
         self.particle_arrays = particle_arrays
         self.equation_groups = group_equations(equations)
@@ -188,6 +188,8 @@ class AccelerationEval(object):
             self.Group = CythonGroup
         elif self.backend == 'opencl':
             self.Group = OpenCLGroup
+        elif self.backend == 'cuda':
+            self.Group = CUDAGroup
 
         all_equations = []
         for group in self.equation_groups:
@@ -213,6 +215,8 @@ class AccelerationEval(object):
             cfg = get_config()
             if cfg.use_opencl:
                 backend = 'opencl'
+            elif cfg.use_cuda:
+                backend = 'cuda'
             else:
                 backend = 'cython'
         return backend
