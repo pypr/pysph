@@ -102,6 +102,16 @@ getfullargspec = getattr(
 )
 
 
+def get_converter(backend):
+    if backend == 'opencl':
+        Converter = OpenCLConverter
+    elif backend == 'cuda':
+        Converter = CUDAConverter
+    else:
+        raise RuntimeError('Invalid backend: %s' % backend)
+    return Converter
+
+
 def get_kernel_definition(kernel, arg_list):
     sig = 'KERNEL void\n{kernel}\n({args})'.format(
         kernel=kernel, args=', '.join(arg_list),
@@ -117,13 +127,13 @@ def wrap_code(code, indent=' ' * 4):
     )
 
 
-def get_helper_code(helpers, transpiler=None):
+def get_helper_code(helpers, transpiler=None, backend=None):
     """This function generates any additional code for the given list of
     helpers.
     """
     result = []
     if transpiler is None:
-        transpiler = OpenCLConverter()
+        transpiler = get_converter(backend)
     doc = '\n// Helpers.\n'
     result.append(doc)
     for helper in helpers:
@@ -136,34 +146,37 @@ class DummyQueue(object):
         pass
 
 
-def get_context():
-    cfg = get_config()
-    if cfg.use_cuda:
+def get_context(backend):
+    if backend == 'cuda':
         from compyle.cuda import set_context
         set_context()
         from pycuda.autoinit import context
         return context
-    elif cfg.use_opencl:
+    elif backend == 'opencl':
         from compyle.opencl import get_context
         return get_context()
+    else:
+        raise RuntimeError('Unsupported GPU backend %s' % backend)
 
 
-def get_queue():
-    cfg = get_config()
-    if cfg.use_cuda:
+def get_queue(backend):
+    if backend == 'cuda':
         return DummyQueue()
-    elif cfg.use_opencl:
+    elif backend == 'opencl':
         from compyle.opencl import get_queue
         return get_queue()
+    else:
+        raise RuntimeError('Unsupported GPU backend %s' % backend)
 
 
-def profile_kernel(knl, name):
-    cfg = get_config()
-    if cfg.use_cuda:
+def profile_kernel(knl, name, backend):
+    if backend == 'cuda':
         return knl
-    elif cfg.use_opencl:
+    elif backend == 'opencl':
         from compyle.opencl import profile_kernel
         return profile_kernel(knl, name)
+    else:
+        raise RuntimeError('Unsupported GPU backend %s' % backend)
 
 
 class GPUAccelerationEval(object):
@@ -316,6 +329,7 @@ def convert_to_float_if_needed(code):
 class AccelerationEvalGPUHelper(object):
     def __init__(self, acceleration_eval):
         self.object = acceleration_eval
+        self.backend = acceleration_eval.backend
         self.all_array_names = get_all_array_names(
             self.object.particle_arrays
         )
@@ -329,8 +343,8 @@ class AccelerationEvalGPUHelper(object):
         self.known_types.update(predefined)
         self.known_types['NBRS'] = KnownType('GLOBAL_MEM unsigned int*')
         self.data = []
-        self._ctx = get_context()
-        self._queue = get_queue()
+        self._ctx = get_context(self.backend)
+        self._queue = get_queue(self.backend)
         self._array_map = None
         self._array_index = None
         self._equations = {}
@@ -338,11 +352,6 @@ class AccelerationEvalGPUHelper(object):
         self._gpu_structs = {}
         self.calls = []
         self.program = None
-        cfg = get_config()
-        if cfg.use_opencl:
-            self.backend = 'opencl'
-        elif cfg.use_cuda:
-            self.backend = 'cuda'
 
     def _setup_arrays_on_device(self):
         pas = self.object.particle_arrays
@@ -359,7 +368,7 @@ class AccelerationEvalGPUHelper(object):
 
         self._setup_structs_on_device()
 
-    def _setup_stucts_on_device(self):
+    def _setup_structs_on_device(self):
         if self.backend == 'opencl':
             import pyopencl as cl
             import pyopencl.array  # noqa: 401
@@ -409,7 +418,9 @@ class AccelerationEvalGPUHelper(object):
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
-                method = profile_kernel(method, method.function_name)
+                method = profile_kernel(
+                    method, method.function_name, self.backend
+                )
                 dest = item['dest']
                 src = item.get('source', dest)
                 args = [self._queue, None, None]
@@ -505,10 +516,7 @@ class AccelerationEvalGPUHelper(object):
     ##########################################################################
     def get_header(self):
         object = self.object
-        if self.backend == 'opencl':
-            Converter = OpenCLConverter
-        else:
-            Converter = CUDAConverter
+        Converter = get_converter(self.backend)
         transpiler = Converter(known_types=self.known_types)
 
         headers = []
@@ -520,7 +528,7 @@ class AccelerationEvalGPUHelper(object):
                 for helper in equation._get_helpers_():
                     if helper not in helpers:
                         helpers.append(helper)
-        headers.extend(get_helper_code(helpers, transpiler))
+        headers.extend(get_helper_code(helpers, transpiler, self.backend))
         headers.append(transpiler.parse_instance(object.kernel))
         cls_name = object.kernel.__class__.__name__
         self.known_types['SPH_KERNEL'] = KnownType(
