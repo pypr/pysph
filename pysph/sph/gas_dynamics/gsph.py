@@ -480,8 +480,8 @@ class GSPHAcceleration(Equation):
 
         # simplest delta or point interpolation
         if self.interpolation == 0:
-            vij_i = 1./(rhoi * rhoi)
-            vij_j = 1./(rhoj * rhoj)
+            vij_i2 = 1./(rhoi * rhoi)
+            vij_j2 = 1./(rhoj * rhoj)
 
         # linear interpolation
         elif self.interpolation == 1:

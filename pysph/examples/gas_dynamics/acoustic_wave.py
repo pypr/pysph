@@ -75,7 +75,7 @@ class AcousticWave(Application):
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=self.dim, 
             gamma=self.gamma, kernel_factor=1.0,
-            g1=0., g2=0., rsolver=7, interpolation=0, monotonicity=0,
+            g1=0., g2=0., rsolver=7, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=5.0,
             niter=40, tol=1e-6
         )
@@ -111,12 +111,6 @@ class AcousticWave(Application):
             return
         outfile = self.output_files[-1]
         data = load(outfile)
-        # print(data['solver_data'])
-        for f in self.output_files:
-            outfile = self.output_files[-1]
-            data = load(outfile)
-            # print(data['solver_data']['dt'])
-
         pa = data['arrays']['fluid']
         x_c = pa.x
         u = self.c_0 * self.delta_rho * numpy.sin(self.k * x_c) /\
@@ -126,7 +120,7 @@ class AcousticWave(Application):
             numpy.abs(u_c - u)
         )
 
-        print(l_inf)
+        print("L_inf norm for the problem: %s" %(l_inf))
 
 if __name__ == "__main__":
     app = AcousticWave()
