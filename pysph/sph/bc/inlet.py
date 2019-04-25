@@ -6,6 +6,8 @@ import numpy as np
 
 
 class Inlet(object):
+    """Defines an inlet object.
+    """
     def __init__(self, inlet_pa, dest_pa, inletinfo, kernel, dim,
                  active_stages=[1], callback=None):
         """An API to add/delete particle when moving between inlet-fluid

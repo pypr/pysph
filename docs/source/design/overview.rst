@@ -582,11 +582,28 @@ the following may be passed into any of the methods of an equation:
 .. note::
 
    Note that all standard functions and constants in ``math.h`` are available
-   for use in the equations. ``pi`` is defined. Please avoid using functions
-   from ``numpy`` as these are Python functions and are slow. They also will
-   not allow PySPH to be run with OpenMP. Similarly, do not use functions or
-   constants from ``sympy`` and other libraries inside the equation methods as
-   these will significantly slow down your code.
+   for use in the equations. The value of :math:`\pi` is available in
+   ``M_PI``. Please avoid using functions from ``numpy`` as these are Python
+   functions and are slow. They also will not allow PySPH to be run with
+   OpenMP. Similarly, do not use functions or constants from ``sympy`` and
+   other libraries inside the equation methods as these will significantly
+   slow down your code.
+
+In addition, these constants from the math library are available:
+
+  - ``M_E``: value of e
+  - ``M_LOG2E``: value of log2e
+  - ``M_LOG10E``: value of log10e
+  - ``M_LN2``: value of loge2
+  - ``M_LN10``: value of loge10
+  - ``M_PI``: value of pi
+  - ``M_PI_2``: value of pi / 2
+  - ``M_PI_4``: value of pi / 4
+  - ``M_1_PI``: value of 1 / pi
+  - ``M_2_PI``: value of 2 / pi
+  - ``M_2_SQRTPI``: value of 2 / (square root of pi)
+  - ``M_SQRT2``: value of square root of 2
+  - ``M_SQRT1_2``: value of square root of 1/2
 
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
