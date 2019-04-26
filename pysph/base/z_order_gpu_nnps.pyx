@@ -25,7 +25,8 @@ from compyle.array import Array
 import compyle.array as array
 from compyle.opencl import get_context, get_config, profile_kernel
 
-from gpu_helper_kernels import get_elwise
+from gpu_helper_kernels import get_elwise, get_scan
+from z_order_gpu_nnps_kernels import *
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
@@ -222,18 +223,17 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.overflow_cid_to_idx.resize(max(1, 27 * overflow_size))
             self.overflow_cid_to_idx.fill(-1)
 
-            fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
+            #fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
+            fill_overflow_map_knl = get_elwise(fill_overflow_map, self.backend)
 
             dst_gpu = self.dst.pa.gpu
-            fill_overflow_map(self.dst_to_src.dev,
-                    self.cid_to_idx[dst_index].dev, dst_gpu.x.dev, dst_gpu.y.dev,
-                    dst_gpu.z.dev, self.src.get_number_of_particles(),
-                    self.cell_size,
-                    self.make_vec(self.xmin[0], self.xmin[1],
-                        self.xmin[2]),
-                    self.pid_keys[src_index].dev, self.pids[dst_index].dev,
-                    self.overflow_cid_to_idx.dev,
-                    <unsigned int> self.max_cid[src_index])
+            fill_overflow_map_knl(self.dst_to_src,
+                    self.cid_to_idx[dst_index], dst_gpu.x, dst_gpu.y,
+                    dst_gpu.z, self.src.get_number_of_particles(),
+                    self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
+                    self.pid_keys[src_index], self.pids[dst_index],
+                    self.overflow_cid_to_idx,
+                    np.array(self.max_cid[src_index], dtype=np.uint32))
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):

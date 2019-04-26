@@ -18,10 +18,10 @@ def norm2(x, y, z):
 
 
 @annotate
-def find_cell_id(x, y, z, h, c_x, c_y, c_z):
-    c_x[0] = floor((x) / h)
-    c_y[0] = floor((y) / h)
-    c_z[0] = floor((z) / h)
+def find_cell_id(x, y, z, h, c):
+    c[0] = floor((x) / h)
+    c[1] = floor((y) / h)
+    c[2] = floor((z) / h)
 
 
 @annotate(p='ulong')
