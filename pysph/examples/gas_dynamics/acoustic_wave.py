@@ -16,12 +16,13 @@ where \lambda is the domain length.
 from __future__ import print_function
 import numpy
 
-#pysph imports
+# pysph imports
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
+
 
 class AcousticWave(Application):
     def initialize(self):
@@ -33,9 +34,9 @@ class AcousticWave(Application):
         self.c_0 = 1.
         self.delta_rho = 1e-6
         self.n_particles = 400
-        self.l = self.xmax - self.xmin
-        self.dx = self.l / (self.n_particles)
-        self.k = -2 * numpy.pi / self.l
+        self.domain_length = self.xmax - self.xmin
+        self.dx = self.domain_length / (self.n_particles)
+        self.k = -2 * numpy.pi / self.domain_length
         self.hdx = 1.
         self.dt = 1e-3
         self.tf = 10
@@ -69,11 +70,11 @@ class AcousticWave(Application):
         )
         self.scheme.setup_properties([fluid])
 
-        return [fluid,]
+        return [fluid, ]
 
     def create_scheme(self):
         gsph = GSPHScheme(
-            fluids=['fluid'], solids=[], dim=self.dim, 
+            fluids=['fluid'], solids=[], dim=self.dim,
             gamma=self.gamma, kernel_factor=1.0,
             g1=0., g2=0., rsolver=7, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=5.0,
@@ -104,7 +105,7 @@ class AcousticWave(Application):
             s.configure(kernel_factor=1.2)
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
-        
+
     def post_process(self):
         from pysph.solver.utils import load
         if len(self.output_files) < 1:
@@ -120,7 +121,8 @@ class AcousticWave(Application):
             numpy.abs(u_c - u)
         )
 
-        print("L_inf norm for the problem: %s" %(l_inf))
+        print("L_inf norm for the problem: %s" % (l_inf))
+
 
 if __name__ == "__main__":
     app = AcousticWave()

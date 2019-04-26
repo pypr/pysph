@@ -111,9 +111,9 @@ class GSPHUpdateGhostProps(Equation):
         assert GHOST_TAG == 2
 
     def initialize(self, d_idx, d_tag, d_orig_idx, d_px, d_py, d_pz,
-            d_ux, d_uy, d_uz, d_vx, d_vy, d_vz, d_wx, d_wy, d_wz,
-            d_grhox, d_grhoy, d_grhoz, d_dwdh, d_rho, d_div,
-            d_p, d_cs):
+                   d_ux, d_uy, d_uz, d_vx, d_vy, d_vz, d_wx, d_wy, d_wz,
+                   d_grhox, d_grhoy, d_grhoz, d_dwdh, d_rho, d_div,
+                   d_p, d_cs):
         idx = declare('int')
         if d_tag[d_idx] == 2:
             idx = d_orig_idx[d_idx]
@@ -521,12 +521,12 @@ class GSPHAcceleration(Equation):
             hj6 = hj4*hj2
 
             vij_i2 = ((15.0)/(64.0)*hi6 * aij*aij +
-                     (3.0)/(16.0) * hi4 * (2*aij*cij + bij*bij) +
-                     0.25*hi2*(2*bij*dij + cij*cij) + dij * dij)
+                      (3.0)/(16.0) * hi4 * (2*aij*cij + bij*bij) +
+                      0.25*hi2*(2*bij*dij + cij*cij) + dij * dij)
 
             vij_j2 = ((15.0)/(64.0)*hj6 * aij*aij +
-                     (3.0)/(16.0) * hj4 * (2*aij*cij + bij*bij) +
-                     0.25*hj2 * (2*bij*dij + cij*cij) + dij * dij)
+                      (3.0)/(16.0) * hj4 * (2*aij*cij + bij*bij) +
+                      0.25*hj2 * (2*bij*dij + cij*cij) + dij * dij)
             hij2 = hij*hij
             hij4 = hij2*hij2
             if not self.interface_zero:

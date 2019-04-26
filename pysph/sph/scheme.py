@@ -1387,7 +1387,7 @@ class GSPHScheme(Scheme):
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
             pa.add_property('orig_idx', type='int')
-            nfp = pa.get_number_of_particles();
+            nfp = pa.get_number_of_particles()
             pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 

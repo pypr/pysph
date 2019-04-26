@@ -95,14 +95,14 @@ class ShockTube2D(Application):
         self.scheme.setup_properties([fluid])
 
         print("2D Accuracy Test with %d particles"
-            %(fluid.get_number_of_particles()))
+              % (fluid.get_number_of_particles()))
 
-        return [fluid,]
+        return [fluid, ]
 
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        
+
         adke = ADKEScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             alpha=1, beta=1, k=1.0, eps=0.8, g1=0.5, g2=0.5)
@@ -125,7 +125,7 @@ class ShockTube2D(Application):
             default='gsph', adke=adke, mpm=mpm, gsph=gsph
         )
         return s
-    
+
     def configure_scheme(self):
         s = self.scheme
         if self.options.scheme == 'mpm':

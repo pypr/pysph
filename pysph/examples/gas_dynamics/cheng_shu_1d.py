@@ -16,12 +16,13 @@ where \lambda is the domain length.
 from __future__ import print_function
 import numpy
 
-#pysph imports
+# pysph imports
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
+
 
 class AcousticWave(Application):
     def initialize(self):
@@ -32,9 +33,9 @@ class AcousticWave(Application):
         self.c_0 = 1.
         self.delta_rho = 1e-6
         self.n_particles = 4000
-        self.l = self.xmax - self.xmin
-        self.dx = self.l / (self.n_particles - 1)
-        self.k = -2 * numpy.pi / self.l
+        self.domain_length = self.xmax - self.xmin
+        self.dx = self.domain_length / (self.n_particles - 1)
+        self.k = -2 * numpy.pi / self.domain_length
         self.hdx = 2.
         self.dt = 1e-3
         self.tf = 1.0
@@ -69,11 +70,11 @@ class AcousticWave(Application):
 
         self.scheme.setup_properties([fluid])
 
-        return [fluid,]
+        return [fluid, ]
 
     def create_scheme(self):
         gsph = GSPHScheme(
-            fluids=['fluid'], solids=[], dim=self.dim, 
+            fluids=['fluid'], solids=[], dim=self.dim,
             gamma=self.gamma, kernel_factor=1.,
             g1=0., g2=0., rsolver=3, interpolation=0, monotonicity=0,
             interface_zero=True, hybrid=False, blend_alpha=5.0,
