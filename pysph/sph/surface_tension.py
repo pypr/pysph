@@ -21,6 +21,18 @@ from pysph.sph.equation import Equation
 
 from math import sqrt
 
+from pysph.sph.equation import Group, Equation
+
+from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
+
+from pysph.sph.wc.transport_velocity import SummationDensity, \
+    MomentumEquationPressureGradient, StateEquation,\
+    MomentumEquationArtificialStress, MomentumEquationViscosity, \
+    SolidWallNoSlipBC
+
+from pysph.sph.wc.basic import TaitEOS
+
+
 
 class SurfaceForceAdami(Equation):
     
@@ -802,3 +814,114 @@ class AdamiColorGradient(Equation):
 
             # discretized dirac delta
             d_ddelta[d_idx] = 1./one_mod_gradc
+
+
+def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, nu, sigma, d, epsilon, gamma, real=False):
+    Equations = []
+    equations = []
+    if scheme == 'tvf':
+        for i in fluids+solids:
+            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real = real))
+        equations = []
+        for i in fluids:
+            equations.append(StateEquation(dest=i, sources=None, rho0=rho0, p0=p0))
+            equations.append(SmoothedColor(dest=i, sources=fluids+solids))
+        for i in solids:
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids))
+            equations.append(SmoothedColor(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MorrisColorGradient(dest=i, sources=fluids+solids, epsilon=epsilon))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+solids),with_morris_correction=True)
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=pb))
+            equations.append(MomentumEquationViscosity(dest=i, sources=fluids, nu=nu))
+            CSFSurfaceTensionForce(dest=i, sources=None, sigma=sigma)
+            SolidWallNoSlipBC(dest=i, sources=solids, nu=nu)
+        Equations.append(Group(equations))
+    elif scheme == 'adami_stress':
+        for i in fluids+solids:
+            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(TaitEOS(dest=i, sources=None, rho0=rho0, c0=c0, gamma=gamma, p0=p0))
+        for i in solids:
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(ColorGradientAdami(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(ConstructStressMatrix(dest=i, sources=None, sigma=sigma, d=d))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MomentumEquationPressureGradientAdami(dest=i, sources=fluids+solids))
+            equations.append(MomentumEquationViscosityAdami(dest=i, sources=fluids))
+            equations.append(SurfaceForceAdami(dest=i, sources=fluids+solids))
+            SolidWallNoSlipBC(dest=i, sources=solids, nu=nu)
+        Equations.append(Group(equations))
+    elif scheme == 'adami':
+        for i in fluids+solids:
+            equations.append(dest=i, sources=fluids+solids)
+        Equations.append(Group(equations, real=real))
+        equations=[]
+        for i in fluids:
+            equations.append(StateEquation(dest=i, sources=None, rho0=rho0, p0=p0, b=b))
+        for i in solids:
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids))
+        Equations.append(Group(equations, real=real))
+        equations=[]
+        for i in fluids:
+            equations.append(AdamiColorGradient(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            
+    elif scheme == 'shadloo':
+        for i in fluids+solids:
+            equations.append(SummationDensity(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real = real))
+        equations = []
+        for i in fluids:
+            equations.append(StateEquation(dest=i, sources=None, rho0=rho0, p0=p0, b=b))
+            equations.append(SY11ColorGradient(dest=i, sources=fluids+solids))
+        for i in solids:
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(ScaleSmoothingLength(dest=i, sources=None, factor=factor1))
+        Equations.append(Group(equations, real=real, update_nnps=True))
+        equations = []
+        for i in fluids:
+            equations.append(SY11DiracDelta(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+sources), with_morris_correction=True)
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(ScaleSmoothingLength(dest=i, sources=None, factor=factor2))
+        Equations.append(Group(equations, real=real, update_nnps=True))
+        equations = []
+        for i in fluids:
+            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=pb))
+            equations.append(MomentumEquationViscosity(dest=i, sources=fluids, nu=nu))
+            equations.append(ShadlooYildizSurfaceTensionForce(dest=i, sources=None, sigma=sigma))
+            equations.append(SolidWallNoSlipBC(dest=i, sources=solids), nu=nu)
+        Equations.append(Group(equations))
+    else:
+
+    return Equations
