@@ -81,7 +81,6 @@ ${helper.get_post_loop_kernel(g_idx, sg_idx, group, dest, all_eqs)}
 #define NORM2(X, Y, Z) ((X)*(X) + (Y)*(Y) + (Z)*(Z))
 #define MAX(X, Y) ((X) > (Y) ? (X) : (Y))
 
-__constant double pi=M_PI;
 ${helper.get_header()}
 #######################################################################
 ## Iterate over groups
