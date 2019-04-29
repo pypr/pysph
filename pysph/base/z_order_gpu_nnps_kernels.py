@@ -39,7 +39,7 @@ def map_cid_to_idx(i, x, y, z, num_particles, cell_size, xmin, ymin, zmin,
                    pids, keys, cids, cid_to_idx):
     cid = cids[i]
 
-    if i != 0 and cid == 0:
+    if i != 0 and cids[i] == cids[i-1]:
         return
 
     c = declare('matrix(3, "int")')

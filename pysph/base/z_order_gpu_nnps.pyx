@@ -155,7 +155,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         fill_unique_cids_knl(keys=self.pid_keys[pa_index],
                              cids=self.cids[pa_index])
 
-        cdef unsigned int num_cids = <unsigned int> (self.curr_cid.get())
+        curr_cids = self.cids[pa_index]
+
+        cdef unsigned int num_cids = 1 + <unsigned int> curr_cids[-1]
         self.cid_to_idx[pa_index].resize(27 * num_cids)
         self.cid_to_idx[pa_index].fill(-1)
 
