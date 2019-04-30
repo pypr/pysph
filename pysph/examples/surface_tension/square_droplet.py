@@ -46,27 +46,11 @@ interface curvature and normals computed from the color function.
 import numpy
 import numpy as np
 import os
-from pysph.sph.wc.transport_velocity import SummationDensity, \
-    MomentumEquationPressureGradient, StateEquation,\
-    MomentumEquationArtificialStress, MomentumEquationViscosity
 
-from pysph.sph.surface_tension import InterfaceCurvatureFromNumberDensity, \
-    ShadlooYildizSurfaceTensionForce, CSFSurfaceTensionForce, \
-    SmoothedColor, MorrisColorGradient, SY11ColorGradient, \
-    SY11DiracDelta, MomentumEquationViscosityAdami, \
-    AdamiReproducingDivergence, CSFSurfaceTensionForceAdami,\
-    MomentumEquationPressureGradientAdami, ColorGradientAdami, \
-    ConstructStressMatrix, SurfaceForceAdami, SummationDensitySourceMass, \
-    MomentumEquationViscosityMorris, MomentumEquationPressureGradientMorris, \
-    InterfaceCurvatureFromDensity, AdamiColorGradient
-
-from pysph.sph.wc.basic import TaitEOS
-from pysph.sph.gas_dynamics.basic import ScaleSmoothingLength
-
+from pysph.sph.surface_tension import return_equations
 from pysph.tools.geometry import get_2d_block
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import CubicSpline, QuinticSpline
-from pysph.sph.equation import Group, Equation
 
 from pysph.solver.application import Application
 from pysph.solver.solver import Solver
@@ -204,7 +188,7 @@ class SquareDroplet(Application):
         return solver
 
     def create_equations(self):
-        return return_equations(['fluid'], [], self.options.scheme, rho0, p0, c0, 0, factor1, factor2, nu, sigma, 2, epsilon, gamma, real=False)
+        return return_equations(['fluid'], [], self.options.scheme, rho0, p0, c0, 0, factor1, factor2, nu, sigma, 2, epsilon, 1, real=False)
 
 if __name__ == '__main__':
     app = SquareDroplet()
