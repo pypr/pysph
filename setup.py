@@ -59,6 +59,8 @@ try:
 except ImportError:
     HAVE_ZOLTAN = False
 
+base_includes = [] if sys.platform == 'win32' else ['/usr/local/include/']
+
 compiler = 'gcc'
 # compiler = 'intel'
 if compiler == 'intel':
@@ -118,6 +120,7 @@ def get_openmp_flags():
         fp.write(test_code)
     extension = Extension(
         name='check_omp', sources=[fname],
+        include_dirs=base_includes,
         extra_compile_args=omp_compile_flags,
         extra_link_args=omp_link_flags,
     )
@@ -272,6 +275,7 @@ def get_basic_extensions():
         import numpy
         include_dirs = [numpy.get_include()]
 
+    include_dirs += base_includes
     openmp_compile_args, openmp_link_args, openmp_env = get_openmp_flags()
 
     ext_modules = [
@@ -550,6 +554,8 @@ def get_parallel_extensions():
     if not HAVE_MPI:
         return []
 
+    include_dirs += base_includes
+
     MPI4PY_V2 = False if mpi4py.__version__.startswith('1.') else True
     cython_compile_time_env = {'MPI4PY_V2': MPI4PY_V2}
 
@@ -618,20 +624,27 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
-        'setuptools>=6.0', 'pytest>=3.0', 'pytools', 'Beaker'
+        'setuptools>=6.0', 'pytools', 'Beaker'
     ]
+    tests_require = ['pytest>=3.0', 'numpy-stl']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
-            'ordereddict', 'importlib', 'unittest2'
+            'ordereddict', 'importlib'
         ]
+        tests_require += ['unittest2']
     if sys.version_info[0] < 3:
-        install_requires += [
+        tests_require += [
             'mock>=1.0'
         ]
+    docs_require = ["sphinx"]
 
     extras_require = dict(
         mpi=['mpi4py>=1.2', 'pyzoltan'],
-        ui=['mayavi>=4.0'],
+        opencl=['pyopencl'],
+        ui=['mayavi>=4.0', 'pyside2', 'h5py'],
+        tests=tests_require,
+        docs=docs_require,
+        dev=tests_require + docs_require,
     )
 
     everything = set()
@@ -666,8 +679,6 @@ def setup_package():
           url='http://github.com/pypr/pysph',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          setup_requires=['pytest-runner'],
-          tests_require=['pytest'],
           packages=find_packages(),
           package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',

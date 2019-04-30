@@ -38,11 +38,11 @@ methods of a typical :py:class:`Equation` subclass::
           # Otherwise, no need to override __init__
 
       def py_initialize(self, dst, t, dt):
-          # Called once per destination before initialize.
+          # Called once per destination array before initialize.
           # This is a pure Python function and is not translated.
 
       def initialize(self, d_idx, ...):
-          # Called once per destination before loop.
+          # Called once per destination particle before loop.
 
       def initialize_pair(self, d_idx, d_*, s_*):
           # Called once per destination particle for each source.
@@ -146,6 +146,116 @@ carefully -- ideally declare any variables used in this as
 ``declare('object')``. On the GPU, this function is not called via OpenCL and
 is a pure Python function.
 
+Understanding Groups a bit more
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Equations can be grouped together and it is important to understand how
+exactly this works. Let us take a simple example of a :py:class:`Group` with
+two equations. We illustrate two simple equations with pseudo-code::
+
+  class Eq1(Equation):
+      def initialize(self, ...):
+          # ...
+      def loop(...):
+          # ...
+      def post_loop(...):
+          # ...
+
+Let us say that ``Eq2`` has a similar structure with respect to its methods.
+Let us say we have a group defined as::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+      ]
+  )
+
+When this is expanded out and used inside PySPH, this is what happens in terms
+of pseudo-code::
+
+    # Instances of the Eq1, and Eq2.
+    eq1 = Eq1(...)
+    eq2 = Eq2(...)
+
+    for d_idx in range(n_destinations):
+        eq1.initialize(...)
+        eq2.initialize(...)
+
+    # Sources from 'fluid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('fluid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    # Sources from 'solid'
+    for d_idx in range(n_destinations):
+        for s_idx in NEIGHBORS('solid', d_idx):
+            eq1.loop(...)
+            eq2.loop(...)
+
+    for d_idx in range(n_destinations):
+        eq1.post_loop(...)
+        eq2.post_loop(...)
+
+That is, all the initialization is done for each equation in sequence,
+followed by the loops for each set of sources, fluid and solid in this case.
+In the end, the ``post_loop`` is called for the destinations. The equations
+are therefore merged inside a group and entirely completed before the next
+group is taken up. Note that the order of the equations will be exactly as
+specified in the group.
+
+When the ``real=False`` is used, then the non-local *destination* particles
+are also iterated over. ``real=True`` by default, which means that only
+destination particles whose ``tag`` property is local or equal to 0 are
+operated on. Otherwise, when ``real=False``, remote and ghost particles are
+also operated on. It is important to note that this does not affect the source
+particles. That is, **ALL** source particles influence the destinations
+whether the sources are local, remote or ghost particles. The ``real`` keyword
+argument only affects the destination particles and not the sources.
+
+Note that if you have different destinations in the same group, they are
+internally split up into different sets of loops for each destination and that
+these are done separately. I.e. one destination is fully processed and then
+the next is considered. So if we had for example, both ``fluid`` and ``solid``
+destinations, they would be processed separately. For example lets say you had
+this::
+
+  Group(
+      equations=[
+          Eq1(dest='fluid', sources=['fluid', 'solid']),
+          Eq1(dest='solid', sources=['fluid', 'solid']),
+          Eq2(dest='fluid', sources=['fluid', 'solid']),
+          Eq2(dest='solid', sources=['fluid', 'solid']),
+      ]
+  )
+
+This would internally be equivalent to the following::
+
+  [
+      Group(
+          equations=[
+              Eq1(dest='fluid', sources=['fluid', 'solid']),
+              Eq2(dest='fluid', sources=['fluid', 'solid']),
+          ]
+       ),
+       Group(
+          equations=[
+              Eq1(dest='solid', sources=['fluid', 'solid']),
+              Eq2(dest='solid', sources=['fluid', 'solid']),
+          ]
+       )
+  ]
+
+Note that basically the fluids are done first and then the solid particles are
+done. Obviously the first form is a lot more compact.
+
+While it may appear that the PySPH equations and groups are fairly complex,
+they actually do a lot of work for you and allow you to express the
+interactions in a rather compact form.
+
+When debugging it sometimes helps to look at the generated log file which will
+also print out the exact equations and groups that are being used.
 
 
 Conventions followed
@@ -221,16 +331,31 @@ following:
    destination particle with index, ``d_idx``.
 
 
-
 .. note::
 
    Note that all standard functions and constants in ``math.h`` are available
-   for use in the equations. ``pi`` is defined. Please avoid using functions
-   from ``numpy`` as these are Python functions and are slow. They also will
-   not allow PySPH to be run with OpenMP. Similarly, do not use functions or
-   constants from ``sympy`` and other libraries inside the equation methods as
-   these will significantly slow down your code.
+   for use in the equations. The value of :math:`\pi` is available as
+   ``M_PI``. Please avoid using functions from ``numpy`` as these are Python
+   functions and are slow. They also will not allow PySPH to be run with
+   OpenMP. Similarly, do not use functions or constants from ``sympy`` and
+   other libraries inside the equation methods as these will significantly
+   slow down your code.
 
+In addition, these constants from the math library are available:
+
+  - ``M_E``: value of e
+  - ``M_LOG2E``: value of log2e
+  - ``M_LOG10E``: value of log10e
+  - ``M_LN2``: value of loge2
+  - ``M_LN10``: value of loge10
+  - ``M_PI``: value of pi
+  - ``M_PI_2``: value of pi / 2
+  - ``M_PI_4``: value of pi / 4
+  - ``M_1_PI``: value of 1 / pi
+  - ``M_2_PI``: value of 2 / pi
+  - ``M_2_SQRTPI``: value of 2 / (square root of pi)
+  - ``M_SQRT2``: value of square root of 2
+  - ``M_SQRT1_2``: value of square root of 1/2
 
 In an equation, any undeclared variables are automatically declared to be
 doubles in the high-performance Cython code that is generated.  In addition
@@ -534,6 +659,8 @@ test suite to illustrate this:
 
             self.compute_accelerations(1, update_nnps=False)
             self.stage2()
+            self.update_domain()
+            self.do_post_stage(dt, 2)
 
 Note that the ``compute_accelerations`` method takes two arguments, the
 ``index`` (which defaults to zero) and ``update_nnps`` which defaults to
@@ -541,7 +668,13 @@ Note that the ``compute_accelerations`` method takes two arguments, the
 ``self.compute_accelerations()``. However, in the above, the first set of
 equations is called first, and then for the second stage the second set of
 equations is evaluated but without updating the NNPS (handy if the particles
-do not move in stage1).
+do not move in stage1). Note the call ``self.update_domain()`` after the
+second stage, this sets up any ghost particles for periodicity when particles
+have been moved, it also updates the neighbor finder to use an appropriate
+neighbor length based on the current smoothing length. If you do not need to
+do this for your particular integrator you may choose not to add this. In the
+above case, the domain is not updated after the first stage as the particles
+have not moved.
 
 The above illustrates how one can create more complex integrators that employ
 different accelerations in each stage.

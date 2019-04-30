@@ -42,7 +42,7 @@ class SodShockTube(ShockTubeSetup):
         self.nl = self.options.nl
         self.hdx = self.options.hdx
         ratio = self.rhor/self.rhol
-        self.nr = ratio*self.nl
+        self.nr = self.nl*ratio
         self.dxl = 0.5/self.nl
         self.dxr = 0.5/self.nr
         self.ml = self.dxl * self.rhol
@@ -64,13 +64,13 @@ class SodShockTube(ShockTubeSetup):
             alpha=1, beta=1.0, k=0.3, eps=0.5, g1=0.2, g2=0.4)
 
         mpm = GasDScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
+            fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
             kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=1.0, update_alpha1=True, update_alpha2=True
+            beta=2.0, update_alpha1=True, update_alpha2=True
         )
         gsph = GSPHScheme(
             fluids=['fluid'], solids=['boundary'], dim=dim, gamma=gamma,
-            kernel_factor=1.2,
+            kernel_factor=1.0,
             g1=0.2, g2=0.4, rsolver=2, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=20, tol=1e-6

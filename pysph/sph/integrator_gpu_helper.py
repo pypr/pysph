@@ -7,16 +7,15 @@ import types
 from mako.template import Template
 import numpy as np
 
-from compyle.opencl import profile_kernel
 from compyle.config import get_config
-from compyle.translator import OpenCLConverter
 from .equation import get_array_names
 from .integrator_cython_helper import IntegratorCythonHelper
-from .acceleration_eval_opencl_helper import (get_kernel_definition,
-                                              wrap_code)
+from .acceleration_eval_gpu_helper import (
+    get_kernel_definition, get_converter, profile_kernel, wrap_code
+)
 
 
-class OpenCLIntegrator(object):
+class GPUIntegrator(object):
     """Does the actual work of calling the kernels for integration.
     """
     def __init__(self, helper, c_acceleration_eval):
@@ -82,6 +81,9 @@ class OpenCLIntegrator(object):
     def compute_accelerations(self, index=0, update_nnps=True):
         self.integrator.compute_accelerations(index, update_nnps)
 
+    def update_domain(self):
+        self.integrator.update_domain()
+
     def do_post_stage(self, stage_dt, stage):
         """This is called after every stage of the integrator.
 
@@ -108,11 +110,12 @@ class OpenCLIntegrator(object):
         self.one_timestep(t, dt)
 
 
-class IntegratorOpenCLHelper(IntegratorCythonHelper):
+class IntegratorGPUHelper(IntegratorCythonHelper):
     def __init__(self, integrator, acceleration_eval_helper):
-        super(IntegratorOpenCLHelper, self).__init__(
+        super(IntegratorGPUHelper, self).__init__(
             integrator, acceleration_eval_helper
         )
+        self.backend = acceleration_eval_helper.backend
         self.py_data = defaultdict(dict)
         self.data = defaultdict(dict)
         self.py_calls = defaultdict(dict)
@@ -148,7 +151,7 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
                 ]
                 all_args = [q, None, None] + _args
                 call = getattr(self.program, kernel)
-                call = profile_kernel(call, call.function_name)
+                call = profile_kernel(call, call.function_name, self.backend)
                 calls[method][dest] = (call, all_args, dest)
 
     def get_code(self):
@@ -179,9 +182,9 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
         # Create the compiled module.
         self.program = module
         self._setup_call_data()
-        opencl_integrator = OpenCLIntegrator(self, acceleration_eval)
+        gpu_integrator = GPUIntegrator(self, acceleration_eval)
         # Setup the integrator to use this compiled module.
-        self.object.set_compiled_object(opencl_integrator)
+        self.object.set_compiled_object(gpu_integrator)
 
     def get_py_stage_code(self, dest, method):
         stepper = self.object.steppers[dest]
@@ -200,7 +203,9 @@ class IntegratorOpenCLHelper(IntegratorCythonHelper):
             classes[cls] = stepper
 
         known_types = dict(self.acceleration_eval_helper.known_types)
-        code_gen = OpenCLConverter(known_types=known_types)
+
+        Converter = get_converter(self.acceleration_eval_helper.backend)
+        code_gen = Converter(known_types=known_types)
 
         wrappers = []
         for cls in sorted(classes.keys()):

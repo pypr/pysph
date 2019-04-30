@@ -8,9 +8,12 @@ import numpy as np
 from pysph.base.utils import get_particle_array
 from pysph.base.kernels import Gaussian
 from pysph.base.nnps import LinkedListNNPS as NNPS
-from pysph.sph.equation import Equation
+from pysph.sph.equation import Equation, Group
 from pysph.sph.acceleration_eval import AccelerationEval
 from pysph.sph.sph_compiler import SPHCompiler
+from compyle.api import declare
+from pysph.sph.wc.linalg import gj_solve, augmented_matrix
+from pysph.sph.basic_equations import SummationDensity
 
 
 class InterpolateFunction(Equation):
@@ -25,6 +28,125 @@ class InterpolateFunction(Equation):
     def post_loop(self, d_idx, d_prop, d_number_density):
         if d_number_density[d_idx] > 1e-12:
             d_prop[d_idx] /= d_number_density[d_idx]
+
+
+class InterpolateSPH(Equation):
+    def initialize(self, d_idx, d_prop):
+        d_prop[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_rho, s_m, s_temp_prop, d_prop, WIJ):
+        d_prop[d_idx] += s_m[s_idx]/s_rho[s_idx]*WIJ*s_temp_prop[s_idx]
+
+
+class SPHFirstOrderApproximationPreStep(Equation):
+    def __init__(self, dest, sources, dim=1):
+        self.dim = dim
+
+        super(SPHFirstOrderApproximationPreStep, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_moment):
+        i, j = declare('int', 2)
+
+        for i in range(4):
+            for j in range(4):
+                d_moment[16*d_idx + j+4*i] = 0.0
+
+    def loop(self, d_idx, s_idx, d_h, s_h, s_x, s_y, s_z, d_x, d_y, d_z, s_rho,
+             s_m, WIJ, XIJ, DWIJ, d_moment):
+        Vj = s_m[s_idx] / s_rho[s_idx]
+        i16 = declare('int')
+        i16 = 16*d_idx
+
+        d_moment[i16+0] += WIJ * Vj
+
+        d_moment[i16+1] += -XIJ[0] * WIJ * Vj
+        d_moment[i16+2] += -XIJ[1] * WIJ * Vj
+        d_moment[i16+3] += -XIJ[2] * WIJ * Vj
+
+        d_moment[i16+4] += DWIJ[0] * Vj
+        d_moment[i16+8] += DWIJ[1] * Vj
+        d_moment[i16+12] += DWIJ[2] * Vj
+
+        d_moment[i16+5] += -XIJ[0] * DWIJ[0] * Vj
+        d_moment[i16+6] += -XIJ[1] * DWIJ[0] * Vj
+        d_moment[i16+7] += -XIJ[2] * DWIJ[0] * Vj
+
+        d_moment[i16+9] += - XIJ[0] * DWIJ[1] * Vj
+        d_moment[i16+10] += -XIJ[1] * DWIJ[1] * Vj
+        d_moment[i16+11] += -XIJ[2] * DWIJ[1] * Vj
+
+        d_moment[i16+13] += -XIJ[0] * DWIJ[2] * Vj
+        d_moment[i16+14] += -XIJ[1] * DWIJ[2] * Vj
+        d_moment[i16+15] += -XIJ[2] * DWIJ[2] * Vj
+
+
+class SPHFirstOrderApproximation(Equation):
+    """ First order SPH approximation
+        -------------
+        The method used to solve the linear system in this function is not same
+        as in the reference. In the function `Ax=b` is solved where `A :=
+        moment` (Moment matrix) and `b := p_sph` (Property calculated using
+        basic SPH).
+        The calculation need the `moment` to be evaluated before this step
+        which is done in `SPHFirstOrderApproximationPreStep`
+
+        References
+        ----------
+
+        .. [Liu2006] M.B. Liu, G.R. Liu, "Restoring particle consistency in
+           smoothed particle hydrodynamics", Applied Numerical Mathematics
+           Volume 56, Issue 1 2006, Pages 19-36, ISSN 0168-9274
+    """
+    def _get_helpers_(self):
+        return [gj_solve, augmented_matrix]
+
+    def __init__(self, dest, sources, dim=1):
+        self.dim = dim
+
+        super(SPHFirstOrderApproximation, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_prop, d_p_sph):
+        i = declare('int')
+
+        for i in range(3):
+            d_prop[4*d_idx+i] = 0.0
+            d_p_sph[4*d_idx+i] = 0.0
+
+    def loop(self, d_idx, d_h, s_h, s_x, s_y, s_z, d_x, d_y, d_z, s_rho,
+             s_m, WIJ, DWIJ, s_temp_prop, d_p_sph, s_idx):
+        i4 = declare('int')
+        Vj = s_m[s_idx] / s_rho[s_idx]
+        pj = s_temp_prop[s_idx]
+        i4 = 4*d_idx
+
+        d_p_sph[i4+0] += pj * WIJ * Vj
+        d_p_sph[i4+1] += pj * DWIJ[0] * Vj
+        d_p_sph[i4+2] += pj * DWIJ[1] * Vj
+        d_p_sph[i4+3] += pj * DWIJ[2] * Vj
+
+    def post_loop(self, d_idx, d_moment, d_prop, d_p_sph):
+
+        a_mat = declare('matrix(16)')
+        aug_mat = declare('matrix(20)')
+        b = declare('matrix(4)')
+        res = declare('matrix(4)')
+
+        i, n, i16, i4 = declare('int', 4)
+        i16 = 16*d_idx
+        i4 = 4*d_idx
+        for i in range(16):
+            a_mat[i] = d_moment[i16+i]
+        for i in range(20):
+            aug_mat[i] = 0.0
+        for i in range(4):
+            b[i] = d_p_sph[4*d_idx+i]
+            res[i] = 0.0
+
+        n = self.dim + 1
+        augmented_matrix(a_mat, b, n, 1, 4, aug_mat)
+        gj_solve(aug_mat, n, 1, res)
+        for i in range(4):
+            d_prop[i4+i] = res[i]
 
 
 def get_bounding_box(particle_arrays, tight=False, stretch=0.05):
@@ -56,6 +178,7 @@ def get_bounding_box(particle_arrays, tight=False, stretch=0.05):
 
     return bounds
 
+
 def get_nx_ny_nz(num_points, bounds):
     """Given a number of points to use and the bounds, return a triplet
     of integers for a uniform mesh with approximately that many points.
@@ -83,7 +206,8 @@ class Interpolator(object):
     """
 
     def __init__(self, particle_arrays, num_points=125000, kernel=None,
-                 x=None, y=None, z=None, domain_manager=None, equations=None):
+                 x=None, y=None, z=None, domain_manager=None,
+                 equations=None, method='shepard'):
         """
         The x, y, z coordinates need not be specified, and if they are not,
         the bounds of the interpolated domain is automatically computed and
@@ -109,6 +233,9 @@ class Interpolator(object):
         equations: sequence
             A sequence of equations or groups.  Defaults to None.  This is
             used only if the default interpolation equations are inadequate.
+        method : str
+            String with the following allowed methods: 'shepard', 'sph',
+            'order1'
         """
         self._set_particle_arrays(particle_arrays)
         bounds = get_bounding_box(self.particle_arrays)
@@ -125,12 +252,15 @@ class Interpolator(object):
         self.equations = equations
         self.func_eval = None
         self.domain_manager = domain_manager
+        self.method = method
+        if method not in ['sph', 'shepard', 'order1']:
+            raise RuntimeError('%s method is not implemented' % (method))
         if x is None and y is None and z is None:
             self.set_domain(bounds, shape)
         else:
             self.set_interpolation_points(x=x, y=y, z=z)
 
-    #### Interpolator protocol ################################################
+    # ## Interpolator protocol ###############################################
     def set_interpolation_points(self, x=None, y=None, z=None):
         """Set the points on which we must interpolate the arrays.
 
@@ -186,7 +316,7 @@ class Interpolator(object):
         x, y, z = self._create_default_points(self.bounds, self.shape)
         self.set_interpolation_points(x, y, z)
 
-    def interpolate(self, prop, gradient=False):
+    def interpolate(self, prop, comp=0):
         """Interpolate given property.
 
         Parameters
@@ -195,21 +325,44 @@ class Interpolator(object):
         prop: str
             The name of the property to interpolate.
 
-        gradient: bool
-            Evaluate gradient and not function.
+        comp: int
+            The component of the gradient required
 
         Returns
         -------
         A numpy array suitably shaped with the property interpolated.
         """
+        assert isinstance(comp, int), 'Error: only interger value is allowed'
         for array in self.particle_arrays:
             data = array.get(prop, only_real_particles=False)
             array.get('temp_prop', only_real_particles=False)[:] = data
 
-        self.func_eval.compute(0.0, 0.1) # These are junk arguments.
-        result = self.pa.prop.copy()
+        self.func_eval.compute(0.0, 0.1)  # These are junk arguments.
+        if comp and (self.method in ['sph', 'shepard']):
+            raise RuntimeError("Error: use 'order1' method to evaluate"
+                               "gradient")
+        elif self.method in ['sph', 'shepard']:
+            result = self.pa.prop.copy()
+        else:
+            if comp > 3:
+                raise RuntimeError("Error: Only 0, 1, 2, 3 allowed")
+            result = self.pa.prop[comp::4].copy()
+
         result.shape = self.shape
         return result.squeeze()
+
+    def update(self, update_domain=True):
+        """Update the NNPS when particles have moved.
+
+        If the update_domain is False, the domain is not updated.
+
+        Use this when the arrays are the same but the particles have themselves
+        changed. If the particle arrays themselves change use the
+        `update_particle_arrays` method instead.
+        """
+        if update_domain:
+            self.nnps.update_domain()
+        self.nnps.update()
 
     def update_particle_arrays(self, particle_arrays):
         """Call this for a new set of particle arrays which have the
@@ -224,7 +377,7 @@ class Interpolator(object):
         self._create_nnps(arrays)
         self.func_eval.update_particle_arrays(arrays)
 
-    #### Private protocol #####################################################
+    # ### Private protocol ###################################################
 
     def _create_nnps(self, arrays):
         # create the neighbor locator object
@@ -232,16 +385,16 @@ class Interpolator(object):
                          radius_scale=self.kernel.radius_scale,
                          domain=self.domain_manager,
                          cache=True)
-        self.nnps.update()
         self.func_eval.set_nnps(self.nnps)
 
     def _create_default_points(self, bounds, shape):
         b = bounds
         n = shape
-        x, y, z = np.mgrid[b[0]:b[1]:n[0]*1j,
-                           b[2]:b[3]:n[1]*1j,
-                           b[4]:b[5]:n[2]*1j,
-                          ]
+        x, y, z = np.mgrid[
+            b[0]:b[1]:n[0]*1j,
+            b[2]:b[3]:n[1]*1j,
+            b[4]:b[5]:n[2]*1j,
+        ]
         return x, y, z
 
     def _create_particle_array(self, x, y, z):
@@ -252,23 +405,50 @@ class Interpolator(object):
 
         hmax = self._get_max_h_in_arrays()
         h = hmax*np.ones_like(xr)
-        prop = np.zeros_like(xr)
         pa = get_particle_array(
             name='interpolate',
             x=xr, y=yr, z=zr, h=h,
-            number_density=np.zeros_like(xr),
-            prop=prop,
-            grad_x=np.zeros_like(xr),
-            grad_y=np.zeros_like(xr),
-            grad_z=np.zeros_like(xr)
+            number_density=np.zeros_like(xr)
         )
+        if self.method in ['sph', 'shepard']:
+            pa.add_property('prop')
+        else:
+            pa.add_property('moment', stride=16)
+            pa.add_property('p_sph', stride=4)
+            pa.add_property('prop', stride=4)
+
         return pa
 
     def _compile_acceleration_eval(self, arrays):
         names = [x.name for x in self.particle_arrays]
         if self.equations is None:
-            equations = [InterpolateFunction(dest='interpolate',
-                                             sources=names)]
+            if self.method == 'shepard':
+                equations = [
+                    InterpolateFunction(dest='interpolate',
+                                        sources=names)
+                ]
+            elif self.method == 'sph':
+                equations = [
+                    InterpolateSPH(dest='interpolate',
+                                        sources=names)
+                ]
+            else:
+                equations = [
+                    Group(equations=[
+                        SummationDensity(dest=name, sources=names)
+                        for name in names],
+                          real=False),
+                    Group(equations=[
+                        SPHFirstOrderApproximationPreStep(dest='interpolate',
+                                                          sources=names,
+                                                          dim=self.dim)],
+                          real=True),
+                    Group(equations=[
+                        SPHFirstOrderApproximation(dest='interpolate',
+                                                   sources=names,
+                                                   dim=self.dim)],
+                          real=True)
+                ]
         else:
             equations = self.equations
         self.func_eval = AccelerationEval(arrays, equations, self.kernel)
@@ -303,7 +483,6 @@ class Interpolator(object):
                 array.add_property(prop)
 
 
-
 def main(fname, prop, npoint):
     from pysph.solver.utils import load
     print("Loading", fname)
@@ -322,6 +501,7 @@ def main(fname, prop, npoint):
         mlab.pipeline.surface(src)
     mlab.pipeline.outline(src)
     mlab.show()
+
 
 if __name__ == '__main__':
     import sys

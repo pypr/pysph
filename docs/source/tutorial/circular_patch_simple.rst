@@ -370,22 +370,22 @@ interpreter with a few useful objects available.  These are::
     >>> dir()
     ['__builtins__', '__doc__', '__name__', 'interpolator', 'mlab',
      'particle_arrays', 'scene', 'self', 'viewer']
-    >>> len(particle_arrays)
-    1
-    >>> particle_arrays[0].name
+    >>> particle_arrays['fluid'].name
     'fluid'
 
-The ``particle_arrays`` object is a list of **ParticleArrayHelpers** which is
-available in :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
+The ``particle_arrays`` object is a dictionary of **ParticleArrayHelpers**
+which is available in
+:py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper`. The
 ``interpolator`` is an instance of
 :py:class:`pysph.tools.mayavi_viewer.InterpolatorView` that is used by the
 viewer. The other objects can be used to script the user interface if desired.
+Note that the ``particle_arrays`` can be indexed by array name or index.
 
 Here is an example of scripting the viewer. Let us say we have two particle
 arrays, `'boundary'` and `'fluid'` in that order. Let us say, we wish to make
 the boundary translucent, then we can write the following::
 
-   b = particle_arrays[0]
+   b = particle_arrays['boundary']
    b.plot.actor.property.opacity = 0.2
 
 This does require some knowledge of Mayavi_ and scripting with it. The `plot`
@@ -393,6 +393,14 @@ attribute of the :py:class:`pysph.tools.mayavi_viewer.ParticleArrayHelper` is
 a `Glyph` instance from Mayavi_. It is useful to use the `record feature
 <http://docs.enthought.com/mayavi/mayavi/mlab_changing_object_looks.html#changing-object-properties-interactively>`_
 of Mayavi to learn more about how best to script the view.
+
+The viewer will always look for a ``mayavi_config.py`` script inside the
+output directory to setup the visualization parameters. This file can be
+created by overriding the :py:class:`pysph.solver.application.Application`
+object's ``customize_output`` method. See the `dam break 3d
+<https://github.com/pypr/pysph/blob/master/pysph/examples/dam_break_3d.py>`_
+example to see this being used. Of course, this file can also be created
+manually.
 
 
 Loading output data files
@@ -593,7 +601,10 @@ this is a Python related error you should get a traceback and debug it as you
 would debug any Python program.
 
 PySPH writes out a log file in the output directory, looking at that is
-sometimes useful.
+sometimes useful. The log file will usually tell you the kernel, integrator,
+NNPS, and the exact equations and groups used for a simulation. This can be
+often be very useful when sorting out subtle issues with the equations and
+groups.
 
 Things get harder to debug when you get a segmentation fault or your code just
 crashes. Even though PySPH is implemented in Python you can get one of these

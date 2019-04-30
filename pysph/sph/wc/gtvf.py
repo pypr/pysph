@@ -7,6 +7,7 @@ Some notes on the paper,
 - In the viscosity term of equation (17) a factor of '2' is missing.
 - A negative sign is missing from equation (22) i.e, either put a negative
   sign in equation (22) or at the integrator step equation(25).
+- The Solid Mechanics Equations are not tested.
 
 References
 -----------
@@ -18,13 +19,13 @@ References
 """
 
 
+from compyle.api import declare
 from pysph.sph.equation import Equation
 from pysph.base.utils import get_particle_array
 from pysph.sph.integrator import Integrator
 from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.equation import Group, MultiStageEquations
 from pysph.sph.scheme import Scheme
-from compyle.api import declare
 from pysph.sph.wc.linalg import mat_vec_mult, mat_mult
 
 
@@ -51,16 +52,19 @@ def get_particle_array_gtvf(constants=None, **props):
 class GTVFIntegrator(Integrator):
     def one_timestep(self, t, dt):
         self.stage1()
+        self.do_post_stage(dt, 1)
 
         self.compute_accelerations(0, update_nnps=False)
 
         self.stage2()
-
+        # We update domain here alone as positions only change here.
+        self.update_domain()
         self.do_post_stage(dt, 2)
 
         self.compute_accelerations(1)
 
         self.stage3()
+        self.do_post_stage(dt, 3)
 
 
 class GTVFStep(IntegratorStep):
@@ -94,7 +98,7 @@ class GTVFStep(IntegratorStep):
         d_w[d_idx] += dtb2*d_aw[d_idx]
 
 
-class DensityEvolution(Equation):
+class ContinuityEquationGTVF(Equation):
     r"""**Evolution of density**
 
     From [ZhangHuAdams2017], equation (12),
@@ -417,32 +421,25 @@ class DeviatoricStressRate(Equation):
         self.dim = dim
         super(DeviatoricStressRate, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_asigma):
-        i = declare('int')
-        for i in range(9):
-            d_asigma[d_idx*9 + i] = 0.0
-
     def _get_helpers_(self):
         return [mat_vec_mult, mat_mult]
 
-    def loop(self, d_idx, s_idx, d_sigma, d_u, d_v, d_w, s_uhat, s_vhat,
-             s_what, d_uhat, d_vhat, d_what, d_asigma, s_sigma, d_gradvhat,
-             s_gradvhat, DWIJ):
+    def initialize(self, d_idx, d_sigma, d_asigma, d_gradvhat):
         i, j, ind = declare('int', 3)
-        eps, omega, omegaT, sigmai, dvi, dvj = declare('matrix(9)', 6)
+        eps, omega, omegaT, sigmai, dvi = declare('matrix(9)', 5)
 
         G = self.G
 
         for i in range(9):
             sigmai[i] = d_sigma[d_idx*9 + i]
             dvi[i] = d_gradvhat[d_idx*9 + i]
-            dvj[i] = s_gradvhat[s_idx*9 + i]
+            d_asigma[d_idx*9 + i] = 0.0
 
         eps_trace = 0.0
         for i in range(3):
             for j in range(3):
-                eps[3*i + j] = 0.5*(dvi[3*i + j] + dvj[3*j + i])
-                omega[3*i + j] = 0.5*(dvi[3*i + j] - dvj[3*j + i])
+                eps[3*i + j] = 0.5*(dvi[3*i + j] + dvi[3*j + i])
+                omega[3*i + j] = 0.5*(dvi[3*i + j] - dvi[3*j + i])
                 if i == j:
                     eps_trace += eps[3*i + j]
 
@@ -498,13 +495,15 @@ class MomentumEquationArtificialStressSolid(Equation):
 
 
 class GTVFScheme(Scheme):
-    def __init__(self, fluids, dim, rho0, c0, nu, h0, p0, pref,
-                 gx=0.0, gy=0.0, gz=0.0, b=1.0):
+    def __init__(self, fluids, solids, dim, rho0, c0, nu, h0, pref,
+                 gx=0.0, gy=0.0, gz=0.0, b=1.0, alpha=0.0):
         r"""Parameters
         ----------
 
         fluids: list
             List of names of fluid particle arrays.
+        solids: list
+            List of names of solid particle arrays.
         dim: int
             Dimensionality of the problem.
         rho0: float
@@ -515,8 +514,6 @@ class GTVFScheme(Scheme):
             Real viscosity of the fluid.
         h0: float
             Reference smoothing length.
-        p0: float
-            reference pressure for the equation of state.
         pref: float
             reference pressure for rate of change of transport velocity.
         gx: float
@@ -530,17 +527,18 @@ class GTVFScheme(Scheme):
         """
 
         self.fluids = fluids
+        self.solids = solids
         self.dim = dim
         self.rho0 = rho0
         self.c0 = c0
         self.nu = nu
         self.h0 = h0
-        self.p0 = p0
         self.pref = pref
         self.gx = gx
         self.gy = gy
         self.gz = gz
         self.b = b
+        self.alpha = alpha
         self.solver = None
 
     def configure_solver(self, kernel=None, integrator_cls=None,
@@ -581,47 +579,82 @@ class GTVFScheme(Scheme):
 
         from pysph.solver.solver import Solver
         self.solver = Solver(
-            dim=self.dim, integrator=integrator, kernel=kernel,
-            output_at_times=[0, 0.2, 0.4, 0.8], **kw
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
         )
 
     def get_equations(self):
-        from pysph.sph.wc.transport_velocity import StateEquation
-        sources = self.fluids
+        from pysph.sph.wc.transport_velocity import (
+            StateEquation, SetWallVelocity, SolidWallPressureBC,
+            VolumeSummation, SolidWallNoSlipBC,
+            MomentumEquationArtificialViscosity, ContinuitySolid
+        )
+        all = self.fluids + self.solids
 
-        eq1, stage1 = [], []
+        stage1 = []
+        if self.solids:
+            eq0 = []
+            for solid in self.solids:
+                eq0.append(SetWallVelocity(dest=solid, sources=self.fluids))
+            stage1.append(Group(equations=eq0, real=False))
+
+        eq1 = []
         for fluid in self.fluids:
-            eq1.append(DensityEvolution(dest=fluid, sources=sources))
+            eq1.append(ContinuityEquationGTVF(dest=fluid, sources=self.fluids))
+            if self.solids:
+                eq1.append(
+                    ContinuitySolid(dest=fluid, sources=self.solids)
+                )
         stage1.append(Group(equations=eq1, real=False))
 
         eq2, stage2 = [], []
         for fluid in self.fluids:
-            eq2.append(CorrectDensity(dest=fluid, sources=sources))
+            eq2.append(CorrectDensity(dest=fluid, sources=all))
         stage2.append(Group(equations=eq2, real=False))
 
         eq3 = []
         for fluid in self.fluids:
             eq3.append(
-                StateEquation(dest=fluid, sources=None, p0=self.p0,
+                StateEquation(dest=fluid, sources=None, p0=self.pref,
                               rho0=self.rho0, b=1.0)
             )
         stage2.append(Group(equations=eq3, real=False))
+
+        g2_s = []
+        for solid in self.solids:
+            g2_s.append(VolumeSummation(dest=solid, sources=all))
+            g2_s.append(SolidWallPressureBC(
+                dest=solid, sources=self.fluids, b=1.0, rho0=self.rho0,
+                p0=self.pref, gx=self.gx, gy=self.gy, gz=self.gz
+            ))
+        if g2_s:
+            stage2.append(Group(equations=g2_s, real=False))
 
         eq4 = []
         for fluid in self.fluids:
             eq4.append(
                 MomentumEquationPressureGradient(
-                    dest=fluid, sources=sources, pref=self.pref,
+                    dest=fluid, sources=all, pref=self.pref,
                     gx=self.gx, gy=self.gy, gz=self.gz
                 ))
+            if self.alpha > 0.0:
+                eq4.append(
+                    MomentumEquationArtificialViscosity(
+                        dest=fluid, sources=all, c0=self.c0,
+                        alpha=self.alpha
+                    ))
             if self.nu > 0.0:
                 eq4.append(
                     MomentumEquationViscosity(
-                        dest=fluid, sources=sources, nu=self.nu
+                        dest=fluid, sources=all, nu=self.nu
                     ))
+                if self.solids:
+                    eq4.append(
+                        SolidWallNoSlipBC(
+                            dest=fluid, sources=self.solids, nu=self.nu
+                        ))
             eq4.append(
                 MomentumEquationArtificialStress(
-                    dest=fluid, sources=sources, dim=self.dim
+                    dest=fluid, sources=self.fluids, dim=self.dim
                 ))
         stage2.append(Group(equations=eq4, real=True))
 
@@ -635,5 +668,12 @@ class GTVFScheme(Scheme):
         output_props = dummy.output_property_arrays
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
+            self._ensure_properties(pa, props, clean)
+            pa.set_output_arrays(output_props)
+
+        solid_props = ['uf', 'vf', 'wf', 'vg', 'ug', 'wij', 'wg', 'V']
+        props += solid_props
+        for solid in self.solids:
+            pa = particle_arrays[solid]
             self._ensure_properties(pa, props, clean)
             pa.set_output_arrays(output_props)

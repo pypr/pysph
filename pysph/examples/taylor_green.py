@@ -178,7 +178,7 @@ class TaylorGreen(Application):
         elif self.options.scheme == 'crksph':
             scheme.configure(h0=h0, nu=self.nu)
         elif self.options.scheme == 'gtvf':
-            scheme.configure(pref=10*p0, p0=p0, nu=self.nu, h0=h0)
+            scheme.configure(pref=p0, nu=self.nu, h0=h0)
         scheme.configure_solver(kernel=kernel, tf=self.tf, dt=self.dt,
                                 pfreq=pfreq)
 
@@ -206,8 +206,8 @@ class TaylorGreen(Application):
             rho0=rho0, h0=h0, c0=c0, p0=0.0
         )
         gtvf = GTVFScheme(
-            fluids=['fluid'], dim=2, rho0=rho0, c0=c0,
-            nu=None, h0=None, p0=p0, pref=None
+            fluids=['fluid'], solids=[], dim=2, rho0=rho0, c0=c0,
+            nu=None, h0=None, pref=None
         )
         pcisph = PCISPHScheme(
             fluids=['fluid'], dim=2, rho0=rho0, nu=None
@@ -326,9 +326,10 @@ class TaylorGreen(Application):
             else:
                 equations = None
             from pysph.solver.tools import SimpleRemesher
-            if options.scheme == 'wcsph' or options.scheme == 'crksph' \
-               or options.scheme == 'pcisph':
+            if options.scheme == 'wcsph' or options.scheme == 'crksph':
                 props = ['u', 'v', 'au', 'av', 'ax', 'ay', 'arho']
+            elif options.scheme == 'pcisph':
+                props = ['u', 'v', 'p']
             elif options.scheme == 'tvf':
                 props = ['u', 'v', 'uhat', 'vhat',
                          'au', 'av', 'auhat', 'avhat']

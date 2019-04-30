@@ -2,6 +2,7 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
+from libc.math cimport log
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 
@@ -65,6 +66,10 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pid_keys = []
         self.cids = []
         self.cid_to_idx = []
+
+        self.allocator = cl.tools.MemoryPool(
+                cl.tools.ImmediateAllocator(self.queue)
+                )
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -130,7 +135,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         (sorted_indices, sorted_keys), evnt = self.radix_sort(
             self.pids[pa_index].dev, self.pid_keys[pa_index].dev,
-            key_bits=max_num_bits
+            key_bits=max_num_bits, allocator=self.allocator
         )
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)

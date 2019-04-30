@@ -166,7 +166,7 @@ class AccelerationEvalCythonHelper(object):
         # for SpatialHashNNPS
         extra_inc_dirs = [join(dirname(dirname(realpath(__file__))), 'base')]
         self._ext_mod = ExtModule(
-            code, verbose=True, root=root, depends=depends,
+            code, verbose=False, root=root, depends=depends,
             extra_inc_dirs=extra_inc_dirs
         )
         self._module = self._ext_mod.load()

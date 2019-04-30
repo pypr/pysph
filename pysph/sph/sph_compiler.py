@@ -69,9 +69,9 @@ class SPHCompiler(object):
                 AccelerationEvalCythonHelper
             cls = AccelerationEvalCythonHelper
         elif self.backend == 'opencl':
-            from .acceleration_eval_opencl_helper import \
-                AccelerationEvalOpenCLHelper
-            cls = AccelerationEvalOpenCLHelper
+            from .acceleration_eval_gpu_helper import \
+                AccelerationEvalGPUHelper
+            cls = AccelerationEvalGPUHelper
 
         self.acceleration_eval_helpers = [
             cls(a_eval)
@@ -88,7 +88,7 @@ class SPHCompiler(object):
                 self.integrator, a_helper0
             )
         elif self.backend == 'opencl':
-            from .integrator_opencl_helper import IntegratorOpenCLHelper
-            self.integrator_helper = IntegratorOpenCLHelper(
+            from .integrator_gpu_helper import IntegratorGPUHelper
+            self.integrator_helper = IntegratorGPUHelper(
                 self.integrator, a_helper0
             )

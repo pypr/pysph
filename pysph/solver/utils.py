@@ -3,19 +3,41 @@ Module contains some common functions.
 """
 
 # standard imports
-import numpy
-import sys
 import os
+import sys
+import time
+
+import numpy
 
 import pysph
 from pysph.solver.output import load, dump, output_formats  # noqa: 401
 from pysph.solver.output import gather_array_data as _gather_array_data
 
-HAS_PBAR = True
+ASCII_FMT = " 123456789#"
 try:
-    import progressbar
-except ImportError:
-    HAS_PBAR = False
+    uni_chr = unichr
+except NameError:
+    uni_chr = chr
+UTF_FMT = u" " + u''.join(map(uni_chr, range(0x258F, 0x2587, -1)))
+
+
+def _supports_unicode(fp):
+    # Taken somewhat from the tqdm package.
+    if not hasattr(fp, 'encoding'):
+        return False
+    else:
+        encoding = fp.encoding
+        try:
+            u'\u2588\u2589'.encode(encoding)
+        except UnicodeEncodeError:
+            return False
+        except Exception:
+            try:
+                return encoding.lower().startswith('utf-') or ('U8' == encoding)
+            except:
+                return False
+        else:
+            return True
 
 
 def check_array(x, y):
@@ -50,61 +72,84 @@ def get_array_by_name(arrays, name):
             return array
 
 
-class PBar(object):
-    """A simple wrapper around the progressbar so it works if a user has
-    it installed or not.
-    """
-    def __init__(self, maxval, show=True):
-        bar = None
+def fmt_time(time):
+    mm, ss = divmod(time, 60)
+    hh, mm = divmod(mm, 60)
+    if hh > 0:
+        s = "%d:%02d:%02d" % (hh, mm, ss)
+    else:
+        s = "%02d:%02.1f" % (mm, ss)
+    return s
+
+
+class ProgressBar(object):
+    def __init__(self, ti, tf, show=True, file=None, ascii=False):
+        if file is None:
+            self.file = sys.stdout
+        self.ti = ti
+        self.tf = tf
+        self.t = 0.0
+        self.dt = 1.0
+        self.start = time.time()
         self.count = 0
-        self.maxval = maxval
+        self.iter_inc = 1
         self.show = show
-        if HAS_PBAR and show:
-            widgets = [progressbar.Percentage(), ' ', progressbar.Bar(),
-                       progressbar.ETA()]
-            bar = progressbar.ProgressBar(widgets=widgets,
-                                          maxval=maxval, fd=sys.stdout).start()
-        elif show:
-            sys.stdout.write('\r0%')
-        if show:
-            sys.stdout.flush()
-        self.bar = bar
+        self.ascii = ascii
+        if not ascii and not _supports_unicode(self.file):
+            self.ascii = True
+        if not self.file.isatty():
+            self.show = False
+        self.display()
 
-    def update(self, delta=1):
-        self.count += delta
-        if self.bar is not None:
-            self.bar.update(self.count)
-        elif self.show:
-            sys.stdout.write('\r%d%%' % int(self.count*100/self.maxval))
+    def _fmt_bar(self, percent, width):
+        chars = ASCII_FMT if self.ascii else UTF_FMT
+        nsyms = len(chars) - 1
+        tens, ones = divmod(int(percent/100 * width * nsyms), nsyms)
+        end = chars[ones] if ones > 0 else ''
+        return (chars[-1]*tens + end).ljust(width)
+
+    def _fmt_iters(self, iters):
+        if iters < 1e3:
+            s = '%d' % iters
+        elif iters < 1e6:
+            s = '%.1fk' % (iters/1e3)
+        elif iters < 1e9:
+            s = '%.1fM' % (iters/1e6)
+        return s
+
+    def display(self):
         if self.show:
-            sys.stdout.flush()
+            elapsed = time.time() - self.start
+            if self.t > 0:
+                eta = (self.tf - self.t)/self.t * elapsed
+            else:
+                eta = 0.0
+            percent = int(round(self.t/self.tf*100))
+            bar = self._fmt_bar(percent, 20)
+            secsperit = elapsed/self.count if self.count > 0 else 0
+            out = ('{percent:3}%|{bar}|'
+                   ' {iters}it | {time:.1e}s [{elapsed}<{eta} | '
+                   '{secsperit:.3f}s/it]').format(
+                bar=bar, percent=percent, iters=self._fmt_iters(self.count),
+                time=self.t, elapsed=fmt_time(elapsed), eta=fmt_time(eta),
+                secsperit=secsperit
+            )
+            self.file.write('\r%s' % out.ljust(70))
+            self.file.flush()
+
+    def update(self, t, iter_inc=1):
+        '''Set the current time and update the number of iterations.
+        '''
+        self.dt = t - self.t
+        self.iter_inc = iter_inc
+        self.count += iter_inc
+        self.t = t
+        self.display()
 
     def finish(self):
-        if self.bar is not None:
-            self.bar.finish()
-        elif self.show:
-            sys.stdout.write('\r100%\n')
+        self.display()
         if self.show:
-            sys.stdout.flush()
-
-
-class FloatPBar(object):
-    def __init__(self, t_initial, t_final, show=True):
-        self.ticks = 1000
-        self.bar = PBar(self.ticks, show)
-        self.t_initial = t_initial
-        self.t_final = t_final
-        self.t_diff = t_final - t_initial
-
-    def update(self, time):
-        expected_count = int((time - self.t_initial)/self.t_diff*self.ticks)
-        expected_count = min(expected_count, self.ticks)
-        diff = max(expected_count - self.bar.count, 0)
-        if diff > 0:
-            self.bar.update(diff)
-
-    def finish(self):
-        self.bar.finish()
+            self.file.write('\n')
 
 
 ##############################################################################

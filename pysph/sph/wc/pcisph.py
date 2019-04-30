@@ -2,8 +2,6 @@
 Predictive-Corrective Incompressible SPH (PCISPH)
 #################################################
 
-Note: beta is missing a factor of :math:`m_i`, which works well for TG.
-
 References
 -----------
 
@@ -42,8 +40,9 @@ class PCISPHIntegrator(Integrator):
         self.compute_accelerations(0)
 
         self.stage1()
+        self.update_domain()
 
-        self.do_post_stage(0.5*dt, 1)
+        self.do_post_stage(dt, 1)
 
     def initial_acceleration(self, t, dt):
         pass
@@ -73,13 +72,13 @@ class PCISPHStep(IntegratorStep):
 
     def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, d_x, d_y, d_z,
                d_aup, d_avp, d_awp, d_u0, d_v0, d_w0, d_x0, d_y0, d_z0, dt):
-        d_u[d_idx] = d_u0[d_idx] + dt*(d_au[d_idx] + d_aup[d_idx])
-        d_v[d_idx] = d_v0[d_idx] + dt*(d_av[d_idx] + d_avp[d_idx])
-        d_w[d_idx] = d_w0[d_idx] + dt*(d_aw[d_idx] + d_awp[d_idx])
+        d_u[d_idx] = d_u0[d_idx] + dt * (d_au[d_idx] + d_aup[d_idx])
+        d_v[d_idx] = d_v0[d_idx] + dt * (d_av[d_idx] + d_avp[d_idx])
+        d_w[d_idx] = d_w0[d_idx] + dt * (d_aw[d_idx] + d_awp[d_idx])
 
-        d_x[d_idx] = d_x0[d_idx] + dt*d_u[d_idx]
-        d_y[d_idx] = d_y0[d_idx] + dt*d_v[d_idx]
-        d_z[d_idx] = d_z0[d_idx] + dt*d_w[d_idx]
+        d_x[d_idx] = d_x0[d_idx] + dt * d_u[d_idx]
+        d_y[d_idx] = d_y0[d_idx] + dt * d_v[d_idx]
+        d_z[d_idx] = d_z0[d_idx] + dt * d_w[d_idx]
 
 
 class MomentumEquationViscosity(Equation):
@@ -87,6 +86,7 @@ class MomentumEquationViscosity(Equation):
 
     See "pysph.sph.wc.viscosity.LaminarViscocity"
     """
+
     def __init__(self, dest, sources, nu=0.0, gx=0.0, gy=0.0, gz=0.0):
         self.nu = nu
         self.gx = gx
@@ -104,9 +104,9 @@ class MomentumEquationViscosity(Equation):
         mb = s_m[s_idx]
         rhoij = (d_rho[d_idx] + s_rho[s_idx])
 
-        xdotdwij = DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2]
+        xdotdwij = DWIJ[0] * XIJ[0] + DWIJ[1] * XIJ[1] + DWIJ[2] * XIJ[2]
 
-        tmp = mb*4*self.nu * xdotdwij/(rhoij*(R2IJ + EPS))
+        tmp = mb * 4 * self.nu * xdotdwij / (rhoij * (R2IJ + EPS))
 
         d_au[d_idx] += tmp * VIJ[0]
         d_av[d_idx] += tmp * VIJ[1]
@@ -118,7 +118,9 @@ class MomentumEquationViscosity(Equation):
         d_v[d_idx] += dt * d_av[d_idx]
         d_w[d_idx] += dt * d_aw[d_idx]
 
-        d_p[d_idx] = 0.0
+        # Retaining the old pressure seems to give better results for the
+        # TG problem.
+        #d_p[d_idx] = 0.0
 
         d_aup[d_idx] = 0.0
         d_avp[d_idx] = 0.0
@@ -136,6 +138,7 @@ class Predict(Equation):
     .. math::
         \mathbf{x}^{*}(t+1) = \mathbf{x}(t) + dt * \mathbf{v}(t+1)
     """
+
     def initialize(self, d_idx, d_u, d_v, d_w, d_aup, d_avp, d_awp, d_x, d_y,
                    d_z, d_au, d_av, d_aw, d_u0, d_v0, d_w0, d_x0, d_y0, d_z0,
                    dt):
@@ -143,9 +146,9 @@ class Predict(Equation):
         d_v[d_idx] = d_v0[d_idx] + dt * (d_av[d_idx] + d_avp[d_idx])
         d_w[d_idx] = d_w0[d_idx] + dt * (d_aw[d_idx] + d_awp[d_idx])
 
-        d_x[d_idx] = d_x0[d_idx] + dt*d_u[d_idx]
-        d_y[d_idx] = d_y0[d_idx] + dt*d_v[d_idx]
-        d_z[d_idx] = d_z0[d_idx] + dt*d_w[d_idx]
+        d_x[d_idx] = d_x0[d_idx] + dt * d_u[d_idx]
+        d_y[d_idx] = d_y0[d_idx] + dt * d_v[d_idx]
+        d_z[d_idx] = d_z0[d_idx] + dt * d_w[d_idx]
 
 
 class ComputePressure(Equation):
@@ -165,36 +168,36 @@ class ComputePressure(Equation):
         \delta = \frac{-1}{\beta (-\sum_j \nabla W_{ij} \cdot
         \sum_j \nabla W_{ij} - \sum_j \nabla W_{ij} \nabla W_{ij})}
     """
+
     def __init__(self, dest, sources, rho0):
         self.rho0 = rho0
         super(ComputePressure, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_dw, d_dwij2):
-        d_dw[d_idx*3 + 0] = 0.0
-        d_dw[d_idx*3 + 1] = 0.0
-        d_dw[d_idx*3 + 2] = 0.0
+        d_dw[d_idx * 3 + 0] = 0.0
+        d_dw[d_idx * 3 + 1] = 0.0
+        d_dw[d_idx * 3 + 2] = 0.0
 
         d_dwij2[d_idx] = 0.0
 
     def loop(self, d_idx, d_dw, d_dwij2, DWIJ):
-        d_dw[d_idx*3 + 0] += DWIJ[0]
-        d_dw[d_idx*3 + 1] += DWIJ[1]
-        d_dw[d_idx*3 + 2] += DWIJ[2]
+        d_dw[d_idx * 3 + 0] += DWIJ[0]
+        d_dw[d_idx * 3 + 1] += DWIJ[1]
+        d_dw[d_idx * 3 + 2] += DWIJ[2]
 
-        dwij2 = DWIJ[0]*DWIJ[0] + DWIJ[1]*DWIJ[1] + DWIJ[2]*DWIJ[2]
+        dwij2 = DWIJ[0] * DWIJ[0] + DWIJ[1] * DWIJ[1] + DWIJ[2] * DWIJ[2]
         d_dwij2[d_idx] += dwij2
 
     def post_loop(self, d_idx, d_dw, d_m, dt, d_dwij2, d_p, d_rho):
-        dwx = d_dw[d_idx*3 + 0]
-        dwy = d_dw[d_idx*3 + 1]
-        dwz = d_dw[d_idx*3 + 2]
-        tmp = dwx*dwx + dwy*dwy + dwz*dwz
+        dwx = d_dw[d_idx * 3 + 0]
+        dwy = d_dw[d_idx * 3 + 1]
+        dwz = d_dw[d_idx * 3 + 2]
+        tmp = dwx * dwx + dwy * dwy + dwz * dwz
 
         mi = d_m[d_idx]
         rho0 = self.rho0
-        # beta is missing a factor of 'mi' which is works well for TG.
-        beta = 2*mi*(dt/rho0)*(dt/rho0)
-        delta = 1.0/(beta * (tmp + d_dwij2[d_idx]))
+        beta = 2 * mi * mi * (dt / rho0) * (dt / rho0)
+        delta = 1.0 / (beta * (tmp + d_dwij2[d_idx]))
 
         rho_err = d_rho[d_idx] - rho0
         d_p[d_idx] += delta * rho_err
@@ -209,6 +212,7 @@ class MomentumEquationPressureGradient(Equation):
         \frac{d\mathbf{v}}{dt} = - \sum_j m_j \left(\frac{p_i}{\rho_i^2}
         + \frac{p_i}{\rho_i^2}\right) \nabla W(x_{ij}, h)
     """
+
     def __init__(self, dest, sources, rho0, tolerance, debug):
         self.rho0 = rho0
         self.tolerance = tolerance
@@ -223,14 +227,14 @@ class MomentumEquationPressureGradient(Equation):
         rhoj2 = 1.0 / (s_rho[s_idx] * s_rho[s_idx])
         mj = s_m[d_idx]
 
-        pij = -1.0*mj * (d_p[d_idx]*rhoi2 + s_p[s_idx]*rhoj2)
+        pij = -1.0 * mj * (d_p[d_idx] * rhoi2 + s_p[s_idx] * rhoj2)
         d_aup[d_idx] += pij * DWIJ[0]
         d_avp[d_idx] += pij * DWIJ[1]
         d_awp[d_idx] += pij * DWIJ[2]
 
     def reduce(self, dst, t, dt):
         import numpy as np
-        self.rho_err = np.max(np.abs(dst.rho - self.rho0))
+        self.rho_err = np.mean(np.abs(dst.rho / self.rho0 - 1.0))
         dst.iters[self.ctr] += 1
 
     def converged(self):
@@ -304,7 +308,7 @@ class PCISPHScheme(Scheme):
         from pysph.solver.solver import Solver
         self.solver = Solver(
             dim=self.dim, integrator=integrator, kernel=kernel,
-            output_at_times=[0, 0.2, 0.4, 0.8], **kw
+            **kw
         )
 
     def get_equations(self):
@@ -312,15 +316,15 @@ class PCISPHScheme(Scheme):
         all = self.fluids
         equations = []
 
-        eq0 = []
+        eq1 = []
         for fluid in self.fluids:
-            eq0.append(
+            eq1.append(
                 MomentumEquationViscosity(
                     dest=fluid, sources=all, nu=self.nu, gx=self.gx,
                     gy=self.gy, gz=self.gz
                 )
             )
-        equations.append(Group(equations=eq0))
+        equations.append(Group(equations=eq1))
 
         eq1, g2 = [], []
         for fluid in self.fluids:
@@ -330,14 +334,14 @@ class PCISPHScheme(Scheme):
         eq2 = []
         for fluid in self.fluids:
             eq2.append(SummationDensity(dest=fluid, sources=all))
-        g2.append(Group(equations=eq2, real=False))
+        g2.append(Group(equations=eq2))
 
         eq3 = []
         for fluid in self.fluids:
             eq3.append(
                 ComputePressure(dest=fluid, sources=all, rho0=self.rho0)
             )
-        g2.append(Group(equations=eq3, real=True))
+        g2.append(Group(equations=eq3, update_nnps=True))
 
         eq4 = []
         for fluid in self.fluids:
@@ -347,7 +351,7 @@ class PCISPHScheme(Scheme):
                     tolerance=self.tolerance, debug=self.debug
                 ),
             )
-        g2.append(Group(equations=eq4, real=True))
+        g2.append(Group(equations=eq4))
 
         equations.append(
             Group(equations=g2, iterate=True,

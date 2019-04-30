@@ -62,26 +62,31 @@ def mat_vec_mult(a=[1.0, 0.0], b=[1.0, 0.0], n=3, result=[0.0, 0.0]):
         result[i] = s
 
 
-def augmented_matrix(A=[0.0, 0.0], b=[0.0, 0.0], n=3, na=1, result=[0.0, 0.0]):
+def augmented_matrix(A=[0.0, 0.0], b=[0.0, 0.0], n=3, na=1, nmax=3,
+                     result=[0.0, 0.0]):
     """Create augmented matrix.
 
-    Given flattened matrix, `A`, and flattened columns `b` with `n` rols and
-    `na` additional columns, put these in result. Result must be already
-    allocated and be flattened.
+    Given flattened matrix, `A` of max rows/columns `nmax`, and flattened
+    columns `b` with `n` rows of interest and `na` additional columns, put
+    these in `result`. Result must be already allocated and be flattened.
+    The `result` will contain `(n + na)*n` first entries as the
+    augmented_matrix.
+
 
     Parameters
     ----------
     A: list: given matrix.
     b: list: additional columns to be augmented.
-    n: int : number of rows/columns in `A`.
+    n: int : number of rows/columns to use from `A`.
     na: int: number of added columns in `b`.
-    result: list: must have size of (n + na)*n.
+    nmax: int: the maximum dimension 'A'
+    result: list: must have size of (nmax + na)*n.
     """
     i, j, nt = declare('int', 3)
     nt = n + na
     for i in range(n):
         for j in range(n):
-            result[nt*i + j] = A[n * i + j]
+            result[nt*i + j] = A[nmax * i + j]
         for j in range(na):
             result[nt*i + n + j] = b[na*i + j]
 
@@ -97,7 +102,7 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
     ----------
 
     m : list: a flattened list representing the augmented matrix [A|b].
-    n : int: number of columns/rows of A.
+    n : int: number of columns/rows used from A in augmented_matrix.
     nb: int: number of columns added to A.
     result: list: with size n*nb
 
@@ -144,15 +149,15 @@ def gj_solve(m=[1., 0.], n=3, nb=1, result=[0.0, 0.0]):
         else:
             for backColr in range(rb, augCol):
                 backCol = rb + augCol - backColr - 1
-                m[nt*rb + backCol] = float(m[nt*rb + backCol]) / m[nt*rb + rb]
+                m[nt*rb + backCol] = m[nt*rb + backCol] / m[nt*rb + rb]
             if not (rb == 0):
                 for kupr in range(rb):
                     kup = rb - kupr - 1
                     for kleftr in range(rb, augCol):
                         kleft = rb + augCol - kleftr - 1
-                        kk = -float(m[nt*kup + rb]) / float(m[nt*rb + rb])
+                        kk = -m[nt*kup + rb] / m[nt*rb + rb]
                         m[nt*kup + kleft] = (m[nt*kup + kleft] +
-                                             kk * float(m[nt*rb + kleft]))
+                                             kk * m[nt*rb + kleft])
 
     for i in range(n):
         for j in range(nb):

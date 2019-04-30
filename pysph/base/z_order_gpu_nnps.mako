@@ -153,7 +153,7 @@
 </%def>
 
 <%def name="z_order_nbrs_prep(data_t, sorted, dst_src)", cached="False">
-     unsigned int qid;
+    unsigned int qid;
 
     qid = pids_dst[i];
 

@@ -122,7 +122,7 @@ class MLSFirstOrder2D(Equation):
         res[0] = 1.0
         res[1] = 0.0
         res[2] = 0.0
-        augmented_matrix(amls, res, 3, 1, aug_mls)
+        augmented_matrix(amls, res, 3, 1, 3, aug_mls)
         gj_solve(aug_mls, n, 1, res)
         b0 = res[0]
         b1 = res[1]

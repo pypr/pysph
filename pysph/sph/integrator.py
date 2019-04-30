@@ -54,13 +54,20 @@ class Integrator(object):
         a_eval = self.acceleration_evals[0]
         factors = [-1.0, -1.0, -1.0]
         for pa in a_eval.particle_arrays:
+            prop_names = []
             for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
                 if name in pa.properties:
                     if pa.gpu:
-                        max_val = pa.gpu.max(name)
+                        prop_names.append(name)
                     else:
                         max_val = np.max(pa.get(name))
-                    factors[i] = max(factors[i], max_val)
+                        factors[i] = max(factors[i], max_val)
+            if pa.gpu:
+                pa.gpu.update_minmax_cl(prop_names, only_max=True)
+                for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
+                    if name in pa.properties:
+                        max_val = getattr(pa.gpu, name).maximum
+                        factors[i] = max(factors[i], max_val)
         cfl_f, force_f, visc_f = factors
         return cfl_f, force_f, visc_f
 
@@ -100,8 +107,6 @@ class Integrator(object):
                 h = pa.gpu.get_device_array('h')
             else:
                 h = pa.get_carray('h')
-
-            h.update_min_max()
 
             if h.minimum < hmin:
                 hmin = h.minimum
@@ -160,8 +165,9 @@ class Integrator(object):
                 - self.stage1(), self.stage2() etc. depending on the number of
                   stages available.
 
-                - self.compute_accelerations(t, dt)
+                - self.compute_accelerations(index=0, update_nnps=True)
                 - self.do_post_stage(stage_dt, stage_count_from_1)
+                - self.update_domain()
 
         Please see any of the concrete implementations of the Integrator class
         to study.  By default the Integrator implements a
@@ -172,6 +178,7 @@ class Integrator(object):
 
         # Predict
         self.stage1()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(0.5*dt, 1)
@@ -180,6 +187,7 @@ class Integrator(object):
 
         # Correct
         self.stage2()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
@@ -236,6 +244,21 @@ class Integrator(object):
         """
         self.acceleration_evals[0].compute(t, dt)
 
+    def update_domain(self):
+        """Update the domain of the simulation.
+
+        This is to be called when particles move so the ghost particles
+        (periodicity, mirror boundary conditions) can be reset. Further, this
+        also recalculates the appropriate cell size based on the particle
+        kernel radius, `h`. This should be called explicitly when desired but
+        usually this is done when the particles are moved or the `h` is
+        changed.
+
+        The integrator should explicitly call this when needed in the
+        `one_timestep` method.
+        """
+        self.nnps.update_domain()
+
 
 ###############################################################################
 # `EulerIntegrator` class
@@ -244,6 +267,7 @@ class EulerIntegrator(Integrator):
     def one_timestep(self, t, dt):
         self.compute_accelerations()
         self.stage1()
+        self.update_domain()
         self.do_post_stage(dt, 1)
 
 
@@ -269,6 +293,7 @@ class PECIntegrator(Integrator):
 
         # Predict
         self.stage1()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(0.5*dt, 1)
@@ -277,6 +302,7 @@ class PECIntegrator(Integrator):
 
         # Correct
         self.stage2()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
@@ -324,6 +350,7 @@ class EPECIntegrator(Integrator):
 
         # Predict
         self.stage1()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(0.5*dt, 1)
@@ -332,6 +359,7 @@ class EPECIntegrator(Integrator):
 
         # Correct
         self.stage2()
+        self.update_domain()
 
         # Call any post-stage functions.
         self.do_post_stage(dt, 2)
@@ -361,16 +389,19 @@ class TVDRK3Integrator(Integrator):
         # stage 1
         self.compute_accelerations()
         self.stage1()
+        self.update_domain()
         self.do_post_stage(1./3*dt, 1)
 
         # stage 2
         self.compute_accelerations()
         self.stage2()
+        self.update_domain()
         self.do_post_stage(2./3*dt, 2)
 
         # stage 3 and end
         self.compute_accelerations()
         self.stage3()
+        self.update_domain()
         self.do_post_stage(dt, 3)
 
 
@@ -382,10 +413,12 @@ class LeapFrogIntegrator(PECIntegrator):
     def one_timestep(self, t, dt):
 
         self.stage1()
+        self.update_domain()
         self.do_post_stage(0.5*dt, 1)
 
         self.compute_accelerations()
         self.stage2()
+        self.update_domain()
         self.do_post_stage(dt, 2)
 
 
@@ -405,20 +438,25 @@ class PEFRLIntegrator(Integrator):
     def one_timestep(self, t, dt):
 
         self.stage1()
+        self.update_domain()
         self.do_post_stage(0.1786178958448091*dt, 1)
 
         self.compute_accelerations()
         self.stage2()
+        self.update_domain()
         self.do_post_stage(0.1123533131749906*dt, 2)
 
         self.compute_accelerations()
         self.stage3()
+        self.update_domain()
         self.do_post_stage(0.8876466868250094*dt, 3)
 
         self.compute_accelerations()
         self.stage4()
+        self.update_domain()
         self.do_post_stage(0.8213821041551909*dt, 4)
 
         self.compute_accelerations()
         self.stage5()
+        self.update_domain()
         self.do_post_stage(dt, 5)

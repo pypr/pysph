@@ -7,7 +7,6 @@ ${' '*4*level}${l}
 </%def>
 
 from libc.math cimport *
-from libc.math cimport M_PI as pi
 
 from pysph.base.nnps_base cimport NNPS
 
@@ -47,6 +46,9 @@ cdef class Integrator:
 
     cpdef compute_accelerations(self, int index=0, update_nnps=True):
         self.integrator.compute_accelerations(index, update_nnps)
+
+    cpdef update_domain(self):
+        self.integrator.update_domain()
 
     cpdef do_post_stage(self, double stage_dt, int stage):
         """This is called after every stage of the integrator.

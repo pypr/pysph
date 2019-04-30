@@ -1,13 +1,16 @@
 os:
     ubuntu
-  
+
+dist:
+    xenial
+
 language: python
 python:
     - 2.7
-    - 3.6
+    - 3.7
 
 install:
-    - sudo apt-get update 
+    - sudo apt-get update
     - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
         wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
       else
@@ -21,7 +24,7 @@ install:
     - conda info -a
     - conda config --add channels conda-forge
     - conda config --add channels defaults
-    - conda install -c conda-forge pocl pyopencl
+    - conda install -c conda-forge pocl==1.2 pyopencl
     - conda install -c defaults virtualenv
     - python -c 'import pyopencl as cl'
     - pip install beaker tox tox-travis
