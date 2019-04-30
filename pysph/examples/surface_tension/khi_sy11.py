@@ -184,7 +184,7 @@ class SquareDroplet(Application):
         )
 
     def create_equations(self):
-        return return_equations(['fluid'], ['wall'], self.options.scheme, rho0, p0, c0, 0,  factor1, factor2, nu, sigma, 2, epsilon, gamma, real=False)
+        return return_equations(['fluid'], ['wall'], self.options.scheme, rho0, p0, c0, 0,  factor1, factor2, nu, sigma, 2, epsilon, 1, real=False)
 
 
 if __name__ == '__main__':
