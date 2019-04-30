@@ -816,10 +816,10 @@ class AdamiColorGradient(Equation):
             d_ddelta[d_idx] = 1./one_mod_gradc
 
 
-def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, nu, sigma, d, epsilon, gamma, real=False):
-    Equations = []
-    equations = []
+def return_equations(fluids, solids, scheme, rho0, p0, c0, b, factor1, factor2, nu, sigma, d, epsilon, gamma, real=False):
     if scheme == 'tvf':
+        Equations = []
+        equations = []
         for i in fluids+solids:
             equations.append(SummationDensity(dest=i, sources=fluids+solids))
         Equations.append(Group(equations, real = real))
@@ -837,16 +837,20 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+solids),with_morris_correction=True)
+            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+solids, with_morris_correction=True))
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=pb))
+            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=p0))
             equations.append(MomentumEquationViscosity(dest=i, sources=fluids, nu=nu))
-            CSFSurfaceTensionForce(dest=i, sources=None, sigma=sigma)
-            SolidWallNoSlipBC(dest=i, sources=solids, nu=nu)
+            equations.append(CSFSurfaceTensionForce(dest=i, sources=None, sigma=sigma))
+            equations.append(MomentumEquationArtificialStress(dest=i, sources=fluids))
+            if len(solids)!=0:
+                equations.append(SolidWallNoSlipBC(dest=i, sources=solids, nu=nu))
         Equations.append(Group(equations))
     elif scheme == 'adami_stress':
+        Equations = []
+        equations = []
         for i in fluids+solids:
             equations.append(SummationDensity(dest=i, sources=fluids+solids))
         Equations.append(Group(equations, real=real))
@@ -854,7 +858,7 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
         for i in fluids:
             equations.append(TaitEOS(dest=i, sources=None, rho0=rho0, c0=c0, gamma=gamma, p0=p0))
         for i in solids:
-            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids+solids))
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids))
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
@@ -869,11 +873,14 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
             equations.append(MomentumEquationPressureGradientAdami(dest=i, sources=fluids+solids))
             equations.append(MomentumEquationViscosityAdami(dest=i, sources=fluids))
             equations.append(SurfaceForceAdami(dest=i, sources=fluids+solids))
-            SolidWallNoSlipBC(dest=i, sources=solids, nu=nu)
+            if len(solids)!=0:
+                equations.append(SolidWallNoSlipBC(dest=i, sources=solids, nu=nu))
         Equations.append(Group(equations))
     elif scheme == 'adami':
+        Equations = []
+        equations = []
         for i in fluids+solids:
-            equations.append(dest=i, sources=fluids+solids)
+            equations.append(SummationDensity(dest=i, sources=fluids+solids))
         Equations.append(Group(equations, real=real))
         equations=[]
         for i in fluids:
@@ -887,8 +894,19 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            
+            equations.append(AdamiReproducingDivergence(dest=i, sources=fluids+solids, dim=d))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=0.0))
+            equations.append(MomentumEquationViscosityAdami(dest=i, sources=fluids))
+            equations.append(CSFSurfaceTensionForceAdami(dest=i, sources=None))
+            if len(solids)!=0:
+                equations.append(SolidWallNoSlipBC(dest=i, sources=solids, nu=nu))
+        Equations.append(Group(equations))
     elif scheme == 'shadloo':
+        Equations = []
+        equations = []        
         for i in fluids+solids:
             equations.append(SummationDensity(dest=i, sources=fluids+solids))
         Equations.append(Group(equations, real = real))
@@ -909,7 +927,7 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
-            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+sources), with_morris_correction=True)
+            equations.append(InterfaceCurvatureFromNumberDensity(dest=i, sources=fluids+solids, with_morris_correction=True))
         Equations.append(Group(equations, real=real))
         equations = []
         for i in fluids:
@@ -917,11 +935,40 @@ def return_equations(fluids, solids, scheme, rho0, p0, b, factor1, factor2, pb, 
         Equations.append(Group(equations, real=real, update_nnps=True))
         equations = []
         for i in fluids:
-            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=pb))
+            equations.append(MomentumEquationPressureGradient(dest=i, sources=fluids+solids, pb=0.0))
             equations.append(MomentumEquationViscosity(dest=i, sources=fluids, nu=nu))
             equations.append(ShadlooYildizSurfaceTensionForce(dest=i, sources=None, sigma=sigma))
-            equations.append(SolidWallNoSlipBC(dest=i, sources=solids), nu=nu)
+            if len(solids)!=0:
+                equations.append(SolidWallNoSlipBC(dest=i, sources=solids, nu=nu))
         Equations.append(Group(equations))
     else:
-
+        Equations = []
+        equations = []
+        for i in fluids+solids:
+            equations.append(SummationDensitySourceMass(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(TaitEOS(dest=i, sources=None, rho0=rho0,c0=c0, gamma=gamma,p0=0.0))
+            equations.append(SmoothedColor(dest=i, sources=fluids+solids))
+        for i in solids:
+            equations.append(SolidWallPressureBCnoDensity(dest=i, sources=fluids))
+            equations.append(SmoothedColor(dest=i, sources=fluids+solids))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MorrisColorGradient(dest=i, sources=fluids+solids, epsilon=epsilon))
+        Equations.append(Group(equations, real=real))
+        equations=[]
+        for i in fluids:
+            equations.append(InterfaceCurvatureFromDensity(dest=i, sources=fluids+solids, with_morris_correction=True))
+        Equations.append(Group(equations, real=real))
+        equations = []
+        for i in fluids:
+            equations.append(MomentumEquationPressureGradientMorris(dest=i, sources=fluids+solids))
+            equations.append(MomentumEquationViscosityMorris(dest=i, sources=fluids))
+            equations.append(CSFSurfaceTensionForce(dest=i, sources=None, sigma=sigma))
+            if len(solids)!=0:
+                equations.append(SolidWallNoSlipBC(dest=i, sources=solids, nu=nu))
+        Equations.append(Group(equations))           
     return Equations
