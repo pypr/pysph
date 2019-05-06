@@ -13,7 +13,6 @@ where \lambda is the domain length.
 
 
 # standard library and numpy imports
-from __future__ import print_function
 import numpy
 
 # pysph imports
@@ -24,7 +23,7 @@ from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
 
 
-class AcousticWave(Application):
+class ChengShu(Application):
     def initialize(self):
         self.xmin = 0.
         self.xmax = 1.
@@ -96,5 +95,5 @@ class AcousticWave(Application):
 
 
 if __name__ == "__main__":
-    app = AcousticWave()
+    app = ChengShu()
     app.run()

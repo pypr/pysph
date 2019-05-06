@@ -3,7 +3,6 @@ Two Dimensional constant pressure accuracy test
 particles should simply advect in a periodic domain
 """
 
-from __future__ import print_function
 # NumPy and standard library imports
 import numpy
 
@@ -40,7 +39,7 @@ beta = 2.0
 kernel_factor = 1.5
 
 
-class ShockTube2D(Application):
+class AccuracyTest2D(Application):
     def initialize(self):
         self.xmin = xmin
         self.xmax = xmax
@@ -161,6 +160,6 @@ class ShockTube2D(Application):
 
 
 if __name__ == '__main__':
-    app = ShockTube2D()
+    app = AccuracyTest2D()
     app.run()
     app.post_process()

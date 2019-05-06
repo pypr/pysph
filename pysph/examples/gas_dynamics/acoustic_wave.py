@@ -13,7 +13,6 @@ where \lambda is the domain length.
 
 
 # standard library and numpy imports
-from __future__ import print_function
 import numpy
 
 # pysph imports
