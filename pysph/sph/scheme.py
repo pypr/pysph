@@ -1229,7 +1229,6 @@ class GSPHScheme(Scheme):
         )
 
     def consume_user_options(self, options):
-        self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
                 'monotonicity', 'interface_zero', 'hybrid',
                 'blend_alpha']

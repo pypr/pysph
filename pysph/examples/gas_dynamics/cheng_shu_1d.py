@@ -59,7 +59,6 @@ class AcousticWave(Application):
         cs = numpy.sqrt(
             self.gamma * p / rho
         )
-        print(u)
         h = numpy.ones_like(x) * self.dx * self.hdx
         m = numpy.ones_like(x) * self.dx * rho
         e = p / ((self.gamma - 1) * rho)
