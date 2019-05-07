@@ -226,7 +226,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         )
 
         z_order_nbr_lengths = Elementwise(
-            krnl_source.function, backend='opencl'
+            krnl_source.function, backend=self.backend
         )
 
         dst_gpu = self.dst.pa.gpu
@@ -252,7 +252,7 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         )
 
         z_order_nbrs = Elementwise(
-            krnl_source.function, backend='opencl'
+            krnl_source.function, backend=self.backend
         )
 
         dst_gpu = self.dst.pa.gpu

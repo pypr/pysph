@@ -179,7 +179,8 @@ cdef class GPUNNPS(NNPSBase):
         NNPSBase.__init__(self, dim, particles, radius_scale, ghost_layers,
                 domain, cache, sort_gids)
 
-        self.backend = 'opencl' if backend is None else backend
+        self.backend = get_backend(backend)
+        self.backend = 'opencl' if self.backend is 'cython' else self.backend
         self.use_double = get_config().use_double
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max

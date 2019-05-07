@@ -110,6 +110,37 @@ class GPUIntegrator(object):
         self.one_timestep(t, dt)
 
 
+class CUDAIntegrator(GPUIntegrator):
+    """Does the actual work of calling the kernels for integration.
+    """
+    def _do_stage(self, method):
+        from pycuda.gpuarray import splay
+        import pycuda.driver as drv
+        # Call the appropriate kernels for either initialize/stage computation.
+        call_info = self.helper.calls[method]
+        py_call_info = self.helper.py_calls['py_' + method]
+        dtype = np.float64 if self._use_double else np.float32
+        extra_args = [np.asarray(self.t, dtype=dtype),
+                      np.asarray(self.dt, dtype=dtype)]
+        # Call the py_{method} for each destination.
+        for name, (py_meth, dest) in py_call_info.items():
+            py_meth(dest, *extra_args)
+
+        # Call the stage* method for each destination.
+        for name, (call, args, dest) in call_info.items():
+            n = dest.get_number_of_particles(real=True)
+
+            gs, ls = splay(n)
+            gs, ls = int(gs[0]), int(ls[0])
+
+            num_blocks = int((gs + ls - 1) / ls)
+            num_tpb = ls
+
+            # Compute the remaining arguments.
+            args = [x() for x in args[3:]]
+            call(*(args + extra_args), block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+
+
 class IntegratorGPUHelper(IntegratorCythonHelper):
     def __init__(self, integrator, acceleration_eval_helper):
         super(IntegratorGPUHelper, self).__init__(
@@ -142,8 +173,12 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
                 # just directly storing the dest.gpu.x, we compute it on
                 # the fly as the number of particles and the actual buffer
                 # may change.
-                def _getter(dest_gpu, x):
-                    return getattr(dest_gpu, x).dev.data
+                if self.backend == 'opencl':
+                    def _getter(dest_gpu, x):
+                        return getattr(dest_gpu, x).dev.data
+                elif self.backend == 'cuda':
+                    def _getter(dest_gpu, x):
+                        return getattr(dest_gpu, x).dev
 
                 _args = [
                     functools.partial(_getter, dest.gpu, x[2:])
@@ -151,7 +186,7 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
                 ]
                 all_args = [q, None, None] + _args
                 call = getattr(self.program, kernel)
-                call = profile_kernel(call, call.function_name, self.backend)
+                #call = profile_kernel(call, call.function_name, self.backend)
                 calls[method][dest] = (call, all_args, dest)
 
     def get_code(self):
@@ -182,7 +217,10 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
         # Create the compiled module.
         self.program = module
         self._setup_call_data()
-        gpu_integrator = GPUIntegrator(self, acceleration_eval)
+        if self.backend == 'opencl':
+            gpu_integrator = GPUIntegrator(self, acceleration_eval)
+        elif self.backend == 'cuda':
+            gpu_integrator = CUDAIntegrator(self, acceleration_eval)
         # Setup the integrator to use this compiled module.
         self.object.set_compiled_object(gpu_integrator)
 
@@ -229,7 +267,7 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
         # the stepper struct as it is not used at all. This simplifies things
         # as we do not need to generate structs and pass them around.
         code = [
-            'int d_idx = get_global_id(0);',
+            'int d_idx = GID_0 * LDIM_0 + LID_0;',
         ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,

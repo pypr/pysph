@@ -311,6 +311,12 @@ class CUDAAccelerationEval(GPUAccelerationEval):
         # we do not need the first 3 args on CUDA.
         args = [x() for x in args[3:]]
 
+        gs, ls = splay(n)
+        gs, ls = int(gs[0]), int(ls[0])
+
+        num_blocks = int((gs + ls - 1) / ls)
+        num_tpb = ls
+
         if info.get('loop'):
             if self._use_local_memory:
                 # FIXME: Fix local memory for CUDA
@@ -325,26 +331,20 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                 call(*args)
             else:
                 # find block sizes
-                gs, ls = splay(n)
-                gs, ls = int(gs[0]), int(ls[0])
-
-                num_blocks = int((gs + ls - 1) / ls)
-                num_tpb = ls
-
                 nnps.set_context(info['src_idx'], info['dst_idx'])
                 cache = nnps.current_cache
                 cache.get_neighbors_gpu()
                 args = args + [
-                    cache._nbr_lengths_gpu.dev.gpudata,
-                    cache._start_idx_gpu.dev.gpudata,
-                    cache._neighbors_gpu.dev.gpudata
+                    cache._nbr_lengths_gpu.dev,
+                    cache._start_idx_gpu.dev,
+                    cache._neighbors_gpu.dev
                 ] + extra_args
                 event = drv.Event()
                 call(*args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
                 event.record()
                 event.synchronize()
         else:
-            call(*(args + extra_args))
+            call(*(args + extra_args), block=(num_tpb, 1, 1), grid=(num_blocks, 1))
 
 
 def add_address_space(known_types):
@@ -392,8 +392,6 @@ class AccelerationEvalGPUHelper(object):
         self.known_types.update(predefined)
         self.known_types['NBRS'] = KnownType('GLOBAL_MEM unsigned int*')
         self.data = []
-        self._ctx = get_context(self.backend)
-        self._queue = get_queue(self.backend)
         self._array_map = None
         self._array_index = None
         self._equations = {}
@@ -401,6 +399,8 @@ class AccelerationEvalGPUHelper(object):
         self._gpu_structs = {}
         self.calls = []
         self.program = None
+        self._ctx = get_context(self.backend)
+        self._queue = get_queue(self.backend)
 
     def _setup_arrays_on_device(self):
         pas = self.object.particle_arrays
@@ -465,7 +465,7 @@ class AccelerationEvalGPUHelper(object):
                 return getattr(gpu_helper, attr).dev.data
         else:
             def _get_array(gpu_helper, attr):
-                return getattr(gpu_helper, attr).dev.gpudata
+                return getattr(gpu_helper, attr).dev
 
         def _get_struct(obj):
             return obj
@@ -478,7 +478,7 @@ class AccelerationEvalGPUHelper(object):
             if self.backend == 'opencl':
                 return partial(_get_struct, structs[arg].data)
             else:
-                return partial(_get_struct, structs[arg].gpudata)
+                return partial(_get_struct, structs[arg])
 
     def _setup_calls(self):
         calls = []
@@ -489,9 +489,9 @@ class AccelerationEvalGPUHelper(object):
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
-                method = profile_kernel(
-                    method, method.function_name, self.backend
-                )
+                #method = profile_kernel(
+                #    method, method.function_name, self.backend
+                #)
                 dest = item['dest']
                 src = item.get('source', dest)
                 args = [self._queue, None, None]
@@ -662,7 +662,7 @@ class AccelerationEvalGPUHelper(object):
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
-            'int d_idx = get_global_id(0);'
+            'int d_idx = GID_0 * LDIM_0 + LID_0;'
             'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
@@ -823,7 +823,7 @@ class AccelerationEvalGPUHelper(object):
         context = eq_group.context
         all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
-        code.append('unsigned int d_idx = get_global_id(0);')
+        code.append('unsigned int d_idx = GID_0 * LDIM_0 + LID_0;')
         code.append('unsigned int s_idx, i;')
         code.append('GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name)
         code.append('unsigned int start = start_idx[d_idx];')
