@@ -47,7 +47,7 @@ IF UNAME_SYSNAME == "Windows":
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, backend='opencl'):
+            bint cache=True, bint sort_gids=False, backend=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids, backend
@@ -65,11 +65,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pid_keys = []
         self.cids = []
         self.cid_to_idx = []
-
-        if self.backend == 'opencl':
-            self.allocator = cl.tools.MemoryPool(
-                    cl.tools.ImmediateAllocator(self.queue)
-                    )
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]

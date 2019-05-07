@@ -300,6 +300,8 @@ class GPUAccelerationEval(object):
 
 class CUDAAccelerationEval(GPUAccelerationEval):
     def _call_kernel(self, info, extra_args):
+        from pycuda.gpuarray import splay
+        import pycuda.driver as drv
         nnps = self.nnps
         call = info.get('method')
         args = list(info.get('args'))
@@ -311,6 +313,7 @@ class CUDAAccelerationEval(GPUAccelerationEval):
 
         if info.get('loop'):
             if self._use_local_memory:
+                # FIXME: Fix local memory for CUDA
                 nnps.set_context(info['src_idx'], info['dst_idx'])
 
                 nnps_args, gs_ls = self.nnps.get_kernel_args('float')
@@ -320,20 +323,28 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                 args = args + extra_args + nnps_args
 
                 call(*args)
-                self._queue.finish()
             else:
+                # find block sizes
+                gs, ls = splay(n)
+                gs, ls = int(gs[0]), int(ls[0])
+
+                num_blocks = int((gs + ls - 1) / ls)
+                num_tpb = ls
+
                 nnps.set_context(info['src_idx'], info['dst_idx'])
                 cache = nnps.current_cache
                 cache.get_neighbors_gpu()
                 args = args + [
-                    cache._nbr_lengths_gpu.dev.data,
-                    cache._start_idx_gpu.dev.data,
-                    cache._neighbors_gpu.dev.data
+                    cache._nbr_lengths_gpu.dev.gpudata,
+                    cache._start_idx_gpu.dev.gpudata,
+                    cache._neighbors_gpu.dev.gpudata
                 ] + extra_args
-                call(*args)
+                event = drv.Event()
+                call(*args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+                event.record()
+                event.synchronize()
         else:
             call(*(args + extra_args))
-        self._queue.finish()
 
 
 def add_address_space(known_types):

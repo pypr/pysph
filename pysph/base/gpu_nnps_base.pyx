@@ -50,8 +50,8 @@ from pysph.base.gpu_helper_kernels import (exclusive_input, exclusive_output,
 
 cdef class GPUNeighborCache:
     def __init__(self, GPUNNPS nnps, int dst_index, int src_index,
-            backend='opencl'):
-        self.backend = backend
+            backend=None):
+        self.backend = get_backend(backend)
         self._dst_index = dst_index
         self._src_index = src_index
         self._nnps = nnps
@@ -146,7 +146,7 @@ cdef class GPUNNPS(NNPSBase):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint cache=True,
-                 bint sort_gids=False, backend='opencl'):
+                 bint sort_gids=False, backend=None):
         """Constructor for NNPS
 
         Parameters
@@ -181,7 +181,6 @@ cdef class GPUNNPS(NNPSBase):
 
         self.backend = get_backend(backend)
         self.use_double = get_config().use_double
-        self.queue = get_queue()
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
         self._last_domain_size = 0.0
