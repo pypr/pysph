@@ -114,8 +114,7 @@ def neighbor_boxes(c_x, c_y, c_z, nbr_boxes):
     for j in range(-1, 2):
         for k in range(-1, 2):
             for m in range(-1, 2):
-                if (j != 0 or k != 0 or m != 0) and c_x + \
-                        m >= 0 and c_y + k >= 0 and c_z + j >= 0:
+                if (j != 0 or k != 0 or m != 0) and c_x + m >= 0 and c_y + k >= 0 and c_z + j >= 0:
                     key = interleave3(c_x + m, c_y + k, c_z + j)
                     nbr_boxes[nbr_boxes_length] = key
                     nbr_boxes_length += 1
