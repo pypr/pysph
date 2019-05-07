@@ -298,6 +298,44 @@ class GPUAccelerationEval(object):
             eq.reduce(dest, t, dt)
 
 
+class CUDAAccelerationEval(GPUAccelerationEval):
+    def _call_kernel(self, info, extra_args):
+        nnps = self.nnps
+        call = info.get('method')
+        args = list(info.get('args'))
+        dest = info['dest']
+        n = dest.get_number_of_particles(info.get('real', True))
+        # args is actually [queue, None, None, actual_meaningful_args]
+        # we do not need the first 3 args on CUDA.
+        args = [x() for x in args[3:]]
+
+        if info.get('loop'):
+            if self._use_local_memory:
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+
+                nnps_args, gs_ls = self.nnps.get_kernel_args('float')
+                args[1] = gs_ls[0]
+                args[2] = gs_ls[1]
+
+                args = args + extra_args + nnps_args
+
+                call(*args)
+                self._queue.finish()
+            else:
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+                cache = nnps.current_cache
+                cache.get_neighbors_gpu()
+                args = args + [
+                    cache._nbr_lengths_gpu.dev.data,
+                    cache._start_idx_gpu.dev.data,
+                    cache._neighbors_gpu.dev.data
+                ] + extra_args
+                call(*args)
+        else:
+            call(*(args + extra_args))
+        self._queue.finish()
+
+
 def add_address_space(known_types):
     for v in known_types.values():
         if 'GLOBAL_MEM' not in v.type:
@@ -388,7 +426,22 @@ class AccelerationEvalGPUHelper(object):
                     if k in self._equations:
                         self._equations[k]._gpu = gpu[k]
         else:
-            raise NotImplementedError('CUDA not supported yet')
+            from pycuda import gpuarray
+            from compyle.cuda import match_dtype_to_c_struct
+
+            gpu = self._gpu_structs
+            cpu = self._cpu_structs
+            for k, v in cpu.items():
+                if v is None:
+                    gpu[k] = v
+                else:
+                    g_struct, code = match_dtype_to_c_struct(
+                        None, "junk", v.dtype
+                    )
+                    g_v = v.astype(g_struct)
+                    gpu[k] = gpuarray.to_gpu(g_v)
+                    if k in self._equations:
+                        self._equations[k]._gpu = gpu[k]
 
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
@@ -396,8 +449,12 @@ class AccelerationEvalGPUHelper(object):
 
         # This is needed for late binding on the device helper's attributes
         # which may change at each iteration when particles are added/removed.
-        def _get_array(gpu_helper, attr):
-            return getattr(gpu_helper, attr).dev.data
+        if self.backend == 'opencl':
+            def _get_array(gpu_helper, attr):
+                return getattr(gpu_helper, attr).dev.data
+        else:
+            def _get_array(gpu_helper, attr):
+                return getattr(gpu_helper, attr).dev.gpudata
 
         def _get_struct(obj):
             return obj
@@ -407,7 +464,10 @@ class AccelerationEvalGPUHelper(object):
         elif arg.startswith('s_'):
             return partial(_get_array, ary_map[src].gpu, arg[2:])
         else:
-            return partial(_get_struct, structs[arg].data)
+            if self.backend == 'opencl':
+                return partial(_get_struct, structs[arg].data)
+            else:
+                return partial(_get_struct, structs[arg].gpudata)
 
     def _setup_calls(self):
         calls = []
@@ -477,7 +537,11 @@ class AccelerationEvalGPUHelper(object):
         object = self.object
         self._setup_arrays_on_device()
         self.calls = self._setup_calls()
-        acceleration_eval = GPUAccelerationEval(self)
+        if self.backend == 'opencl':
+            acceleration_eval = GPUAccelerationEval(self)
+        elif self.backend == 'cuda':
+            acceleration_eval = CUDAAccelerationEval(self)
+
         object.set_compiled_object(acceleration_eval)
 
     def compile(self, code):
@@ -507,7 +571,7 @@ class AccelerationEvalGPUHelper(object):
                 options=['-w']
             )
         elif self.backend == 'cuda':
-            from pycuda.compiler import SourceModule
+            from compyle.cuda import SourceModule
             self.program = SourceModule(code)
         return self.program
 
