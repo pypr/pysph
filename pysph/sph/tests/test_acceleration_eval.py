@@ -556,7 +556,8 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
         comp = SPHCompiler(a_eval, integrator=None)
         comp.compile()
         self.sph_compiler = comp
-        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps)
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=cache_nnps,
+                       backend='opencl')
         nnps.update()
         a_eval.set_nnps(nnps)
         return a_eval

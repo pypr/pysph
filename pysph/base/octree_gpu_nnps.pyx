@@ -8,10 +8,11 @@ cdef class OctreeGPUNNPS(GPUNNPS):
                  int ghost_layers=1, domain=None, bint fixed_h=False,
                  bint cache=True, bint sort_gids=False,
                  allow_sort=False, leaf_size=32,
-                 bint use_elementwise=False, bint use_partitions=False):
+                 bint use_elementwise=False, bint use_partitions=False,
+                 backend=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
-            cache, sort_gids, backend='opencl'
+            cache, sort_gids, backend=backend
         )
 
         self.src_index = -1

@@ -254,7 +254,8 @@ class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0
+            dim=2, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -274,7 +275,8 @@ class OctreeGPUNNPSDouble2DTestCase(DictBoxSortNNPS2DTestCase):
         cfg.use_double = True
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0
+            dim=2, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -629,7 +631,8 @@ class OctreeGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -668,7 +671,8 @@ class OctreeGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         self._orig_use_double = cfg.use_double
         cfg.use_double = True
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -708,7 +712,8 @@ class OctreeGPUNNPSWithSortingTestCase(DictBoxSortNNPSTestCase):
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
         self.nps.spatially_order_particles(0)
         self.nps.spatially_order_particles(1)
@@ -731,7 +736,7 @@ class OctreeGPUNNPSWithPartitioningTestCase(DictBoxSortNNPSTestCase):
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            use_partitions=True
+            use_partitions=True, backend='opencl'
         )
 
         for pa in self.particles:
