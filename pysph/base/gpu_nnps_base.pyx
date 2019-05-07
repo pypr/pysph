@@ -26,7 +26,6 @@ cimport cython
 
 import pyopencl as cl
 import pyopencl.array
-from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
@@ -44,6 +43,9 @@ from cyarray.carray cimport BaseArray, aligned_malloc, aligned_free
 from utils import ParticleTAGS
 
 from nnps_base cimport *
+
+from pysph.base.gpu_helper_kernels import (exclusive_input, exclusive_output,
+                                           get_scan)
 
 
 cdef class GPUNeighborCache:
@@ -84,6 +86,7 @@ cdef class GPUNeighborCache:
     #### Private protocol ################################################
 
     cdef void _find_neighbors(self):
+
         self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu)
         # FIXME:
         # - Store sum kernel
@@ -101,11 +104,10 @@ cdef class GPUNeighborCache:
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
         if self._get_start_indices is None:
-            self._get_start_indices = ExclusiveScanKernel(
-                get_context(), np.uint32, scan_expr="a+b", neutral="0"
-            )
+            self._get_start_indices = get_scan(exclusive_input, exclusive_output,
+                    dtype=np.uint32, backend=self.backend)
 
-        self._get_start_indices(self._start_idx_gpu.dev)
+        self._get_start_indices(ary=self._start_idx_gpu)
 
         self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu,
                 self._start_idx_gpu)

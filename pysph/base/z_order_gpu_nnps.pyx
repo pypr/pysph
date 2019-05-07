@@ -53,13 +53,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-        self.radix_sort = None
-        self.make_vec = cl.cltypes.make_double3 if self.use_double \
-                else cl.cltypes.make_float3
-
-        #self.helper = GPUNNPSHelper("z_order_gpu_nnps.mako",
-        #                            use_double=self.use_double,
-        #                            backend=self.backend)
 
         self.src_index = -1
         self.dst_index = -1
@@ -124,14 +117,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
                 self.xmin[0], self.xmin[1], self.xmin[2],
                 self.pid_keys[pa_index], self.pids[pa_index])
 
-        if self.radix_sort is None:
-            self.radix_sort = cl.algorithm.RadixSort(
-                get_context(),
-                "unsigned int* pids, unsigned long* keys",
-                scan_kernel=GenericScanKernel, key_expr="keys[i]",
-                sort_arg_names=["pids", "keys"]
-            )
-
         cdef double max_length = fmax(fmax((self.xmax[0] - self.xmin[0]),
             (self.xmax[1] - self.xmin[1])), (self.xmax[2] - self.xmin[2]))
 
@@ -139,16 +124,16 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         cdef int max_num_bits = 3*(<int> ceil(log2(max_num_cells)))
 
-        (sorted_indices, sorted_keys), evnt = self.radix_sort(
-            self.pids[pa_index].dev, self.pid_keys[pa_index].dev,
-            key_bits=max_num_bits, allocator=self.allocator
+        sorted_keys, sorted_indices = array.sort_by_keys(
+            [self.pid_keys[pa_index], self.pids[pa_index]],
+            key_bits=max_num_bits,
+            backend=self.backend
         )
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
 
         self.curr_cid.fill(1)
 
-        #fill_unique_cids = self.helper.get_kernel("fill_unique_cids")
         fill_unique_cids_knl = get_scan(inp_fill_unique_cids, out_fill_unique_cids,
                                         np.int32, self.backend)
 
@@ -163,7 +148,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         self.max_cid[pa_index] = num_cids
 
-        #map_cid_to_idx = self.helper.get_kernel("map_cid_to_idx")
         map_cid_to_idx_knl= get_elwise(map_cid_to_idx, self.backend)
 
         map_cid_to_idx_knl(
@@ -212,7 +196,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         if self.dst_src:
             self.dst_to_src.resize(self.max_cid[dst_index])
 
-            #map_dst_to_src = self.helper.get_kernel("map_dst_to_src")
             map_dst_to_src_knl = get_elwise(map_dst_to_src, self.backend)
 
             self.max_cid_src.fill(self.max_cid[src_index])
@@ -229,7 +212,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.overflow_cid_to_idx.resize(max(1, 27 * overflow_size))
             self.overflow_cid_to_idx.fill(-1)
 
-            #fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
             fill_overflow_map_knl = get_elwise(fill_overflow_map, self.backend)
 
             dst_gpu = self.dst.pa.gpu
