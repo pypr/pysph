@@ -313,8 +313,9 @@ class CUDAAccelerationEval(GPUAccelerationEval):
 
         gs, ls = splay(n)
         gs, ls = int(gs[0]), int(ls[0])
+        num_blocks = (n + ls - 1) // ls
 
-        num_blocks = int((gs + ls - 1) / ls)
+        #num_blocks = int((gs + ls - 1) / ls)
         num_tpb = ls
 
         if info.get('loop'):
@@ -340,11 +341,15 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                     cache._neighbors_gpu.dev
                 ] + extra_args
                 event = drv.Event()
+                #import pudb; pudb.set_trace()
                 call(*args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
                 event.record()
                 event.synchronize()
         else:
+            event = drv.Event()
             call(*(args + extra_args), block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+            event.record()
+            event.synchronize()
 
 
 def add_address_space(known_types):

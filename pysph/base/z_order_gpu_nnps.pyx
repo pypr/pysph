@@ -221,17 +221,18 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        krnl_source = ZOrderLengthKernel(
-            "z_order_nbr_lengths", dst_src=self.dst_src
-        )
+        if not self.z_order_nbr_lengths:
+            krnl_source = ZOrderLengthKernel(
+                "z_order_nbr_lengths", dst_src=self.dst_src
+            )
 
-        z_order_nbr_lengths = Elementwise(
-            krnl_source.function, backend=self.backend
-        )
+            self.z_order_nbr_lengths = Elementwise(
+                krnl_source.function, backend=self.backend
+            )
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+        self.z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
                 src_gpu.h,
                 self.xmin[0], self.xmin[1], self.xmin[2],
@@ -247,17 +248,18 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        krnl_source = ZOrderNbrsKernel(
-            "z_order_nbrs", dst_src=self.dst_src
-        )
+        if not self.z_order_nbrs:
+            krnl_source = ZOrderNbrsKernel(
+                "z_order_nbrs", dst_src=self.dst_src
+            )
 
-        z_order_nbrs = Elementwise(
-            krnl_source.function, backend=self.backend
-        )
+            self.z_order_nbrs = Elementwise(
+                krnl_source.function, backend=self.backend
+            )
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+        self.z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
                 src_gpu.h,
                 self.xmin[0], self.xmin[1], self.xmin[2],
