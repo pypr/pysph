@@ -87,6 +87,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.dst_to_src = Array(np.uint32, backend=self.backend)
         self.overflow_cid_to_idx = Array(np.int32, backend=self.backend)
 
+        self.z_order_nbrs = [None] * 2
+        self.z_order_nbr_lengths = [None] * 2
+
         self.domain.update()
         self.update()
 
@@ -221,18 +224,20 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        if not self.z_order_nbr_lengths:
+        if not self.z_order_nbr_lengths[self.dst_src]:
             krnl_source = ZOrderLengthKernel(
                 "z_order_nbr_lengths", dst_src=self.dst_src
             )
 
-            self.z_order_nbr_lengths = Elementwise(
+            self.z_order_nbr_lengths[self.dst_src] = Elementwise(
                 krnl_source.function, backend=self.backend
             )
 
+        knl = self.z_order_nbr_lengths[self.dst_src]
+
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        self.z_order_nbr_lengths(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+        knl(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
                 src_gpu.h,
                 self.xmin[0], self.xmin[1], self.xmin[2],
@@ -248,18 +253,20 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        if not self.z_order_nbrs:
+        if not self.z_order_nbrs[self.dst_src]:
             krnl_source = ZOrderNbrsKernel(
                 "z_order_nbrs", dst_src=self.dst_src
             )
 
-            self.z_order_nbrs = Elementwise(
+            self.z_order_nbrs[self.dst_src] = Elementwise(
                 krnl_source.function, backend=self.backend
             )
 
+        knl = self.z_order_nbrs[self.dst_src]
+
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        self.z_order_nbrs(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+        knl(dst_gpu.x, dst_gpu.y, dst_gpu.z,
                 dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
                 src_gpu.h,
                 self.xmin[0], self.xmin[1], self.xmin[2],
