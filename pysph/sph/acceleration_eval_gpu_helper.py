@@ -169,12 +169,12 @@ def get_queue(backend):
         raise RuntimeError('Unsupported GPU backend %s' % backend)
 
 
-def profile_kernel(knl, name, backend):
+def profile_kernel(knl, backend):
     if backend == 'cuda':
         return knl
     elif backend == 'opencl':
         from compyle.opencl import profile_kernel
-        return profile_kernel(knl, name)
+        return profile_kernel(knl, knl.function_name)
     else:
         raise RuntimeError('Unsupported GPU backend %s' % backend)
 
@@ -494,9 +494,7 @@ class AccelerationEvalGPUHelper(object):
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
-                #method = profile_kernel(
-                #    method, method.function_name, self.backend
-                #)
+                method = profile_kernel(method, self.backend)
                 dest = item['dest']
                 src = item.get('source', dest)
                 args = [self._queue, None, None]
@@ -667,7 +665,7 @@ class AccelerationEvalGPUHelper(object):
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
-            'int d_idx = GID_0 * LDIM_0 + LID_0;'
+            'int d_idx = GID_0 * LDIM_0 + LID_0;',
             'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
