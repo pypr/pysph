@@ -133,7 +133,7 @@ class CUDAIntegrator(GPUIntegrator):
             gs, ls = splay(n)
             gs, ls = int(gs[0]), int(ls[0])
 
-            num_blocks = int((gs + ls - 1) / ls)
+            num_blocks = (n + ls - 1) // ls
             num_tpb = ls
 
             # Compute the remaining arguments.
