@@ -186,7 +186,7 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
                 ]
                 all_args = [q, None, None] + _args
                 call = getattr(self.program, kernel)
-                #call = profile_kernel(call, call.function_name, self.backend)
+                call = profile_kernel(call, self.backend)
                 calls[method][dest] = (call, all_args, dest)
 
     def get_code(self):
