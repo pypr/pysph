@@ -212,7 +212,8 @@ class GPUAccelerationEval(object):
                 args[1] = gs_ls[0]
                 args[2] = gs_ls[1]
 
-                args = args + extra_args + nnps_args
+                # No need for the guard variable for the local memory code.
+                args = args + extra_args[:-1] + nnps_args
 
                 call(*args)
                 self._queue.finish()
@@ -334,7 +335,8 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                 args[1] = gs_ls[0]
                 args[2] = gs_ls[1]
 
-                args = args + extra_args + nnps_args
+                # No need for the guard variable for the local memory code.
+                args = args + extra_args[:-1] + nnps_args
 
                 call(*args)
             else:
