@@ -7,7 +7,6 @@ ${' '*4*level}${l}
 </%def>
 
 from libc.math cimport *
-from libc.math cimport M_PI as pi
 
 from pysph.base.nnps_base cimport NNPS
 

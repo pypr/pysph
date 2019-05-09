@@ -26,7 +26,8 @@ from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
     EnumEditor, TitleEditor, HGroup, ShellEditor)  # noqa: E402
 from mayavi.core.api import PipelineBase  # noqa: E402
-from mayavi.core.ui.api import (MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
+from mayavi.core.ui.api import (
+    MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
 from pyface.timer.api import Timer, do_later  # noqa: E402
 from tvtk.api import tvtk  # noqa: E402
 from tvtk.array_handler import array2vtk  # noqa: E402
@@ -35,8 +36,8 @@ from pysph.base.particle_array import ParticleArray  # noqa: E402
 from pysph.solver.solver_interfaces import MultiprocessingClient  # noqa: E402
 from pysph.solver.utils import load, dump, output_formats  # noqa: E402
 from pysph.solver.utils import remove_irrelevant_files, _sort_key  # noqa: E402
-from pysph.tools.interpolator import (get_bounding_box, get_nx_ny_nz,  # noqa: E402
-    Interpolator)
+from pysph.tools.interpolator import (
+        get_bounding_box, get_nx_ny_nz, Interpolator)  # noqa: E402
 
 import logging  # noqa: E402
 logger = logging.getLogger()
@@ -151,7 +152,7 @@ class InterpolatorView(HasTraits):
         if self.interpolator is None:
             interpolator = Interpolator(
                 self.particle_arrays, num_points=self.num_points,
-                use_shepard=False
+                method='shepard'
             )
             self.bounds = interpolator.bounds
             self.interpolator = interpolator
@@ -210,9 +211,11 @@ class InterpolatorView(HasTraits):
 
             if self.plot is None:
                 if interp.dim == 3:
-                    plot = mlab.pipeline.scalar_cut_plane(src)
+                    plot = mlab.pipeline.scalar_cut_plane(
+                        src, colormap='viridis'
+                    )
                 else:
-                    plot = mlab.pipeline.surface(src)
+                    plot = mlab.pipeline.surface(src, colormap='viridis')
                 self.plot = plot
                 scm = plot.module_manager.scalar_lut_manager
                 scm.set(show_legend=self.show_legend,
@@ -399,7 +402,9 @@ class ParticleArrayHelper(HasTraits):
             old_empty = len(old_x) == 0
         if p is None and not empty:
             src = mlab.pipeline.scalar_scatter(x, y, z, s)
-            p = mlab.pipeline.glyph(src, mode='point', scale_mode='none')
+            p = mlab.pipeline.glyph(
+                src, mode='point', scale_mode='none', colormap='viridis'
+            )
             p.actor.property.point_size = 6
             scm = p.module_manager.scalar_lut_manager
             scm.set(show_legend=self.show_legend,
@@ -505,7 +510,8 @@ class ParticleArrayHelper(HasTraits):
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
                 mask_points=self.mask_on_ratio,
-                scale_factor=self.scale_factor
+                scale_factor=self.scale_factor,
+                colormap='viridis'
             )
             self.plot_vectors = pv
 
@@ -1010,7 +1016,11 @@ class MayaviViewer(HasTraits):
         obj.edit_traits()
 
     def _get_shell_namespace(self):
-        return dict(viewer=self, particle_arrays=self.particle_arrays,
+        pas = {}
+        for i, x in enumerate(self.particle_arrays):
+            pas[i] = x
+            pas[x.name] = x
+        return dict(viewer=self, particle_arrays=pas,
                     interpolator=self.interpolator, scene=self.scene,
                     mlab=self.scene.mlab)
 
@@ -1024,6 +1034,9 @@ class MayaviViewer(HasTraits):
             self.file_count = min(self.file_count, len(files))
         else:
             pass
+        config_file = os.path.join(d, 'mayavi_config.py')
+        if os.path.exists(config_file):
+            self.run_script(config_file)
 
     def _live_mode_changed(self, value):
         if value:
@@ -1168,6 +1181,9 @@ def main(args=None):
                 if len(_files) == 0:
                     _files = glob.glob(os.path.join(arg, '*.npz'))
                 files.extend(_files)
+                config_file = os.path.join(arg, 'mayavi_config.py')
+                if os.path.exists(config_file):
+                    scripts.append(config_file)
                 continue
             else:
                 usage()

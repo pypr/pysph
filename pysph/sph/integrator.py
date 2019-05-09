@@ -54,13 +54,20 @@ class Integrator(object):
         a_eval = self.acceleration_evals[0]
         factors = [-1.0, -1.0, -1.0]
         for pa in a_eval.particle_arrays:
+            prop_names = []
             for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
                 if name in pa.properties:
                     if pa.gpu:
-                        max_val = pa.gpu.max(name)
+                        prop_names.append(name)
                     else:
                         max_val = np.max(pa.get(name))
-                    factors[i] = max(factors[i], max_val)
+                        factors[i] = max(factors[i], max_val)
+            if pa.gpu:
+                pa.gpu.update_minmax_cl(prop_names, only_max=True)
+                for i, name in enumerate(('dt_cfl', 'dt_force', 'dt_visc')):
+                    if name in pa.properties:
+                        max_val = getattr(pa.gpu, name).maximum
+                        factors[i] = max(factors[i], max_val)
         cfl_f, force_f, visc_f = factors
         return cfl_f, force_f, visc_f
 
@@ -100,8 +107,6 @@ class Integrator(object):
                 h = pa.gpu.get_device_array('h')
             else:
                 h = pa.get_carray('h')
-
-            h.update_min_max()
 
             if h.minimum < hmin:
                 hmin = h.minimum

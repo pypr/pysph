@@ -2,6 +2,7 @@
 
 # malloc and friends
 from libc.stdlib cimport malloc, free
+from libc.math cimport log
 from libcpp.vector cimport vector
 from libcpp.map cimport map
 

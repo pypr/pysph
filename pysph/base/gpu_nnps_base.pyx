@@ -221,6 +221,12 @@ cdef class GPUNNPS(NNPSBase):
         self.particles[pa_index].gpu.align(indices)
         callback()
 
+    def set_use_cache(self, bint use_cache):
+        self.use_cache = use_cache
+        if use_cache:
+            for cache in self.cache:
+                cache.update()
+
     cdef void find_neighbor_lengths(self, nbr_lengths):
         raise NotImplementedError("NNPS :: find_neighbor_lengths called")
 
@@ -271,9 +277,8 @@ cdef class GPUNNPS(NNPSBase):
             y = pa_wrapper.pa.gpu.get_device_array('y')
             z = pa_wrapper.pa.gpu.get_device_array('z')
 
-            x.update_min_max()
-            y.update_min_max()
-            z.update_min_max()
+            pa_wrapper.pa.gpu.update_minmax_cl(['x', 'y', 'z'])
+
             # find min and max of variables
             xmax = np.maximum(x.maximum, xmax)
             ymax = np.maximum(y.maximum, ymax)

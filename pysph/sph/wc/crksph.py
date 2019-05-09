@@ -102,7 +102,7 @@ class CRKSPHPreStep(Equation):
                         grad_m2[d2*gam + d*alp + bet] += V * temp2
 
         identity(m2inv, d)
-        augmented_matrix(m2, m2inv, d, d, temp_aug_m2)
+        augmented_matrix(m2, m2inv, d, d, d, temp_aug_m2)
 
         # If is_singular > 0 then matrix was singular
         is_singular = gj_solve(temp_aug_m2, d, d, m2inv)

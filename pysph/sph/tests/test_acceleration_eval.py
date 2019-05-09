@@ -823,7 +823,7 @@ class TestAccelerationEval1DGPU(unittest.TestCase):
 
     def test_get_equations_with_converged(self):
         pytest.importorskip('pysph.base.gpu_nnps')
-        from pysph.sph.acceleration_eval_opencl_helper import \
+        from pysph.sph.acceleration_eval_gpu_helper import \
             get_equations_with_converged
         # Given
         se = SimpleEquation(dest='fluid', sources=['fluid'])

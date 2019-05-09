@@ -71,7 +71,7 @@ class GPUDomainManager(DomainManagerBase):
 
         for pa_wrapper in self.pa_wrappers:
             h = pa_wrapper.pa.gpu.get_device_array('h')
-            h.update_min_max()
+            pa_wrapper.pa.gpu.update_minmax_cl(['h'])
 
             _hmax = h.maximum
             _hmin = h.minimum

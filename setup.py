@@ -624,20 +624,27 @@ def setup_package():
     # The requirements.
     install_requires = [
         'numpy', 'mako', 'cyarray', 'compyle', 'Cython>=0.20',
-        'setuptools>=6.0', 'pytest>=3.0', 'pytools', 'Beaker'
+        'setuptools>=6.0', 'pytools', 'Beaker'
     ]
+    tests_require = ['pytest>=3.0', 'numpy-stl']
     if sys.version_info[:2] == (2, 6):
         install_requires += [
-            'ordereddict', 'importlib', 'unittest2'
+            'ordereddict', 'importlib'
         ]
+        tests_require += ['unittest2']
     if sys.version_info[0] < 3:
-        install_requires += [
+        tests_require += [
             'mock>=1.0'
         ]
+    docs_require = ["sphinx"]
 
     extras_require = dict(
         mpi=['mpi4py>=1.2', 'pyzoltan'],
-        ui=['mayavi>=4.0'],
+        opencl=['pyopencl'],
+        ui=['mayavi>=4.0', 'pyside2', 'h5py'],
+        tests=tests_require,
+        docs=docs_require,
+        dev=tests_require + docs_require,
     )
 
     everything = set()
@@ -672,8 +679,6 @@ def setup_package():
           url='http://github.com/pypr/pysph',
           license="BSD",
           keywords="SPH simulation computational fluid dynamics",
-          setup_requires=['pytest-runner'],
-          tests_require=['pytest'],
           packages=find_packages(),
           package_data={
               '': ['*.pxd', '*.mako', '*.txt.gz', '*.txt', '*.vtk.gz', '*.gz',

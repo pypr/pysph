@@ -7,7 +7,7 @@ import unittest
 
 def gj_solve_helper(a, b, n):
     m = np.zeros((n, n+1)).ravel().tolist()
-    augmented_matrix(a, b, n, 1, m)
+    augmented_matrix(a, b, n, 1, n, m)
     result = [0.0]*n
     is_singular = gj_solve(m, n, 1, result)
     return is_singular, result
@@ -30,8 +30,37 @@ class TestLinalg(unittest.TestCase):
         expect[:, :3] = a
         expect[:, 3:] = b
         # When
-        augmented_matrix(a.ravel(), b.ravel(), 3, 2, res)
+        augmented_matrix(a.ravel(), b.ravel(), 3, 2, 3, res)
         res = self._to_array(res, (3, 5))
+        # Then
+        np.testing.assert_array_almost_equal(res, expect)
+
+    def test_augmented_matrix_with_lower_dimension(self):
+        # Given
+        a = np.random.random((3, 3))
+        b = np.random.random((3, 2))
+        res = np.zeros((3, 5)).ravel().tolist()
+        expect = np.zeros((2, 4))
+        expect[:, :2] = a[:2, :2]
+        expect[:, 2:] = b[:2, :]
+        expect.resize(3, 5)
+        # When
+        augmented_matrix(a.ravel(), b.ravel(), 2, 2, 3, res)
+        res = self._to_array(res, (3, 5))
+        # Then
+        np.testing.assert_array_almost_equal(res, expect)
+
+    def test_augmented_matrix_with_gjsolve_with_lower_dimension(self):
+        # Given
+        nmax = 3
+        mat = np.array([[7., 4., 2.], [8., 9., 4.], [1., 4., 10.]])
+        b = np.array([5., 4., 2.])
+        expect = np.linalg.solve(mat[:2, :2], b[:2])
+        augmat = np.zeros((3, 4)).ravel().tolist()
+        res = np.zeros(2).ravel().tolist()
+        # When
+        augmented_matrix(mat.ravel(), b.ravel(), 2, 1, nmax, augmat)
+        gj_solve(augmat, 2, 1, res)
         # Then
         np.testing.assert_array_almost_equal(res, expect)
 
@@ -118,7 +147,7 @@ class TestLinalg(unittest.TestCase):
         mat = [[1.0, 2.0, 2.5], [2.5, 1.0, 0.0], [0.0, 0.0, 1.0]]
         b = np.identity(3).ravel().tolist()
         A = np.zeros((3, 6)).ravel().tolist()
-        augmented_matrix(np.ravel(mat), b, 3, 3, A)
+        augmented_matrix(np.ravel(mat), b, 3, 3, 3, A)
         result = np.zeros((3, 3)).ravel().tolist()
 
         # When

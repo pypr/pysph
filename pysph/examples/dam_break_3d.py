@@ -68,11 +68,20 @@ class DamBreak3D(Application):
         dt = 0.25*h0/(1.1 * self.co)
         s.configure_solver(
             kernel=kernel, integrator_cls=EPECIntegrator, tf=tf, dt=dt,
-            adaptive_timestep=True, n_damp=50
+            adaptive_timestep=True, n_damp=50,
+            output_at_times=[0.4, 0.6, 1.0]
         )
 
     def create_particles(self):
         return self.geom.create_particles()
+
+    def customize_output(self):
+        self._mayavi_config('''
+        viewer.scalar = 'u'
+        b = particle_arrays['boundary']
+        b.plot.actor.mapper.scalar_visibility = False
+        b.plot.actor.property.opacity = 0.1
+        ''')
 
 
 if __name__ == '__main__':

@@ -1,14 +1,15 @@
 # Standard imports.
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import glob
 import inspect
 import json
 import logging
 import os
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from os.path import (abspath, basename, dirname, isdir, join, realpath,
                      splitext)
 import socket
 import sys
+from textwrap import dedent
 import time
 import numpy as np
 import warnings
@@ -124,7 +125,9 @@ class Application(object):
     10. :py:meth:`create_tools()`: Add any ``pysph.solver.tools.Tool``
         instances.
 
-    Additionally, as the appliction runs there are several convenient optional
+    11. :py:meth:`customize_output()`: Customize the output visualization.
+
+    Additionally, as the application runs there are several convenient optional
     callbacks setup:
 
     1. :py:meth:`pre_step`: Called before each time step.
@@ -218,6 +221,10 @@ class Application(object):
         self.output_dir = abspath(self._get_output_dir_from_fname())
         self.particles = []
         self.inlet_outlet = []
+        # The default value that is overridden by the command line
+        # options passed or in initializee.
+        self.cache_nnps = False
+        self.iom = None
 
         self.initialize()
         self.scheme = self.create_scheme()
@@ -448,6 +455,15 @@ class Application(object):
             default=False,
             help="Use OpenCL to run the simulation.")
 
+        # --cuda
+        parser.add_argument(
+            "--cuda",
+            action="store_true",
+            dest="with_cuda",
+            default=False,
+            help="Use CUDA to run the simulation."
+        )
+
         # --use-local-memory
         parser.add_argument(
             "--use-local-memory",
@@ -574,7 +590,7 @@ class Application(object):
             "--cache-nnps",
             dest="cache_nnps",
             action="store_true",
-            default=False,
+            default=self.cache_nnps,
             help="Option to enable the use of neighbor caching.")
 
         nnps_options.add_argument(
@@ -837,7 +853,7 @@ class Application(object):
             # Hook up the inlet/outlet's update method to be called after
             # each stage.
             for obj in self.inlet_outlet:
-                solver.add_post_step_callback(obj.update)
+                solver.add_post_stage_callback(obj.update)
 
     def _create_particles(self, particle_factory, *args, **kw):
         """ Create particles given a callable `particle_factory` and any
@@ -905,20 +921,25 @@ class Application(object):
     def _configure_options(self):
         options = self.options
         # Setup configuration options.
+        config = get_config()
         if options.with_openmp is not None:
-            get_config().use_openmp = options.with_openmp
+            config.use_openmp = options.with_openmp
         if options.omp_schedule is not None:
-            get_config().set_omp_schedule(options.omp_schedule)
+            config.set_omp_schedule(options.omp_schedule)
+
         if options.with_opencl:
-            get_config().use_opencl = True
+            config.use_opencl = True
+        elif options.with_cuda:
+            config.use_cuda = True
+
         if options.with_local_memory:
             leaf_size = int(options.octree_leaf_size)
-            get_config().wgs = leaf_size
-            get_config().use_local_memory = True
+            config.wgs = leaf_size
+            config.use_local_memory = True
         if options.use_double:
-            get_config().use_double = options.use_double
+            config.use_double = options.use_double
         if options.profile:
-            get_config().profile = options.profile
+            config.profile = options.profile
         for pa in self.particles:
             pa.update_backend()
 
@@ -1379,6 +1400,17 @@ class Application(object):
             eqn_info = equations
         logger.info('Using equations:\n%s\n%s\n%s', sep, eqn_info, sep)
 
+    def _mayavi_config(self, code):
+        """Write out the given code to a `mayavi_config.py` in the output
+        directory.
+
+        Note that this will call `textwrap.dedent` on the code.
+        """
+        cfg = os.path.join(self.output_dir, 'mayavi_config.py')
+        if not os.path.exists(cfg):
+            with open(cfg, 'w') as fp:
+                fp.write(dedent(code))
+
     ######################################################################
     # Public interface.
     ######################################################################
@@ -1470,6 +1502,8 @@ class Application(object):
             setup_duration = end_time - start_time
             self._message("Setup took: %.5f secs" % (setup_duration))
             self._write_info(self.info_filename, completed=False, cpu_time=0)
+
+        self.customize_output()
 
         start_time = time.time()
         self.solver.solve(not self.options.quiet)
@@ -1651,6 +1685,18 @@ class Application(object):
         called after particles/inlets etc. are all setup, configured etc.
         """
         return []
+
+    def customize_output(self):
+        """Customize the output file visualization by adding any files.
+
+        For example, the pysph view command will look for a
+        ``mayavi_config.py`` file that can be used to script the viewer. You
+        can use self._mayavi_config('code') to add a default customization
+        here.
+
+        Note that this is executed before the simulation starts.
+        """
+        pass
 
     def pre_step(self, solver):
         """If overloaded, this is called automatically before each integrator
