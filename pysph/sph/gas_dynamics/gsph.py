@@ -262,7 +262,6 @@ class GSPHAcceleration(Equation):
         vij_i = sp_vol[0]
         vij_j = sp_vol[1]
         sstar = sp_vol[2]
-
         # Gradients in the local coordinate system
         rsi = (d_grhox[d_idx]*eij[0] + d_grhoy[d_idx]*eij[1] +
                d_grhoz[d_idx]*eij[2])

@@ -47,6 +47,10 @@ def run_example(module):
     env_vars['ETS_TOOLKIT'] = 'null'
     try:
         check_output(cmd, env=env_vars)
+    except subprocess.CalledProcessError as e:
+        print(e.stdout)
+        print(e.stderr)
+        raise
     finally:
         shutil.rmtree(out_dir)
 
