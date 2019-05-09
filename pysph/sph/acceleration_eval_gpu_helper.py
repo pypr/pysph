@@ -200,6 +200,8 @@ class GPUAccelerationEval(object):
         n = dest.get_number_of_particles(info.get('real', True))
         args[1] = (n,)
         args[3:] = [x() for x in args[3:]]
+        # Argument for NP_MAX
+        extra_args[-1][...] = n - 1
 
         if info.get('loop'):
             if self._use_local_memory:
@@ -244,7 +246,9 @@ class GPUAccelerationEval(object):
     def compute(self, t, dt):
         helper = self.helper
         dtype = np.float64 if self._use_double else np.float32
-        extra_args = [np.asarray(t, dtype=dtype), np.asarray(dt, dtype=dtype)]
+        extra_args = [np.asarray(t, dtype=dtype),
+                      np.asarray(dt, dtype=dtype),
+                      np.asarray(0, dtype=np.uint32)]
         i = 0
         iter_count = 0
         iter_start = 0
@@ -311,6 +315,9 @@ class CUDAAccelerationEval(GPUAccelerationEval):
         # we do not need the first 3 args on CUDA.
         args = [x() for x in args[3:]]
 
+        # Argument for NP_MAX
+        extra_args[-1][...] = n - 1
+
         gs, ls = splay(n)
         gs, ls = int(gs[0]), int(ls[0])
         num_blocks = (n + ls - 1) // ls
@@ -341,13 +348,14 @@ class CUDAAccelerationEval(GPUAccelerationEval):
                     cache._neighbors_gpu.dev
                 ] + extra_args
                 event = drv.Event()
-                #import pudb; pudb.set_trace()
                 call(*args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
                 event.record()
                 event.synchronize()
         else:
             event = drv.Event()
-            call(*(args + extra_args), block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+            call(*(args + extra_args),
+                 block=(num_tpb, 1, 1),
+                 grid=(num_blocks, 1))
             event.record()
             event.synchronize()
 
@@ -666,6 +674,8 @@ class AccelerationEvalGPUHelper(object):
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
             'int d_idx = GID_0 * LDIM_0 + LID_0;',
+            '/* Guard for padded threads. */',
+            'if (d_idx > NP_MAX) {return;};',
             'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
@@ -685,7 +695,7 @@ class AccelerationEvalGPUHelper(object):
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
             ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
-             'double t', 'double dt']
+             'double t', 'double dt', 'unsigned int NP_MAX']
         )
 
         body = '\n'.join([' ' * 4 + x for x in code])
@@ -826,13 +836,17 @@ class AccelerationEvalGPUHelper(object):
         context = eq_group.context
         all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
-        code.append('unsigned int d_idx = GID_0 * LDIM_0 + LID_0;')
-        code.append('unsigned int s_idx, i;')
-        code.append('GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name)
-        code.append('unsigned int start = start_idx[d_idx];')
-        code.append('GLOBAL_MEM unsigned int* NBRS = &(neighbors[start]);')
-        code.append('int N_NBRS = nbr_length[d_idx];')
-        code.append('unsigned int end = start + N_NBRS;')
+        code.extend([
+            'unsigned int d_idx = GID_0 * LDIM_0 + LID_0;',
+            '/* Guard for padded threads. */',
+            'if (d_idx > NP_MAX) {return;};',
+            'unsigned int s_idx, i;',
+            'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name,
+            'unsigned int start = start_idx[d_idx];',
+            'GLOBAL_MEM unsigned int* NBRS = &(neighbors[start]);',
+            'int N_NBRS = nbr_length[d_idx];',
+            'unsigned int end = start + N_NBRS;'
+        ])
         if eq_group.has_loop_all():
             _all_args, _py_args, _calls = self._get_equation_method_calls(
                 eq_group, kind='loop_all', indent=''
@@ -880,7 +894,7 @@ class AccelerationEvalGPUHelper(object):
              'GLOBAL_MEM unsigned int *nbr_length',
              'GLOBAL_MEM unsigned int *start_idx',
              'GLOBAL_MEM unsigned int *neighbors',
-             'double t', 'double dt']
+             'double t', 'double dt', 'unsigned int NP_MAX']
         )
 
         self.data.append(dict(

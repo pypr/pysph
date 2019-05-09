@@ -56,15 +56,18 @@ class GPUIntegrator(object):
         py_call_info = self.helper.py_calls['py_' + method]
         dtype = np.float64 if self._use_double else np.float32
         extra_args = [np.asarray(self.t, dtype=dtype),
-                      np.asarray(self.dt, dtype=dtype)]
+                      np.asarray(self.dt, dtype=dtype),
+                      np.asarray(0, dtype=np.uint32)]
         # Call the py_{method} for each destination.
         for name, (py_meth, dest) in py_call_info.items():
-            py_meth(dest, *extra_args)
+            py_meth(dest, *(extra_args[:-1]))
 
         # Call the stage* method for each destination.
         for name, (call, args, dest) in call_info.items():
             n = dest.get_number_of_particles(real=True)
             args[1] = (n,)
+            # For NP_MAX
+            extra_args[-1][...] = n - 1
             # Compute the remaining arguments.
             rest = [x() for x in args[3:]]
             call(*(args[:3] + rest + extra_args))
@@ -262,12 +265,15 @@ class IntegratorGPUHelper(IntegratorCythonHelper):
         all_args = self.acceleration_eval_helper._get_typed_args(
             list(d) + ['t', 'dt']
         )
+        all_args.append('unsigned int NP_MAX')
 
         # All the steppers are essentially empty structs so we just pass 0 as
         # the stepper struct as it is not used at all. This simplifies things
         # as we do not need to generate structs and pass them around.
         code = [
             'int d_idx = GID_0 * LDIM_0 + LID_0;',
+            '/* Guard for padded threads. */',
+            'if (d_idx > NP_MAX) {return;};'
         ] + wrap_code(
             '{cls}_{method}({args});'.format(
                 cls=cls, method=method,
