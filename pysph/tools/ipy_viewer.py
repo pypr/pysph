@@ -1729,7 +1729,7 @@ class Viewer3D(Viewer):
                     c = self._get_c(
                         pa_widgets,
                         temp_data[array_name],
-                        component,
+                        comp,
                         stride
                     )
                     scatters = self._scatters[array_name]
