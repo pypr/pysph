@@ -1,8 +1,7 @@
 from math import exp
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve,
-                                                   printf)
+from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve)
 from pysph.base.particle_array import get_ghost_tag
 
 # Constants
@@ -534,7 +533,7 @@ class GSPHAcceleration(Equation):
                          (3.0/8.0)*hij4*(aij*dij + bij*cij) +
                          0.5*hij2*cij*dij)/vij
         else:
-            printf("Unknown interpolation type")
+            printf("%s", "Unknown interpolation type")
 
         result[0] = vij_i2
         result[1] = vij_j2

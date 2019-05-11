@@ -31,12 +31,12 @@ class ChengShu(Application):
         self.p_0 = 1.
         self.c_0 = 1.
         self.delta_rho = 1e-6
-        self.n_particles = 4000
+        self.n_particles = 1000
         self.domain_length = self.xmax - self.xmin
         self.dx = self.domain_length / (self.n_particles - 1)
         self.k = -2 * numpy.pi / self.domain_length
         self.hdx = 2.
-        self.dt = 1e-3
+        self.dt = 1e-4
         self.tf = 1.0
         self.dim = 1
 
@@ -74,9 +74,9 @@ class ChengShu(Application):
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=self.dim,
             gamma=self.gamma, kernel_factor=1.,
-            g1=0., g2=0., rsolver=3, interpolation=0, monotonicity=0,
+            g1=0., g2=0., rsolver=3, interpolation=1, monotonicity=1,
             interface_zero=True, hybrid=False, blend_alpha=5.0,
-            niter=40, tol=1e-6
+            niter=200, tol=1e-6
         )
 
         s = SchemeChooser(
