@@ -1,7 +1,8 @@
 from math import exp
 from compyle.api import declare
 from pysph.sph.equation import Equation
-from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve)
+from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve,
+                                                   printf)
 from pysph.base.particle_array import get_ghost_tag
 
 # Constants

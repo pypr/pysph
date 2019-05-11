@@ -5,15 +5,15 @@ from math import sqrt
 from compyle.api import declare
 
 
+def printf(s):
+    print(s)
+
+
 def SIGN(x=0.0, y=0.0):
     if y >= 0:
         return abs(x)
     else:
         return -abs(x)
-
-
-# def printf(s):
-#     print(s)
 
 
 def riemann_solve(method=1, rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,

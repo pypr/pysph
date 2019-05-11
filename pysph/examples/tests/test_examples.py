@@ -19,6 +19,13 @@ def check_output(*args, **kw):
         subprocess.check_output(*args, **kw)
 
 
+def print_safe(string_or_bytes):
+    if type(string_or_bytes) is bytes:
+        print(string_or_bytes.decode('utf-8'))
+    else:
+        print(string_or_bytes)
+
+
 _orig_ets_toolkit = None
 def setup_module():
     # Set the ETS_TOOLKIT to null to avoid errors when importing TVTK.
@@ -48,8 +55,8 @@ def run_example(module):
     try:
         check_output(cmd, env=env_vars)
     except subprocess.CalledProcessError as e:
-        print(e.stdout)
-        print(e.stderr)
+        print_safe(e.stdout)
+        print_safe(e.stderr)
         raise
     finally:
         shutil.rmtree(out_dir)
