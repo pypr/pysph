@@ -1,4 +1,5 @@
-"""
+"""Acoustic wave diffusion in 2-d (2 mins)
+
 Two Dimensional constant pressure accuracy test
 particles should simply advect in a periodic domain
 """

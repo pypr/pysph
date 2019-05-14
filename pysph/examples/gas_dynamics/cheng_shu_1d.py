@@ -1,14 +1,14 @@
-"""
-Propagation of acoustic wave
-particles are have properties according
+"""Cheng and Shu's 1d acoustic wave propagation in 1d (1 min)
+
+particles have properties according
 to the following distribuion
 \rho = \rho_0 + \Delta\rho sin(kx)
-p = p_0 + c_0^2\Delta\rho sin(kx)
-u = c_0\rho_0^{-1}\Delta\rho sin(kx)
+p = 1.0
+u = 1 + 0.1sin(kx)
 
-with \Delta\rho = 1e-6 and k = 2\pi/\lambda
+with \Delta\rho = 1 and k = 2\pi/\lambda
 where \lambda is the domain length.
-\rho_0 = \gamma = 1.4 and p_0 = 1.0
+\rho_0 = 2, \gamma = 1.4 and p_0 = 1.0
 """
 
 
@@ -30,11 +30,11 @@ class ChengShu(Application):
         self.gamma = 1.4
         self.p_0 = 1.
         self.c_0 = 1.
-        self.delta_rho = 1e-6
+        self.delta_rho = 1
         self.n_particles = 1000
         self.domain_length = self.xmax - self.xmin
         self.dx = self.domain_length / (self.n_particles - 1)
-        self.k = -2 * numpy.pi / self.domain_length
+        self.k = 2 * numpy.pi / self.domain_length
         self.hdx = 2.
         self.dt = 1e-4
         self.tf = 1.0
@@ -49,7 +49,7 @@ class ChengShu(Application):
         x = numpy.linspace(
             self.xmin, self.xmax, self.n_particles
             )
-        rho = 2 + numpy.sin(2 * numpy.pi * x)
+        rho = 2 + numpy.sin(2 * numpy.pi * x)*self.delta_rho
 
         p = numpy.ones_like(x)
 
