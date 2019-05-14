@@ -70,15 +70,6 @@ class WCBlastwave(Application):
     def create_scheme(self):
         self.dt = dt
         self.tf = tf
-        adke = ADKEScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            alpha=1, beta=1.0, k=1.0, eps=0.8, g1=0.5, g2=1.0)
-
-        mpm = GasDScheme(
-            fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
-            kernel_factor=1.2, alpha1=1.0, alpha2=0.1,
-            beta=2.0, update_alpha1=True, update_alpha2=True
-        )
         gsph = GSPHScheme(
             fluids=['fluid'], solids=[], dim=dim, gamma=gamma,
             kernel_factor=1.0,
@@ -86,19 +77,12 @@ class WCBlastwave(Application):
             interface_zero=True, hybrid=False, blend_alpha=2.0,
             niter=20, tol=1e-6
         )
-        s = SchemeChooser(default='gsph', adke=adke, mpm=mpm, gsph=gsph)
+        s = SchemeChooser(default='gsph', gsph=gsph)
         return s
     
     def configure_scheme(self):
         s = self.scheme
-        if self.options.scheme == 'mpm':
-            s.configure(kernel_factor=1.2)
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=True, pfreq=50)
-        elif self.options.scheme == 'adke':
-            s.configure_solver(dt=self.dt, tf=self.tf,
-                               adaptive_timestep=False, pfreq=50)
-        elif self.options.scheme == 'gsph':
+        if self.options.scheme == 'gsph':
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
@@ -115,6 +99,15 @@ class WCBlastwave(Application):
         from pysph.solver.utils import load        
         import os
 
+        fnames = [
+            'wc_density_exact.npz',
+            'wc_velocity_exact.npz',
+            'wc_pressure_exact.npz',
+            'wc_ie_exact.npz'
+            ]
+        props = ['rho', 'u', 'p', 'e']
+
+
         outfile = self.output_files[-1]
         data = load(outfile)
         pa = data['arrays']['fluid']
@@ -123,28 +116,45 @@ class WCBlastwave(Application):
         e = pa.e
         p = pa.p
         rho = pa.rho
-        cs = pa.cs
+        prop_vals = [rho, u, p, e]
+
+        for _i, fname in enumerate(fnames):
+            fname = os.path.join(
+                os.path.dirname(__file__), fname
+            )
+            d = numpy.load(fname)
+            pyplot.plot(x, prop_vals[_i])
+            pyplot.scatter(d['x'], d['data'], c='k', s=4)
+            pyplot.xlabel('x')
+            pyplot.ylabel(props[_i])
+            pyplot.legend(['pysph', 'exact'])
+            fig = os.path.join(self.output_dir, props[_i] + ".png")
+            pyplot.savefig(fig, dpi=300)
+            pyplot.close('all')
+
+
+        # cs = pa.cs
         
-        pyplot.plot(x, rho)
-        pyplot.xlabel('x')
-        pyplot.ylabel('rho')
-        fig = os.path.join(self.output_dir, "density.png")
-        pyplot.savefig(fig, dpi=300)
-        pyplot.close('all')
+        # pyplot.plot(x, rho)
+        # pyplot.xlabel('x')
+        # pyplot.ylabel('rho')
+        # fig = os.path.join(self.output_dir, "density.png")
+        # pyplot.savefig(fig, dpi=300)
+        # pyplot.close('all')
 
-        pyplot.plot(x, u)
-        pyplot.xlabel('x')
-        pyplot.ylabel('u')
-        fig = os.path.join(self.output_dir, "velocity.png")
-        pyplot.savefig(fig, dpi=300)
-        pyplot.close('all')
+        # pyplot.plot(x, u)
+        # pyplot.xlabel('x')
+        # pyplot.ylabel('u')
+        # fig = os.path.join(self.output_dir, "velocity.png")
+        # pyplot.savefig(fig, dpi=300)
+        # pyplot.close('all')
 
-        pyplot.plot(x, p)
-        pyplot.xlabel('x')
-        pyplot.ylabel('p')
-        fig = os.path.join(self.output_dir, "pressure.png")
-        pyplot.savefig(fig, dpi=300)
-        pyplot.close('all')
+        # pyplot.plot(x, p)
+        # pyplot.xlabel('x')
+        # pyplot.ylabel('p')
+        # fig = os.path.join(self.output_dir, "pressure.png")
+        # pyplot.savefig(fig, dpi=300)
+        # pyplot.close('all')
 
 
 if __name__ == '__main__':
