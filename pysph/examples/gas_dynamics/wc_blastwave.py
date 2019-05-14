@@ -1,4 +1,6 @@
-"""Simulate the classical Sod Shocktube problem in 1D (5 seconds).
+"""Woodward Colella blastwave (2 minutes)
+
+Two discontinuities moving towards each other and their interaction
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
@@ -131,30 +133,6 @@ class WCBlastwave(Application):
             fig = os.path.join(self.output_dir, props[_i] + ".png")
             pyplot.savefig(fig, dpi=300)
             pyplot.close('all')
-
-
-        # cs = pa.cs
-        
-        # pyplot.plot(x, rho)
-        # pyplot.xlabel('x')
-        # pyplot.ylabel('rho')
-        # fig = os.path.join(self.output_dir, "density.png")
-        # pyplot.savefig(fig, dpi=300)
-        # pyplot.close('all')
-
-        # pyplot.plot(x, u)
-        # pyplot.xlabel('x')
-        # pyplot.ylabel('u')
-        # fig = os.path.join(self.output_dir, "velocity.png")
-        # pyplot.savefig(fig, dpi=300)
-        # pyplot.close('all')
-
-        # pyplot.plot(x, p)
-        # pyplot.xlabel('x')
-        # pyplot.ylabel('p')
-        # fig = os.path.join(self.output_dir, "pressure.png")
-        # pyplot.savefig(fig, dpi=300)
-        # pyplot.close('all')
 
 
 if __name__ == '__main__':
