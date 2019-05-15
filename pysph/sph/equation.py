@@ -925,3 +925,6 @@ class MultiStageEquations(object):
             name, kw,
         )
         return s
+
+    def __len__(self):
+        return len(self.groups)
