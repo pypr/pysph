@@ -1,6 +1,7 @@
-"""Woodward Colella blastwave (2 minutes)
+"""Woodward Collela blastwave (2 minutes)
 
-Two discontinuities moving towards each other and their interaction
+Two discontinuities moving towards each other and the
+results after they interact
 """
 from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
 from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
@@ -101,14 +102,11 @@ class WCBlastwave(Application):
         from pysph.solver.utils import load        
         import os
 
-        fnames = [
-            'wc_density_exact.npz',
-            'wc_velocity_exact.npz',
-            'wc_pressure_exact.npz',
-            'wc_ie_exact.npz'
-            ]
+        fname = os.path.join(
+            os.path.dirname(__file__), 'wc_exact.npz'
+        )
+        exact_data = numpy.load(fname, allow_pickle=True)
         props = ['rho', 'u', 'p', 'e']
-
 
         outfile = self.output_files[-1]
         data = load(outfile)
@@ -120,13 +118,13 @@ class WCBlastwave(Application):
         rho = pa.rho
         prop_vals = [rho, u, p, e]
 
-        for _i, fname in enumerate(fnames):
-            fname = os.path.join(
-                os.path.dirname(__file__), fname
-            )
-            d = numpy.load(fname)
+        for _i, prop in enumerate(props):
             pyplot.plot(x, prop_vals[_i])
-            pyplot.scatter(d['x'], d['data'], c='k', s=4)
+            pyplot.scatter(
+                exact_data[prop].reshape(1)[0]['x'],
+                exact_data[prop].reshape(1)[0]['data'],
+                c='k', s=4
+                )
             pyplot.xlabel('x')
             pyplot.ylabel(props[_i])
             pyplot.legend(['pysph', 'exact'])
