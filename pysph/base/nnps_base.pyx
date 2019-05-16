@@ -243,8 +243,8 @@ cdef class DomainManager:
     def __init__(self, double xmin=-1000, double xmax=1000, double ymin=0,
                  double ymax=0, double zmin=0, double zmax=0,
                  periodic_in_x=False, periodic_in_y=False, periodic_in_z=False,
-                 double n_layers=2.0, backend=None, mirror_in_x=False,
-                 mirror_in_y=False, mirror_in_z=False):
+                 double n_layers=2.0, backend=None, props=None,
+                 mirror_in_x=False, mirror_in_y=False, mirror_in_z=False):
 
         """Constructor
 
@@ -275,8 +275,9 @@ cdef class DomainManager:
             xmin=xmin, xmax=xmax, ymin=ymin,
             ymax=ymax, zmin=zmin, zmax=zmax, periodic_in_x=periodic_in_x,
             periodic_in_y=periodic_in_y, periodic_in_z=periodic_in_z,
-            n_layers=n_layers, backend=self.backend, mirror_in_x=mirror_in_x,
-            mirror_in_y=mirror_in_y, mirror_in_z=mirror_in_z
+            n_layers=n_layers, backend=self.backend, props=props,
+            mirror_in_x=mirror_in_x, mirror_in_y=mirror_in_y,
+            mirror_in_z=mirror_in_z
         )
 
     def set_pa_wrappers(self, wrappers):
