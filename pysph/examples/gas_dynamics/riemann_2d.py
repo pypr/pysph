@@ -39,7 +39,7 @@ class Riemann2D(Application):
         )
         group.add_argument(
             "--nparticles", action="store", type=int,
-            dest="nparticles", default=100
+            dest="nparticles", default=200
         )
 
     def consume_user_options(self):

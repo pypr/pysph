@@ -14,7 +14,7 @@ path: src/examples/r2d_config.py
 
 
 class R2DConfig(object):
-    def __init__(self, config=1):
+    def __init__(self, config=3):
         self.config = config
 
         self.xmin = -0.25
