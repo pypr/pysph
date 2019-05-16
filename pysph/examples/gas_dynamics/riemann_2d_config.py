@@ -8,9 +8,9 @@ Eitan Tadmor
 General notations for the different configurations are (S) for shock
 waves, (R) for Rarefactions and (J) for contact/slip lines
 
-Code from https://bitbucket.org/kunalp/sph2d/src/7f83889eb7afb9de1ca474461914bb35c6e77188/examples/r2d_config.py
+Code from https://bitbucket.org/kunalp/sph2d/
+path: src/examples/r2d_config.py
 """
-import numpy
 
 
 class R2DConfig(object):
@@ -43,7 +43,7 @@ class R2DConfig(object):
 
         elif config == 6:
             self.setup_config6()
-            
+
         elif config == 8:
             self.setup_config8()
 
@@ -56,7 +56,7 @@ class R2DConfig(object):
     def setup_config3(self):
         """Four Shocks"""
         self.endtime = 0.3
-        
+
         self.p1 = 1.5
         self.rho1 = 1.5
         self.u1 = 0.0
@@ -103,7 +103,7 @@ class R2DConfig(object):
 
     def setup_config4(self):
         self.endtime = 0.25
-        
+
         self.p1 = 1.1
         self.rho1 = 1.1
         self.u1 = 0.0
@@ -126,7 +126,7 @@ class R2DConfig(object):
 
     def setup_config5(self):
         self.endtime = 0.23
-        
+
         self.p1 = 1
         self.rho1 = 1
         self.u1 = -0.75
@@ -149,7 +149,7 @@ class R2DConfig(object):
 
     def setup_config6(self):
         self.endtime = 0.3
-        
+
         self.p1 = 1
         self.rho1 = 1
         self.u1 = 0.75

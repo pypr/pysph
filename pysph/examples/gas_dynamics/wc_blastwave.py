@@ -3,8 +3,7 @@
 Two discontinuities moving towards each other and the
 results after they interact
 """
-from pysph.examples.gas_dynamics.shocktube_setup import ShockTubeSetup
-from pysph.sph.scheme import ADKEScheme, GasDScheme, GSPHScheme, SchemeChooser
+from pysph.sph.scheme import GSPHScheme, SchemeChooser
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
@@ -82,7 +81,7 @@ class WCBlastwave(Application):
         )
         s = SchemeChooser(default='gsph', gsph=gsph)
         return s
-    
+
     def configure_scheme(self):
         s = self.scheme
         if self.options.scheme == 'gsph':
@@ -99,7 +98,7 @@ class WCBlastwave(Application):
         except ImportError:
             print("Post processing requires matplotlib.")
             return
-        from pysph.solver.utils import load        
+        from pysph.solver.utils import load
         import os
 
         fname = os.path.join(

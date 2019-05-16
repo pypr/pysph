@@ -19,8 +19,7 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
-from pysph.sph.scheme import \
-    GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.scheme import GSPHScheme, SchemeChooser
 
 
 class ChengShu(Application):
