@@ -5,15 +5,15 @@ from math import sqrt
 from compyle.api import declare
 
 
+def printf(s):
+    print(s)
+
+
 def SIGN(x=0.0, y=0.0):
     if y >= 0:
         return abs(x)
     else:
         return -abs(x)
-
-
-def printf(s):
-    print(s)
 
 
 def riemann_solve(method=1, rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
@@ -276,7 +276,7 @@ def exact(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0,
         pold = p
 
     if i == niter - 1:
-        printf("Divergence in Newton-Raphson Iteration")
+        printf("%s", "Divergence in Newton-Raphson Iteration")
         return 1
 
     # compute the velocity in the star region 'um'
@@ -709,7 +709,7 @@ def hllc(rhol=0.0, rhor=1.0, pl=0.0, pr=1.0, ul=0.0, ur=1.0,
         ustar = ur
 
     else:
-        printf("Incorrect wave speeds")
+        printf("%s", "Incorrect wave speeds")
         return 1
 
     result[0] = pstar
