@@ -111,13 +111,14 @@ class ExtractParticles(Template):
 
     def template(self, i, indices, start_idx):
         '''
-        idx, s_idx, s_i, j = declare('int', 4)
+        idx, s_idx, s_i, j, start = declare('int', 5)
         idx = indices[i]
         % for prop in obj.prop_names:
         s_idx = stride_${prop} * idx
         s_i = stride_${prop} * i
+        start = stride_${prop} * start_idx
         for j in range(stride_${prop}):
-            dst_${prop}[start_idx + s_i + j] = src_${prop}[s_idx + j]
+            dst_${prop}[start + s_i + j] = src_${prop}[s_idx + j]
         % endfor
         '''
 
@@ -701,7 +702,9 @@ class DeviceHelper(object):
         else:
             prop_names = props
 
-        result_array = pysph.base.particle_array.ParticleArray()
+        result_array = pysph.base.particle_array.ParticleArray(
+            backend=self._particle_array.backend
+        )
         result_array.set_name(self._particle_array.name)
         result_array.set_device_helper(DeviceHelper(result_array,
                                                     backend=self.backend))

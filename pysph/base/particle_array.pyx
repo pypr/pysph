@@ -1309,7 +1309,7 @@ cdef class ParticleArray:
             dst_prop_array = dest_array.get_carray(prop)
             stride = self.stride.get(prop, 1)
             src_prop_array.copy_values(index_array, dst_prop_array,
-                                       stride, start_idx)
+                                       stride, stride*start_idx)
 
         if align:
             dest_array.align_particles()
