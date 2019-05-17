@@ -945,8 +945,6 @@ class ParticleArrayTest(object):
         p.add_property('A', data=numpy.arange(6), stride=2)
         n = p.empty_clone()
         n.extend(2)
-        self.pull(n)
-        print(n.x)
 
         # When.
         p.extract_particles([1], dest_array=n)
