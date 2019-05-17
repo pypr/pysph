@@ -938,6 +938,26 @@ class ParticleArrayTest(object):
         self.assertEqual(n.x[0], 2.0)
         numpy.testing.assert_array_equal(n.A, [2, 3])
 
+    def test_extract_particles_works_with_non_empty_dest(self):
+        # Given
+        p = particle_array.ParticleArray(name='f', x=[1, 2, 3],
+                                         backend=self.backend)
+        p.add_property('A', data=numpy.arange(6), stride=2)
+        n = p.empty_clone()
+        n.extend(2)
+
+        # When.
+        p.extract_particles([1], dest_array=n)
+        self.pull(n)
+
+        # Then.
+        self.assertEqual(len(p.x), 3)
+        self.assertEqual(len(p.A), 6)
+        self.assertEqual(len(n.x), 3)
+        self.assertEqual(len(n.A), 6)
+        numpy.testing.assert_array_equal(n.x, [0.0, 0.0, 2.0])
+        numpy.testing.assert_array_equal(n.A, [0, 0, 0, 0, 2, 3])
+
     def test_extract_particles_works_with_specific_props_with_dest(self):
         # Given
         p = particle_array.ParticleArray(name='f', x=[1, 2, 3], y=[0, 0, 0],
