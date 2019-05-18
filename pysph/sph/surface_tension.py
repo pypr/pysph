@@ -43,9 +43,9 @@ class SurfaceForceAdami(Equation):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
 
-    def loop(self, d_au, d_av, d_idx, d_m, DWIJ, d_pi00, d_pi01, d_pi02, d_pi10,
+    def loop(self, d_au, d_av, d_aw, d_idx, d_m, DWIJ, d_pi00, d_pi01, d_pi02, d_pi10,
              d_pi11, d_pi12, d_pi20, d_pi21, d_pi22, s_pi00, s_pi01, s_pi02, s_pi10, s_pi11, 
-             s_pi12, d_V, s_V, s_idx):
+             s_pi12, s_pi20, s_pi21, s_pi22, d_V, s_V, s_idx):
         s2 = s_V[s_idx]*s_V[s_idx]
         f00 = (d_pi00[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi00[s_idx]/s2)
         f01 = (d_pi01[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi01[s_idx]/s2)
