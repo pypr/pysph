@@ -78,8 +78,9 @@ class MultiPhase(Application):
                             'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat',
                             'ax', 'ay', 'az', 'wij', 'vmag2', 'N', 'wij_sum',
                             'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
-                            'kappa', 'arho', 'nu', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12',
-                            'pi20', 'pi21', 'pi22', 'alpha']
+                            'kappa', 'arho', 'nu', 'pi00', 'pi01', 'pi02',
+                            'pi10', 'pi11', 'pi12', 'pi20', 'pi21', 'pi22',
+                            'alpha']
         fluid = get_particle_array(
             name='fluid', x=fluid_x, y=fluid_y, h=h_fluid, m=m_fluid,
             rho=rho_fluid, cs=cs_fluid, additional_props=additional_props)
@@ -109,7 +110,9 @@ class MultiPhase(Application):
         return solver
 
     def create_equations(self):
-        return return_equations(['fluid'], [], self.options.scheme, rho0, p0, c0, 0, factor1, factor2, nu, sigma, 2, epsilon, gamma, real=False)
+        return return_equations(['fluid'], [], self.options.scheme, rho0, p0,
+                                c0, 0, factor1, factor2, nu, sigma, 2, epsilon,
+                                gamma, real=False)
 
     def post_process(self):
         try:
@@ -117,7 +120,7 @@ class MultiPhase(Application):
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
-            print ("Post processing requires Matplotlib")
+            print("Post processing requires Matplotlib")
             return
         from pysph.solver.utils import load
         files = self.output_files

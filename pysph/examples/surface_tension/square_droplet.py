@@ -143,7 +143,7 @@ class SquareDroplet(Application):
 
             # variable to indicate reliable normals and normalizing
             # constant
-            'N', 'wij_sum', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12', 
+            'N', 'wij_sum', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12',
             'pi20', 'pi21', 'pi22', 'nu'
 
             ]
@@ -189,7 +189,9 @@ class SquareDroplet(Application):
         return solver
 
     def create_equations(self):
-        return return_equations(['fluid'], [], self.options.scheme, rho0, p0, c0, 0, factor1, factor2, nu, sigma, 2, epsilon, 1, real=False)
+        return return_equations(['fluid'], [], self.options.scheme, rho0, p0,
+                                c0, 0, factor1, factor2, nu, sigma, 2, epsilon,
+                                1, real=False)
 
 if __name__ == '__main__':
     app = SquareDroplet()

@@ -142,7 +142,9 @@ class MultiPhase(Application):
         )
 
     def create_equations(self):
-        return return_equations(['fluid'], ['wall'], self.options.scheme, rho0, p0, c0, 0,  factor1, factor2, nu, sigma, 2, epsilon, gamma, real=True)
+        return return_equations(['fluid'], ['wall'], self.options.scheme, rho0,
+                                p0, c0, 0,  factor1, factor2, nu, sigma, 2,
+                                epsilon, gamma, real=True)
 
     def post_process(self):
         try:
@@ -150,7 +152,7 @@ class MultiPhase(Application):
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
-            print ("Post processing requires Matplotlib")
+            print("Post processing requires Matplotlib")
             return
         from pysph.solver.utils import load
         files = self.output_files

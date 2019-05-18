@@ -214,7 +214,7 @@ class MultiPhase(Application):
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
-            print ("Post processing requires Matplotlib")
+            print("Post processing requires Matplotlib")
             return
         from pysph.solver.utils import load
         files = self.output_files
