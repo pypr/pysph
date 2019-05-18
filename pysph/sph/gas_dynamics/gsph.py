@@ -3,8 +3,10 @@ from compyle.api import declare
 from pysph.sph.equation import Equation
 from pysph.sph.gas_dynamics.riemann_solver import (HELPERS, riemann_solve,
                                                    printf)
+from pysph.base.particle_array import get_ghost_tag
 
 # Constants
+GHOST_TAG = get_ghost_tag()
 
 # Riemann solver types
 NonDiffusive = 0
@@ -97,6 +99,50 @@ class GSPHGradients(Equation):
         d_wx[d_idx] += tmp*DWI[0]
         d_wy[d_idx] += tmp*DWI[1]
         d_wz[d_idx] += tmp*DWI[2]
+
+
+class GSPHUpdateGhostProps(Equation):
+    """Copy the GSPH gradients and other props required for GSPH
+    from real particle to ghost particles
+
+    """
+    def __init__(self, dest, sources=None):
+        super(GSPHUpdateGhostProps, self).__init__(dest, sources)
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_tag, d_orig_idx, d_px, d_py, d_pz,
+                   d_ux, d_uy, d_uz, d_vx, d_vy, d_vz, d_wx, d_wy, d_wz,
+                   d_grhox, d_grhoy, d_grhoz, d_dwdh, d_rho, d_div,
+                   d_p, d_cs):
+        idx = declare('int')
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            # copy pressure grads
+            d_px[d_idx] = d_px[idx]
+            d_py[d_idx] = d_py[idx]
+            d_pz[d_idx] = d_pz[idx]
+            # copy u grads
+            d_ux[d_idx] = d_ux[idx]
+            d_uy[d_idx] = d_uy[idx]
+            d_uz[d_idx] = d_uz[idx]
+            # copy u grads
+            d_vx[d_idx] = d_vx[idx]
+            d_vy[d_idx] = d_vy[idx]
+            d_vz[d_idx] = d_vz[idx]
+            # copy u grads
+            d_wx[d_idx] = d_wx[idx]
+            d_wy[d_idx] = d_wy[idx]
+            d_wz[d_idx] = d_wz[idx]
+            # copy density grads
+            d_grhox[d_idx] = d_grhox[idx]
+            d_grhoy[d_idx] = d_grhoy[idx]
+            d_grhoz[d_idx] = d_grhoz[idx]
+            # other misc props
+            d_dwdh[d_idx] = d_dwdh[idx]
+            d_rho[d_idx] = d_rho[idx]
+            d_div[d_idx] = d_div[idx]
+            d_p[d_idx] = d_p[idx]
+            d_cs[d_idx] = d_cs[idx]
 
 
 class GSPHAcceleration(Equation):
@@ -216,7 +262,6 @@ class GSPHAcceleration(Equation):
         vij_i = sp_vol[0]
         vij_j = sp_vol[1]
         sstar = sp_vol[2]
-
         # Gradients in the local coordinate system
         rsi = (d_grhox[d_idx]*eij[0] + d_grhoy[d_idx]*eij[1] +
                d_grhoz[d_idx]*eij[2])
@@ -226,7 +271,7 @@ class GSPHAcceleration(Equation):
                eij[0]*eij[2]*(d_uz[d_idx] + d_wx[d_idx]) +
                eij[1]*eij[1]*d_vy[d_idx] +
                eij[1]*eij[2]*(d_vz[d_idx] + d_wy[d_idx]) +
-               eij[2]*eij[2]*d_wy[d_idx])
+               eij[2]*eij[2]*d_wz[d_idx])
 
         rsj = (s_grhox[s_idx]*eij[0] + s_grhoy[s_idx]*eij[1] +
                s_grhoz[s_idx]*eij[2])
@@ -236,7 +281,7 @@ class GSPHAcceleration(Equation):
                eij[0]*eij[2]*(s_uz[s_idx] + s_wx[s_idx]) +
                eij[1]*eij[1]*s_vy[s_idx] +
                eij[1]*eij[2]*(s_vz[s_idx] + s_wy[s_idx]) +
-               eij[2]*eij[2]*s_wy[s_idx])
+               eij[2]*eij[2]*s_wz[s_idx])
 
         csi = d_cs[d_idx]
         csj = s_cs[s_idx]
@@ -434,8 +479,8 @@ class GSPHAcceleration(Equation):
 
         # simplest delta or point interpolation
         if self.interpolation == 0:
-            vij_i = 1./(rhoi * rhoi)
-            vij_j = 1./(rhoj * rhoj)
+            vij_i2 = 1./(rhoi * rhoi)
+            vij_j2 = 1./(rhoj * rhoj)
 
         # linear interpolation
         elif self.interpolation == 1:
@@ -447,20 +492,20 @@ class GSPHAcceleration(Equation):
 
             dij = 0.5 * (Vi + Vj)
 
-            vij_i = 0.25 * hi * hi * cij * cij + dij * dij
-            vij_j = 0.25 * hj * hj * cij * cij + dij * dij
+            vij_i2 = 0.25 * hi * hi * cij * cij + dij * dij
+            vij_j2 = 0.25 * hj * hj * cij * cij + dij * dij
 
             # approximate value for the interface location when using
             # variable smoothing lengths
             if not self.interface_zero:
-                vij = 0.5 * (vij_i + vij_j)
-                sstar = 0.5 * hij*hij * cij*dij/(vij*vij)
+                vij = 0.5 * (vij_i2 + vij_j2)
+                sstar = 0.5 * hij*hij * cij*dij/vij
 
         # cubic spline interpolation
         elif self.interpolation == 2:
             if sij < 1e-8:
                 aij = bij = cij = 0.0
-                dij = 0.5 * Vi + Vj
+                dij = 0.5 * (Vi + Vj)
             else:
                 aij = -2.0 * (Vi - Vj)/(sij*sij*sij) + (Vip + Vjp)/(sij*sij)
                 bij = 0.5 * (Vip - Vjp)/sij
@@ -474,23 +519,23 @@ class GSPHAcceleration(Equation):
             hi6 = hi4*hi2
             hj6 = hj4*hj2
 
-            vij_i = ((15.0)/(64.0)*hi6 * aij*aij +
-                     (3.0)/(16.0) * hi4 * (2*aij*cij + bij*bij) +
-                     0.25*hi2*(2*bij*dij + cij*cij) + dij * dij)
+            vij_i2 = ((15.0)/(64.0)*hi6 * aij*aij +
+                      (3.0)/(16.0) * hi4 * (2*aij*cij + bij*bij) +
+                      0.25*hi2*(2*bij*dij + cij*cij) + dij * dij)
 
-            vij_j = ((15.0)/(64.0)*hj6 * aij*aij +
-                     (3.0)/(16.0) * hj4 * (2*aij*cij + bij*bij) +
-                     0.25*hj2 * (2*bij*dij + cij*cij) + dij * dij)
+            vij_j2 = ((15.0)/(64.0)*hj6 * aij*aij +
+                      (3.0)/(16.0) * hj4 * (2*aij*cij + bij*bij) +
+                      0.25*hj2 * (2*bij*dij + cij*cij) + dij * dij)
             hij2 = hij*hij
             hij4 = hij2*hij2
             if not self.interface_zero:
-                vij = 0.5*(vij_i + vij_j)
+                vij = 0.5*(vij_i2 + vij_j2)
                 sstar = ((15.0/32.0)*hij4*hij2*aij*bij +
                          (3.0/8.0)*hij4*(aij*dij + bij*cij) +
-                         0.5*hij2*cij*dij)/(vij*vij)
+                         0.5*hij2*cij*dij)/vij
         else:
-            printf("Unknown interpolation type")
+            printf("%s", "Unknown interpolation type")
 
-        result[0] = vij_i
-        result[1] = vij_j
+        result[0] = vij_i2
+        result[1] = vij_j2
         result[2] = sstar

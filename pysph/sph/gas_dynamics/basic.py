@@ -421,7 +421,7 @@ class MPMAccelerations(Equation):
 
         # signal velocities
         pdiff = abs(p_i - pj)
-        vsig1 = 0.5 * max(cij - self.beta*dot, 0.0)
+        vsig1 = 0.5 * max(2*cij - self.beta*dot, 0.0)
         vsig2 = sqrt(pdiff/RHOIJ)
 
         # compute the Courant-limited time step factor.

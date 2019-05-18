@@ -879,7 +879,9 @@ class AdamiHuAdamsScheme(TVFScheme):
 class GasDScheme(Scheme):
     def __init__(self, fluids, solids, dim, gamma, kernel_factor, alpha1=1.0,
                  alpha2=0.1, beta=2.0, adaptive_h_scheme='mpm',
-                 update_alpha1=False, update_alpha2=False):
+                 update_alpha1=False, update_alpha2=False,
+                 max_density_iterations=250,
+                 density_iteration_tolerance=1e-5):
         """
         Parameters
         ----------
@@ -907,6 +909,10 @@ class GasDScheme(Scheme):
             Update the alpha1 parameter dynamically.
         update_alpha2: bool
             Update the alpha2 parameter dynamically.
+        max_density_iterations: int
+            Maximum number of iterations to run for one density step
+        density_iteration_tolerance: float
+            Maximum difference allowed in two successive density iterations
         """
         self.fluids = fluids
         self.solids = solids
@@ -920,6 +926,8 @@ class GasDScheme(Scheme):
         self.beta = beta
         self.kernel_factor = kernel_factor
         self.adaptive_h_scheme = adaptive_h_scheme
+        self.density_iteration_tolerance = density_iteration_tolerance
+        self.max_density_iterations = max_density_iterations
 
     def add_user_options(self, group):
         choices = ['gsph', 'mpm']
@@ -1023,13 +1031,14 @@ class GasDScheme(Scheme):
                 g1.append(
                     SummationDensity(
                         dest=fluid, sources=self.fluids, k=self.kernel_factor,
-                        density_iterations=True, dim=self.dim, htol=1e-3
+                        density_iterations=True, dim=self.dim,
+                        htol=self.density_iteration_tolerance
                     )
                 )
 
             equations.append(Group(
                 equations=g1, update_nnps=True, iterate=True,
-                max_iterations=50
+                max_iterations=self.max_density_iterations
             ))
 
         elif self.adaptive_h_scheme == 'gsph':
@@ -1220,7 +1229,6 @@ class GSPHScheme(Scheme):
         )
 
     def consume_user_options(self, options):
-        self.adaptive_h_scheme = options.adaptive_h_scheme
         vars = ['gamma', 'g1', 'g2', 'rsolver', 'interpolation',
                 'monotonicity', 'interface_zero', 'hybrid',
                 'blend_alpha']
@@ -1279,7 +1287,7 @@ class GSPHScheme(Scheme):
         )
         from pysph.sph.gas_dynamics.boundary_equations import WallBoundary
         from pysph.sph.gas_dynamics.gsph import (
-            GSPHGradients, GSPHAcceleration
+            GSPHGradients, GSPHAcceleration, GSPHUpdateGhostProps
         )
         equations = []
         # Find the optimal 'h'
@@ -1349,7 +1357,12 @@ class GSPHScheme(Scheme):
 
         g3 = []
         for fluid in self.fluids:
-            g3.append(GSPHAcceleration(
+            g3.append(GSPHUpdateGhostProps(dest=fluid, sources=None))
+        equations.append(Group(equations=g3, update_nnps=False, real=False))
+
+        g4 = []
+        for fluid in self.fluids:
+            g4.append(GSPHAcceleration(
                 dest=fluid, sources=all_pa, g1=self.g1,
                 g2=self.g2, monotonicity=self.monotonicity,
                 rsolver=self.rsolver, interpolation=self.interpolation,
@@ -1357,11 +1370,12 @@ class GSPHScheme(Scheme):
                 hybrid=self.hybrid, blend_alpha=self.blend_alpha,
                 gamma=self.gamma, niter=self.niter, tol=self.tol
             ))
-        equations.append(Group(equations=g3))
+        equations.append(Group(equations=g4))
         return equations
 
     def setup_properties(self, particles, clean=True):
         from pysph.base.utils import get_particle_array_gasd
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         dummy = get_particle_array_gasd(name='junk')
         props = (list(dummy.properties.keys()) +
@@ -1371,6 +1385,9 @@ class GSPHScheme(Scheme):
         for fluid in self.fluids:
             pa = particle_arrays[fluid]
             self._ensure_properties(pa, props, clean)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
 
         solid_props = set(props) | set(('wij', 'htmp'))

@@ -39,6 +39,11 @@ def camel_to_underscore(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
+def indent(text, prefix='    '):
+    """Prepend prefix to every line in the text"""
+    return ''.join(prefix + line for line in text.splitlines(True))
+
+
 ##############################################################################
 # `Context` class.
 ##############################################################################
@@ -505,11 +510,11 @@ class Group(object):
     ##########################################################################
     def __repr__(self):
         cls = self.__class__.__name__
-        eqs = [repr(eq) for eq in self.equations]
+        eqs = ', \n'.join(repr(eq) for eq in self.equations)
         ignore = ['equations']
         kws = ', '.join(get_init_args(self, self.__init__, ignore))
-        return '%s(equations=[\n%s\n    ],\n    %s)' % (
-            cls, ',\n'.join(eqs), kws
+        return '%s(equations=[\n%s\n],\n    %s)' % (
+            cls, indent(eqs), kws
         )
 
     def _has_code(self, kind='loop'):
@@ -913,7 +918,13 @@ class MultiStageEquations(object):
 
     def __repr__(self):
         name = self.__class__.__name__
-        kw = [', \n'.join(str(grps) for grps in stg) for stg in self.groups]
-        return '%s(groups=[[\n%s\n    ]]\n)' % (
-            name, '], [\n'.join(kw)
+        groups = [', \n'.join(str(stg_grps) for stg_grps in stg)
+                  for stg in self.groups]
+        kw = indent('\n], [\n'.join(groups))
+        s = '%s(groups=[\n[\n%s\n    ]\n])' % (
+            name, kw,
         )
+        return s
+
+    def __len__(self):
+        return len(self.groups)
