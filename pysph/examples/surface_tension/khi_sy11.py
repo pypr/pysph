@@ -81,7 +81,7 @@ class SquareDroplet(Application):
         # additional properties required for the fluid.
         additional_props = [
             # volume inverse or number density
-            'V', 'pi00', 'pi01', 'pi10', 'pi11',
+            'V', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12', 'pi20', 'pi21', 'pi22',
 
             # color and gradients
             'color', 'scolor', 'cx', 'cy', 'cz', 'cx2', 'cy2', 'cz2',

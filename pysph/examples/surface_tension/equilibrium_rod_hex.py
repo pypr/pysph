@@ -78,8 +78,8 @@ class MultiPhase(Application):
                             'uhat', 'vhat', 'what', 'auhat', 'avhat', 'awhat',
                             'ax', 'ay', 'az', 'wij', 'vmag2', 'N', 'wij_sum',
                             'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
-                            'kappa', 'arho', 'nu', 'pi00', 'pi01', 'pi10',
-                            'pi11', 'alpha']
+                            'kappa', 'arho', 'nu', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12',
+                            'pi20', 'pi21', 'pi22', 'alpha']
         fluid = get_particle_array(
             name='fluid', x=fluid_x, y=fluid_y, h=h_fluid, m=m_fluid,
             rho=rho_fluid, cs=cs_fluid, additional_props=additional_props)

@@ -92,7 +92,8 @@ class MultiPhase(Application):
                             'ax', 'ay', 'az', 'wij', 'vmag2', 'N', 'wij_sum',
                             'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
                             'kappa', 'arho', 'nu', 'wg', 'ug', 'vg',
-                            'pi00', 'pi01', 'pi10', 'pi11', 'alpha']
+                            'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12',
+                            'pi20', 'pi21', 'pi22', 'alpha']
         consts = {'max_ddelta': np.zeros(1, dtype=float)}
 
         fluid = get_particle_array(

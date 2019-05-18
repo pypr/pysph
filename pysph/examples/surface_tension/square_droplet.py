@@ -143,7 +143,8 @@ class SquareDroplet(Application):
 
             # variable to indicate reliable normals and normalizing
             # constant
-            'N', 'wij_sum', 'pi00', 'pi01', 'pi10', 'pi11', 'nu'
+            'N', 'wij_sum', 'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12', 
+            'pi20', 'pi21', 'pi22', 'nu'
 
             ]
 

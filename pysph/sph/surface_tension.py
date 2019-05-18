@@ -30,6 +30,9 @@ from pysph.sph.wc.transport_velocity import SummationDensity, \
     MomentumEquationArtificialStress, MomentumEquationViscosity, \
     SolidWallNoSlipBC
 
+from pysph.sph.wc.linalg import gj_solve, augmented_matrix
+
+
 from pysph.sph.wc.basic import TaitEOS
 
 
@@ -40,15 +43,23 @@ class SurfaceForceAdami(Equation):
         d_au[d_idx] = 0.0
         d_av[d_idx] = 0.0
 
-    def loop(self, d_au, d_av, d_idx, d_m, DWIJ, d_pi00, d_pi01, d_pi10,
-             d_pi11, s_pi00, s_pi01, s_pi10, s_pi11, d_V, s_V, s_idx):
+    def loop(self, d_au, d_av, d_idx, d_m, DWIJ, d_pi00, d_pi01, d_pi02, d_pi10,
+             d_pi11, d_pi12, d_pi20, d_pi21, d_pi22, s_pi00, s_pi01, s_pi02, s_pi10, s_pi11, 
+             s_pi12, d_V, s_V, s_idx):
         s2 = s_V[s_idx]*s_V[s_idx]
-        f1 = (d_pi00[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi00[s_idx]/s2)
-        f2 = (d_pi01[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi01[s_idx]/s2)
-        f3 = (d_pi10[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi10[s_idx]/s2)
-        f4 = (d_pi11[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi11[s_idx]/s2)
-        d_au[d_idx] += (DWIJ[0]*f1 + DWIJ[1]*f2)/d_m[d_idx]
-        d_av[d_idx] += (DWIJ[0]*f3 + DWIJ[1]*f4)/d_m[d_idx]
+        f00 = (d_pi00[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi00[s_idx]/s2)
+        f01 = (d_pi01[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi01[s_idx]/s2)
+        f02 = (d_pi02[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi02[s_idx]/s2)
+        f10 = (d_pi10[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi10[s_idx]/s2)
+        f11 = (d_pi11[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi11[s_idx]/s2)
+        f12 = (d_pi12[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi12[s_idx]/s2)
+        f20 = (d_pi20[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi20[s_idx]/s2)
+        f21 = (d_pi21[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi21[s_idx]/s2)
+        f22 = (d_pi22[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi22[s_idx]/s2)
+        d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f01 + DWIJ[2]*f02)/d_m[d_idx]
+        d_av[d_idx] += (DWIJ[0]*f10 + DWIJ[1]*f11 + DWIJ[2]*f12)/d_m[d_idx]
+        d_aw[d_idx] += (DWIJ[0]*f20 + DWIJ[1]*f21 + DWIJ[2]*f22)/d_m[d_idx]
+
 
 
 class ConstructStressMatrix(Equation):
@@ -58,9 +69,9 @@ class ConstructStressMatrix(Equation):
         self.d = d
         super(ConstructStressMatrix, self).__init__(dest, sources)
 
-    def initialize(self, d_pi00, d_pi01, d_pi10, d_pi11, d_cx, d_cy, d_idx,
+    def initialize(self, d_pi00, d_pi01, d_pi02, d_pi10, d_pi11, d_pi12, d_pi20, d_pi21, d_pi22, d_cx, d_cy, d_cz, d_idx,
                    d_N):
-        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + d_cy[d_idx]*d_cy[d_idx]
+        mod_gradc2 = d_cx[d_idx]*d_cx[d_idx] + d_cy[d_idx]*d_cy[d_idx] + d_cz[d_idx]*d_cz[d_idx]
         mod_gradc = sqrt(mod_gradc2)
         d_N[d_idx] = 0.0
         if mod_gradc > 1e-14:
@@ -68,15 +79,27 @@ class ConstructStressMatrix(Equation):
             d_pi00[d_idx] = (-d_cx[d_idx]*d_cx[d_idx] +
                              (mod_gradc2)/self.d)*factor
             d_pi01[d_idx] = -factor*d_cx[d_idx]*d_cy[d_idx]
+            d_pi02[d_idx] = -factor*d_cx[d_idx]*d_cz[d_idx]
             d_pi10[d_idx] = -factor*d_cx[d_idx]*d_cy[d_idx]
             d_pi11[d_idx] = (-d_cy[d_idx]*d_cy[d_idx] +
+                             (mod_gradc2)/self.d)*factor
+            d_pi12[d_idx] = -factor*d_cy[d_idx]*d_cz[d_idx]
+            d_pi20[d_idx] = -factor*d_cx[d_idx]*d_cz[d_idx]
+            d_pi21[d_idx] = -factor*d_cy[d_idx]*d_cz[d_idx]
+            d_pi22[d_idx] = (-d_cz[d_idx]*d_cz[d_idx] +
                              (mod_gradc2)/self.d)*factor
             d_N[d_idx] = 1.0
         else:
             d_pi00[d_idx] = 0.0
             d_pi01[d_idx] = 0.0
+            d_pi02[d_idx] = 0.0
             d_pi10[d_idx] = 0.0
             d_pi11[d_idx] = 0.0
+            d_pi12[d_idx] = 0.0
+            d_pi20[d_idx] = 0.0
+            d_pi21[d_idx] = 0.0
+            d_pi22[d_idx] = 0.0
+            
 
 
 class ColorGradientAdami(Equation):

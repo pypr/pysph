@@ -110,7 +110,8 @@ class MultiPhase(Application):
                             'ax', 'ay', 'az', 'wij', 'vmag2', 'N', 'wij_sum',
                             'rho0', 'u0', 'v0', 'w0', 'x0', 'y0', 'z0',
                             'kappa', 'arho', 'nu', 'wg', 'ug', 'vg',
-                            'pi00', 'pi01', 'pi10', 'pi11']
+                            'pi00', 'pi01', 'pi02', 'pi10', 'pi11', 'pi12',
+                            'pi20', 'pi21', 'pi22']
         gas = get_particle_array(
             name='gas', x=fluid_x, y=fluid_y, h=h_fluid, m=m_fluid,
             rho=rho_fluid, cs=cs_fluid, additional_props=additional_props)
@@ -209,7 +210,7 @@ class MultiPhase(Application):
 
     def post_process(self):
         try:
-            import matplotlibs
+            import matplotlib
             matplotlib.use('Agg')
             import matplotlib.pyplot as plt
         except ImportError:
