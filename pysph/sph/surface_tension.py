@@ -995,7 +995,7 @@ def return_equations(fluids, solids, scheme, rho0, p0, c0, b, factor1, factor2,
                 dest=i, sources=fluids+solids, pb=0.0))
             equations.append(MomentumEquationViscosity(dest=i, sources=fluids,
                                                        nu=nu))
-            equations.append(ShadlooYildizSurfaceTensionForce(dest=i, 
+            equations.append(ShadlooYildizSurfaceTensionForce(dest=i,
                                                               sources=None,
                                                               sigma=sigma))
             if len(solids) != 0:
