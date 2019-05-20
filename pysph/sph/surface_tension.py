@@ -844,8 +844,13 @@ class AdamiColorGradient(Equation):
             d_ddelta[d_idx] = 1./one_mod_gradc
 
 
-def return_equations(fluids, solids, scheme, rho0, p0, c0, b, factor1, factor2,
-                     nu, sigma, d, epsilon, gamma, real=False):
+def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
+                                  factor1, factor2, nu, sigma, d, epsilon,
+                                  gamma, real=False):
+    """
+    This function returns the required equations for the multiphase
+    formulation taking inputs of the fluid particles array, solid particles
+    array, the scheme to be used and other physical parameters"""
     if scheme == 'tvf':
         Equations = []
         equations = []

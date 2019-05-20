@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from pysph.sph.surface_tension import return_equations
+from pysph.sph.surface_tension import get_surface_tension_equations
 
 from pysph.tools.geometry import get_2d_block
 from pysph.base.utils import get_particle_array
@@ -112,9 +112,10 @@ class MultiPhase(Application):
         return solver
 
     def create_equations(self):
-        return return_equations(['fluid'], [], self.options.scheme, rho0, p0,
-                                c0, 0, factor1, factor2, nu, sigma, 2, epsilon,
-                                gamma, real=False)
+        return get_surface_tension_equations(['fluid'], [],
+                                             self.options.scheme, rho0, p0, c0,
+                                             0, factor1, factor2, nu, sigma, 2,
+                                             epsilon, gamma, real=False)
 
     def post_process(self):
         try:

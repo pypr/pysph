@@ -2,7 +2,7 @@ from math import sqrt
 import numpy as np
 import os
 import numpy
-from pysph.sph.surface_tension import return_equations
+from pysph.sph.surface_tension import get_surface_tension_equations
 
 from pysph.tools.geometry import get_2d_block, remove_overlap_particles
 from pysph.base.utils import get_particle_array
@@ -185,9 +185,10 @@ class SquareDroplet(Application):
         )
 
     def create_equations(self):
-        return return_equations(['fluid'], ['wall'], self.options.scheme, rho0,
-                                p0, c0, 0,  factor1, factor2, nu, sigma, 2,
-                                epsilon, 1, real=False)
+        return get_surface_tension_equations(['fluid'], ['wall'],
+                                             self.options.scheme, rho0, p0, c0,
+                                             0,  factor1, factor2, nu, sigma,
+                                             2, epsilon, 1, real=False)
 
 
 if __name__ == '__main__':
