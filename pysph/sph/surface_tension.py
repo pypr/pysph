@@ -46,15 +46,15 @@ class SurfaceForceAdami(Equation):
              s_pi02, s_pi10, s_pi11, s_pi12, s_pi20, s_pi21, s_pi22, d_V, s_V,
              s_idx):
         s2 = s_V[s_idx]*s_V[s_idx]
-        f00 = (d_pi00[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi00[s_idx]/s2)
-        f01 = (d_pi01[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi01[s_idx]/s2)
-        f02 = (d_pi02[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi02[s_idx]/s2)
-        f10 = (d_pi10[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi10[s_idx]/s2)
-        f11 = (d_pi11[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi11[s_idx]/s2)
-        f12 = (d_pi12[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi12[s_idx]/s2)
-        f20 = (d_pi20[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi20[s_idx]/s2)
-        f21 = (d_pi21[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi21[s_idx]/s2)
-        f22 = (d_pi22[d_idx]/(d_V[d_idx]*d_V[d_idx])+s_pi22[s_idx]/s2)
+        f00 = (d_pi00[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi00[s_idx]/s2)
+        f01 = (d_pi01[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi01[s_idx]/s2)
+        f02 = (d_pi02[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi02[s_idx]/s2)
+        f10 = (d_pi10[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi10[s_idx]/s2)
+        f11 = (d_pi11[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi11[s_idx]/s2)
+        f12 = (d_pi12[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi12[s_idx]/s2)
+        f20 = (d_pi20[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi20[s_idx]/s2)
+        f21 = (d_pi21[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi21[s_idx]/s2)
+        f22 = (d_pi22[d_idx]/(d_V[d_idx]*d_V[d_idx]) + s_pi22[s_idx]/s2)
         d_au[d_idx] += (DWIJ[0]*f00 + DWIJ[1]*f01 + DWIJ[2]*f02)/d_m[d_idx]
         d_av[d_idx] += (DWIJ[0]*f10 + DWIJ[1]*f11 + DWIJ[2]*f12)/d_m[d_idx]
         d_aw[d_idx] += (DWIJ[0]*f20 + DWIJ[1]*f21 + DWIJ[2]*f22)/d_m[d_idx]
@@ -129,9 +129,9 @@ class MomentumEquationViscosityAdami(Equation):
         factor = 2.0*d_nu[d_idx]*s_nu[s_idx]/(d_nu[d_idx] + s_nu[s_idx])
         V_i = 1/(d_V[d_idx]*d_V[d_idx])
         V_j = 1/(s_V[s_idx]*s_V[s_idx])
-        dwijdotrij = (DWIJ[0]*XIJ[0]+DWIJ[1]*XIJ[1]+DWIJ[2]*XIJ[2])
+        dwijdotrij = (DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2])
         dwijdotrij /= (R2IJ + EPS)
-        factor = factor*(V_i+V_j)*dwijdotrij/d_m[d_idx]
+        factor = factor*(V_i + V_j)*dwijdotrij/d_m[d_idx]
         d_au[d_idx] += factor*VIJ[0]
         d_av[d_idx] += factor*VIJ[1]
         d_aw[d_idx] += factor*VIJ[2]
@@ -162,8 +162,9 @@ class MomentumEquationViscosityMorris(Equation):
     def loop(self, d_idx, s_idx, d_au, d_av, d_aw, s_m, d_nu, s_nu, d_rho,
              s_rho, DWIJ, R2IJ, VIJ, HIJ, XIJ):
         r2 = R2IJ + self.eta*HIJ*HIJ
-        dw = (DWIJ[0]*XIJ[0]+DWIJ[1]*XIJ[1]+DWIJ[2]*XIJ[2])/(r2)
-        mult = s_m[s_idx]*(d_nu[d_idx]+s_nu[s_idx])/(d_rho[d_idx]*s_rho[s_idx])
+        dw = (DWIJ[0]*XIJ[0] + DWIJ[1]*XIJ[1] + DWIJ[2]*XIJ[2])/(r2)
+        mult = s_m[s_idx]*(d_nu[d_idx] + s_nu[s_idx]) / \
+            (d_rho[d_idx]*s_rho[s_idx])
         d_au[d_idx] += dw*mult*VIJ[0]
         d_av[d_idx] += dw*mult*VIJ[1]
         d_aw[d_idx] += dw*mult*VIJ[2]
