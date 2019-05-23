@@ -450,10 +450,16 @@ def is_overloaded_method(method):
     """Returns True if the given method is overloaded from any of its bases.
     """
     method_name = method.__name__
-    self = method.__self__
-    klass = self.__class__
-    for base in klass.__bases__:
+    klass = method.__self__.__class__
+    count = 0
+    prev = None
+    for base in klass.mro():
         if hasattr(base, method_name):
-            if getattr(base, method_name) != getattr(klass, method_name):
-                return True
-    return False
+            method = getattr(base, method_name)
+            if method != prev:
+                prev = method
+                count += 1
+        if count > 1:
+            break
+
+    return count > 1
