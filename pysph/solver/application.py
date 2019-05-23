@@ -918,19 +918,23 @@ class Application(object):
         if rank != 0:
             self.particles = utils.create_dummy_particles(particles_info)
 
-    def _configure_options(self):
+    def _configure_global_config(self):
         options = self.options
         # Setup configuration options.
         config = get_config()
         if options.with_openmp is not None:
             config.use_openmp = options.with_openmp
+            logger.info('Using OpenMP')
         if options.omp_schedule is not None:
             config.set_omp_schedule(options.omp_schedule)
+            logger.info('Using OpenMP schedule %s', options.omp_schedule)
 
         if options.with_opencl:
             config.use_opencl = True
+            logger.info('Using OpenCL')
         elif options.with_cuda:
             config.use_cuda = True
+            logger.info('Using CUDA')
 
         if options.with_local_memory:
             leaf_size = int(options.octree_leaf_size)
@@ -938,10 +942,9 @@ class Application(object):
             config.use_local_memory = True
         if options.use_double:
             config.use_double = options.use_double
+            logger.info('Using double precision')
         if options.profile:
             config.profile = options.profile
-        for pa in self.particles:
-            pa.update_backend()
 
     def _configure_solver(self):
         """Configures the application using the options from the
@@ -1247,7 +1250,7 @@ class Application(object):
         """Configures the application using the options from the
         command-line.
         """
-        self._configure_options()
+        self._configure_global_config()
         self._configure_solver()
 
     def _setup_parallel_manager_and_initial_load_balance(self):
@@ -1472,6 +1475,7 @@ class Application(object):
 
             self._parse_command_line(force=argv is not None)
             self._setup_logging()
+            self._configure_global_config()
 
             self.solver = self.create_solver()
             msg = "Solver is None, you may have forgotten to return it!"
@@ -1479,8 +1483,6 @@ class Application(object):
             self.equations = self.create_equations()
 
             self._create_particles(self.create_particles)
-
-            self._configure_options()
 
             # This must be done before the initial load balancing
             # as the inlets will create new particles.
@@ -1573,11 +1575,10 @@ class Application(object):
         solver.get_options(self.arg_parse)
         self._parse_command_line()
         self._setup_logging()
+        self._configure_global_config()
 
         # Create particles either from scratch or restart
         self._create_particles(particle_factory, *args, **kwargs)
-
-        self._configure_options()
 
         # This must be done before the initial load balancing
         # as the inlets will create new particles.
