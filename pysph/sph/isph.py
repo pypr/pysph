@@ -2,7 +2,7 @@
 Incompressible SPH
 """
 import numpy
-import numpy as np
+from numpy import sqrt
 from compyle.api import declare
 from pysph.sph.scheme import Scheme
 from pysph.base.utils import get_particle_array
@@ -15,13 +15,13 @@ def get_particle_array_isph(constants=None, **props):
     isph_props = [
         'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'rho0', 'diag', 'odiag',
         'pk', 'rhs', 'pdiff', 'wg', 'vf', 'vg', 'ug', 'wij', 'wf', 'uf',
-        'V', 'au_visc', 'av_visc', 'aw_visc', 'au_pre', 'av_pre', 'aw_pre'
+        'V', 'au', 'av', 'aw', 'dt_force', 'dt_cfl', 'rhoband', 'vmag'
     ]
 
     # No of particles
     N = len(props['gid'])
     consts = {
-        'np': np.array([N], dtype=int),
+        'np': numpy.array([N], dtype=int),
     }
 
     if constants:
@@ -30,7 +30,7 @@ def get_particle_array_isph(constants=None, **props):
     pa = get_particle_array(
         additional_props=isph_props, constants=consts, **props
     )
-    pa.add_output_arrays(['p', 'V'])
+    pa.add_output_arrays(['p', 'V', 'rhoband', 'vmag'])
     return pa
 
 
@@ -69,33 +69,37 @@ class ISPHStep(IntegratorStep):
         d_v0[d_idx] = d_v[d_idx]
         d_w0[d_idx] = d_w[d_idx]
 
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au_visc, d_av_visc,
-               d_aw_visc, dt):
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
+               d_aw, dt):
         d_x[d_idx] += dt*d_u[d_idx]
         d_y[d_idx] += dt*d_v[d_idx]
         d_z[d_idx] += dt*d_w[d_idx]
 
-        d_u[d_idx] += dt*d_au_visc[d_idx]
-        d_v[d_idx] += dt*d_av_visc[d_idx]
-        d_w[d_idx] += dt*d_aw_visc[d_idx]
+        d_u[d_idx] += dt*d_au[d_idx]
+        d_v[d_idx] += dt*d_av[d_idx]
+        d_w[d_idx] += dt*d_aw[d_idx]
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_u0, d_v0, d_w0,
-               d_x0, d_y0, d_z0, dt, d_au_pre, d_av_pre, d_aw_pre):
-        d_u[d_idx] += dt*d_au_pre[d_idx]
-        d_v[d_idx] += dt*d_av_pre[d_idx]
-        d_w[d_idx] += dt*d_aw_pre[d_idx]
+               d_x0, d_y0, d_z0, dt, d_au, d_av, d_aw, d_vmag, d_dt_cfl):
+        d_u[d_idx] += dt*d_au[d_idx]
+        d_v[d_idx] += dt*d_av[d_idx]
+        d_w[d_idx] += dt*d_aw[d_idx]
 
         d_x[d_idx] = d_x0[d_idx] + 0.5*dt * (d_u[d_idx] + d_u0[d_idx])
         d_y[d_idx] = d_y0[d_idx] + 0.5*dt * (d_v[d_idx] + d_v0[d_idx])
         d_z[d_idx] = d_z0[d_idx] + 0.5*dt * (d_w[d_idx] + d_w0[d_idx])
 
+        d_vmag[d_idx] = sqrt(d_u[d_idx]*d_u[d_idx] + d_v[d_idx]*d_v[d_idx] +
+                             d_w[d_idx]*d_w[d_idx])
+        d_dt_cfl[d_idx] = 2.0*d_vmag[d_idx]
+
 
 class ISPHDIStep(ISPHStep):
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au_visc, d_av_visc,
-               d_aw_visc, dt):
-        d_u[d_idx] += dt*d_au_visc[d_idx]
-        d_v[d_idx] += dt*d_av_visc[d_idx]
-        d_w[d_idx] += dt*d_aw_visc[d_idx]
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
+               d_aw, dt):
+        d_u[d_idx] += dt*d_au[d_idx]
+        d_v[d_idx] += dt*d_av[d_idx]
+        d_w[d_idx] += dt*d_aw[d_idx]
 
         d_x[d_idx] += dt*d_u[d_idx]
         d_y[d_idx] += dt*d_v[d_idx]
@@ -103,56 +107,28 @@ class ISPHDIStep(ISPHStep):
 
 
 class ISPHDFDIStep(ISPHStep):
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au_visc, d_av_visc,
-               d_aw_visc, dt):
-        d_u[d_idx] += dt*d_au_visc[d_idx]
-        d_v[d_idx] += dt*d_av_visc[d_idx]
-        d_w[d_idx] += dt*d_aw_visc[d_idx]
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
+               d_aw, dt):
+        d_u[d_idx] += dt*d_au[d_idx]
+        d_v[d_idx] += dt*d_av[d_idx]
+        d_w[d_idx] += dt*d_aw[d_idx]
 
         d_x[d_idx] += dt*d_u[d_idx]
         d_y[d_idx] += dt*d_v[d_idx]
         d_z[d_idx] += dt*d_w[d_idx]
 
 
-class MomentumEquationViscosity(Equation):
-    def __init__(self, dest, sources, nu, c0, alpha, beta,
-                 gx=0.0, gy=0.0, gz=0.0):
-        self.nu = nu
-        self.c0 = c0
-        self.alpha = alpha
-        self.beta = beta
+class MomentumEquationBodyForce(Equation):
+    def __init__(self, dest, sources, gx=0.0, gy=0.0, gz=0.0):
         self.gx = gx
         self.gy = gy
         self.gz = gz
-        super(MomentumEquationViscosity, self).__init__(dest, sources)
+        super(MomentumEquationBodyForce, self).__init__(dest, sources)
 
-    def initialize(self, d_idx, d_au_visc, d_av_visc, d_aw_visc):
-        d_au_visc[d_idx] = self.gx
-        d_av_visc[d_idx] = self.gy
-        d_aw_visc[d_idx] = self.gz
-
-    def loop(self, d_idx, s_idx, s_m, d_rho, s_rho, d_au_visc, d_av_visc,
-             d_aw_visc, XIJ, DWIJ, R2IJ, EPS, VIJ, RHOIJ1, HIJ):
-        nu = self.nu
-        rhoij = (s_rho[s_idx] + d_rho[d_idx])
-        rhoij2_1 = 1.0/(rhoij*rhoij)
-        xdotdwij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
-        fac = 8.0 * s_m[s_idx] * nu * rhoij2_1 * xdotdwij / (R2IJ + EPS)
-
-        vijdotxij = VIJ[0]*XIJ[0] + VIJ[1]*XIJ[1] + VIJ[2]*XIJ[2]
-        piij = 0.0
-        if vijdotxij < 0.0:
-            muij = (HIJ * vijdotxij)/(R2IJ + EPS)
-            piij = -self.alpha*self.c0*muij + self.beta*muij*muij
-            piij = piij*RHOIJ1
-
-            d_au_visc[d_idx] += -s_m[s_idx] * piij * DWIJ[0]
-            d_av_visc[d_idx] += -s_m[s_idx] * piij * DWIJ[1]
-            d_aw_visc[d_idx] += -s_m[s_idx] * piij * DWIJ[2]
-
-        d_au_visc[d_idx] += fac * VIJ[0]
-        d_av_visc[d_idx] += fac * VIJ[1]
-        d_aw_visc[d_idx] += fac * VIJ[2]
+    def post_loop(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] += self.gx
+        d_av[d_idx] += self.gy
+        d_aw[d_idx] += self.gz
 
 
 class VelocityDivergence(Equation):
@@ -188,6 +164,12 @@ class DensityInvariance(Equation):
     def post_loop(self, d_idx, d_rho, d_rhs, dt):
         rho0 = self.rho0
         d_rhs[d_idx] = (rho0 - d_rho[d_idx]) / (dt*dt*rho0)
+
+
+class DensityInvarianceDFDI(Equation):
+    def post_loop(self, d_idx, d_V, d_V0, d_rhs, dt):
+        V0 = d_V0[d_idx]
+        d_rhs[d_idx] = (V0 - d_V[d_idx]) / (dt*dt*0.5*V0)
 
 
 class PressureCoeffMatrix(Equation):
@@ -239,10 +221,8 @@ class PPESolve(Equation):
                   d_m):
         omega = self.omega
         rho = d_V[d_idx] * d_m[d_idx] / self.rho0
-        if abs(d_diag[d_idx]) < 1e-9:
-            # pnew = d_pk[d_idx]
-            p = 0.0
-        elif rho < 0.8:
+        # FIXME: Tune this parameter.
+        if rho < 0.8:
             p = 0.0
         else:
             pnew = (d_rhs[d_idx] - d_odiag[d_idx]) / d_diag[d_idx]
@@ -272,20 +252,38 @@ class UpdateGhostPressure(Equation):
 
 
 class MomentumEquationPressureGradient(Equation):
-    def initialize(self, d_idx, d_au_pre, d_av_pre, d_aw_pre):
-        d_au_pre[d_idx] = 0.0
-        d_av_pre[d_idx] = 0.0
-        d_aw_pre[d_idx] = 0.0
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
 
-    def loop(self, d_idx, s_idx, s_m, d_p, s_p, d_rho, s_rho, d_au_pre,
-             d_av_pre, d_aw_pre, DWIJ):
+    def loop(self, d_idx, s_idx, s_m, d_p, s_p, d_rho, s_rho, d_au,
+             d_av, d_aw, DWIJ):
         Vj = s_m[s_idx] / s_rho[s_idx]
         pji = (s_p[s_idx] - d_p[d_idx])
         fac = -Vj * pji / d_rho[d_idx]
 
-        d_au_pre[d_idx] += fac * DWIJ[0]
-        d_av_pre[d_idx] += fac * DWIJ[1]
-        d_aw_pre[d_idx] += fac * DWIJ[2]
+        d_au[d_idx] += fac * DWIJ[0]
+        d_av[d_idx] += fac * DWIJ[1]
+        d_aw[d_idx] += fac * DWIJ[2]
+
+
+class MomentumEquationPressureGradientSymmetric(Equation):
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, s_m, d_p, s_p, d_rho, s_rho, d_au, d_av, d_aw,
+             DWIJ):
+        rhoi2 = d_rho[d_idx]*d_rho[d_idx]
+        rhoj2 = s_rho[s_idx]*s_rho[s_idx]
+        pij = d_p[d_idx]/rhoi2 + s_p[s_idx]/rhoj2
+        fac = -s_m[s_idx] * pij
+
+        d_au[d_idx] += fac * DWIJ[0]
+        d_av[d_idx] += fac * DWIJ[1]
+        d_aw[d_idx] += fac * DWIJ[2]
 
 
 class EvaluateNumberDensity(Equation):
@@ -294,6 +292,14 @@ class EvaluateNumberDensity(Equation):
 
     def loop(self, d_idx, d_wij, WIJ):
         d_wij[d_idx] += WIJ
+
+
+class VolumeSummationBand(Equation):
+    def initialize(self, d_idx, d_rhoband):
+        d_rhoband[d_idx] = 0.0
+
+    def loop(self, d_idx, d_rhoband, d_m, WIJ):
+        d_rhoband[d_idx] += WIJ * d_m[d_idx]
 
 
 class SetPressureSolid(Equation):
@@ -330,7 +336,7 @@ class SetPressureSolid(Equation):
 
 
 class ISPHScheme(Scheme):
-    def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha, beta=0.0,
+    def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha=0.0, beta=0.0,
                  gx=0.0, gy=0.0, gz=0.0, variant="CR", tolerance=0.05,
                  omega=0.5, hg_correction=True, has_ghosts=False,
                  inviscid_solids=None, inlet_outlet_manager=None):
@@ -458,9 +464,11 @@ class ISPHScheme(Scheme):
 
         return Group(equations=eqs) if eqs else None
 
-    def get_equations(self):
-        from pysph.sph.basic_equations import SummationDensity
-        from pysph.sph.wc.transport_velocity import VolumeSummation
+    def _get_viscous_eqns(self, variant):
+        from pysph.sph.wc.transport_velocity import (
+            MomentumEquationViscosity, MomentumEquationArtificialViscosity,
+            SummationDensity, SolidWallNoSlipBC)
+        from pysph.sph.wc.viscosity import LaminarViscosity
 
         iom = self.inlet_outlet_manager
         if iom is not None:
@@ -468,64 +476,75 @@ class ISPHScheme(Scheme):
         all = self.fluid_with_io + self.solids + self.inviscid_solids
         all_solids = self.solids + self.inviscid_solids
 
-        eq1, stg1 = [], []
-        if all_solids:
-            g0 = self._get_velocity_bc()
-            stg1.append(g0)
+        eq, stg = [], []
+        if variant.endswith('DI'):
+            for fluid in self.fluids:
+                eq.append(SummationDensity(dest=fluid, sources=all))
+            stg.append(Group(equations=eq, real=False))
 
-        if iom is not None:
-            io_eqs = iom.get_equations(self)
-            for grp in io_eqs:
-                stg1.append(grp)
-
+        eq = []
         for fluid in self.fluids:
-            eq1.append(
-                MomentumEquationViscosity(
-                    dest=fluid, sources=all, nu=self.nu, alpha=self.alpha,
-                    beta=self.beta, c0=self.c0, gx=self.gx, gy=self.gy,
-                    gz=self.gz)
-            )
-        stg1.append(Group(equations=eq1))
+            if variant.endswith('DI'):
+                eq.append(
+                    MomentumEquationViscosity(fluid, sources=all, nu=self.nu)
+                )
+            else:
+                eq.append(
+                    LaminarViscosity(fluid, sources=self.fluids, nu=self.nu)
+                )
+            if self.alpha > 0.0:
+                eq.append(
+                    # FIXME: All sources?
+                    MomentumEquationArtificialViscosity(
+                        dest=fluid, sources=self.fluids, c0=self.c0,
+                        alpha=self.alpha
+                    )
+                )
+            if self.gx != 0.0 or self.gy != 0.0 or self.gz != 0.0:
+                eq.append(
+                    MomentumEquationBodyForce(
+                        fluid, sources=None, gx=self.gx, gy=self.gy, gz=self.gz)
+                )
+            if self.solids and self.nu > 0.0:
+                eq.append(
+                    SolidWallNoSlipBC(
+                        dest=fluid, sources=self.solids, nu=self.nu
+                    )
+                )
+        stg.append(Group(equations=eq))
+        return stg
 
-        eq2, stg2 = [], []
+    def _get_ppe(self, variant):
+        from pysph.sph.wc.transport_velocity import SummationDensity, VolumeSummation
 
-        if all_solids:
-            g0 = self._get_velocity_bc()
-            stg2.append(g0)
-
+        iom = self.inlet_outlet_manager
         if iom is not None:
-            io_eqs = iom.get_equations(self)
-            for grp in io_eqs:
-                stg2.append(grp)
+            self.fluid_with_io = self.fluids + iom.get_io_names()
+        all = self.fluid_with_io + self.solids + self.inviscid_solids
+        all_solids = self.solids + self.inviscid_solids
 
-        if self.variant == 'DI':
+        eq, stg = [], []
+        if self.variant.endswith('DI'):
             for fluid in self.fluid_with_io:
-                eq2.append(SummationDensity(dest=fluid, sources=all))
-                eq2.append(VolumeSummation(dest=fluid, sources=all))
-            stg2.append(Group(equations=eq2))
+                eq.append(SummationDensity(dest=fluid, sources=all))
+                # FIXME: Should this be fluids_with_io?
+                eq.append(VolumeSummationBand(dest=fluid, sources=self.fluids))
+            stg.append(Group(equations=eq, real=False))
 
         eq2 = []
         for fluid in self.fluid_with_io:
             if self.variant == 'DI':
                 eq2.append(
-                    DensityInvariance(dest=fluid, sources=all, rho0=self.rho0)
+                    DensityInvariance(dest=fluid, sources=None, rho0=self.rho0)
                 )
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
-                eq2.append(VelocityDivergence(
-                    dest=fluid, sources=self.fluid_with_io))
-                if all_solids:
-                    eq2.append(VelocityDivergenceSolid(
-                        dest=fluid, sources=all_solids
-                    ))
-        stg2.append(Group(equations=eq2))
-
-        eq3 = []
-        for fluid in self.fluids:
-            eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
-            eq3.append(PPESolve(dest=fluid, sources=all, rho0=self.rho0,
-                                tolerance=self.tolerance, omega=self.omega))
-        eq3 = Group(equations=eq3)
+                eq2.append(VelocityDivergence(dest=fluid, sources=self.fluids))
+                if self.solids:
+                    eq2.append(
+                        VelocityDivergenceSolid(dest=fluid, sources=self.solids)
+                    )
+        stg.append(Group(equations=eq2))
 
         solver_eqns = []
         if self.has_ghosts:
@@ -540,9 +559,16 @@ class ISPHScheme(Scheme):
             g3 = self._get_pressure_bc()
             solver_eqns.append(g3)
 
+        eq3 = []
+        for fluid in self.fluids:
+            eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
+            eq3.append(PPESolve(dest=fluid, sources=all, rho0=self.rho0,
+                                tolerance=self.tolerance, omega=self.omega))
+        eq3 = Group(equations=eq3)
+
         solver_eqns.append(eq3)
 
-        stg2.append(
+        stg.append(
             Group(
                 equations=solver_eqns, iterate=True, max_iterations=100,
                 min_iterations=2
@@ -555,12 +581,42 @@ class ISPHScheme(Scheme):
                            for fluid in self.fluid_with_io],
                 real=False
             )
-            stg2.append(ghost_eqns)
-        eq4 = []
-        for fluid in self.fluids:
-            eq4.append(
-                MomentumEquationPressureGradient(dest=fluid, sources=all)
-            )
+            stg.append(ghost_eqns)
+        return stg
+
+    def get_equations(self):
+        from pysph.sph.basic_equations import SummationDensity
+        from pysph.sph.wc.transport_velocity import VolumeSummation
+
+        iom = self.inlet_outlet_manager
+        if iom is not None:
+            self.fluid_with_io = self.fluids + iom.get_io_names()
+        all = self.fluid_with_io + self.solids + self.inviscid_solids
+        all_solids = self.solids + self.inviscid_solids
+
+        stg1 = []
+        if all_solids:
+            g0 = self._get_velocity_bc()
+            stg1.append(g0)
+
+        if iom is not None:
+            io_eqs = iom.get_equations(self)
+            for grp in io_eqs:
+                stg1.append(grp)
+
+        stg1.extend(self._get_viscous_eqns(self.variant))
+
+        stg2 = []
+        if all_solids:
+            g0 = self._get_velocity_bc()
+            stg2.append(g0)
+
+        if iom is not None:
+            io_eqs = iom.get_equations(self)
+            for grp in io_eqs:
+                stg2.append(grp)
+
+        stg2.extend(self._get_ppe(self.variant))
 
         if all_solids:
             g3 = self._get_pressure_bc()
@@ -570,8 +626,12 @@ class ISPHScheme(Scheme):
             g0 = self._get_velocity_bc()
             stg2.append(g0)
 
+        eq4 = []
+        for fluid in self.fluids:
+            eq4.append(
+                MomentumEquationPressureGradientSymmetric(dest=fluid, sources=all)
+            )
         stg2.append(Group(equations=eq4))
-
         return MultiStageEquations([stg1, stg2])
 
     def setup_properties(self, particles, clean=True):
@@ -592,7 +652,7 @@ class ISPHScheme(Scheme):
             if iom is not None:
                 iom.add_io_properties(pa, self)
 
-        solid_props = ['wij', 'ug', 'vg', 'wg', 'uf', 'vf', 'wf', 'pk']
+        solid_props = ['wij', 'ug', 'vg', 'wg', 'uf', 'vf', 'wf', 'pk', 'V']
         all_solids = self.solids + self.inviscid_solids
         for solid in all_solids:
             pa = particle_arrays[solid]
