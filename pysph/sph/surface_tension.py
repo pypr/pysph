@@ -851,7 +851,45 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
     """
     This function returns the required equations for the multiphase
     formulation taking inputs of the fluid particles array, solid particles
-    array, the scheme to be used and other physical parameters"""
+    array, the scheme to be used and other physical parameters
+    Parameters
+    ------------------
+
+    fluids: list
+        List of names of fluid particle arrays
+    solids: list
+        List of names of solid particle arrays
+    scheme: string
+        The scheme with which the equations are to be setup
+    rho0 : float
+        The reference density of the medium (Currently multiple reference
+        densities for different particles is not supported)
+    p0 : float
+        The background pressure of the medium(Currently multiple background
+        pressures for different particles is not supported)
+    c0 : float
+        The speed of sound of the medium(Currently multiple speeds of sounds
+        for different particles is not supported)
+    b : float
+        The b parameter of the generalized Tait Equation of State. Refer to
+        the Tait Equation's documentation for reference
+    factor1 : float
+        The factor for scaling of smoothing length for calculation of
+        interface curvature number for shadloo's scheme
+    factor2 : float
+        The factor for scaling back of smoothing length for calculation of
+        forces after calculating the interface curvature number in shadloo's
+        scheme
+    nu : float
+        The kinematic viscosity of the medium
+    sigma : float
+        The surface tension of the system
+    d : int
+        The number of dimensions of the problem in the cartesian space
+    epsilon: float
+        Put this option false if the equations are supposed to be evaluated
+        for the ghost particles, else keep it True
+    """
     if scheme == 'tvf':
         result = []
         equations = []
