@@ -189,7 +189,7 @@ class SquareDroplet(Application):
         return solver
 
     def create_equations(self):
-        return get_surface_tension_equations(['fluid'], [], 
+        return get_surface_tension_equations(['fluid'], [],
                                              self.options.scheme, rho0, p0, c0,
                                              0, factor1, factor2, nu, sigma, 2,
                                              epsilon, 1, real=False)
