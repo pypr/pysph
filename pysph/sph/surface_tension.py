@@ -860,7 +860,19 @@ def get_surface_tension_equations(fluids, solids, scheme, rho0, p0, c0, b,
     solids: list
         List of names of solid particle arrays
     scheme: string
-        The scheme with which the equations are to be setup
+        The scheme with which the equations are to be setup.
+        Supported Schemes:
+            1. TVF scheme with Morris' surface tension.
+            String to be used: "tvf"
+            2. Adami's surface tension implementation which doesn't involve
+            calculation of curvature. String to be used: "adami_stress"
+            3. Adami's surface tension implementation which involves
+            calculation of curvature. String to be used: "adami"
+            4. Shadloo Yildiz surface tension formulation.
+            String to be used: "shadloo"
+            5. Morris' surface tension formulation. This is the default scheme
+            which will be used if none of the above strings are input as
+            scheme.
     rho0 : float
         The reference density of the medium (Currently multiple reference
         densities for different particles is not supported)
