@@ -926,6 +926,7 @@ class TestAccelerationEval1DGPUOctreeNonCached(
 class TestAccelerationEval1DCUDA(TestAccelerationEval1DGPU):
 
     def _make_accel_eval(self, equations, cache_nnps=True):
+        pytest.importorskip('pycuda')
         pytest.importorskip('pysph.base.gpu_nnps')
         GPUNNPS = self._get_nnps_cls()
         arrays = [self.pa]
