@@ -364,7 +364,8 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         )
         comp = SPHCompiler(a_eval, integrator=integrator)
         comp.compile()
-        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=True)
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=True,
+                       backend='opencl')
         nnps.update()
         a_eval.set_nnps(nnps)
         integrator.set_nnps(nnps)
@@ -426,6 +427,26 @@ class TestLeapFrogIntegratorGPU(TestIntegratorBase):
         get_config().use_double = True
         self.addCleanup(_cleanup)
         self.test_leapfrog()
+
+
+class TestLeapFrogIntegratorCUDA(TestLeapFrogIntegratorGPU):
+    def _setup_integrator(self, equations, integrator):
+        pytest.importorskip('pycuda')
+        pytest.importorskip('pysph.base.gpu_nnps')
+        kernel = CubicSpline(dim=1)
+        arrays = [self.pa]
+        from pysph.base.gpu_nnps import BruteForceNNPS as GPUNNPS
+        a_eval = AccelerationEval(
+             particle_arrays=arrays, equations=equations, kernel=kernel,
+             backend='cuda'
+        )
+        comp = SPHCompiler(a_eval, integrator=integrator)
+        comp.compile()
+        nnps = GPUNNPS(dim=kernel.dim, particles=arrays, cache=True,
+                       backend='cuda')
+        nnps.update()
+        a_eval.set_nnps(nnps)
+        integrator.set_nnps(nnps)
 
 
 if __name__ == '__main__':

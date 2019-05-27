@@ -26,7 +26,6 @@ cimport cython
 
 import pyopencl as cl
 import pyopencl.array
-from pyopencl.scan import ExclusiveScanKernel
 from pyopencl.elementwise import ElementwiseKernel
 
 from pysph.base.nnps_base cimport *
@@ -45,11 +44,14 @@ from utils import ParticleTAGS
 
 from nnps_base cimport *
 
+from pysph.base.gpu_helper_kernels import (exclusive_input, exclusive_output,
+                                           get_scan)
+
 
 cdef class GPUNeighborCache:
     def __init__(self, GPUNNPS nnps, int dst_index, int src_index,
-            backend='opencl'):
-        self.backend = backend
+            backend=None):
+        self.backend = get_backend(backend)
         self._dst_index = dst_index
         self._src_index = src_index
         self._nnps = nnps
@@ -84,6 +86,7 @@ cdef class GPUNeighborCache:
     #### Private protocol ################################################
 
     cdef void _find_neighbors(self):
+
         self._nnps.find_neighbor_lengths(self._nbr_lengths_gpu)
         # FIXME:
         # - Store sum kernel
@@ -101,11 +104,10 @@ cdef class GPUNeighborCache:
 
         # Do prefix sum on self._neighbor_lengths for the self._start_idx
         if self._get_start_indices is None:
-            self._get_start_indices = ExclusiveScanKernel(
-                get_context(), np.uint32, scan_expr="a+b", neutral="0"
-            )
+            self._get_start_indices = get_scan(exclusive_input, exclusive_output,
+                    dtype=np.uint32, backend=self.backend)
 
-        self._get_start_indices(self._start_idx_gpu.dev)
+        self._get_start_indices(ary=self._start_idx_gpu)
 
         self._nnps.find_nearest_neighbors_gpu(self._neighbors_gpu,
                 self._start_idx_gpu)
@@ -144,7 +146,7 @@ cdef class GPUNNPS(NNPSBase):
     """
     def __init__(self, int dim, list particles, double radius_scale=2.0,
                  int ghost_layers=1, domain=None, bint cache=True,
-                 bint sort_gids=False, backend='opencl'):
+                 bint sort_gids=False, backend=None):
         """Constructor for NNPS
 
         Parameters
@@ -178,8 +180,8 @@ cdef class GPUNNPS(NNPSBase):
                 domain, cache, sort_gids)
 
         self.backend = get_backend(backend)
+        self.backend = 'opencl' if self.backend is 'cython' else self.backend
         self.use_double = get_config().use_double
-        self.queue = get_queue()
         self.dtype = np.float64 if self.use_double else np.float32
         self.dtype_max = np.finfo(self.dtype).max
         self._last_domain_size = 0.0

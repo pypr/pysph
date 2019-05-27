@@ -25,7 +25,7 @@ install:
     - conda config --add channels conda-forge
     - conda config --add channels defaults
     - conda install -c conda-forge pocl==1.2 pyopencl
-    - conda install -c defaults virtualenv
+    - conda install -c defaults virtualenv cython
     - python -c 'import pyopencl as cl'
     - pip install beaker tox tox-travis
 

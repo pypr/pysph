@@ -46,7 +46,7 @@ class SPHCompiler(object):
                 self.integrator_helper.setup_compiled_module(
                     mod, c_accel_eval0
                 )
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             if self.integrator is not None:
                 self.integrator_helper.setup_compiled_module(
                     mod, c_accel_eval0
@@ -68,7 +68,7 @@ class SPHCompiler(object):
             from .acceleration_eval_cython_helper import \
                 AccelerationEvalCythonHelper
             cls = AccelerationEvalCythonHelper
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             from .acceleration_eval_gpu_helper import \
                 AccelerationEvalGPUHelper
             cls = AccelerationEvalGPUHelper
@@ -87,7 +87,7 @@ class SPHCompiler(object):
             self.integrator_helper = IntegratorCythonHelper(
                 self.integrator, a_helper0
             )
-        elif self.backend == 'opencl':
+        elif self.backend == 'opencl' or self.backend == 'cuda':
             from .integrator_gpu_helper import IntegratorGPUHelper
             self.integrator_helper = IntegratorGPUHelper(
                 self.integrator, a_helper0

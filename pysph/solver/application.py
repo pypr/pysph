@@ -972,7 +972,7 @@ class Application(object):
             cache = options.cache_nnps
 
             # create the NNPS object
-            if options.with_opencl:
+            if options.with_opencl or options.with_cuda:
                 if options.nnps == 'gpu_octree':
                     leaf_size = int(options.octree_leaf_size)
                     # if leaf_size % 32 != 0:

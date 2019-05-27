@@ -254,7 +254,8 @@ class OctreeGPUNNPS2DTestCase(DictBoxSortNNPS2DTestCase):
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0
+            dim=2, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -274,7 +275,8 @@ class OctreeGPUNNPSDouble2DTestCase(DictBoxSortNNPS2DTestCase):
         cfg.use_double = True
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=2, particles=self.particles, radius_scale=2.0
+            dim=2, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -596,6 +598,25 @@ class ZOrderGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class ZOrderGPUNNPSTestCaseCUDA(ZOrderGPUNNPSTestCase):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        importorskip("pycuda")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='cuda'
+        )
+
+    def tearDown(self):
+        super(ZOrderGPUNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class BruteForceNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for OpenCL brute force algorithm"""
 
@@ -629,7 +650,8 @@ class OctreeGPUNNPSTestCase(DictBoxSortNNPSTestCase):
         cfg.use_double = False
 
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -657,6 +679,26 @@ class ZOrderGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class ZOrderGPUDoubleNNPSTestCaseCUDA(ZOrderGPUDoubleNNPSTestCase):
+    """Test for Z-Order SFC based OpenCL algorithm"""
+
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        importorskip("pycuda")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = True
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='cuda'
+        )
+
+    def tearDown(self):
+        super(ZOrderGPUDoubleNNPSTestCase, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class OctreeGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
     """Test for Octree based OpenCL algorithm"""
 
@@ -668,7 +710,8 @@ class OctreeGPUDoubleNNPSTestCase(DictBoxSortNNPSTestCase):
         self._orig_use_double = cfg.use_double
         cfg.use_double = True
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
 
     def tearDown(self):
@@ -699,6 +742,29 @@ class TestZOrderGPUNNPSWithSorting(DictBoxSortNNPSTestCase):
         get_config().use_double = self._orig_use_double
 
 
+class TestZOrderGPUNNPSWithSortingCUDA(TestZOrderGPUNNPSWithSorting):
+    def setUp(self):
+        NNPSTestCase.setUp(self)
+        cl = importorskip("pycuda")
+        from pysph.base import gpu_nnps
+        cfg = get_config()
+        self._orig_use_double = cfg.use_double
+        cfg.use_double = False
+        self.nps = gpu_nnps.ZOrderGPUNNPS(
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='cuda'
+        )
+        self.nps.spatially_order_particles(0)
+        self.nps.spatially_order_particles(1)
+
+        for pa in self.particles:
+            pa.gpu.pull()
+
+    def tearDown(self):
+        super(TestZOrderGPUNNPSWithSorting, self).tearDown()
+        get_config().use_double = self._orig_use_double
+
+
 class OctreeGPUNNPSWithSortingTestCase(DictBoxSortNNPSTestCase):
     def setUp(self):
         NNPSTestCase.setUp(self)
@@ -708,7 +774,8 @@ class OctreeGPUNNPSWithSortingTestCase(DictBoxSortNNPSTestCase):
         self._orig_use_double = cfg.use_double
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
-            dim=3, particles=self.particles, radius_scale=2.0
+            dim=3, particles=self.particles, radius_scale=2.0,
+            backend='opencl'
         )
         self.nps.spatially_order_particles(0)
         self.nps.spatially_order_particles(1)
@@ -731,7 +798,7 @@ class OctreeGPUNNPSWithPartitioningTestCase(DictBoxSortNNPSTestCase):
         cfg.use_double = False
         self.nps = gpu_nnps.OctreeGPUNNPS(
             dim=3, particles=self.particles, radius_scale=2.0,
-            use_partitions=True
+            use_partitions=True, backend='opencl'
         )
 
         for pa in self.particles:

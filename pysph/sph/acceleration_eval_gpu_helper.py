@@ -169,12 +169,12 @@ def get_queue(backend):
         raise RuntimeError('Unsupported GPU backend %s' % backend)
 
 
-def profile_kernel(knl, name, backend):
+def profile_kernel(knl, backend):
     if backend == 'cuda':
         return knl
     elif backend == 'opencl':
         from compyle.opencl import profile_kernel
-        return profile_kernel(knl, name)
+        return profile_kernel(knl, knl.function_name)
     else:
         raise RuntimeError('Unsupported GPU backend %s' % backend)
 
@@ -200,6 +200,8 @@ class GPUAccelerationEval(object):
         n = dest.get_number_of_particles(info.get('real', True))
         args[1] = (n,)
         args[3:] = [x() for x in args[3:]]
+        # Argument for NP_MAX
+        extra_args[-1][...] = n - 1
 
         if info.get('loop'):
             if self._use_local_memory:
@@ -210,7 +212,8 @@ class GPUAccelerationEval(object):
                 args[1] = gs_ls[0]
                 args[2] = gs_ls[1]
 
-                args = args + extra_args + nnps_args
+                # No need for the guard variable for the local memory code.
+                args = args + extra_args[:-1] + nnps_args
 
                 call(*args)
                 self._queue.finish()
@@ -244,7 +247,9 @@ class GPUAccelerationEval(object):
     def compute(self, t, dt):
         helper = self.helper
         dtype = np.float64 if self._use_double else np.float32
-        extra_args = [np.asarray(t, dtype=dtype), np.asarray(dt, dtype=dtype)]
+        extra_args = [np.asarray(t, dtype=dtype),
+                      np.asarray(dt, dtype=dtype),
+                      np.asarray(0, dtype=np.uint32)]
         i = 0
         iter_count = 0
         iter_start = 0
@@ -298,6 +303,65 @@ class GPUAccelerationEval(object):
             eq.reduce(dest, t, dt)
 
 
+class CUDAAccelerationEval(GPUAccelerationEval):
+    def _call_kernel(self, info, extra_args):
+        from pycuda.gpuarray import splay
+        import pycuda.driver as drv
+        nnps = self.nnps
+        call = info.get('method')
+        args = list(info.get('args'))
+        dest = info['dest']
+        n = dest.get_number_of_particles(info.get('real', True))
+        # args is actually [queue, None, None, actual_meaningful_args]
+        # we do not need the first 3 args on CUDA.
+        args = [x() for x in args[3:]]
+
+        # Argument for NP_MAX
+        extra_args[-1][...] = n - 1
+
+        gs, ls = splay(n)
+        gs, ls = int(gs[0]), int(ls[0])
+        num_blocks = (n + ls - 1) // ls
+
+        #num_blocks = int((gs + ls - 1) / ls)
+        num_tpb = ls
+
+        if info.get('loop'):
+            if self._use_local_memory:
+                # FIXME: Fix local memory for CUDA
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+
+                nnps_args, gs_ls = self.nnps.get_kernel_args('float')
+                args[1] = gs_ls[0]
+                args[2] = gs_ls[1]
+
+                # No need for the guard variable for the local memory code.
+                args = args + extra_args[:-1] + nnps_args
+
+                call(*args)
+            else:
+                # find block sizes
+                nnps.set_context(info['src_idx'], info['dst_idx'])
+                cache = nnps.current_cache
+                cache.get_neighbors_gpu()
+                args = args + [
+                    cache._nbr_lengths_gpu.dev,
+                    cache._start_idx_gpu.dev,
+                    cache._neighbors_gpu.dev
+                ] + extra_args
+                event = drv.Event()
+                call(*args, block=(num_tpb, 1, 1), grid=(num_blocks, 1))
+                event.record()
+                event.synchronize()
+        else:
+            event = drv.Event()
+            call(*(args + extra_args),
+                 block=(num_tpb, 1, 1),
+                 grid=(num_blocks, 1))
+            event.record()
+            event.synchronize()
+
+
 def add_address_space(known_types):
     for v in known_types.values():
         if 'GLOBAL_MEM' not in v.type:
@@ -343,8 +407,6 @@ class AccelerationEvalGPUHelper(object):
         self.known_types.update(predefined)
         self.known_types['NBRS'] = KnownType('GLOBAL_MEM unsigned int*')
         self.data = []
-        self._ctx = get_context(self.backend)
-        self._queue = get_queue(self.backend)
         self._array_map = None
         self._array_index = None
         self._equations = {}
@@ -352,6 +414,8 @@ class AccelerationEvalGPUHelper(object):
         self._gpu_structs = {}
         self.calls = []
         self.program = None
+        self._ctx = get_context(self.backend)
+        self._queue = get_queue(self.backend)
 
     def _setup_arrays_on_device(self):
         pas = self.object.particle_arrays
@@ -388,7 +452,22 @@ class AccelerationEvalGPUHelper(object):
                     if k in self._equations:
                         self._equations[k]._gpu = gpu[k]
         else:
-            raise NotImplementedError('CUDA not supported yet')
+            from pycuda import gpuarray
+            from compyle.cuda import match_dtype_to_c_struct
+
+            gpu = self._gpu_structs
+            cpu = self._cpu_structs
+            for k, v in cpu.items():
+                if v is None:
+                    gpu[k] = v
+                else:
+                    g_struct, code = match_dtype_to_c_struct(
+                        None, "junk", v.dtype
+                    )
+                    g_v = v.astype(g_struct)
+                    gpu[k] = gpuarray.to_gpu(g_v)
+                    if k in self._equations:
+                        self._equations[k]._gpu = gpu[k]
 
     def _get_argument(self, arg, dest, src=None):
         ary_map = self._array_map
@@ -396,8 +475,12 @@ class AccelerationEvalGPUHelper(object):
 
         # This is needed for late binding on the device helper's attributes
         # which may change at each iteration when particles are added/removed.
-        def _get_array(gpu_helper, attr):
-            return getattr(gpu_helper, attr).dev.data
+        if self.backend == 'opencl':
+            def _get_array(gpu_helper, attr):
+                return getattr(gpu_helper, attr).dev.data
+        else:
+            def _get_array(gpu_helper, attr):
+                return getattr(gpu_helper, attr).dev
 
         def _get_struct(obj):
             return obj
@@ -407,7 +490,10 @@ class AccelerationEvalGPUHelper(object):
         elif arg.startswith('s_'):
             return partial(_get_array, ary_map[src].gpu, arg[2:])
         else:
-            return partial(_get_struct, structs[arg].data)
+            if self.backend == 'opencl':
+                return partial(_get_struct, structs[arg].data)
+            else:
+                return partial(_get_struct, structs[arg])
 
     def _setup_calls(self):
         calls = []
@@ -418,9 +504,7 @@ class AccelerationEvalGPUHelper(object):
             if type == 'kernel':
                 kernel = item.get('kernel')
                 method = getattr(prg, kernel)
-                method = profile_kernel(
-                    method, method.function_name, self.backend
-                )
+                method = profile_kernel(method, self.backend)
                 dest = item['dest']
                 src = item.get('source', dest)
                 args = [self._queue, None, None]
@@ -477,7 +561,11 @@ class AccelerationEvalGPUHelper(object):
         object = self.object
         self._setup_arrays_on_device()
         self.calls = self._setup_calls()
-        acceleration_eval = GPUAccelerationEval(self)
+        if self.backend == 'opencl':
+            acceleration_eval = GPUAccelerationEval(self)
+        elif self.backend == 'cuda':
+            acceleration_eval = CUDAAccelerationEval(self)
+
         object.set_compiled_object(acceleration_eval)
 
     def compile(self, code):
@@ -507,7 +595,7 @@ class AccelerationEvalGPUHelper(object):
                 options=['-w']
             )
         elif self.backend == 'cuda':
-            from pycuda.compiler import SourceModule
+            from compyle.cuda import SourceModule
             self.program = SourceModule(code)
         return self.program
 
@@ -587,7 +675,9 @@ class AccelerationEvalGPUHelper(object):
 
         sph_k_name = self.object.kernel.__class__.__name__
         code = [
-            'int d_idx = get_global_id(0);'
+            'int d_idx = GID_0 * LDIM_0 + LID_0;',
+            '/* Guard for padded threads. */',
+            'if (d_idx > NP_MAX) {return;};',
             'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name
         ]
         all_args, py_args, _calls = self._get_equation_method_calls(
@@ -607,7 +697,7 @@ class AccelerationEvalGPUHelper(object):
         all_args.extend(self._get_typed_args(_args))
         all_args.extend(
             ['GLOBAL_MEM {kernel}* kern'.format(kernel=sph_k_name),
-             'double t', 'double dt']
+             'double t', 'double dt', 'unsigned int NP_MAX']
         )
 
         body = '\n'.join([' ' * 4 + x for x in code])
@@ -748,13 +838,17 @@ class AccelerationEvalGPUHelper(object):
         context = eq_group.context
         all_args, py_args = [], []
         code = self._declare_precomp_vars(context)
-        code.append('unsigned int d_idx = get_global_id(0);')
-        code.append('unsigned int s_idx, i;')
-        code.append('GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name)
-        code.append('unsigned int start = start_idx[d_idx];')
-        code.append('GLOBAL_MEM unsigned int* NBRS = &(neighbors[start]);')
-        code.append('int N_NBRS = nbr_length[d_idx];')
-        code.append('unsigned int end = start + N_NBRS;')
+        code.extend([
+            'unsigned int d_idx = GID_0 * LDIM_0 + LID_0;',
+            '/* Guard for padded threads. */',
+            'if (d_idx > NP_MAX) {return;};',
+            'unsigned int s_idx, i;',
+            'GLOBAL_MEM %s* SPH_KERNEL = kern;' % sph_k_name,
+            'unsigned int start = start_idx[d_idx];',
+            'GLOBAL_MEM unsigned int* NBRS = &(neighbors[start]);',
+            'int N_NBRS = nbr_length[d_idx];',
+            'unsigned int end = start + N_NBRS;'
+        ])
         if eq_group.has_loop_all():
             _all_args, _py_args, _calls = self._get_equation_method_calls(
                 eq_group, kind='loop_all', indent=''
@@ -802,7 +896,7 @@ class AccelerationEvalGPUHelper(object):
              'GLOBAL_MEM unsigned int *nbr_length',
              'GLOBAL_MEM unsigned int *start_idx',
              'GLOBAL_MEM unsigned int *neighbors',
-             'double t', 'double dt']
+             'double t', 'double dt', 'unsigned int NP_MAX']
         )
 
         self.data.append(dict(

@@ -25,7 +25,13 @@ from pysph.base.gpu_nnps_helper import GPUNNPSHelper
 from compyle.array import Array
 import compyle.array as array
 from compyle.opencl import get_context, get_config, profile_kernel
+from compyle.api import Elementwise
 
+from pysph.base.z_order_gpu_nnps_kernels import (ZOrderNbrsKernel,
+                                                 ZOrderLengthKernel)
+
+from pysph.base.gpu_helper_kernels import get_elwise, get_scan
+from pysph.base.z_order_gpu_nnps_kernels import *
 
 IF UNAME_SYSNAME == "Windows":
     cdef inline double fmin(double x, double y) nogil:
@@ -41,20 +47,13 @@ IF UNAME_SYSNAME == "Windows":
 cdef class ZOrderGPUNNPS(GPUNNPS):
     def __init__(self, int dim, list particles, double radius_scale=2.0,
             int ghost_layers=1, domain=None, bint fixed_h=False,
-            bint cache=True, bint sort_gids=False, backend='opencl'):
+            bint cache=True, bint sort_gids=False, backend=None):
         GPUNNPS.__init__(
             self, dim, particles, radius_scale, ghost_layers, domain,
             cache, sort_gids, backend
         )
 
         self.radius_scale2 = radius_scale*radius_scale
-        self.radix_sort = None
-        self.make_vec = cl.cltypes.make_double3 if self.use_double \
-                else cl.cltypes.make_float3
-
-        self.helper = GPUNNPSHelper("z_order_gpu_nnps.mako",
-                                    use_double=self.use_double,
-                                    backend=self.backend)
 
         self.src_index = -1
         self.dst_index = -1
@@ -66,10 +65,6 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.pid_keys = []
         self.cids = []
         self.cid_to_idx = []
-
-        self.allocator = cl.tools.MemoryPool(
-                cl.tools.ImmediateAllocator(self.queue)
-                )
 
         for i from 0<=i<self.narrays:
             pa_wrapper = <NNPSParticleArrayWrapper>self.pa_wrappers[i]
@@ -92,6 +87,9 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.dst_to_src = Array(np.uint32, backend=self.backend)
         self.overflow_cid_to_idx = Array(np.int32, backend=self.backend)
 
+        self.z_order_nbrs = [None] * 2
+        self.z_order_nbr_lengths = [None] * 2
+
         self.domain.update()
         self.update()
 
@@ -110,21 +108,13 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         self.sorted = False
         cdef NNPSParticleArrayWrapper pa_wrapper = self.pa_wrappers[pa_index]
 
-        fill_pids = self.helper.get_kernel("fill_pids")
+        fill_pids_knl = get_elwise(fill_pids, self.backend)
 
         pa_gpu = pa_wrapper.pa.gpu
-        fill_pids(pa_gpu.x.dev, pa_gpu.y.dev, pa_gpu.z.dev,
+        fill_pids_knl(pa_gpu.x, pa_gpu.y, pa_gpu.z,
                 self.cell_size,
-                self.make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
-                self.pid_keys[pa_index].dev, self.pids[pa_index].dev)
-
-        if self.radix_sort is None:
-            self.radix_sort = cl.algorithm.RadixSort(
-                get_context(),
-                "unsigned int* pids, unsigned long* keys",
-                scan_kernel=GenericScanKernel, key_expr="keys[i]",
-                sort_arg_names=["pids", "keys"]
-            )
+                self.xmin[0], self.xmin[1], self.xmin[2],
+                self.pid_keys[pa_index], self.pids[pa_index])
 
         cdef double max_length = fmax(fmax((self.xmax[0] - self.xmin[0]),
             (self.xmax[1] - self.xmin[1])), (self.xmax[2] - self.xmin[2]))
@@ -133,40 +123,39 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
 
         cdef int max_num_bits = 3*(<int> ceil(log2(max_num_cells)))
 
-        (sorted_indices, sorted_keys), evnt = self.radix_sort(
-            self.pids[pa_index].dev, self.pid_keys[pa_index].dev,
-            key_bits=max_num_bits, allocator=self.allocator
+        sorted_keys, sorted_indices = array.sort_by_keys(
+            [self.pid_keys[pa_index], self.pids[pa_index]],
+            key_bits=max_num_bits,
+            backend=self.backend
         )
         self.pids[pa_index].set_data(sorted_indices)
         self.pid_keys[pa_index].set_data(sorted_keys)
 
         self.curr_cid.fill(1)
 
-        fill_unique_cids = self.helper.get_kernel("fill_unique_cids")
+        fill_unique_cids_knl = get_scan(inp_fill_unique_cids, out_fill_unique_cids,
+                                        np.int32, self.backend)
 
-        fill_unique_cids(self.pid_keys[pa_index].dev,
-                self.cids[pa_index].dev, self.curr_cid.dev)
+        fill_unique_cids_knl(keys=self.pid_keys[pa_index],
+                             cids=self.cids[pa_index])
 
-        cdef unsigned int num_cids = <unsigned int> (self.curr_cid.get())
+        curr_cids = self.cids[pa_index]
+
+        cdef unsigned int num_cids = 1 + <unsigned int> curr_cids[-1]
         self.cid_to_idx[pa_index].resize(27 * num_cids)
         self.cid_to_idx[pa_index].fill(-1)
 
         self.max_cid[pa_index] = num_cids
 
-        map_cid_to_idx = self.helper.get_kernel("map_cid_to_idx")
+        map_cid_to_idx_knl= get_elwise(map_cid_to_idx, self.backend)
 
-        map_cid_to_idx(
-            pa_gpu.x.dev, pa_gpu.y.dev, pa_gpu.z.dev,
+        map_cid_to_idx_knl(
+            pa_gpu.x, pa_gpu.y, pa_gpu.z,
             pa_wrapper.get_number_of_particles(), self.cell_size,
-            self.make_vec(self.xmin[0], self.xmin[1], self.xmin[2]),
-            self.pids[pa_index].dev, self.pid_keys[pa_index].dev,
-            self.cids[pa_index].dev, self.cid_to_idx[pa_index].dev
+            self.xmin[0], self.xmin[1], self.xmin[2],
+            self.pids[pa_index], self.pid_keys[pa_index],
+            self.cids[pa_index], self.cid_to_idx[pa_index]
         )
-
-        fill_cids = self.helper.get_kernel("fill_cids")
-
-        fill_cids(self.pid_keys[pa_index].dev, self.cids[pa_index].dev,
-                pa_wrapper.get_number_of_particles())
 
     cpdef _refresh(self):
         cdef NNPSParticleArrayWrapper pa_wrapper
@@ -206,15 +195,15 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
         if self.dst_src:
             self.dst_to_src.resize(self.max_cid[dst_index])
 
-            map_dst_to_src = self.helper.get_kernel("map_dst_to_src")
+            map_dst_to_src_knl = get_elwise(map_dst_to_src, self.backend)
 
             self.max_cid_src.fill(self.max_cid[src_index])
 
-            map_dst_to_src(self.dst_to_src.dev, self.cids[dst_index].dev,
-                    self.cid_to_idx[dst_index].dev,
-                    self.pid_keys[dst_index].dev,
-                    self.pid_keys[src_index].dev, self.cids[src_index].dev,
-                    self.src.get_number_of_particles(), self.max_cid_src.dev)
+            map_dst_to_src_knl(self.dst_to_src, self.cids[dst_index],
+                    self.cid_to_idx[dst_index],
+                    self.pid_keys[dst_index],
+                    self.pid_keys[src_index], self.cids[src_index],
+                    self.src.get_number_of_particles(), self.max_cid_src)
 
             overflow_size = <unsigned int>(self.max_cid_src.get()) - \
                     self.max_cid[src_index]
@@ -222,57 +211,70 @@ cdef class ZOrderGPUNNPS(GPUNNPS):
             self.overflow_cid_to_idx.resize(max(1, 27 * overflow_size))
             self.overflow_cid_to_idx.fill(-1)
 
-            fill_overflow_map = self.helper.get_kernel("fill_overflow_map")
+            fill_overflow_map_knl = get_elwise(fill_overflow_map, self.backend)
 
             dst_gpu = self.dst.pa.gpu
-            fill_overflow_map(self.dst_to_src.dev,
-                    self.cid_to_idx[dst_index].dev, dst_gpu.x.dev, dst_gpu.y.dev,
-                    dst_gpu.z.dev, self.src.get_number_of_particles(),
-                    self.cell_size,
-                    self.make_vec(self.xmin[0], self.xmin[1],
-                        self.xmin[2]),
-                    self.pid_keys[src_index].dev, self.pids[dst_index].dev,
-                    self.overflow_cid_to_idx.dev,
-                    <unsigned int> self.max_cid[src_index])
+            fill_overflow_map_knl(self.dst_to_src,
+                    self.cid_to_idx[dst_index], dst_gpu.x, dst_gpu.y,
+                    dst_gpu.z, self.src.get_number_of_particles(),
+                    self.cell_size, self.xmin[0], self.xmin[1], self.xmin[2],
+                    self.pid_keys[src_index], self.pids[dst_index],
+                    self.overflow_cid_to_idx,
+                    np.array(self.max_cid[src_index], dtype=np.uint32))
 
 
     cdef void find_neighbor_lengths(self, nbr_lengths):
-        z_order_nbr_lengths = self.helper.get_kernel(
-                "z_order_nbr_lengths", sorted=self.sorted,
-                dst_src=self.dst_src)
+        if not self.z_order_nbr_lengths[self.dst_src]:
+            krnl_source = ZOrderLengthKernel(
+                "z_order_nbr_lengths", dst_src=self.dst_src
+            )
+
+            self.z_order_nbr_lengths[self.dst_src] = Elementwise(
+                krnl_source.function, backend=self.backend
+            )
+
+        knl = self.z_order_nbr_lengths[self.dst_src]
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbr_lengths(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
-                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
-                src_gpu.h.dev,
-                self.make_vec(self.xmin[0], self.xmin[1],
-                    self.xmin[2]), self.src.get_number_of_particles(),
-                self.pid_keys[self.src_index].dev,
-                self.pids[self.dst_index].dev,
-                self.pids[self.src_index].dev,
-                self.max_cid[self.src_index], self.cids[self.dst_index].dev,
-                self.cid_to_idx[self.src_index].dev,
-                self.overflow_cid_to_idx.dev, self.dst_to_src.dev,
-                nbr_lengths.dev, self.radius_scale2, self.cell_size)
+        knl(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h,
+                self.xmin[0], self.xmin[1], self.xmin[2],
+                self.src.get_number_of_particles(),
+                self.pid_keys[self.src_index],
+                self.pids[self.dst_index],
+                self.pids[self.src_index],
+                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.cid_to_idx[self.src_index],
+                self.overflow_cid_to_idx, self.dst_to_src,
+                self.radius_scale2, self.cell_size, nbr_lengths)
+
+
 
     cdef void find_nearest_neighbors_gpu(self, nbrs, start_indices):
-        z_order_nbrs = self.helper.get_kernel(
-                "z_order_nbrs", sorted=self.sorted,
-                dst_src=self.dst_src)
+        if not self.z_order_nbrs[self.dst_src]:
+            krnl_source = ZOrderNbrsKernel(
+                "z_order_nbrs", dst_src=self.dst_src
+            )
+
+            self.z_order_nbrs[self.dst_src] = Elementwise(
+                krnl_source.function, backend=self.backend
+            )
+
+        knl = self.z_order_nbrs[self.dst_src]
 
         dst_gpu = self.dst.pa.gpu
         src_gpu = self.src.pa.gpu
-        z_order_nbrs(dst_gpu.x.dev, dst_gpu.y.dev, dst_gpu.z.dev,
-                dst_gpu.h.dev, src_gpu.x.dev, src_gpu.y.dev, src_gpu.z.dev,
-                src_gpu.h.dev,
-                self.make_vec(self.xmin[0], self.xmin[1],
-                    self.xmin[2]),
+        knl(dst_gpu.x, dst_gpu.y, dst_gpu.z,
+                dst_gpu.h, src_gpu.x, src_gpu.y, src_gpu.z,
+                src_gpu.h,
+                self.xmin[0], self.xmin[1], self.xmin[2],
                 self.src.get_number_of_particles(),
-                self.pid_keys[self.src_index].dev,
-                self.pids[self.dst_index].dev,
-                self.pids[self.src_index].dev,
-                self.max_cid[self.src_index], self.cids[self.dst_index].dev,
-                self.cid_to_idx[self.src_index].dev,
-                self.overflow_cid_to_idx.dev, self.dst_to_src.dev,
-                start_indices.dev, nbrs.dev, self.radius_scale2, self.cell_size)
+                self.pid_keys[self.src_index],
+                self.pids[self.dst_index],
+                self.pids[self.src_index],
+                self.max_cid[self.src_index], self.cids[self.dst_index],
+                self.cid_to_idx[self.src_index],
+                self.overflow_cid_to_idx, self.dst_to_src,
+                self.radius_scale2, self.cell_size, start_indices, nbrs)
