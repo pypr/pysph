@@ -24,7 +24,7 @@ from traits.api import (Any, Array, Dict, HasTraits, Instance,  # noqa: E402
     on_trait_change, List, Str, Int, Range, Float, Bool, Button,
     Directory, Event, Password, Property, cached_property)
 from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
-    EnumEditor, TitleEditor, HGroup, ShellEditor)  # noqa: E402
+    EnumEditor, HGroup, ShellEditor)  # noqa: E402
 from mayavi.core.api import PipelineBase  # noqa: E402
 from mayavi.core.ui.api import (
     MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
@@ -252,6 +252,14 @@ class ParticleArrayHelper(HasTraits):
     # The active scalar to view.
     scalar = Str('rho', desc='name of the active scalar to view')
 
+    # Formula to use for scalar.
+    formula = Str('', enter_set=True, auto_set=False,
+                  desc='formula to use for scalar (you may use np/numpy)')
+
+    # Scalar range to use.
+    range = Str('', enter_set=True, auto_set=False,
+                desc='scalar range to display (enter a tuple)')
+
     # The mlab scalar plot for this particle array.
     plot = Instance(PipelineBase)
 
@@ -272,8 +280,19 @@ class ParticleArrayHelper(HasTraits):
     # Sync'd trait with the dataset to turn on/off visibility.
     visible = Bool(True, desc='if the particle array is to be displayed')
 
+    # Sync'd trait for point size
+    point_size = Float(6.0, enter_set=True, auto_set=False,
+                       desc='the point size of the particles')
+
+    # Sync'd trait for point size
+    opacity = Float(1.0, enter_set=True, auto_set=False,
+                    desc='the opacity of the particles')
+
     # Show the time of the simulation on screen.
     show_time = Bool(False, desc='if the current time is displayed')
+
+    # Edit the colors and legends
+    edit_colors = Button('Edit colors ...')
 
     # Edit the scalars.
     edit_scalars = Button('More options ...')
@@ -309,25 +328,33 @@ class ParticleArrayHelper(HasTraits):
     # arrays.
     _old_visible = Bool(True)
 
+    # The namespace in which we evaluate any formulae.
+    _eval_ns = Dict()
+
     ########################################
     # View related code.
     view = View(
-        Item(name='name',
-             show_label=False,
-             editor=TitleEditor()),
         Group(
             Group(
                 Group(
                     Item(name='visible'),
-                    Item(name='show_legend'),
+                    Item(name='show_legend', label='Legend'),
                     Item(name='scalar',
                          editor=EnumEditor(name='scalar_list')),
-                    Item(name='list_all_scalars'),
-                    Item(name='show_time'),
+                    Item(name='list_all_scalars', label='All scalars'),
+                    Item(name='show_time', label='Time'),
                     Item(name='component', enabled_when='stride > 1'),
+                    Item(name='formula'),
+                    Item(name='range'),
+                    Item(name='point_size'),
+                    Item(name='opacity'),
                     columns=2,
                 ),
-                Item(name='edit_scalars', show_label=False),
+                Group(
+                    Item(name='edit_scalars', show_label=False),
+                    Item(name='edit_colors', show_label=False),
+                    columns=2,
+                ),
                 label='Scalars',
             ),
             Group(
@@ -361,9 +388,24 @@ class ParticleArrayHelper(HasTraits):
                 pa.add_output_arrays(['vmag'])
             self.updated = True
 
+    def _eval_formula(self):
+        if len(self.formula) > 0:
+            try:
+                array = eval(self.formula, self._eval_ns)
+            except Exception:
+                return None
+            else:
+                return array
+        else:
+            return None
+
     def _get_scalar(self, pa, scalar):
         """Return the requested scalar from the given particle array.
         """
+        array = self._eval_formula()
+        if array is not None:
+            return array
+
         if scalar in self.extra_scalars:
             method_name = '_add_' + scalar
             method = getattr(self, method_name)
@@ -381,12 +423,18 @@ class ParticleArrayHelper(HasTraits):
     def _edit_scalars_fired(self):
         self.plot.edit_traits()
 
+    def _edit_colors_fired(self):
+        self.plot.module_manager.scalar_lut_manager.edit_traits()
+
     def _edit_vectors_fired(self):
         self.plot_vectors.edit_traits()
 
     def _particle_array_changed(self, old, pa):
         self.name = pa.name
 
+        self._eval_ns = {k: v.get_npy_array()
+                         for k, v in pa.properties.items()}
+        self._eval_ns.update(dict(np=numpy, numpy=numpy))
         self._list_all_scalars_changed(self.list_all_scalars)
 
         # Update the plot.
@@ -412,6 +460,8 @@ class ParticleArrayHelper(HasTraits):
                     data_name=self.scalar)
             self.sync_trait('visible', p, mutual=True)
             self.sync_trait('show_legend', scm, mutual=True)
+            self.sync_trait('point_size', p.actor.property, mutual=True)
+            self.sync_trait('opacity', p.actor.property, mutual=True)
             # set_arrays(p.mlab_source.m_data, pa)
             self.plot = p
         elif not empty:
@@ -442,13 +492,33 @@ class ParticleArrayHelper(HasTraits):
         # Setup the time.
         self._show_time_changed(self.show_time)
 
+    def _range_changed(self, value):
+        scm = self.plot.module_manager.scalar_lut_manager
+        try:
+            rng = eval(value)
+        except Exception:
+            rng = None
+
+        if rng is not None and len(rng) == 2:
+            scm.use_default_range = False
+            scm.data_range = rng
+        else:
+            scm.use_default_range = True
+
+    def _formula_changed(self, value):
+        self._scalar_changed(self.scalar)
+
     def _scalar_changed(self, value):
         p = self.plot
         if p is not None:
             p.mlab_source.scalars = self._get_scalar(
                 self.particle_array, value
             )
-            p.module_manager.scalar_lut_manager.data_name = value
+            if len(self.formula) > 0:
+                name = self.formula
+            else:
+                name = value
+            p.module_manager.scalar_lut_manager.data_name = name
 
     def _component_changed(self, value):
         self._scalar_changed(self.scalar)
@@ -484,17 +554,19 @@ class ParticleArrayHelper(HasTraits):
                 txt.visible = False
 
     def _get_vectors_for_plot(self, vectors):
-        pa = self.particle_array
         comps = [x.strip() for x in vectors.split(',')]
+        namespace = self._eval_ns
         if len(comps) == 3:
             try:
-                vec = pa.get(*comps, only_real_particles=False)
-            except AttributeError:
+                vec = [eval(c, namespace) for c in comps]
+            except Exception:
                 return None
             else:
                 return vec
 
     def _vectors_changed(self, value):
+        if self.plot_vectors is None:
+            return
         vec = self._get_vectors_for_plot(value)
         if vec is not None:
             self.plot.mlab_source.set(
@@ -597,7 +669,7 @@ class MayaviViewer(HasTraits):
     ########################################
     # Timer traits.
     timer = Instance(Timer)
-    interval = Range(0.5, 20.0, 2.0,
+    interval = Float(2.0, enter_set=True, auto_set=False,
                      desc='frequency in seconds with which plot is updated')
 
     ########################################
@@ -626,24 +698,29 @@ class MayaviViewer(HasTraits):
                   Group(
                     Group(
                         Group(
-                            Item(name='directory'),
-                            Item(name='current_file'),
-                            Item(name='file_count'),
+                            Group(
+                                Item(name='directory'),
+                                Item(name='current_file'),
+                                Item(name='file_count'),
+                                padding=0,
+                            ),
                             HGroup(Item(name='play'),
                                    Item(name='play_delay',
-                                        label='Delay',
-                                        resizable=True),
+                                        label='Delay'),
                                    Item(name='loop'),
                                    Item(name='update_files',
                                         show_label=False),
-                                   padding=0),
+                                   padding=0,
+                            ),
                             padding=0,
                             label='Saved Data',
                             selected=True,
                             enabled_when='not live_mode',
                             ),
                         Group(
-                            Item(name='live_mode'),
+                            Group(
+                                Item(name='live_mode'),
+                            ),
                             Group(
                                 Item(name='host'),
                                 Item(name='port'),
@@ -652,19 +729,22 @@ class MayaviViewer(HasTraits):
                             ),
                             label='Connection',
                         ),
-                        layout='tabbed'
+                        layout='tabbed',
                     ),
                     Group(
                         Group(
-                              Item(name='current_time'),
-                              Item(name='time_step'),
-                              Item(name='iteration'),
+                              Item(name='current_time', style='readonly',
+                                   format_str='%.4e'),
                               Item(name='pause_solver',
                                    enabled_when='live_mode'
                                    ),
+                              Item(name='iteration', style='readonly'),
                               Item(name='interval',
-                                   enabled_when='not live_mode'
+                                   enabled_when='live_mode'
                                    ),
+                              Item(name='time_step', style='readonly',
+                                   format_str='%.4e'),
+                              columns=2,
                               label='Solver',
                              ),
                         Group(
