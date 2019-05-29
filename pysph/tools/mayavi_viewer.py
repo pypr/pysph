@@ -669,7 +669,7 @@ class MayaviViewer(HasTraits):
     ########################################
     # Timer traits.
     timer = Instance(Timer)
-    interval = Float(2.0, enter_set=True, auto_set=False,
+    interval = Float(5.0, enter_set=True, auto_set=False,
                      desc='frequency in seconds with which plot is updated')
 
     ########################################
@@ -704,13 +704,14 @@ class MayaviViewer(HasTraits):
                                 Item(name='file_count'),
                                 padding=0,
                             ),
-                            HGroup(Item(name='play'),
-                                   Item(name='play_delay',
-                                        label='Delay'),
-                                   Item(name='loop'),
-                                   Item(name='update_files',
-                                        show_label=False),
-                                   padding=0,
+                            HGroup(
+                                Item(name='play'),
+                                Item(name='play_delay',
+                                     label='Delay'),
+                                Item(name='loop'),
+                                Item(name='update_files',
+                                     show_label=False),
+                                padding=0,
                             ),
                             padding=0,
                             label='Saved Data',
