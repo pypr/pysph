@@ -12,6 +12,7 @@ import math
 import numpy
 import os
 import os.path
+import time
 
 if not os.environ.get('ETS_TOOLKIT'):
     # Set the default toolkit to qt4 unless the user has explicitly
@@ -340,6 +341,7 @@ class ParticleArrayHelper(HasTraits):
                     Item(name='visible'),
                     Item(name='show_legend', label='Legend'),
                     Item(name='scalar',
+                         enabled_when='len(formula) == 0',
                          editor=EnumEditor(name='scalar_list')),
                     Item(name='list_all_scalars', label='All scalars'),
                     Item(name='show_time', label='Time'),
@@ -672,8 +674,10 @@ class MayaviViewer(HasTraits):
     ########################################
     # Timer traits.
     timer = Instance(Timer)
-    interval = Float(5.0, enter_set=True, auto_set=False,
-                     desc='frequency in seconds with which plot is updated')
+    interval = Float(
+        5.0, enter_set=True, auto_set=False,
+        desc='suggested frequency in seconds with which plot is updated'
+    )
 
     ########################################
     # Solver info/control.
@@ -694,6 +698,8 @@ class MayaviViewer(HasTraits):
     _solver_data = Any
     _file_name = Str
     _particle_array_updated = Bool
+    _doing_update = Bool(False)
+    _poll_interval = Float(5.0)
 
     ########################################
     # The layout of the dialog created
@@ -803,13 +809,13 @@ class MayaviViewer(HasTraits):
         # Just accessing the timer will start it.
         t = self.timer
         if not t.IsRunning():
-            t.Start(int(self.interval*1000))
+            t.Start(int(self._poll_interval*1000))
 
     @on_trait_change('scene:activated')
     def update_plot(self):
 
         # No need to do this if files are being used.
-        if not self.live_mode:
+        if self._doing_update or not self.live_mode:
             return
 
         # do not update if solver is paused
@@ -823,21 +829,30 @@ class MayaviViewer(HasTraits):
         if controller is None:
             return
 
-        self.current_time = t = controller.get_t()
-        self.time_step = controller.get_dt()
-        self.iteration = controller.get_count()
+        try:
+            start = time.time()
+            self._doing_update = True
+            self.current_time = t = controller.get_t()
+            self.time_step = controller.get_dt()
+            self.iteration = controller.get_count()
 
-        arrays = []
-        for idx, name in enumerate(self.pa_names):
-            pa = controller.get_named_particle_array(name)
-            arrays.append(pa)
-            pah = self.particle_arrays[idx]
-            pah.set(particle_array=pa, time=t)
+            arrays = []
+            for idx, name in enumerate(self.pa_names):
+                pa = controller.get_named_particle_array(name)
+                arrays.append(pa)
+                pah = self.particle_arrays[idx]
+                pah.set(particle_array=pa, time=t)
 
-        self.interpolator.particle_arrays = arrays
+            self.interpolator.particle_arrays = arrays
 
-        if self.record:
-            self._do_snap()
+            total = time.time() - start
+            if total*3 > self._poll_interval or total*5 < self._poll_interval:
+                self._poll_interval = max(3*total, self.interval)
+                self._interval_changed(self._poll_interval)
+            if self.record:
+                self._do_snap()
+        finally:
+            self._doing_update = False
 
     def run_script(self, path):
         """Execute a script in the namespace of the viewer.
@@ -950,6 +965,7 @@ class MayaviViewer(HasTraits):
             for x in self.pa_names
         ]
         self.interpolator = InterpolatorView(scene=self.scene)
+        do_later(self.update_plot)
 
         output_dir = self.client.controller.get_output_directory()
         config_file = os.path.join(output_dir, 'mayavi_config.py')
@@ -973,10 +989,11 @@ class MayaviViewer(HasTraits):
             return
         if t.IsRunning():
             t.Stop()
-            t.Start(int(value*1000))
+            interval = max(value, self._poll_interval)
+            t.Start(int(interval*1000))
 
     def _timer_default(self):
-        return Timer(int(self.interval*1000), self._timer_event)
+        return Timer(int(self._poll_interval*1000), self._timer_event)
 
     def _pause_solver_changed(self, value):
         if self.live_mode:
@@ -1015,7 +1032,7 @@ class MayaviViewer(HasTraits):
         else:
             if not t.IsRunning():
                 t.Stop()
-                t.Start(self.interval*1000)
+                t.Start(self._poll_interval*1000)
 
     def _file_count_changed(self, value):
         # Save out any updates for the previous file if needed.
