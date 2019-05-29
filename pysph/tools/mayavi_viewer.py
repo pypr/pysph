@@ -28,7 +28,7 @@ from traitsui.api import (View, Item, Group, Handler, HSplit, ListEditor,
 from mayavi.core.api import PipelineBase  # noqa: E402
 from mayavi.core.ui.api import (
     MayaviScene, SceneEditor, MlabSceneModel)  # noqa: E402
-from pyface.timer.api import Timer, do_later  # noqa: E402
+from pyface.timer.api import Timer, do_later, do_after  # noqa: E402
 from tvtk.api import tvtk  # noqa: E402
 from tvtk.array_handler import array2vtk  # noqa: E402
 
@@ -644,9 +644,12 @@ class MayaviViewer(HasTraits):
                                  'or from saved files')
 
     shell = Button('Launch Python Shell')
-    host = Str('localhost', desc='machine to connect to')
-    port = Int(8800, desc='port to use to connect to solver')
-    authkey = Password('pysph', desc='authorization key')
+    host = Str('localhost', enter_set=True, auto_set=False,
+               desc='machine to connect to')
+    port = Int(8800, enter_set=True, auto_set=False,
+               desc='port to use to connect to solver')
+    authkey = Password('pysph', enter_set=True, auto_set=False,
+                       desc='authorization key')
     host_changed = Bool(True)
     client = Instance(MultiprocessingClient)
     controller = Property(depends_on='live_mode, host_changed')
@@ -839,6 +842,11 @@ class MayaviViewer(HasTraits):
     def run_script(self, path):
         """Execute a script in the namespace of the viewer.
         """
+        pas = self.particle_arrays
+        if len(pas) == 0 or pas[0].plot is None:
+            do_after(2000, self.run_script, path)
+            return
+
         with open(path) as fp:
             data = fp.read()
             ns = self._get_shell_namespace()
@@ -1279,7 +1287,7 @@ def main(args=None):
         try:
             val = eval(arg, math.__dict__)
             # this will fail if arg is a string.
-        except NameError:
+        except Exception:
             val = arg
         kw[key] = val
 
