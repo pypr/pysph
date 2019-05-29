@@ -942,9 +942,15 @@ class MayaviViewer(HasTraits):
             for x in self.pa_names
         ]
         self.interpolator = InterpolatorView(scene=self.scene)
-        # Turn on the legend for the first particle array.
-        if len(self.particle_arrays) > 0:
-            self.particle_arrays[0].set(show_legend=True, show_time=True)
+
+        output_dir = self.client.controller.get_output_directory()
+        config_file = os.path.join(output_dir, 'mayavi_config.py')
+        if os.path.exists(config_file):
+            do_later(self.run_script, config_file)
+        else:
+            # Turn on the legend for the first particle array.
+            if len(self.particle_arrays) > 0:
+                self.particle_arrays[0].set(show_legend=True, show_time=True)
 
     def _timer_event(self):
         # catch all Exceptions else timer will stop
