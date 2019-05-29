@@ -65,6 +65,16 @@ def set_arrays(dataset, particle_array):
     dataset._update_data()
 
 
+def get_files_in_dir(pth):
+    '''Get the files in a given directory.
+    '''
+    _files = glob.glob(os.path.join(pth, '*.hdf5'))
+    if len(_files) == 0:
+        _files = glob.glob(os.path.join(pth, '*.npz'))
+        _files = [x for x in _files if os.path.basename(x) != 'results.npz']
+    return _files
+
+
 def glob_files(fname):
     """Glob for all similar files given one of them.
 
@@ -1137,8 +1147,7 @@ class MayaviViewer(HasTraits):
                     mlab=self.scene.mlab)
 
     def _directory_changed(self, d):
-        ext = os.path.splitext(self.files[-1])[1]
-        files = glob.glob(os.path.join(d, '*' + ext))
+        files = get_files_in_dir(d)
         if len(files) > 0:
             self._clear()
             sort_file_list(files)
@@ -1289,9 +1298,7 @@ def main(args=None):
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
-                _files = glob.glob(os.path.join(arg, '*.hdf5'))
-                if len(_files) == 0:
-                    _files = glob.glob(os.path.join(arg, '*.npz'))
+                _files = get_files_in_dir(arg)
                 files.extend(_files)
                 config_file = os.path.join(arg, 'mayavi_config.py')
                 if os.path.exists(config_file):
