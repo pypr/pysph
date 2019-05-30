@@ -11,7 +11,6 @@ from pysph.sph.integrator_step import IntegratorStep
 from pysph.sph.equation import Equation, Group, MultiStageEquations
 
 
-
 def get_particle_array_isph(constants=None, **props):
     isph_props = [
         'u0', 'v0', 'w0', 'x0', 'y0', 'z0', 'rho0', 'diag', 'odiag',
@@ -598,7 +597,8 @@ class ISPHScheme(Scheme):
                 )
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
-                eq2.append(VelocityDivergence(dest=fluid, sources=self.fluids))
+                eq2.append(VelocityDivergence(dest=fluid,
+                           sources=self.fluid_with_io))
                 if self.solids:
                     eq2.append(
                         VelocityDivergenceSolid(fluid, sources=self.solids)
@@ -613,6 +613,12 @@ class ISPHScheme(Scheme):
                 real=False
             )
             solver_eqns = [ghost_eqns]
+
+        iom = self.inlet_outlet_manager
+        if iom is not None:
+            io_eqs = iom.get_equations(self)
+            for grp in io_eqs:
+                solver_eqns.append(grp)
 
         if all_solids:
             g3 = self._get_pressure_bc()
@@ -672,12 +678,11 @@ class ISPHScheme(Scheme):
             g0 = self._get_velocity_bc()
             stg2.append(g0)
 
+        stg2.extend(self._get_ppe(self.variant))
+
         if iom is not None:
             io_eqs = iom.get_equations(self)
-            for grp in io_eqs:
-                stg2.append(grp)
-
-        stg2.extend(self._get_ppe(self.variant))
+            stg2.extend(io_eqs)
 
         if all_solids:
             g3 = self._get_pressure_bc()
