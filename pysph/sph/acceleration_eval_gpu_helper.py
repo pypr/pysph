@@ -239,7 +239,6 @@ class GPUAccelerationEval(object):
 
     def _converged(self, equations):
         for eq in equations:
-            self._sync_from_gpu(eq)
             if not (eq.converged() > 0):
                 return False
         return True
