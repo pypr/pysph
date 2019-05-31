@@ -598,7 +598,7 @@ class ISPHScheme(Scheme):
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
                 eq2.append(VelocityDivergence(dest=fluid,
-                           sources=self.fluid_with_io))
+                           sources=self.fluid_with_io+self.inviscid_solids))
                 if self.solids:
                     eq2.append(
                         VelocityDivergenceSolid(fluid, sources=self.solids)
@@ -625,7 +625,7 @@ class ISPHScheme(Scheme):
             solver_eqns.append(g3)
 
         eq3 = []
-        for fluid in self.fluids:
+        for fluid in self.fluid_with_io:
             eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
             eq3.append(
                 PPESolve(
