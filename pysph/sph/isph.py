@@ -17,7 +17,7 @@ def get_particle_array_isph(constants=None, **props):
         'pk', 'rhs', 'pdiff', 'wg', 'vf', 'vg', 'ug', 'wij', 'wf', 'uf',
         'V', 'au', 'av', 'aw', 'dt_force', 'dt_cfl', 'vmag',
         'auhat', 'avhat', 'awhat', 'p0', 'uhat', 'vhat', 'what',
-        'uhat0', 'vhat0', 'what0'
+        'uhat0', 'vhat0', 'what0', 'pabs'
     ]
 
     pa = get_particle_array(
@@ -228,7 +228,7 @@ class PPESolve(Equation):
         super(PPESolve, self).__init__(dest, sources)
 
     def post_loop(self, d_idx, d_p, d_pk, d_rhs, d_odiag, d_diag, d_pdiff, d_V,
-                  d_m):
+                  d_m, d_pabs):
         omega = self.omega
         rho = d_V[d_idx] * d_m[d_idx] / self.rho0
         if rho < self.rho_cutoff:
@@ -238,14 +238,25 @@ class PPESolve(Equation):
             p = omega * pnew + (1.0 - omega) * d_pk[d_idx]
 
         d_pdiff[d_idx] = abs(p - d_pk[d_idx])
+        d_pabs[d_idx] = abs(p)
         d_p[d_idx] = p
         d_pk[d_idx] = p
 
     def reduce(self, dst, t, dt):
-        pdiff = dst.pdiff.mean()
-        pmean = numpy.abs(dst.p).mean()
-        conv = pdiff/abs(pmean)
-        self.conv = 1 if conv < self.tolerance else -1
+        if dst.gpu is not None:
+            from compyle.array import sum
+            n = dst.gpu.p.length
+            pdiff = sum(dst.gpu.pdiff, dst.backend) / n
+            pmean = sum(dst.gpu.pabs, dst.backend) / n
+            conv = pdiff/pmean
+            self.conv = 1 if conv < self.tolerance else -1
+            # print(pdiff, pmean, conv, self.tolerance, self.conv)
+        else:
+            pdiff = dst.pdiff.mean()
+            pmean = numpy.abs(dst.p).mean()
+            conv = pdiff/pmean
+            self.conv = 1 if conv < self.tolerance else -1
+            # print(pdiff, pmean, conv, self.tolerance, self.conv)
 
     def converged(self):
         return self.conv
@@ -537,14 +548,17 @@ class ISPHScheme(Scheme):
 
         eq = []
         for fluid in self.fluids:
-            if variant.endswith('DI'):
-                eq.append(
-                    MomentumEquationViscosity(fluid, sources=all, nu=self.nu)
-                )
-            else:
-                eq.append(
-                    LaminarViscosity(fluid, sources=self.fluids, nu=self.nu)
-                )
+            if self.nu > 0.0:
+                if variant.endswith('DI'):
+                    eq.append(
+                        MomentumEquationViscosity(fluid, sources=all,
+                                                  nu=self.nu)
+                    )
+                else:
+                    eq.append(
+                        LaminarViscosity(fluid, sources=self.fluids,
+                                         nu=self.nu)
+                    )
             if self.alpha > 0.0:
                 eq.append(
                     # FIXME: All sources?
@@ -640,7 +654,7 @@ class ISPHScheme(Scheme):
 
         stg.append(
             Group(
-                equations=solver_eqns, iterate=True, max_iterations=100,
+                equations=solver_eqns, iterate=True, max_iterations=1000,
                 min_iterations=2
             )
         )
