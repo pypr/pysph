@@ -418,6 +418,21 @@ class Equation(object):
         """
         return 1.0
 
+    def _pull(self, *args):
+        """Pull attributes from the GPU if needed.
+
+        The GPU reduce and converged methods run on the host and not on
+        the device and this is useful to call there.  This is not useful
+        on the CPU as this does not matter which is why this is a
+        private method.
+        """
+        if hasattr(self, '_gpu'):
+            ary = self._gpu.get()
+            if len(args) == 0:
+                args = ary.dtype.names
+            for arg in args:
+                setattr(self, arg, ary[arg][0])
+
 
 ###############################################################################
 # `Group` class.
