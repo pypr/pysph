@@ -893,7 +893,7 @@ class OpenCLGroup(Group):
             modified_classes = self._update_for_local_memory(predefined, eqs)
 
         code_gen = self._Converter_Class(known_types=predefined)
-        ignore = ['reduce']
+        ignore = ['reduce', 'converged']
         for cls in sorted(classes.keys()):
             src = code_gen.parse_instance(eqs[cls], ignore_methods=ignore)
             wrappers.append(src)
