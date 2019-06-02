@@ -162,6 +162,11 @@ class MomentumEquationBodyForce(Equation):
         self.gz = gz
         super(MomentumEquationBodyForce, self).__init__(dest, sources)
 
+    def initialize(self, d_idx, d_au, d_av, d_aw):
+        d_au[d_idx] = 0.0
+        d_av[d_idx] = 0.0
+        d_aw[d_idx] = 0.0
+
     def post_loop(self, d_idx, d_au, d_av, d_aw):
         d_au[d_idx] += self.gx
         d_av[d_idx] += self.gy
@@ -396,6 +401,54 @@ class GTVFAcceleration(Equation):
         d_avhat[d_idx] += tmp * dwijhat[1]
         d_awhat[d_idx] += tmp * dwijhat[2]
 
+    def post_loop(self, d_auhat, d_avhat, d_awhat, d_idx, d_h, dt):
+        max_dist = 0.25*d_h[d_idx]
+        dt2b2 = dt*dt*0.5
+        dist = abs(d_auhat[d_idx]) + abs(d_avhat[d_idx]) + abs(d_awhat[d_idx])
+        if dist*dt2b2 > max_dist:
+            fac = max_dist/dist
+            d_auhat[d_idx] *= fac
+            d_avhat[d_idx] *= fac
+            d_awhat[d_idx] *= fac
+
+
+class SmoothedVelocity(Equation):
+    def initialize(self, d_ax, d_ay, d_az, d_idx):
+        d_ax[d_idx] = 0.0
+        d_ay[d_idx] = 0.0
+        d_az[d_idx] = 0.0
+
+    def loop(self, d_ax, d_ay, d_az, d_idx, s_uhat, s_vhat, s_what, s_idx, s_m,
+             s_rho, WIJ):
+        fac = s_m[s_idx]*WIJ / s_rho[s_idx]
+        d_ax[d_idx] += fac*s_uhat[s_idx]
+        d_ay[d_idx] += fac*s_vhat[s_idx]
+        d_az[d_idx] += fac*s_what[s_idx]
+
+
+class SolidWallNoSlipBC(Equation):
+    def __init__(self, dest, sources, nu):
+        self.nu = nu
+        super(SolidWallNoSlipBC, self).__init__(dest, sources)
+
+    def loop(self, d_idx, s_idx, d_m, d_rho, s_rho, s_m,
+             d_u, d_v, d_w,
+             d_au, d_av, d_aw,
+             s_ug, s_vg, s_wg,
+             DWIJ, R2IJ, EPS, XIJ):
+        mj = s_m[s_idx]
+        rhoi = d_rho[d_idx]
+        rhoj = s_rho[s_idx]
+        rhoij1 = 1.0/(rhoi + rhoj)
+
+        Fij = XIJ[0]*DWIJ[0] + XIJ[1]*DWIJ[1] + XIJ[2]*DWIJ[2]
+
+        tmp = mj * 4 * self.nu * rhoij1 * Fij/(R2IJ + EPS)
+
+        d_au[d_idx] += tmp * (d_u[d_idx] - s_ug[s_idx])
+        d_av[d_idx] += tmp * (d_v[d_idx] - s_vg[s_idx])
+        d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
+
 
 class ISPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha=0.0, beta=0.0,
@@ -547,7 +600,7 @@ class ISPHScheme(Scheme):
     def _get_viscous_eqns(self, variant):
         from pysph.sph.wc.transport_velocity import (
             MomentumEquationViscosity, MomentumEquationArtificialViscosity,
-            SummationDensity, SolidWallNoSlipBC)
+            SummationDensity)
         from pysph.sph.wc.viscosity import LaminarViscosity
         from pysph.sph.wc.gtvf import MomentumEquationArtificialStress
 
@@ -567,7 +620,7 @@ class ISPHScheme(Scheme):
             if self.nu > 0.0:
                 if variant.endswith('DI'):
                     eq.append(
-                        MomentumEquationViscosity(fluid, sources=all,
+                        MomentumEquationViscosity(fluid, sources=self.fluids,
                                                   nu=self.nu)
                     )
                 else:
@@ -577,18 +630,16 @@ class ISPHScheme(Scheme):
                     )
             if self.alpha > 0.0:
                 eq.append(
-                    # FIXME: All sources?
                     MomentumEquationArtificialViscosity(
                         dest=fluid, sources=self.fluids, c0=self.c0,
                         alpha=self.alpha
                     )
                 )
-            if self.gx != 0.0 or self.gy != 0.0 or self.gz != 0.0:
-                eq.append(
-                    MomentumEquationBodyForce(
-                        fluid, sources=None, gx=self.gx, gy=self.gy,
-                        gz=self.gz)
-                )
+            eq.append(
+                MomentumEquationBodyForce(
+                    fluid, sources=None, gx=self.gx, gy=self.gy,
+                    gz=self.gz)
+            )
             if self.gtvf:
                 eq.append(
                     MomentumEquationArtificialStress(
