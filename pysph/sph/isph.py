@@ -41,7 +41,7 @@ class PECIntegrator(Integrator):
 
         self.do_post_stage(0.5*dt, 1)
 
-        self.compute_accelerations(1)
+        self.compute_accelerations(1, update_nnps=False)
 
         self.stage2()
 
@@ -64,12 +64,7 @@ class ISPHStep(IntegratorStep):
         d_v0[d_idx] = d_v[d_idx]
         d_w0[d_idx] = d_w[d_idx]
 
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
-               d_aw, dt):
-        d_x[d_idx] += dt*d_u[d_idx]
-        d_y[d_idx] += dt*d_v[d_idx]
-        d_z[d_idx] += dt*d_w[d_idx]
-
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
@@ -98,15 +93,10 @@ class ISPHStep(IntegratorStep):
 
 
 class ISPHDIStep(ISPHStep):
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
-               d_aw, dt):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
-
-        d_x[d_idx] += dt*d_u[d_idx]
-        d_y[d_idx] += dt*d_v[d_idx]
-        d_z[d_idx] += dt*d_w[d_idx]
 
 
 class ISPHGTVFStep(IntegratorStep):
@@ -125,13 +115,7 @@ class ISPHGTVFStep(IntegratorStep):
         d_vhat0[d_idx] = d_vhat[d_idx]
         d_what0[d_idx] = d_what[d_idx]
 
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
-               d_aw, d_uhat, d_vhat, d_what, dt):
-        # FIXME: dtb2? or dt?
-        d_x[d_idx] += dt*d_uhat[d_idx]
-        d_y[d_idx] += dt*d_vhat[d_idx]
-        d_z[d_idx] += dt*d_what[d_idx]
-
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
@@ -164,15 +148,10 @@ class ISPHGTVFStep(IntegratorStep):
 
 
 class ISPHGTVFDIStep(ISPHGTVFStep):
-    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
-               d_aw, d_uhat, d_vhat, d_what, dt):
+    def stage1(self, d_idx, d_u, d_v, d_w, d_au, d_av, d_aw, dt):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
-
-        d_x[d_idx] += dt*d_uhat[d_idx]
-        d_y[d_idx] += dt*d_vhat[d_idx]
-        d_z[d_idx] += dt*d_what[d_idx]
 
 
 class MomentumEquationBodyForce(Equation):
