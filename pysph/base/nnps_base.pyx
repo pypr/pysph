@@ -266,9 +266,14 @@ cdef class DomainManager:
         self.backend = get_backend(backend)
         is_periodic = periodic_in_x or periodic_in_y or periodic_in_z
         is_mirror = mirror_in_x or mirror_in_y or mirror_in_z
-        if (self.backend is 'opencl' or self.backend is 'cuda') and not is_mirror:
-            from pysph.base.gpu_domain_manager import GPUDomainManager
-            domain_manager = GPUDomainManager
+        if (self.backend is 'opencl' or self.backend is 'cuda'):
+            if not is_mirror:
+                from pysph.base.gpu_domain_manager import GPUDomainManager
+                domain_manager = GPUDomainManager
+            else:
+                print("warning: mirrored boundary conditions not "
+                "supported with GPU backend, using CPUDomainManager")
+                domain_manager = CPUDomainManager
         else:
             domain_manager = CPUDomainManager
         self.manager = domain_manager(

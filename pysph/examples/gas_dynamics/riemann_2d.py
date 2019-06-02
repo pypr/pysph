@@ -1,5 +1,6 @@
-"""2-d Riemann problem (xx minutes)
+"""2-d Riemann problem (3 hours)
 
+four shock waves' interaction at the centerof the domain
 """
 
 # numpy and standard imports
@@ -248,10 +249,32 @@ class Riemann2D(Application):
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=False, pfreq=50)
 
-    def post_process():
-        pass
+    def post_process(self):
+        if len(self.output_files) < 1 or self.rank > 0:
+            return
+        try:
+            import matplotlib
+            matplotlib.use('Agg')
+            from matplotlib import pyplot
+        except ImportError:
+            print("Post processing requires matplotlib.")
+            return
+        from pysph.solver.utils import load
+        import os
+        outfile = self.output_files[-1]
+        data = load(outfile)
+        pa = data['arrays']['fluid']
+        x = pa.x
+        y = pa.y
+        pyplot.scatter(x, y, s=1)
+        pyplot.xlim((0.1, 0.6))
+        pyplot.ylim((0.1, 0.6))
+        fig = os.path.join(self.output_dir, "positions.png")
+        pyplot.savefig(fig, dpi=300)
+        pyplot.close('all')
 
 
 if __name__ == "__main__":
     app = Riemann2D()
     app.run()
+    app.post_process()

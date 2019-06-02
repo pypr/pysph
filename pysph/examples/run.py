@@ -53,6 +53,7 @@ def get_all_examples():
                ['tests', 'test_examples.py'],
                ['tests', 'test_riemann_solver.py'],
                ['gas_dynamics', 'shocktube_setup.py'],
+               ['gas_dynamics', 'riemann_2d_config.py'],
                ['sphysics', 'beach_geometry.py'],
                ['sphysics', 'periodic_rigidbody.py']]
     ignore = [os.path.abspath(os.path.join(basedir, *pth))

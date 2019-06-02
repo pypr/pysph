@@ -101,11 +101,24 @@ class WCBlastwave(Application):
         from pysph.solver.utils import load
         import os
 
+        plot_exact = False
+        plot_legends = ['pysph']
+
+        try:
+            import h5py
+            plot_exact = True
+            plot_legends.append('exact')
+        except ImportError:
+            print("h5py not found, exact data will not be plotted")
+
         fname = os.path.join(
-            os.path.dirname(__file__), 'wc_exact.npz'
+            os.path.dirname(__file__), 'wc_exact.hdf5'
         )
-        exact_data = numpy.load(fname, allow_pickle=True)
-        props = ['rho', 'u', 'p', 'e']
+        props = ["rho", "u", "p", "e"]
+        props_h5 = ["'" + pr + "'" for pr in props]
+        if plot_exact:
+            h5file = h5py.File(fname)
+            dataset = h5file['data_0']
 
         outfile = self.output_files[-1]
         data = load(outfile)
@@ -116,17 +129,19 @@ class WCBlastwave(Application):
         p = pa.p
         rho = pa.rho
         prop_vals = [rho, u, p, e]
-
         for _i, prop in enumerate(props):
             pyplot.plot(x, prop_vals[_i])
-            pyplot.scatter(
-                exact_data[prop].reshape(1)[0]['x'],
-                exact_data[prop].reshape(1)[0]['data'],
-                c='k', s=4
-                )
+            if plot_exact:
+                pyplot.scatter(
+                    dataset.get(props_h5[_i])['data_0'].get("'x'")
+                    ['data_0'][:],
+                    dataset.get(props_h5[_i])['data_0'].get("'data'")
+                    ['data_0'][:],
+                    c='k', s=4
+                    )
             pyplot.xlabel('x')
             pyplot.ylabel(props[_i])
-            pyplot.legend(['pysph', 'exact'])
+            pyplot.legend(plot_legends)
             fig = os.path.join(self.output_dir, props[_i] + ".png")
             pyplot.savefig(fig, dpi=300)
             pyplot.close('all')
