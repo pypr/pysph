@@ -448,6 +448,14 @@ class SolidWallNoSlipBC(Equation):
         d_aw[d_idx] += tmp * (d_w[d_idx] - s_wg[s_idx])
 
 
+class SummationDensity(Equation):
+    def initialize(self, d_idx, d_rho):
+        d_rho[d_idx] = 0.0
+
+    def loop(self, d_idx, s_idx, d_rho, s_m, WIJ):
+        d_rho[d_idx] += s_m[s_idx]*WIJ
+
+
 class ISPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha=0.0, beta=0.0,
                  gx=0.0, gy=0.0, gz=0.0, variant="CR", tolerance=0.05,
@@ -571,6 +579,11 @@ class ISPHScheme(Scheme):
 
         for solids in self.inviscid_solids:
             eqs.append(
+                EvaluateNumberDensity(
+                    dest=solids, sources=self.fluid_with_io
+                )
+            )
+            eqs.append(
                 NoSlipVelocityExtrapolation(
                     dest=solids, sources=self.fluid_with_io
                 )
@@ -599,8 +612,7 @@ class ISPHScheme(Scheme):
 
     def _get_viscous_eqns(self, variant):
         from pysph.sph.wc.transport_velocity import (
-            MomentumEquationViscosity, MomentumEquationArtificialViscosity,
-            SummationDensity)
+            MomentumEquationViscosity, MomentumEquationArtificialViscosity)
         from pysph.sph.wc.viscosity import LaminarViscosity
         from pysph.sph.wc.gtvf import MomentumEquationArtificialStress
 
@@ -654,8 +666,7 @@ class ISPHScheme(Scheme):
         return stg
 
     def _get_ppe(self, variant):
-        from pysph.sph.wc.transport_velocity import (SummationDensity,
-                                                     VolumeSummation)
+        from pysph.sph.wc.transport_velocity import VolumeSummation
 
         iom = self.inlet_outlet_manager
         if iom is not None:
@@ -815,4 +826,4 @@ class ISPHScheme(Scheme):
             pa = particle_arrays[solid]
             for prop in solid_props:
                 pa.add_property(prop)
-            pa.add_output_arrays(['p'])
+            pa.add_output_arrays(['p', 'ug', 'vg', 'wg'])
