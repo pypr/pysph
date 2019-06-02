@@ -610,10 +610,9 @@ class ISPHScheme(Scheme):
         all = self.fluid_with_io + self.solids + self.inviscid_solids
 
         eq, stg = [], []
-        if variant.endswith('DI'):
-            for fluid in self.fluids:
-                eq.append(SummationDensity(dest=fluid, sources=all))
-            stg.append(Group(equations=eq, real=False))
+        for fluid in self.fluids:
+            eq.append(SummationDensity(dest=fluid, sources=all))
+        stg.append(Group(equations=eq, real=False))
 
         eq = []
         for fluid in self.fluids:
@@ -665,10 +664,10 @@ class ISPHScheme(Scheme):
         all_solids = self.solids + self.inviscid_solids
 
         eq, stg = [], []
-        if self.variant.endswith('DI'):
-            for fluid in self.fluid_with_io:
-                eq.append(SummationDensity(dest=fluid, sources=all))
-            stg.append(Group(equations=eq, real=False))
+
+        for fluid in self.fluid_with_io:
+            eq.append(SummationDensity(dest=fluid, sources=all))
+        stg.append(Group(equations=eq, real=False))
 
         eq2 = []
         for fluid in self.fluid_with_io:
