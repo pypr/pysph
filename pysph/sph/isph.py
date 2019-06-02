@@ -24,6 +24,7 @@ def get_particle_array_isph(constants=None, **props):
         additional_props=isph_props, constants=constants, **props
     )
 
+    pa.add_constant('iters', [0.0])
     pa.add_output_arrays(['p', 'V', 'vmag', 'p0'])
     return pa
 
@@ -219,12 +220,14 @@ class PressureCoeffMatrixIterative(Equation):
 
 class PPESolve(Equation):
     def __init__(self, dest, sources, rho0, rho_cutoff=0.8, omega=0.5,
-                 tolerance=0.05):
+                 tolerance=0.05, max_iterations=1000):
         self.rho0 = rho0
         self.rho_cutoff = rho_cutoff
         self.conv = 0.0
         self.omega = omega
         self.tolerance = tolerance
+        self.count = 0.0
+        self.max_iterations = max_iterations
         super(PPESolve, self).__init__(dest, sources)
 
     def post_loop(self, d_idx, d_p, d_pk, d_rhs, d_odiag, d_diag, d_pdiff, d_V,
@@ -243,22 +246,33 @@ class PPESolve(Equation):
         d_pk[d_idx] = p
 
     def reduce(self, dst, t, dt):
+        self.count += 1
+        dst.iters[0] = self.count
         if dst.gpu is not None:
             from compyle.array import sum
             n = dst.gpu.p.length
             pdiff = sum(dst.gpu.pdiff, dst.backend) / n
             pmean = sum(dst.gpu.pabs, dst.backend) / n
             conv = pdiff/pmean
+            if pmean < 1.0:
+                conv = pdiff
             self.conv = 1 if conv < self.tolerance else -1
-            # print(pdiff, pmean, conv, self.tolerance, self.conv)
         else:
             pdiff = dst.pdiff.mean()
             pmean = numpy.abs(dst.p).mean()
             conv = pdiff/pmean
+            if pmean < 1.0:
+                conv = pdiff
             self.conv = 1 if conv < self.tolerance else -1
-            # print(pdiff, pmean, conv, self.tolerance, self.conv)
+            #dst.p[:] -= dst.p.mean()
+        # print(pdiff, pmean, conv, self.tolerance, self.conv)
 
     def converged(self):
+        if self.conv == 1 and self.count < self.max_iterations:
+            self.count = 0
+        if self.count > self.max_iterations:
+            self.count = 0
+            print("Max iterations exceeded")
         return self.conv
 
 
@@ -388,7 +402,8 @@ class ISPHScheme(Scheme):
                  gx=0.0, gy=0.0, gz=0.0, variant="CR", tolerance=0.05,
                  omega=0.5, hg_correction=True, has_ghosts=False,
                  inviscid_solids=None, inlet_outlet_manager=None, pref=None,
-                 gtvf=False, symmetric=False, rho_cutoff=0.8, hij_fac=0.5):
+                 gtvf=False, symmetric=False, rho_cutoff=0.8, hij_fac=0.5,
+                 max_iterations=1000):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -416,6 +431,7 @@ class ISPHScheme(Scheme):
         self.gtvf = gtvf
         self.symmetric = symmetric
         self.hij_fac = hij_fac
+        self.max_iterations = max_iterations
 
     def add_user_options(self, group):
         group.add_argument(
@@ -611,8 +627,9 @@ class ISPHScheme(Scheme):
                 )
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
-                eq2.append(VelocityDivergence(dest=fluid,
-                           sources=self.fluid_with_io+self.inviscid_solids))
+                eq2.append(VelocityDivergence(
+                    dest=fluid, sources=self.fluid_with_io+self.inviscid_solids)
+                          )
                 if self.solids:
                     eq2.append(
                         VelocityDivergenceSolid(fluid, sources=self.solids)
@@ -645,7 +662,7 @@ class ISPHScheme(Scheme):
                 PPESolve(
                     dest=fluid, sources=all, rho0=self.rho0,
                     rho_cutoff=self.rho_cutoff, tolerance=self.tolerance,
-                    omega=self.omega
+                    omega=self.omega, max_iterations=self.max_iterations
                 )
             )
         eq3 = Group(equations=eq3)
@@ -654,8 +671,8 @@ class ISPHScheme(Scheme):
 
         stg.append(
             Group(
-                equations=solver_eqns, iterate=True, max_iterations=1000,
-                min_iterations=2
+                equations=solver_eqns, iterate=True,
+                max_iterations=self.max_iterations, min_iterations=2
             )
         )
 
