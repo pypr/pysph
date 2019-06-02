@@ -94,7 +94,7 @@ class ISPHStep(IntegratorStep):
         av = (d_v[d_idx] - d_v0[d_idx])/dt
         aw = (d_w[d_idx] - d_w0[d_idx])/dt
 
-        d_dt_force[d_idx] = 2*(au*au + av*av + aw*aw)
+        d_dt_force[d_idx] = 4.0*(au*au + av*av + aw*aw)
 
 
 class ISPHDIStep(ISPHStep):
@@ -127,6 +127,7 @@ class ISPHGTVFStep(IntegratorStep):
 
     def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
                d_aw, d_uhat, d_vhat, d_what, dt):
+        # FIXME: dtb2? or dt?
         d_x[d_idx] += dt*d_uhat[d_idx]
         d_y[d_idx] += dt*d_vhat[d_idx]
         d_z[d_idx] += dt*d_what[d_idx]
@@ -137,7 +138,8 @@ class ISPHGTVFStep(IntegratorStep):
 
     def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_x0, d_y0, d_z0,
                d_au, d_av, d_aw, d_uhat, d_vhat, d_what, d_auhat, d_avhat,
-               d_awhat, d_uhat0, d_vhat0, d_what0, d_vmag, d_dt_cfl, dt):
+               d_awhat, d_uhat0, d_vhat0, d_what0, d_vmag, d_dt_cfl, dt,
+               d_u0, d_v0, d_w0, d_dt_force):
         d_u[d_idx] += dt*d_au[d_idx]
         d_v[d_idx] += dt*d_av[d_idx]
         d_w[d_idx] += dt*d_aw[d_idx]
@@ -153,6 +155,24 @@ class ISPHGTVFStep(IntegratorStep):
         d_x[d_idx] = d_x0[d_idx] + 0.5*dt * (d_uhat[d_idx] + d_uhat0[d_idx])
         d_y[d_idx] = d_y0[d_idx] + 0.5*dt * (d_vhat[d_idx] + d_vhat0[d_idx])
         d_z[d_idx] = d_z0[d_idx] + 0.5*dt * (d_what[d_idx] + d_what0[d_idx])
+
+        au = (d_u[d_idx] - d_u0[d_idx])/dt
+        av = (d_v[d_idx] - d_v0[d_idx])/dt
+        aw = (d_w[d_idx] - d_w0[d_idx])/dt
+
+        d_dt_force[d_idx] = 4*(au*au + av*av + aw*aw)
+
+
+class ISPHGTVFDIStep(ISPHGTVFStep):
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_au, d_av,
+               d_aw, d_uhat, d_vhat, d_what, dt):
+        d_u[d_idx] += dt*d_au[d_idx]
+        d_v[d_idx] += dt*d_av[d_idx]
+        d_w[d_idx] += dt*d_aw[d_idx]
+
+        d_x[d_idx] += dt*d_uhat[d_idx]
+        d_y[d_idx] += dt*d_vhat[d_idx]
+        d_z[d_idx] += dt*d_what[d_idx]
 
 
 class MomentumEquationBodyForce(Equation):
@@ -269,7 +289,6 @@ class PPESolve(Equation):
             if pmean < 1.0:
                 conv = pdiff
             self.conv = 1 if conv < self.tolerance else -1
-            #dst.p[:] -= dst.p.mean()
         # print(pdiff, pmean, conv, self.tolerance, self.conv)
 
     def converged(self):
@@ -532,10 +551,12 @@ class ISPHScheme(Scheme):
             steppers.update(extra_steppers)
 
         step_cls = ISPHStep
-        if self.variant == "DI":
-            step_cls = ISPHDIStep
         if self.gtvf:
             step_cls = ISPHGTVFStep
+        if self.variant == "DI":
+            step_cls = ISPHDIStep
+            if self.gtvf:
+                step_cls = ISPHGTVFStep
 
         for fluid in self.fluids:
             if fluid not in steppers:
