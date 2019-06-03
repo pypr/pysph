@@ -85,12 +85,13 @@ class SetWallVelocityNew(Equation):
         d_wij[d_idx] = 0.0
 
     def loop(self, d_idx, s_idx, d_uf, d_vf, d_wf,
-             s_u, s_v, s_w, d_wij, WIJ):
-        d_wij[d_idx] += WIJ
+             s_u, s_v, s_w, d_wij, XIJ, RIJ, HIJ, SPH_KERNEL):
+        wij = SPH_KERNEL.kernel(XIJ, RIJ, 0.5*HIJ)
 
-        d_uf[d_idx] += s_u[s_idx] * WIJ
-        d_vf[d_idx] += s_v[s_idx] * WIJ
-        d_wf[d_idx] += s_w[s_idx] * WIJ
+        d_wij[d_idx] += wij
+        d_uf[d_idx] += s_u[s_idx] * wij
+        d_vf[d_idx] += s_v[s_idx] * wij
+        d_wf[d_idx] += s_w[s_idx] * wij
 
     def post_loop(self, d_uf, d_vf, d_wf, d_wij, d_idx,
                   d_ug, d_vg, d_wg, d_u, d_v, d_w, d_normal):
@@ -104,15 +105,15 @@ class SetWallVelocityNew(Equation):
             d_vf[d_idx] /= d_wij[d_idx]
             d_wf[d_idx] /= d_wij[d_idx]
 
-        vn = (d_uf[d_idx]*d_normal[idx] + d_vf[d_idx]*d_normal[idx+1]
-              + d_wf[d_idx]*d_normal[idx+2])
-        if vn < 0:
-            d_uf[d_idx] -= vn*d_normal[idx]
-            d_vf[d_idx] -= vn*d_normal[idx+1]
-            d_wf[d_idx] -= vn*d_normal[idx+2]
-
         # Dummy velocities at the ghost points using Eq. (23),
         # d_u, d_v, d_w are the prescribed wall velocities.
         d_ug[d_idx] = 2*d_u[d_idx] - d_uf[d_idx]
         d_vg[d_idx] = 2*d_v[d_idx] - d_vf[d_idx]
         d_wg[d_idx] = 2*d_w[d_idx] - d_wf[d_idx]
+
+        vn = (d_ug[d_idx]*d_normal[idx] + d_vg[d_idx]*d_normal[idx+1]
+              + d_wg[d_idx]*d_normal[idx+2])
+        if vn < 0:
+            d_ug[d_idx] -= vn*d_normal[idx]
+            d_vg[d_idx] -= vn*d_normal[idx+1]
+            d_wg[d_idx] -= vn*d_normal[idx+2]
