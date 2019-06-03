@@ -238,10 +238,11 @@ class PPESolve(Equation):
                   d_m, d_pabs):
         omega = self.omega
         rho = d_V[d_idx] * d_m[d_idx] / self.rho0
-        if rho < self.rho_cutoff:
+        diag = d_diag[d_idx]
+        if abs(diag) < 1e-12 or rho < self.rho_cutoff:
             p = 0.0
         else:
-            pnew = (d_rhs[d_idx] - d_odiag[d_idx]) / d_diag[d_idx]
+            pnew = (d_rhs[d_idx] - d_odiag[d_idx]) / diag
             p = omega * pnew + (1.0 - omega) * d_pk[d_idx]
 
         d_pdiff[d_idx] = abs(p - d_pk[d_idx])
@@ -373,10 +374,11 @@ class SetPressureSolid(Equation):
 
 
 class GTVFAcceleration(Equation):
-    def __init__(self, dest, sources, pref, hij_fac=0.5):
+    def __init__(self, dest, sources, pref, hij_fac=0.5, internal_flow=False):
         self.hij_fac = hij_fac
         self.pref = pref
         assert self.pref is not None, "pref should not be None"
+        self.internal = internal_flow
         super(GTVFAcceleration, self).__init__(dest, sources)
 
     def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p):
@@ -384,7 +386,10 @@ class GTVFAcceleration(Equation):
         d_avhat[d_idx] = 0.0
         d_awhat[d_idx] = 0.0
 
-        d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
+        if self.internal:
+            d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
+        else:
+            d_p0[d_idx] = self.pref
 
     def loop(self, d_p0, s_m, s_idx, d_rho, d_idx, d_auhat, d_avhat,
              d_awhat, XIJ, RIJ, SPH_KERNEL,
@@ -459,10 +464,10 @@ class SummationDensity(Equation):
 class ISPHScheme(Scheme):
     def __init__(self, fluids, solids, dim, nu, rho0, c0, alpha=0.0, beta=0.0,
                  gx=0.0, gy=0.0, gz=0.0, variant="CR", tolerance=0.05,
-                 omega=0.5, hg_correction=True, has_ghosts=False,
+                 omega=0.5, hg_correction=False, has_ghosts=False,
                  inviscid_solids=None, inlet_outlet_manager=None, pref=None,
                  gtvf=False, symmetric=False, rho_cutoff=0.8, hij_fac=0.5,
-                 max_iterations=1000):
+                 max_iterations=1000, internal_flow=False):
         self.fluids = fluids
         self.solids = solids
         self.solver = None
@@ -491,6 +496,7 @@ class ISPHScheme(Scheme):
         self.symmetric = symmetric
         self.hij_fac = hij_fac
         self.max_iterations = max_iterations
+        self.internal_flow = internal_flow
 
     def add_user_options(self, group):
         group.add_argument(
@@ -571,8 +577,9 @@ class ISPHScheme(Scheme):
             iom.setup_iom(dim=self.dim, kernel=kernel)
 
     def _get_velocity_bc(self):
-        from pysph.sph.wc.transport_velocity import SetWallVelocity
+        # from pysph.sph.wc.transport_velocity import SetWallVelocity
         from pysph.sph.wc.edac import NoSlipVelocityExtrapolation
+        from wall_normal import SetWallVelocityNew as SetWallVelocity
 
         eqs = [SetWallVelocity(dest=s, sources=self.fluid_with_io)
                for s in self.solids]
@@ -609,6 +616,28 @@ class ISPHScheme(Scheme):
             )
 
         return Group(equations=eqs) if eqs else None
+
+    def _get_normals(self, pa):
+        from pysph.tools.sph_evaluator import SPHEvaluator
+        from wall_normal import ComputeNormals, SmoothNormals
+
+        pa.add_property('normal', stride=3)
+        pa.add_property('normal_tmp', stride=3)
+
+        name = pa.name
+
+        seval = SPHEvaluator(
+            arrays=[pa], equations=[
+                Group(equations=[
+                    ComputeNormals(dest=name, sources=[name])
+                ]),
+                Group(equations=[
+                    SmoothNormals(dest=name, sources=[name])
+                ]),
+            ],
+            dim=self.dim
+        )
+        seval.evaluate()
 
     def _get_viscous_eqns(self, variant):
         from pysph.sph.wc.transport_velocity import (
@@ -689,7 +718,8 @@ class ISPHScheme(Scheme):
             else:
                 eq2.append(VolumeSummation(dest=fluid, sources=all))
                 eq2.append(VelocityDivergence(
-                    dest=fluid, sources=self.fluid_with_io+self.inviscid_solids)
+                    dest=fluid,
+                    sources=self.fluid_with_io+self.inviscid_solids)
                           )
                 if self.solids:
                     eq2.append(
@@ -797,7 +827,8 @@ class ISPHScheme(Scheme):
             if self.gtvf:
                 eq4.append(
                     GTVFAcceleration(dest=fluid, sources=all, pref=self.pref,
-                                     hij_fac=self.hij_fac)
+                                     hij_fac=self.hij_fac,
+                                     internal_flow=self.internal_flow)
                 )
         stg2.append(Group(equations=eq4))
         return MultiStageEquations([stg1, stg2])
@@ -826,4 +857,5 @@ class ISPHScheme(Scheme):
             pa = particle_arrays[solid]
             for prop in solid_props:
                 pa.add_property(prop)
-            pa.add_output_arrays(['p', 'ug', 'vg', 'wg'])
+            self._get_normals(pa)
+            pa.add_output_arrays(['p', 'ug', 'vg', 'wg', 'normal'])
