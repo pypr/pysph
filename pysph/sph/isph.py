@@ -387,9 +387,9 @@ class GTVFAcceleration(Equation):
         d_awhat[d_idx] = 0.0
 
         if self.internal:
-            d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
-        else:
             d_p0[d_idx] = self.pref
+        else:
+            d_p0[d_idx] = min(10*abs(d_p[d_idx]), self.pref)
 
     def loop(self, d_p0, s_m, s_idx, d_rho, d_idx, d_auhat, d_avhat,
              d_awhat, XIJ, RIJ, SPH_KERNEL,
@@ -405,14 +405,44 @@ class GTVFAcceleration(Equation):
         d_awhat[d_idx] += tmp * dwijhat[2]
 
     def post_loop(self, d_auhat, d_avhat, d_awhat, d_idx, d_h, dt):
-        max_dist = 0.25*d_h[d_idx]
+        max_dist = 0.02*d_h[d_idx]
         dt2b2 = dt*dt*0.5
-        dist = abs(d_auhat[d_idx]) + abs(d_avhat[d_idx]) + abs(d_awhat[d_idx])
-        if dist*dt2b2 > max_dist:
+        dist = sqrt(d_auhat[d_idx]**2 + d_avhat[d_idx]**2 +
+                    d_awhat[d_idx]**2)*dt2b2
+        if dist > max_dist:
             fac = max_dist/dist
             d_auhat[d_idx] *= fac
             d_avhat[d_idx] *= fac
             d_awhat[d_idx] *= fac
+
+
+#class GTVFAccelerationInternal(Equation):
+class GTVFAcceleration1(Equation):
+    def __init__(self, dest, sources, pref, hij_fac=0.5):
+        self.hij_fac = hij_fac
+        self.pref = pref
+        assert self.pref is not None, "pref should not be None"
+        super(GTVFAcceleration1, self).__init__(dest, sources)
+
+    def initialize(self, d_idx, d_auhat, d_avhat, d_awhat, d_p0, d_p):
+        d_auhat[d_idx] = 0.0
+        d_avhat[d_idx] = 0.0
+        d_awhat[d_idx] = 0.0
+
+        d_p0[d_idx] = self.pref  #min(10*abs(d_p[d_idx]), self.pref)
+
+    def loop(self, d_p0, s_m, s_idx, d_rho, d_idx, d_auhat, d_avhat,
+             d_awhat, XIJ, RIJ, SPH_KERNEL,
+             HIJ, d_h, dt):
+        rhoi2 = d_rho[d_idx]*d_rho[d_idx]
+        tmp = -d_p0[d_idx] * s_m[s_idx]/rhoi2
+
+        dwijhat = declare('matrix(3)')
+        SPH_KERNEL.gradient(XIJ, RIJ, self.hij_fac*HIJ, dwijhat)
+
+        d_auhat[d_idx] += tmp * dwijhat[0]
+        d_avhat[d_idx] += tmp * dwijhat[1]
+        d_awhat[d_idx] += tmp * dwijhat[2]
 
 
 class SmoothedVelocity(Equation):
