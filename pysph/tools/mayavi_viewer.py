@@ -508,6 +508,7 @@ class ParticleArrayHelper(HasTraits):
         scm = self.plot.module_manager.scalar_lut_manager
         try:
             rng = eval(value)
+            len(rng)
         except Exception:
             rng = None
 
@@ -566,36 +567,37 @@ class ParticleArrayHelper(HasTraits):
                 txt.visible = False
 
     def _get_vectors_for_plot(self, vectors):
-        comps = [x.strip() for x in vectors.split(',')]
+        comps = vectors.split(',')
         namespace = self._eval_ns
         if len(comps) == 3:
             try:
-                vec = [eval(c, namespace) for c in comps]
+                vec = eval(vectors, namespace)
             except Exception:
                 return None
             else:
                 return vec
 
+    def _set_vector_plot_data(self, vectors):
+        vec = self._get_vectors_for_plot(vectors)
+        if vec is not None:
+            self.plot.mlab_source.vectors = numpy.column_stack(vec)
+
     def _vectors_changed(self, value):
         if self.plot_vectors is None:
             return
-        vec = self._get_vectors_for_plot(value)
-        if vec is not None:
-            self.plot.mlab_source.set(
-                vectors=numpy.c_[vec[0], vec[1], vec[2]]
-            )
+        self._set_vector_plot_data(value)
 
     def _show_vectors_changed(self, value):
         pv = self.plot_vectors
         if pv is not None:
             pv.visible = value
         elif self.plot is not None and value:
-            self._vectors_changed(self.vectors)
+            self._set_vector_plot_data(self.vectors)
             pv = self.scene.mlab.pipeline.vectors(
                 self.plot.mlab_source.m_data,
                 mask_points=self.mask_on_ratio,
                 scale_factor=self.scale_factor,
-                colormap='viridis'
+                colormap='viridis', reset_zoom=False
             )
             self.plot_vectors = pv
 
