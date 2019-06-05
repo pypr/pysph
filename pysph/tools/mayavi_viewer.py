@@ -1055,7 +1055,7 @@ class MayaviViewer(HasTraits):
         if not self.files:
             return
         # Load the new file.
-        value = min(value, len(self.files))
+        value = min(value, len(self.files) - 1)
         fname = self.files[value]
         if not os.path.exists(fname):
             print("File %s is missing, ignoring!" % fname)
@@ -1143,7 +1143,7 @@ class MayaviViewer(HasTraits):
         sort_file_list(files)
         self.files = files
         if len(files) > 0:
-            fc = min(len(files), fc)
+            fc = min(len(files) - 1, fc)
             self.file_count = fc
             if self.play:
                 self._play_changed(self.play)
@@ -1168,7 +1168,7 @@ class MayaviViewer(HasTraits):
             self._clear()
             sort_file_list(files)
             self.files = files
-            self.file_count = min(self.file_count, len(files))
+            self.file_count = min(self.file_count, len(files) - 1)
         else:
             pass
         config_file = os.path.join(d, 'mayavi_config.py')
