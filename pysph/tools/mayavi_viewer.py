@@ -229,9 +229,9 @@ class InterpolatorView(HasTraits):
                     plot = mlab.pipeline.surface(src, colormap='viridis')
                 self.plot = plot
                 scm = plot.module_manager.scalar_lut_manager
-                scm.set(show_legend=self.show_legend,
-                        use_default_name=False,
-                        data_name=self.scalar)
+                scm.trait_set(show_legend=self.show_legend,
+                              use_default_name=False,
+                              data_name=self.scalar)
                 self.sync_trait('show_legend', scm, mutual=True)
             else:
                 self.plot.visible = True
@@ -467,9 +467,9 @@ class ParticleArrayHelper(HasTraits):
             )
             p.actor.property.point_size = 6
             scm = p.module_manager.scalar_lut_manager
-            scm.set(show_legend=self.show_legend,
-                    use_default_name=False,
-                    data_name=self.scalar)
+            scm.trait_set(show_legend=self.show_legend,
+                          use_default_name=False,
+                          data_name=self.scalar)
             self.sync_trait('visible', p, mutual=True)
             self.sync_trait('show_legend', scm, mutual=True)
             self.sync_trait('point_size', p.actor.property, mutual=True)
@@ -853,7 +853,7 @@ class MayaviViewer(HasTraits):
                 pa = controller.get_named_particle_array(name)
                 arrays.append(pa)
                 pah = self.particle_arrays[idx]
-                pah.set(particle_array=pa, time=t)
+                pah.trait_set(particle_array=pa, time=t)
 
             self.interpolator.particle_arrays = arrays
 
@@ -986,7 +986,9 @@ class MayaviViewer(HasTraits):
         else:
             # Turn on the legend for the first particle array.
             if len(self.particle_arrays) > 0:
-                self.particle_arrays[0].set(show_legend=True, show_time=True)
+                self.particle_arrays[0].trait_set(
+                    show_legend=True, show_time=True
+                )
 
     def _timer_event(self):
         # catch all Exceptions else timer will stop
@@ -1023,11 +1025,12 @@ class MayaviViewer(HasTraits):
 
     def _files_changed(self, value):
         if len(value) == 0:
+            self._n_files = 0
             return
         else:
             d = os.path.dirname(os.path.abspath(value[0]))
             self.movie_directory = os.path.join(d, 'movie')
-            self.set(directory=d, trait_change_notify=False)
+            self.trait_set(directory=d, trait_change_notify=False)
         self._n_files = len(value) - 1
         self._frame_count = 0
         self._count = 0
@@ -1049,8 +1052,14 @@ class MayaviViewer(HasTraits):
     def _file_count_changed(self, value):
         # Save out any updates for the previous file if needed.
         self._handle_particle_array_updates()
+        if not self.files:
+            return
         # Load the new file.
+        value = min(value, len(self.files))
         fname = self.files[value]
+        if not os.path.exists(fname):
+            print("File %s is missing, ignoring!" % fname)
+            return
         self._file_name = fname
         self.current_file = os.path.basename(fname)
         # Code to read the file, create particle array and setup the helper.
@@ -1072,14 +1081,14 @@ class MayaviViewer(HasTraits):
                 pa = arrays[name]
                 pah = self._make_particle_array_helper(self.scene, name)
                 # Must set this after setting the scene.
-                pah.set(particle_array=pa, time=t)
+                pah.trait_set(particle_array=pa, time=t)
                 pas.append(pah)
             self.particle_arrays = pas
         else:
             for idx, name in enumerate(pa_names):
                 pa = arrays[name]
                 pah = self.particle_arrays[idx]
-                pah.set(particle_array=pa, time=t)
+                pah.trait_set(particle_array=pa, time=t)
 
         self.interpolator.particle_arrays = list(arrays.values())
 
@@ -1127,12 +1136,17 @@ class MayaviViewer(HasTraits):
 
     def _update_files_fired(self):
         fc = self.file_count
-        files = glob_files(self.files[fc])
+        if len(self.files) == 0:
+            files = get_files_in_dir(self.directory)
+        else:
+            files = glob_files(self.files[fc])
         sort_file_list(files)
         self.files = files
-        self.file_count = fc
-        if self.play:
-            self._play_changed(self.play)
+        if len(files) > 0:
+            fc = min(len(files), fc)
+            self.file_count = fc
+            if self.play:
+                self._play_changed(self.play)
 
     def _shell_fired(self):
         ns = self._get_shell_namespace()
@@ -1284,6 +1298,7 @@ def main(args=None):
     kw = {}
     files = []
     scripts = []
+    directory = None
     for arg in args:
         if '=' not in arg:
             if arg.endswith('.py'):
@@ -1300,6 +1315,7 @@ def main(args=None):
                 files.extend(glob.glob(arg))
                 continue
             elif os.path.isdir(arg):
+                directory = arg
                 _files = get_files_in_dir(arg)
                 files.extend(_files)
                 config_file = os.path.join(arg, 'mayavi_config.py')
@@ -1323,7 +1339,10 @@ def main(args=None):
     # If we set the particle arrays before the scene is activated, the arrays
     # are not displayed on screen so we use do_later to set the  files.
     m = MayaviViewer(live_mode=live_mode)
-    do_later(m.set, files=files, **kw)
+    if not directory and len(files) > 0:
+        directory = os.path.dirname(files[0])
+    m.trait_set(directory=directory, trait_change_notify=False)
+    do_later(m.trait_set, files=files, **kw)
     for script in scripts:
         do_later(m.run_script, script)
     m.configure_traits()
