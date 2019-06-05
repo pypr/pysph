@@ -4,7 +4,6 @@ import numpy as np
 from stl import mesh
 from numpy.linalg import norm
 from cyarray.api import UIntArray
-import time
 from mayavi import mlab
 
 
@@ -133,6 +132,10 @@ def _get_stl_mesh_uniform(stl_fname, dx_triangle):
     sizes = []  # contains number of points corresponding to each triangle
     for i in range(np.shape(x_list)[0]):
         sizes.append(np.shape(x_list[i])[0])
+    sizes = np.array(sizes)
+    sizes[0] = sizes[0]-1
+    for k in range(len(sizes)-1):
+        sizes[k+1] = sizes[k]+sizes[k+1]
     x = np.concatenate(x_list)
     y = np.concatenate(y_list)
     z = np.concatenate(z_list)
@@ -159,34 +162,31 @@ def _get_neighbouring_particles(pa_src, pa_dst, radius_scale, sizes):
                               radius_scale=radius_scale)
 
     nps.set_context(src_index=1, dst_index=0)
-    sizes = np.array(sizes)
-    sizes[0] = sizes[0]-1
-    for k in range(len(sizes)-1):
-        sizes[k+1] = sizes[k]+sizes[k+1]
     n = len(pa_dst.x)
     nbrs = UIntArray()
-    grid_set = []
-    size_count = 0
-    tracker = 0
-    new_sizes = []  # contains new no. of points corresponding to each triangle
-    mulitple_occur = []  # contains the triangles corresponding to every point.
+    grid_set, new_sizes, mulitple_occur = [], [], []
+    # new_sizes-contains new no. of points corresponding
+    # to each triangle
+    # multiple_occur- contains the triangles from which given point originated.
     # When finding neighbouring particles it is possible that a
-    # neighbouring point obatined might be the nearest neighbour
-    # of mulitple points corresponding to different triangles.
+    # neighbouring point obtained might be the nearest neighbour
+    # of mulitple surface points corresponding to different triangles.
+    size_count, tracker = 0, 0
     for i in range(n):
         nps.get_nearest_particles(1, 0, i, nbrs)
         neighbours = list(nbrs.get_npy_array())
         for neighbour in neighbours:
-            if neighbour in grid_set:
-                if tracker in mulitple_occur[grid_set.index(neighbour)]:
+            try:
+                index = grid_set.index(neighbour)
+                if tracker in mulitple_occur[index]:
                     pass
                 else:
-                    mulitple_occur[grid_set.index(neighbour)].append(tracker)
-            else:
+                    mulitple_occur[index].append(tracker)
+            except ValueError:
                 grid_set.append(neighbour)
                 mulitple_occur.append(list([tracker]))
-                size_count = size_count+1
-        if(i == sizes[tracker]):
+                size_count = size_count + 1
+        if i == sizes[tracker]:
             tracker = tracker+1
             new_sizes.append(size_count)
     idx = list(grid_set)
@@ -320,12 +320,9 @@ def get_stl_surface_uniform(stl_fname, dx_sph, h_sph, radius_scale=1.0,
     return xf, yf, zf
 
 
-def get_stl_surface(stl_fname, dx_sph, h_sph, radius_scale=1.0,
-                    dx_triangle=None):
+def get_stl_surface(stl_fname, dx_triangle, radius_scale=1.0):
     """ Returns coordinates of particle distribution along surface
     of stl file"""
-    if dx_triangle is None:
-        dx_triangle = 0.5 * dx_sph
 
     x, y, z = _get_stl_mesh(stl_fname, dx_triangle)
     return x, y, z
