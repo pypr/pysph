@@ -13,6 +13,7 @@ except ImportError:
 
 import os
 import shutil
+import sys
 from tempfile import mkdtemp
 
 from pysph.solver.application import Application
@@ -63,7 +64,13 @@ class TestApplication(TestCase):
         self.app = MockApp(output_dir=self.output_dir)
 
     def tearDown(self):
-        shutil.rmtree(self.output_dir)
+        if sys.platform.startswith('win'):
+            try:
+                shutil.rmtree(self.output_dir)
+            except WindowsError:
+                pass
+        else:
+            shutil.rmtree(self.output_dir)
 
     def test_user_options_when_args_are_not_passed(self):
         # Given
