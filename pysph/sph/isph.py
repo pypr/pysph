@@ -234,10 +234,10 @@ class PPESolve(Equation):
         self.max_iterations = max_iterations
         super(PPESolve, self).__init__(dest, sources)
 
-    def post_loop(self, d_idx, d_p, d_pk, d_rhs, d_odiag, d_diag, d_pdiff, d_V,
-                  d_m, d_pabs):
+    def post_loop(self, d_idx, d_p, d_pk, d_rhs, d_odiag, d_diag, d_pdiff,
+                  d_rho, d_m, d_pabs):
         omega = self.omega
-        rho = d_V[d_idx] * d_m[d_idx] / self.rho0
+        rho = d_rho[d_idx] / self.rho0
         diag = d_diag[d_idx]
         if abs(diag) < 1e-12 or rho < self.rho_cutoff:
             p = 0.0
@@ -765,27 +765,22 @@ class ISPHScheme(Scheme):
                 real=False
             )
             solver_eqns = [ghost_eqns]
-
-        iom = self.inlet_outlet_manager
-        if iom is not None:
-            io_eqs = iom.get_equations(self)
-            for grp in io_eqs:
-                solver_eqns.append(grp)
-
+        
         if all_solids:
             g3 = self._get_pressure_bc()
             solver_eqns.append(g3)
 
         eq3 = []
         for fluid in self.fluid_with_io:
-            eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
-            eq3.append(
-                PPESolve(
-                    dest=fluid, sources=all, rho0=self.rho0,
-                    rho_cutoff=self.rho_cutoff, tolerance=self.tolerance,
-                    omega=self.omega, max_iterations=self.max_iterations
+            if not fluid == 'outlet': 
+                eq3.append(PressureCoeffMatrixIterative(dest=fluid, sources=all))
+                eq3.append(
+                    PPESolve(
+                        dest=fluid, sources=all, rho0=self.rho0,
+                        rho_cutoff=self.rho_cutoff, tolerance=self.tolerance,
+                        omega=self.omega, max_iterations=self.max_iterations
+                    )
                 )
-            )
         eq3 = Group(equations=eq3)
 
         solver_eqns.append(eq3)
