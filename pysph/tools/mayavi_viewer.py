@@ -1316,11 +1316,6 @@ def main(args=None):
                 continue
             elif os.path.isdir(arg):
                 directory = arg
-                _files = get_files_in_dir(arg)
-                files.extend(_files)
-                config_file = os.path.join(arg, 'mayavi_config.py')
-                if os.path.exists(config_file):
-                    scripts.append(config_file)
                 continue
             else:
                 usage()
@@ -1334,15 +1329,16 @@ def main(args=None):
         kw[key] = val
 
     sort_file_list(files)
-    live_mode = len(files) == 0
+    live_mode = (len(files) == 0 and directory is None)
 
     # If we set the particle arrays before the scene is activated, the arrays
     # are not displayed on screen so we use do_later to set the  files.
     m = MayaviViewer(live_mode=live_mode)
-    if not directory and len(files) > 0:
-        directory = os.path.dirname(files[0])
-    m.trait_set(directory=directory, trait_change_notify=False)
-    do_later(m.trait_set, files=files, **kw)
+    if files:
+        kw['files'] = files
+    if directory:
+        kw['directory'] = directory
+    do_later(m.trait_set, **kw)
     for script in scripts:
         do_later(m.run_script, script)
     m.configure_traits()
