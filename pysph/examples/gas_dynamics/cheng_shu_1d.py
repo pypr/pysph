@@ -1,14 +1,16 @@
-"""Cheng and Shu's 1d acoustic wave propagation in 1d (1 min)
+r"""Cheng and Shu's 1d acoustic wave propagation in 1d (1 min)
 
 particles have properties according
 to the following distribuion
-\rho = \rho_0 + \Delta\rho sin(kx)
-p = 1.0
-u = 1 + 0.1sin(kx)
+.. math::
+        \rho = \rho_0 + \Delta\rho sin(kx)
+        p = 1.0
+        u = 1 + 0.1sin(kx)
 
-with \Delta\rho = 1 and k = 2\pi/\lambda
+with :math:`\Delta\rho = 1` and :math:`k = 2\pi/\lambda`
 where \lambda is the domain length.
-\rho_0 = 2, \gamma = 1.4 and p_0 = 1.0
+.. math::
+        \rho_0 = 2, \gamma = 1.4 and p_0 = 1.0
 """
 
 
@@ -19,8 +21,7 @@ import numpy
 from pysph.base.utils import get_particle_array as gpa
 from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
-from pysph.sph.scheme import \
-    GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.scheme import GSPHScheme, SchemeChooser
 
 
 class ChengShu(Application):

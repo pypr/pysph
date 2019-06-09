@@ -165,6 +165,8 @@ cdef class DomainManagerBase:
     cdef public int dim
     cdef public bint periodic_in_x, periodic_in_y, periodic_in_z
     cdef public bint is_periodic
+    cdef public bint mirror_in_x, mirror_in_y, mirror_in_z
+    cdef public bint is_mirror
 
     cdef public object props
     cdef public list copy_props
@@ -195,8 +197,20 @@ cdef class CPUDomainManager(DomainManagerBase):
     # Convenience function to add a value to a carray
     cdef _add_to_array(self, DoubleArray arr, double disp, int start=*)
 
-    # create new ghosts
+    # Convenience function to multiply a value to a carray
+    cdef _mul_to_array(self, DoubleArray arr, double val)
+
+    # Convenience function to add a carray to a carray elementwise
+    cdef _add_array_to_array(self, DoubleArray arr, DoubleArray translate)
+
+    # Convenience function to add a value to a carray
+    cdef _change_velocity(self, DoubleArray arr, double disp)
+
+    # create new periodic ghosts
     cdef _create_ghosts_periodic(self)
+
+    # create new mirror ghosts
+    cdef _create_ghosts_mirror(self)
 
     # Compute the cell size across processors. The cell size is taken
     # as max(h)*radius_scale

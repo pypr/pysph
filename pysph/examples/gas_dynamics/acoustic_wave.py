@@ -1,15 +1,17 @@
-"""Diffusion of an acoustic wave in 1-d (30 secs)
+r"""Diffusion of an acoustic wave in 1-d (30 secs)
 
 Propagation of acoustic wave
 particles have properties according
 to the following distribuion
-\rho = \rho_0 + \Delta\rho sin(kx)
-p = p_0 + c_0^2\Delta\rho sin(kx)
-u = c_0\rho_0^{-1}\Delta\rho sin(kx)
+.. math::
+        \rho = \rho_0 + \Delta\rho sin(kx)
+        p = p_0 + c_0^2\Delta\rho sin(kx)
+        u = c_0\rho_0^{-1}\Delta\rho sin(kx)
 
-with \Delta\rho = 1e-6 and k = 2\pi/\lambda
-where \lambda is the domain length.
-\rho_0 = \gamma = 1.4 and p_0 = 1.0
+with :math:`\Delta\rho = 1e-6` and :math:`k = 2\pi/\lambda`
+where :math:`\lambda` is the domain length.
+.. math::
+        \rho_0 = \gamma = 1.4 and p_0 = 1.0
 """
 
 
