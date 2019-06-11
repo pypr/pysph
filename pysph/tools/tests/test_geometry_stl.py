@@ -2,92 +2,91 @@ import numpy as np
 import unittest
 import pytest
 import tempfile
-from pysph.base.particle_array import ParticleArray
-from stl import mesh
-import pysph.tools.geometry_stl as G
-from pysph.base.utils import get_particle_array
 
 pytest.importorskip("stl")
 
+import pysph.tools.geometry_stl as G
+from pysph.base.utils import get_particle_array
+
 cube_stl = """solid cube
-  facet normal 0 0 -1
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
       vertex 0 1 0
       vertex 1 1 0
     endloop
   endfacet
-  facet normal 0 0 -1
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
-     vertex 1 1 0
+      vertex 1 1 0
       vertex 1 0 0
     endloop
   endfacet
-  facet normal -1 0 0
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
       vertex 0 0 1
       vertex 0 1 1
     endloop
   endfacet
-  facet normal -1 0 0
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
       vertex 0 1 1
       vertex 0 1 0
     endloop
   endfacet
-  facet normal 0 -1 0
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
       vertex 1 0 0
       vertex 1 0 1
     endloop
   endfacet
-  facet normal 0 -1 0
+  facet normal 0 0 0
     outer loop
       vertex 0 0 0
       vertex 1 0 1
       vertex 0 0 1
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0 0 0
     outer loop
       vertex 0 0 1
       vertex 1 0 1
       vertex 1 1 1
     endloop
   endfacet
-  facet normal 0 0 1
+  facet normal 0 0 0
     outer loop
       vertex 0 0 1
       vertex 1 1 1
       vertex 0 1 1
     endloop
   endfacet
-  facet normal 1 0 0
+  facet normal 0 0 0
     outer loop
       vertex 1 0 0
       vertex 1 1 0
       vertex 1 1 1
     endloop
   endfacet
-  facet normal 1 0 0
+  facet normal 0 0 0
     outer loop
       vertex 1 0 0
       vertex 1 1 1
       vertex 1 0 1
     endloop
   endfacet
-  facet normal 0 1 0
+  facet normal 0 0 0
     outer loop
       vertex 0 1 0
       vertex 0 1 1
       vertex 1 1 1
     endloop
   endfacet
-  facet normal 0 1 0
+  facet normal 0 0 0
     outer loop
       vertex 0 1 0
       vertex 1 1 1
@@ -133,29 +132,26 @@ class TestGeometry(unittest.TestCase):
         self.assertRaises(G.PolygonMeshError, G._fill_triangle,
                           np.zeros((4, 3)), 0.5)
 
+    def test_get_neighbouring_particles(self):
+        """Find neighbouring particles around a unit sphere"""
+        h = 0.1
+        x1, y1, z1 = np.mgrid[-1.1:1.1:0.05, -1.1:1.1:0.05, -1.1:1.1:0.05]
+        r2 = (x1 ** 2 + y1 ** 2 + z1 ** 2)
+        mask = (r2 < (1. + h) ** 2) & (r2 > (1. - h) ** 2)
+        x2, y2, z2 = x1[mask], y1[mask], z1[mask]
+        p1 = get_particle_array(x=x1, y=y1, z=z1, h=h)
+        p2 = get_particle_array(x=x2, y=y2, z=z2, h=h)
+        x, y, z = G._get_neighbouring_particles(p2, p1, h)
+
+        for i in range(x.shape[0]):
+            assert((1. - 2 * h) ** 2 < (x[i] ** 2 + y[i] ** 2 + z[i] ** 2) <
+                   (1. + 2 * h) ** 2)
+
     def _generate_cube_stl(self):
         f = tempfile.NamedTemporaryFile(mode='w', delete=False)
         f.write(cube_stl)
         f.close()
         return f.name
-
-    def test_get_neighbouring_particles(self):
-        """Find neighbouring particles around a unit cube"""
-        h = 0.1
-        cube_fname = self._generate_cube_stl()
-        x, y, z, c_x, c_y, c_z, sizes = G._get_stl_mesh_uniform(cube_fname, h)
-        pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h)
-        offset = h
-        x_grid, y_grid, z_grid = np.meshgrid(
-         np.arange(x.min() - offset, x.max() + offset, h),
-         np.arange(y.min() - offset, y.max() + offset, h),
-         np.arange(z.min() - offset, z.max() + offset, h))
-        pa_grid = ParticleArray(name='grid', x=x_grid, y=y_grid, z=z_grid, h=h)
-        x_grid, y_grid, z_grid, new_sizes, mulitple_occur = \
-        G._get_neighbouring_particles(pa_grid, pa_mesh, 1, sizes)
-
-        for i in range(x.shape[0]):
-            assert((x[i] ** 2 + y[i] ** 2 + z[i] ** 2) <= 4)
 
     def _cube_assert(self, x, y, z, h):
         """Check if x,y,z lie within surface of thickness `h` of a unit cube"""
@@ -181,45 +177,6 @@ class TestGeometry(unittest.TestCase):
         h = 0.1
         x, y, z = G.get_stl_surface(cube_fname, h, h, 1)
         self._cube_assert(x, y, z, h)
-
-    def test_get_stl_surface_uniform(self):
-        """Check if stl surface is generated correctly for unit cube"""
-        cube_fname = self._generate_cube_stl()
-        h = 0.1
-        x, y, z = G.get_stl_surface(cube_fname, h, h, 1)
-        self._cube_assert(x, y, z, h)
-
-
-    def test_remove_exterior(self):
-        h = 0.1
-        cube_fname = self._generate_cube_stl()
-        x, y, z, c_x, c_y, c_z, sizes = G._get_stl_mesh_uniform(cube_fname, h)
-        pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h)
-        offset = h
-        x_grid, y_grid, z_grid = np.meshgrid(
-                np.arange(x.min() - offset, x.max() + offset, h),
-                np.arange(y.min() - offset, y.max() + offset, h),
-                np.arange(z.min() - offset, z.max() + offset, h)
-        )
-        pa_grid = ParticleArray(name='grid', x=x_grid, y=y_grid, z=z_grid, h=h)
-        x_grid, y_grid, z_grid, new_sizes, mulitple_occur = \
-         G._get_neighbouring_particles(pa_grid, pa_mesh, 1, sizes)
-        my_mesh = mesh.Mesh.from_file(cube_fname)
-        u, v, w = [], [], []
-        for i in range(np.shape(my_mesh.vectors)[0]):
-            u.append(my_mesh.normals[i][0])
-            v.append(my_mesh.normals[i][1])
-            w.append(my_mesh.normals[i][2])
-        xf, yf, zf = G.remove_exterior(x_grid, y_grid, z_grid,
-                                       c_x, c_y, c_z,
-                                       cube_fname, new_sizes,
-                                       u, v, w,
-                                       1, h, mulitple_occur)
-
-        for i in range(len(xf)):
-            assert 0 <= xf[i] <= 1
-            assert 0 <= yf[i] <= 1
-            assert 0 <= zf[i] <= 1
 
 
 if __name__ == "__main__":
