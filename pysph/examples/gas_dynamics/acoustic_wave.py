@@ -1,4 +1,4 @@
-r"""Diffusion of an acoustic wave in 1-d (30 secs)
+r"""Diffusion of an acoustic wave in 1-d (5 minutes)
 
 Propagation of acoustic wave
 particles have properties according
@@ -24,6 +24,7 @@ from pysph.base.nnps import DomainManager
 from pysph.solver.application import Application
 from pysph.sph.scheme import \
     GSPHScheme, ADKEScheme, GasDScheme, SchemeChooser
+from pysph.sph.wc.crksph import CRKSPHScheme
 
 
 class AcousticWave(Application):
@@ -89,8 +90,13 @@ class AcousticWave(Application):
             beta=2.0, update_alpha1=False, update_alpha2=False
         )
 
+        crksph = CRKSPHScheme(
+            fluids=['fluid'], dim=self.dim, rho0=0, c0=0, nu=0, h0=0, p0=0,
+            gamma=self.gamma, cl=2
+        )
+
         s = SchemeChooser(
-            default='gsph', gsph=gsph, mpm=mpm
+            default='gsph', gsph=gsph, mpm=mpm, crksph=crksph
         )
 
         return s
@@ -108,6 +114,10 @@ class AcousticWave(Application):
             s.configure_solver(dt=self.dt, tf=self.tf,
                                adaptive_timestep=True, pfreq=50)
 
+        if self.options.scheme == 'crksph':
+            s.configure_solver(dt=self.dt, tf=self.tf,
+                               adaptive_timestep=False, pfreq=50)
+
     def post_process(self):
         from pysph.solver.utils import load
         if len(self.output_files) < 1:
@@ -122,8 +132,17 @@ class AcousticWave(Application):
         l_inf = numpy.max(
             numpy.abs(u_c - u)
         )
+        print("L_inf norm of velocity for the problem: %s" % (l_inf))
 
-        print("L_inf norm for the problem: %s" % (l_inf))
+        rho = self.rho_0 + self.delta_rho *\
+            numpy.sin(self.k * x_c)
+
+        rho_c = pa.rho
+        l1 = numpy.sum(
+            numpy.abs(rho - rho_c)
+        )
+        l1 = l1 / self.n_particles
+        print("l_1 norm of density for the problem: %s" % (l1))
 
 
 if __name__ == "__main__":

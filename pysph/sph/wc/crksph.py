@@ -23,6 +23,12 @@ from pysph.sph.wc.linalg import (
 from pysph.sph.scheme import Scheme
 from pysph.base.utils import get_particle_array
 from pysph.sph.integrator import Integrator, IntegratorStep
+from pysph.base.particle_array import get_ghost_tag
+
+from pysph.sph.basic_equations import SummationDensity
+
+# Constants
+GHOST_TAG = get_ghost_tag()
 
 
 class CRKSPHPreStep(Equation):
@@ -241,73 +247,38 @@ class CRKSPH(Equation):
         super(CRKSPH, self).__init__(dest, sources)
 
     def loop(self, d_idx, s_idx, d_ai, d_gradai, d_cwij, d_bi, d_gradbi,
-             s_ai, s_gradai, s_cwij, s_bi, s_gradbi, d_h, s_h, WIJ, DWIJ, XIJ,
-             HIJ, DWI, DWJ, RIJ, SPH_KERNEL):
-        alp, gam, d, i = declare('int', 4)
-        resij, resji = declare('matrix(3)', 2)
-        gbxij, gbxji = declare('matrix(3)', 2)
-        dwij, dwji = declare('matrix(3)', 2)
-        xij, xji = declare('matrix(3)', 2)
-
-        for i in range(d):
-            xij[i] = XIJ[i]
-            xji[i] = -XIJ[i]
-
-        SPH_KERNEL.gradient(xij, RIJ, d_h[d_idx], dwij)
-        SPH_KERNEL.gradient(xji, RIJ, s_h[s_idx], dwji)
-        wij = SPH_KERNEL.kernel(xij, RIJ, d_h[d_idx])
-        wji = SPH_KERNEL.kernel(xji, RIJ, s_h[s_idx])
-
+             WIJ, DWIJ, XIJ, HIJ):
+        alp, gam, d = declare('int', 3)
+        res = declare('matrix(3)')
+        dbxij = declare('matrix(3)')
         d = self.dim
-        # ai = d_ai[d_idx]
+        ai = d_ai[d_idx]
         eps = 1.0e-04 * HIJ
-
         bxij = 0.0
         for alp in range(d):
-            bxij += d_bi[d*d_idx + alp] * xij[alp]
+            bxij += d_bi[d*d_idx + alp] * XIJ[alp]
         for gam in range(d):
             temp = 0.0
             for alp in range(d):
-                temp += d_gradbi[d*d*d_idx + d*gam + alp]*xij[alp]
-            gbxij[gam] = temp
+                temp += d_gradbi[d*d*d_idx + d*gam + alp]*XIJ[alp]
+            dbxij[gam] = temp
 
-        bxji = 0.0
-        for alp in range(d):
-            bxji += s_bi[d*s_idx + alp] * xji[alp]
-        for gam in range(d):
-            temp = 0.0
-            for alp in range(d):
-                temp += s_gradbi[d*d*s_idx + d*gam + alp]*xji[alp]
-            gbxji[gam] = temp
-
-        d_cwij[d_idx] = (d_ai[d_idx]*(1 + bxij))  # * (wij of current), bug
+        d_cwij[d_idx] = (ai*(1 + bxij))
 
         for gam in range(d):
-            resij[gam] = ((d_ai[d_idx] * dwij[gam] + d_gradai[d * d_idx + gam]
-                          * wij) * (1 + bxij))
-            resij[gam] += (d_ai[d_idx] * (gbxij[gam] + d_bi[d * d_idx + gam])
-                           * wij)
-
-        for gam in range(d):
-            resji[gam] = ((s_ai[s_idx] * dwji[gam] + s_gradai[d * s_idx + gam]
-                          * wji) * (1 + bxji))
-            resji[gam] += (s_ai[s_idx] * (gbxji[gam] + s_bi[d * s_idx + gam])
-                           * wji)
+            res[gam] = ((ai * DWIJ[gam] + d_gradai[d * d_idx + gam] * WIJ) *
+                        (1 + bxij))
+            res[gam] += ai * (dbxij[gam] + d_bi[d * d_idx + gam]) * WIJ
 
         res_mag = 0.0
         dwij_mag = 0.0
         for i in range(d):
-            res_mag += abs(resij[i])
+            res_mag += abs(res[i])
             dwij_mag += abs(DWIJ[i])
         change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
         if change < self.tol:
             for i in range(d):
-                DWIJ[i] = resij[i]
-
-        for i in range(d):
-            DWI[i] = resij[i]
-            DWJ[i] = resji[i]
-            DWIJ[i] = DWI[i] - DWJ[i]
+                DWIJ[i] = res[i]
 
 
 class CRKSPHSymmetric(Equation):
@@ -379,9 +350,8 @@ class CRKSPHSymmetric(Equation):
 
     def loop(self, d_idx, s_idx, d_ai, d_gradai, d_cwij, d_bi, d_gradbi, s_ai,
              s_gradai, s_bi, s_gradbi, d_h, s_h, WIJ, DWIJ, XIJ, HIJ, RIJ,
-             DWI, DWJ, SPH_KERNEL):
+             DWI, DWJ, WI, WJ, SPH_KERNEL):
         alp, gam, d = declare('int', 3)
-        res = declare('matrix(3)')
         dbxij = declare('matrix(3)')
         dbxji = declare('matrix(3)')
         dwij, dwji = declare('matrix(3)', 2)
@@ -392,7 +362,6 @@ class CRKSPHSymmetric(Equation):
         d = self.dim
         ai = d_ai[d_idx]
         aj = s_ai[s_idx]
-        eps = 1.0e-04 * HIJ
         bxij = 0.0
         bxji = 0.0
         for alp in range(d):
@@ -408,6 +377,8 @@ class CRKSPHSymmetric(Equation):
             dbxji[gam] = temp1
 
         d_cwij[d_idx] = (ai*(1 + bxij))
+        WI = (ai*(1 + bxij)) * WIJ
+        WJ = (aj*(1 + bxji)) * WIJ
 
         for gam in range(d):
             temp = ((ai * dwij[gam] + d_gradai[d * d_idx + gam] * wij) *
@@ -416,21 +387,9 @@ class CRKSPHSymmetric(Equation):
             temp1 = ((-aj * dwji[gam] + s_gradai[d * s_idx + gam] * wji) *
                      (1 + bxji))
             temp1 += aj * (dbxji[gam] + s_bi[d * s_idx + gam]) * wji
-            res[gam] = 0.5*(temp - temp1)
+            DWIJ[gam] = 0.5*(temp - temp1)
             DWI[gam] = temp
             DWJ[gam] = temp1
-
-        res_mag = 0.0
-        dwij_mag = 0.0
-        for i in range(d):
-            res_mag += abs(res[i])
-            dwij_mag += abs(DWIJ[i])
-        change = abs(res_mag - dwij_mag)/(dwij_mag + eps)
-        if change < self.tol:
-            for i in range(d):
-                DWIJ[i] = res[i]
-        for i in range(d):
-            DWIJ[i] = res[i]
 
 
 class NumberDensity(Equation):
@@ -519,7 +478,7 @@ class VelocityGradient(Equation):
 
         for alp in range(d):
             for bet in range(d):
-                d_gradv[d_idx*d*d + d*bet + alp] += -Vj * VIJ[alp] * DWI[bet]
+                d_gradv[d_idx*d*d + d*alp + bet] += -Vj * VIJ[alp] * DWI[bet]
 
 
 class MomentumEquation(Equation):
@@ -671,8 +630,7 @@ class MomentumEquation(Equation):
         Qi = rhoi * (-Cl*ci*mui + Cq*mui*mui)
         Qj = rhoj * (-Cl*cj*muj + Cq*muj*muj)
 
-        fac = -(0.5/mi) * Vi * Vj * (pi + pj + Qi + Qj) * 2
-        # print("diff in grad ", abs(DWI[0] - DWJ[0]) - DWIJ[0])
+        fac = -(1.0/mi) * Vi * Vj * (pi + pj + Qi + Qj)
         d_au[d_idx] += fac * (DWIJ[0])  # - DWJ[0])
         d_av[d_idx] += fac * (DWIJ[1])  # - DWJ[1])
         d_aw[d_idx] += fac * (DWIJ[2])  # - DWJ[2])
@@ -861,6 +819,40 @@ class SpeedOfSound(Equation):
         d_cs[d_idx] = (self.gamma * d_p[d_idx] / d_rho[d_idx])**0.5
 
 
+class CRKSPHUpdateGhostProps(Equation):
+    def __init__(self, dest, sources=None, dim=2):
+        super(CRKSPHUpdateGhostProps, self).__init__(dest, sources)
+        self.dim = dim
+        assert GHOST_TAG == 2
+
+    def initialize(self, d_idx, d_orig_idx, d_p, d_cs, d_V, d_ai, d_bi, d_tag,
+                   d_gradbi, d_gradai, d_rho, d_u0, d_v0, d_w0, d_gradv, d_u,
+                   d_v, d_w):
+        idx, d, alp, bet = declare('int', 4)
+        d = self.dim
+        if d_tag[d_idx] == 2:
+            idx = d_orig_idx[d_idx]
+            d_p[d_idx] = d_p[idx]
+            d_cs[d_idx] = d_cs[idx]
+            d_V[d_idx] = d_V[idx]
+            d_rho[d_idx] = d_rho[idx]
+            d_u0[d_idx] = d_u0[idx]
+            d_v0[d_idx] = d_v0[idx]
+            d_w0[d_idx] = d_w0[idx]
+            d_u[d_idx] = d_u[idx]
+            d_v[d_idx] = d_v[idx]
+            d_w[d_idx] = d_w[idx]
+            d_ai[d_idx] = d_ai[idx]
+            for alp in range(d):
+                d_gradai[d*d_idx + alp] = d_gradai[d*idx + alp]
+                d_bi[d*d_idx + alp] = d_bi[d*idx + alp]
+                for bet in range(d):
+                    d_gradv[d*d*d_idx + d*alp + bet] = \
+                        d_gradv[d*d*idx + d*alp + bet]
+                    d_gradbi[d*d*d_idx + d*alp + bet] = \
+                        d_gradbi[d*d*idx + d*alp + bet]
+
+
 def get_particle_array_crksph(constants=None, **props):
     crksph_props = [
         'e', 'au', 'av', 'aw', 'ae', 'u0', 'v0', 'w0', 'cs', 'V', 'rhofac',
@@ -896,6 +888,7 @@ class CRKSPHIntegrator(Integrator):
 
         self.stage3()
         self.do_post_stage(dt, 3)
+        self.update_domain()
 
 
 class CRKSPHStep(IntegratorStep):
@@ -1000,15 +993,36 @@ class CRKSPHScheme(Scheme):
             )
         equations_stage1.append(Group(equations=eq00))
 
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
+
         eq0 = []
         for fluid in self.fluids:
             eq0.append(NumberDensity(dest=fluid, sources=all))
         equations_stage1.append(Group(equations=eq0, real=False))
 
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
+
         eq1 = []
         for fluid in self.fluids:
             eq1.append(CRKSPHPreStep(dest=fluid, sources=all, dim=self.dim))
         equations_stage1.append(Group(equations=eq1, real=False))
+
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
 
         eq2 = []
         for fluid in self.fluids:
@@ -1030,6 +1044,13 @@ class CRKSPHScheme(Scheme):
             )
         equations_stage1.append(Group(equations=eq3))
 
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
+
         eq4 = []
         for fluid in self.fluids:
             eq4.extend([
@@ -1039,6 +1060,13 @@ class CRKSPHScheme(Scheme):
                 VelocityGradient(dest=fluid, sources=all, dim=self.dim)
             ])
         equations_stage1.append(Group(equations=eq4))
+
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage1.append(Group(equations=gh, real=False))
 
         eq5 = []
         for fluid in self.fluids:
@@ -1060,6 +1088,13 @@ class CRKSPHScheme(Scheme):
                 ))
         equations_stage1.append(Group(equations=eq5))
 
+        gh = []
+        for fluid in self.fluids:
+            gh.append(
+                CRKSPHUpdateGhostProps(dest=fluid, sources=None, dim=self.dim)
+            )
+        equations_stage2.append(Group(equations=gh, real=False))
+
         eq6 = []
         for fluid in self.fluids:
             eq6.append(
@@ -1067,7 +1102,6 @@ class CRKSPHScheme(Scheme):
                     dest=fluid, sources=all, dim=self.dim, tol=self.tol
                     )
             )
-
             eq6.append(
                 EnergyEquation(
                     dest=fluid, sources=all, dim=self.dim, gamma=self.gamma
@@ -1078,6 +1112,7 @@ class CRKSPHScheme(Scheme):
         return MultiStageEquations([equations_stage1, equations_stage2])
 
     def setup_properties(self, particles, clean=True):
+        import numpy
         particle_arrays = dict([(p.name, p) for p in particles])
         crksph_props = [
             'au', 'av', 'aw', 'ae', 'u0', 'v0', 'w0', 'cs', 'V', 'rhofac',
@@ -1098,4 +1133,7 @@ class CRKSPHScheme(Scheme):
             pa.add_property('gradai', stride=3)
             pa.add_property('gradbi', stride=9)
             pa.add_property('gradv', stride=9)
+            pa.add_property('orig_idx', type='int')
+            nfp = pa.get_number_of_particles()
+            pa.orig_idx[:] = numpy.arange(nfp)
             pa.set_output_arrays(output_props)
