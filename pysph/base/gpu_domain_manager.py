@@ -15,7 +15,8 @@ class GPUDomainManager(DomainManagerBase):
     def __init__(self, xmin=-1000., xmax=1000., ymin=0.,
                  ymax=0., zmin=0., zmax=0.,
                  periodic_in_x=False, periodic_in_y=False,
-                 periodic_in_z=False, n_layers=2.0, backend=None, props=None):
+                 periodic_in_z=False, n_layers=2.0, backend=None, props=None,
+                 mirror_in_x=False, mirror_in_y=False, mirror_in_z=False):
         """Constructor"""
         DomainManagerBase.__init__(self, xmin=xmin, xmax=xmax,
                                    ymin=ymin, ymax=ymax, zmin=zmin, zmax=zmax,
