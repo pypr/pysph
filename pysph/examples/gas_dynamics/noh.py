@@ -1,4 +1,4 @@
-"""Example for the Noh's cylindrical implosion test. (15 mins)
+"""Example for the Noh's cylindrical implosion test. (2 hours)
 """
 
 # NumPy and standard library imports
@@ -20,7 +20,7 @@ gamma1 = gamma - 1.0
 alpha1 = 1.0
 alpha2 = 0.1
 beta = 2.0
-kernel_factor = 1.2
+kernel_factor = 1.5
 
 # numerical constants
 dt = 1e-3
