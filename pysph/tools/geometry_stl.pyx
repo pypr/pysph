@@ -5,6 +5,7 @@ from stl import mesh
 from numpy.linalg import norm
 from cyarray.api import UIntArray
 from mayavi import mlab
+cimport cython
 cimport numpy as np
 
 DTYPE = np.float
@@ -126,7 +127,19 @@ def _get_stl_mesh(stl_fname, dx_triangle):
         x.append(points[i][0])
         y.append(points[i][1])
         z.append(points[i][2])
-    return x, y, z
+    points = []
+    for i in range(len(x)):
+        point = [x[i], y[i], z[i]]
+        if point in points:
+            pass
+        else:
+            points.append([x[i], y[i], z[i]])
+    x, y, z = [], [], []
+    for i in range(np.shape(points)[0]):
+        x.append(points[i][0])
+        y.append(points[i][1])
+        z.append(points[i][2])
+    return np.array(x), np.array(y), np.array(z)
 
 
 def _get_stl_mesh_uniform(stl_fname, dx_triangle):
@@ -154,28 +167,27 @@ def _get_stl_mesh_uniform(stl_fname, dx_triangle):
     x = np.concatenate(x_list)
     y = np.concatenate(y_list)
     z = np.concatenate(z_list)
-    centroids_x = []
-    centroids_y = []
-    centroids_z = []
-    for i in range(np.shape(m.vectors)[0]):
-        centroid = ((m.vectors[i][0]+m.vectors[i][1]+m.vectors[i][2]))/3
-        centroids_x.append(centroid[0])
-        centroids_y.append(centroid[1])
-        centroids_z.append(centroid[2])
-    points = []
-    for i in range(len(x)):
-        point = [x[i], y[i], z[i]]
-        if point in points:
-            pass
-        else:
-            points.append([x[i], y[i], z[i]])
-    x, y, z = [], [], []
-    for i in range(np.shape(points)[0]):
-        x.append(points[i][0])
-        y.append(points[i][1])
-        z.append(points[i][2])
     return x, y, z, sizes
 
+
+def updater(my_mesh, normal_5, points, radius_scale, dx_sph, tracker):
+    cdef int m,n
+    cdef float mag = norm(my_mesh.normals[tracker])
+    normal_5[0] = my_mesh.normals[tracker] / norm(my_mesh.normals[tracker])
+    normal_5[4] = -1*normal_5[0]
+    cdef float h = 1.5 * radius_scale * dx_sph
+    for m in range(3):
+        for n in range(3):
+            points[n][m] = my_mesh.vectors[tracker][n][m]
+    for m in range(3):
+        for n in range(3):
+            points[m+3][n] = my_mesh.vectors[tracker][m][n] - normal_5[0][n]*h
+    normal_5[1] = np.cross(points[1]-points[0], points[1]-points[4])
+    normal_5[2] = np.cross(points[2]-points[0], points[5]-points[2] )
+    normal_5[3] = np.cross(points[1]-points[2], points[5]-points[2])
+    for i in range(1,4):
+        normal_5[i] = normal_5[i] / norm(normal_5[i])
+    return normal_5, points
 
 def _get_neighbouring_particles(pa_src, pa_dst, float radius_scale,
                                 np.ndarray sizes, float dx_sph, stl_fname):
@@ -192,72 +204,55 @@ def _get_neighbouring_particles(pa_src, pa_dst, float radius_scale,
     nps.set_context(src_index=1, dst_index=0)
     cdef int n = len(pa_dst.x)
     nbrs = UIntArray()
-    cdef np.ndarray grid_set = np.zeros_like(pa_dst.x, dtype=DTYPE1)
+    cdef list grid_set = []
     cdef list remover = []
-    # new_sizes-contains new no. of points corresponding
-    # to each triangle
-    # multiple_occur- contains the triangles from which given point originated.
-    # When finding neighbouring particles it is possible that a
-    # neighbouring point obtained might be the nearest neighbour
-    # of mulitple surface points corresponding to different triangles.
     cdef int tracker = 0
     my_mesh = mesh.Mesh.from_file(stl_fname)
     cdef int n_trig = np.shape(my_mesh.vectors)[0]
     cdef np.ndarray centroids = np.zeros((n_trig, 3), dtype=DTYPE)
-    cdef int counter = 0
-    for i in range(n_trig):
-        centroids[i] = (my_mesh.vectors[i][0] +
-                        my_mesh.vectors[i][1] +
-                        my_mesh.vectors[i][2]) / 3
-    normals = my_mesh.normals
+    cdef int i
+    cdef np.ndarray normal_5 = np.zeros((5,3), dtype=DTYPE)
+    cdef np.ndarray point_2 = np.zeros((6,3), dtype=DTYPE)
+    normal_5, point_2 = updater(my_mesh, normal_5, point_2, radius_scale, dx_sph, tracker)
     for i in range(n):
         nps.get_nearest_particles(1, 0, i, nbrs)
         neighbours = nbrs.get_npy_array()
         for neighbour in neighbours:
             point = np.array([pa_src.x[neighbour],
-                              pa_src.y[neighbour],
-                              pa_src.z[neighbour]])
-            if neighbour in grid_set:
-                if elemental_volume(point, centroids[tracker],
-                                    normals[tracker], dx_sph, radius_scale):
-                    pass
-                else:
-                    index = int(np.where(grid_set == neighbour)[0])
-                    remover[index] = 1
+                pa_src.y[neighbour],
+                pa_src.z[neighbour]])
+            grid_set.append(neighbour)
+            if elemental_volume(point, normal_5, point_2,my_mesh, dx_sph, radius_scale,i):
+                remover.append(0)
             else:
-                grid_set[counter] = neighbour
-                counter = counter + 1
-                if elemental_volume(point, centroids[tracker],
-                                    normals[tracker], dx_sph, radius_scale):
-                    remover.append(0)
-                else:
-                    remover.append(1)
+                remover.append(1)
         if i == sizes[tracker]:
-            tracker = tracker+1
+            if not(sizes[tracker] == sizes[-1]):
+                tracker = tracker+1
+                normal_5, point_2 = updater(my_mesh, normal_5, point_2, radius_scale, dx_sph, tracker)
+    x, y, z = [], [], []
+    for i in grid_set:
+        x.append(pa_src.x[i])
+        y.append(pa_src.y[i])
+        z.append(pa_src.z[i])
+    return x, y, z, remover
 
-    idx = []
-    for i in range(counter):
-        idx.append(grid_set[i])
-
-    idx = np.array(idx)
-    return pa_src.x[idx], pa_src.y[idx], pa_src.z[idx], remover
-
-def elemental_volume(np.ndarray point, np.ndarray centroid, np.ndarray normal,
-                     float dx_sph, float radius_scale):
+def elemental_volume(np.ndarray point, np.ndarray normal_5,np.ndarray points,
+                     my_mesh, float dx_sph, float radius_scale, i):
     """ Identifies whether a point is within h thickness of it's
     corresponding side"""
-    cdef float mag = norm(normal)
-    normal = normal/mag
-    cdef float h = 1.5*radius_scale*dx_sph
-    cdef np.ndarray centroid_2 = np.zeros_like(centroid, dtype=DTYPE)
-    for i in range(3):
-        centroid_2[i] = centroid[i] - normal[i]*h
-    if(np.dot(point - centroid, normal) <= 0 and
-       np.dot(point - centroid_2, normal) > 0):
-        return True
-    else:
+    if np.dot(normal_5[0], point - (points[0]+points[1]+points[2])/3) > 0:
+        return False
+    elif np.dot(normal_5[4], point - (points[5]+points[4]+points[3])/3) > 0:
+        return False
+    elif np.dot(normal_5[1], point - (points[0]+points[3]+points[1]+points[4])/4) > 0:
+        return False
+    elif np.dot(normal_5[2], point - (points[0]+points[3]+points[2]+points[5])/4) > 0:
+        return False
+    elif np.dot(normal_5[3], point - (points[1]+points[2]+points[4]+points[5])/4) > 0:
         return False
 
+    return True
 
 def remove_exterior(x, y, z, remover):
     """ removes points which lie outside the given volume"""
@@ -265,20 +260,36 @@ def remove_exterior(x, y, z, remover):
     for i in range(len(x)):
         if remover[i] == 1:
             remove_point.append(i)
+
     x = np.delete(x, remove_point)
     y = np.delete(y, remove_point)
     z = np.delete(z, remove_point)
     return x, y, z
 
+def remove_repeated(x, y, z):
+    cdef int n = len(x)
+    cdef list points = []
+    for i in range(n):
+        point = [x[i], y[i], z[i]]
+        points.append(point)
+    points_uni = set(tuple(i) for i in points)
+    points = list(points_uni)
+    cdef list xf =[], yf =[], zf = []
+    for i in range(len(points)):
+        xf.append(points[i][0])
+        yf.append(points[i][1])
+        zf.append(points[i][2])
+    return xf, yf, zf
 
-def get_stl_surface_uniform(stl_fname, dx_sph, h_sph, 
+
+def get_stl_surface_uniform(stl_fname="stl_files/bit_yes_up.stl", dx_sph=1, h_sph=1,
                             radius_scale=1.0, dx_triangle=None):
     """ Returns coordinates of uniform distribution of
      particles for given stl"""
     if dx_triangle is None:
         dx_triangle = 0.5 * dx_sph
 
-    x, y, z, sizes = _get_stl_mesh_uniform(stl_fname, dx_triangle)
+    x, y, z ,sizes = _get_stl_mesh_uniform(stl_fname, dx_triangle)
     pa_mesh = ParticleArray(name='mesh', x=x, y=y, z=z, h=h_sph)
     offset = radius_scale * h_sph
     x_grid, y_grid, z_grid = np.meshgrid(
@@ -292,7 +303,7 @@ def get_stl_surface_uniform(stl_fname, dx_sph, h_sph,
         _get_neighbouring_particles(pa_grid, pa_mesh, radius_scale,
                                     sizes, dx_sph, stl_fname)
     xf, yf, zf = remove_exterior(x_grid, y_grid, z_grid, remover)
-
+    xf, yf, zf = remove_repeated(xf, yf, zf)
     return xf, yf, zf
 
 
