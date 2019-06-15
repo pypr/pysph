@@ -234,12 +234,15 @@ class TestDeviceHelper(object):
         self.setup()
         # Given
         pa = self.pa
+        pa.add_property('force', stride=3)
         h = DeviceHelper(pa, backend=backend)
 
         # When
         pa.set_device_helper(h)
-        h.resize(5)
+        n = 5
+        h.resize(n)
         h.x.set(np.array([2.0, 3.0, 4.0, 5.0, 6.0], h.x.dtype))
+        h.force.set(np.arange(n*3, dtype=h.force.dtype))
 
         indices = array.arange(4, -1, -1, dtype=np.int32,
                                backend=backend)
@@ -248,6 +251,10 @@ class TestDeviceHelper(object):
 
         # Then
         assert np.all(h.x.get() == np.array([6., 5., 4., 3., 2.]))
+        x = np.arange(n*3)
+        x.shape = (n, 3)
+        expect = x[::-1, :].ravel()
+        assert np.all(h.force.get() == expect)
 
     @test_all_backends
     def test_align_particles(self, backend):

@@ -62,6 +62,7 @@ class DeviceHelper(object):
         self._data = {}
         self.properties = []
         self.constants = []
+        self._strided_indices_knl = None
 
         for prop, ary in pa.properties.items():
             self.add_prop(prop, ary)
@@ -109,10 +110,36 @@ class DeviceHelper(object):
         '''
         if not isinstance(indices, dict):
             indices = {1: indices}
+            self._make_strided_indices(indices)
+
         for prop in self.properties:
             stride = self._particle_array.stride.get(prop, 1)
             self._data[prop] = self._data[prop].align(indices.get(stride))
             setattr(self, prop, self._data[prop])
+
+    def _make_strided_indices(self, indices_dict):
+        '''Takes the indices in a dict assuming that the indices are for a
+        stride of 1 and makes suitable indices for other possible stride
+        values.
+        '''
+        indices = indices_dict[1]
+        n = indices.length
+        if not self._strided_indices_knl:
+            self._setup_strided_indices_kernel()
+        for stride in set(self._particle_array.stride.values()):
+            dest = array.empty(n*stride, dtype=np.int32, backend=self.backend)
+            self._strided_indices_knl(indices, dest, stride)
+            indices_dict[stride] = dest
+
+    def _setup_strided_indices_kernel(self):
+        @annotate(int='i, stride', gintp='indices, dest')
+        def set_indices(i, indices, dest, stride):
+            j = declare('int')
+            for j in range(stride):
+                dest[i*stride + j] = indices[i]*stride + j
+
+        knl = Elementwise(set_indices, backend=self.backend)
+        self._strided_indices_knl = knl
 
     def add_prop(self, name, carray):
         """Add a new property given the name and carray, note
@@ -161,8 +188,7 @@ class DeviceHelper(object):
     def update_minmax_cl(self, props, only_min=False, only_max=False):
         ary_list = [getattr(self, prop) for prop in props]
         array.update_minmax_gpu(ary_list, only_min=only_min,
-                               only_max=only_max, backend=self.backend)
-
+                                only_max=only_max, backend=self.backend)
 
     def update_min_max(self, props=None):
         """Update the min,max values of all properties """
