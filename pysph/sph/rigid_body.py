@@ -7,6 +7,7 @@ from pysph.sph.integrator_step import IntegratorStep
 import numpy as np
 import numpy
 from math import sqrt
+from pysph.sph.scheme import Scheme
 
 
 def skew(vec):
@@ -768,3 +769,102 @@ class RK2StepRigidBody(IntegratorStep):
         d_x[d_idx] = d_x0[d_idx] + dt*d_u[d_idx]
         d_y[d_idx] = d_y0[d_idx] + dt*d_v[d_idx]
         d_z[d_idx] = d_z0[d_idx] + dt*d_w[d_idx]
+
+
+class RigidBodySimpleScheme(Scheme):
+    def __init__(self, bodies, solids, dim, kn, mu=0.5, en=1.0, gx=0.0,
+                 gy=0.0, gz=0.0, debug=False):
+        """Parameters
+        ----------
+
+        bodies: list
+            List of names of rigid body particle arrays.
+        solids: list
+            List of names of solid particle arrays (or boundaries).
+        dim: int
+            Dimensionality of the problem.
+        kn: float
+            normal spring stiffness value
+        mu: float
+            Friction coefficient
+        en: float
+            Coefficient of restitution between two colliding particles
+        gx, gy, gz: float
+            Body force acceleration components.
+
+        This scheme will implement the rigid body dynamics (rbd) without using
+        the rotation matrices. The main algorithm recomputes the moment of
+        inertia at every time step rather than using the body moment of
+        inertia.
+
+        For the detailed algorithm please look at the documentation of PySPH.
+        """
+        self.bodies = bodies
+        self.solids = solids
+        self.dim = dim
+        self.kn = kn
+        self.mu = mu
+        self.en = en
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.debug = debug
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        from pysph.base.kernels import CubicSpline
+        from pysph.sph.integrator import EPECIntegrator
+        from pysph.solver.solver import Solver
+        if kernel is None:
+            kernel = CubicSpline(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        for body in self.bodies:
+            if body not in steppers:
+                steppers[body] = RK2StepRigidBody()
+
+        cls = integrator_cls if integrator_cls is not None else EPECIntegrator
+        integrator = cls(**steppers)
+
+        self.solver = Solver(
+            dim=self.dim, integrator=integrator, kernel=kernel, **kw
+        )
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        equations = []
+        g1 = []
+        if self.solids is not None:
+            all = self.bodies + self.solids
+        else:
+            all = self.bodies
+
+        for name in self.bodies:
+            g1.append(BodyForce(
+                dest=name, sources=None, gx=self.gx, gy=self.gy, gz=self.gz
+            ))
+        equations.append(Group(equations=g1, real=False))
+
+        g2 = []
+        for name in self.bodies:
+            g2.append(RigidBodyCollision(
+                dest=name, sources=all, kn=self.kn, mu=self.mu, en=self.en
+            ))
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for name in self.bodies:
+            g3.append(RigidBodyMoments(
+                dest=name, sources=None))
+        equations.append(Group(equations=g3, real=False))
+
+        g4 = []
+        for name in self.bodies:
+            g4.append(RigidBodyMotion(
+                dest=name, sources=None))
+        equations.append(Group(equations=g4, real=False))
+
+        return equations
