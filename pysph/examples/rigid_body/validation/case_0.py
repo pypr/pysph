@@ -10,7 +10,9 @@ from pysph.base.utils import get_particle_array_rigid_body
 from pysph.sph.integrator import EPECIntegrator
 from pysph.solver.application import Application
 from pysph.sph.scheme import SchemeChooser
-from pysph.sph.rigid_body import (RigidBodySimpleScheme)
+from pysph.sph.rigid_body import (
+    RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
+    get_particle_array_rigid_body_rotation_matrix)
 from pysph.examples.solid_mech.impact import add_properties
 
 
@@ -29,7 +31,10 @@ class Case0(Application):
         # rbss = RigidBodySimpleScheme
         rbss = RigidBodySimpleScheme(bodies=['body'], solids=None, dim=3,
                                      kn=self.kn, mu=self.mu, en=self.en)
-        s = SchemeChooser(default='rbss', rbss=rbss)
+        rbrms = RigidBodyRotationMatricesScheme(
+            bodies=['body'], solids=None, dim=3, kn=self.kn,
+            mu=self.mu, en=self.en)
+        s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms)
         return s
 
     def configure_scheme(self):
@@ -54,6 +59,13 @@ class Case0(Application):
         rad_s = np.ones_like(x) * dx
         body = get_particle_array_rigid_body(name='body', x=x, y=y, z=z, h=h,
                                              m=m, rad_s=rad_s)
+
+        if self.options.scheme == 'rbrms':
+            body = get_particle_array_rigid_body_rotation_matrix(
+                name='body', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s)
+            add_properties(body, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
 
         body.vc[0] = 0.5
         body.vc[1] = 0.5
