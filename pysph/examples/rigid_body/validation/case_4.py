@@ -1,4 +1,4 @@
-"""A 2d cube bouncing inside a box. (5 seconds)
+"""Four two dimensional cubes falling under gravity into a tank. (5 seconds)
 
 This is used to test the rigid body equations.
 """
@@ -14,8 +14,10 @@ from pysph.sph.scheme import SchemeChooser
 from pysph.solver.application import Application
 from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
-    RigidBodyQuaternionScheme, get_particle_array_rigid_body_rotation_matrix,
-    get_particle_array_rigid_body_quaternion)
+    RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
+    get_particle_array_rigid_body_rotation_matrix,
+    get_particle_array_rigid_body_quaternion,
+    get_particle_array_rigid_body_rotation_matrix_optimized)
 from pysph.examples.solid_mech.impact import add_properties
 from pysph.tools.geometry import get_2d_tank
 
@@ -34,7 +36,7 @@ def create_four_bodies(dx):
     return x4, y4, b4
 
 
-class Case2c(Application):
+class Case4(Application):
     def initialize(self):
         self.rho0 = 10.0
         self.hdx = 1.3
@@ -84,6 +86,14 @@ class Case2c(Application):
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
 
+        elif self.options.scheme == 'rbrmos':
+            body = get_particle_array_rigid_body_rotation_matrix_optimized(
+                name='body', x=body.x, y=body.y, h=body.h, m=body.m,
+                rad_s=body.rad_s, body_id=body.body_id)
+            add_properties(body, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+
         # setup initial conditions
         body.vc[0] = -3.0
         body.vc[1] = -3.0
@@ -113,7 +123,11 @@ class Case2c(Application):
         rbqs = RigidBodyQuaternionScheme(bodies=['body'], solids=['tank'],
                                          dim=self.dim, kn=self.kn, mu=self.mu,
                                          en=self.en, gy=-9.81)
-        s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs)
+        rbrmos = RigidBodyRotationMatricesOptimizedScheme(
+            bodies=['body'], solids=['tank'], dim=self.dim, kn=self.kn,
+            mu=self.mu, en=self.en, gy=-9.81)
+        s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
+                          rbrmos=rbrmos)
 
         return s
 
@@ -141,5 +155,5 @@ class Case2c(Application):
 
 
 if __name__ == '__main__':
-    app = Case2c()
+    app = Case4()
     app.run()
