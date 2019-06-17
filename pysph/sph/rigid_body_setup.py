@@ -80,3 +80,12 @@ def setup_rotation_matrix_rigid_body(pa):
     set_center_of_mass(pa)
     set_mi_in_body_frame(pa)
     set_body_frame_position_vectors(pa)
+
+
+def setup_quaternion_rigid_body(pa):
+    """Setup total mass, center of mass, moment of inertia and
+    angular momentum of a rigid body defined using quaternion."""
+    set_total_mass(pa)
+    set_center_of_mass(pa)
+    set_mi_in_body_frame(pa)
+    set_body_frame_position_vectors(pa)
