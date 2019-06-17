@@ -9,9 +9,10 @@ import numpy as np
 import numpy
 from math import sqrt
 from pysph.sph.scheme import Scheme
-from pysph.sph.rigid_body_setup import (setup_rotation_matrix_rigid_body,
-                                        setup_quaternion_rigid_body,
-                                        setup_rotation_matrix_rigid_body_optimized)
+from pysph.sph.rigid_body_setup import (
+    setup_rotation_matrix_rigid_body, setup_quaternion_rigid_body,
+    setup_rotation_matrix_rigid_body_optimized,
+    setup_quaternion_rigid_body_optimized)
 from numpy import sin, cos
 
 
@@ -1877,6 +1878,337 @@ class RigidBodyRotationMatricesOptimizedScheme(Scheme):
         for body in self.bodies:
             if body not in steppers:
                 steppers[body] = RK2StepRigidBodyRotationMatricesOptimized()
+
+        cls = integrator_cls if integrator_cls is not None else EPECIntegrator
+        integrator = cls(**steppers)
+
+        self.solver = Solver(dim=self.dim, integrator=integrator,
+                             kernel=kernel, **kw)
+
+    def get_equations(self):
+        from pysph.sph.equation import Group
+        equations = []
+        g1 = []
+        if self.solids is not None:
+            all = self.bodies + self.solids
+        else:
+            all = self.bodies
+
+        for name in self.bodies:
+            g1.append(
+                BodyForce(dest=name, sources=None, gx=self.gx, gy=self.gy,
+                          gz=self.gz))
+        equations.append(Group(equations=g1, real=False))
+
+        g2 = []
+        for name in self.bodies:
+            g2.append(
+                RigidBodyCollision(dest=name, sources=all, kn=self.kn,
+                                   mu=self.mu, en=self.en))
+        equations.append(Group(equations=g2, real=False))
+
+        g3 = []
+        for name in self.bodies:
+            g3.append(SumUpExternalForces(dest=name, sources=None))
+        equations.append(Group(equations=g3, real=False))
+
+        return equations
+
+
+###################################################
+# Optimized rigid body simulation using quaternion#
+###################################################
+def get_particle_array_rigid_body_quaternion_optimized(constants=None,
+                                                       **props):
+    extra_props = [
+        'fx', 'fy', 'fz', 'dx0', 'dy0', 'dz0', 'nx0', 'ny0', 'nz0', 'nx', 'ny',
+        'nz', 'x0', 'y0', 'z0', 'u0', 'v0', 'w0'
+    ]
+
+    body_id = props.pop('body_id', None)
+    nb = 1 if body_id is None else numpy.max(body_id) + 1
+
+    dem_id = props.pop('dem_id', None)
+
+    consts = {
+        'total_mass': numpy.zeros(nb, dtype=float),
+        'cm': numpy.zeros(3*nb, dtype=float),
+        'cm0': numpy.zeros(3*nb, dtype=float),
+        'q': [1., 0., 0., 0.] * nb,
+        'q0': [1., 0., 0., 0.] * nb,
+        'qdot': numpy.zeros(4*nb, dtype=float),
+        'R': [1., 0., 0., 0., 1., 0., 0., 0., 1.] * nb,
+        # moment of inertia in body frame about principal axis
+        'mibp': numpy.zeros(3*nb, dtype=float),
+        # moment of inertia inverse in body frame
+        'mib': numpy.zeros(9*nb, dtype=float),
+        # moment of inertia inverse in global frame
+        'mig': numpy.zeros(9*nb, dtype=float),
+        # total force at the center of mass
+        'force': numpy.zeros(3*nb, dtype=float),
+        # torque about the center of mass
+        'torque': numpy.zeros(3*nb, dtype=float),
+        # velocity, acceleration of CM.
+        'vc': numpy.zeros(3*nb, dtype=float),
+        'vc0': numpy.zeros(3*nb, dtype=float),
+        # angular velocity in global frame
+        'omega': numpy.zeros(3*nb, dtype=float),
+        'omega0': numpy.zeros(3*nb, dtype=float),
+        'nb': nb
+    }
+
+    if constants:
+        consts.update(constants)
+
+    pa = get_particle_array(constants=consts, additional_props=extra_props,
+                            **props)
+    pa.add_property('body_id', type='int', data=body_id)
+    pa.add_property('dem_id', type='int', data=dem_id)
+
+    setup_quaternion_rigid_body_optimized(pa)
+
+    pa.set_output_arrays(['x', 'y', 'z', 'u', 'v', 'w', 'fx', 'fy', 'fz', 'm',
+                          'body_id'])
+    return pa
+
+
+class RK2StepRigidBodyQuaternionsOptimized(IntegratorStep):
+    def py_initialize(self, dst, t, dt):
+        for i in range(dst.nb[0]):
+            for j in range(3):
+                # save the center of mass and center of mass velocity
+                dst.cm0[3*i+j] = dst.cm[3*i+j]
+                dst.vc0[3*i+j] = dst.vc[3*i+j]
+
+                # save the current angular momentum
+                dst.omega0[3*i+j] = dst.omega[3*i+j]
+
+            # save the current orientation
+            for j in range(4):
+                dst.q0[4*i+j] = dst.q[4*i+j]
+
+    def initialize(self):
+        pass
+
+    def py_stage1(self, dst, t, dt):
+        dtb2 = dt / 2.
+        for i in range(dst.nb[0]):
+            i3 = 3 * i
+            i9 = 9 * i
+            i4 = 9 * i
+            for j in range(3):
+                # using velocity at t, move position
+                # to t + dt/2.
+                dst.cm[i3+j] = dst.cm[i3+j] + dtb2 * dst.vc[i3+j]
+                dst.vc[i3+j] = dst.vc[i3+j] + dtb2 * dst.force[i3+j] / dst.total_mass[i]
+
+            # change in quaternion
+            delta_quat = np.array([0., 0., 0., 0.])
+            # angular velocity magnitude
+            omega_magn = sqrt(dst.omega[i3]**2 + dst.omega[i3+1]**2 +
+                              dst.omega[i3+2]**2)
+            axis_rot = np.array([0., 0., 0.])
+            if omega_magn > 1e-12:
+                axis_rot = dst.omega[i3:i3+3] / omega_magn
+            delta_quat[0] = cos(omega_magn * dtb2 * 0.5)
+            delta_quat[1] = axis_rot[0] * sin(omega_magn * dtb2 * 0.5)
+            delta_quat[2] = axis_rot[1] * sin(omega_magn * dtb2 * 0.5)
+            delta_quat[3] = axis_rot[2] * sin(omega_magn * dtb2 * 0.5)
+
+            # convert the angular velocity and torque to body frame
+            # Currently the orientation is at time t
+            R = dst.R[i9:i9+9].reshape(3, 3)
+            ob = np.matmul(R.transpose(), dst.omega[i3:i3+3])
+            tb = np.matmul(R.transpose(), dst.torque[i3:i3+3])
+            mibp_i = dst.mibp[i3:i3+3]
+
+            ob_dot = np.array([0., 0., 0.])
+            ob_dot[0] = mibp_i[0] * (tb[0] - (mibp_i[2] - mibp_i[1]) *
+                                     ob[2] * ob[1])
+            ob_dot[1] = mibp_i[1] * (tb[1] - (mibp_i[0] - mibp_i[2]) *
+                                     ob[0] * ob[2])
+            ob_dot[2] = mibp_i[2] * (tb[2] - (mibp_i[1] - mibp_i[0]) *
+                                     ob[1] * ob[0])
+
+            # convert the rate of change of angular velocity from
+            # body frame to global frame
+            og_dot = np.matmul(R, ob_dot)
+            # increment the angular velocity to next time step
+            dst.omega[i3:i3+3] = dst.omega0[i3:i3+3] + og_dot * dtb2
+
+            # using the computed net change rotation of quaternion
+            # update the orientation to next time step
+            res = np.array([0., 0., 0., 0.])
+            quaternion_multiplication(dst.q[i4:i4+4], delta_quat, res)
+            dst.q[i4:i4+4] = res
+
+            # normalize the orientation
+            normalize_q_orientation(dst.q[i4:i4+4])
+
+            # get the rotation matrix from quaternion
+            quaternion_to_matrix(dst.q[i4:i4+4], dst.R[i9:i9+9])
+
+    def stage1(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,
+               d_cm, d_vc, d_R, d_omega, d_body_id):
+        # some variables to update the positions seamlessly
+        bid, i9, i3 = declare('int', 3)
+        bid = d_body_id[d_idx]
+        i9 = 9 * bid
+        i3 = 3 * bid
+
+        ###########################
+        # Update position vectors #
+        ###########################
+        # rotate the position of the vector in the body frame to global frame
+        dx = (d_R[i9+0] * d_dx0[d_idx] + d_R[i9+1] * d_dy0[d_idx] +
+              d_R[i9+2] * d_dz0[d_idx])
+        dy = (d_R[i9+3] * d_dx0[d_idx] + d_R[i9+4] * d_dy0[d_idx] +
+              d_R[i9+5] * d_dz0[d_idx])
+        dz = (d_R[i9+6] * d_dx0[d_idx] + d_R[i9+7] * d_dy0[d_idx] +
+              d_R[i9+8] * d_dz0[d_idx])
+
+        d_x[d_idx] = d_cm[i3+0] + dx
+        d_y[d_idx] = d_cm[i3+1] + dy
+        d_z[d_idx] = d_cm[i3+2] + dz
+
+        ###########################
+        # Update velocity vectors #
+        ###########################
+        # here du, dv, dw are velocities due to angular velocity
+        # dV = omega \cross dr
+        # where dr = x - cm
+        du = d_omega[i3+1] * dz - d_omega[i3+2] * dy
+        dv = d_omega[i3+2] * dx - d_omega[i3+0] * dz
+        dw = d_omega[i3+0] * dy - d_omega[i3+1] * dx
+
+        d_u[d_idx] = d_vc[i3+0] + du
+        d_v[d_idx] = d_vc[i3+1] + dv
+        d_w[d_idx] = d_vc[i3+2] + dw
+
+    def py_stage2(self, dst, t, dt):
+        for i in range(dst.nb[0]):
+            i3 = 3 * i
+            i9 = 9 * i
+            i4 = 9 * i
+            for j in range(3):
+                # using velocity at t, move position
+                # to t + dt/2.
+                dst.cm[i3+j] = dst.cm0[i3+j] + dt * dst.vc[i3+j]
+                dst.vc[i3+j] = dst.vc0[i3+j] + dt * dst.force[i3+j] / dst.total_mass[i]
+
+            # change in quaternion
+            delta_quat = np.array([0., 0., 0., 0.])
+            # angular velocity magnitude
+            omega_magn = sqrt(dst.omega[i3]**2 + dst.omega[i3+1]**2 +
+                              dst.omega[i3+2]**2)
+            axis_rot = np.array([0., 0., 0.])
+            if omega_magn > 1e-12:
+                axis_rot = dst.omega[i3:i3+3] / omega_magn
+            delta_quat[0] = cos(omega_magn * dt * 0.5)
+            delta_quat[1] = axis_rot[0] * sin(omega_magn * dt * 0.5)
+            delta_quat[2] = axis_rot[1] * sin(omega_magn * dt * 0.5)
+            delta_quat[3] = axis_rot[2] * sin(omega_magn * dt * 0.5)
+
+            # convert the angular velocity and torque to body frame
+            # Currently the orientation is at time t
+            R = dst.R[i9:i9+9].reshape(3, 3)
+            ob = np.matmul(R.transpose(), dst.omega[i3:i3+3])
+            tb = np.matmul(R.transpose(), dst.torque[i3:i3+3])
+            mibp_i = dst.mibp[i3:i3+3]
+
+            ob_dot = np.array([0., 0., 0.])
+            ob_dot[0] = mibp_i[0] * (tb[0] - (mibp_i[2] - mibp_i[1]) *
+                                     ob[2] * ob[1])
+            ob_dot[1] = mibp_i[1] * (tb[1] - (mibp_i[0] - mibp_i[2]) *
+                                     ob[0] * ob[2])
+            ob_dot[2] = mibp_i[2] * (tb[2] - (mibp_i[1] - mibp_i[0]) *
+                                     ob[1] * ob[0])
+
+            # convert the rate of change of angular velocity from
+            # body frame to global frame
+            og_dot = np.matmul(R, ob_dot)
+            # increment the angular velocity to next time step
+            dst.omega[i3:i3+3] = dst.omega0[i3:i3+3] + og_dot * dt
+
+            # using the computed net change rotation of quaternion
+            # update the orientation to next time step
+            res = np.array([0., 0., 0., 0.])
+            quaternion_multiplication(dst.q0[i4:i4+4], delta_quat, res)
+            dst.q[i4:i4+4] = res
+
+            # normalize the orientation
+            normalize_q_orientation(dst.q[i4:i4+4])
+
+            # get the rotation matrix from quaternion
+            quaternion_to_matrix(dst.q[i4:i4+4], dst.R[i9:i9+9])
+
+    def stage2(self, d_idx, d_x, d_y, d_z, d_u, d_v, d_w, d_dx0, d_dy0, d_dz0,
+               d_cm, d_vc, d_R, d_omega, d_body_id):
+        # some variables to update the positions seamlessly
+        bid, i9, i3 = declare('int', 3)
+        bid = d_body_id[d_idx]
+        i9 = 9 * bid
+        i3 = 3 * bid
+
+        ###########################
+        # Update position vectors #
+        ###########################
+        # rotate the position of the vector in the body frame to global frame
+        dx = (d_R[i9+0] * d_dx0[d_idx] + d_R[i9+1] * d_dy0[d_idx] +
+              d_R[i9+2] * d_dz0[d_idx])
+        dy = (d_R[i9+3] * d_dx0[d_idx] + d_R[i9+4] * d_dy0[d_idx] +
+              d_R[i9+5] * d_dz0[d_idx])
+        dz = (d_R[i9+6] * d_dx0[d_idx] + d_R[i9+7] * d_dy0[d_idx] +
+              d_R[i9+8] * d_dz0[d_idx])
+
+        d_x[d_idx] = d_cm[i3+0] + dx
+        d_y[d_idx] = d_cm[i3+1] + dy
+        d_z[d_idx] = d_cm[i3+2] + dz
+
+        ###########################
+        # Update velocity vectors #
+        ###########################
+        # here du, dv, dw are velocities due to angular velocity
+        # dV = omega \cross dr
+        # where dr = x - cm
+        du = d_omega[i3+1] * dz - d_omega[i3+2] * dy
+        dv = d_omega[i3+2] * dx - d_omega[i3+0] * dz
+        dw = d_omega[i3+0] * dy - d_omega[i3+1] * dx
+
+        d_u[d_idx] = d_vc[i3+0] + du
+        d_v[d_idx] = d_vc[i3+1] + dv
+        d_w[d_idx] = d_vc[i3+2] + dw
+
+
+class RigidBodyQuaternionsOptimizedScheme(Scheme):
+    def __init__(self, bodies, solids, dim, kn, mu=0.5, en=1.0, gx=0.0,
+                 gy=0.0, gz=0.0, debug=False):
+        self.bodies = bodies
+        self.solids = solids
+        self.dim = dim
+        self.kn = kn
+        self.mu = mu
+        self.en = en
+        self.gx = gx
+        self.gy = gy
+        self.gz = gz
+        self.debug = debug
+
+    def configure_solver(self, kernel=None, integrator_cls=None,
+                         extra_steppers=None, **kw):
+        from pysph.base.kernels import CubicSpline
+        from pysph.sph.integrator import EPECIntegrator
+        from pysph.solver.solver import Solver
+        if kernel is None:
+            kernel = CubicSpline(dim=self.dim)
+
+        steppers = {}
+        if extra_steppers is not None:
+            steppers.update(extra_steppers)
+
+        for body in self.bodies:
+            if body not in steppers:
+                steppers[body] = RK2StepRigidBodyQuaternionsOptimized()
 
         cls = integrator_cls if integrator_cls is not None else EPECIntegrator
         integrator = cls(**steppers)
