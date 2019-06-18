@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial.transform import Rotation as Rot
 
 
 def normalize_q_orientation(q):
@@ -270,8 +271,14 @@ def set_mi_in_body_frame_quaternion_optimized(pa):
         pa.mibp[3 * i:3 * i + 3] = 1. / vals
 
         # get the quaternion from the rotation matrix
-        q = np.array([0., 0., 0., 0.])
-        rotation_mat_to_quat(R, q)
+        r = Rot.from_dcm(R.reshape(3, 3))
+        q_tmp = r.as_quat()
+        q = np.zeros(4)
+        q[0] = q_tmp[3]
+        q[1] = q_tmp[0]
+        q[2] = q_tmp[1]
+        q[3] = q_tmp[2]
+
         normalize_q_orientation(q)
         pa.q[4 * i:4 * i + 4] = q
 
