@@ -15,9 +15,11 @@ from pysph.solver.application import Application
 from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
     RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
+    RigidBodyQuaternionsOptimizedScheme,
     get_particle_array_rigid_body_rotation_matrix,
     get_particle_array_rigid_body_quaternion,
-    get_particle_array_rigid_body_rotation_matrix_optimized)
+    get_particle_array_rigid_body_rotation_matrix_optimized,
+    get_particle_array_rigid_body_quaternion_optimized)
 
 from pysph.examples.solid_mech.impact import add_properties
 
@@ -110,6 +112,21 @@ class Case2(Application):
             add_properties(body2, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+
+        elif self.options.scheme == 'rbqos':
+            body1 = get_particle_array_rigid_body_quaternion_optimized(
+                name='body1', x=body1.x, y=body1.y, h=body1.h, m=body1.m,
+                rad_s=body1.rad_s)
+            body1.omega[2] = -3.
+            add_properties(body1, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+            body2 = get_particle_array_rigid_body_quaternion_optimized(
+                name='body2', x=body2.x, y=body2.y, h=body2.h, m=body2.m,
+                rad_s=body2.rad_s)
+            add_properties(body2, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
         return [body1, body2]
 
     def create_scheme(self):
@@ -125,8 +142,11 @@ class Case2(Application):
         rbrmos = RigidBodyRotationMatricesOptimizedScheme(
             bodies=['body1', 'body2'], solids=None, dim=self.dim, kn=self.kn,
             mu=self.mu, en=self.en)
+        rbqos = RigidBodyQuaternionsOptimizedScheme(
+            bodies=['body1', 'body2'], solids=None, dim=self.dim, kn=self.kn,
+            mu=self.mu, en=self.en)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
-                          rbrmos=rbrmos)
+                          rbrmos=rbrmos, rbqos=rbqos)
         return s
 
     def configure_scheme(self):

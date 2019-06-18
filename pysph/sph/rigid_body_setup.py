@@ -1,6 +1,11 @@
 import numpy as np
 
 
+def normalize_q_orientation(q):
+    norm_q = np.sqrt(q[0]**2 + q[1]**2 + q[2]**2 + q[3]**2)
+    q[:] = q[:] / norm_q
+
+
 def set_total_mass(pa):
     # left limit of body i
     for i in range(max(pa.body_id) + 1):
@@ -267,6 +272,7 @@ def set_mi_in_body_frame_quaternion_optimized(pa):
         # get the quaternion from the rotation matrix
         q = np.array([0., 0., 0., 0.])
         rotation_mat_to_quat(R, q)
+        normalize_q_orientation(q)
         pa.q[4 * i:4 * i + 4] = q
 
         # also set the rotation matrix
