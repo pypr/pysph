@@ -1995,7 +1995,7 @@ class RK2StepRigidBodyQuaternionsOptimized(IntegratorStep):
         for i in range(dst.nb[0]):
             i3 = 3 * i
             i9 = 9 * i
-            i4 = 9 * i
+            i4 = 4 * i
             for j in range(3):
                 # using velocity at t, move position
                 # to t + dt/2.
@@ -2089,7 +2089,7 @@ class RK2StepRigidBodyQuaternionsOptimized(IntegratorStep):
         for i in range(dst.nb[0]):
             i3 = 3 * i
             i9 = 9 * i
-            i4 = 9 * i
+            i4 = 4 * i
             for j in range(3):
                 # using velocity at t, move position
                 # to t + dt/2.
