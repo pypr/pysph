@@ -14,6 +14,7 @@ from pysph.sph.rigid_body import (
     RigidBodySimpleScheme, RigidBodyRotationMatricesScheme,
     RigidBodyQuaternionScheme, RigidBodyRotationMatricesOptimizedScheme,
     RigidBodyQuaternionsOptimizedScheme,
+    RigidBodyRotationMatricesCompyleScheme,
     get_particle_array_rigid_body_rotation_matrix,
     get_particle_array_rigid_body_quaternion,
     get_particle_array_rigid_body_rotation_matrix_optimized,
@@ -47,8 +48,11 @@ class Case0(Application):
         rbqos = RigidBodyQuaternionsOptimizedScheme(
             bodies=['body'], solids=None, dim=3, kn=self.kn, mu=self.mu,
             en=self.en)
+        rbrmcs = RigidBodyRotationMatricesCompyleScheme(
+            bodies=['body'], solids=None, dim=3, kn=self.kn, mu=self.mu,
+            en=self.en)
         s = SchemeChooser(default='rbss', rbss=rbss, rbrms=rbrms, rbqs=rbqs,
-                          rbrmos=rbrmos, rbqos=rbqos)
+                          rbrmos=rbrmos, rbqos=rbqos, rbrmcs=rbrmcs)
         return s
 
     def configure_scheme(self):
@@ -101,6 +105,14 @@ class Case0(Application):
             add_properties(body, 'tang_velocity_z', 'tang_disp_y',
                            'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
                            'tang_disp_z')
+
+        if self.options.scheme == 'rbrmcs':
+            body = get_particle_array_rigid_body_rotation_matrix(
+                name='body', x=x, y=y, z=z, h=h, m=m, rad_s=rad_s)
+            add_properties(body, 'tang_velocity_z', 'tang_disp_y',
+                           'tang_velocity_x', 'tang_disp_x', 'tang_velocity_y',
+                           'tang_disp_z')
+
         body.vc[0] = 0.5
         body.vc[1] = 0.5
         body.omega[2] = 1.
